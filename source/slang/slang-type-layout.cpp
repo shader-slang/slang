@@ -1570,6 +1570,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
@@ -1771,11 +1772,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -1829,19 +1830,19 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -2336,7 +2337,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (const auto varRefVal = as<GenericParamIntVal>(val))
+    else if (const auto varRefVal = as<DeclRefIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -2349,6 +2350,10 @@ static LayoutSize GetElementCount(IntVal* val)
         return 0;
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    {
+        return 0;
+    }
+    else if (as<FuncCallIntVal>(val))
     {
         return 0;
     }
@@ -4582,7 +4587,7 @@ static TypeLayoutResult _updateLayout(
     if (layoutResultPtr)
     {
         // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        SLANG_ASSERT(layoutResultPtr->layout == result.layout);
         // Update the info
         layoutResultPtr->info = result.info;
     }
@@ -4941,6 +4946,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto optionalType = as<OptionalType>(type))
     {
         // OptionalType should be laid out the same way as Tuple<T, bool>.
+        if (isNullableType(optionalType->getValueType()))
+            return _createTypeLayout(context, optionalType->getValueType());
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());

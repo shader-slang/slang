@@ -314,6 +314,23 @@ IRIntegerValue getIntVal(IRInst* inst)
     }
 }
 
+IRIntegerValue getArraySizeVal(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+        return static_cast<IRConstant*>(inst)->value.intVal;
+        break;
+    default:
+        // Treat specialization constant array as the unsized array here.
+        if (isSpecConstRateType(inst->getFullType()))
+            return kUnsizedArrayMagicLength;
+
+        SLANG_UNEXPECTED("needed a known integer value");
+        UNREACHABLE_RETURN(0);
+    }
+}
+
 // IRCapabilitySet
 
 CapabilitySet IRCapabilitySet::getCaps()
@@ -601,6 +618,12 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         // defer <deferBlock> <mergeBlock> <scopeEndBlock>
         begin = operands + 0;
         end = begin + 1;
+        break;
+
+    case kIROp_TryCall:
+        // tryCall <successBlock> <failBlock> <callee> <args>...
+        begin = operands + 0;
+        end = begin + 2;
         break;
 
     default:
@@ -1804,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -2510,7 +2533,8 @@ static void addGlobalValue(IRBuilder* builder, IRInst* value)
     //
     if (value->parent)
     {
-        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        SLANG_ASSERT(
+            getIROpInfo(value->getOp()).isHoistable() || isSpecConstRateType(value->getFullType()));
         return;
     }
 
@@ -3194,6 +3218,10 @@ IRActualGlobalRate* IRBuilder::getActualGlobalRate()
 {
     return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
 }
+IRSpecConstRate* IRBuilder::getSpecConstRate()
+{
+    return (IRSpecConstRate*)getType(kIROp_SpecConstRate);
+}
 
 IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)
 {
@@ -3365,6 +3393,13 @@ IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSli
     IRInst* args[] = {getStringValue(fileName), getStringValue(source)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
 }
+IRInst* IRBuilder::emitDebugBuildIdentifier(
+    UnownedStringSlice buildIdentifier,
+    IRIntegerValue flags)
+{
+    IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
@@ -3483,6 +3518,14 @@ IRLiveRangeEnd* IRBuilder::emitLiveRangeEnd(IRInst* referenced)
 IRInst* IRBuilder::emitExtractExistentialValue(IRType* type, IRInst* existentialValue)
 {
     auto inst = createInst<IRInst>(this, kIROp_ExtractExistentialValue, type, 1, &existentialValue);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitIsNullExistential(IRInst* existentialValue)
+{
+    auto inst =
+        createInst<IRInst>(this, kIROp_IsNullExistential, getBoolType(), 1, &existentialValue);
     addInst(inst);
     return inst;
 }
@@ -4440,6 +4483,12 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
         break;
     }
     return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
+}
+
+IRInst* IRBuilder::emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func)
+{
+    IRInst* args[] = {tuple, func};
+    return emitIntrinsicInst(type, kIROp_CoopMatMapElementIFunc, 2, args);
 }
 
 IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
@@ -8586,6 +8635,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
+    case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
     case kIROp_MakeVectorFromScalar:
@@ -8616,6 +8666,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:

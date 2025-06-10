@@ -446,9 +446,65 @@ int caller()
 }
 ```
 
+## `Conditional<T, bool condition>` Type
+
+A `Conditional` type can be used to define struct fields that can be specialized away. If `condition` is `false`, the field will be removed
+by the compiler from the target code. This is useful for scenarios where a developer would like to make sure a field is not defined in a
+specialized shader variant when it is not used by the shader.
+
+For example, a common use case is to define the vertex shader output / fragment shader input:
+
+```slang
+interface IVertex
+{
+    property float3 position{get;}
+    property Optional<float3> normal{get;}
+    property Optional<float3> color{get;}
+}
+
+struct Vertex<bool hasNormal, bool hasColor> : IVertex
+{
+    private float3 m_position;
+    private Conditional<float3, hasNormal> m_normal;
+    private Conditional<float3, hasColor> m_color;
+
+    __init(float3 position, float3 normal, float3 color)
+    {
+        m_position = position;
+        m_normal = normal;
+        m_color = color;
+    }
+
+    property float3 position
+    {
+        get { return m_position; }
+    }
+    property Optional<float3> normal
+    {
+        get { return m_normal; }
+    }
+    property Optional<float3> color
+    {
+        get { return m_color; }
+    }
+}
+```
+
+In this example, `Vertex` type is parameterized on `hasNormal` and `hasColor`. If `hasNormal` is false, the `m_normal` field will be eliminated in the target code, allowing a specialized vertex shader to declare minimum output fields. For example, a vertex shader
+can be defined as follows:
+
+```slang
+[shader("vertex")]
+Vertex<hasNormal, hasColor> vertMain<bool hasNormal, bool hasColor>(VertexIn inputVertex)
+{
+    ...
+}
+```
+
+
 ## `if_let` syntax
-Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` value. The syntax is similar to Rust's
-`if let` syntax, the value expression must be an `Optional<T>` type, for example:
+Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
+`if let` syntax, the value expression must be an `Optional<T>` or `Conditional<T, hasValue>` type, for example:
 
 ```csharp
 Optional<int> getOptInt() { ... }
@@ -521,7 +577,7 @@ int invalidTest()
 }
 ```
 
-Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
@@ -604,6 +660,22 @@ When targeting SPIRV, Slang will introduce a global array of descriptors and fet
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
+Default behavior assigns binding-indicies based on descriptor types:
+
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                | Other                                     | 3             |
+
+> `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
+
 > #### Note
 > The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
 > equivalent to D3D's `ResourceDescriptorHeap` construct.
@@ -653,8 +725,44 @@ interface IOpaqueDescriptor
 The user can call `defaultGetDescriptorFromHandle` function from their implementation of
 `getDescriptorFromHandle` to dispatch to the default behavior.
 
-The `kind` and `descriptorAccess` constants allows user code to fetch from different locations
-depending on the type and access of the resource being requested. The `DescriptorKind` and
+Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whose type is `constexpr BindlessDescriptorOptions`. This parameter allows to specify alternative standard presets for how bindless-indexes are assigned. Note that this is currently only relevant to SPIRV:
+ ```slang
+public enum BindlessDescriptorOptions
+{
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
+}
+ ```
+
+`None` provides the following bindings for descriptor types:
+
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
+| Unknown                | Other                                     | 8             |
+
+`VkMutable` provides the following bindings for descriptor types:
+
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                | Other                                     | 3             |
+
+The `kind` and `descriptorAccess` constants allows user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
 `DescriptorAccess` enums are defined as:
 
 ```slang
@@ -666,6 +774,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -691,6 +800,8 @@ void test(DescriptorHandle<Texture2D> t)
 
 If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
 undefined.
+
+
 
 Extensions
 --------------------
@@ -754,6 +865,71 @@ by using the `[ForceInline]` decoration:
 int f(int x) { return x + 1; }
 ```
 
+Error handling
+-----------------
+
+Slang supports an error handling mechanism that is superficially similar to
+exceptions in many other languages, but has some unique characteristics.
+
+In contrast to C++ exceptions, this mechanism makes the control flow of errors
+more explicit, and the performance charasteristics are similar to adding an
+if-statement after every potentially throwing function call to check and handle
+the error.
+
+In order to be able to throw an error, a function must declare the type of that
+error with `throws`:
+```
+enum MyError
+{
+    Failure,
+    CatastrophicFailure
+}
+
+int f() throws MyError
+{
+    if (computerIsBroken())
+        throw MyError.CatastrophicFailure;
+    return 42;
+}
+```
+Currently, functions may only throw a single type of error.
+
+To call a function that may throw, you must prepend it with `try`:
+
+```
+let result = try f();
+```
+
+If you don't catch the `try`, related errors are re-thrown and the calling
+function must declare that it `throws` that error type:
+
+```
+void g() throws MyError
+{
+    // This would not compile if `g()` wasn't declared to throw MyError as well.
+    let result = try f();
+    printf("Success: %d\n", result);
+}
+```
+
+To catch an error, you can use a `do-catch` statement:
+
+```
+void g()
+{
+    do
+    {
+        let result = try f();
+        printf("Success: %d\n", result);
+    }
+    catch(err: MyError)
+    {
+        printf("Not good!\n");
+    }
+}
+```
+
+You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------

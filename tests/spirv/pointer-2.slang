@@ -44,7 +44,7 @@ ConstantBuffer<PushConstants> constantBuffer;
 // CHECK_SPV_VIA_GLSL: OpTypePointer PhysicalStorageBuffer
 
 [shader("vertex")]
-VSOutput vertexMain(int vertexIndex: SV_VertexID)
+VSOutput vertexMain(int vertexIndex: SV_VulkanVertexID)
 {
     //
     // Test field access chains.

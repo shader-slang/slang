@@ -17,11 +17,11 @@ layout(shaderRecordNV) ConstantBuffer<MyStruct> myStruct : register(b0, space1);
 ConstantBuffer<MyStruct> myStruct1 : register(b1, space1);
 
 // Storage buffer
-RWStructuredBuffer<MyStruct> myStruct2 : register(b2, space1);
+RWStructuredBuffer<MyStruct> myStruct2 : register(u2, space1);
 
 // UniformConstant
-Texture2D<float>    texture: register(b3, space1);
-SamplerState        sampler: register(b4, space1);
+Texture2D<float>    texture: register(t3, space1);
+SamplerState        sampler: register(s4, space1);
 
 [shader("anyhit")]
 void main(out float3 pos)

@@ -492,6 +492,8 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
+    Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -553,6 +555,17 @@ struct AstOrIRType
     explicit operator bool() { return astType || irType; }
 };
 
+struct CatchHandler
+{
+    // 'nullptr' implies catch-all.
+    IRType* errorType = nullptr;
+
+    // Block of the handler statement. Takes a value of errorType as parameter.
+    IRBlock* errorHandler = nullptr;
+
+    CatchHandler* prev = nullptr;
+};
+
 struct IRGenContext
 {
     ASTBuilder* astBuilder;
@@ -596,6 +609,9 @@ struct IRGenContext
 
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
+
+    // A chain of nested `catch` handlers for `try` and `throw.
+    CatchHandler* catchHandler = nullptr;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -752,6 +768,19 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
     return int32_t(irOp);
 }
 
+static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
+{
+    for (auto handler = context->catchHandler; handler != nullptr;
+         handler = context->catchHandler->prev)
+    {
+        if (!handler->errorType || handler->errorType == type)
+        {
+            return *handler;
+        }
+    }
+    return CatchHandler();
+}
+
 struct TryClauseEnvironment
 {
     TryClauseType clauseType = TryClauseType::None;
@@ -807,18 +836,28 @@ LoweredValInfo emitCallToVal(
         case TryClauseType::Standard:
             {
                 auto callee = getSimpleVal(context, funcVal);
-                auto succBlock = builder->createBlock();
-                auto failBlock = builder->createBlock();
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
                 assert(throwAttr);
+
+                auto handler = findErrorHandler(context, throwAttr->getErrorType());
+                auto succBlock = builder->createBlock();
+                auto failBlock =
+                    handler.errorHandler ? handler.errorHandler : builder->createBlock();
+
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
-                builder->insertBlock(failBlock);
-                auto errParam = builder->emitParam(throwAttr->getErrorType());
-                builder->emitThrow(errParam);
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
+
+                if (!handler.errorHandler)
+                {
+                    // We have to create a default fail block, which just re-throws.
+                    builder->insertBlock(failBlock);
+                    auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    builder->emitThrow(errParam);
+                    builder->setInsertInto(succBlock);
+                }
                 return LoweredValInfo::simple(value);
             }
             break;
@@ -1150,6 +1189,13 @@ top:
             if (auto fieldDeclRef = declRef.as<VarDecl>())
             {
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
+                goto top;
+            }
+            else if (auto methodDeclRef = declRef.as<CallableDecl>())
+            {
+                auto funcVal = emitDeclRef(context, declRef, boundMemberInfo->type);
+                SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+                lowered = funcVal;
                 goto top;
             }
             else
@@ -1550,9 +1596,6 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
-
-//
-
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -1565,7 +1608,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
+    LoweredValInfo visitDeclRefIntVal(DeclRefIntVal* val)
     {
         return emitDeclRef(
             context,
@@ -1577,27 +1620,33 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         TryClauseEnvironment tryEnv;
         List<IRInst*> args;
+        IRType* specConstRateType = nullptr;
         for (auto arg : val->getArgs())
         {
             auto loweredArg = lowerVal(context, arg);
             args.add(loweredArg.val);
+            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
+                specConstRateType = loweredArg.val->getFullType();
         }
         auto funcType = lowerType(context, val->getFuncType());
-        return emitCallToDeclRef(
-            context,
-            as<IRFuncType>(funcType)->getResultType(),
-            val->getFuncDeclRef(),
-            funcType,
-            args,
-            tryEnv);
+        auto funcResType = maybeAddRateType(
+            getBuilder(),
+            specConstRateType,
+            as<IRFuncType>(funcType)->getResultType());
+        auto resVal =
+            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
+        return resVal;
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
+
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
-        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        return resVal;
     }
 
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
@@ -1623,12 +1672,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
+                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
                 }
             }
-            resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
+            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
+    }
+
+    LoweredValInfo visitSizeOfIntVal(SizeOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitSizeOf(typeArg);
+        return LoweredValInfo::simple(count);
+    }
+
+    LoweredValInfo visitAlignOfIntVal(AlignOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitAlignOf(typeArg);
+        return LoweredValInfo::simple(count);
     }
 
     LoweredValInfo visitCountOfIntVal(CountOfIntVal* val)
@@ -1961,8 +2026,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         else
         {
             auto errorType = lowerType(context, type->getErrorType());
+            IRInst* operands[] = {errorType};
             auto irThrowFuncTypeAttribute =
-                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, operands);
             return getBuilder()->getFuncType(
                 paramCount,
                 paramTypes.getBuffer(),
@@ -2056,8 +2122,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         if (!type->isUnsized())
         {
-            auto elementCount = lowerSimpleVal(context, type->getElementCount());
-            return getBuilder()->getArrayType(elementType, elementCount);
+            return getBuilder()->getArrayType(
+                elementType,
+                lowerSimpleVal(context, type->getElementCount()));
         }
         else
         {
@@ -2445,6 +2512,13 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     {
         inst->setFullType(
             builder->getRateQualifiedType(builder->getActualGlobalRate(), inst->getFullType()));
+    }
+    else if (
+        decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+    {
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
     }
 }
 
@@ -3420,9 +3494,9 @@ void _lowerFuncDeclBaseTypeInfo(
     if (!getErrorCodeType(context->astBuilder, declRef)
              ->equals(context->astBuilder->getBottomType()))
     {
-        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
-        IRAttr* throwTypeAttr = nullptr;
-        throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+        auto irErrorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        IRInst* operands[] = {irErrorType};
+        IRAttr* throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, operands);
         outInfo.type = builder->getFuncType(
             paramTypes.getCount(),
             paramTypes.getBuffer(),
@@ -4517,9 +4591,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
             RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type = nullptr;
+            boundMemberInfo->type =
+                lowerType(context, getResultType(context->astBuilder, callableDeclRef));
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
+
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -4598,6 +4675,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo visitParenExpr(ParenExpr* expr) { return lowerSubExpr(expr->base); }
+
+    LoweredValInfo visitTupleExpr(TupleExpr* expr)
+    {
+        List<IRInst*> elements;
+        for (auto element : expr->elements)
+        {
+            auto elementVal = getSimpleVal(context, lowerSubExpr(element));
+            if (auto makeValPack = as<IRMakeValuePack>(elementVal))
+            {
+                // If the element is a value pack, we need to flatten it out
+                // into the tuple.
+                for (UInt i = 0; i < makeValPack->getOperandCount(); ++i)
+                {
+                    elements.add(makeValPack->getOperand(i));
+                }
+                continue;
+            }
+            elements.add(elementVal);
+        }
+        auto irMakeTuple =
+            getBuilder()->emitMakeTuple((UInt)elements.getCount(), elements.getBuffer());
+        return LoweredValInfo::simple(irMakeTuple);
+    }
 
     LoweredValInfo visitPackExpr(PackExpr* expr)
     {
@@ -4823,6 +4923,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             SLANG_ASSERT(type);
             return getDefaultVal(type);
         }
+    }
+
+    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irDefaultElement = getSimpleVal(
+            context,
+            getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
     }
 
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
@@ -6627,6 +6738,117 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         builder->insertBlock(mergeBlock);
         builder->setInsertInto(mergeBlock);
+    }
+
+    void visitThrowStmt(ThrowStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        auto loweredExpr = lowerRValueExpr(context, stmt->expression);
+        auto loweredVal = getSimpleVal(context, loweredExpr);
+        auto throwType = lowerType(context, stmt->expression->type);
+
+        CatchHandler handler;
+        if (loweredVal && throwType)
+        {
+            handler = findErrorHandler(context, throwType);
+        }
+
+        if (handler.errorHandler)
+        {
+            builder->emitBranch(handler.errorHandler, 1, &loweredVal);
+        }
+        else
+        {
+            builder->emitThrow(getSimpleVal(context, loweredExpr));
+        }
+    }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        // The mental model here is that the below Catch statement:
+        //
+        // let val = try MayThrowFunc();
+        // // Do stuff with val
+        // catch(err: Error)
+        // {
+        //     catchBlock(err);
+        // }
+        //
+        // lowers similarly to:
+        //
+        // handlerLoop: for(;;)
+        // {
+        //     E err; // Actually just a parameter for the catchBlock, not a real variable.
+        //     bodyLoop: for(;;)
+        //     {
+        //         // Body goes here
+        //         Result<T, E> r = mayThrowFunc();
+        //         if(isResultError(r))
+        //         {
+        //             err = r.error;
+        //             break bodyLoop;
+        //         }
+        //         let val = r.getSuccessValue();
+        //         // Do stuff with val
+        //         break handlerLoop;
+        //     }
+        //     catchBlock(err);
+        //     break handlerLoop;
+        // }
+        //
+        // This approach allows for it to generate valid SPIR-V. Just jumping
+        // around with unstructured conditional jumps doesn't work there.
+
+        IRBlock* handlerLoopHead = createBlock();
+        IRBlock* handlerBreakLabel = createBlock();
+        IRBlock* bodyLoopHead = createBlock();
+        IRBlock* bodyBreakLabel = createBlock();
+
+        builder->emitLoop(handlerLoopHead, handlerBreakLabel, handlerLoopHead);
+        insertBlock(handlerLoopHead);
+
+        builder->emitLoop(bodyLoopHead, bodyBreakLabel, bodyLoopHead);
+        insertBlock(bodyLoopHead);
+
+        CatchHandler catchHandler;
+        catchHandler.errorType =
+            stmt->errorVar ? lowerType(context, stmt->errorVar->getType()) : nullptr;
+        catchHandler.errorHandler = bodyBreakLabel;
+        catchHandler.prev = context->catchHandler;
+        context->catchHandler = &catchHandler;
+
+        // Note that the tryBody doesn't actually have to have it's own scope or
+        // block. If there's a `defer` in the tryBody, it can run after the
+        // catch statement.
+        lowerStmt(context, stmt->tryBody);
+
+        // Put break; at the end of the body if there's nothing else there yet.
+        // This prevents the catch handler from running.
+        emitBranchIfNeeded(handlerBreakLabel);
+
+        context->catchHandler = catchHandler.prev;
+
+        insertBlock(bodyBreakLabel);
+
+        if (catchHandler.errorType)
+        {
+            auto irParam = builder->emitParam(catchHandler.errorType);
+            auto paramVal = LoweredValInfo::simple(irParam);
+            context->setGlobalValue(stmt->errorVar, paramVal);
+        }
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(handlerBreakLabel);
+        lowerStmt(context, stmt->handleBody);
+        popScopeBlock(prevScopeEndBlock, true);
+
+        emitBranchIfNeeded(handlerBreakLabel);
+
+        insertBlock(handlerBreakLabel);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)
@@ -8494,6 +8716,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
+            subContextStorage.catchHandler = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -11833,9 +12056,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     }
 
 #if 0
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 

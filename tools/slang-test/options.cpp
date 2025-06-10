@@ -1,4 +1,4 @@
-// test-context.cpp
+// options.cpp
 #include "options.h"
 
 #include "../../source/core/slang-io.h"
@@ -88,6 +88,12 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+        "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
+        "                                 and Debug Device for DX\n"
+#if _DEBUG
+        "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
+        "build)\n"
+#endif
         "\n"
         "Output modes:\n"
         "  -appveyor                      Use AppVeyor output format\n"
@@ -115,6 +121,19 @@ static bool _isSubCommand(const char* arg)
     int argCount = argc;
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
+
+#if _DEBUG
+    // Enabling debug layers by default in debug builds.
+    // For DX12 it will use the debug layer, for Vulkan it will enable validation layers.
+    //
+    // CI/CD will explicitly disable this until we address all of VUID errors.
+    // https://github.com/shader-slang/slang/issues/4798
+    //
+    // When you run the Debug build locally, you may see more errors if not disabled with
+    // '-enable-debug-layers false'.
+    //
+    optionsOut->enableDebugLayers = true;
+#endif
 
     // first argument is the application name
     if (argCursor != argEnd)
@@ -406,6 +425,34 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->skipReferenceImageGeneration = true;
         }
+        else if (strcmp(arg, "-enable-debug-layers") == 0)
+        {
+            optionsOut->enableDebugLayers = true;
+
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+
+            // Check for false variants
+            const char* value = *argCursor++;
+            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                value[0] == '0' ||
+                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+            {
+                optionsOut->enableDebugLayers = false;
+            }
+        }
+#if _DEBUG
+        else if (strcmp(arg, "-disable-debug-layers") == 0)
+        {
+            stdError.print("warning: '-disable-debug-layers' is deprecated, use "
+                           "'-enable-debug-layers false'\n");
+            optionsOut->enableDebugLayers = false;
+        }
+#endif
         else
         {
             stdError.print("unknown option '%s'\n", arg);

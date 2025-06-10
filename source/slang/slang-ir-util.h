@@ -388,6 +388,16 @@ void legalizeDefUse(IRGlobalValueWithCode* func);
 UnownedStringSlice getMangledName(IRInst* inst);
 
 bool isFirstBlock(IRInst* inst);
+
+bool isSpecConstRateType(IRType* type);
+void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+bool canOperationBeSpecConst(
+    IROp op,
+    IRType* resultType,
+    IRInst* const* fixedArgs,
+    IRUse* operands);
+bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
 } // namespace Slang
 
 #endif

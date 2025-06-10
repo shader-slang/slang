@@ -30,6 +30,12 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__magic_type(DefaultPushConstantDataLayoutType)
+struct DefaultPushConstantDataLayout : IBufferDataLayout
+{};
+
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
@@ -180,7 +186,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -213,7 +219,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -226,7 +232,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -239,7 +245,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -255,7 +261,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -282,7 +288,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -295,7 +301,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -308,7 +314,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -323,7 +329,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -349,7 +355,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -362,7 +368,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -375,7 +381,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -390,7 +396,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -402,14 +408,14 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -421,7 +427,7 @@ struct ByteAddressBuffer
     ///Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -503,6 +509,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -4785,23 +4792,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(spirv, byteaddressbuffer)]
@@ -5053,7 +5060,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -5086,7 +5093,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -5099,7 +5106,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5116,7 +5123,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -5129,7 +5136,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -5154,7 +5161,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -5167,7 +5174,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5184,7 +5191,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -5197,7 +5204,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -5221,7 +5228,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -5234,7 +5241,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5251,7 +5258,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -5264,7 +5271,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -5275,7 +5282,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
@@ -5283,7 +5290,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5296,7 +5303,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -6452,6 +6459,18 @@ vector<T,N> acosh(vector<T,N> x)
     }
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> acosh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "acosh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, acosh, x);
+    }
+}
 
 // Test if all components are non-zero.
 __generic<T : __BuiltinType>
@@ -6952,6 +6971,19 @@ vector<T,N> asinh(vector<T,N> x)
     case wgsl: __intrinsic_asm "asinh";
     default:
         VECTOR_MAP_UNARY(T, N, asinh, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> asinh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asinh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, asinh, x);
     }
 }
 
@@ -7577,6 +7609,19 @@ vector<T,N> atanh(vector<T,N> x)
     }
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> atanh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "atanh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, atanh, x);
+    }
+}
+
 /// Ceiling. Returns the smallest integer that is greater than or equal to the specified value.
 /// @param x The value.
 /// @return The smallest integer that is greater than or equal to the specified value.
@@ -8084,9 +8129,20 @@ uint countbits(T value)
         // 16-bit support dependent on SM6.2 and dxil
         __intrinsic_asm "countbits";
     case glsl:
-        // 64-bit support dependent on GL_ARB_gpu_shader_int64
-        // 16-bit support dependent on GL_EXT_shader_16bit_storage
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t)
+        {
+            return __emulatedCountbits64(__intCast<uint64_t>(value));
+        }
+        else if (T is int16_t || T  is uint16_t)
+        {
+            // emulate 16-bit
+            return countbits(__intCast<uint32_t>(value));
+        }
+        else
+        {
+            // bitCount only supports 32-bit
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if (T is int64_t || T  is uint64_t)
         {
@@ -8150,7 +8206,15 @@ vector<uint, N> countbits(vector<T, N> value)
     case hlsl:
         __intrinsic_asm "countbits";
     case glsl:
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
+        {
+            // Emulate 64-bit and 16-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
@@ -10564,7 +10628,15 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        __intrinsic_asm "($0 > 0x1.fffffep+127f) || ($0 < -0x1.fffffep+127f)";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac == 0u;
+        }
+        return false;
     }
 }
 
@@ -10620,7 +10692,15 @@ bool isnan(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsNan $x};
     case wgsl:
-         __intrinsic_asm "$0 != $0";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac != 0u;
+        }
+        return false;
     }
 }
 
@@ -14081,382 +14161,294 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 
 // Across lane ops
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAnd($1)";
-    case cuda: __intrinsic_asm "_waveAnd($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAnd($1)";
-    case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitOr(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupOr($1)";
-    case cuda: __intrinsic_asm "_waveOr($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[ForceInline]
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupOr($1)";
-    case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitXor(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupXor($1)";
-    case cuda: __intrinsic_asm "_waveXor($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupXor($1)";
-    case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskMax(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMax($1)";
-    case cuda: __intrinsic_asm "_waveMax($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
+
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMax($1)";
-    case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskMin(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMin($1)";
-    case cuda: __intrinsic_asm "_waveMin($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMin($1)";
-    case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N>  result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N>  result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N>  result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMul($1)";
-    case cuda: __intrinsic_asm "_waveProduct($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$T result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMul($1)";
-    case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupAdd($1)";
-    case cuda: __intrinsic_asm "_waveSum($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIAdd $$T result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupAdd($1)";
-    case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic; 
-                OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
+
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskSum(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 
@@ -14523,134 +14515,48 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 // Prefix
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinType>
@@ -14756,133 +14662,76 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAnd($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_hlsl, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOr($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXor($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 //@public:
@@ -15099,7 +14948,7 @@ const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "Bitwi
 for (auto opName : kWaveActiveBitOpEntries) {
 }}}}
 /// @category wave Wave and quad functions
-__generic<T : __BuiltinIntegerType>
+__generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -15122,7 +14971,7 @@ T WaveActive$(opName.hlslName)(T expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+__generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -15145,7 +14994,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
@@ -16181,377 +16030,13 @@ uint4 WaveMatch(matrix<T,N,M> value)
 }
 
 /// @category wave
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_hlsl, subgroup_partitioned)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WaveMultiPrefixCountBits";
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitAnd(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAnd(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAndNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseAnd Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAndNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseAnd Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitAnd(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitOr(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOr(, _getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveOrNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseOr Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveOrNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseOr Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitOr(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitXor(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXor(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveXorNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseXor Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveXorNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseXor Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitXor(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixProduct(T value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProduct(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveMulNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformFMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformIMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveMulNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformFMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformIMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixProduct(value[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixSum(T value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSum(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAddNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformFAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformIAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-__spirv_version(1.3)
-vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0 )";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAddNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformFAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixSum(value[i], mask);
-        return result;
     }
 }
 
@@ -16615,6 +16100,7 @@ void __checkMetalShaderSubgroupType()
 }
 
 __generic<T : __BuiltinType>
+[ForceInline]
 void shader_subgroup_preamble()
 {
     // checks needed for shader_subgroup functions; __requireTargetExtension does not work
@@ -16721,6 +16207,582 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
         };
     }
 }
+
+
+//
+// WaveMulti intrinsics are subgroup operations that operate on a 128-bit `uint4` mask.
+// They are equivalent to SPIRV/GLSL's subgroup partitioned operation and HLSL's `WaveMultiPrefix*` operations.
+//
+// SPIRV/GLSL natively supports masked subgroup operations for both reductions and exclusive/inclusive scans.
+// HLSL only natively supports exclusive scans(prefix operations) on arithmetic operations. Inclusve scans
+// are emulated by performing an additional operation to the inclusive scan result. Reductions are not supported.
+//
+
+__generic<T : __BuiltinType>
+[ForceInline]
+void __shaderSubgroupPartitionedPreamble()
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __requireTargetExtension("GL_NV_shader_subgroup_partitioned");
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedNV;
+        };
+    default:
+        return;
+    }
+}
+
+//
+// WaveMultiSum/WaveMultiProduct.
+//
+${{{{
+struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
+const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
+for (auto opName : kWaveMultiSumProductNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiSum/WaveMultiProduct.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
+// WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
+// WaveMultiPrefixSum/WaveMultiPrefixProduct.
+//
+${{{{
+struct WaveMultiPrefixSumProductEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+    const char* hlslName;
+    const char* cudaName;
+    const char* cudaExtraOperation;
+
+    // Inclusive operations are not implemented by the CUDA prelude functions.
+    // They are implemented here by calling the exclusive implementation and performing an additional operations
+    // with the current invocation's value. This works for all cases except for element-wise matrix multiplication.
+    bool cudaMatrixVariantSupport;
+};
+
+const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
+{
+    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport
+    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false },
+    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false },
+    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+
+    // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
+    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+};
+
+for (auto opName : kWaveMultiPrefixSumProductNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefix$(opName.hlslName)";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefix$(opName.hlslName)";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformI$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
+{
+    __target_switch
+    {
+    ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    ${{{{ } }}}}
+    default:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+}
+// WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
+// WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
+// WaveMultiPrefixSum/WaveMultiPrefixProduct.
+}}}}
+
+
+//
+// WaveMultiMin/WaveMultiMax.
+//
+${{{{
+struct WaveMultiMinMaxEntry { const char* name; };
+const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
+for (auto opName : kWaveMultiMinMaxNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiMin/WaveMultiMax.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
+// WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
+//
+${{{{
+struct WaveMultiPrefixMinMaxEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+};
+
+const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
+{
+    // name             spirvName  spirvGroupOperation              glslName
+    { "InclusiveMin",   "Min",     "PartitionedInclusiveScanNV",    "InclusiveMin" },
+    { "InclusiveMax",   "Max",     "PartitionedInclusiveScanNV",    "InclusiveMax" },
+    { "ExclusiveMin",   "Min",     "PartitionedExclusiveScanNV",    "ExclusiveMin" },
+    { "ExclusiveMax",   "Max",     "PartitionedExclusiveScanNV",    "ExclusiveMax" },
+};
+
+for (auto opName : kWaveMultiPrefixMinMaxNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(glsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformU$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformS$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    matrix<T, N, M> result;
+    [ForceUnroll]
+    for (int i = 0; i < N; ++i)
+        result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+    return result;
+}
+
+${{{{
+}
+// WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
+// WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
+}}}}
+
+
+//
+// WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
+//
+${{{{
+struct WaveMultiBitsEntry { const char* name; };
+const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
+for (auto opName : kWaveMultiBitsNames) {
+}}}}
+
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMultiBit$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiBit$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
+// WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
+// WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+//
+${{{{
+struct WaveMultiPrefixBitwiseEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+    const char* hlslName;
+    const char* cudaExtraOperation;
+
+    bool cudaMatrixVariantSupport;
+};
+
+const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
+{
+    // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport
+    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false },
+    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false },
+    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false },
+    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+
+    // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
+    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+};
+
+for (auto opName : kWaveMultiPrefixBitwiseNames) {
+}}}}
+
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+${{{{
+    if (opName.cudaMatrixVariantSupport) {
+}}}}
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+${{{{
+    }
+}}}}
+    default:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+${{{{
+}
+// WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
+// WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
+// WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+}}}}
+
 
 //
 // Quad Control intrinsics
@@ -17211,7 +17273,7 @@ void TraceRay(
             Ray,
             __forceVarIntoRayPayloadStructTemporarily(Payload));
         return;
-    case cuda: __intrinsic_asm "traceOptiXRay";
+    case cuda: __intrinsic_asm "optixTrace";
     case glsl:
     {
         [__vulkanRayPayload]
@@ -17909,6 +17971,114 @@ int GetClusterID()
         };
     }
 }
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float4 GetSpherePositionAndRadius()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+    case cuda:
+        {
+            __intrinsic_asm "optixGetSpherePositionAndRadius";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
+            %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
+            result:$$float4 = OpCompositeConstruct %pos %rad;
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float2x4 GetLssPositionsAndRadii()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+    case cuda:
+        {
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %r0:$$float = OpCompositeExtract %radii 0;
+            %r1:$$float = OpCompositeExtract %radii 1;
+            %p0:$$float3 = OpCompositeExtract %positions 0;
+            %p1:$$float3 = OpCompositeExtract %positions 1;
+            %a:$$float4 = OpCompositeConstruct %p0 %r0;
+            %b:$$float4 = OpCompositeConstruct %p1 %r1;
+            result:$$float2x4 = OpCompositeConstruct %a %b;
+        };
+    
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsSphereHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsSphereHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsSphereNV:bool);
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsLssHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsLssHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsLSSHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsLSSNV:bool);
+        };
+    }
+}
+
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
 // we will forward them to the new names as a convience
@@ -19537,7 +19707,7 @@ struct HitObject
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -19590,6 +19760,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19630,7 +19801,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -19681,6 +19852,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19729,7 +19901,7 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -19777,6 +19949,7 @@ struct HitObject
                     Ray.TMax,
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
             {
                 // Save the attributes
@@ -19814,7 +19987,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]    
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -19851,6 +20024,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19896,7 +20070,7 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -19941,6 +20115,7 @@ struct HitObject
                 Ray.TMax,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19974,7 +20149,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -20008,6 +20183,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -20045,7 +20221,7 @@ struct HitObject
         /// table.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
@@ -20055,6 +20231,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20080,7 +20257,7 @@ struct HitObject
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
         RayDesc Ray,
@@ -20091,6 +20268,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20123,7 +20301,7 @@ struct HitObject
         /// miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
@@ -20132,6 +20310,7 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
+        case cuda: __intrinsic_asm "optixMakeNopHitObject";
         case spirv:
             spirv_asm 
             {
@@ -20160,7 +20339,7 @@ struct HitObject
         /// shader is invoked.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -20186,6 +20365,7 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixInvoke";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -20212,13 +20392,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20232,13 +20413,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20252,13 +20434,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20272,7 +20455,7 @@ struct HitObject
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -20284,6 +20467,7 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
         case spirv:
             return spirv_asm 
             {
@@ -20302,13 +20486,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20319,17 +20504,41 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
+    uint SetShaderTableIndex(uint RecordIndex)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".SetShaderTableIndex";
+        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
+        }
+    }
+
+    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
+        }
+    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20344,13 +20553,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20365,13 +20575,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20386,13 +20597,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20443,6 +20655,106 @@ struct HitObject
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float4 GetSpherePositionAndRadius()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
+                %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
+                result:$$float4 = OpCompositeConstruct %position %radius;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float2x4 GetLssPositionsAndRadii()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsSphereHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsSphereHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsSphereHitNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsLssHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsLssHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsLSSHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
         }
     }
@@ -20557,7 +20869,7 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -20579,6 +20891,7 @@ struct HitObject
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
         case spirv:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20969,13 +21282,14 @@ struct HitObject
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder";
     case spirv:
         spirv_asm 
         {
@@ -21006,13 +21320,14 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
         spirv_asm 
         {
@@ -21033,13 +21348,14 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder()";
     case spirv:
         spirv_asm 
         {
@@ -22232,6 +22548,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -22284,7 +22601,9 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = (Shape.flavor == __ShapeBuffer.flavor ?
+        DescriptorKind.TexelBuffer : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
+);
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -22403,8 +22722,36 @@ __prefix T operator*(DescriptorHandle<T> value)
     return getDescriptorFromHandle(value);
 }
 
+// https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
+enum DefaultVkBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
+}
+
+// https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
+enum VkMutableBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
+}
+
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
-T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>();
+T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
 
 // Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
@@ -22423,10 +22770,16 @@ T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
 __intrinsic_op($(kIROp_CastDescriptorHandleToResource))
 T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
+public enum BindlessDescriptorOptions
+{
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
+}
+
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
     __target_switch
     {
@@ -22439,6 +22792,73 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+
+        switch(bindlessOptions)
+        {
+${{{{
+{
+    static const struct 
+    {
+        char const* option;
+        char const* enumType;
+    }kBindlessOptions[] =
+    {
+        {"None", "DefaultVkBindlessBindings"},
+        {"VkMutable", "VkMutableBindlessBindings"},
+    };
+
+    for(auto bindlessOption : kBindlessOptions)
+    {
+        StringBuilder bindlessOptionIfElsePre;
+        StringBuilder bindlessOptionIfElsePost;
+
+        bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
+        bindlessOptionIfElsePost << "}\n";
+}}}}
+    $(bindlessOptionIfElsePre.toString())
+    switch(T.kind)
+    {
+    case DescriptorKind.Sampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Sampler)[((uint2)handleValue).x];
+    case DescriptorKind.CombinedTextureSampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).CombinedTextureSampler)[((uint2)handleValue).x];
+    case DescriptorKind.Texture:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.TexelBuffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.Buffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.AccelerationStructure:
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    default:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+    }
+    $(bindlessOptionIfElsePost.toString())
+${{{{
+    }
+}
+}}}}
+    default:
+    {
+        static_assert(false, "Impossible to end up here unless something went very wrong");
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    }
+    }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     default:
@@ -22509,13 +22929,289 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+namespace linalg
+{
+
+//
+// Cooperative Matrix enums
+//
+
+enum CoopMatMatrixUse
+{
+    MatrixA = 0,
+    MatrixB = 1,
+    MatrixAccumulator = 2,
+};
+
+enum CoopMatMatrixLayout
+{
+    RowMajor = 0,
+    ColumnMajor = 1,
+};
+
+enum CoopMatClampMode
+{
+    Undefined,
+    Constant,
+    ClampToEdge,
+    Repeat,
+    RepeatMirrored
+};
+
+
+${{{{
+// SPIRV described that the max value for `Dim` is 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
+// OpTypeTensorLayoutNV:
+// Dim is the number of dimensions in the tensor layout, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorViewNV
+// OpTypeTensorViewNV:
+// Dim is the number of dimensions in the tensor view, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+const int kMaxCoopMatTensorDimension = 5;
+}}}}
+
+//
+// TensorLayout
+//
+
+__intrinsic_type($(kIROp_TensorAddressingTensorLayoutType))
+[require(tensor_addressing)]
+__generic<
+    let Dim : uint32_t,
+    let ClampMode : CoopMatClampMode = CoopMatClampMode.Undefined
+>
+struct TensorLayout
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorLayout))
+    __init();
+};
+
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        StringBuilder sliceParams;
+        StringBuilder sliceAsms;
+        StringBuilder blockSizeParams;
+        StringBuilder blockSizeAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+            sliceParams << ", uint32_t offset" << j << ", uint32_t span" << j;
+            sliceAsms << " $offset" << j << " $span" << j;
+            blockSizeParams << ", uint32_t blockSize" << j;
+            blockSizeAsms << " $blockSize" << j;
+        }
+}}}}
+
+
+extension<
+    let ClampMode : CoopMatClampMode
+> TensorLayout<$(iDim), ClampMode>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetDimensionNV $this $dim0 $(dimAsms)
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Slice(uint32_t offset0, uint32_t span0 $(sliceParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSliceNV $this $offset0 $span0 $(sliceAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This ClampValue(CoopMatClampMode clampMode)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetClampValueNV $this $clampMode;
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This BlockSize(uint32_t blockSize0 $(blockSizeParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetBlockSizeNV $this $blockSize0 $(blockSizeAsms);
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
+
+//
+// TensorView
+//
+
+${{{{
+    StringBuilder tensorViewStruct;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        // Assigning the max value as a default value,
+        // because the max value is an invalid value and it allows us to check if the value
+        // is explicitly set by the user or not.
+        tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
+    }
+}}}}
+
+__intrinsic_type($(kIROp_TensorAddressingTensorViewType))
+__generic<
+    let Dim : uint32_t,
+    let HasDimensions : bool
+    $(tensorViewStruct)
+>
+struct TensorView
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorView))
+    __init();
+};
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder tensorViewTypes;
+        StringBuilder tensorViewExtensions;
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            tensorViewTypes << ", let Dim" << j << " : uint32_t";
+            tensorViewExtensions << ", Dim" << j;
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+        }
+        for (int j = iDim; j < kMaxCoopMatTensorDimension; ++j)
+        {
+            tensorViewExtensions << ", 0xff";
+        }
+}}}}
+
+[require(tensor_addressing)]
+extension<
+    let HasDimensions : bool,
+    let Dim0 : uint32_t
+    $(tensorViewTypes)
+> TensorView<$(iDim), HasDimensions, Dim0 $(tensorViewExtensions)>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetDimensionNV $this $dim0 $(dimAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Clip(uint clipRowOffset, uint clipRowSpan, uint clipColOffset, uint clipColSpan)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetClipNV $this $clipRowOffset $clipRowSpan $clipColOffset $clipColSpan;
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
+
+
 //
 // Cooperative Matrix type
 //
 
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
-struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse> : IArray<T>, IArithmetic
+__generic<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>
+struct CoopMat
+    : IArray<T>
+    , IArithmetic
 {
     //
     // Initialization
@@ -22535,21 +23231,25 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
-    __init<U : __BuiltinArithmeticType>(CoopMat<U, S, M, N, R> other)
+    [require(cooperative_matrix_conversion)]
+    __init<
+        U : __BuiltinArithmeticType
+    >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
     }
 
     [ForceInline]
+    [require(cooperative_matrix)]
     __init(This x)
     {
         this = x;
     }
 
     // Required for `IArithmetic`.
-    [OverloadRank(-10)]
     [ForceInline]
+    [OverloadRank(-10)]
+    [require(cooperative_matrix)]
     __init(int i)
     {
         this = CoopMat<T, S, M, N, R>(T(i));
@@ -22559,9 +23259,11 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     // Simple setters
     //
 
-    [require(cooperative_matrix)]
-    [mutating]
+    /// Fills the cooperative matrix with the specified value.
+    /// @param t The value to fill the matrix with.
     [ForceInline]
+    [mutating]
+    [require(cooperative_matrix)]
     void fill(T t)
     {
         this = spirv_asm
@@ -22570,10 +23272,15 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
-    [require(cooperative_matrix)]
-    [mutating]
+    /// Copies the contents from another cooperative matrix into this matrix.
+    /// @param U The element type of the source cooperative matrix.
+    /// @param other The source cooperative matrix to copy from.
     [ForceInline]
-    void copyFrom<U : __BuiltinArithmeticType>(CoopMat<U, S, M, N, R> other)
+    [mutating]
+    [require(cooperative_matrix_conversion)]
+    void copyFrom<
+        U : __BuiltinArithmeticType
+    >(CoopMat<U, S, M, N, R> other)
     {
         if (__isFloat<T>() && __isInt<U>())
             this = __int_to_float_cast<T>(other);
@@ -22598,25 +23305,13 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     [__NoSideEffect]
     Ref<T> __indexRef(int index);
 
+    /// Returns the count as an integer value.
     [ForceInline]
+    [require(cooperative_matrix)]
     [__NoSideEffect]
     int getCount()
     {
-        return getLength();
-    }
-
-    [ForceInline]
-    [__NoSideEffect]
-    int getRowCount()
-    {
-        return M;
-    }
-
-    [ForceInline]
-    [__NoSideEffect]
-    int getColumnCount()
-    {
-        return N;
+        return GetLength();
     }
 
     __subscript(int index) -> T
@@ -22635,31 +23330,155 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         }
     }
 
-    /// Returns the number of components owned by each invocation.
+    //
+    // CoopMat operations
+    //
+
+    /// Returns the number of elements for the current thread.
+    /// Depending on the number of threads for the given matrix, each
+    /// thread will get smaller length.
+    ///
+    /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
-    uint getLength()
+    static uint GetLength()
     {
         return spirv_asm
         {
-            result:$$uint = OpCooperativeMatrixLengthKHR $$This;
+            result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
         };
+    }
+
+    /// Returns the number of rows in the matrix.
+    [ForceInline]
+    [__NoSideEffect]
+    static int GetRowCount()
+    {
+        return M;
+    }
+
+    /// Returns the number of columns in the matrix.
+    [ForceInline]
+    [__NoSideEffect]
+    static int GetColumnCount()
+    {
+        return N;
+    }
+
+    [require(cooperative_matrix_conversion)]
+    CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> Transpose()
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixConversionsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> = OpCooperativeMatrixTransposeNV $this;
+        };
+    }
+
+    [require(cooperative_matrix_reduction)]
+    CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow<
+        let RN : int
+    >(functype(T, T) -> T combineOp)
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixReductionsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixReduceNV $this Row $combineOp;
+        };
+    }
+
+    [require(cooperative_matrix_reduction)]
+    CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn<
+        let RM : int
+    >(functype(T, T) -> T combineOp)
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixReductionsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixReduceNV $this Column $combineOp;
+        };
+    }
+
+    [require(cooperative_matrix_reduction)]
+    CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn<
+        let RM : int,
+        let RN : int
+    >(functype(T, T) -> T combineOp)
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixReductionsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixReduceNV $this Row|Column $combineOp;
+        };
+    }
+
+    [require(cooperative_matrix_reduction)]
+    CoopMat<T, S, M / 2, N / 2, CoopMatMatrixUse.MatrixAccumulator> Reduce2x2(functype(T, T)->T combineOp)
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixReductionsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, M / 2, N / 2, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixReduceNV $this 0x4 $combineOp;
+        };
+    }
+
+    [require(cooperative_matrix_map_element)]
+    This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
+    {
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixPerElementOperationsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
+        };
+    }
+
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    internal static This __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(
+        This coopMat,
+        TOperator mapOp,
+        TFunc mapObj
+    );
+
+    This MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
     }
 
     //
     // Store
     //
 
-    [ForceInline]
     [require(cooperative_matrix)]
-    void store(RWByteAddressBuffer buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
-        return store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
+        __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
-    [ForceInline]
     [require(cooperative_matrix)]
-    void store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+        __store<matrixLayout>(buffer, element, stride);
+    }
+
+    [require(cooperative_matrix)]
+    internal void __store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22671,10 +23490,10 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
-    [__NoSideEffect]
-    [ForceInline]
     [require(cooperative_matrix)]
-    void store(T* buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22684,9 +23503,12 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
-    [require(cooperative_matrix)]
     [ForceInline]
-    void store<let U : int>(__ref groupshared T[U] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        let V : int
+    >(__ref groupshared T[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22698,9 +23520,12 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [ForceInline]
-    [ForceInline]
     [require(cooperative_matrix)]
-    void storeAny<U, let V : int>(__ref groupshared U[V] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__ref groupshared U[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22712,9 +23537,13 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [ForceInline]
-    [ForceInline]
     [require(cooperative_matrix)]
-    void storeAny<U, let V : int, let L : int>(__ref groupshared vector<U, L>[V] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int,
+        let L : int
+    >(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22725,45 +23554,36 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
+
     //
     // Load
     //
 
-    [__NoSideEffect]
-    [ForceInline]
-    [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(ByteAddressBuffer buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+${{{{
+    for (const char* RW : { "", "RW" })
     {
-        return load(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
+}}}}
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        uint stride)
+    {
+        return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [__NoSideEffect]
-    [ForceInline]
     [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(RWByteAddressBuffer buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
-    {
-        return load(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
-    }
-
-    [__NoSideEffect]
-    [ForceInline]
-    [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(StructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
-    {
-        let zero = 0;
-        let alignment = 16U;
-        return spirv_asm
-        {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
-    }
-
-    [__NoSideEffect]
-    [ForceInline]
-    [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22775,10 +23595,16 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
-    [__NoSideEffect]
+${{{{
+    } // RW
+}}}}
+
     [ForceInline]
+    [__NoSideEffect]
     [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(T* buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride)
     {
         let alignment = 16;
         return spirv_asm
@@ -22790,7 +23616,10 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     [ForceInline]
     [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load<let U : int>(__constref groupshared T[U] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        let V : int
+    >(__constref groupshared T[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22803,7 +23632,11 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     [ForceInline]
     [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> loadAny<U, let V : int>(__constref groupshared U[V] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__constref groupshared U[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22816,7 +23649,12 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     [ForceInline]
     [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> loadAny<U, let V : int, let L : int>(__constref groupshared vector<U, L>[V] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int,
+        let L : int
+    >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22849,7 +23687,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     This mod(This other)
     {
         This ret;
-        for (int i = 0; i < getLength(); ++i)
+        for (int i = 0; i < GetLength(); ++i)
         {
             ret[i] = this[i] % other[i];
         }
@@ -22862,7 +23700,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     bool equals(This other)
     {
-        for (int i = 0; i < getLength(); i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             if (this[i] != other[i])
             {
@@ -22874,7 +23712,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     bool lessThan(This other)
     {
-        for (int i = 0; i < getLength(); i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             if (this[i] < other[i])
             {
@@ -22890,7 +23728,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     bool lessThanOrEquals(This other)
     {
-        for (int i = 0; i < getLength(); i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             if (this[i] < other[i])
             {
@@ -22903,7 +23741,343 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         }
         return true;
     }
-}
+
+    //
+    // Load with TensorLayout and TensorView
+    //
+
+${{{{
+    StringBuilder tensorViewTypes;
+    StringBuilder tensorViewParams;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
+        tensorViewParams << ", p" << j;
+    }
+
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadLayout<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+        };
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadView<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadLayoutDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadViewDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+        };
+    }
+
+${{{{
+    } // RW
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+            };
+        }
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+            };
+        }
+    }
+
+} // struct CoopMat
+
 
 //
 // Convenience loading functions for cooperative matrices which infer the
@@ -22912,78 +24086,168 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>(ByteAddressBuffer buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    ByteAddressBuffer buffer,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(buffer, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>(RWByteAddressBuffer buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    RWByteAddressBuffer buffer,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(buffer, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>(StructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    StructuredBuffer<T> buffer,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(buffer, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    RWStructuredBuffer<T> buffer,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(buffer, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>(T* buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(buffer, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
 [ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> coopMatLoad<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse, let U : int>(__constref groupshared T[U] data, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+CoopMat<T, S, M, N, R> coopMatLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout,
+    let U : int
+>(
+    __constref groupshared T[U] data,
+    uint element,
+    uint stride)
 {
-    return CoopMat<T, S, M, N, R>.load(data, element, stride, matrixLayout);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(data, element, stride);
 }
+
 
 //
 // Cooperative Matrix casting
 //
 
-__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
-[require(cooperative_matrix)]
-CoopMat<T,S,M,N,R> __int_cast(CoopMat<U,S,M,N,R> val);
+CoopMat<T,S,M,N,R> __int_cast<
+    T : __BuiltinArithmeticType,
+    U : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<U,S,M,N,R> val);
 
-__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
-[require(cooperative_matrix)]
-CoopMat<T,S,M,N,R> __real_cast(CoopMat<U,S,M,N,R> val);
+CoopMat<T,S,M,N,R> __real_cast<
+    T : __BuiltinArithmeticType,
+    U : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<U,S,M,N,R> val);
 
-__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
-[require(cooperative_matrix)]
-CoopMat<T,S,M,N,R> __int_to_float_cast(CoopMat<U,S,M,N,R> val);
+CoopMat<T,S,M,N,R> __int_to_float_cast<
+    T : __BuiltinArithmeticType,
+    U : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<U,S,M,N,R> val);
 
-__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
-[require(cooperative_matrix)]
-CoopMat<T,S,M,N,R> __float_to_int_cast(CoopMat<U,S,M,N,R> val);
+CoopMat<T,S,M,N,R> __float_to_int_cast<
+    T : __BuiltinArithmeticType,
+    U : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<U,S,M,N,R> val);
 
 //
 // Cooperative Matrix multiplication with scalar
 //
 
-__generic<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
-[ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *(CoopMat<T, S, M, N, R> lhs, const T rhs)
+CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<T, S, M, N, R> lhs, const T rhs)
 {
     return spirv_asm
     {
@@ -22991,63 +24255,96 @@ CoopMat<T, S, M, N, R> operator *(CoopMat<T, S, M, N, R> lhs, const T rhs)
     };
 }
 
-__generic<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
-[ForceInline]
 [require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *(const T lhs, CoopMat<T, S, M, N, R> rhs)
+CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(const T lhs, CoopMat<T, S, M, N, R> rhs)
 {
     return rhs * lhs;
 }
 
 //
-// Cooperative Matrix enums
-//
-
-enum CoopMatScope
-{
-    Device = 1,
-    Workgroup = 2,
-    Subgroup = 3,
-    QueueFamily = 5,
-};
-
-enum CoopMatMatrixUse
-{
-    MatrixA = 0,
-    MatrixB = 1,
-    MatrixAccumulator = 2,
-};
-
-enum CoopMatMatrixLayout
-{
-    RowMajor = 0,
-    ColumnMajor = 1,
-};
-
-enum CoopMatMatrixOperands
-{
-    None = 0x0,
-    MatrixASigned = 0x1,
-    MatrixBSigned = 0x2,
-    MatrixCSigned = 0x4,
-    MatrixResultSigned = 0x8,
-    SaturatingAccumulation = 0x10,
-};
-
-//
-// Cooperative Matrix multiply accumulate
+// Cooperative Matrix Multiply-Accumulate
 //
 
 [require(cooperative_matrix)]
-__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, V : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let K : int, let N : int, let RA : CoopMatMatrixUse, let RB : CoopMatMatrixUse, let RC : CoopMatMatrixUse>
-CoopMat<V, S, M, N, RC> coopMatMulAdd(CoopMat<T, S, M, K, RA> matA, CoopMat<U, S, K, N, RB> matB, CoopMat<V, S, M, N, RC> matC, constexpr CoopMatMatrixOperands operands)
+CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
+    T : __BuiltinArithmeticType,
+    let saturatingAccumulation : bool,
+    U : __BuiltinArithmeticType,
+    V : __BuiltinArithmeticType,
+    W : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let K : int,
+    let N : int
+>(
+    CoopMat<U, S, M, K, CoopMatMatrixUse.MatrixA> matA,
+    CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
+    CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    static_assert((RA == CoopMatMatrixUse::MatrixA) && (RB == CoopMatMatrixUse::MatrixB) && (RC == CoopMatMatrixUse::MatrixAccumulator), "matrix uses for `coopMatMulAdd` matrix parameters must be `MatrixA`, `MatrixB` and `MatrixAccumulator`");
+    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+    int operands = 0; // NoneKHR
+    if (__isSignedInt<U>())
+    {
+        operands |= 0x01; // MatrixASignedComponentsKHR
+    }
+    if (__isSignedInt<V>())
+    {
+        operands |= 0x02; // MatrixBSignedComponentsKHR
+    }
+    if (__isSignedInt<W>())
+    {
+        operands |= 0x04; // MatrixCSignedComponentsKHR
+    }
+    if (__isSignedInt<T>())
+    {
+        operands |= 0x08; // MatrixResultSignedComponentsKHR
+    }
+    if (saturatingAccumulation)
+    {
+        operands |= 0x10; // SaturatingAccumulationKHR
+    }
+
     return spirv_asm
     {
-        result:$$CoopMat<V, S, M, N, RC> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
+        result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
     };
 }
+
+extension<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse,
+    each Ts : __BuiltinArithmeticType
+> Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
+{
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
+
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    static CoopMat<T, S, M, N, R> __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(This tuple, TOperator mapOp, TFunc mapObj);
+
+    [ForceInline]
+    CoopMat<T, S, M, N, R> MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
+    }
+};
+
+} // namespace linalg
+
 
 //
 // Cooperative Vector
@@ -23068,6 +24365,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     __init()
     {
         this = CoopVec<T, N>(T(0));
@@ -23075,6 +24373,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     __init(T t)
     {
         this.fill(t);
@@ -23082,6 +24381,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
     {
         this.copyFrom(other);
@@ -23097,6 +24397,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [OverloadRank(-10)]
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     __init(int i)
     {
         this = CoopVec<T, N>(T(i));
@@ -23115,14 +24417,18 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// Copy values from another CoopVec instance into this one. The source CoopVec can have a different element type,
     /// in which case appropriate type conversion will be performed.
     /// @param other The source CoopVec to copy from.
-    [require(hlsl)] 
     [mutating] 
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
     { 
         __target_switch 
         { 
-        case hlsl: __intrinsic_asm ".CopyFrom";
+        case hlsl:
+            __intrinsic_asm "$0 = $1";
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".CopyFrom";
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -23137,9 +24443,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     /// Fill all elements of this CoopVec with the specified value.
     /// @param t The value to fill all elements with.
-    [require(cooperative_vector)] 
     [mutating] 
-    [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void fill(T t)
     { 
         __target_switch
@@ -23151,10 +24457,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
         case hlsl:
-            case hlsl: __intrinsic_asm ".Fill"; 
+             __intrinsic_asm "$0 = $1";
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Fill";
         default:
             for(int i = 0; i < N; ++i)
                 this[i] = t;
+            return;
         }
     }
 
@@ -23163,10 +24472,11 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     //
 
     /// Store all elements of this CoopVec into a buffer at a specified offset.
+    /// Pointer accesses are 16-byte aligned.
     /// @param buffer The destination buffer to store the values into.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer where the data will be stored. Must be 16-byte aligned.
-    [ForceInline]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void store(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -23178,17 +24488,19 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
-#ifdef NOT_SUPPORTED_YET
         case hlsl:
-            this.__Store(buffer, byteOffset16ByteAligned);
-#endif
+                __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
+        case hlsl_coopvec_poc:
+            for(int i = 0; i < N; ++i)
+                buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
+            return;
         }
     }
 
-    [ForceInline]
     [require(cooperative_vector)]
     void store(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
     {
@@ -23201,10 +24513,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            this.__Store(buffer, byteOffset16ByteAligned);
-#endif
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -23212,20 +24520,36 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [ForceInline]
+    [require(spirv, cooperative_vector)]
+    void store(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned !alignment;
+        };
+    }
+
+    [ForceInline]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void store<let M : int>(__ref groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
             spirv_asm{
                 OpCooperativeVectorStoreNV &data $byteOffset16ByteAligned $this None;
             };
-        case hlsl:
+        case hlsl_coopvec_poc:
             this.__Store(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
+            return;
         }
     }
 
@@ -23236,6 +24560,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     void storeAny<U, let M : int>(__ref groupshared U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23259,12 +24584,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     /// Load values from a byte-addressable buffer into a cooperative vector.
+    /// Pointer accesses are 16-byte aligned.
     /// @param buffer The source buffer to load data from.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
     /// @return A new cooperative vector containing the loaded values.
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> load(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -23276,6 +24602,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
         case hlsl:
+        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
@@ -23288,9 +24615,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> load(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -23302,6 +24629,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
         case hlsl:
+        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
@@ -23314,9 +24642,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -23327,12 +24655,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(buffer, byteOffset16ByteAligned);
-            return ret;
-#endif
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -23342,7 +24664,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
     static CoopVec<T, N> load(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
@@ -23355,12 +24676,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(buffer, byteOffset16ByteAligned);
-            return ret;
-#endif
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -23369,12 +24684,27 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
+    [ForceInline]
+    [__NoSideEffect]
+    [require(spirv, cooperative_vector)]
+    static CoopVec<T, N> load(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
+    }
+
     // Groupshared
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23382,6 +24712,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV &data $byteOffset16ByteAligned None
             };
         case hlsl:
+        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return ret;
@@ -23403,6 +24734,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(__constref groupshared const U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23452,22 +24784,28 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         [ForceInline]
         [__NoSideEffect]
         [nonmutating]
+        [require(cooperative_vector)]
+        [require(hlsl_coopvec_poc)]
         get
         {
             __target_switch
             {
-            case hlsl: __intrinsic_asm ".ReadFromIndex";
+            case hlsl_coopvec_poc:
+                __intrinsic_asm ".ReadFromIndex";
             default: return __indexRead(index);
             }
         }
 
         [ForceInline]
         [mutating]
+        [require(cooperative_vector)]
+        [require(hlsl_coopvec_poc)]
         set
         {
             __target_switch
             {
-            case hlsl: __intrinsic_asm ".WriteToIndex";
+            case hlsl_coopvec_poc:
+                __intrinsic_asm ".WriteToIndex";
             default: __indexRef(index) = newValue;
             }
         }
@@ -23483,6 +24821,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// Creates a new cooperative vector with all elements initialized to the specified scalar value.
     /// @param t The scalar value to replicate across all elements.
     /// @return A new cooperative vector where each element equals the input value.
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> replicate(T t)
     {
         CoopVec<T, N> ret;
@@ -23561,12 +24901,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     This __pureAdd(This other);
 
     [mutating]
+    [ForceInline]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutAdd(This other)
     {
         __target_switch 
         { 
-        case hlsl: __intrinsic_asm ".Add"; 
+        case hlsl:
+            __intrinsic_asm "$0 += $1";
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Add";
         } 
     }
 
@@ -23575,11 +24920,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the sum of the two vectors.
     // TODO: Why is this ForceInline necessary for hlsl, dxc bug?
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This add(This other)
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "$0 + $1"; 
+        case hlsl_coopvec_poc:
             This ret = this;
             ret.__mutAdd(other);
             return ret;
@@ -23592,18 +24941,29 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutSub(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Subtract"; } }
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 -= $1";
+        case hlsl_coopvec_poc: __intrinsic_asm ".Subtract";
+        }
+    }
 
     /// Performs component-wise subtraction with another cooperative vector.
     /// @param other The cooperative vector to subtract from this vector.
     /// @return A new cooperative vector containing the difference of the two vectors.
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This sub(This other)
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "$0 - $1";
+        case hlsl_coopvec_poc:
             This ret = this;
             ret.__mutSub(other);
             return ret;
@@ -23616,18 +24976,29 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutMul(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Multiply"; } }
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 *= $1";
+        case hlsl_coopvec_poc: __intrinsic_asm ".Multiply";
+        }
+    }
 
     /// Performs component-wise multiplication with another cooperative vector.
     /// @param other The cooperative vector to multiply with this vector.
     /// @return A new cooperative vector containing the product of the two vectors.
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This mul(This other)
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "$0 * $1";
+        case hlsl_coopvec_poc:
             This ret = this;
             ret.__mutMul(other);
             return ret;
@@ -23640,18 +25011,29 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutDiv(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Divide"; } }
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 /= $1";
+        case hlsl_coopvec_poc: __intrinsic_asm ".Divide";
+        }
+    }
 
     /// Performs component-wise division with another cooperative vector.
     /// @param other The cooperative vector to divide this vector by.
     /// @return A new cooperative vector containing the quotient of the two vectors.
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This div(This other)
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "$0 / $1";
+        case hlsl_coopvec_poc:
             This ret = this;
             ret.__mutDiv(other);
             return ret;
@@ -23661,18 +25043,29 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutMod(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Mod"; } }
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 %= %1";
+        case hlsl_coopvec_poc: __intrinsic_asm ".Mod";
+        }
+    }
 
     /// Performs component-wise remainder operation between two cooperative vectors.
     /// @param other The cooperative vector to compute the remainder with.
     /// @return A new cooperative vector containing the remainder of the division between corresponding components.
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This mod(This other)
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "$0 % $1";
+        case hlsl_coopvec_poc:
             This ret = this;
             ret.__mutMod(other);
             return ret;
@@ -23690,11 +25083,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// Returns a new cooperative vector where each component has its sign negated.
     /// @return A new cooperative vector containing the negated values.
     //[ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     This neg()
     {
         __target_switch
         {
         case hlsl:
+            __intrinsic_asm "-$0";
+        case hlsl_coopvec_poc:
             This ret = this;
             for(int i = 0; i < N; ++i)
                 ret[i] = -this[i];
@@ -23705,54 +25102,130 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutScalarMul(T t)
-    { __target_switch { case hlsl: __intrinsic_asm ".ScalarMultiply"; } }
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 *= $1";
+        case hlsl_coopvec_poc: __intrinsic_asm ".ScalarMultiply";
+        }
+    }
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutMin(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Min"; } }
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Min";
+        }
+    }
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutMax(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Max"; } }
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Max";
+        }
+    }
 
     [mutating]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __mutClamp(This minVal, This maxVal)
-    { __target_switch { case hlsl: __intrinsic_asm ".Clamp"; } }
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Clamp";
+        }
+    }
 
     //
     // Internal utilities for loading and storing
     //
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer)]
     void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Load";
+        }
+    }
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Load";
+        }
+    }
 
     __generic<let M : int>
     [mutating]
     // Careful, this takes the offset in elements
+    [ForceInline]
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
+    {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
+        __target_switch
+        {
+        case hlsl:
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                this[i] = buffer[i + elemOffset];
+            return;
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Load";
+        }
+    }
 
     [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Store"; } }
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
+        }
+    }
 
     __generic<let M : int>
     [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
     // Careful, this takes the offset in elements
     void __Store(__ref groupshared T buffer[M], uint elemOffset)
-    { __target_switch { case hlsl: __intrinsic_asm ".Store"; } }
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
+        }
+    }
 
 ${{{{
 static const struct {
@@ -23766,7 +25239,9 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases) {
 }}}}
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
         $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
@@ -23774,12 +25249,30 @@ for(auto buffer : kByteAddressBufferCases) {
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".MatMul";
+        case hlsl:
+            if (__isFloat<T>() || __isSignedInt<T>())
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
+            else
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".MatMul";
         }
     }
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
         $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
@@ -23788,7 +25281,23 @@ for(auto buffer : kByteAddressBufferCases) {
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".MatMulAdd";
+        case hlsl:
+            if (__isFloat<T>() || __isSignedInt<T>())
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
+            else
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".MatMulAdd";
         }
     }
 
@@ -23806,7 +25315,8 @@ for(auto buffer : kByteAddressBufferCases) {
     /// can be packed into each element of the input vector. The k parameter specifies the actual number of
     /// values to use from the packed input.
     [mutating]
-    [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void matMulAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -23870,6 +25380,8 @@ for(auto buffer : kByteAddressBufferCases) {
     /// @param matrixStride The stride in bytes between rows/columns of the matrix.
     [mutating]
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void matMulAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -23897,7 +25409,8 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
     [mutating]
-    [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void matMulAddAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -23976,6 +25489,8 @@ for(auto buffer : kByteAddressBufferCases) {
     /// while matMulAddAccumPacked allows k to be specified independently for packed interpretations.
     [mutating]
     [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
     void matMulAddAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -24006,6 +25521,24 @@ for(auto buffer : kByteAddressBufferCases) {
             transpose,
             matrixStride
         );
+    }
+
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __OuterProductAccumulate<let K : int>(
+        CoopVec<T, K> b,
+        $(buffer.type) matrix,
+        int32_t matrixOffset,
+        uint matrixStride,
+        uint memoryLayout,
+        uint matrixInterpretation,
+    )
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
+        }
     }
 
 
@@ -24040,6 +25573,7 @@ CoopVec<T,N> __float_to_int_cast(CoopVec<U,N> val);
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 {
     __target_switch
@@ -24061,6 +25595,8 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
             return lhs;
         }
     case hlsl:
+        __intrinsic_asm "$0 * $1";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = lhs;
         ret.__mutScalarMul(rhs);
         return ret;
@@ -24076,6 +25612,7 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> operator *(const T lhs, CoopVec<T, N> rhs)
 {
     return rhs * lhs;
@@ -24083,6 +25620,7 @@ CoopVec<T, N> operator *(const T lhs, CoopVec<T, N> rhs)
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -24093,6 +25631,8 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
             result:$$CoopVec<T, N> = OpExtInst glsl450 FMin $x $y;
         };
     case hlsl:
+        __intrinsic_asm "min($0, $1)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutMin(y);
         return ret;
@@ -24107,6 +25647,7 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -24117,6 +25658,8 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
             result:$$CoopVec<T, N> = OpExtInst glsl450 FMax $x $y;
         };
     case hlsl:
+        __intrinsic_asm "max($0, $1)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutMax(y);
         return ret;
@@ -24130,6 +25673,7 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> minVal, CoopVec<T, N> maxVal)
 {
     __target_switch
@@ -24140,6 +25684,8 @@ CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x
             result:$$CoopVec<T, N> = OpExtInst glsl450 FClamp $x $minVal $maxVal;
         };
     case hlsl:
+        __intrinsic_asm "clamp($0, $1, $2)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutClamp(minVal, maxVal);
         return ret;
@@ -24153,6 +25699,7 @@ CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -24173,6 +25720,8 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
             };
         }
     case hlsl:
+        __intrinsic_asm "min($0, $1)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutMin(y);
         return ret;
@@ -24187,6 +25736,7 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -24207,6 +25757,8 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
             };
         }
     case hlsl:
+        __intrinsic_asm "max($0, $1)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutMax(y);
         return ret;
@@ -24220,6 +25772,7 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> minVal, CoopVec<T, N> maxVal)
 {
     __target_switch
@@ -24240,6 +25793,8 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
             };
         }
     case hlsl:
+        __intrinsic_asm "clamp($0, $1, $2)";
+    case hlsl_coopvec_poc:
         CoopVec<T, N> ret = x;
         ret.__mutClamp(minVal, maxVal);
         return ret;
@@ -24253,10 +25808,18 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> edge, CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "step($0, $1)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = step(edge[i], x[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24272,10 +25835,18 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "exp($0)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = exp(x[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24291,10 +25862,18 @@ CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "log($0)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = log(x[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24310,10 +25889,18 @@ CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "tanh($0)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = tanh(x[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24327,14 +25914,20 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
     }
 }
 
-// TODO: Why does this fail when inlined on HLSL,
-// We generate some really weird code...
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yOverX)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "atan($0)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = atan(yOverX[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24350,6 +25943,7 @@ CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yO
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, CoopVec<T, N> b, CoopVec<T, N> c)
 {
     // TODO: Investigate, why does this fail if it's not inlined
@@ -24357,6 +25951,13 @@ CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, 
     // dxc generated substantially different code
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "mad($0, $1, $2)";
+    case hlsl_coopvec_poc:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = mad(a[i], b[i], c[i]);
+        return ret;
     case spirv:
         return spirv_asm
         {
@@ -24460,6 +26061,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBu
 [ForceInline]
 [require(cooperative_vector)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+{
+    return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector)]
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
@@ -24612,36 +26220,77 @@ uint32_t __getSpvCoopVecComponentType(CoopVecComponentType componentType)
 [ForceInline]
 uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
 {
-    switch (componentType)
+    __target_switch
     {
-    case CoopVecComponentType::Float16:
-        return 0;
-    case CoopVecComponentType::Float32:
-        return 1;
-    case CoopVecComponentType::UnsignedInt8:
-        return 2;
-    case CoopVecComponentType::UnsignedInt16:
-        return 3;
-    case CoopVecComponentType::UnsignedInt32:
-        return 4;
-    case CoopVecComponentType::SignedInt8:
-        return 5;
-    case CoopVecComponentType::SignedInt16:
-        return 6;
-    case CoopVecComponentType::SignedInt32:
-        return 7;
-    case CoopVecComponentType::SignedInt8Packed:
-        return 8;
-    case CoopVecComponentType::UnsignedInt8Packed:
-        return 9;
-    case CoopVecComponentType::FloatE4M3:
-        return 10;
-    case CoopVecComponentType::FloatE5M2:
-        return 11;
-    default:
-        static_assert(false, "unsupported componentType value");
+    case hlsl:
+        switch (componentType)
+        {
+        case CoopVecComponentType::SignedInt16:
+            return 2;
+        case CoopVecComponentType::UnsignedInt16:
+            return 3;
+        case CoopVecComponentType::SignedInt32:
+            return 4;
+        case CoopVecComponentType::UnsignedInt32:
+            return 5;
+        case CoopVecComponentType::SignedInt64:
+            return 6;
+        case CoopVecComponentType::UnsignedInt64:
+            return 7;
+        case CoopVecComponentType::Float16:
+            return 8;
+        case CoopVecComponentType::Float32:
+            return 9;
+        case CoopVecComponentType::Float64:
+            return 10;
+        case CoopVecComponentType::SignedInt8Packed:
+            return 17;
+        case CoopVecComponentType::UnsignedInt8Packed:
+            return 18;
+        case CoopVecComponentType::UnsignedInt8:
+            return 19;
+        case CoopVecComponentType::SignedInt8:
+            return 20;
+        case CoopVecComponentType::FloatE4M3:
+            return 21;
+        case CoopVecComponentType::FloatE5M2:
+            return 22;
+        default:
+            static_assert(false, "unsupported componentType value");
+        }
+        return 0; // ComponentType::Invalid
+    case hlsl_coopvec_poc:
+        switch (componentType)
+        {
+        case CoopVecComponentType::Float16:
+            return 0;
+        case CoopVecComponentType::Float32:
+            return 1;
+        case CoopVecComponentType::UnsignedInt8:
+            return 2;
+        case CoopVecComponentType::UnsignedInt16:
+            return 3;
+        case CoopVecComponentType::UnsignedInt32:
+            return 4;
+        case CoopVecComponentType::SignedInt8:
+            return 5;
+        case CoopVecComponentType::SignedInt16:
+            return 6;
+        case CoopVecComponentType::SignedInt32:
+            return 7;
+        case CoopVecComponentType::SignedInt8Packed:
+            return 8;
+        case CoopVecComponentType::UnsignedInt8Packed:
+            return 9;
+        case CoopVecComponentType::FloatE4M3:
+            return 10;
+        case CoopVecComponentType::FloatE5M2:
+            return 11;
+        default:
+            static_assert(false, "unsupported componentType value");
+        }
+        return 32;
     }
-    return 32;
 }
 
 [ForceInline]
@@ -24711,6 +26360,7 @@ for(auto buffer : kByteAddressBufferCases_) {
 // need it
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
@@ -24738,9 +26388,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = matrix.GetBufferPointer();
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -24854,6 +26509,7 @@ CoopVec<T, M> coopVecMatMulPacked(
 /// @return A new cooperative vector containing the result of the matrix multiplication.
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -24900,6 +26556,7 @@ CoopVec<T, M> coopVecMatMul(
 /// values to use from the packed input.
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -25037,6 +26694,7 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 /// @return A new cooperative vector containing the result of the matrix multiplication plus bias.
 [ForceInline]
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulAdd(
     CoopVec<U, K> input,
@@ -25087,6 +26745,7 @@ if(buffer.isRW)
 /// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
 /// @param matrixInterpretation Specifies how to interpret the values in the matrix.
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
     CoopVec<T, N> b,
@@ -25100,6 +26759,10 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     __target_switch
     {
     case hlsl:
+        uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
+        uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
+    case hlsl_coopvec_poc:
         __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
@@ -25172,6 +26835,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// @param buffer The buffer to accumulate the sum into.
 /// @param offset Byte offset into the buffer.
 [require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     CoopVec<T, N> v,
     $(buffer.type) buffer,
@@ -25181,6 +26845,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     __target_switch
     {
     case hlsl:
+        __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
+    case hlsl_coopvec_poc:
         __intrinsic_asm "$0.ReduceSumAccumulate($1, $2)";
     case spirv:
         let bufferPtr = buffer.GetBufferPointer();
@@ -25258,9 +26924,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = __getStructuredBufferPtr(matrix);
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

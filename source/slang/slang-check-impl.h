@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -1028,6 +1030,20 @@ public:
         return result;
     }
 
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
+    }
+
     // Setup the flag to indicate disabling the short-circuiting evaluation
     // for the logical expressions associted with the subcontext
     SemanticsContext disableShortCircuitLogicalExpr()
@@ -1451,6 +1467,15 @@ public:
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
+
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
     // type that is applied to arguments, like `Texture2D<float4>`.
@@ -1646,7 +1671,7 @@ public:
         InitializerListExpr* fromInitializerListExpr);
 
     /// Report that implicit type coercion is not possible.
-    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr);
+    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
     /// Central engine for implementing implicit coercion logic
     ///
@@ -1674,6 +1699,7 @@ public:
         Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
+        DiagnosticSink* sink,
         ConversionCost* outCost);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -1698,7 +1724,7 @@ public:
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr);
+    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -2110,6 +2136,7 @@ public:
     {
         CompileTime,
         LinkTime,
+        SpecializationConstant
     };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
@@ -2856,6 +2883,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -2892,6 +2921,8 @@ public:
     Expr* visitIndexExpr(IndexExpr* subscriptExpr);
 
     Expr* visitParenExpr(ParenExpr* expr);
+
+    Expr* visitTupleExpr(TupleExpr* expr);
 
     Expr* visitAssignExpr(AssignExpr* expr);
 
@@ -2954,6 +2985,7 @@ public:
     Expr* visitMemberExpr(MemberExpr* expr);
 
     Expr* visitInitializerListExpr(InitializerListExpr* expr);
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr);
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
@@ -2999,9 +3031,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void checkStmt(Stmt* stmt);
 
-    template<typename T>
-    T* FindOuterStmt(Stmt* searchUntil = nullptr);
-
     Stmt* findOuterStmtWithLabel(Name* label);
 
     void visitDeclStmt(DeclStmt* stmt);
@@ -3046,6 +3075,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeferStmt(DeferStmt* stmt);
 
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
+
     void visitWhileStmt(WhileStmt* stmt);
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt);
@@ -3083,6 +3116,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

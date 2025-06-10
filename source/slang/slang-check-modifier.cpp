@@ -828,7 +828,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 if (!typeChecked)
                 {
                     arg = CheckTerm(arg);
-                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg);
+                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg, getSink());
                 }
             }
             paramIndex++;
@@ -1532,6 +1532,8 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         if (!as<VarDeclBase>(decl))
             return false;
         return isGlobalDecl(decl) || isEffectivelyStatic(decl);
+    case ASTNodeType::DynModifier:
+        return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
     default:
         return true;
     }
@@ -1671,6 +1673,7 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         auto moduleDecl = getModuleDecl(decl);
         bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
+
         if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
             isGLSLInput = true;
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
@@ -2208,6 +2211,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         return;
     }
 
+    // Define valid stage names
+    const HashSet<String> validStages("anyhit", "closesthit", "miss", "caller");
+
     // Check each field in the struct
     for (auto member : structDecl->members)
     {
@@ -2217,8 +2223,11 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
             continue;
         }
 
-        bool hasReadModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>() != nullptr;
-        bool hasWriteModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>() != nullptr;
+        auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
+        auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
+
+        bool hasReadModifier = readModifier != nullptr;
+        bool hasWriteModifier = writeModifier != nullptr;
 
         if (!hasReadModifier && !hasWriteModifier)
         {
@@ -2227,6 +2236,38 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 fieldVarDecl,
                 Diagnostics::rayPayloadFieldMissingAccessQualifiers,
                 fieldVarDecl->getName());
+        }
+
+        // Check stage names in read qualifier
+        if (readModifier)
+        {
+            for (auto& stageToken : readModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
+        }
+
+        // Check stage names in write qualifier
+        if (writeModifier)
+        {
+            for (auto& stageToken : writeModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
         }
     }
 }

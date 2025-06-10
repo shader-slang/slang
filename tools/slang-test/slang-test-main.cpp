@@ -46,21 +46,12 @@
 #include <atomic>
 #include <thread>
 
-using namespace Slang;
-
 #if defined(_WIN32)
-// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
-
-extern "C"
-{
-    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
-}
-
-extern "C"
-{
-    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
-}
+#include <slang-rhi/agility-sdk.h>
+SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
+
+using namespace Slang;
 
 // Options for a particular test
 struct TestOptions
@@ -3394,6 +3385,11 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-capability");
         ioCmdLine.addArg(capability);
     }
+
+    if (options.enableDebugLayers)
+    {
+        ioCmdLine.addArg("-enable-debug-layers");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -3601,15 +3597,6 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
-
-#if _DEBUG
-    // When using test server, any validation warning printed from the backend
-    // gets misinterpreted as the result from the test.
-    // This is due to the limitation that Slang RPC implementation expects only
-    // one time communication.
-    if (input.spawnType != SpawnType::UseTestServer)
-        cmdLine.addArg("-enable-debug-layers");
-#endif
 
     if (context->isExecuting())
     {
@@ -4344,7 +4331,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             context->setTestRequirements(&requirements);
             runTest(context, filePath, filePath, filePath, testDetails.options);
 
-            //
+
             apiUsedFlags |= requirements.usedRenderApiFlags;
             explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown)
                                        ? (RenderApiFlags(1) << int(requirements.explicitRenderApi))
@@ -4596,7 +4583,7 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+            printf("found test: '%s'\n", file.getBuffer());
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
@@ -4703,6 +4690,7 @@ static SlangResult runUnitTestModule(
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
+    unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
 
     auto testCount = testModule->getTestCount();
@@ -4746,12 +4734,16 @@ static SlangResult runUnitTestModule(
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
             args.enabledApis = context->options.enabledApis;
+            args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;
 
             {
                 TestReporter::TestScope scopeTest(reporter, options.command);
                 ExecuteResult exeRes;
+                // Initialize the ExecuteResult, otherwise we can get bogus
+                // error results.
+                exeRes.init();
 
                 SlangResult rpcRes = _executeRPC(
                     context,
@@ -4763,15 +4755,23 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
+                // If the rpc failed, output an error message
+                if (SLANG_FAILED(rpcRes))
+                {
+                    reporter->message(TestMessageType::RunError, "rpc failed");
+                }
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
-                if (isFailed)
+                if (testResult == TestResult::Fail)
                 {
                     String output = getOutput(exeRes);
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
-                if (isFailed && !context->isRetry &&
+                // If the test failed and it is not an expected failure, add it to the list of
+                // failed unit tests.
+                if (isFailed &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5057,18 +5057,15 @@ SlangResult innerMain(int argc, char** argv)
             for (bool isRetry : {false, true})
             {
                 auto spawnType = context.getFinalSpawnType();
-
-                context.isRetry = false;
+                context.isRetry = isRetry;
                 if (isRetry)
                 {
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
                     printf("Retrying unit tests...\n");
-                    context.isRetry = true;
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
-                    spawnType = SpawnType::Default;
                 }
 
                 // Run the unit tests
@@ -5090,14 +5087,20 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
-        // excution or driver instability. We can try running them again.
+        // excution or driver instability. We can try running them again. Debug build has more
+        // instability at this moment, so we allow more retries.
+#if _DEBUG
+        static constexpr int kFailedTestLimitForRetry = 100;
+#else
         static constexpr int kFailedTestLimitForRetry = 16;
+#endif
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
                 printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
             for (auto& test : context.failedFileTests)
             {
+                context.isRetry = true;
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
                 TestReporter::SuiteScope suiteScope(&reporter, "tests");
                 TestReporter::TestScope scope(&reporter, fileTestInfo->testName);

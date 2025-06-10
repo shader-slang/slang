@@ -636,6 +636,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
             case IRTargetBuiltinVarName::SpvInstanceIndex:
             case IRTargetBuiltinVarName::SpvBaseInstance:
+            case IRTargetBuiltinVarName::SpvVertexIndex:
+            case IRTargetBuiltinVarName::SpvBaseVertex:
                 return AddressSpace::BuiltinInput;
             }
         }
@@ -1471,6 +1473,115 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // TODO: Currently SPIRV doesn't support non-32-bit integer types for bitfield extract and
+    // insert. We will relax this restriction once this is done:
+    // https://github.com/shader-slang/slang/issues/7015.
+    void processBitFieldOp(IRInst* inst)
+    {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
+        if (vectorType)
+            elementType = vectorType->getElementType();
+
+        const IntInfo i = getIntTypeInfo(elementType);
+
+        // SPIRV doesn't support non-32bit integer types, so we need to convert
+        if (i.width < 32)
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            IRType* intType = i.isSigned ? builder.getIntType() : builder.getUIntType();
+            auto targetType = vectorType
+                                  ? builder.getVectorType(intType, vectorType->getElementCount())
+                                  : intType;
+            auto baseInst = builder.emitCast(targetType, inst->getOperand(0));
+            builder.replaceOperand(inst->getOperands(), baseInst);
+            if (inst->getOp() == kIROp_BitfieldInsert)
+            {
+                auto insertInst = builder.emitCast(targetType, inst->getOperand(1));
+                builder.replaceOperand(inst->getOperands() + 1, insertInst);
+            }
+            inst->setFullType(intType);
+        }
+    }
+
+    // Creates a new function with a different parameter order.
+    // OpCooperativeMatrixPerElementOpNV expects a callback function to have the parameter
+    // in the following order:
+    //   return-type CallbackFunction(uint, uint, coopmat1, functorThis, coopmat2, coopmat3, ...)
+    // But what we have by default is:
+    //   return-type CallbackFunction(functorThis, uint, uint, coopmat1, coopmat2, coopmat3, ...)
+    //
+    // The new function will do the following,
+    //   return-type newCallback(uint a, uint b, T mat1, TFunc f, T mat2, T mat3, ...)
+    //   { return targetFunc(f, a, b, mat1, mat2, mat3, ...); }
+    IRFunc* createWrapperFunctionForPerElement(IRBuilder& builder, IRFunc* targetFunc)
+    {
+        List<IRType*> paramTypes;
+        for (UInt i = 0; i < targetFunc->getParamCount(); i++)
+        {
+            paramTypes.add(targetFunc->getParamType(i));
+        }
+
+        SLANG_ASSERT(paramTypes.getCount() >= 4);
+
+        IRType* tempTypes[4];
+        tempTypes[3] = builder.getPtrType(paramTypes[0]);
+        tempTypes[0] = paramTypes[1];
+        tempTypes[1] = paramTypes[2];
+        tempTypes[2] = paramTypes[3];
+        paramTypes[0] = tempTypes[0];
+        paramTypes[1] = tempTypes[1];
+        paramTypes[2] = tempTypes[2];
+        paramTypes[3] = tempTypes[3];
+
+        IRType* returnType = targetFunc->getDataType()->getResultType();
+
+        IRBuilderInsertLocScope insertLocScope(&builder);
+        auto wrapperFunc = builder.createFunc();
+        builder.setDataType(wrapperFunc, builder.getFuncType(paramTypes, returnType));
+        builder.setInsertInto(wrapperFunc);
+        auto block = builder.emitBlock();
+        builder.setInsertInto(block);
+
+        List<IRInst*> params;
+        for (Index i = 0; i < paramTypes.getCount(); i++)
+        {
+            params.add(builder.emitParam(paramTypes[i]));
+        }
+
+        IRInst* tempParams[4];
+        tempParams[0] = builder.emitLoad(params[3]);
+        tempParams[1] = params[0];
+        tempParams[2] = params[1];
+        tempParams[3] = params[2];
+        params[0] = tempParams[0];
+        params[1] = tempParams[1];
+        params[2] = tempParams[2];
+        params[3] = tempParams[3];
+
+        auto result = builder.emitCallInst(returnType, targetFunc, params);
+        builder.emitReturn(result);
+        return wrapperFunc;
+    }
+
+    void processCoopMatMapElementIFunc(IRCoopMatMapElementIFunc* inst)
+    {
+        IRBuilder builder{inst};
+        builder.setInsertBefore(inst);
+
+        auto ifuncCall = inst->getIFuncCall();
+
+        // `this` of the functor is optional.
+        // Skip the synthesis if `this` is not passed.
+        if (ifuncCall->getParamCount() > 3)
+        {
+            auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
+            inst->setIFuncCall(funcSynth);
+        }
+    }
+
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
         auto stage = entryPointDecor->getProfile().getStage();
@@ -1704,6 +1815,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
+            case kIROp_BitfieldExtract:
+            case kIROp_BitfieldInsert:
+                processBitFieldOp(inst);
+                break;
+            case kIROp_CoopMatMapElementIFunc:
+                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFunc>(inst));
+                break;
+
             case kIROp_DebugValue:
                 if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
                     inst->removeAndDeallocate();
@@ -1768,9 +1887,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
         }
+
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
+            switch (globalInst->getOp())
+            {
+            case kIROp_CoopVectorType:
+            case kIROp_CoopMatrixType:
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+                break;
+            }
+
             for (auto decor : globalInst->getDecorations())
             {
                 switch (decor->getOp())
@@ -1803,6 +1931,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto globalInst : m_module->getGlobalInsts())
         {
             processInst(globalInst);
+        }
+
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
+        {
+            m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
         }
 
         if (m_sharedContext->m_spvVersion < 0x10300)

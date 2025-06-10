@@ -83,6 +83,9 @@ struct Options
     // integration builds.
     bool dumpOutputOnFailure = false;
 
+    // When true it will run with debug layer (e.g. vulkan validation layer)
+    bool enableDebugLayers = false;
+
     // Set the default spawn type to use
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
     // desirable default usually.

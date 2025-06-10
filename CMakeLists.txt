@@ -223,6 +223,11 @@ advanced_option(
     "Build using user defined path for tinyobjloader"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_LUA_PATH
+    "Build using user defined path for lua"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN
@@ -235,22 +240,6 @@ advanced_option(
     "Optionally exclude slang-tint from the build"
     OFF
 )
-
-if(${SLANG_USE_SYSTEM_LZ4})
-    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
-endif()
-
-if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
-endif()
-
-if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
-endif()
-
-if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
-endif()
 
 enum_option(
     SLANG_LIB_TYPE
@@ -270,7 +259,7 @@ option(
     ON
 )
 
-option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" ON)
+option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" OFF)
 
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO

@@ -224,6 +224,10 @@ def hlsl_nvapi : hlsl;
 /// [Version]
 def hlsl_2018 : _sm_5_1;
 
+/// Represet compatibility support for the deprecated POC DXC
+/// [Version]
+def hlsl_coopvec_poc : _sm_6_8;
+
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
 alias dxil_lib = _sm_6_3;
@@ -543,6 +547,10 @@ def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 /// [EXT]
 def SPV_NV_cluster_acceleration_structure : _spirv_1_0;
 
+/// Represents the SPIR-V extension for linear swept spheres.
+/// [EXT]
+def SPV_NV_linear_swept_spheres : _spirv_1_0;
+
 /// Represents the SPIR-V extension for shader image footprint.
 /// [EXT]
 def SPV_NV_shader_image_footprint : _spirv_1_0;
@@ -563,13 +571,26 @@ def SPV_GOOGLE_user_type : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_replicated_composites : _spirv_1_0;
 
+/// Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+/// [EXT]
+def SPV_KHR_vulkan_memory_model : _spirv_1_3;
+
 /// Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 /// [EXT]
-def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
+def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites + SPV_KHR_vulkan_memory_model;
 
 /// Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
 /// [EXT]
-def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer;
+def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer + SPV_KHR_vulkan_memory_model;
+
+/// Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+/// [EXT]
+def SPV_NV_tensor_addressing : _spirv_1_6;
+
+/// Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
+/// [EXT]
+def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
+
 
 // SPIRV Capabilities.
 
@@ -697,6 +718,10 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
 
+/// Represents the SPIR-V capability for linear swept spheres.
+/// [EXT]
+def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
+
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
 def spvShaderClockKHR : SPV_KHR_shader_clock;
@@ -733,6 +758,30 @@ def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
 /// [EXT]
 def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix;
 
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixReductionsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixConversionsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixPerElementOperationsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixTensorAddressingNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixBlockLoadsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for tensor addressing
+/// [EXT]
+def spvTensorAddressingNV : SPV_NV_tensor_addressing;
+
 /// Represents the SPIR-V capability for maximal reconvergence.
 /// [EXT]
 def spvMaximalReconvergenceKHR : SPV_KHR_maximal_reconvergence;
@@ -740,6 +789,14 @@ def spvMaximalReconvergenceKHR : SPV_KHR_maximal_reconvergence;
 /// Represents the SPIR-V capability for quad group control.
 /// [EXT]
 def spvQuadControlKHR : SPV_KHR_quad_control;
+
+/// Represents the SPIR-V capability for vulkan memory model.
+/// [EXT]
+def spvVulkanMemoryModelKHR : SPV_KHR_vulkan_memory_model;
+
+/// Represents the SPIR-V capability for vulkan memory model.
+/// [EXT]
+def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
@@ -773,6 +830,7 @@ def _GL_EXT_shader_atomic_float : glsl;
 def _GL_EXT_shader_atomic_float_min_max : glsl;
 def _GL_EXT_shader_atomic_float2 : glsl;
 def _GL_EXT_shader_atomic_int64 : glsl;
+def _GL_EXT_shader_explicit_arithmetic_types : _GLSL_140;
 def _GL_EXT_shader_explicit_arithmetic_types_int64 : _GLSL_140;
 def _GL_EXT_shader_image_load_store : _GLSL_130;
 def _GL_EXT_shader_realtime_clock : glsl;
@@ -896,6 +954,10 @@ alias GL_EXT_shader_atomic_float2 = _GL_EXT_shader_atomic_float2 | spvAtomicFloa
 /// Represents the GL_EXT_shader_atomic_int64 extension.
 /// [EXT]
 alias GL_EXT_shader_atomic_int64 = _GL_EXT_shader_atomic_int64 | spvInt64Atomics;
+
+/// Represents the GL_EXT_shader_explicit_arithmetic_types extension.
+/// [EXT]
+alias GL_EXT_shader_explicit_arithmetic_types = _GL_EXT_shader_explicit_arithmetic_types | _spirv_1_0;
 
 /// Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
 /// [EXT]
@@ -1103,11 +1165,6 @@ alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 ///  (gfx targets) Capabilities needed to use memory barriers
 /// [Compound]
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
-/// Capabilities needed to use HLSL tier wave operations
-/// [Compound]
-alias wave_multi_prefix = _sm_6_5
-                 | _cuda_sm_7_0
-                 | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 /// Capabilities needed to use GLSL buffer-reference's
 /// [Compound]
 alias bufferreference = GL_EXT_buffer_reference;
@@ -1118,13 +1175,39 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 /// Note that cpp and cuda are supported via a fallback non-cooperative implementation
 /// No HLSL shader model bound yet
 /// [Compound]
-alias cooperative_vector = _sm_6_8 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
 
 /// Capabilities needed to use cooperative matrices
+/// [Compound]
 alias cooperative_matrix = spvCooperativeMatrixKHR;
+/// Capabilities needed to use reduction operations with cooperative matrix
+/// [Compound]
+alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
+/// Capabilities needed to convert cooperative matrices
+/// [Compound]
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV;
+/// Capabilities needed to use MapElement operation with cooperative matrix
+/// [Compound]
+alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
+/// Capabilities needed to load or store with tensor_addressing extension
+/// [Compound]
+alias cooperative_matrix_tensor_addressing = spvCooperativeMatrixTensorAddressingNV;
+/// Capabilities needed to use decodeFunc with cooperative matrix load
+/// [Compound]
+alias cooperative_matrix_block_load = spvCooperativeMatrixBlockLoadsNV;
+/// Capabilities needed to use tensor addressing
+/// [Compound]
+alias tensor_addressing = spvTensorAddressingNV;
+/// Capabilities needed to use tensor addressing
+/// [Compound]
+alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReductionsNV + spvCooperativeMatrixConversionsNV + spvCooperativeMatrixPerElementOperationsNV + spvCooperativeMatrixTensorAddressingNV + spvCooperativeMatrixBlockLoadsNV + spvTensorAddressingNV;
+
+/// Capabilities needed to use vulkan memory model
+/// [Compound]
+alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
 
 // Non-internal shader stages
 //
@@ -1389,7 +1472,7 @@ alias sm_4_1 = sm_4_1_version
 alias sm_5_0_version = _sm_5_0 
              | _GLSL_330
              | spirv_1_0
-             | _cuda_sm_9_0
+             | _cuda_sm_6_0
              | metal
              | wgsl
              | cpp
@@ -1410,7 +1493,7 @@ alias sm_5_0 = sm_5_0_version
 alias sm_5_1_version = _sm_5_1
              | _GLSL_330
              | spirv_1_0
-             | _cuda_sm_9_0
+             | _cuda_sm_6_0
              | metal
              | cpp
              ;
@@ -1429,7 +1512,7 @@ alias sm_5_1 = sm_5_1_version
 alias sm_6_0_version = _sm_6_0 
              | _GLSL_450
              | spirv_1_3
-             | _cuda_sm_9_0 
+             | _cuda_sm_6_0 
              | metal
              | cpp
              ;
@@ -1448,7 +1531,7 @@ alias sm_6_0 = sm_6_0_version
 alias sm_6_1_version = _sm_6_1 
              | _GLSL_450 
              | spirv_1_3 
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1467,7 +1550,7 @@ alias sm_6_1 = sm_6_1_version
 alias sm_6_2_version = _sm_6_2
              | _GLSL_450
              | spirv_1_3
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1485,7 +1568,7 @@ alias sm_6_2 = sm_6_2_version
 alias sm_6_3_version = _sm_6_3
              | _GLSL_460 
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1504,7 +1587,7 @@ alias sm_6_3 = sm_6_3_version
 alias sm_6_4_version = _sm_6_4
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1522,7 +1605,7 @@ alias sm_6_4 = sm_6_4_version
 alias sm_6_5_version = _sm_6_5
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1542,7 +1625,7 @@ alias sm_6_5 = sm_6_5_version
 alias sm_6_6_version = _sm_6_6
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1560,7 +1643,7 @@ alias sm_6_6 = sm_6_6_version
 alias sm_6_7_version = _sm_6_7
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1577,7 +1660,7 @@ alias sm_6_7 = sm_6_7_version
 alias sm_6_8_version = _sm_6_8
              | _GLSL_460
              | spirv_1_5
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1595,7 +1678,7 @@ alias sm_6_8 = sm_6_8_version
 alias sm_6_9_version = _sm_6_9
              | _GLSL_460
              | spirv_1_5
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1812,43 +1895,43 @@ alias GLSL_430_SPIRV_1_0 = _GLSL_430 + GLSL_420_SPIRV_1_0 | GLSL_420_SPIRV_1_0;
 //
 /// cuda 1.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_1_0 = _cuda_sm_1_0 | sm_4_0;
+alias cuda_sm_1_0 = _cuda_sm_1_0;
 
 /// cuda 2.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_2_0 = _cuda_sm_2_0 | sm_4_1;
+alias cuda_sm_2_0 = _cuda_sm_2_0 | cuda_sm_1_0 | sm_4_0;
 
 /// cuda 3.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_3_0 = _cuda_sm_3_0 | sm_6_0;
+alias cuda_sm_3_0 = _cuda_sm_3_0 | cuda_sm_2_0;
 
 /// cuda 3.5 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_3_5 = _cuda_sm_3_5 | sm_6_0;
+alias cuda_sm_3_5 = _cuda_sm_3_5 | cuda_sm_3_0;
 
 /// cuda 4.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_4_0 = _cuda_sm_4_0 | sm_6_0;
+alias cuda_sm_4_0 = _cuda_sm_4_0 | cuda_sm_3_5;
 
 /// cuda 5.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_5_0 = _cuda_sm_5_0 | sm_6_0;
+alias cuda_sm_5_0 = _cuda_sm_5_0 | cuda_sm_4_0;
 
 /// cuda 6.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_6_0 = _cuda_sm_6_0 | sm_6_0;
+alias cuda_sm_6_0 = _cuda_sm_6_0 | cuda_sm_5_0 | sm_4_1;
 
 /// cuda 7.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_7_0 = _cuda_sm_7_0 | sm_5_1;
+alias cuda_sm_7_0 = _cuda_sm_7_0 | cuda_sm_6_0;
 
 /// cuda 8.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_8_0 = _cuda_sm_8_0 | sm_5_1;
+alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
 
 /// cuda 9.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_9_0 = _cuda_sm_9_0 | sm_5_1;
+alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_0 | sm_5_0;
 
 // Metal profile capabilities
 //
@@ -2018,7 +2101,7 @@ alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0_version;
 /// [Compound]
 alias pack_vector = GL_ARB_gpu_shader5
                   | _sm_6_6
-                  | _cuda_sm_9_0
+                  | _cuda_sm_6_0
                   | wgsl
                   | metal
                   | cpp
@@ -2035,22 +2118,22 @@ alias subgroup_basic = GL_KHR_shader_subgroup_basic
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot'
 /// [Compound]
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
-                      | glsl + GL_KHR_shader_subgroup_ballot + shader5_sm_5_0 
-                      | _sm_6_0  + shader5_sm_5_0 
-                      | _cuda_sm_7_0 + shader5_sm_5_0
+                      | glsl + GL_KHR_shader_subgroup_ballot + shader5_sm_5_0
+                      | _sm_6_0
+                      | _cuda_sm_7_0
                       | wgsl
                       | metal
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot_activemask'
 /// [Compound]
 alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
-                      | glsl + GL_KHR_shader_subgroup_ballot 
+                      | glsl + GL_KHR_shader_subgroup_ballot
                       | _sm_6_0
                       | _cuda_sm_7_0
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic_ballot'
 /// [Compound]
-alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_ballot 
+alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_ballot
                             | spirv + GL_KHR_shader_subgroup_basic + subgroup_ballot
                             | hlsl + subgroup_ballot
                             | cuda + subgroup_ballot
@@ -2106,7 +2189,9 @@ alias subgroup_quad = GL_KHR_shader_subgroup_quad
                     ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 /// [Compound]
-alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
+alias subgroup_partitioned = _sm_6_5
+                           | _cuda_sm_7_0
+                           | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
@@ -2168,6 +2253,10 @@ alias raytracing_intersection = intersection + raytracing;
 /// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
+
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]

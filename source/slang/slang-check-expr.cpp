@@ -518,7 +518,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
 {
     if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
-        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+        return coerce(
+            CoercionSite::ExplicitCoercion,
+            resPtrType->getElementType(),
+            base,
+            getSink());
     }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
@@ -1974,7 +1978,30 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // if they're marked `const`.
     if (decl->hasModifier<SpecializationConstantAttribute>() ||
         decl->hasModifier<VkConstantIdAttribute>())
+    {
+        if (kind == ConstantFoldingKind::SpecializationConstant)
+        {
+            // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
+            // which means they need to be local instructions can cannot be hoisted to the
+            // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
+            // instructions using this `IntVal` will trigger error. Hence we emit error here
+            // to not allow such cases.
+            //
+            // Note that float-to-inst casts for non-`IntVal`s are allowed.
+            if (!isScalarIntegerType(decl->getType()))
+            {
+                getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+                return nullptr;
+            }
+
+            return m_astBuilder->getOrCreate<DeclRefIntVal>(
+                declRef.substitute(m_astBuilder, decl->getType()),
+                declRef);
+        }
+        // Don't fold on other folding passes, we don't actually know the
+        // values.
         return nullptr;
+    }
 
     if (decl->hasModifier<ExternModifier>())
     {
@@ -1982,7 +2009,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         if (kind == ConstantFoldingKind::CompileTime)
             return nullptr;
         // But if we are OK with link-time constants, we can still fold it into a val.
-        auto rs = m_astBuilder->getOrCreate<GenericParamIntVal>(
+        auto rs = m_astBuilder->getOrCreate<DeclRefIntVal>(
             declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
             declRef);
         return rs;
@@ -2051,13 +2078,25 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
     }
 
-    if (auto countOfExpr = expr.as<CountOfExpr>())
+    if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
-        auto type =
-            as<Type>(countOfExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
-        if (type)
+        auto type = as<Type>(
+            sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        {
+            return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto alignOfExpr = expr.as<AlignOfExpr>())
+        {
+            return as<IntVal>(
+                AlignOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto countOfExpr = expr.as<CountOfExpr>())
+        {
             return as<IntVal>(
                 CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
     }
 
     // it is possible that we are referring to a generic value param
@@ -2067,7 +2106,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
         {
-            Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                 genericValParamRef);
             valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
@@ -2149,20 +2188,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto val = tryConstantFoldExpr(invokeExpr, kind, circularityInfo);
         if (val)
             return val;
-    }
-    else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
-    {
-        ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
-        const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
-        if (!size)
-        {
-            return nullptr;
-        }
-
-        auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? size.alignment : size.size;
-
-        // We can return as an IntVal
-        return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
     }
     else if (auto indexExpr = expr.as<IndexExpr>())
     {
@@ -2249,7 +2274,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     switch (coercionType)
     {
     case IntegerConstantExpressionCoercionType::SpecificType:
-        expr = coerce(CoercionSite::General, expectedType, inExpr);
+        expr = coerce(CoercionSite::General, expectedType, inExpr, sink);
         break;
     case IntegerConstantExpressionCoercionType::AnyInteger:
         if (isScalarIntegerType(inExpr->type))
@@ -2257,7 +2282,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
         else if (isEnumType(inExpr->type))
             expr = inExpr;
         else
-            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
+            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr, sink);
         break;
     default:
         break;
@@ -2324,6 +2349,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
         return CreateErrorExpr(subscriptExpr);
     }
 
+    for (auto& expr : subscriptExpr->indexExprs)
+    {
+        expr = CheckExpr(expr);
+    }
     auto indexExpr = subscriptExpr->indexExprs[0];
 
     if (!isScalarIntegerType(indexExpr->type.type))
@@ -2383,12 +2412,12 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
-                ConstantFoldingKind::LinkTime);
+                ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is greater than zero
+            // Validate that array size is non-negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() <= 0)
+                if (constElementCount->getValue() < 0)
                 {
                     getSink()->diagnose(
                         subscriptExpr->indexExprs[0],
@@ -2473,6 +2502,30 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
+{
+    List<Type*> elementTypes;
+    for (auto& element : expr->elements)
+    {
+        element = CheckTerm(element);
+        auto elementType = element->type.type;
+        if (auto concreteTypePack = as<ConcreteTypePack>(elementType))
+        {
+            // We need to flatten the type pack into a tuple type
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementTypes.add(concreteTypePack->getElementType(i));
+            }
+        }
+        else
+        {
+            elementTypes.add(element->type.type);
+        }
+    }
+    expr->type = m_astBuilder->getTupleType(elementTypes.getArrayView());
+    return expr;
+}
+
 void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
 {
     // We will try to handle expressions of the form:
@@ -2522,7 +2575,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         type = atomicType->getElementType();
     }
     auto right = maybeOpenRef(expr->right);
-    expr->right = coerce(CoercionSite::Assignment, type, right);
+    expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
 
     if (!expr->left->type.isLeftValue)
     {
@@ -2878,6 +2931,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             }
         }
     }
+    rs->checked = true;
     return rs;
 }
 
@@ -2951,7 +3005,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             // to handle if this expression doesn't support short-circuiting.
             for (auto& arg : expr->arguments)
             {
-                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg, getSink());
             }
 
             expr->functionExpr = CheckTerm(expr->functionExpr);
@@ -3915,7 +3969,11 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
 
-                        return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
+                        return coerce(
+                            CoercionSite::General,
+                            typeExp.type,
+                            checkedInitListExpr,
+                            getSink());
                     }
                 }
             }
@@ -3939,45 +3997,64 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
 
     auto parentFunc = this->m_parentFunc;
-    // TODO: check if the try clause is caught.
-    // For now we assume all `try`s are not caught (because we don't have catch yet).
-    if (!parentFunc)
-    {
-        getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
-        return expr;
-    }
-    if (parentFunc->errorType->equals(m_astBuilder->getBottomType()))
-    {
-        getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
-        return expr;
-    }
-    if (!as<InvokeExpr>(expr->base))
+    auto base = as<InvokeExpr>(expr->base);
+    if (!base)
     {
         getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
         return expr;
     }
-    auto base = as<InvokeExpr>(expr->base);
-    if (auto callee = as<DeclRefExpr>(base->functionExpr))
+
+    auto callee = as<DeclRefExpr>(base->functionExpr);
+    if (!callee)
     {
-        if (auto funcCallee = as<FuncDecl>(callee->declRef.getDecl()))
+        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
+    }
+
+    auto funcCallee = as<FuncDecl>(callee->declRef.getDecl());
+    Stmt* catchStmt = nullptr;
+    if (funcCallee)
+    {
+        if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
         {
-            if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
-            {
-                getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
-            }
-            if (!parentFunc->errorType->equals(funcCallee->errorType))
-            {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
-                    callee->declRef,
-                    funcCallee->errorType,
-                    parentFunc->errorType);
-            }
+            getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+            return expr;
+        }
+        catchStmt = findMatchingCatchStmt(funcCallee->errorType);
+    }
+
+    if (FindOuterStmt<DeferStmt>(catchStmt))
+    {
+        // 'try' may jump outside a defer statement, which isn't allowed for
+        // now.
+        getSink()->diagnose(expr, Diagnostics::uncaughtTryInsideDefer);
+        return expr;
+    }
+
+    if (!catchStmt)
+    {
+        // Uncaught try.
+        if (!parentFunc)
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (parentFunc->errorType->equals(m_astBuilder->getBottomType()))
+        {
+            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            return expr;
+        }
+        if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
+        {
+            getSink()->diagnose(
+                expr,
+                Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
+                callee->declRef,
+                funcCallee->errorType,
+                parentFunc->errorType);
             return expr;
         }
     }
-    getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
     return expr;
 }
 
@@ -3987,6 +4064,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     auto originalVal = CheckTerm(expr->value);
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
+
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(expr->typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        return expr;
+    }
 
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
@@ -4026,6 +4110,15 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
+
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     expr->value = CheckTerm(expr->value);
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
@@ -4196,9 +4289,9 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     if (m_parentFunc)
     {
         nameBuilder << getText(m_parentFunc->getName());
+        nameBuilder << "_";
+        nameBuilder << m_parentFunc->members.getCount();
     }
-    nameBuilder << "_";
-    nameBuilder << m_parentFunc->members.getCount();
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
     lambdaStructDecl->nameAndLoc.loc = lambdaExpr->loc;
@@ -4270,6 +4363,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     auto resultLambdaObj = synthesizer.emitCtorInvokeExpr(
         synthesizer.emitStaticTypeExpr(DeclRefType::create(m_astBuilder, lambdaStructDecl)),
         _Move(args));
+    resultLambdaObj->loc = lambdaExpr->loc;
     auto checkedResultExpr = dispatchExpr(resultLambdaObj, *this);
     return checkedResultExpr;
 }
@@ -5179,6 +5273,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return checkGeneralMemberLookupExpr(expr, baseType);
     }
+}
+
+Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+{
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)

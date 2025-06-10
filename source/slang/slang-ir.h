@@ -1162,6 +1162,11 @@ struct IRBoolLit : IRConstant
 // if it has one, and assert-fail otherwise.
 IRIntegerValue getIntVal(IRInst* inst);
 
+// If it's a specialization constant sized array or unsized array, returns
+// kUnsizedArrayMagicLength if it's an unsized array. Otherwise just returns
+// the actual size.
+IRIntegerValue getArraySizeVal(IRInst* inst);
+
 struct IRStringLit : IRConstant
 {
 
@@ -1644,6 +1649,7 @@ struct IRAtomicType : IRType
 
 SIMPLE_IR_PARENT_TYPE(Rate, Type)
 SIMPLE_IR_TYPE(ConstExprRate, Rate)
+SIMPLE_IR_TYPE(SpecConstRate, Rate)
 SIMPLE_IR_TYPE(GroupSharedRate, Rate)
 SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 
@@ -1874,6 +1880,23 @@ struct IRCoopMatrixType : IRType
     IRInst* getMatrixUse() { return getOperand(4); }
 
     IR_LEAF_ISA(CoopMatrixType)
+};
+
+struct IRTensorAddressingTensorLayoutType : IRType
+{
+    IRInst* getDimension() { return getOperand(0); }
+    IRInst* getClampMode() { return getOperand(1); }
+
+    IR_LEAF_ISA(TensorAddressingTensorLayoutType)
+};
+
+struct IRTensorAddressingTensorViewType : IRType
+{
+    IRInst* getDimension() { return getOperand(0); }
+    IRInst* getHasDimension() { return getOperand(1); }
+    IRInst* getPermutation(int index) { return getOperand(2 + index); }
+
+    IR_LEAF_ISA(TensorAddressingTensorViewType)
 };
 
 bool isDefinition(IRInst* inVal);

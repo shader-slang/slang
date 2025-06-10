@@ -573,6 +573,8 @@ protected:
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         auto localVar = builder.emitVar(valueType);
+        // Add TempCallArgVar decoration to mark this variable as a temporary for parameter passing
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
         if (const auto inOutType = as<IRInOutType>(paramPtrType))
@@ -1892,6 +1894,10 @@ private:
                 structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
             Index fieldIndex = 0;
             List<IRInst*> fieldParams;
+            // TODO: We currently lose some decorations from the struct that should possibly be
+            // transfered
+            //       to the new params here, like
+            //       kIROp_GlobalVariableShadowingGlobalParameterDecoration.
             for (auto field : structType->getFields())
             {
                 auto fieldParam = builder.emitParam(field->getFieldType());
@@ -3191,6 +3197,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3254,6 +3261,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3857,6 +3865,7 @@ protected:
             break;
 
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
@@ -3910,6 +3919,7 @@ protected:
             }
 
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_index");
                 result.permittedTypes.add(builder.getUIntType());

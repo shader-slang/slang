@@ -41,6 +41,19 @@ void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
     checkModifiers(stmt);
 }
 
+CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
+{
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    {
+        if (auto catchStmt = as<CatchStmt>(outerStmtInfo->stmt))
+        {
+            if (!catchStmt->errorVar || catchStmt->errorVar->getType()->equals(errorType))
+                return catchStmt;
+        }
+    }
+    return nullptr;
+}
+
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
     // When we encounter a declaration during statement checking,
@@ -116,20 +129,6 @@ void SemanticsStmtVisitor::visitLabelStmt(LabelStmt* stmt)
 void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
 {
     SemanticsVisitor::checkStmt(stmt, *this);
-}
-
-template<typename T>
-T* SemanticsStmtVisitor::FindOuterStmt(Stmt* searchUntil)
-{
-    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
-         outerStmtInfo = outerStmtInfo->next)
-    {
-        auto outerStmt = outerStmtInfo->stmt;
-        auto found = as<T>(outerStmt);
-        if (found)
-            return found;
-    }
-    return nullptr;
 }
 
 Stmt* SemanticsStmtVisitor::findOuterStmtWithLabel(Name* label)
@@ -255,7 +254,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e);
+    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
 
@@ -408,7 +407,7 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
-    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr);
+    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr, getSink());
 
     // coerce to type being switch on, and ensure that value is a compile-time constant
     // The Vals in the AST are pointer-unique, making them easy to check for duplicates
@@ -574,7 +573,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             if (!m_parentLambdaExpr && expectedReturnType)
             {
                 stmt->expression =
-                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression);
+                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
             }
         }
     }
@@ -614,6 +613,55 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
     subContext.checkStmt(stmt->statement);
+}
+
+void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
+{
+    stmt->expression = CheckTerm(stmt->expression);
+    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
+
+    auto parentFunc = getParentFunc();
+    if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
+    {
+        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInNonThrowFunc);
+        return;
+    }
+
+    if (!catchStmt && !stmt->expression->type->equals(m_astBuilder->getErrorType()))
+    {
+        if (!parentFunc->errorType->equals(stmt->expression->type))
+        {
+            getSink()->diagnose(
+                stmt->expression,
+                Diagnostics::throwTypeIncompatibleWithErrorType,
+                stmt->expression->type,
+                parentFunc->errorType);
+        }
+    }
+
+    if (FindOuterStmt<DeferStmt>(catchStmt))
+    {
+        // Allowing 'throw' to escape a defer statement gets quite complex, for
+        // similar reasons as 'return' - if you have two (or more) defers,
+        // both of which exit the outer scope, it's unclear which one gets
+        // called and when. Both can't fully run. That kind of goes against the
+        // point of 'defer', which is to _always_ run some code when exiting
+        // scopes.
+        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInsideDefer);
+    }
+}
+
+void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
+{
+    if (stmt->errorVar)
+    {
+        ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
+        stmt->errorVar->hiddenFromLookup = false;
+    }
+
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->tryBody);
+    subContext.checkStmt(stmt->handleBody);
 }
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)

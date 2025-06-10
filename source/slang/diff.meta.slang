@@ -1396,6 +1396,45 @@ extension Array<T, N> : IDifferentiablePtrType
     typedef Array<T.Differential, N> Differential;
 }
 
+__generic<T:IDifferentiable>
+extension Optional<T> : IDifferentiable
+{
+    typedef Optional<T.Differential> Differential;
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return Optional<T.Differential>();
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        if (!a.hasValue)
+            return b;
+        if (b.hasValue)
+            return T.dadd(a.value, b.value);
+        else
+            return a;
+    }
+
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    static Differential dmul(U a, Differential b)
+    {
+        if (b.hasValue)
+            return Optional<T.Differential>(T.dmul<U>(a, b.value));
+        else
+            return b;
+    }
+}
+
+__generic<T : IDifferentiablePtrType>
+extension Optional<T> : IDifferentiablePtrType
+{
+    typedef Optional<T.Differential> Differential;
+}
+
 __generic<each T : IDifferentiable>
 extension Tuple<T> : IDifferentiable
 {
@@ -1970,6 +2009,12 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(asin, T(1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(acos, T(-1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 // Arc-tan
 SIMPLE_UNARY_DERIVATIVE_IMPL(atan, T(1.0) / (T(1.0) + dpx.p * dpx.p))
+// Arc-sinh
+SIMPLE_UNARY_DERIVATIVE_IMPL(asinh, T(1.0) / sqrt(dpx.p * dpx.p + T(1.0)))
+// Arc-cosh
+SIMPLE_UNARY_DERIVATIVE_IMPL(acosh, T(1.0) / sqrt(dpx.p * dpx.p - T(1.0)))
+// Arc-tanh
+SIMPLE_UNARY_DERIVATIVE_IMPL(atanh, T(1.0) / (T(1.0) - dpx.p * dpx.p))
 
 // Atan2
 __generic<T : __BuiltinFloatingPointType>

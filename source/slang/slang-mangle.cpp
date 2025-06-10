@@ -323,7 +323,7 @@ void emitVal(ManglingContext* context, Val* val)
         // to mangle in the constraints even when
         // the whole thing is specialized...
     }
-    else if (auto genericParamIntVal = dynamicCast<GenericParamIntVal>(val))
+    else if (auto genericParamIntVal = dynamicCast<DeclRefIntVal>(val))
     {
         // TODO: we shouldn't be including the names of generic parameters
         // anywhere in mangled names, since changing parameter names
@@ -356,6 +356,21 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "KL");
         emitVal(context, lookupIntVal->getWitness());
         emitName(context, lookupIntVal->getKey()->getName());
+    }
+    else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
+    {
+        emitRaw(context, "KSO");
+        emitVal(context, sizeOfIntVal->getTypeArg());
+    }
+    else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
+    {
+        emitRaw(context, "KAO");
+        emitVal(context, alignOfIntVal->getTypeArg());
+    }
+    else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
+    {
+        emitRaw(context, "KCO");
+        emitVal(context, countOfIntVal->getTypeArg());
     }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {

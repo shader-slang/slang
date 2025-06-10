@@ -1175,6 +1175,46 @@ SlangResult passthroughDownstreamDiagnostics(
     return SLANG_OK;
 }
 
+bool isValidSlangLanguageVersion(SlangLanguageVersion version)
+{
+    switch (version)
+    {
+    case SLANG_LANGUAGE_VERSION_LEGACY:
+    case SLANG_LANGUAGE_VERSION_2025:
+    case SLANG_LANGUAGE_VERSION_2026:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isValidGLSLVersion(int version)
+{
+    switch (version)
+    {
+    case 100:
+    case 110:
+    case 120:
+    case 130:
+    case 140:
+    case 150:
+    case 300:
+    case 310:
+    case 320:
+    case 330:
+    case 400:
+    case 410:
+    case 420:
+    case 430:
+    case 440:
+    case 450:
+    case 460:
+        return true;
+    default:
+        return false;
+    }
+}
+
 SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
     outArtifact.setNull();
@@ -1415,6 +1455,39 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             version.version = glslTracker->getSPIRVVersion();
 
             requiredCapabilityVersions.add(version);
+        }
+    }
+
+    CapabilitySet targetCaps = getTargetCaps();
+    for (auto atomSets : targetCaps.getAtomSets())
+    {
+        for (auto atomVal : atomSets)
+        {
+            auto atom = CapabilityAtom(atomVal);
+            switch (atom)
+            {
+            default:
+                break;
+
+#define CASE(KIND, NAME, VERSION)                                                   \
+    case CapabilityAtom::NAME:                                                      \
+        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{ \
+            DownstreamCompileOptions::CapabilityVersion::Kind::KIND,                \
+            VERSION});                                                              \
+        break
+
+                CASE(CUDASM, _cuda_sm_1_0, SemanticVersion(1, 0));
+                CASE(CUDASM, _cuda_sm_2_0, SemanticVersion(2, 0));
+                CASE(CUDASM, _cuda_sm_3_0, SemanticVersion(3, 0));
+                CASE(CUDASM, _cuda_sm_4_0, SemanticVersion(4, 0));
+                CASE(CUDASM, _cuda_sm_5_0, SemanticVersion(5, 0));
+                CASE(CUDASM, _cuda_sm_6_0, SemanticVersion(6, 0));
+                CASE(CUDASM, _cuda_sm_7_0, SemanticVersion(7, 0));
+                CASE(CUDASM, _cuda_sm_8_0, SemanticVersion(8, 0));
+                CASE(CUDASM, _cuda_sm_9_0, SemanticVersion(9, 0));
+
+#undef CASE
+            }
         }
     }
 
@@ -1787,6 +1860,23 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     }
 }
 
+static IArtifact* _getSeparateDbgArtifact(IArtifact* artifact)
+{
+    if (!artifact)
+        return nullptr;
+
+    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug
+    // artifact.
+    for (auto* associated : artifact->getAssociated())
+    {
+        auto desc = associated->getDesc();
+        if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::SPIRV)
+            return associated;
+    }
+
+    return nullptr;
+}
+
 /// Function to simplify the logic around emitting, and dissassembling
 SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
@@ -1816,6 +1906,32 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 intermediateArtifact,
                 getSink(),
                 disassemblyArtifact.writeRef()));
+
+            // Also disassemble the debug artifact if one exists.
+            auto debugArtifact = _getSeparateDbgArtifact(intermediateArtifact);
+            ComPtr<IArtifact> disassemblyDebugArtifact;
+            if (debugArtifact)
+            {
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(
+                    getSession(),
+                    debugArtifact,
+                    getSink(),
+                    disassemblyDebugArtifact.writeRef()));
+                disassemblyDebugArtifact->setName(debugArtifact->getName());
+
+                // The disassembly needs both the metadata for the debug build identifier
+                // and the debug spirv to be associated with is.
+                for (auto associated : intermediateArtifact->getAssociated())
+                {
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    {
+                        disassemblyArtifact->addAssociated(associated);
+                        break;
+                    }
+                }
+                disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
+            }
 
             outArtifact.swap(disassemblyArtifact);
             return SLANG_OK;
@@ -2035,6 +2151,46 @@ SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArt
     else
     {
         SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
+    }
+
+    return SLANG_OK;
+}
+
+// These helper functions are used by the -separate-debug-info command line
+// arg to extract the associated artifact containing the debug SPIRV data
+// and save it to a file with a .dbg.spv extension.
+static String _getDebugSpvPath(const String& basePath)
+{
+    // Find the last occurrence of ".spv" at the end of the string.
+    static const char ext[] = ".spv";
+    static const char dbgExt[] = ".dbg.spv";
+    Index extLen = 4;
+    if (basePath.getLength() >= extLen && basePath.endsWith(ext))
+    {
+        // Replace the ".spv" extension with ".dbg.spv"
+        String prefix = String(basePath.subString(0, basePath.getLength() - extLen));
+        return prefix + dbgExt;
+    }
+    // If it doesn't end with .spv, just append .dbg.spv
+    return basePath + dbgExt;
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    {
+        const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
+        // The artifact's name may have been set to the debug build id hash, use
+        // it as the filename if it exists.
+        String dbgPath = dbgArtifact->getName();
+        if (dbgPath.getLength() == 0)
+            dbgPath = _getDebugSpvPath(path);
+        else
+            dbgPath.append(".dbg.spv");
+        return _maybeWriteArtifact(dbgPath, dbgArtifact);
     }
 
     return SLANG_OK;
@@ -2539,6 +2695,10 @@ void EndToEndCompileRequest::generateOutput()
                     const auto path = _getWholeProgramPath(targetReq);
 
                     _maybeWriteArtifact(path, artifact);
+
+                    // If we are compiling separate debug info, check for the additional
+                    // SPIRV artifact and write that if needed.
+                    _maybeWriteDebugArtifact(targetProgram, path, artifact);
                 }
             }
             else
@@ -2551,6 +2711,10 @@ void EndToEndCompileRequest::generateOutput()
                         const auto path = _getEntryPointPath(targetReq, ee);
 
                         _maybeWriteArtifact(path, artifact);
+
+                        // If we are compiling separate debug info, check for the additional
+                        // SPIRV artifact and write that if needed.
+                        _maybeWriteDebugArtifact(targetProgram, path, artifact);
                     }
                 }
             }

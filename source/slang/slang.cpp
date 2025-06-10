@@ -687,34 +687,31 @@ SlangResult Session::_readBuiltinModule(
     StringBuilder moduleFilename;
     moduleFilename << moduleName << ".slang-module";
 
-    RiffContainer riffContainer;
+    // Load it
+    ComPtr<ISlangBlob> fileContents;
+    SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), fileContents.writeRef()));
+
+    RIFF::RootChunk const* rootChunk = RIFF::RootChunk::getFromBlob(fileContents);
+    if (!rootChunk)
     {
-        // Load it
-        ComPtr<ISlangBlob> blob;
-        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), blob.writeRef()));
-
-        // Set up a stream
-        MemoryStreamBase stream(FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
-
-        // Load the riff container
-        SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
+        return SLANG_FAIL;
     }
 
     Linkage* linkage = getBuiltinLinkage();
     SourceManager* sourceManager = getBuiltinSourceManager();
     NamePool* sessionNamePool = &namePool;
 
-    auto moduleChunk = ModuleChunkRef::find(&riffContainer);
+    auto moduleChunk = ModuleChunk::find(rootChunk);
     if (!moduleChunk)
         return SLANG_FAIL;
 
-    SHA1::Digest moduleDigest = moduleChunk.getDigest();
+    SHA1::Digest moduleDigest = moduleChunk->getDigest();
 
-    auto irChunk = moduleChunk.findIR();
+    auto irChunk = moduleChunk->findIR();
     if (!irChunk)
         return SLANG_FAIL;
 
-    auto astChunk = moduleChunk.findAST();
+    auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;
 
@@ -724,7 +721,7 @@ SlangResult Session::_readBuiltinModule(
     // in the IR and AST deserialization (if we find anything).
     //
     RefPtr<SerialSourceLocReader> sourceLocReader;
-    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
+    if (auto debugChunk = DebugChunk::find(moduleChunk))
     {
         SLANG_RETURN_ON_FAIL(
             readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
@@ -1604,7 +1601,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module.detach());
+        return asExternal(module.get());
     }
     catch (const AbortCompilationException& e)
     {
@@ -2032,6 +2029,31 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outBuffer,
+    uint32_t bufferSize)
+{
+    // Slang RTTI header format:
+    // byte 0-7: pointer to RTTI struct describing the type. (not used for now, set to 1 for valid
+    // types, and 0 to represent null).
+    // byte 8-11: 32-bit sequential ID of the type conformance witness.
+    // byte 12-15: unused.
+
+    if (bufferSize < 16)
+        return SLANG_E_BUFFER_TOO_SMALL;
+
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+
+    // Make the RTTI part non zero.
+    outBuffer[0] = 1;
+
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentType(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -2350,7 +2372,16 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        CapabilitySet toAdd;
+        switch (atomVal.kind)
+        {
+        case CompilerOptionValueKind::Int:
+            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
+            break;
+        case CompilerOptionValueKind::String:
+            toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
+            break;
+        }
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
@@ -2509,6 +2540,16 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+void TranslationUnitRequest::addIncludedSourceFileIfNotExist(SourceFile* sourceFile)
+{
+    if (m_includedFileSet.contains(sourceFile))
+        return;
+
+    sourceFile->setIncludedFile();
+    m_sourceFiles.add(sourceFile);
+    m_includedFileSet.add(sourceFile);
+}
+
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -2621,7 +2662,6 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
 {
-    SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
     return m_sourceFiles;
 }
 
@@ -2724,7 +2764,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage;
+    SourceLanguage sourceLanguage = SourceLanguage::Slang;
+    SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
 
     auto tokens = preprocessSource(
         srcFile,
@@ -2732,7 +2773,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage);
+        sourceLanguage,
+        languageVersion);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = SourceLanguage::Slang;
@@ -2778,7 +2820,12 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     Expr* typeExpr = linkage->parseTermString(typeStr, scope);
-    type = checkProperType(linkage, TypeExp(typeExpr), sink);
+    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+    type = visitor.TranslateTypeNode(typeExpr);
+    auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));
+    if (typeOut.type)
+        type = typeOut.type;
 
     if (type)
     {
@@ -3034,8 +3081,15 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
-    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink)
-        : m_module(module), m_astBuilder(astBuilder), m_sink(sink)
+    FrontEndPreprocessorHandler(
+        Module* module,
+        ASTBuilder* astBuilder,
+        DiagnosticSink* sink,
+        TranslationUnitRequest* translationUnit)
+        : m_module(module)
+        , m_astBuilder(astBuilder)
+        , m_sink(sink)
+        , m_translationUnit(translationUnit)
     {
     }
 
@@ -3043,6 +3097,7 @@ protected:
     Module* m_module;
     ASTBuilder* m_astBuilder;
     DiagnosticSink* m_sink;
+    TranslationUnitRequest* m_translationUnit = nullptr;
 
     // The first task that this handler tries to deal with is
     // capturing all the files on which a module is dependent.
@@ -3054,6 +3109,7 @@ protected:
     void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
         m_module->addFileDependency(sourceFile);
+        m_translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3320,6 +3376,9 @@ static void _outputIncludes(
     // For all the source files
     for (SourceFile* sourceFile : sourceFiles)
     {
+        if (sourceFile->isIncludedFile())
+            continue;
+
         // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
         SourceView* sourceView = _findInitialSourceView(sourceFile);
         if (!sourceView)
@@ -3391,7 +3450,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     // preprocessoing can be communicated to later phases of
     // compilation.
     //
-    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink());
+    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink(), translationUnit);
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -3400,7 +3459,9 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+        SlangLanguageVersion languageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
@@ -3408,7 +3469,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
+            languageVersion,
             &preprocessorHandler);
+
+        translationUnitSyntax->languageVersion = languageVersion;
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4118,6 +4182,9 @@ void Linkage::loadParsedModule(
         if (errorCountAfter != errorCountBefore)
         {
             // There must have been an error in the loaded module.
+            // Remove from maps if there were errors during semantic checking
+            mapPathToLoadedModule.remove(mostUniqueIdentity);
+            mapNameToLoadedModules.remove(name);
         }
         else
         {
@@ -4134,7 +4201,8 @@ void Linkage::loadParsedModule(
 }
 
 RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* libraryChunk,
     DiagnosticSink* sink)
 {
     RefPtr<Module> resultModule;
@@ -4147,7 +4215,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // The first step is to simply decode the module name, and
     // see if we have a already loaded a matching module.
 
-    auto moduleName = getNamePool()->getName(moduleChunk.getName());
+    auto moduleName = getNamePool()->getName(moduleChunk->getName());
     if (mapNameToLoadedModules.tryGetValue(moduleName, resultModule))
         return resultModule;
 
@@ -4163,12 +4231,12 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // already. It isn't something that can be fixed in just one
     // place at this point.
 
-    auto fileDependenciesChunk = moduleChunk.getFileDependencies();
-    auto firstFileDependencyChunk = fileDependenciesChunk.getFirst();
+    auto fileDependenciesList = moduleChunk->getFileDependencies();
+    auto firstFileDependencyChunk = fileDependenciesList.getFirst();
     if (!firstFileDependencyChunk)
         return nullptr;
 
-    auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk.getValue());
+    auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk->getValue());
     if (mapPathToLoadedModule.tryGetValue(modulePathInfo.getMostUniqueIdentity(), resultModule))
         return resultModule;
 
@@ -4176,13 +4244,20 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // will go ahead and load the module from the serialized form.
     //
     PathInfo filePathInfo;
-    return loadSerializedModule(moduleName, modulePathInfo, moduleChunk, SourceLoc(), sink);
+    return loadSerializedModule(
+        moduleName,
+        modulePathInfo,
+        moduleChunk,
+        libraryChunk,
+        SourceLoc(),
+        sink);
 }
 
 RefPtr<Module> Linkage::loadSerializedModule(
     Name* moduleName,
     const PathInfo& moduleFilePathInfo,
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* containerChunk,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink)
 {
@@ -4211,8 +4286,12 @@ RefPtr<Module> Linkage::loadSerializedModule(
     mapNameToLoadedModules.add(moduleName, module);
     try
     {
-        if (SLANG_FAILED(
-                loadSerializedModuleContents(module, moduleFilePathInfo, moduleChunk, sink)))
+        if (SLANG_FAILED(loadSerializedModuleContents(
+                module,
+                moduleFilePathInfo,
+                moduleChunk,
+                containerChunk,
+                sink)))
         {
             mapPathToLoadedModule.remove(mostUniqueIdentity);
             mapNameToLoadedModules.remove(moduleName);
@@ -4240,24 +4319,17 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     auto astBuilder = getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    // We start by reading the content of the file into
+    // We start by reading the content of the file as
     // an in-memory RIFF container.
     //
-    // TODO(tfoley): this is an unnecessary copy step, since
-    // we can simply use the contents of the blob directly
-    // and navigate it in-memory.
-    //
-    RiffContainer riffContainer;
+    auto rootChunk = RIFF::RootChunk::getFromBlob(moduleFileContents);
+    if (!rootChunk)
     {
-        MemoryStreamBase readStream(
-            FileAccess::Read,
-            moduleFileContents->getBufferPointer(),
-            moduleFileContents->getBufferSize());
-        SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, riffContainer));
+        return nullptr;
     }
 
-    auto moduleChunkRef = ModuleChunkRef::find(&riffContainer);
-    if (!moduleChunkRef)
+    auto moduleChunk = ModuleChunk::find(rootChunk);
+    if (!moduleChunk)
     {
         return nullptr;
     }
@@ -4271,7 +4343,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
     if (m_optionSet.getBoolOption(CompilerOptionName::UseUpToDateBinaryModule))
     {
-        if (!isBinaryModuleUpToDate(moduleFilePathInfo.foundPath, moduleChunkRef))
+        if (!isBinaryModuleUpToDate(moduleFilePathInfo.foundPath, moduleChunk))
         {
             return nullptr;
         }
@@ -4280,8 +4352,13 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     // If everything seems reasonable, then we will go ahead and load
     // the module more completely from that serialized representation.
     //
-    RefPtr<Module> module =
-        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunkRef, requestingLoc, sink);
+    RefPtr<Module> module = loadSerializedModule(
+        moduleName,
+        moduleFilePathInfo,
+        moduleChunk,
+        rootChunk,
+        requestingLoc,
+        sink);
 
     return module;
 }
@@ -4744,18 +4821,13 @@ SourceFile* Linkage::loadSourceFile(String pathFrom, String path)
 }
 
 // Check if a serialized module is up-to-date with current compiler options and source files.
-bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* riffContainer)
+bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk)
 {
-    auto moduleChunk = ModuleChunkRef::find(riffContainer);
+    auto moduleChunk = ModuleChunk::find(baseChunk);
     if (!moduleChunk)
         return false;
 
-    return isBinaryModuleUpToDate(fromPath, moduleChunk);
-}
-
-bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk)
-{
-    SHA1::Digest existingDigest = moduleChunk.getDigest();
+    SHA1::Digest existingDigest = moduleChunk->getDigest();
 
     DigestBuilder<SHA1> digestBuilder;
     auto version = String(getBuildTagString());
@@ -4765,10 +4837,10 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
     // Find the canonical path of the directory containing the module source file.
     String moduleSrcPath = "";
 
-    auto dependencyChunks = moduleChunk.getFileDependencies();
+    auto dependencyChunks = moduleChunk->getFileDependencies();
     if (auto firstDependencyChunk = dependencyChunks.getFirst())
     {
-        moduleSrcPath = firstDependencyChunk.getValue();
+        moduleSrcPath = firstDependencyChunk->getValue();
 
         IncludeSystem includeSystem(
             &getSearchDirectories(),
@@ -4784,7 +4856,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
 
     for (auto dependencyChunk : dependencyChunks)
     {
-        auto file = dependencyChunk.getValue();
+        auto file = dependencyChunk->getValue();
         auto sourceFile = loadSourceFile(fromPath, file);
         if (!sourceFile)
         {
@@ -4803,14 +4875,10 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
 SLANG_NO_THROW bool SLANG_MCALL
 Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob)
 {
-    RiffContainer container;
-    MemoryStreamBase readStream(
-        FileAccess::Read,
-        binaryModuleBlob->getBufferPointer(),
-        binaryModuleBlob->getBufferSize());
-    if (SLANG_FAILED(RiffUtil::read(&readStream, container)))
+    auto rootChunk = RIFF::RootChunk::getFromBlob(binaryModuleBlob);
+    if (!rootChunk)
         return false;
-    return isBinaryModuleUpToDate(modulePath, &container);
+    return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
@@ -4903,11 +4971,17 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
-    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
+    FrontEndPreprocessorHandler preprocessorHandler(
+        module,
+        module->getASTBuilder(),
+        sink,
+        translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+    SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
@@ -4915,10 +4989,18 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
+        slangLanguageVersion,
         &preprocessorHandler);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;
+
+    if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
+    {
+        sink->diagnose(
+            tokens.begin()->getLoc(),
+            Diagnostics::languageVersionDiffersFromIncludingModule);
+    }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(
@@ -5417,12 +5499,16 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     buildHash(builder);
 
     // Add the name and name override for the specified entry point to the hash.
-    auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
-    builder.append(entryPointName);
-    auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
-    builder.append(entryPointMangledName);
-    auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
-    builder.append(entryPointNameOverride);
+    auto entryPoint = getEntryPoint(entryPointIndex);
+    if (entryPoint)
+    {
+        auto entryPointName = entryPoint->getName()->text;
+        builder.append(entryPointName);
+        auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
+        builder.append(entryPointMangledName);
+        auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
+        builder.append(entryPointNameOverride);
+    }
 
     auto hash = builder.finalize().toBlob();
     *outHash = hash.detach();
@@ -5482,6 +5568,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
 
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
     return SLANG_OK;
 }
 
@@ -5820,6 +5933,20 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    //(*outCompileResult)->addRef(); // TODO: Needed if using a ComPtr.
+    return SLANG_OK;
+}
+
 //
 // CompositeComponentType
 //
@@ -6081,7 +6208,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
         {
             collectReferencedModules(type);
         }
-        else if (auto declRefVal = as<GenericParamIntVal>(val))
+        else if (auto declRefVal = as<DeclRefIntVal>(val))
         {
             collectReferencedModules(declRefVal->getDeclRef());
         }
@@ -6534,7 +6661,8 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* containerChunk,
     DiagnosticSink* sink)
 {
     // At this point we've dealt with basically all of
@@ -6542,19 +6670,49 @@ SlangResult Linkage::loadSerializedModuleContents(
     // to the real work of decoding the information
     // in the `moduleChunk`.
 
+    //
+    // TODO(tfoley): The fact that a separate `containerChunk` is getting
+    // passed in here is entirely byproduct of the support for "module libraries"
+    // that can (in principle) contain multiple serialized modules. When
+    // things are serialized in the "container" representation used for
+    // a module library, there is a single `DebugChunk` as a child of
+    // the container, with all of the `ModuleChunk`s sharing that debug info.
+    //
+    // In contrast, the more typical kind of serialized module that the compiler
+    // produces serializes a single `ModuleChunk`, and the `DebugChunk` is
+    // one of its direct children. Thus there are currently two different
+    // locations where debug information might be found.
+    //
+    // Prior to the change where we navigate the serialized RIFF hierarchy
+    // in memory without copying it, this issue was addressed by having
+    // the subroutine that looked for a `DebugChunk` start at the `ModuleChunk`
+    // and work its way up through the hierarchy using parent pointers that
+    // were created as part of RIFF loading. When navigating the RIFF in-place
+    // we don't have such parent pointers.
+    //
+    // As a short-term solution, we should deprecate and remove the support
+    // for "module libraries" so that the code doesn't have to handle two
+    // different layouts.
+    //
+    // In the longer term, we should be making some conscious design decisions
+    // around how we want to organize the top-level structure of our serialized
+    // intermediate/output formats, since there's quite a mix of different
+    // approaches currently in use.
+    //
+
     auto sourceManager = getSourceManager();
     RefPtr<SerialSourceLocReader> sourceLocReader;
-    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
+    if (auto debugChunk = DebugChunk::find(moduleChunk, containerChunk))
     {
         SLANG_RETURN_ON_FAIL(
             readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
     }
 
-    auto astChunk = moduleChunk.findAST();
+    auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;
 
-    auto irChunk = moduleChunk.findIR();
+    auto irChunk = moduleChunk->findIR();
     if (!irChunk)
         return SLANG_FAIL;
 
@@ -6620,9 +6778,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->clearFileDependency();
     String moduleSourcePath = moduleFilePathInfo.foundPath;
     bool isFirst = true;
-    for (auto depenencyFileChunk : moduleChunk.getFileDependencies())
+    for (auto depenencyFileChunk : moduleChunk->getFileDependencies())
     {
-        auto encodedDependencyFilePath = depenencyFileChunk.getValue();
+        auto encodedDependencyFilePath = depenencyFileChunk->getValue();
 
         auto sourceFile = loadSourceFile(moduleFilePathInfo.foundPath, encodedDependencyFilePath);
         if (isFirst)
@@ -6646,7 +6804,7 @@ SlangResult Linkage::loadSerializedModuleContents(
         }
     }
     module->setPathInfo(moduleFilePathInfo);
-    module->setDigest(moduleChunk.getDigest());
+    module->setDigest(moduleChunk->getDigest());
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink, targets);
 
@@ -7159,8 +7317,8 @@ SlangResult _addLibraryReference(
                     SourceMap::getTypeGuid(),
                     ArtifactKeep::Yes,
                     castable.writeRef()));
-                auto sourceMap = asBoxValue<SourceMap>(castable);
-                SLANG_ASSERT(sourceMap);
+                auto sourceMapBox = asBoxValue<SourceMap>(castable);
+                SLANG_ASSERT(sourceMapBox);
 
                 // TODO(JS):
                 // There is perhaps (?) a risk here that we might copy the obfuscated map
@@ -7175,7 +7333,7 @@ SlangResult _addLibraryReference(
                 // unit(s).
                 for (auto module : library->m_modules)
                 {
-                    module->getIRModule()->setObfuscatedSourceMap(sourceMap);
+                    module->getIRModule()->setObfuscatedSourceMap(sourceMapBox);
                 }
 
                 // Look up the source file
@@ -7185,8 +7343,26 @@ SlangResult _addLibraryReference(
 
                 if (name.getLength())
                 {
+                    // Note(tfoley): There is a subtle requirement here, that any
+                    // source file `name` that might be searched for here *must*
+                    // have been added to the `sourceManager` already, as a
+                    // byproduct of debug source location information getting
+                    // deserialized as part of the call to `loadModuleLibrary()` above.
+                    //
+                    // The implicit dependency is frustrating, and could potentially
+                    // break if somehow the debug info chunk was stripped from a binary,
+                    // while the source map was left in (which should be valid, even if
+                    // it is unlikely to be what a user wants).
+                    //
+                    // Ideally the source map would either be made an integral part of
+                    // the debug source location chunk, so they are loaded together,
+                    // or the `SourceManager` would be adapted so that it can store
+                    // registered source maps independent of whether or not the
+                    // corresponding source file(s) have been loaded.
+
                     auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setSourceMap(sourceMap, SourceMapKind::Obfuscated);
+                    SLANG_ASSERT(sourceFile);
+                    sourceFile->setSourceMap(sourceMapBox, SourceMapKind::Obfuscated);
                 }
             }
         }

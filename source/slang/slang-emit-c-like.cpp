@@ -109,6 +109,9 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_codeGenContext = desc.codeGenContext;
     m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
+
+    auto targetCaps = getTargetReq()->getTargetCaps();
+    isCoopvecPoc = targetCaps.implies(CapabilityAtom::hlsl_coopvec_poc);
 }
 
 SlangResult CLikeSourceEmitter::init()
@@ -348,6 +351,10 @@ String CLikeSourceEmitter::getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltin
         return "gl_InstanceIndex";
     case IRTargetBuiltinVarName::SpvBaseInstance:
         return "gl_BaseInstance";
+    case IRTargetBuiltinVarName::SpvVertexIndex:
+        return "gl_VertexIndex";
+    case IRTargetBuiltinVarName::SpvBaseVertex:
+        return "gl_BaseVertex";
     }
     if (auto linkage = inst->findDecoration<IRLinkageDecoration>())
         return linkage->getMangledName();
@@ -1106,9 +1113,25 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
     }
 }
 
+inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink)
+{
+    if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+        isMetalTarget(getTargetReq()))
+    {
+        if (name == "main")
+        {
+            String newName = _generateUniqueName(name.getUnownedSlice());
+            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
+            return newName;
+        }
+    }
+    return name;
+}
+
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    return entryPointDecor->getName()->getStringSlice();
+    String name = entryPointDecor->getName()->getStringSlice();
+    return maybeMakeEntryPointNameValid(name, getSink());
 }
 
 String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
@@ -3118,18 +3141,32 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         case kIROp_MakeCoopVector:
             {
                 emitType(coopVecType, getName(inst));
-                m_writer->emit(";\n");
+                m_writer->emit(isCoopvecPoc ? ";\n" : " = { ");
 
                 auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
                 IRIntegerValue elemCountValue = elemCount->getValue();
-                for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                if (isCoopvecPoc)
                 {
-                    m_writer->emit(getName(inst));
-                    m_writer->emit(".WriteToIndex(");
-                    m_writer->emit(i);
-                    m_writer->emit(", ");
+                    for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                    {
+                        m_writer->emit(getName(inst));
+                        m_writer->emit(".WriteToIndex(");
+                        m_writer->emit(i);
+                        m_writer->emit(", ");
+                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                        m_writer->emit(");\n");
+                    }
+                }
+                else
+                {
+                    IRIntegerValue i = 0;
+                    for (; i < elemCountValue - 1; ++i)
+                    {
+                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                        m_writer->emit(", ");
+                    }
                     emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                    m_writer->emit(");\n");
+                    m_writer->emit("};\n");
                 }
                 return;
             }
@@ -3138,7 +3175,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
             emitCallExpr((IRCall*)inst, getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3147,7 +3184,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
             emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3173,6 +3210,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
+    case kIROp_DebugBuildIdentifier:
         break;
 
     case kIROp_Unmodified:
@@ -3409,10 +3447,21 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
     auto dstPtr = store->getPtr();
     if (isPointerOfType(dstPtr->getDataType(), kIROp_CoopVectorType))
     {
-        emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
-        m_writer->emit(".CopyFrom(");
-        emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
-        m_writer->emit(");\n");
+        if (isCoopvecPoc)
+        {
+            emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
+            m_writer->emit(".CopyFrom(");
+            emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+        }
+        else
+        {
+            auto prec = getInfo(EmitOp::Assign);
+            emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+            m_writer->emit(" = ");
+            emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+            m_writer->emit(";\n");
+        }
     }
     else
     {
@@ -4705,7 +4754,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
                 emitDereferenceOperand(store->getVal()->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4713,7 +4762,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
                 emitCallExpr((IRCall*)store->getVal(), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4726,13 +4775,14 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
                 {
                     m_writer->emit(";\n");
                     m_writer->emit(getName(varDecl));
-                    m_writer->emit(".WriteToIndex(");
+                    m_writer->emit(isCoopvecPoc ? ".WriteToIndex(" : "[");
                     m_writer->emit(i);
-                    m_writer->emit(", ");
+                    m_writer->emit(isCoopvecPoc ? ", " : "] = ");
                     emitDereferenceOperand(
                         store->getVal()->getOperand(i),
                         getInfo(EmitOp::General));
-                    m_writer->emit(")");
+                    if (isCoopvecPoc)
+                        m_writer->emit(")");
                 }
             }
             else
@@ -5165,6 +5215,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugSource:
     case kIROp_DebugValue:
     case kIROp_DebugInlinedVariable:
+    case kIROp_DebugBuildIdentifier:
         return;
     default:
         break;
@@ -5282,7 +5333,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
         // Skip resource types in this pass.
         if (isResourceType(inst->getDataType()))
             continue;
-
+        if (as<IRInterfaceRequirementEntry>(inst))
+            continue;
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }
 }

@@ -34,7 +34,7 @@ namespace Slang
 struct PathInfo;
 struct IncludeHandler;
 struct SharedSemanticsContext;
-struct ModuleChunkRef;
+struct ModuleChunk;
 
 class ProgramLayout;
 class PtrType;
@@ -322,6 +322,16 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
         SlangInt targetIndex,
         slang::IMetadata** outMetadata,
+        slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
         slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -974,6 +984,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -1251,6 +1282,27 @@ public:
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE
     {
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
     }
 
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -1581,6 +1633,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     /// Get a serialized representation of the checked module.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     serialize(ISlangBlob** outSerializedBlob) override;
@@ -1880,6 +1953,7 @@ public:
     {
         m_sourceArtifacts.clear();
         m_sourceFiles.clear();
+        m_includedFileSet.clear();
     }
 
     /// Add a source artifact
@@ -1887,6 +1961,8 @@ public:
 
     /// Add both the artifact and the sourceFile.
     void addSource(IArtifact* sourceArtifact, SourceFile* sourceFile);
+
+    void addIncludedSourceFileIfNotExist(SourceFile* sourceFile);
 
     // The entry points associated with this translation unit
     List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }
@@ -1936,6 +2012,9 @@ protected:
     // NOTE! This member is generated lazily from m_sourceArtifacts
     // it is *necessary* to call requireSourceFiles to ensure it's in sync.
     List<SourceFile*> m_sourceFiles;
+
+    // Track all the included source files added in m_sourceFiles
+    HashSet<SourceFile*> m_includedFileSet;
 };
 
 enum class FloatingPointMode : SlangFloatingPointModeIntegral
@@ -2192,6 +2271,11 @@ public:
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
         uint32_t* outId) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outBytes,
+        uint32_t bufferSize) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
@@ -2363,20 +2447,23 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
 
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink);
 
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);
@@ -2387,8 +2474,7 @@ public:
         Name* name,
         PathInfo const& pathInfo);
 
-    bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
-    bool isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk);
+    bool isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk);
 
     RefPtr<Module> findOrImportModule(
         Name* name,
@@ -3343,6 +3429,10 @@ private:
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+    SlangResult _maybeWriteDebugArtifact(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest
@@ -3884,6 +3974,9 @@ bool maybeDiagnoseWarningOrError(
         return maybeDiagnose(sink, optionSet, errorType, pos, warningInfo, args...);
     }
 }
+
+bool isValidSlangLanguageVersion(SlangLanguageVersion version);
+bool isValidGLSLVersion(int version);
 
 } // namespace Slang
 

@@ -33,7 +33,6 @@ class DeclRefExpr : public Expr
     // The original expr before DeclRef resolution.
     Expr* originalExpr = nullptr;
 
-    SLANG_UNREFLECTED
     // The scope in which to perform lookup
     Scope* scope = nullptr;
 };
@@ -137,6 +136,12 @@ class StringLiteralExpr : public LiteralExpr
     //      "first" "second" "third"
     //
     FIDDLE() String value;
+};
+
+FIDDLE()
+class MakeArrayFromElementExpr : public Expr
+{
+    FIDDLE(...)
 };
 
 // An initializer list, e.g. `{ 1, 2, 3 }`
@@ -570,13 +575,23 @@ class ParenExpr : public Expr
     Expr* base = nullptr;
 };
 
+// An expression that constructs a tuple `(arg1, arg2, ...)`
+//
+FIDDLE()
+class TupleExpr : public Expr
+{
+    FIDDLE(...)
+    List<Expr*> elements;
+};
+
+
 // An object-oriented `this` expression, used to
 // refer to the current instance of an enclosing type.
 FIDDLE()
 class ThisExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -586,7 +601,7 @@ FIDDLE()
 class ReturnValExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -715,7 +730,7 @@ FIDDLE()
 class ThisTypeExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 

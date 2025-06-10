@@ -63,6 +63,7 @@ enum class ValueCategory
     FileSystemType,
     VulkanShift,
     SourceEmbedStyle,
+    LanguageVersion,
 
     CountOf,
 };
@@ -146,6 +147,14 @@ void initCommandOptions(CommandOptions& options)
             "Language",
             UserValue(ValueCategory::Language));
         options.addValues(TypeTextUtil::getLanguageInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "language-version",
+            "Language Version",
+            UserValue(ValueCategory::LanguageVersion));
+        options.addValues(TypeTextUtil::getLanguageVersionInfos());
+
 
         options.addCategory(
             CategoryKind::Value,
@@ -446,6 +455,10 @@ void initCommandOptions(CommandOptions& options)
          "Display the build version. This is the contents of git describe --tags.\n"
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
+        {OptionKind::LanguageVersion,
+         "-std",
+         "-std <language-version>",
+         "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",
@@ -517,6 +530,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Preserve all resource parameters in the output code, even if they are not used by the "
          "shader."},
+        {OptionKind::TypeConformance,
+         "-conformance",
+         "-conformance <typeName>:<interfaceName>[=<sequentialID>]",
+         "Include additional type conformance during linking for dynamic dispatch."},
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "reflection-json <path>",
@@ -803,7 +820,11 @@ void initCommandOptions(CommandOptions& options)
          "-verify-debug-serial-ir",
          nullptr,
          "Verify IR in the front-end."},
-        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
+        {OptionKind::EmitSeparateDebug,
+         "-separate-debug-info",
+         nullptr,
+         "Emit debug data to a separate file, and strip it from the main output file."}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -841,6 +862,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EnableExperimentalDynamicDispatch,
+         "-enable-experimental-dynamic-dispatch",
+         nullptr,
+         "Enable experimental dynamic dispatch features"},
         {OptionKind::EmbedDownstreamIR,
          "-embed-downstream-ir",
          nullptr,
@@ -2146,6 +2171,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
+        case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
         case OptionKind::DumpReproOnError:
@@ -2537,6 +2563,24 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
+        case OptionKind::LanguageVersion:
+            {
+                CommandLineArg name;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+
+                SlangLanguageVersion stdRevision =
+                    TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
+                if (stdRevision == SLANG_LANGUAGE_VERSION_UNKNOWN)
+                {
+                    m_sink->diagnose(name.loc, Diagnostics::unknownLanguageVersion, name.value);
+                    return SLANG_FAIL;
+                }
+                else
+                {
+                    linkage->m_optionSet.add(OptionKind::LanguageVersion, stdRevision);
+                }
+                break;
+            }
         case OptionKind::Stage:
             {
                 CommandLineArg name;
@@ -2698,6 +2742,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
+                break;
+            }
+        case OptionKind::TypeConformance:
+            {
+                if (!m_reader.hasArg())
+                    break;
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                auto unquoted =
+                    StringEscapeUtil::maybeUnquoteCommandLineArg(operand.value.getUnownedSlice());
+                linkage->m_optionSet.add(OptionKind::TypeConformance, unquoted);
                 break;
             }
         case OptionKind::Output:
@@ -3026,6 +3081,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
 
+                break;
+            }
+        case OptionKind::EmitSeparateDebug:
+            {
+                // This will emit a separate debug file, containing all debug info in
+                // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
+                m_compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
         default:
