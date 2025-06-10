@@ -273,20 +273,17 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     //
     // TODO: This step should skip `static` fields.
     //
-    for (auto member : structDecl->members)
+    for (auto varMember : structDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
-        if (auto varMember = as<VarDecl>(member))
-        {
-            ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
+        ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
 
-            ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
-            paramDecl->nameAndLoc = member->nameAndLoc;
-            paramDecl->type = varMember->type;
-            paramDecl->loc = member->loc;
-            paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
+        ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
+        paramDecl->nameAndLoc = varMember->nameAndLoc;
+        paramDecl->type = varMember->type;
+        paramDecl->loc = varMember->loc;
+        paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
-            attrDecl->addMember(paramDecl);
-        }
+        attrDecl->addMember(paramDecl);
     }
 
     // We need to end by putting the new attribute declaration
@@ -297,8 +294,6 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     // TODO: handle the case where `parentDecl` is generic?
     //
     parentDecl->addMember(attrDecl);
-
-    SLANG_ASSERT(!parentDecl->isMemberDictionaryValid());
 
     // Finally, we perform any required semantic checks on
     // the newly constructed attribute decl.
@@ -1660,11 +1655,17 @@ Modifier* SemanticsVisitor::checkModifier(
 
         auto checkedAttr = checkAttribute(hlslUncheckedAttribute, syntaxNode);
 
-        if (as<UnscopedEnumAttribute>(checkedAttr))
+        if (auto unscopedEnumAttr = as<UnscopedEnumAttribute>(checkedAttr))
         {
-            if (auto parentDecl = as<ContainerDecl>(getParentDecl(as<Decl>(syntaxNode))))
-                parentDecl->invalidateMemberDictionary();
-            return getASTBuilder()->create<TransparentModifier>();
+            auto transparentModifier = getASTBuilder()->create<TransparentModifier>();
+            if (auto parentDecl = getParentDecl(as<Decl>(syntaxNode)))
+            {
+                parentDecl
+                    ->_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
+                        unscopedEnumAttr,
+                        transparentModifier);
+            }
+            return transparentModifier;
         }
         return checkedAttr;
     }
@@ -1940,7 +1941,7 @@ Modifier* SemanticsVisitor::checkModifier(
                         // specialization constant with this ID.
                         Int specConstId = cintVal->getValue();
 
-                        for (auto member : decl->parentDecl->members)
+                        for (auto member : decl->parentDecl->getDirectMemberDecls())
                         {
                             auto constantId = member->findModifier<VkConstantIdAttribute>();
                             if (constantId)
@@ -2211,17 +2212,17 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         return;
     }
 
-    // Check each field in the struct
-    for (auto member : structDecl->members)
-    {
-        auto fieldVarDecl = as<VarDeclBase>(member);
-        if (!fieldVarDecl)
-        {
-            continue;
-        }
+    // Define valid stage names
+    const HashSet<String> validStages("anyhit", "closesthit", "miss", "caller");
 
-        bool hasReadModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>() != nullptr;
-        bool hasWriteModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>() != nullptr;
+    // Check each field in the struct
+    for (auto fieldVarDecl : structDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+    {
+        auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
+        auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
+
+        bool hasReadModifier = readModifier != nullptr;
+        bool hasWriteModifier = writeModifier != nullptr;
 
         if (!hasReadModifier && !hasWriteModifier)
         {
@@ -2230,6 +2231,38 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 fieldVarDecl,
                 Diagnostics::rayPayloadFieldMissingAccessQualifiers,
                 fieldVarDecl->getName());
+        }
+
+        // Check stage names in read qualifier
+        if (readModifier)
+        {
+            for (auto& stageToken : readModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
+        }
+
+        // Check stage names in write qualifier
+        if (writeModifier)
+        {
+            for (auto& stageToken : writeModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
         }
     }
 }

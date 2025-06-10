@@ -842,7 +842,15 @@ DIAGNOSTIC(
     isOperatorValueMustBeInterfaceType,
     "'is'/'as' operator requires an interface-typed expression.")
 
+DIAGNOSTIC(
+    30301,
+    Error,
+    isAsOperatorCannotUseInterfaceAsRHS,
+    "'is' and 'as' operators do not support interface types as the right-hand side. Use a concrete "
+    "type instead.")
+
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
+
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
@@ -2896,5 +2904,11 @@ DIAGNOSTIC(
     Error,
     rayPayloadFieldMissingAccessQualifiers,
     "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+DIAGNOSTIC(
+    40001,
+    Error,
+    rayPayloadInvalidStageInAccessQualifier,
+    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
+    "'closesthit', 'miss', and 'caller'")
 
 #undef DIAGNOSTIC
