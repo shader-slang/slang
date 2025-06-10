@@ -784,18 +784,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (irOpCode)
             {
             case kIROp_IntCast:
-                {
-                    auto typeStyle = getTypeStyle(basicType->getBaseType());
-                    if (typeStyle == kIROp_FloatType)
-                    {
-                        return SpvOpConvertFToU;
-                    }
-                    else if (typeStyle == kIROp_IntType)
-                    {
-                        return SpvOpUConvert;
-                    }
-                    break;
-                }
+                return SpvOpUConvert;
+            case kIROp_FloatCast:
+                return SpvOpFConvert;
             default:
                 break;
             }
@@ -2292,6 +2283,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;
+            }
+        case kIROp_DebugBuildIdentifier:
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
+                auto debugBuildIdentifier = as<IRDebugBuildIdentifier>(inst);
+                return emitOpDebugBuildIdentifier(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    debugBuildIdentifier->getBuildIdentifier(),
+                    debugBuildIdentifier->getFlags());
             }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
@@ -9190,6 +9193,10 @@ SlangResult emitSPIRVFromIR(
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+        {
+            context.ensureInst(inst);
+        }
+        if (as<IRDebugBuildIdentifier>(inst))
         {
             context.ensureInst(inst);
         }

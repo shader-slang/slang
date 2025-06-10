@@ -249,6 +249,17 @@ DIAGNOSTIC(
     cannotMatchOutputFileToEntryPoint,
     "the output path '$0' is not associated with any entry point; a '-o' option for a compiled "
     "kernel must follow the '-entry' option for its corresponding entry point")
+DIAGNOSTIC(
+    71,
+    Error,
+    invalidTypeConformanceOptionString,
+    "syntax error in type conformance option '$0'.")
+DIAGNOSTIC(
+    72,
+    Error,
+    invalidTypeConformanceOptionNoType,
+    "invalid conformance option '$0', type '$0' is not found.")
+DIAGNOSTIC(73, Error, cannotCreateTypeConformance, "cannot create type conformance '$0'.")
 
 DIAGNOSTIC(
     80,
@@ -646,7 +657,7 @@ DIAGNOSTIC(
     Error,
     cannotConvertArrayOfSmallerToLargerSize,
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
-DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
+DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30026,
     Error,
@@ -831,7 +842,15 @@ DIAGNOSTIC(
     isOperatorValueMustBeInterfaceType,
     "'is'/'as' operator requires an interface-typed expression.")
 
+DIAGNOSTIC(
+    30301,
+    Error,
+    isAsOperatorCannotUseInterfaceAsRHS,
+    "'is' and 'as' operators do not support interface types as the right-hand side. Use a concrete "
+    "type instead.")
+
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
+
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
@@ -2058,6 +2077,12 @@ DIAGNOSTIC(
     nonUniformEntryPointParameterTreatedAsUniform,
     "parameter '$0' is treated as 'uniform' because it does not have a system-value semantic.")
 
+DIAGNOSTIC(
+    38041,
+    Error,
+    intValFromNonIntSpecConstEncountered,
+    "cannot cast non-integer specialization constant to compile-time integer")
+
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(
@@ -2879,5 +2904,11 @@ DIAGNOSTIC(
     Error,
     rayPayloadFieldMissingAccessQualifiers,
     "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+DIAGNOSTIC(
+    40001,
+    Error,
+    rayPayloadInvalidStageInAccessQualifier,
+    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
+    "'closesthit', 'miss', and 'caller'")
 
 #undef DIAGNOSTIC

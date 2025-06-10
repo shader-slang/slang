@@ -30,6 +30,12 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__magic_type(DefaultPushConstantDataLayoutType)
+struct DefaultPushConstantDataLayout : IBufferDataLayout
+{};
+
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
@@ -503,6 +509,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -10621,7 +10628,15 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        __intrinsic_asm "($0 > 0x1.fffffep+127f) || ($0 < -0x1.fffffep+127f)";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac == 0u;
+        }
+        return false;
     }
 }
 
@@ -10677,7 +10692,15 @@ bool isnan(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsNan $x};
     case wgsl:
-         __intrinsic_asm "$0 != $0";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac != 0u;
+        }
+        return false;
     }
 }
 
@@ -17986,7 +18009,7 @@ float2x4 GetLssPositionsAndRadii()
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
     case cuda:
         {
-            __intrinsic_asm "optixObjectPositionsAndRadii";
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
         }
     case spirv:
         return spirv_asm
@@ -20671,7 +20694,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
@@ -24434,9 +24457,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
         case hlsl:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
-            return;
+             __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
             __intrinsic_asm ".Fill";
         default:
@@ -26367,9 +26388,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = matrix.GetBufferPointer();
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -26898,9 +26924,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = __getStructuredBufferPtr(matrix);
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

@@ -11,6 +11,7 @@ static const StructRttiInfo _makeExecuteUnitTestArgsRtti()
     builder.addField("moduleName", &obj.moduleName);
     builder.addField("testName", &obj.testName);
     builder.addField("enabledApis", &obj.enabledApis);
+    builder.addField("enableDebugLayers", &obj.enableDebugLayers);
     return builder.make();
 }
 /* static */ const UnownedStringSlice ExecuteUnitTestArgs::g_methodName =

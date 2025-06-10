@@ -134,6 +134,13 @@ class DefaultDataLayoutType : public DataLayoutType
 };
 
 FIDDLE()
+class DefaultPushConstantDataLayoutType : public DataLayoutType
+{
+    FIDDLE(...)
+};
+
+
+FIDDLE()
 class Std430DataLayoutType : public DataLayoutType
 {
     FIDDLE(...)

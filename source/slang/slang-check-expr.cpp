@@ -455,21 +455,24 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
                 // Another exception is if we are accessing a property
                 // that provides a [nonmutating] setter.
-                if (!expr->type.isLeftValue && as<PropertyDecl>(declRef.getDecl()))
+                if (!expr->type.isLeftValue)
                 {
-                    bool isLValue = false;
-                    for (auto member : as<ContainerDecl>(declRef.getDecl())->members)
+                    if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                     {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                        bool isLValue = false;
+                        for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
                         {
-                            if (member->findModifier<NonmutatingAttribute>())
+                            if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                             {
-                                isLValue = true;
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    isLValue = true;
+                                }
+                                break;
                             }
-                            break;
                         }
+                        expr->type.isLeftValue = isLValue;
                     }
-                    expr->type.isLeftValue = isLValue;
                 }
             }
             else
@@ -479,7 +482,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                 {
                     bool isLValue = false;
-                    for (auto member : propertyDecl->members)
+                    for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
                         if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                         {
@@ -681,12 +684,11 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                     createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
 
                 typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
-                structDecl->members.add(typeDef);
+                structDecl->addDirectMemberDecl(typeDef);
 
                 synthesizedDecl->nameAndLoc.name = item.declRef.getName();
                 synthesizedDecl->loc = parent->loc;
-                parent->addMember(synthesizedDecl);
-                parent->invalidateMemberDictionary();
+                parent->addDirectMemberDecl(synthesizedDecl);
 
                 // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can
                 // differentiate it from user-provided definitions, and proceed to fill in its
@@ -711,8 +713,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
 
                 synthesizedDecl = parent;
 
-                parent->addMember(typeDef);
-                parent->invalidateMemberDictionary();
+                parent->addDirectMemberDecl(typeDef);
 
                 markSelfDifferentialMembersOfType(parent, subType);
             }
@@ -1293,17 +1294,14 @@ bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTyp
     // and their differential types are the same as the original types.
     //
     bool canBeUsed = true;
-    for (auto member : aggTypeDecl->members)
+    for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
-        if (auto varDecl = as<VarDecl>(member))
+        // Try to get the differential type of the member.
+        Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
+        if (!diffType || !diffType->equals(varDecl->getType()))
         {
-            // Try to get the differential type of the member.
-            Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
-            if (!diffType || !diffType->equals(varDecl->getType()))
-            {
-                canBeUsed = false;
-                break;
-            }
+            canBeUsed = false;
+            break;
         }
     }
     return canBeUsed;
@@ -1976,13 +1974,31 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
-         decl->hasModifier<VkConstantIdAttribute>()) &&
-        kind == ConstantFoldingKind::SpecializationConstant)
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
     {
-        return m_astBuilder->getOrCreate<DeclRefIntVal>(
-            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
-            declRef);
+        if (kind == ConstantFoldingKind::SpecializationConstant)
+        {
+            // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
+            // which means they need to be local instructions can cannot be hoisted to the
+            // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
+            // instructions using this `IntVal` will trigger error. Hence we emit error here
+            // to not allow such cases.
+            //
+            // Note that float-to-inst casts for non-`IntVal`s are allowed.
+            if (!isScalarIntegerType(decl->getType()))
+            {
+                getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+                return nullptr;
+            }
+
+            return m_astBuilder->getOrCreate<DeclRefIntVal>(
+                declRef.substitute(m_astBuilder, decl->getType()),
+                declRef);
+        }
+        // Don't fold on other folding passes, we don't actually know the
+        // values.
+        return nullptr;
     }
 
     if (decl->hasModifier<ExternModifier>())
@@ -2396,10 +2412,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 nullptr,
                 ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is greater than zero
+            // Validate that array size is non-negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() <= 0)
+                if (constElementCount->getValue() < 0)
                 {
                     getSink()->diagnose(
                         subscriptExpr->indexExprs[0],
@@ -4047,6 +4063,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
 
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(expr->typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        return expr;
+    }
+
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
@@ -4085,6 +4108,15 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
+
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     expr->value = CheckTerm(expr->value);
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
@@ -4256,7 +4288,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     {
         nameBuilder << getText(m_parentFunc->getName());
         nameBuilder << "_";
-        nameBuilder << m_parentFunc->members.getCount();
+        nameBuilder << m_parentFunc->getDirectMemberDeclCount();
     }
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
@@ -4281,7 +4313,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     synthesizer.popScope();
 
     funcDecl->body = lambdaExpr->bodyStmt;
-    for (auto param : lambdaExpr->paramScopeDecl->members)
+    for (auto param : lambdaExpr->paramScopeDecl->getDirectMemberDecls())
     {
         funcDecl->addMember(param);
     }

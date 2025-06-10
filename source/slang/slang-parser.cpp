@@ -3785,9 +3785,6 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // function `foo` has been defined), and direct member
             // lookup will only give us the first.
             //
-            Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
-            //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
             //
@@ -3797,7 +3794,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // as possible in the parser, and we'd rather be
             // as permissive as possible right now.
             //
-            for (Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+            for (auto d : parentDecl->getDirectMemberDeclsOfName(nameAndLoc.name))
             {
                 namespaceDecl = as<NamespaceDecl>(d);
                 if (namespaceDecl)
@@ -4110,6 +4107,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
+                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
@@ -4976,8 +4974,9 @@ static DeclBase* ParseDeclWithModifiers(
                 };
                 if (AdvanceIf(parser, "buffer"))
                 {
-                    decl = as<Decl>(
-                        parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                    decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
+                        parser,
+                        getLayoutArg("DefaultDataLayout")));
                     break;
                 }
                 else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
@@ -6122,11 +6121,6 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
-    if (semanticsVisitor)
-        semanticsVisitor->ensureDecl(
-            (Decl*)tempVarDecl,
-            DeclCheckState::DefinitionChecked,
-            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
