@@ -3600,7 +3600,7 @@ SLANG_API unsigned int spReflectionDecl_getChildrenCount(SlangReflectionDecl* pa
     Decl* decl = (Decl*)parentDecl;
     if (as<ContainerDecl>(decl))
     {
-        return (unsigned int)as<ContainerDecl>(decl)->members.getCount();
+        return (unsigned int)as<ContainerDecl>(decl)->getDirectMemberDeclCount();
     }
 
     return 0;
@@ -3613,8 +3613,8 @@ SLANG_API SlangReflectionDecl* spReflectionDecl_getChild(
     Decl* decl = (Decl*)parentDecl;
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
-        if (containerDecl->members.getCount() > index)
-            return (SlangReflectionDecl*)containerDecl->members[index];
+        if (containerDecl->getDirectMemberDeclCount() > index)
+            return (SlangReflectionDecl*)containerDecl->getDirectMemberDecl(index);
     }
 
     return nullptr;

@@ -76,7 +76,7 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     {
         // Add the container - which could be a class, struct, enum, namespace, extension, generic
         // etc. Now add what the container contains
-        for (Decl* childDecl : containerDecl->members)
+        for (Decl* childDecl : containerDecl->getDirectMemberDecls())
         {
             _addDeclRec(childDecl, outDecls);
         }
@@ -85,7 +85,7 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
 
 /* static */ void ASTMarkupUtil::findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
 {
-    for (Decl* decl : moduleDecl->members)
+    for (Decl* decl : moduleDecl->getDirectMemberDecls())
     {
         _addDeclRec(decl, outDecls);
     }
