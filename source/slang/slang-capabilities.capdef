@@ -547,6 +547,10 @@ def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 /// [EXT]
 def SPV_NV_cluster_acceleration_structure : _spirv_1_0;
 
+/// Represents the SPIR-V extension for linear swept spheres.
+/// [EXT]
+def SPV_NV_linear_swept_spheres : _spirv_1_0;
+
 /// Represents the SPIR-V extension for shader image footprint.
 /// [EXT]
 def SPV_NV_shader_image_footprint : _spirv_1_0;
@@ -713,6 +717,10 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
+
+/// Represents the SPIR-V capability for linear swept spheres.
+/// [EXT]
+def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
@@ -1464,7 +1472,7 @@ alias sm_4_1 = sm_4_1_version
 alias sm_5_0_version = _sm_5_0 
              | _GLSL_330
              | spirv_1_0
-             | _cuda_sm_9_0
+             | _cuda_sm_6_0
              | metal
              | wgsl
              | cpp
@@ -1485,7 +1493,7 @@ alias sm_5_0 = sm_5_0_version
 alias sm_5_1_version = _sm_5_1
              | _GLSL_330
              | spirv_1_0
-             | _cuda_sm_9_0
+             | _cuda_sm_6_0
              | metal
              | cpp
              ;
@@ -1504,7 +1512,7 @@ alias sm_5_1 = sm_5_1_version
 alias sm_6_0_version = _sm_6_0 
              | _GLSL_450
              | spirv_1_3
-             | _cuda_sm_9_0 
+             | _cuda_sm_6_0 
              | metal
              | cpp
              ;
@@ -1523,7 +1531,7 @@ alias sm_6_0 = sm_6_0_version
 alias sm_6_1_version = _sm_6_1 
              | _GLSL_450 
              | spirv_1_3 
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1542,7 +1550,7 @@ alias sm_6_1 = sm_6_1_version
 alias sm_6_2_version = _sm_6_2
              | _GLSL_450
              | spirv_1_3
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1560,7 +1568,7 @@ alias sm_6_2 = sm_6_2_version
 alias sm_6_3_version = _sm_6_3
              | _GLSL_460 
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1579,7 +1587,7 @@ alias sm_6_3 = sm_6_3_version
 alias sm_6_4_version = _sm_6_4
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1597,7 +1605,7 @@ alias sm_6_4 = sm_6_4_version
 alias sm_6_5_version = _sm_6_5
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1617,7 +1625,7 @@ alias sm_6_5 = sm_6_5_version
 alias sm_6_6_version = _sm_6_6
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1635,7 +1643,7 @@ alias sm_6_6 = sm_6_6_version
 alias sm_6_7_version = _sm_6_7
              | _GLSL_460
              | spirv_1_4
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1652,7 +1660,7 @@ alias sm_6_7 = sm_6_7_version
 alias sm_6_8_version = _sm_6_8
              | _GLSL_460
              | spirv_1_5
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -1670,7 +1678,7 @@ alias sm_6_8 = sm_6_8_version
 alias sm_6_9_version = _sm_6_9
              | _GLSL_460
              | spirv_1_5
-             | _cuda_sm_9_0
+             | _cuda_sm_7_0
              | metal
              | cpp
              ;
@@ -2093,7 +2101,7 @@ alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0_version;
 /// [Compound]
 alias pack_vector = GL_ARB_gpu_shader5
                   | _sm_6_6
-                  | _cuda_sm_9_0
+                  | _cuda_sm_6_0
                   | wgsl
                   | metal
                   | cpp
@@ -2110,22 +2118,22 @@ alias subgroup_basic = GL_KHR_shader_subgroup_basic
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot'
 /// [Compound]
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
-                      | glsl + GL_KHR_shader_subgroup_ballot + shader5_sm_5_0 
-                      | _sm_6_0  + shader5_sm_5_0 
-                      | _cuda_sm_7_0 + shader5_sm_5_0
+                      | glsl + GL_KHR_shader_subgroup_ballot + shader5_sm_5_0
+                      | _sm_6_0
+                      | _cuda_sm_7_0
                       | wgsl
                       | metal
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot_activemask'
 /// [Compound]
 alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
-                      | glsl + GL_KHR_shader_subgroup_ballot 
+                      | glsl + GL_KHR_shader_subgroup_ballot
                       | _sm_6_0
                       | _cuda_sm_7_0
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic_ballot'
 /// [Compound]
-alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_ballot 
+alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_ballot
                             | spirv + GL_KHR_shader_subgroup_basic + subgroup_ballot
                             | hlsl + subgroup_ballot
                             | cuda + subgroup_ballot
@@ -2245,6 +2253,10 @@ alias raytracing_intersection = intersection + raytracing;
 /// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
+
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]

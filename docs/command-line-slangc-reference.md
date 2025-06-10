@@ -22,7 +22,7 @@ slangc -help-style markdown -h
 * [Deprecated](#Deprecated)
 * [compiler](#compiler)
 * [language](#language)
-* [std-revision](#std-revision)
+* [language-version](#language-version)
 * [archive-type](#archive-type)
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
@@ -227,7 +227,7 @@ It is typically only set from automated builds(such as distros available on gith
 <a id="std"></a>
 ### -std
 
-**-std &lt;[std-revision](#std-revision)&gt;**
+**-std &lt;[language-version](#language-version)&gt;**
 
 Specifies the language standard that should be used. 
 
@@ -341,6 +341,14 @@ Treat enums types as unscoped by default.
 <a id="preserve-params"></a>
 ### -preserve-params
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
+
+
+<a id="conformance"></a>
+### -conformance
+
+**-conformance &lt;typeName&gt;:&lt;interfaceName&gt;\[=&lt;sequentialID&gt;\]**
+
+Include additional type conformance during linking for dynamic dispatch. 
 
 
 <a id="reflection-json"></a>
@@ -642,6 +650,11 @@ Verify IR in the front-end.
 Disassemble and print the module IR. 
 
 
+<a id="separate-debug-info"></a>
+### -separate-debug-info
+Emit debug data to a separate file, and strip it from the main output file. 
+
+
 
 <a id="Repro"></a>
 ## Repro
@@ -898,14 +911,14 @@ Language
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 
 
-<a id="std-revision"></a>
-## std-revision
+<a id="language-version"></a>
+## language-version
 
-Std Revision 
+Language Version 
 
-* `unknown` : Unknown 
-* `2025`, `default` : Slang language rules for 2025 and older 
-* `2026` : Slang language rules for 2026 and newer 
+* `legacy`, `default`, `2018` : Legacy Slang language 
+* `2025` : Slang language rules for 2025 and older 
+* `2026`, `latest` : Slang language rules for 2026 and newer 
 
 <a id="archive-type"></a>
 ## archive-type
@@ -1128,6 +1141,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
+* `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
@@ -1168,6 +1182,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
+* `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1496,6 +1511,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_anyhit` 
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
+* `raytracing_lss` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 

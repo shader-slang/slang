@@ -1976,13 +1976,31 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
-         decl->hasModifier<VkConstantIdAttribute>()) &&
-        kind == ConstantFoldingKind::SpecializationConstant)
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
     {
-        return m_astBuilder->getOrCreate<DeclRefIntVal>(
-            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
-            declRef);
+        if (kind == ConstantFoldingKind::SpecializationConstant)
+        {
+            // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
+            // which means they need to be local instructions can cannot be hoisted to the
+            // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
+            // instructions using this `IntVal` will trigger error. Hence we emit error here
+            // to not allow such cases.
+            //
+            // Note that float-to-inst casts for non-`IntVal`s are allowed.
+            if (!isScalarIntegerType(decl->getType()))
+            {
+                getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+                return nullptr;
+            }
+
+            return m_astBuilder->getOrCreate<DeclRefIntVal>(
+                declRef.substitute(m_astBuilder, decl->getType()),
+                declRef);
+        }
+        // Don't fold on other folding passes, we don't actually know the
+        // values.
+        return nullptr;
     }
 
     if (decl->hasModifier<ExternModifier>())
@@ -2396,10 +2414,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 nullptr,
                 ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is greater than zero
+            // Validate that array size is non-negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() <= 0)
+                if (constElementCount->getValue() < 0)
                 {
                     getSink()->diagnose(
                         subscriptExpr->indexExprs[0],
@@ -2481,6 +2499,30 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
 
     expr->base = base;
     expr->type = base->type;
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
+{
+    List<Type*> elementTypes;
+    for (auto& element : expr->elements)
+    {
+        element = CheckTerm(element);
+        auto elementType = element->type.type;
+        if (auto concreteTypePack = as<ConcreteTypePack>(elementType))
+        {
+            // We need to flatten the type pack into a tuple type
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementTypes.add(concreteTypePack->getElementType(i));
+            }
+        }
+        else
+        {
+            elementTypes.add(element->type.type);
+        }
+    }
+    expr->type = m_astBuilder->getTupleType(elementTypes.getArrayView());
     return expr;
 }
 
@@ -4023,6 +4065,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
 
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(expr->typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        return expr;
+    }
+
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
@@ -4061,6 +4110,15 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
+
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     expr->value = CheckTerm(expr->value);
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;

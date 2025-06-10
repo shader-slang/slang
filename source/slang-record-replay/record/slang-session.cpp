@@ -369,6 +369,22 @@ SLANG_NO_THROW SlangResult SessionRecorder::getTypeConformanceWitnessMangledName
     return result;
 }
 
+SLANG_NO_THROW SlangResult SessionRecorder::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outRTTIDataBuffer,
+    uint32_t bufferSizeInBytes)
+{
+    // No need to record this function, it's just a query.
+
+    SlangResult result = m_actualSession->getDynamicObjectRTTIBytes(
+        type,
+        interfaceType,
+        outRTTIDataBuffer,
+        bufferSizeInBytes);
+    return result;
+}
+
 SLANG_NO_THROW SlangResult SessionRecorder::getTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,

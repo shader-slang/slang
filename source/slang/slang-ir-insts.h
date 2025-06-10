@@ -2500,7 +2500,14 @@ struct IRLoad : IRInst
     IRInst* getPtr() { return ptr.get(); }
 };
 
-struct IRAtomicLoad : IRInst
+struct IRAtomicOperation : IRInst
+{
+    IR_PARENT_ISA(AtomicOperation);
+
+    IRInst* getPtr() { return getOperand(0); }
+};
+
+struct IRAtomicLoad : IRAtomicOperation
 {
     IRUse ptr;
     IR_LEAF_ISA(AtomicLoad)
@@ -2521,7 +2528,7 @@ struct IRStore : IRInst
     IRUse* getValUse() { return &val; }
 };
 
-struct IRAtomicStore : IRInst
+struct IRAtomicStore : IRAtomicOperation
 {
     IRUse ptr;
     IRUse val;
@@ -3074,6 +3081,17 @@ struct IREach : IRInst
     IRInst* getElement() { return getOperand(0); }
 };
 
+struct IRMakeArray : IRInst
+{
+    IR_LEAF_ISA(MakeArray)
+};
+
+struct IRMakeArrayFromElement : IRInst
+{
+    IR_LEAF_ISA(MakeArrayFromElement)
+};
+
+
 // An Instruction that creates a tuple value.
 struct IRMakeTuple : IRInst
 {
@@ -3122,6 +3140,18 @@ struct IRMakeVectorFromScalar : IRInst
 struct IRMakeCoopVector : IRInst
 {
     IR_LEAF_ISA(MakeCoopVector)
+};
+
+struct IRCoopMatMapElementIFunc : IRInst
+{
+    IR_LEAF_ISA(CoopMatMapElementIFunc)
+    IRInst* getCoopMat() { return getOperand(0); }
+    IRInst* getTuple() { return getOperand(0); }
+    IRFunc* getIFuncCall() { return as<IRFunc>(getOperand(1)); }
+    IRInst* getIFuncThis() { return getOperand(2); }
+
+    bool hasIFuncThis() { return getOperandCount() > 2; }
+    void setIFuncCall(IRFunc* func) { setOperand(1, func); }
 };
 
 // An Instruction that creates a differential pair value from a
@@ -3331,6 +3361,12 @@ struct IRExtractExistentialWitnessTable : IRInst
     IR_LEAF_ISA(ExtractExistentialWitnessTable);
 };
 
+struct IRIsNullExistential : IRInst
+{
+    IR_LEAF_ISA(IsNullExistential);
+};
+
+
 /* Base class for instructions that track liveness */
 struct IRLiveRangeMarker : IRInst
 {
@@ -3424,6 +3460,13 @@ struct IRDebugSource : IRInst
     IR_LEAF_ISA(DebugSource)
     IRInst* getFileName() { return getOperand(0); }
     IRInst* getSource() { return getOperand(1); }
+};
+
+struct IRDebugBuildIdentifier : IRInst
+{
+    IR_LEAF_ISA(DebugBuildIdentifier)
+    IRInst* getBuildIdentifier() { return getOperand(0); }
+    IRInst* getFlags() { return getOperand(1); }
 };
 
 struct IRDebugLine : IRInst
@@ -3995,6 +4038,8 @@ public:
     }
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
+    IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
+    IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,
@@ -4046,6 +4091,9 @@ public:
 
     /// Given an existential value, extract the underlying "real" type
     IRType* emitExtractExistentialType(IRInst* existentialValue);
+
+    /// Given an existential value, return if it is empty/null.
+    IRInst* emitIsNullExistential(IRInst* existentialValue);
 
     /// Given an existential value, extract the witness table showing how the value conforms to the
     /// existential type.
@@ -4240,6 +4288,8 @@ public:
 
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
+
+    IRInst* emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func);
 
     IRInst* emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);
     IRInst* emitGetElementPtr(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);

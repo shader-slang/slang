@@ -627,17 +627,6 @@ typedef uint32_t SlangSizeT;
         SLANG_TARGET_COUNT_OF,
     };
 
-    typedef int SlangStdRevisionIntegral;
-    enum SlangStdRevision : SlangStdRevisionIntegral
-    {
-        SLANG_STD_REVISION_UNKNOWN,
-        SLANG_STD_REVISION_2025,
-        SLANG_STD_REVISION_2026,
-        SLANG_STD_REVISION_COUNT_OF,
-
-        SLANG_STD_REVISION_DEFAULT = SLANG_STD_REVISION_2025,
-    };
-
     /* A "container format" describes the way that the outputs
     for multiple files, entry points, targets, etc. should be
     combined into a single artifact for output. */
@@ -917,7 +906,6 @@ typedef uint32_t SlangSizeT;
         DisableSourceMap,               // bool
         UnscopedEnum,                   // bool
         PreserveParameters, // bool: preserve all resource parameters in the output code.
-
         // Target
 
         Capability,                // intValue0: CapabilityName
@@ -1009,8 +997,13 @@ typedef uint32_t SlangSizeT;
         TrackLiveness,
         LoopInversion, // bool, enable loop inversion optimization
 
-        // Deprecated
-        ParameterBlocksUseRegisterSpaces,
+        ParameterBlocksUseRegisterSpaces, // Deprecated
+        LanguageVersion,                  // intValue0: SlangLanguageVersion
+        TypeConformance, // stringValue0: additional type conformance to link, in the format of
+                         // "<TypeName>:<IInterfaceName>[=<sequentialId>]", for example
+                         // "Impl:IFoo=3" or "Impl:IFoo".
+        EnableExperimentalDynamicDispatch, // bool, experimental
+        EmitReflectionJSON,                // bool
 
         CountOfParsableOptions,
 
@@ -1027,14 +1020,12 @@ typedef uint32_t SlangSizeT;
         // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
         EmitSpirvMethod, // enum SlangEmitSpirvMethod
 
-        EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
-        EnableExperimentalDynamicDispatch, // bool, experimental
-        StdRevision,                       // intValue0: SlangStdRevision
+        EmitSeparateDebug, // bool
         CountOf,
     };
 
@@ -4068,6 +4059,7 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outNameBlob) = 0;
 
     /** Get the sequential ID used to identify a type witness in a dynamic object.
+        The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
@@ -4129,6 +4121,37 @@ struct ISession : public ISlangUnknown
         const char* path,
         const char* string,
         slang::IBlob** outDiagnostics = nullptr) = 0;
+
+
+    /** Get the 16-byte RTTI header to fill into a dynamic object.
+        This header is used to identify the type of the object for dynamic dispatch purpose.
+        For example, given the following shader:
+
+        ```slang
+        [anyValueSize(32)] dyn interface IFoo { int eval(); }
+        struct Impl : IFoo { int eval() { return 1; } }
+
+        ConstantBuffer<dyn IFoo> cb0;
+
+        [numthreads(1,1,1)
+        void main()
+        {
+            cb0.eval();
+        }
+        ```
+
+        The constant buffer `cb0` should be filled with 16+32=48 bytes of data, where the first
+        16 bytes should be the RTTI bytes returned by calling `getDynamicObjectRTTIBytes(type_Impl,
+        type_IFoo)`, and the rest 32 bytes should hold the actual data of the dynamic object (in
+        this case, fields in the `Impl` type).
+
+        `bufferSizeInBytes` must be greater than 16.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outRTTIDataBuffer,
+        uint32_t bufferSizeInBytes) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4146,8 +4169,31 @@ struct IMetadata : public ISlangCastable
         SlangUInt spaceIndex,            // `space` for D3D12, `set` for Vulkan
         SlangUInt registerIndex,         // `register` for D3D12, `binding` for Vulkan
         bool& outUsed) = 0;
+
+    /*
+    Returns the debug build identifier for a base and debug spirv pair.
+    */
+    virtual const char* getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+/** Compile result for storing and retrieving multiple output blobs.
+    This is needed for features such as separate debug compilation which
+    output both base and debug spirv.
+ */
+struct ICompileResult : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x5fa9380e,
+        0xb62f,
+        0x41e5,
+        {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
+
+    virtual uint32_t getItemCount() = 0;
+    virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
+    virtual SlangResult getMetadata(IMetadata** outMetadata) = 0;
+};
+    #define SLANG_UUID_ICompileResult ICompileResult::getTypeGuid()
 
 /** A component type is a unit of shader code layout, reflection, and linking.
 
@@ -4367,6 +4413,16 @@ struct IComponentType : public ISlangUnknown
         SlangInt targetIndex,
         IMetadata** outMetadata,
         IBlob** outDiagnostics = nullptr) = 0;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
 };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
@@ -4523,7 +4579,12 @@ struct SpecializationArg
 
 enum SlangLanguageVersion
 {
-    SLANG_LANGUAGE_VERSION_2025 = 2025
+    SLANG_LANGUAGE_VERSION_UNKNOWN = 0,
+    SLANG_LANGUAGE_VERSION_LEGACY = 2018,
+    SLANG_LANGUAGE_VERSION_2025 = 2025,
+    SLANG_LANGUAGE_VERSION_2026 = 2026,
+    SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
+    SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
 };
 
 
@@ -4537,8 +4598,8 @@ struct SlangGlobalSessionDesc
     /// Slang API version.
     uint32_t apiVersion = SLANG_API_VERSION;
 
-    /// Slang language version.
-    uint32_t languageVersion = SLANG_LANGUAGE_VERSION_2025;
+    /// Specify the oldest Slang language version that any sessions will use.
+    uint32_t minLanguageVersion = SLANG_LANGUAGE_VERSION_2025;
 
     /// Whether to enable GLSL support.
     bool enableGLSL = false;

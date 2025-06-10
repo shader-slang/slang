@@ -365,6 +365,11 @@ struct CompilerOptionSet
 
     bool shouldHaveSourceMap() { return !getBoolOption(CompilerOptionName::DisableSourceMap); }
 
+    bool shouldEmitSeparateDebugInfo()
+    {
+        return getBoolOption(CompilerOptionName::EmitSeparateDebug);
+    }
+
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
@@ -383,6 +388,15 @@ struct CompilerOptionSet
     DebugInfoLevel getDebugInfoLevel()
     {
         return getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation);
+    }
+
+    SlangLanguageVersion getLanguageVersion()
+    {
+        if (!hasOption(CompilerOptionName::LanguageVersion))
+        {
+            return SLANG_LANGAUGE_VERSION_DEFAULT;
+        }
+        return (SlangLanguageVersion)getIntOption(CompilerOptionName::LanguageVersion);
     }
 
     List<String> getDownstreamArgs(String downstreamToolName);
