@@ -1965,6 +1965,8 @@ void ASTSerialReadContext::handleContainerDeclDirectMemberDecls(
     ASTSerializer const& serializer,
     ContainerDeclDirectMemberDecls& value)
 {
+    TESS_TRACE("ASTSerialReadContext::handleContainerDeclDirectMemberDecls");
+
     // In the reading direction, we will intentionally
     // *not* deserialize things the usual way, because
     // we want to support deserializing only a subset
@@ -2043,14 +2045,17 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 {
     TESS_TRACE("ASTSerialReadContext::readFossilizedDecl");
 
+    TESS_TRACE("auto contentValPtr = getVariantContentPtr(fossilizedDecl)");
     auto contentValPtr = getVariantContentPtr(fossilizedDecl);
 
+    TESS_TRACE("Fossil::SerialReader reader");
     Fossil::SerialReader reader(
         _readContext,
         *contentValPtr,
         Fossil::SerialReader::InitialStateType::PseudoPtr);
     ASTSerializer serializer(&reader, this);
 
+    TESS_TRACE("serialize(serializer, decl)");
     Decl* decl = nullptr;
     serialize(serializer, decl);
     return decl;
