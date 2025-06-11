@@ -361,7 +361,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
         ValUnificationContext unificationContext;
-        unificationContext.optionalConstraint = constraintDeclRef.getDecl()->isOptionalConstraint;
+        unificationContext.optionalConstraint = constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
         if (!TryUnifyTypes(
                 *system,
                 unificationContext,
@@ -703,24 +703,18 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 subTypeWitness = nullptr;
         }
 
-        if (constraintDecl->isOptionalConstraint)
-        {
-            // Wrap the witness in Optional<>
-            if (subTypeWitness)
-            {
-                subTypeWitness = m_astBuilder->getOptionalSubtypeWitness(sub, sup, subTypeWitness);
-            }
-            else
-            {
-                subTypeWitness = m_astBuilder->getOptionalSubtypeWitnessNone(sub, sup);
-            }
-        }
-
         if (subTypeWitness)
         {
             // We found a witness, so it will become an (implicit) argument.
             args.add(subTypeWitness);
             outBaseCost += subTypeWitness->getOverloadResolutionCost();
+        }
+        else if (constraintDecl->hasModifier<OptionalConstraintModifier>())
+        {
+            // Optional witness failed to resolve; not an error.
+            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            args.add(noneWitness);
+            outBaseCost += kConversionCost_FailedOptionalConstraint;
         }
         else
         {

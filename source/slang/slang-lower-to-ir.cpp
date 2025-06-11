@@ -1981,6 +1981,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
+    LoweredValInfo visitNoneWitness(NoneWitness* witness)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getVoidValue());
+    }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
