@@ -1672,11 +1672,15 @@ FossilizedValPtr SerialReader::_readPotentiallyIndirectValPtr()
 {
     TESS_TRACE("SerialReader::_readPotentiallyIndirectValPtr");
     auto baseValPtr = _readValPtr();
+    TESS_TRACE("if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))");
     if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))
     {
+    TESS_TRACE("auto targetValRef = basePtrPtr->getTarget()");
         auto targetValRef = basePtrPtr->getTarget();
+    TESS_TRACE("FossilizedValPtr(targetValRef)");
         return FossilizedValPtr(targetValRef);
     }
+    TESS_TRACE("return baseValPtr");
     return baseValPtr;
 }
 
