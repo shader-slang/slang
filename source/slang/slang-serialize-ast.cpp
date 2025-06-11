@@ -2127,6 +2127,7 @@ ModuleDecl* readSerializedModuleAST(
     auto dataChunk = as<RIFF::DataChunk>(chunk);
 
     auto rootVal = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    _dump(rootVal);
 
     auto fossilizedModuleInfo = cast<Fossilized<ASTModuleInfo>>(rootVal);
 
