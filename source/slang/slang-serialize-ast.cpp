@@ -2082,6 +2082,37 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
     return decl;
 }
 
+static void _dump(FossilizedValPtr valPtr, int depth = 0)
+{
+    fprintf(stderr, "\n");
+    for (auto i = 0; i < depth; ++i)
+        fprintf(stderr, "  ");
+
+    if (!valPtr)
+    {
+        fprintf(stderr, "null");
+        return;
+    }
+
+    if (depth > 3)
+    {
+        fprintf(stderr, "...");
+        return;
+    }
+
+    switch (valPtr->getKind())
+    {
+    case FossilizedValKind::VariantObj:
+        fprintf(stderr, "variant");
+        _dump(getVariantContentPtr(as<FossilizedVariantObj>(valPtr)));
+        break;
+
+    default:
+        fprintf(stderr, "unhandled: %d", int(valPtr->getKind()));
+        return;
+    }
+}
+
 ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
     ASTBuilder* astBuilder,
