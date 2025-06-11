@@ -994,7 +994,7 @@ void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
     // types as variants for serialization purposes.
     //
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
-    serializer.getContext()->handleASTNode(serializer, *(NodeBase**)&value);
+    serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));
 }
 
 //
