@@ -7545,7 +7545,7 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
                        .as<ExtensionDecl>();
     auto targetType = getTargetType(m_astBuilder, declRef);
 
-    // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
+    // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
     auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
     for (auto inheritanceDecl : inheritanceDecls)
     {
@@ -7598,7 +7598,7 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // just with `abstract` methods that replicate things?
         // (That's what C# does).
 
-        // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
+        // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
         auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
         for (auto inheritanceDecl : inheritanceDecls)
         {
