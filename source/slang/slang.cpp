@@ -2994,17 +2994,14 @@ static void collectExportedConstantInContainer(
     ASTBuilder* builder,
     ContainerDecl* containerDecl)
 {
-    for (auto m : containerDecl->members)
+    for (auto varMember : containerDecl->getDirectMemberDeclsOfType<VarDeclBase>())
     {
-        auto varMember = as<VarDeclBase>(m);
-        if (!varMember)
-            continue;
         if (!varMember->val)
             continue;
         bool isExported = false;
         bool isConst = false;
         bool isExtern = false;
-        for (auto modifier : m->modifiers)
+        for (auto modifier : varMember->modifiers)
         {
             if (as<HLSLExportModifier>(modifier))
                 isExported = true;
@@ -3018,14 +3015,14 @@ static void collectExportedConstantInContainer(
         }
         if (isExported && isConst)
         {
-            auto mangledName = getMangledName(builder, m);
+            auto mangledName = getMangledName(builder, varMember);
             if (isExtern && dict.containsKey(mangledName))
                 continue;
             dict[mangledName] = varMember->val;
         }
     }
 
-    for (auto member : containerDecl->members)
+    for (auto member : containerDecl->getDirectMemberDecls())
     {
         if (as<NamespaceDecl>(member) || as<FileDecl>(member))
         {
@@ -5262,7 +5259,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     // If it's a container process it's children
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
-        for (auto child : containerDecl->members)
+        for (auto child : containerDecl->getDirectMemberDecls())
         {
             _processFindDeclsExportSymbolsRec(child);
         }
@@ -5499,12 +5496,16 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     buildHash(builder);
 
     // Add the name and name override for the specified entry point to the hash.
-    auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
-    builder.append(entryPointName);
-    auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
-    builder.append(entryPointMangledName);
-    auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
-    builder.append(entryPointNameOverride);
+    auto entryPoint = getEntryPoint(entryPointIndex);
+    if (entryPoint)
+    {
+        auto entryPointName = entryPoint->getName()->text;
+        builder.append(entryPointName);
+        auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
+        builder.append(entryPointMangledName);
+        auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
+        builder.append(entryPointNameOverride);
+    }
 
     auto hash = builder.finalize().toBlob();
     *outHash = hash.detach();
@@ -5564,6 +5565,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
 
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
     return SLANG_OK;
 }
 
@@ -5899,6 +5927,20 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
         return SLANG_E_NOT_AVAILABLE;
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    //(*outCompileResult)->addRef(); // TODO: Needed if using a ComPtr.
     return SLANG_OK;
 }
 
@@ -6764,12 +6806,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
-    for (auto globalDecl : moduleDecl->members)
+    for (auto fileDecl : moduleDecl->getDirectMemberDeclsOfType<FileDecl>())
     {
-        if (auto fileDecl = as<FileDecl>(globalDecl))
-        {
-            addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
-        }
+        addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
 
     return SLANG_OK;

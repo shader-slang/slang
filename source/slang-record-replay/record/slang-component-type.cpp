@@ -157,6 +157,32 @@ SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getTargetMetadata
     return m_actualComponentType->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    // No need to record this call.
+    return m_actualComponentType->getEntryPointCompileResult(
+        entryPointIndex,
+        targetIndex,
+        outCompileResult,
+        outDiagnostics);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getTargetCompileResult(
+    SlangInt targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    // No need to record this call.
+    return m_actualComponentType->getTargetCompileResult(
+        targetIndex,
+        outCompileResult,
+        outDiagnostics);
+}
+
 SLANG_NO_THROW SlangResult IComponentTypeRecorder::getResultAsFileSystem(
     SlangInt entryPointIndex,
     SlangInt targetIndex,
