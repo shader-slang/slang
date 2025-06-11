@@ -205,6 +205,9 @@ static SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
         samplerDesc.reductionOp = TextureReductionOp::Comparison;
         samplerDesc.comparisonFunc = ComparisonFunc::Less;
     }
+    samplerDesc.minFilter = srcDesc.filteringMode;
+    samplerDesc.magFilter = srcDesc.filteringMode;
+    samplerDesc.mipFilter = srcDesc.filteringMode;
     return samplerDesc;
 }
 
