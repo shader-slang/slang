@@ -4,11 +4,11 @@
 // the downstream compiler being present is a requirement, so we mark as a 'TEST' so that 
 // those tests are made.
 
-//TEST:SIMPLE_LINE:-entry computeMain -target spirv -emit-spirv-via-glsl
-//TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
-//TEST:SIMPLE_LINE:-entry computeMain -target dxbc 
-//TEST:SIMPLE_LINE:-entry computeMain -target shader-dll 
-//TEST:SIMPLE_LINE:-entry computeMain -target ptx 
+//TEST:SIMPLE(filecheck=CHK):-entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHK):-entry computeMain -target dxil -profile cs_6_0 
+//TEST:SIMPLE(filecheck=CHK):-entry computeMain -target dxbc 
+//TEST:SIMPLE(filecheck=CHK):-entry computeMain -target shader-dll 
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHK):-entry computeMain -target ptx 
 
 // Here the thing being checked is error reporting around return, and += 
 
@@ -19,6 +19,7 @@ int doSomething(int a)
     return a 
     += 
     __SyntaxError();
+    //CHK:([[#@LINE-1]]): error
 }
 
 [shader("compute")]
