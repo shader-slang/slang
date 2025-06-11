@@ -873,6 +873,7 @@ interface __EnumType : ILogical
 /// }
 /// ```
 interface IArray<T>
+    where noncopyable(T)
 {
     /// Returns the number of elements in the conforming type.
     int getCount();
@@ -922,6 +923,7 @@ interface IArray<T>
 /// }
 /// ```
 interface IRWArray<T> : IArray<T>
+    where noncopyable(T)
 {
     /// The subscript operator to be provided by a conforming type. Provides both a `get` and a `set` accessor.
     __subscript(int index)->T
@@ -1894,6 +1896,14 @@ extension int16_t : IRangedValue
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
 struct Array : IRWArray<T>
+    where noncopyable(T)
+{
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
+}
+
+__generic<T, let N : int>
+extension Array<T, N>
 {
     __intrinsic_op($(kIROp_GetArrayLength))
     int getCount();

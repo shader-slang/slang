@@ -15,4 +15,5 @@ void foo(T v)
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     foo(inputBuffer);
+    outputBuffer[0] = 0;
 }

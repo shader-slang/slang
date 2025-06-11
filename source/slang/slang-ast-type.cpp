@@ -1336,14 +1336,9 @@ bool isNonCopyableType(Type* type)
 {
     Decl* decl = nullptr;
 
-    if (auto declRefTypeAggType = isDeclRefTypeOf<AggTypeDecl>(type))
+    if (auto array = as<ArrayExpressionType>(type))
     {
-        decl = declRefTypeAggType.getDecl();
-    }
-    else if (auto declRefTypeGenericType = isDeclRefTypeOf<GenericTypeParamDeclBase>(type))
-    {
-        // handle the case where we have a generic arg to resolve.
-        decl = declRefTypeGenericType.getDecl();
+        return isNonCopyableType(array->getElementType());
     }
     else if (auto tuple = as<TupleType>(type))
     {
@@ -1359,6 +1354,16 @@ bool isNonCopyableType(Type* type)
         }
         return false;
     }
+    else if (auto declRefTypeGenericType = isDeclRefTypeOf<GenericTypeParamDeclBase>(type))
+    {
+        // handle the case where we have a generic arg to resolve.
+        decl = declRefTypeGenericType.getDecl();
+    }
+    else if (auto declRefTypeAggType = isDeclRefTypeOf<AggTypeDecl>(type))
+    {
+        decl = declRefTypeAggType.getDecl();
+    }
+
     if (!decl)
         return false;
     return decl->findModifier<NonCopyableTypeAttribute>();
