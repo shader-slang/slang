@@ -759,8 +759,15 @@ public:
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 
-    // The next declaration defined in the same container with the same name
-    Decl* nextInContainerWithSameName = nullptr;
+    /// The previous declaration defined in the same `ContainerDecl`
+    /// that has the same name as this declaration.
+    ///
+    /// Note: it is not recommended to ever access this member directly;
+    /// instead, code should use the `ContainerDecl::getPrevDeclWithSameName()`
+    /// method, which ensures that the `_prevInContainerWithSameName` fields
+    /// have been properly set for all declarations in that container.
+    ///
+    Decl* _prevInContainerWithSameName = nullptr;
 
     bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)

@@ -785,6 +785,29 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
 }
 
+static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCaps, Stage stage)
+{
+    auto stageAtom = getAtomFromStage(stage);
+
+    // Cache the result of this function for easier lookup.
+    auto result = emitter->getCachedCapability(stageAtom);
+    if (result)
+        return *result;
+
+    // Here we check for presence of the `hlsl_2018` capability for the
+    // current target+stage.
+    auto capabilitySetForStageOfEntryPoint = CapabilitySet(CapabilityName(stageAtom));
+    auto hlsl2018CapabilitySet =
+        CapabilitySet(CapabilityName::hlsl_2018).join(capabilitySetForStageOfEntryPoint);
+    if (targetCaps.join(capabilitySetForStageOfEntryPoint).implies(hlsl2018CapabilitySet))
+    {
+        emitter->addCachedCapability(stageAtom, false);
+        return false;
+    }
+    emitter->addCachedCapability(stageAtom, true);
+    return true;
+}
+
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
@@ -827,7 +850,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
-            if (targetCaps.implies(CapabilityAtom::hlsl_2018))
+            if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
                 return false;
 
             if (as<IRBasicType>(inst->getDataType()))
@@ -855,7 +878,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
-            if (targetCaps.implies(CapabilityAtom::hlsl_2018))
+            if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
                 return false;
 
             if (as<IRBasicType>(inst->getDataType()))
