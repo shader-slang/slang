@@ -1,8 +1,16 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
-static void _tessTrace(char const* message)
+#include <stdarg.h>
+
+static void _tessTrace(char const* message, ...)
 {
+    va_list args;
+    va_start(args, message);
+
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), message, args);
+
     fprintf(stderr, "TESS: %s\n", message);
 }
 
@@ -976,9 +984,15 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
 //
 
 template<typename T>
-void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
+void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase* unused)
 {
-    TESS_TRACE("serializeObject(NodeBase)");
+    TESS_TRACE("serializeObject(NodeBase) impl:%p context:%p value:%p &value:%p unused:%p",
+        serializer.getImpl(),
+        serializer.getContext(),
+        value,
+        &value,
+        unused);
+
     // The general-purpose serialization layer defines
     // a variant as akin to a struct, but where the
     // specific number and type of fields that get written
