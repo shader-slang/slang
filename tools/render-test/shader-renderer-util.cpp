@@ -76,6 +76,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     const FormatInfo& formatInfo = getFormatInfo(format);
 
     bool isArray = inputDesc.arrayLength > 1;
+    bool isMS = inputDesc.sampleCount > 1;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
@@ -113,9 +114,13 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     case 2:
         {
             textureDesc.type =
-                isArray ? (inputDesc.isCube ? TextureType::TextureCubeArray
-                                            : TextureType::Texture2DArray)
-                        : (inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D);
+                isArray
+                    ? (inputDesc.isCube
+                           ? TextureType::TextureCubeArray
+                           : (isMS ? TextureType::Texture2DMSArray : TextureType::Texture2DArray))
+                    : (inputDesc.isCube
+                           ? TextureType::TextureCube
+                           : (isMS ? TextureType::Texture2DMS : TextureType::Texture2D));
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = inputDesc.size;
             textureDesc.size.depth = 1;
