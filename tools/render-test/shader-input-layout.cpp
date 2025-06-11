@@ -664,7 +664,7 @@ struct ShaderInputLayoutParser
     RefPtr<ShaderInputLayout::Val> parseVal(Misc::TokenReader& parser)
     {
         auto nextToken = parser.NextToken();
-        auto word = parser.NextToken().Content;
+        auto word = nextToken.Content;
         if (parser.AdvanceIf("begin_array"))
         {
             RefPtr<ShaderInputLayout::ArrayVal> val = new ShaderInputLayout::ArrayVal;
@@ -834,8 +834,8 @@ struct ShaderInputLayoutParser
         else
         {
             throw ShaderInputLayoutFormatException(
-                String("Unknown shader input type '") + word + String("' at line ") +
-                String(parser.NextToken().Position.Line));
+                String("Unknown shader input type '") + word + String("' at line: ") +
+                String(nextToken.Position.Line));
         }
         parser.ReadToken();
         return nullptr;
