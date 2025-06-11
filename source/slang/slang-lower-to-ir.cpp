@@ -1990,9 +1990,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
-    LoweredValInfo visitNoneWitness(NoneWitness* witness)
+    LoweredValInfo visitNoneWitness(NoneWitness*)
     {
-        return LoweredValInfo::simple(context->irBuilder->getVoidValue());
+        auto builder = getBuilder();
+        auto uint2Type = builder->getVectorType(
+            builder->getUIntType(),
+            builder->getIntValue(builder->getIntType(), 2));
+        IRInst* uint2Args[] = {
+            builder->getIntValue(builder->getUIntType(), -1),
+            builder->getIntValue(builder->getUIntType(), 0)};
+        auto uint2seqID = builder->emitMakeVector(uint2Type, 2, uint2Args);
+        return LoweredValInfo::simple(uint2seqID);
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -5476,23 +5484,37 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
     {
+        auto builder = getBuilder();
         if (expr->constantVal)
         {
-            return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
+            return LoweredValInfo::simple(builder->getBoolValue(expr->constantVal->value));
         }
-        // If expr is a witness, then this is a run-time type check from for an existential type.
         if (expr->witnessArg)
         {
             auto value = lowerLValueExpr(context, expr->value);
             auto type = lowerType(context, expr->typeExpr.type);
             auto witness = lowerSimpleVal(context, expr->witnessArg);
-            auto existentialInfo = value.getExtractedExistentialValInfo();
-            auto irVal = getBuilder()->emitIsType(
-                existentialInfo->extractedVal,
-                existentialInfo->witnessTable,
-                type,
-                witness);
-            return LoweredValInfo::simple(irVal);
+            auto declWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
+
+            if (declWitness && declWitness->isOptional())
+            {
+                // Optional constraint check. NoneWitness lowers to a specific
+                // ID, so that we can check for that here.
+                auto witnessID = builder->emitGetSequentialIDInst(witness);
+                auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
+                auto irVal = builder->emitNeq(witnessID, noneWitnessID);
+                return LoweredValInfo::simple(irVal);
+            }
+            else
+            { // This is a run-time type check from for an existential type.
+                auto existentialInfo = value.getExtractedExistentialValInfo();
+                auto irVal = builder->emitIsType(
+                    existentialInfo->extractedVal,
+                    existentialInfo->witnessTable,
+                    type,
+                    witness);
+                return LoweredValInfo::simple(irVal);
+            }
         }
         // For all other cases, we map to a simple type equality check in the IR.
         IRType* leftType = nullptr;
@@ -5507,7 +5529,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto rightType = lowerType(context, expr->typeExpr.type);
         IRInst* args[] = {leftType, rightType};
         auto irVal =
-            getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
+            builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 

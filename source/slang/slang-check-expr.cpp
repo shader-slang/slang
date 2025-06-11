@@ -4068,19 +4068,16 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
 
-    // Check if the right-hand side type is an interface type
-    if (isInterfaceType(expr->typeExpr.type))
-    {
-        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
-        return expr;
-    }
-
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
 
     // If value is a subtype of `type`, then this expr is always true.
-    if (isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None))
+    auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::AllowOptional);
+    auto declWitness = as<DeclaredSubtypeWitness>(witness);
+    bool optionalWitness = declWitness && declWitness->isOptional();
+
+    if (witness && !optionalWitness)
     {
         // Instead of returning a BoolLiteralExpr, we use a field to indicate this scenario,
         // so that the language server can still see the original syntax tree.
@@ -4091,15 +4088,22 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         return expr;
     }
 
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(expr->typeExpr.type) && !optionalWitness)
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        return expr;
+    }
+
     // Otherwise, if the target type is a subtype of value->type, we need to grab the
     // subtype witness for runtime checks.
 
     expr->value = maybeOpenExistential(originalVal);
-    expr->witnessArg = tryGetSubtypeWitness(expr->typeExpr.type, valueType);
+    expr->witnessArg = witness;
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(originalVal->type))
+        if (!optionalWitness && !isInterfaceType(originalVal->type))
         {
             getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
         }

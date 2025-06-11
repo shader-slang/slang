@@ -697,6 +697,13 @@ class DeclaredSubtypeWitness : public SubtypeWitness
         return false;
     }
 
+    bool isOptional()
+    {
+        if (auto declRef = getDeclRef().as<GenericTypeConstraintDecl>())
+            return declRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        return false;
+    }
+
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
