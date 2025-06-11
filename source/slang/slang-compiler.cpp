@@ -476,6 +476,49 @@ Stage getStageFromAtom(CapabilityAtom atom)
     }
 }
 
+CapabilityAtom getAtomFromStage(Stage stage)
+{
+    // Convert Slang::Stage to CapabilityAtom.
+    // Note that capabilities do not share the same values as Slang::Stage
+    // and must be explicitly converted.
+    switch (stage)
+    {
+    case Stage::Compute:
+        return CapabilityAtom::compute;
+    case Stage::Vertex:
+        return CapabilityAtom::vertex;
+    case Stage::Fragment:
+        return CapabilityAtom::fragment;
+    case Stage::Geometry:
+        return CapabilityAtom::geometry;
+    case Stage::Hull:
+        return CapabilityAtom::hull;
+    case Stage::Domain:
+        return CapabilityAtom::domain;
+    case Stage::Mesh:
+        return CapabilityAtom::_mesh;
+    case Stage::Amplification:
+        return CapabilityAtom::_amplification;
+    case Stage::RayGeneration:
+        return CapabilityAtom::_raygen;
+    case Stage::AnyHit:
+        return CapabilityAtom::_anyhit;
+    case Stage::ClosestHit:
+        return CapabilityAtom::_closesthit;
+    case Stage::Miss:
+        return CapabilityAtom::_miss;
+    case Stage::Intersection:
+        return CapabilityAtom::_intersection;
+    case Stage::Callable:
+        return CapabilityAtom::_callable;
+    case Stage::Dispatch:
+        return CapabilityAtom::dispatch;
+    default:
+        SLANG_UNEXPECTED("unknown stage");
+        UNREACHABLE_RETURN(CapabilityAtom::Invalid);
+    }
+}
+
 SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
 {
     // Check if the type is supported on this compile

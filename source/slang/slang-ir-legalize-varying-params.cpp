@@ -3,6 +3,8 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-out-parameters.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 
@@ -1880,6 +1882,7 @@ private:
             auto structType = as<IRStructType>(param->getDataType());
             builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
             auto varLayout = findVarLayout(param);
+            SLANG_ASSERT(varLayout);
 
             // If `param` already has a semantic, we don't want to hoist its fields out.
             if (varLayout->findSystemValueSemanticAttr() != nullptr ||
@@ -2242,6 +2245,7 @@ private:
                 index++;
                 continue;
             }
+            SLANG_ASSERT(typeLayout);
             typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
@@ -4015,11 +4019,55 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
+void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+{
+    const auto oldFunc = entryPoint.entryPointFunc;
+
+    // We can avoid this lowering if it's a simple scalar return as it's
+    // handled further down the pipeline
+    const bool hasOutParameters = anyOf(
+        oldFunc->getParams(),
+        [](auto param) { return as<IROutTypeBase>(param->getFullType()); });
+
+    auto returnType = oldFunc->getResultType();
+    if (!as<IRStructType>(returnType) && !hasOutParameters)
+        return;
+
+    const bool alwaysUseReturnStruct = true;
+    entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink, alwaysUseReturnStruct);
+
+    if (oldFunc == entryPoint.entryPointFunc)
+        return;
+
+    // Since this will no longer be the entry point function, remove those decorations
+    List<IRDecoration*> ds;
+    for (auto decor : oldFunc->getDecorations())
+    {
+        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
+        {
+            ds.add(decor);
+        }
+    }
+
+    for (auto decor : ds)
+    {
+        decor->removeFromParent();
+    }
+}
+
+
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
+    for (auto& e : entryPoints)
+    {
+        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        {
+            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        }
+    }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
 }
