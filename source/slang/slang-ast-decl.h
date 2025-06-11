@@ -66,6 +66,8 @@ private:
     Decl* _readSerializedDeclAtIndex(Index index) const;
     Decl* _readSerializedDeclsOfName(Name* name) const;
 
+    void _readAllSerializedDecls() const;
+
     mutable List<Decl*> decls;
 
     mutable struct
@@ -76,7 +78,7 @@ private:
         List<Decl*> filteredListOfTransparentDecls;
     } accelerators;
 
-    struct
+    mutable struct
     {
         RefPtr<RefObject> context;
         void const* data = nullptr;

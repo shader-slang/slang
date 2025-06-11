@@ -71,35 +71,48 @@ void ContainerDeclDirectMemberDecls::_initForOnDemandDeserialization(
         decls.add(nullptr);
 }
 
+void ContainerDeclDirectMemberDecls::_readAllSerializedDecls() const
+{
+    SLANG_ASSERT(isUsingOnDemandDeserialization());
+
+    // We start by querying each of the contained decls
+    // by index, which should cause the entire `decls`
+    // array to be filled in.
+    //
+    auto declCount = getDeclCount();
+    for (Index i = 0; i < declCount; ++i)
+    {
+        auto decl = getDecl(i);
+        SLANG_UNUSED(decl);
+    }
+
+    // At this point, we have loaded all the information
+    // that was in the serialized representation, and
+    // don't need to keep doing on-demand loading.
+    // Thus, we clear out the pointer to the serialized
+    // data (which will cause later calls to
+    // `isDoingOnDemandSerialization()` to return `false`).
+    //
+    // Note that we do *not* clear out the `context` pointer
+    // used for on-demand deserialization, because in the
+    // case where we are storing the members of a `ModuleDecl`,
+    // that context will hold the additional state needed to
+    // look up declarations by their mangled names, and we
+    // want to retain that state. The
+    // `isUsingOnDemandDeserializationForExports()` query
+    // is based on the `context` pointer only, so it will
+    // continue to return `true`.
+    //
+    onDemandDeserialization.data = nullptr;
+
+    _invalidateLookupAccelerators();
+}
+
 List<Decl*> const& ContainerDeclDirectMemberDecls::getDecls() const
 {
     if (isUsingOnDemandDeserialization())
     {
-        // If the caller needs the list of all of the direct
-        // member declarations, then we will simply query
-        // each of the declarations by index, which should
-        // trigger each of them to get deserialized (if it
-        // hasn't already been done).
-        //
-        // Once we are done with that loop, we can in
-        // principle turn off on-demand deserialization,
-        // since everything will already have been loaded.
-        //
-        // TODO: Actually do something to turn off on-demand
-        // deserialization (setting `onDemandDeserializaton.data`
-        // to null should suffice), and then do the work required
-        // to make sure that works correctly with the rest of
-        // the accessors. In particular, if we turn off on-demand
-        // deserialization then we probably need to invalidate
-        // the by-name lookup accelerator so that it will get
-        // rebuilt from the now-fully-deserialized member list.
-        //
-        auto declCount = getDeclCount();
-        for (Index i = 0; i < declCount; ++i)
-        {
-            auto decl = getDecl(i);
-            SLANG_UNUSED(decl);
-        }
+        _readAllSerializedDecls();
     }
 
     return decls;
@@ -148,7 +161,18 @@ Decl* ContainerDeclDirectMemberDecls::findLastDeclOfName(Name* name) const
 
 Dictionary<Name*, Decl*> ContainerDeclDirectMemberDecls::getMapFromNameToLastDeclOfThatName() const
 {
-    SLANG_ASSERT(!isUsingOnDemandDeserialization());
+    if (isUsingOnDemandDeserialization())
+    {
+        // If we have been using on-demand deserialization,
+        // then the `mapNameToLastDeclOfThatName` dictionary
+        // may not accurately reflect the contained declarations.
+        // We need to force all of the declarations to be
+        // deserialized immediately, which will also have
+        // the effect of invalidating the accelerators so
+        // that they can be rebuilt to contain complete information.
+        //
+        _readAllSerializedDecls();
+    }
 
     _ensureLookupAcceleratorsAreValid();
     return accelerators.mapNameToLastDeclOfThatName;
