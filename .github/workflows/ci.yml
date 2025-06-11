@@ -229,7 +229,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -239,7 +239,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info  \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
           else
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -249,7 +249,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
           fi
       - name: Test Slang 2
         if: steps.filter.outputs.should-run == 'true'
@@ -265,7 +265,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 3
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -280,7 +280,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 4
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -295,7 +295,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 5
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -310,7 +310,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 6
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -325,7 +325,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 7
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -340,7 +340,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 8
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -355,7 +355,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 9
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -370,7 +370,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 10
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -385,7 +385,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 11
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -400,7 +400,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 12
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -415,7 +415,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 13
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -430,7 +430,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 14
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -445,7 +445,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 15
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -460,7 +460,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 16
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -475,7 +475,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 17
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -490,7 +490,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 18
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -505,7 +505,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 19
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -520,7 +520,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 20
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -535,7 +535,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 21
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -550,7 +550,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 22
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -565,7 +565,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 23
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -580,7 +580,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 24
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -595,7 +595,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 25
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -610,7 +610,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 26
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -625,7 +625,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 27
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -640,7 +640,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 28
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -655,7 +655,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 29
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -670,7 +670,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 30
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -685,7 +685,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 31
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -700,7 +700,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 32
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -715,7 +715,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 33
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -730,7 +730,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 34
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -745,7 +745,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 35
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -760,7 +760,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 36
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -775,7 +775,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 37
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -790,7 +790,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 38
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -805,7 +805,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 39
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -820,7 +820,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 40
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -835,7 +835,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 41
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -850,7 +850,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 42
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -865,7 +865,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 43
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -880,7 +880,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 44
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -895,7 +895,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 45
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -910,7 +910,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 46
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -925,7 +925,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 47
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -940,7 +940,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 48
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -955,7 +955,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 49
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -970,7 +970,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 50
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -985,7 +985,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 51
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1000,7 +1000,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 52
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1015,7 +1015,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 53
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1030,7 +1030,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 54
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1045,7 +1045,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 55
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1060,7 +1060,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 56
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1075,7 +1075,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 57
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1090,7 +1090,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 58
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1105,7 +1105,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 59
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1120,7 +1120,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 60
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1135,7 +1135,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 61
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1150,7 +1150,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 62
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1165,7 +1165,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 63
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1180,7 +1180,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 64
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1195,7 +1195,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 65
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1210,7 +1210,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 66
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1225,7 +1225,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 67
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1240,7 +1240,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 68
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1255,7 +1255,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 69
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1270,7 +1270,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 70
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1285,7 +1285,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 71
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1300,7 +1300,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 72
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1315,7 +1315,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 73
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1330,7 +1330,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 74
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1345,7 +1345,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 75
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1360,7 +1360,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 76
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1375,7 +1375,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 77
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1390,7 +1390,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 78
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1405,7 +1405,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 79
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1420,7 +1420,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 80
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1435,7 +1435,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 81
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1450,7 +1450,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 82
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1465,7 +1465,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 83
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1480,7 +1480,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 84
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1495,7 +1495,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 85
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1510,7 +1510,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 86
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1525,7 +1525,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 87
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1540,7 +1540,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 88
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1555,7 +1555,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 89
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1570,7 +1570,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 90
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1585,7 +1585,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 91
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1600,7 +1600,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 92
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1615,7 +1615,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 94
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1630,7 +1630,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 95
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1645,7 +1645,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 96
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1660,7 +1660,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 97
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1675,7 +1675,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 98
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1690,7 +1690,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 99
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1705,7 +1705,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 100
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1720,7 +1720,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Test Slang 90
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -1735,7 +1735,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false tests/
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
