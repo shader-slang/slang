@@ -796,7 +796,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
     }
 
-    if(!validateGenericTypeRestrictions(genericDeclRef, args, false))
+    if (!validateGenericTypeRestrictions(genericDeclRef, args, false))
         return DeclRef<Decl>();
 
     // Add a flat cost to all unconstrained generic params.
