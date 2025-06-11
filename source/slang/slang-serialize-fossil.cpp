@@ -1355,6 +1355,8 @@ void SerialReader::endStruct()
 
 void SerialReader::beginVariant()
 {
+    TESS_TRACE("SerialReader::beginVariant this:%p _state.type:%d", this, _state.type);
+
     auto valPtr = _readPotentiallyIndirectValPtr();
     if (auto variantPtr = as<FossilizedVariantObj>(valPtr))
     {
@@ -1611,6 +1613,7 @@ void SerialReader::_flush()
 
 FossilizedValPtr SerialReader::_readValPtr()
 {
+    TESS_TRACE("SerialReader::_readValPtr");
     switch (_state.type)
     {
     case State::Type::Root:
@@ -1667,6 +1670,7 @@ FossilizedValPtr SerialReader::_readIndirectValPtr()
 
 FossilizedValPtr SerialReader::_readPotentiallyIndirectValPtr()
 {
+    TESS_TRACE("SerialReader::_readPotentiallyIndirectValPtr");
     auto baseValPtr = _readValPtr();
     if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))
     {

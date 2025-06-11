@@ -1,25 +1,6 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
-#include <stdarg.h>
-
-static void _tessTrace(char const* message, ...)
-{
-    va_list args;
-    va_start(args, message);
-
-    char buffer[1024];
-    vsnprintf(buffer, sizeof(buffer), message, args);
-
-    fprintf(stderr, "TESS: %s\n", buffer);
-}
-
-#define TESS_TRACE(...) \
-    do                          \
-    {                           \
-        _tessTrace(__VA_ARGS__);\
-    } while (0)
-
 #include "slang-ast-dispatch.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
