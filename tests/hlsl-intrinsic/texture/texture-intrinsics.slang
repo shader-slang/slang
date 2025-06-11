@@ -82,6 +82,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     /*
         float Object.SampleCmpLevelZero()
     */
+#if !defined(VK)
     // NOTE: These are having issues with vulkan (glsl)
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
@@ -96,7 +97,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     // TextureCube does not have an offset version of this
 
     // Status variant
-#if !defined(VK)
+
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0, status);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0), status);
 
@@ -331,6 +332,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         <Template Type> Object.SampleGrad()
     */
     float _ddx = 0.0f, _ddy = 0.0f;
+#if !defined(VK)
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
     val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
     val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
@@ -348,7 +350,6 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
 
     // Status variant
-#if !defined(VK)
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0, clamp,  status);
     val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
     val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0), clamp, status);
