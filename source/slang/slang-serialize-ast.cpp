@@ -107,6 +107,7 @@ struct FossilizedTypeTraits<RefObject>
 //
 void serialize(Serializer const& serializer, MatrixCoord& value)
 {
+    TESS_TRACE("serialize(MatrixCoord)");
     // We start with one of the `SLANG_SCOPED_SERIALIZER_*`
     // macros, which basically just handles calling
     // `ISerializerImpl::beginTuple()` and the start of our
@@ -181,6 +182,7 @@ struct FossilizedTypeTraits<MatrixCoord>
 //
 void serialize(Serializer const& serializer, SemanticVersion& value)
 {
+    TESS_TRACE("serialize(SemanticVersion)");
     // This function is doing something a little "clever"
     // handle the fact that it might be used to either
     // *write* a `SemanticVersion` to the serialized format,
@@ -411,6 +413,7 @@ public:
 /// Serialize a `value` of type `$T`.
 void serialize(Serializer const& serializer, $T& value)
 {
+    TESS_TRACE("serialize($T)");
     serializeEnum(serializer, value);
 }
 
@@ -768,6 +771,7 @@ private:
 //
 void serialize(ASTSerializer const& serializer, SourceLoc& value)
 {
+    TESS_TRACE("serialize(SourceLoc)");
     // Its body is trivial, because the actual handling of `SourceLoc`
     // serialization is delegated to the `ASTSerialWriter` and
     // `ASTSerialReader`.
@@ -858,6 +862,7 @@ SLANG_DECLARE_FOSSILIZED_AS(Name, String);
 
 void serializeObject(ASTSerializer const& serializer, Name*& value, Name*)
 {
+    TESS_TRACE("serializeObject(Name)");
     serializer.getContext()->handleName(serializer, value);
 }
 
@@ -895,6 +900,7 @@ struct FossilizedTypeTraits<Token>
 
 void serialize(ASTSerializer const& serializer, Token& value)
 {
+    TESS_TRACE("serialize(Token)");
     serializer.getContext()->handleToken(serializer, value);
 }
 
@@ -972,6 +978,7 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
 template<typename T>
 void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
 {
+    TESS_TRACE("serializeObject(NodeBase)");
     // The general-purpose serialization layer defines
     // a variant as akin to a struct, but where the
     // specific number and type of fields that get written
@@ -1000,6 +1007,7 @@ void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
 
 void serializeObjectContents(ASTSerializer const& serializer, NodeBase* value, NodeBase*)
 {
+    TESS_TRACE("serializeObjectContents(NodeBase)");
     serializer.getContext()->handleASTNodeContents(serializer, value);
 }
 
@@ -1018,6 +1026,7 @@ SLANG_DECLARE_FOSSILIZED_AS(ContainerDeclDirectMemberDecls, ContainerDeclDirectM
 
 void serialize(ASTSerializer const& serializer, ContainerDeclDirectMemberDecls& value)
 {
+    TESS_TRACE("serialize(ContainerDeclDirectMemberDecls)");
     serializer.getContext()->handleContainerDeclDirectMemberDecls(serializer, value);
 }
 
@@ -1031,6 +1040,7 @@ SLANG_DECLARE_FOSSILIZED_AS(DiagnosticInfo const*, Int32);
 
 void serializePtr(Serializer const& serializer, DiagnosticInfo const*& value, DiagnosticInfo const*)
 {
+    TESS_TRACE("serializePtr(DiagnosticInfo)");
     Int32 id = 0;
     if (isWriting(serializer))
     {
@@ -1053,6 +1063,7 @@ void serializePtr(Serializer const& serializer, DiagnosticInfo const*& value, Di
 template<typename T>
 void serialize(ASTSerializer const& serializer, DeclRef<T>& value)
 {
+    TESS_TRACE("serialize(DeclRef)");
     serialize(serializer, value.declRefBase);
 }
 
@@ -1075,6 +1086,7 @@ SLANG_DECLARE_FOSSILIZED_AS(SyntaxClass<NodeBase>, ASTNodeType);
 
 void serialize(Serializer const& serializer, SyntaxClass<NodeBase>& value)
 {
+    TESS_TRACE("serialize(SyntaxClass)");
     ASTNodeType raw = ASTNodeType(0);
     if (isWriting(serializer))
     {
@@ -1099,6 +1111,7 @@ SLANG_DECLARE_FOSSILIZED_AS(Modifiers, List<Modifier*>);
 
 void serialize(ASTSerializer const& serializer, Modifiers& value)
 {
+    TESS_TRACE("serialize(Modifiers)");
     SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
 
     // Because we are dealing with a list, rather
@@ -1147,6 +1160,7 @@ SLANG_DECLARE_FOSSILIZED_AS_MEMBER(TypeExp, type);
 
 void serialize(ASTSerializer const& serializer, TypeExp& value)
 {
+    TESS_TRACE("serialize(TypeExp)");
     serialize(serializer, value.type);
 }
 
@@ -1159,6 +1173,7 @@ SLANG_DECLARE_FOSSILIZED_AS_MEMBER(CandidateExtensionList, candidateExtensions);
 
 void serialize(ASTSerializer const& serializer, CandidateExtensionList& value)
 {
+    TESS_TRACE("serialize(CandidateExtensionList)");
     serialize(serializer, value.candidateExtensions);
 }
 
@@ -1167,6 +1182,7 @@ SLANG_DECLARE_FOSSILIZED_AS_MEMBER(DeclAssociationList, associations);
 
 void serialize(ASTSerializer const& serializer, DeclAssociationList& value)
 {
+    TESS_TRACE("serialize(DeclAssociationList)");
     serialize(serializer, value.associations);
 }
 
@@ -1197,6 +1213,7 @@ SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilityTargetSets);
 
 void serialize(Serializer const& serializer, CapabilityAtomSet& value)
 {
+    TESS_TRACE("serialize(CapabilityAtomSet)");
     SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
     if (isWriting(serializer))
     {
@@ -1219,11 +1236,13 @@ void serialize(Serializer const& serializer, CapabilityAtomSet& value)
 
 void serialize(Serializer const& serializer, CapabilityStageSet& value)
 {
+    TESS_TRACE("serialize(CapabilityStageSet)");
     serialize(serializer, value.atomSet);
 }
 
 void serialize(Serializer const& serializer, CapabilityTargetSet& value)
 {
+    TESS_TRACE("serialize(CapabilityTargetSet)");
     serialize(serializer, value.shaderStageSets);
 
     // The value for each entry in `shaderStageSets` have
@@ -1242,6 +1261,7 @@ void serialize(Serializer const& serializer, CapabilityTargetSet& value)
 
 void serialize(Serializer const& serializer, CapabilitySet& value)
 {
+    TESS_TRACE("serialize(CapabilitySet)");
     serialize(serializer, value.getCapabilityTargetSets());
 
     // The value for each entry in `getCapabilityTargetSets()` have
@@ -1278,6 +1298,7 @@ struct FossilizedTypeTraits<RequirementWitness>
 
 void serialize(ASTSerializer const& serializer, RequirementWitness& value)
 {
+    TESS_TRACE("serialize(RequirementWitness)");
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.m_flavor);
     switch (value.m_flavor)
@@ -1316,6 +1337,7 @@ struct FossilizedTypeTraits<ValNodeOperand>
 
 void serialize(ASTSerializer const& serializer, ValNodeOperand& value)
 {
+    TESS_TRACE("serialize(ValNodeOperand)");
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.kind);
     switch (value.kind)
@@ -1378,6 +1400,7 @@ struct Fossilized_$T
 /// Serialize a `value` of type `$T`
 void serialize(ASTSerializer const& serializer, $T& value)
 {
+    TESS_TRACE("serialize($T)");
     SLANG_UNUSED(value);
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
 %   if T.directSuperClass then
@@ -1435,6 +1458,7 @@ struct Fossilized_$T
 /// Serialize the contents of an AST node of type `$T`
 void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
 {
+    TESS_TRACE("_serializeASTNodeContents($T)");
     SLANG_UNUSED(serializer);
     SLANG_UNUSED(value);
 %   if T.directSuperClass then
@@ -1461,6 +1485,7 @@ void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
 
 void serializeASTNodeContents(ASTSerializer const& serializer, NodeBase* node)
 {
+    TESS_TRACE("serializeASTNodeContents(NodeBase)");
     ASTNodeDispatcher<NodeBase, void>::dispatch(
         node,
         [&](auto n) { _serializeASTNodeContents(serializer, n); });
@@ -1570,6 +1595,7 @@ static ASTNodeType _getAsASTNodeType(PseudoASTNodeType type)
 
 void ASTSerialReadContext::handleASTNode(ASTSerializer const& serializer, NodeBase*& outNode)
 {
+    TESS_TRACE("handleASTNode(NodeBase)");
     // We start by reading the `ASTNodeType`, because
     // we will dispatch differently based on what
     // value we see there.
