@@ -978,6 +978,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
+    bool shouldError = context.mode != OverloadResolveContext::Mode::JustTrying;
+
     List<Val*> newArgs;
     for (auto arg : substArgs)
         newArgs.add(arg);
@@ -1000,7 +1002,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         }
         else
         {
-            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            if (shouldError)
             {
                 subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
                 getSink()->diagnose(
@@ -1013,7 +1015,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         }
     }
 
-    validateGenericTypeRestrictions(genericDeclRef, newArgs);
+    if (!validateGenericTypeRestrictions(genericDeclRef, newArgs, shouldError))
+        return false;
 
     candidate.subst =
         SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));

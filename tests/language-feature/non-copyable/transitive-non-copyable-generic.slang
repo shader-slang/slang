@@ -3,7 +3,7 @@
 
 // CHECK_PASS: OpEntryPoint
 // CHECK_PASS-NOT: error
-// CHECK_FAIL: error 38042
+// CHECK_FAIL: error 39999
 // Foo should implicitly be non-copyable if var of type T is 
 // defined since T is `noncopyable`
 

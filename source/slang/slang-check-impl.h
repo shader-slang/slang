@@ -1571,7 +1571,7 @@ public:
         VarDeclBase* varDecl,
         DerivativeMemberAttribute* derivativeMemberAttr);
 
-    void validateGenericTypeRestrictions(DeclRef<GenericDecl> genericDeclRef, List<Val*>& args);
+    bool validateGenericTypeRestrictions(DeclRef<GenericDecl> genericDeclRef, List<Val*>& args, bool shouldError);
 
     void ensureValidAtomicTypeUseSite(DeclRef<Decl> declRef);
 

@@ -1579,6 +1579,13 @@ struct Tuple where noncopyable(T)
     __init(expand each T);
 }
 
+__generic<each T>
+extension Tuple<T>
+{
+    __intrinsic_op($(kIROp_MakeTuple))
+    __init(expand each T);
+}
+
 /// Construct a tuple from several values in order
 __intrinsic_op($(kIROp_MakeTuple))
 Tuple<T> makeTuple<each T>(T v) where noncopyable(T);

@@ -24,7 +24,7 @@ struct CopyableType : IFoo
 
 // CHECK_PASS: OpEntryPoint
 // CHECK_PASS-NOT: error
-// CHECK_FAIL: error 38042
+// CHECK_FAIL: error 39999
 void foo<T>(T t)
 #ifdef WITH_CONSTRAINT
     where noncopyable(T)

@@ -1,13 +1,13 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -DCASE_1
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -DCASE_2
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -DCASE_3
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -DCASE_4
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -DCASE_5
+//TEST:SIMPLE(filecheck=CHECK_1): -stage compute -entry computeMain -target spirv -DCASE_1
+//TEST:SIMPLE(filecheck=CHECK_1): -stage compute -entry computeMain -target spirv -DCASE_2
+//TEST:SIMPLE(filecheck=CHECK_1): -stage compute -entry computeMain -target spirv -DCASE_3
+//TEST:SIMPLE(filecheck=CHECK_2): -stage compute -entry computeMain -target spirv -DCASE_4
+//TEST:SIMPLE(filecheck=CHECK_2): -stage compute -entry computeMain -target spirv -DCASE_5
 
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK: error 30079
-
+// CHECK_1: error 38042
+// CHECK_2: error 30079
 #if defined(CASE_1)
 ConstantBuffer<Atomic<int>> atomicBuffer;
 #elif defined(CASE_2)

@@ -330,9 +330,10 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
-void SemanticsVisitor::validateGenericTypeRestrictions(
+bool SemanticsVisitor::validateGenericTypeRestrictions(
     DeclRef<GenericDecl> genericDeclRef,
-    List<Val*>& args)
+    List<Val*>& args,
+    bool shouldDiagnose)
 {
     for (auto constraintDecl :
          genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDeclBase>())
@@ -349,12 +350,18 @@ void SemanticsVisitor::validateGenericTypeRestrictions(
 
         // If T is not non-copyable, verify that the sub-type is not non-copyable.
         if (!constraintDecl->hasModifier<NonCopyableTypeAttribute>() && isNonCopyableType(type))
-            getSink()->diagnose(
-                constraintDecl,
-                Diagnostics::genericTypeDefaultAttributeCopyableViolated,
-                constraintDecl,
-                type);
+        {
+            if (shouldDiagnose)
+                getSink()->diagnose(
+                    constraintDecl,
+                    Diagnostics::genericTypeDefaultAttributeCopyableViolated,
+                    constraintDecl,
+                    type);
+
+            return false;
+        }
     }
+    return true;
 }
 
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
@@ -789,7 +796,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
     }
 
-    validateGenericTypeRestrictions(genericDeclRef, args);
+    if(!validateGenericTypeRestrictions(genericDeclRef, args, false))
+        return DeclRef<Decl>();
 
     // Add a flat cost to all unconstrained generic params.
     for (auto typeParamDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())

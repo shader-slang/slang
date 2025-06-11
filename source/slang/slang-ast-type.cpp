@@ -1345,14 +1345,17 @@ bool isNonCopyableType(Type* type)
         // handle the case where we have a generic arg to resolve.
         decl = declRefTypeGenericType.getDecl();
     }
+    else if (auto tuple = as<TupleType>(type))
+    {
+        return isNonCopyableType(tuple->getTypePack());
+    }
     else if (auto concreteTypePack = as<ConcreteTypePack>(type))
     {
         // If any type-pack element is non-copyable, the entire type-pack is non-copyable.
         for (auto i = 0; i < concreteTypePack->getTypeCount(); i++)
         {
-            if (!isNonCopyableType(concreteTypePack->getElementType(i)))
-                continue;
-            return true;
+            if (isNonCopyableType(concreteTypePack->getElementType(i)))
+                return true;
         }
         return false;
     }
