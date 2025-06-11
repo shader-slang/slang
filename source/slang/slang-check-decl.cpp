@@ -2625,14 +2625,14 @@ static void validateAtomicElementTypeUseSite(SemanticsVisitor* visitor, Type* ty
     if (!genericAppDeclRef)
         return;
 
-    // Start checking generic args, `Atomic` can only be direct child to Ptr, RWStructuredBuffer,
-    // and GLSLShaderStorageBuffer.
+    // Start checking generic args, `Atomic` can only be direct child to
+    // Ptr, RWStructuredBuffer, GLSLShaderStorageBuffer, and Array.
     for (auto i : genericAppDeclRef->getArgs())
     {
         if (as<AtomicType>(i))
         {
             if (!as<PtrType>(type) && !as<HLSLRWStructuredBufferType>(type) &&
-                !as<GLSLShaderStorageBufferType>(type))
+                !as<GLSLShaderStorageBufferType>(type) && !as<ArrayExpressionType>(type))
                 visitor->getSink()->diagnose(loc, Diagnostics::InvalidAtomicTypeUseSite);
             continue;
         }

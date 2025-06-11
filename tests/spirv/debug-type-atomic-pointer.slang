@@ -8,13 +8,9 @@
 // CHECK_SPV: [[TYPE_atomic_uint:%[1-9][0-9]*]] = OpExtInst %void %{{[0-9]*}} DebugTypeQualifier [[TYPE_uint]] %uint_3
 // CHECK_SPV: OpExtInst %void %{{[0-9]*}} DebugTypePointer [[TYPE_atomic_uint]]
 
-struct Test {
-    Atomic<uint32_t> atomicMember;
-};
-
 struct PC {
-    Atomic<uint>* atomicMember;
-    Test* test;
+    Atomic<uint>* atomicMember1;
+    Atomic<uint32_t>* atomicMember2;
 }
 
 [[vk::push_constant]]
@@ -23,9 +19,8 @@ PC pc;
 [shader("compute")]
 [numthreads(1,1,1)]
 public void computeMain() {
-    Atomic<uint32_t>* atomicMember = pc.atomicMember;
+    Atomic<uint32_t>* atomicMember = pc.atomicMember1;
     atomicMember.store(10);
 
-    Test* test = pc.test;
-    test.atomicMember.store(10);
+    pc.atomicMember2.store(10);
 }
