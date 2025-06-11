@@ -846,8 +846,9 @@ DIAGNOSTIC(
     30301,
     Error,
     isAsOperatorCannotUseInterfaceAsRHS,
-    "'is' and 'as' operators do not support interface types as the right-hand side. Use a concrete "
-    "type instead.")
+    "'is' and 'as' operators do not support interface types as the right-hand "
+    "side without a corresponding optional constraint. Use a concrete type "
+    "instead, or add an optional constraint for the interface type.")
 
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 
