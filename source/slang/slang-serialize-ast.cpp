@@ -10,6 +10,7 @@
 
 namespace Slang
 {
+
 // TODO(tfoley): have the parser export this, or a utility function
 // for initializing a `SyntaxDecl` in the common case.
 //
@@ -136,7 +137,7 @@ void serialize(Serializer const& serializer, SemanticVersion& value)
 
 void serialize(Serializer const& serializer, SyntaxClass<NodeBase>& value)
 {
-    ASTNodeType raw;
+    ASTNodeType raw = ASTNodeType(0);
     if (isWriting(serializer))
     {
         raw = value.getTag();
@@ -277,7 +278,7 @@ void serialize(Serializer const& serializer, CapabilityAtomSet& value)
     {
         while (hasElements(serializer))
         {
-            CapabilityAtom atom;
+            CapabilityAtom atom = CapabilityAtom(0);
             serialize(serializer, atom);
             value.add(UInt(atom));
         }
@@ -432,6 +433,11 @@ void serialize(ASTSerializer const& serializer, NameLoc& value)
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
     serialize(serializer, value.name);
     serialize(serializer, value.loc);
+}
+
+void serialize(ASTSerializer const& serializer, ContainerDeclDirectMemberDecls& value)
+{
+    serialize(serializer, value._refDecls());
 }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -594,7 +600,7 @@ private:
     void _assignGenericParameterIndices(GenericDecl* genericDecl)
     {
         int parameterCounter = 0;
-        for (auto m : genericDecl->members)
+        for (auto m : genericDecl->getDirectMemberDecls())
         {
             if (auto typeParam = as<GenericTypeParamDeclBase>(m))
             {
@@ -769,7 +775,7 @@ void ASTDecodingContext::handleASTNode(NodeBase*& outNode)
 {
     ASTSerializer serializer(this);
 
-    ASTNodeType typeTag;
+    ASTNodeType typeTag = ASTNodeType(0);
     serialize(serializer, typeTag);
     switch (_getPseudoASTNodeType(typeTag))
     {

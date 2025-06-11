@@ -1025,6 +1025,7 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
+        EmitSeparateDebug, // bool
         CountOf,
     };
 
@@ -4163,8 +4164,31 @@ struct IMetadata : public ISlangCastable
         SlangUInt spaceIndex,            // `space` for D3D12, `set` for Vulkan
         SlangUInt registerIndex,         // `register` for D3D12, `binding` for Vulkan
         bool& outUsed) = 0;
+
+    /*
+    Returns the debug build identifier for a base and debug spirv pair.
+    */
+    virtual const char* getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+/** Compile result for storing and retrieving multiple output blobs.
+    This is needed for features such as separate debug compilation which
+    output both base and debug spirv.
+ */
+struct ICompileResult : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x5fa9380e,
+        0xb62f,
+        0x41e5,
+        {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
+
+    virtual uint32_t getItemCount() = 0;
+    virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
+    virtual SlangResult getMetadata(IMetadata** outMetadata) = 0;
+};
+    #define SLANG_UUID_ICompileResult ICompileResult::getTypeGuid()
 
 /** A component type is a unit of shader code layout, reflection, and linking.
 
@@ -4383,6 +4407,16 @@ struct IComponentType : public ISlangUnknown
         SlangInt entryPointIndex,
         SlangInt targetIndex,
         IMetadata** outMetadata,
+        IBlob** outDiagnostics = nullptr) = 0;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
         IBlob** outDiagnostics = nullptr) = 0;
 };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()

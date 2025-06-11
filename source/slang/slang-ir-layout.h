@@ -65,9 +65,17 @@ public:
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count) = 0;
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment) = 0;
+
+    /// Adjust the offset of an element. Handles two cases; alignmment when
+    /// the previous field was a composite, and the D3D constant buffer case
+    /// where an element is aligned to the next 16-byte boundary if it doesn't
+    /// fit entirely within the current one.
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment) = 0;
+
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();

@@ -1373,6 +1373,7 @@ INST(DebugFunction, DebugFunction, 5, 0)
 INST(DebugInlinedVariable, DebugInlinedVariable, 2, 0)
 INST(DebugScope, DebugScope, 2, 0)
 INST(DebugNoScope, DebugNoScope, 1, 0)
+INST(DebugBuildIdentifier, DebugBuildIdentifier, 2, 0)
 
 /* Embedded Precompiled Libraries */
 INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)

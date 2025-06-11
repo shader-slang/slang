@@ -138,6 +138,9 @@ public:
 
     /// Get the list of functions that were exported in the linked IR
     SLANG_NO_THROW virtual Slice<String> SLANG_MCALL getExportedFunctionMangledNames() = 0;
+
+    /// Get the debug build identifier for a base and debug spirv pair
+    SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
 
 } // namespace Slang

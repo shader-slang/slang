@@ -170,6 +170,48 @@ void Artifact::removeAt(ContainedKind kind, Index i)
     }
 }
 
+uint32_t Artifact::getItemCount()
+{
+    // Ignore the metadata when counting items, and the base artifact is item 0.
+    uint32_t count = 1;
+    for (auto artifact : m_associated)
+        if (artifact->getDesc().payload != ArtifactPayload::Metadata &&
+            artifact->getDesc().payload != ArtifactPayload::PostEmitMetadata)
+            count++;
+    return count;
+}
+
+SlangResult Artifact::getItemData(uint32_t index, slang::IBlob** outblob)
+{
+    // Item 0 is the base artifact, otherwise iterate and ignore the metadata.
+    if (index == 0)
+        return loadBlob(ArtifactKeep::Yes, outblob);
+
+    uint32_t count = 1;
+    for (auto artifact : m_associated)
+    {
+        if (artifact->getDesc().payload == ArtifactPayload::Metadata ||
+            artifact->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+            continue;
+        if (count == index)
+            return artifact->loadBlob(ArtifactKeep::Yes, outblob);
+        count++;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult Artifact::getMetadata(slang::IMetadata** outMetadata)
+{
+    // Find and return the associated metadata artifact.
+    auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(this);
+    if (!metadata)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outMetadata = static_cast<slang::IMetadata*>(metadata);
+    (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
 SlangResult Artifact::getOrCreateRepresentation(
     const Guid& typeGuid,
     ArtifactKeep keep,
