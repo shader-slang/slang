@@ -11,7 +11,7 @@ static void _tessTrace(char const* message, ...)
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), message, args);
 
-    fprintf(stderr, "TESS: %s\n", message);
+    fprintf(stderr, "TESS: %s\n", buffer);
 }
 
 #define TESS_TRACE(...) \
