@@ -6,7 +6,6 @@
 #include "../core/slang-string.h"
 
 #include <optional>
-#include <spirv/unified1/NonSemanticShaderDebugInfo100.h>
 #include <spirv/unified1/spirv.h>
 
 namespace Slang
