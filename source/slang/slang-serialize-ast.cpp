@@ -1,6 +1,17 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
+static void _tessTrace(char const* message)
+{
+    fprintf(stderr, "TESS: %s\n", message);
+}
+
+#define TESS_TRACE(...) \
+    do                          \
+    {                           \
+        _tessTrace(__VA_ARGS__);\
+    } while (0)
+
 #include "slang-ast-dispatch.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -1563,7 +1574,7 @@ void ASTSerialReadContext::handleASTNode(ASTSerializer const& serializer, NodeBa
     // we will dispatch differently based on what
     // value we see there.
     //
-    ASTNodeType typeTag;
+    ASTNodeType typeTag = ASTNodeType::NodeBase;
     serialize(serializer, typeTag);
 
     // In the case where the `ASTNodeType` is actually
@@ -2030,6 +2041,8 @@ void writeSerializedModuleAST(
 
 Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 {
+    TESS_TRACE("ASTSerialReadContext::readFossilizedDecl");
+
     auto contentValPtr = getVariantContentPtr(fossilizedDecl);
 
     Fossil::SerialReader reader(
@@ -2052,6 +2065,8 @@ ModuleDecl* readSerializedModuleAST(
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc)
 {
+    TESS_TRACE("readSerializedModuleAST");
+
     auto dataChunk = as<RIFF::DataChunk>(chunk);
 
     auto rootVal = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
@@ -2125,6 +2140,8 @@ ModuleDecl* readSerializedModuleAST(
 Decl* ModuleDecl::_findSerializedDeclByMangledExportName(
     UnownedStringSlice const& mangledName)
 {
+    TESS_TRACE("ModuleDecl::_findSerializedDeclByMangledExportName");
+
     SLANG_ASSERT(isUsingOnDemandDeserializationForExports());
 
     auto sharedContext =
@@ -2163,6 +2180,8 @@ T const* _findEntryInFossilizedDictionaryWithSortedKeys(
 
 Decl* ASTSerialReadContext::findExportedDeclByMangledName(UnownedStringSlice const& mangledName)
 {
+    TESS_TRACE("ASTSerialReadContext::findExportedDeclByMangledName");
+
     auto found = _findEntryInFossilizedDictionaryWithSortedKeys(
         _fossilizedModuleInfo->mapMangledNameToDecl,
         mangledName);
@@ -2175,6 +2194,8 @@ Decl* ASTSerialReadContext::findExportedDeclByMangledName(UnownedStringSlice con
 
 void ContainerDeclDirectMemberDecls::_readSerializedTransparentDecls() const
 {
+    TESS_TRACE("ContainerDeclDirectMemberDecls::_readSerializedTransparentDecls");
+
     SLANG_ASSERT(isUsingOnDemandDeserialization());
     SLANG_ASSERT(accelerators.filteredListOfTransparentDecls.getCount() == 0);
 
@@ -2194,6 +2215,8 @@ void ContainerDeclDirectMemberDecls::_readSerializedTransparentDecls() const
 
 Decl* ContainerDeclDirectMemberDecls::_readSerializedDeclAtIndex(Index index) const
 {
+    TESS_TRACE("ContainerDeclDirectMemberDecls::_readSerializedDeclAtIndex");
+
     SLANG_ASSERT(isUsingOnDemandDeserialization());
 
     auto sharedContext = as<ASTSerialReadContext>(onDemandDeserialization.context);
@@ -2208,6 +2231,8 @@ Decl* ContainerDeclDirectMemberDecls::_readSerializedDeclAtIndex(Index index) co
 
 Decl* ContainerDeclDirectMemberDecls::_readSerializedDeclsOfName(Name* name) const
 {
+    TESS_TRACE("ContainerDeclDirectMemberDecls::_readSerializedDeclsOfName");
+
     SLANG_ASSERT(isUsingOnDemandDeserialization());
 
     if (name == nullptr)
