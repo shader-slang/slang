@@ -7059,7 +7059,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-
     SpvInst* emitSwizzleSet(SpvInstParent* parent, IRSwizzleSet* inst)
     {
         if (inst->getElementCount() == 1)
