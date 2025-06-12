@@ -1273,6 +1273,11 @@ Compound Capabilities
 `raytracing_lss`
 > Collection of capabilities for linear swept spheres.
 
+`raytracing_lss_ho`
+> hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
+> capdef specifically for the hitobject variant.
+> Collection of capabilities for linear swept spheres.
+
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 
