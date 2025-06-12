@@ -2114,6 +2114,8 @@ static void _dump(FossilizedValPtr valPtr, int depth = 0)
     }
 }
 
+static_assert(sizeof(Fossilized_ASTModuleInfo) == 12);
+
 ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
     ASTBuilder* astBuilder,

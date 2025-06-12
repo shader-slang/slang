@@ -183,6 +183,8 @@ public:
     using Fossil::RelativePtr<T>::RelativePtr;
 };
 
+static_assert(sizeof(FossilizedPtr<void>) == sizeof(FossilUInt));
+
 //
 // Simple scalar values are fossilized into a wrapper
 // `struct` that contains the underlying value.
@@ -231,6 +233,19 @@ SLANG_DECLARE_FOSSILIZED_SIMPLE_TYPE(uint64_t, UInt64)
 SLANG_DECLARE_FOSSILIZED_SIMPLE_TYPE(float, Float32)
 SLANG_DECLARE_FOSSILIZED_SIMPLE_TYPE(double, Float64)
 
+static_assert(sizeof(Fossilized<int8_t>) == 1);
+static_assert(sizeof(Fossilized<int16_t>) == 2);
+static_assert(sizeof(Fossilized<int32_t>) == 4);
+static_assert(sizeof(Fossilized<int64_t>) == 8);
+
+static_assert(sizeof(Fossilized<uint8_t>) == 1);
+static_assert(sizeof(Fossilized<uint16_t>) == 2);
+static_assert(sizeof(Fossilized<uint32_t>) == 4);
+static_assert(sizeof(Fossilized<uint64_t>) == 8);
+
+static_assert(sizeof(Fossilized<float>) == 4);
+static_assert(sizeof(Fossilized<double>) == 8);
+
 //
 // The `bool` type shouldn't be fossilized as itself, because
 // its layout is not guaranteed to be consistent across targets.
@@ -252,6 +267,8 @@ public:
 private:
     uint8_t _value;
 };
+
+static_assert(sizeof(Fossilized<bool>) == 1);
 
 //
 // Some simple types can be fossilized as one of the
@@ -364,6 +381,8 @@ SLANG_DECLARE_FOSSILIZED_TYPE(String, FossilizedString);
 SLANG_DECLARE_FOSSILIZED_TYPE(UnownedStringSlice, FossilizedString);
 SLANG_DECLARE_FOSSILIZED_TYPE(UnownedTerminatedStringSlice, FossilizedString);
 
+static_assert(sizeof(Fossilized<String>) == sizeof(FossilUInt));
+
 //
 // The array and dictionary types are handled largely
 // the same as strings, with the added detail that the
@@ -461,6 +480,8 @@ struct FossilizedTypeTraits<T[N]>
     using FossilizedType = FossilizedArray<Fossilized<T>>;
 };
 
+static_assert(sizeof(Fossilized<List<int32_t>>) == sizeof(FossilUInt));
+
 template<typename K, typename V>
 struct FossilizedKeyValuePair
 {
@@ -516,6 +537,7 @@ struct FossilizedTypeTraits<OrderedDictionary<K, V>>
     using FossilizedType = FossilizedDictionary<Fossilized<K>, Fossilized<V>>;
 };
 
+static_assert(sizeof(Fossilized<Dictionary<String, String>>) == sizeof(FossilUInt));
 
 //
 // TODO: need to handle pointers here, with some clever logic...
@@ -593,6 +615,8 @@ struct FossilizedTypeTraits<std::optional<T>>
     using FossilizedType = FossilizedOptional<FossilizedPointerTarget<T>>;
 };
 
+static_assert(sizeof(Fossilized<std::optional<double>>) == sizeof(FossilUInt));
+
 //
 // Many user-defined types will be fossilized as some kind
 // of "record" (either a tuple or struct).
@@ -642,6 +666,8 @@ public:
 private:
     FossilizedPtr<FossilizedVariantObj> _obj;
 };
+
+static_assert(sizeof(FossilizedVariant) == sizeof(FossilUInt));
 
 //
 // In many cases, a new C++ type can be fossilized using
@@ -1290,6 +1316,8 @@ struct Header
     ///
     FossilizedPtr<FossilizedVariantObj> rootValue;
 };
+
+static_assert(sizeof(Header) == 32);
 
 /// Get the root object from a fossilized blob.
 ///
