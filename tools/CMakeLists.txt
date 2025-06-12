@@ -51,7 +51,7 @@ if(NOT SLANG_OVERRIDE_LUA_PATH)
         LINK_WITH_PRIVATE
         compiler-core
         INCLUDE_DIRECTORIES_PUBLIC
-        ${slang_SOURCE_DIR}/external/lua
+        ${slang_SOURCE_DIR}/external
     )
 else()
     generator(
@@ -182,34 +182,28 @@ if(SLANG_ENABLE_GFX)
             ${slang_SOURCE_DIR}/include
             if
             (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external/spirv-tools
-            else
-            ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
             endif
             ()
             if
             (not ${SLANG_OVERRIDE_GLM_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/glm else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_GLM_PATH}
             endif
             ()
             if
             (not ${SLANG_OVERRIDE_IMGUI_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/imgui else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_IMGUI_PATH}
             endif
             ()
             if
             (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external/tinyobjloader
-            else
-            ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
         INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
         INSTALL
@@ -263,7 +257,9 @@ if(SLANG_ENABLE_TESTS)
         EXECUTABLE
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_FROM_PRIVATE unit-test
+        INCLUDE_FROM_PRIVATE
+            unit-test
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         FOLDER test
     )
     slang_add_target(
@@ -286,6 +282,7 @@ if(SLANG_ENABLE_TESTS)
             stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
+        INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test

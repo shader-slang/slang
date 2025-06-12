@@ -10,6 +10,12 @@
 //TEST:SIMPLE(filecheck=SAMPLED_IMAGE): -target spirv -stage compute -entry computeMain -DSAMPLED_IMAGE
 //TEST:SIMPLE(filecheck=MIX): -target spirv -stage compute -entry computeMain -DSAMPLER -DSTORAGE_TEXEL_BUFFER -DUNIFORM_BUFFER -DACCELERATION_STRUCTURE
 
+
+export T getDescriptorFromHandle<T : IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+{
+    return defaultGetDescriptorFromHandle(handleValue, BindlessDescriptorOptions.None);
+}
+
 // To intentionally fill up binding slots
 [[vk::binding(0, 1)]]
 RWTexture1D<float> t1;

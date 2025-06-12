@@ -1601,7 +1601,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module.detach());
+        return asExternal(module.get());
     }
     catch (const AbortCompilationException& e)
     {
@@ -2026,6 +2026,31 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     mapMangledNameToRTTIObjectIndex[name] = resultIndex;
     if (outId)
         *outId = resultIndex;
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outBuffer,
+    uint32_t bufferSize)
+{
+    // Slang RTTI header format:
+    // byte 0-7: pointer to RTTI struct describing the type. (not used for now, set to 1 for valid
+    // types, and 0 to represent null).
+    // byte 8-11: 32-bit sequential ID of the type conformance witness.
+    // byte 12-15: unused.
+
+    if (bufferSize < 16)
+        return SLANG_E_BUFFER_TOO_SMALL;
+
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+
+    // Make the RTTI part non zero.
+    outBuffer[0] = 1;
+
     return SLANG_OK;
 }
 
@@ -2515,6 +2540,16 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+void TranslationUnitRequest::addIncludedSourceFileIfNotExist(SourceFile* sourceFile)
+{
+    if (m_includedFileSet.contains(sourceFile))
+        return;
+
+    sourceFile->setIncludedFile();
+    m_sourceFiles.add(sourceFile);
+    m_includedFileSet.add(sourceFile);
+}
+
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -2627,7 +2662,6 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
 {
-    SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
     return m_sourceFiles;
 }
 
@@ -2730,7 +2764,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage;
+    SourceLanguage sourceLanguage = SourceLanguage::Slang;
+    SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
 
     auto tokens = preprocessSource(
         srcFile,
@@ -2738,7 +2773,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage);
+        sourceLanguage,
+        languageVersion);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = SourceLanguage::Slang;
@@ -2958,17 +2994,14 @@ static void collectExportedConstantInContainer(
     ASTBuilder* builder,
     ContainerDecl* containerDecl)
 {
-    for (auto m : containerDecl->members)
+    for (auto varMember : containerDecl->getDirectMemberDeclsOfType<VarDeclBase>())
     {
-        auto varMember = as<VarDeclBase>(m);
-        if (!varMember)
-            continue;
         if (!varMember->val)
             continue;
         bool isExported = false;
         bool isConst = false;
         bool isExtern = false;
-        for (auto modifier : m->modifiers)
+        for (auto modifier : varMember->modifiers)
         {
             if (as<HLSLExportModifier>(modifier))
                 isExported = true;
@@ -2982,14 +3015,14 @@ static void collectExportedConstantInContainer(
         }
         if (isExported && isConst)
         {
-            auto mangledName = getMangledName(builder, m);
+            auto mangledName = getMangledName(builder, varMember);
             if (isExtern && dict.containsKey(mangledName))
                 continue;
             dict[mangledName] = varMember->val;
         }
     }
 
-    for (auto member : containerDecl->members)
+    for (auto member : containerDecl->getDirectMemberDecls())
     {
         if (as<NamespaceDecl>(member) || as<FileDecl>(member))
         {
@@ -3045,8 +3078,15 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
-    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink)
-        : m_module(module), m_astBuilder(astBuilder), m_sink(sink)
+    FrontEndPreprocessorHandler(
+        Module* module,
+        ASTBuilder* astBuilder,
+        DiagnosticSink* sink,
+        TranslationUnitRequest* translationUnit)
+        : m_module(module)
+        , m_astBuilder(astBuilder)
+        , m_sink(sink)
+        , m_translationUnit(translationUnit)
     {
     }
 
@@ -3054,6 +3094,7 @@ protected:
     Module* m_module;
     ASTBuilder* m_astBuilder;
     DiagnosticSink* m_sink;
+    TranslationUnitRequest* m_translationUnit = nullptr;
 
     // The first task that this handler tries to deal with is
     // capturing all the files on which a module is dependent.
@@ -3065,6 +3106,7 @@ protected:
     void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
         m_module->addFileDependency(sourceFile);
+        m_translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3331,6 +3373,9 @@ static void _outputIncludes(
     // For all the source files
     for (SourceFile* sourceFile : sourceFiles)
     {
+        if (sourceFile->isIncludedFile())
+            continue;
+
         // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
         SourceView* sourceView = _findInitialSourceView(sourceFile);
         if (!sourceView)
@@ -3402,7 +3447,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     // preprocessoing can be communicated to later phases of
     // compilation.
     //
-    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink());
+    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink(), translationUnit);
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -3411,7 +3456,9 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+        SlangLanguageVersion languageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
@@ -3419,7 +3466,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
+            languageVersion,
             &preprocessorHandler);
+
+        translationUnitSyntax->languageVersion = languageVersion;
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4129,6 +4179,9 @@ void Linkage::loadParsedModule(
         if (errorCountAfter != errorCountBefore)
         {
             // There must have been an error in the loaded module.
+            // Remove from maps if there were errors during semantic checking
+            mapPathToLoadedModule.remove(mostUniqueIdentity);
+            mapNameToLoadedModules.remove(name);
         }
         else
         {
@@ -4915,11 +4968,17 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
-    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
+    FrontEndPreprocessorHandler preprocessorHandler(
+        module,
+        module->getASTBuilder(),
+        sink,
+        translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+    SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
@@ -4927,10 +4986,18 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
+        slangLanguageVersion,
         &preprocessorHandler);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;
+
+    if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
+    {
+        sink->diagnose(
+            tokens.begin()->getLoc(),
+            Diagnostics::languageVersionDiffersFromIncludingModule);
+    }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(
@@ -5192,7 +5259,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     // If it's a container process it's children
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
-        for (auto child : containerDecl->members)
+        for (auto child : containerDecl->getDirectMemberDecls())
         {
             _processFindDeclsExportSymbolsRec(child);
         }
@@ -5429,12 +5496,16 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     buildHash(builder);
 
     // Add the name and name override for the specified entry point to the hash.
-    auto entryPointName = getEntryPoint(entryPointIndex)->getName()->text;
-    builder.append(entryPointName);
-    auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
-    builder.append(entryPointMangledName);
-    auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
-    builder.append(entryPointNameOverride);
+    auto entryPoint = getEntryPoint(entryPointIndex);
+    if (entryPoint)
+    {
+        auto entryPointName = entryPoint->getName()->text;
+        builder.append(entryPointName);
+        auto entryPointMangledName = getEntryPointMangledName(entryPointIndex);
+        builder.append(entryPointMangledName);
+        auto entryPointNameOverride = getEntryPointNameOverride(entryPointIndex);
+        builder.append(entryPointNameOverride);
+    }
 
     auto hash = builder.finalize().toBlob();
     *outHash = hash.detach();
@@ -5494,6 +5565,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
 
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
     return SLANG_OK;
 }
 
@@ -5829,6 +5927,20 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
         return SLANG_E_NOT_AVAILABLE;
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    //(*outCompileResult)->addRef(); // TODO: Needed if using a ComPtr.
     return SLANG_OK;
 }
 
@@ -6694,12 +6806,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
-    for (auto globalDecl : moduleDecl->members)
+    for (auto fileDecl : moduleDecl->getDirectMemberDeclsOfType<FileDecl>())
     {
-        if (auto fileDecl = as<FileDecl>(globalDecl))
-        {
-            addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
-        }
+        addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
 
     return SLANG_OK;

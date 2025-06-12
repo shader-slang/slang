@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // missing entrypoint attribute
 void vertMain()

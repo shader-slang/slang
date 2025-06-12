@@ -214,6 +214,11 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << "TensorView";
             return SLANG_OK;
         }
+    case kIROp_HitObjectType:
+        {
+            out << "OptixTraversableHandle";
+            return SLANG_OK;
+        }
     default:
         {
             if (isNominalOp(type->getOp()))
@@ -877,9 +882,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_GetOptiXRayPayloadPtr:
         {
-            m_writer->emit("(");
+            m_writer->emit("((");
             emitType(inst->getDataType());
-            m_writer->emit(")getOptiXRayPayloadPtr()");
+            m_writer->emit(")getOptiXRayPayloadPtr())");
             return true;
         }
     case kIROp_GetOptiXHitAttribute:

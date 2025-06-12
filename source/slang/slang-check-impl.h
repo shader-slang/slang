@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -1026,6 +1028,20 @@ public:
         SemanticsContext result(*this);
         result.m_outerStmts = outerStmts;
         return result;
+    }
+
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
     }
 
     // Setup the flag to indicate disabling the short-circuiting evaluation
@@ -2867,6 +2883,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -2903,6 +2921,8 @@ public:
     Expr* visitIndexExpr(IndexExpr* subscriptExpr);
 
     Expr* visitParenExpr(ParenExpr* expr);
+
+    Expr* visitTupleExpr(TupleExpr* expr);
 
     Expr* visitAssignExpr(AssignExpr* expr);
 
@@ -3011,9 +3031,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void checkStmt(Stmt* stmt);
 
-    template<typename T>
-    T* FindOuterStmt(Stmt* searchUntil = nullptr);
-
     Stmt* findOuterStmtWithLabel(Name* label);
 
     void visitDeclStmt(DeclStmt* stmt);
@@ -3058,6 +3075,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeferStmt(DeferStmt* stmt);
 
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
+
     void visitWhileStmt(WhileStmt* stmt);
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt);
@@ -3095,6 +3116,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

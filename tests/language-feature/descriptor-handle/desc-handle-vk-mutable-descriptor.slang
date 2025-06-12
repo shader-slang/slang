@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -DIS_DEFAULT
 
 // To intentionally fill up binding slots
 [[vk::binding(0, 1)]]
@@ -25,10 +26,13 @@ Texture1D<float> t4;
 //CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
 //CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
 //CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 9
+
+#ifndef IS_DEFAULT
 export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
     return defaultGetDescriptorFromHandle(handleValue, BindlessDescriptorOptions.VkMutable);
 }
+#endif
 
 uniform SamplerState.Handle sampler;
 uniform Sampler1DShadow.Handle combinedSampler;

@@ -2,11 +2,11 @@
 #pragma once
 
 #include "core/slang-list.h"
-#include "include/spirv-tools/linker.hpp"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang-glslang/slang-glslang.h"
 #include "slang.h"
+#include "spirv-tools/include/spirv-tools/linker.hpp"
 
 namespace gfx
 {

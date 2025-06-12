@@ -2666,4 +2666,30 @@ SpvInst* emitOpTypeNodePayloadArray(IRInst* inst, const T& type)
         type);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixPerElementOpNV
+template<typename T1, typename T2, typename T3, typename... TOperands>
+SpvInst* emiOpCooperativeMatrixPerElementOp(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& matrix,
+    const T3& func,
+    const TOperands&... operands)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isSingular<T3>);
+    // Emit the instruction with a variable number of operands
+    return emitInst(
+        parent,
+        inst,
+        SpvOpCooperativeMatrixPerElementOpNV,
+        idResultType,
+        kResultID,
+        matrix,
+        func,
+        operands...);
+}
+
+
 #endif // SLANG_IN_SPIRV_EMIT_CONTEXT

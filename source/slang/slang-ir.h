@@ -103,7 +103,7 @@ enum IRMemoryOrder
 
 inline int32_t operator&(const IROpMask m, const IROp o)
 {
-    return std::bit_cast<int32_t>(m) & std::bit_cast<int32_t>(o);
+    return int32_t{m} & int32_t{o};
 }
 
 inline int32_t operator&(const IROp o, const IROpMask m)

@@ -36,6 +36,7 @@ emscripten::val getCompileTargets()
         {"WGSL", SLANG_WGSL},
         {"SPIRV", SLANG_SPIRV},
         {"METAL", SLANG_METAL},
+        {"CUDA", SLANG_CUDA_SOURCE},
     };
 
     std::vector<emscripten::val> result;

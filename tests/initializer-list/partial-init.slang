@@ -8,15 +8,15 @@ struct PartialInit {
   int x;
   int y = 1;
   // compiler synthesizes:
-  // __init(int x, int y = 1);
+  // __init(int x = {}, int y = 1);
 }
 
 struct PartialInit2 {
   int x = 1;
   int y;
-  // __init(int x, int y);
+  // __init(int x, int y = {});
 }
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 void test()
 {
@@ -38,6 +38,18 @@ void test()
   outputBuffer[4] = p3.x;
   // BUFFER-NEXT: 5
   outputBuffer[5] = p3.y;
+
+  PartialInit p4 = {}; // calls `__init`, result is {0, 1}
+  // BUFFER-NEXT: 0
+  outputBuffer[6] = p4.x;
+  // BUFFER-NEXT: 1
+  outputBuffer[7] = p4.y;
+
+  PartialInit2 p5 = {}; // calls `__init`, result is {1, 0}
+  // BUFFER-NEXT: 1
+  outputBuffer[8] = p5.x;
+  // BUFFER-NEXT: 0
+  outputBuffer[9] = p5.y;
 }
 
 [shader("compute")]

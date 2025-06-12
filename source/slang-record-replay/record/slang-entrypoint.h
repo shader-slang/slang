@@ -96,6 +96,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,

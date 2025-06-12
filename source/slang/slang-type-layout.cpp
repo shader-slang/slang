@@ -1570,6 +1570,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
@@ -1771,11 +1772,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -1829,19 +1830,19 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -4945,6 +4946,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto optionalType = as<OptionalType>(type))
     {
         // OptionalType should be laid out the same way as Tuple<T, bool>.
+        if (isNullableType(optionalType->getValueType()))
+            return _createTypeLayout(context, optionalType->getValueType());
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
@@ -5758,7 +5761,7 @@ void TypeLayoutContext::buildExternTypeMap()
 
         if (auto scopeDecl = as<ScopeDecl>(decl))
         {
-            for (auto member : scopeDecl->members)
+            for (auto member : scopeDecl->getDirectMemberDecls())
             {
                 go(go, member);
             }
@@ -5768,7 +5771,7 @@ void TypeLayoutContext::buildExternTypeMap()
     for (const auto& m : linkage->loadedModulesList)
     {
         const auto& ast = m->getModuleDecl();
-        for (auto member : ast->members)
+        for (auto member : ast->getDirectMemberDecls())
         {
             processDecl(processDecl, member);
         }

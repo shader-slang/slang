@@ -224,8 +224,12 @@ private:
     virtual bool hasElements() override;
 
     virtual void beginStruct() override;
-    virtual void handleFieldKey(char const* name, Int index) override;
     virtual void endStruct() override;
+
+    virtual void beginVariant() override;
+    virtual void endVariant() override;
+
+    virtual void handleFieldKey(char const* name, Int index) override;
 
     virtual void beginTuple() override;
     virtual void endTuple() override;
@@ -410,8 +414,12 @@ private:
     virtual bool hasElements() override;
 
     virtual void beginStruct() override;
-    virtual void handleFieldKey(char const* name, Int index) override;
     virtual void endStruct() override;
+
+    virtual void beginVariant() override;
+    virtual void endVariant() override;
+
+    virtual void handleFieldKey(char const* name, Int index) override;
 
     virtual void beginTuple() override;
     virtual void endTuple() override;

@@ -4,15 +4,15 @@
 #include "window.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
+#include "tinyobjloader/tiny_obj_loader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "glm/glm.hpp"
-#include "glm/gtc/constants.hpp"
-#include "glm/gtc/matrix_transform.hpp"
+#include "glm/glm/glm.hpp"
+#include "glm/glm/gtc/constants.hpp"
+#include "glm/glm/gtc/matrix_transform.hpp"
 #include "stb_image_resize.h"
 
 #include <memory>

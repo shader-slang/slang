@@ -15,8 +15,6 @@
 #include <assert.h>
 #include <type_traits>
 
-#define SLANG_UNREFLECTED /* empty */
-
 FIDDLE(hidden class RefObject;)
 
 FIDDLE() namespace Slang
@@ -1096,12 +1094,6 @@ FIDDLE() namespace Slang
             m_begin; ///< Is either equal to m_end, or points to first *valid* filtered member
         const Element* m_end;
         MemberFilterStyle m_filterStyle;
-    };
-
-    struct TransparentMemberInfo
-    {
-        // The declaration of the transparent member
-        Decl* decl = nullptr;
     };
 
     template<typename T>

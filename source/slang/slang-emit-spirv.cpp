@@ -784,18 +784,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (irOpCode)
             {
             case kIROp_IntCast:
-                {
-                    auto typeStyle = getTypeStyle(basicType->getBaseType());
-                    if (typeStyle == kIROp_FloatType)
-                    {
-                        return SpvOpConvertFToU;
-                    }
-                    else if (typeStyle == kIROp_IntType)
-                    {
-                        return SpvOpUConvert;
-                    }
-                    break;
-                }
+                return SpvOpUConvert;
+            case kIROp_FloatCast:
+                return SpvOpFConvert;
             default:
                 break;
             }
@@ -2069,10 +2060,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                auto strideInst = irArrayType->getArrayStride();
-                if (strideInst && shouldEmitArrayStride(irArrayType->getElementType()))
+                if (shouldEmitArrayStride(irArrayType->getElementType()))
                 {
-                    int stride = (int)getIntVal(strideInst);
+                    auto stride = 0;
+                    if (auto strideInst = irArrayType->getArrayStride())
+                    {
+                        stride = (int)getIntVal(strideInst);
+                    }
+                    else
+                    {
+                        // Stride may not have been calculated for basic element types. Calculate it
+                        // here.
+                        IRSizeAndAlignment sizeAndAlignment;
+                        getNaturalSizeAndAlignment(
+                            m_targetProgram->getOptionSet(),
+                            elementType,
+                            &sizeAndAlignment);
+                        stride = (int)sizeAndAlignment.getStride();
+                    }
+
                     emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
@@ -2277,6 +2283,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     registerDebugInst(moduleInst, translationUnit);
                 }
                 return result;
+            }
+        case kIROp_DebugBuildIdentifier:
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
+                auto debugBuildIdentifier = as<IRDebugBuildIdentifier>(inst);
+                return emitOpDebugBuildIdentifier(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    debugBuildIdentifier->getBuildIdentifier(),
+                    debugBuildIdentifier->getFlags());
             }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
@@ -4260,6 +4278,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_MakeArray:
             result = emitConstruct(parent, inst);
+            break;
+        case kIROp_CoopMatMapElementIFunc:
+            result = emitCoopMatMapElementWithIFunc(parent, as<IRCoopMatMapElementIFunc>(inst));
             break;
         case kIROp_MakeTensorAddressingTensorLayout:
             result = emitOpCreateTensorLayout(parent, inst, getID(ensureInst(inst->getDataType())));
@@ -7683,6 +7704,53 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    SpvInst* emitCoopMatMapElementWithIFunc(SpvInstParent* parent, IRCoopMatMapElementIFunc* inst)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
+        requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
+
+        IRInst* matOrTuple = inst->getCoopMat();
+
+        IRInst* mat0 = nullptr;
+
+        UInt tupleCount = 0;
+        IRInst* tuple = as<IRMakeStruct>(matOrTuple);
+        if (tuple)
+        {
+            mat0 = tuple->getOperand(0);
+            tupleCount = tuple->getOperandCount();
+        }
+        else
+        {
+            mat0 = matOrTuple;
+        }
+
+        auto funcCall = inst->getIFuncCall();
+
+        IRInst* ifuncThis = nullptr;
+        if (inst->getOperandCount() > 2)
+            ifuncThis = inst->getIFuncThis();
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpCooperativeMatrixPerElementOpNV,
+            [&]()
+            {
+                emitOperand(mat0->getDataType());
+                emitOperand(kResultID);
+
+                emitOperand(mat0);
+                emitOperand(funcCall);
+
+                if (ifuncThis)
+                    emitOperand(ifuncThis);
+
+                for (UInt i = 1; i < tupleCount; i++)
+                    emitOperand(tuple->getOperand(i));
+            });
+    }
+
     SpvInst* emitSplat(SpvInstParent* parent, IRInst* inst, IRInst* scalar, IRIntegerValue numElems)
     {
         const auto scalarTy = as<IRBasicType>(scalar->getDataType());
@@ -9125,6 +9193,10 @@ SlangResult emitSPIRVFromIR(
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+        {
+            context.ensureInst(inst);
+        }
+        if (as<IRDebugBuildIdentifier>(inst))
         {
             context.ensureInst(inst);
         }

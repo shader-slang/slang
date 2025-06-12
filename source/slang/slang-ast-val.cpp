@@ -3,6 +3,7 @@
 
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
+#include "slang-ast-natural-layout.h"
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
@@ -212,7 +213,7 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
     Count argCount = args.getCount();
 
     Count argIndex = 0;
-    for (auto m : outerGeneric->members)
+    for (auto m : outerGeneric->getDirectMemberDecls())
     {
         // If we have run out of arguments, then we can stop
         // iterating over the parameters, because `this`
@@ -540,17 +541,15 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
 
         bool found = false;
         Index index = 0;
-        for (auto m : genericDecl->members)
+        for (auto constraintParam :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
-            if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
+            if (constraintParam == getDeclRef().getDecl())
             {
-                if (constraintParam == getDeclRef().getDecl())
-                {
-                    found = true;
-                    break;
-                }
-                index++;
+                found = true;
+                break;
             }
+            index++;
         }
         if (found)
         {
@@ -1740,6 +1739,106 @@ Val* FuncCallIntVal::_substituteImplOverride(
     }
     // Nothing found: don't substitute.
     return this;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SizeOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void SizeOfIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "sizeof(";
+    getTypeArg()->toText(out);
+    out << ")";
+}
+
+Val* SizeOfIntVal::tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    ASTNaturalLayoutContext context(astBuilder, nullptr);
+    const auto size = context.calcSize(newType);
+
+    if (!size)
+        return nullptr;
+
+    return astBuilder->getIntVal(intType, size.size);
+}
+
+Val* SizeOfIntVal::tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto result = tryFoldOrNull(astBuilder, intType, newType))
+        return result;
+    auto result = astBuilder->getOrCreate<SizeOfIntVal>(intType, newType);
+    return result;
+}
+
+Val* SizeOfIntVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newType = as<Type>(getTypeArg()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return tryFold(astBuilder, getType(), newType);
+}
+
+Val* SizeOfIntVal::_resolveImplOverride()
+{
+    auto resolvedTypeArg = getTypeArg()->resolve();
+    if (resolvedTypeArg == getTypeArg())
+        return this;
+    return tryFold(getCurrentASTBuilder(), getType(), as<Type>(resolvedTypeArg));
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AlignOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void AlignOfIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "alignof(";
+    getTypeArg()->toText(out);
+    out << ")";
+}
+
+Val* AlignOfIntVal::tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    ASTNaturalLayoutContext context(astBuilder, nullptr);
+    const auto size = context.calcSize(newType);
+
+    if (!size)
+        return nullptr;
+
+    return astBuilder->getIntVal(intType, size.alignment);
+}
+
+Val* AlignOfIntVal::tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType)
+{
+    if (auto result = tryFoldOrNull(astBuilder, intType, newType))
+        return result;
+    auto result = astBuilder->getOrCreate<AlignOfIntVal>(intType, newType);
+    return result;
+}
+
+Val* AlignOfIntVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newType = as<Type>(getTypeArg()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return tryFold(astBuilder, getType(), newType);
+}
+
+Val* AlignOfIntVal::_resolveImplOverride()
+{
+    auto resolvedTypeArg = getTypeArg()->resolve();
+    if (resolvedTypeArg == getTypeArg())
+        return this;
+    return tryFold(getCurrentASTBuilder(), getType(), as<Type>(resolvedTypeArg));
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CountOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

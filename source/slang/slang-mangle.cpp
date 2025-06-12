@@ -357,6 +357,21 @@ void emitVal(ManglingContext* context, Val* val)
         emitVal(context, lookupIntVal->getWitness());
         emitName(context, lookupIntVal->getKey()->getName());
     }
+    else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
+    {
+        emitRaw(context, "KSO");
+        emitVal(context, sizeOfIntVal->getTypeArg());
+    }
+    else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
+    {
+        emitRaw(context, "KAO");
+        emitVal(context, alignOfIntVal->getTypeArg());
+    }
+    else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
+    {
+        emitRaw(context, "KCO");
+        emitVal(context, countOfIntVal->getTypeArg());
+    }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
         emitRaw(context, "KX");

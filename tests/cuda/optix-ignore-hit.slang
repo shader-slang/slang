@@ -1,6 +1,6 @@
 // optix-ignore-hit.slang
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry anyHitShader
-//CHECK: HitBuffer_insert_0((HitBuffer_0 *)getOptiXRayPayloadPtr(), hit_0.t_0);
+//CHECK: HitBuffer_insert_0(((HitBuffer_0 *)getOptiXRayPayloadPtr()), hit_0.t_0);
 //CHECK: optixIgnoreIntersection
 
 

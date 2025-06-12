@@ -620,6 +620,12 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         end = begin + 1;
         break;
 
+    case kIROp_TryCall:
+        // tryCall <successBlock> <failBlock> <callee> <args>...
+        begin = operands + 0;
+        end = begin + 2;
+        break;
+
     default:
         SLANG_UNEXPECTED("unhandled terminator instruction");
         UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -1821,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type))
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -3387,6 +3393,13 @@ IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSli
     IRInst* args[] = {getStringValue(fileName), getStringValue(source)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
 }
+IRInst* IRBuilder::emitDebugBuildIdentifier(
+    UnownedStringSlice buildIdentifier,
+    IRIntegerValue flags)
+{
+    IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
@@ -3505,6 +3518,14 @@ IRLiveRangeEnd* IRBuilder::emitLiveRangeEnd(IRInst* referenced)
 IRInst* IRBuilder::emitExtractExistentialValue(IRType* type, IRInst* existentialValue)
 {
     auto inst = createInst<IRInst>(this, kIROp_ExtractExistentialValue, type, 1, &existentialValue);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitIsNullExistential(IRInst* existentialValue)
+{
+    auto inst =
+        createInst<IRInst>(this, kIROp_IsNullExistential, getBoolType(), 1, &existentialValue);
     addInst(inst);
     return inst;
 }
@@ -4135,7 +4156,10 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     {
         return _getTypeStyleId(matrixType->getElementType());
     }
+    // Try to simplify style if we can, otherwise just handle it unsimplified
     auto style = getTypeStyle(type->getOp());
+    if (style == kIROp_Invalid)
+        style = type->getOp();
     switch (style)
     {
     case kIROp_IntType:
@@ -4459,6 +4483,12 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
         break;
     }
     return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
+}
+
+IRInst* IRBuilder::emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func)
+{
+    IRInst* args[] = {tuple, func};
+    return emitIntrinsicInst(type, kIROp_CoopMatMapElementIFunc, 2, args);
 }
 
 IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
@@ -8636,6 +8666,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:

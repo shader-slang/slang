@@ -2146,26 +2146,39 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
-    // Bindings for global generic parameters are currently represented
-    // as stand-alone global-scope instructions in the IR module for
-    // `SpecializedComponentType`s. These instructions are required for
-    // correct codegen, and so we must make sure to copy them all over,
-    // even though they are not directly referenced.
-    //
-    // TODO: We should change these to decorations, akin to how
-    // `[bindExistentialSlots(...)]` works, so that they can be attached
-    // to the relevant parameters and cloned via `cloneExtraDecorations`.
-    // In the long run we do not want to *ever* iterate over all the
-    // instructions in all the input modules.
-    //
-
+    // Clone additional insts that should be included in the linked IR module
+    // even if they are not being directly referenced.
     for (IRModule* irModule : userModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            if (auto bindInst = as<IRBindGlobalGenericParam>(inst))
+            switch (inst->getOp())
             {
-                cloneValue(context, bindInst);
+            default:
+                break;
+            case kIROp_BindGlobalGenericParam:
+                // Bindings for global generic parameters are currently represented
+                // as stand-alone global-scope instructions in the IR module for
+                // `SpecializedComponentType`s. These instructions are required for
+                // correct codegen, and so we must make sure to copy them all over,
+                // even though they are not directly referenced.
+                //
+                // TODO: We should change these to decorations, akin to how
+                // `[bindExistentialSlots(...)]` works, so that they can be attached
+                // to the relevant parameters and cloned via `cloneExtraDecorations`.
+                // In the long run we do not want to *ever* iterate over all the
+                // instructions in all the input modules.
+                [[fallthrough]];
+            case kIROp_DebugSource:
+                // Need to list all source files in the debug source file list,
+                // regardless if the source files participate in the line table or not.
+                cloneValue(context, inst);
+                break;
+            case kIROp_DebugBuildIdentifier:
+                // The debug build identifier won't be referenced by anything,
+                // but we still need to keep it around if it is in the IR.
+                cloneValue(context, inst);
+                break;
             }
         }
     }

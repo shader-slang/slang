@@ -198,6 +198,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
+    case CompilerOptionName::TypeConformance:
         return true;
     }
     return false;
@@ -208,6 +209,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     {
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
+    case CompilerOptionName::LanguageVersion:
+        return CompilerOptionValue::fromEnum(SLANG_LANGAUGE_VERSION_DEFAULT);
     default:
         return CompilerOptionValue();
     }

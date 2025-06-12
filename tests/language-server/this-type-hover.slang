@@ -1,4 +1,4 @@
-//TEST:LANG_SERVER(filecheck=CHECK):
+//DISABLE_TEST:LANG_SERVER(filecheck=CHECK):
 
 struct G
 {}

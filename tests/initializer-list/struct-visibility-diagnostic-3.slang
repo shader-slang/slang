@@ -1,15 +1,13 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
+public struct NonCStyle
+{}
 public struct Visibility
 {
   internal int x;
-  public int y;
-  // the compiler does not synthesize any ctor.
-  // the compiler will try to synthesize:
-  //     public __init(int y);
-  // but then it will find that `x` cannot be initialized.
-  // so this synthesis will fail and no ctor will be added
-  // to the type.
+  public int[] y; // define a unsized array here on purpose so that the ctor will not associate it with a '{}' initializer
+  // will synthesize a constructor
+  // __init(int[] y)
 }
 
 void test()

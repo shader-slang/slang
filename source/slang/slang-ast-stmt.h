@@ -106,7 +106,6 @@ class BreakableStmt : public ScopeStmt
     ///
     UniqueStmtIDNode* uniqueID = kInvalidUniqueID;
 
-    SLANG_UNREFLECTED
     typedef UniqueStmtIDNode* UniqueID;
     static constexpr UniqueID kInvalidUniqueID = nullptr;
 };
@@ -292,6 +291,22 @@ class DeferStmt : public Stmt
     FIDDLE(...)
 
     FIDDLE() Stmt* statement = nullptr;
+};
+
+FIDDLE()
+class ThrowStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() Expr* expression = nullptr;
+};
+
+FIDDLE()
+class CatchStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() ParamDecl* errorVar = nullptr; // null => catch-all
+    FIDDLE() Stmt* tryBody = nullptr;
+    FIDDLE() Stmt* handleBody = nullptr;
 };
 
 FIDDLE()

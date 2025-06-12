@@ -107,7 +107,7 @@ if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
         )
     else()
         set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/include"
+            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers/include"
         )
     endif()
 endif()

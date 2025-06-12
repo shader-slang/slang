@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_1
-//DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_2
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_1
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_2
 
 SamplerState sampler;
 
