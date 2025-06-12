@@ -5491,7 +5491,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         if (expr->witnessArg)
         {
-            auto value = lowerLValueExpr(context, expr->value);
             auto type = lowerType(context, expr->typeExpr.type);
             auto witness = lowerSimpleVal(context, expr->witnessArg);
             auto declWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
@@ -5507,6 +5506,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
             else
             { // This is a run-time type check from for an existential type.
+                auto value = lowerLValueExpr(context, expr->value);
                 auto existentialInfo = value.getExtractedExistentialValInfo();
                 auto irVal = builder->emitIsType(
                     existentialInfo->extractedVal,

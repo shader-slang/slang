@@ -1023,6 +1023,86 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
     return result;
 }
 
+LookupResult SemanticsVisitor::filterLookupResultByCheckedOptional(const LookupResult& lookupResult)
+{
+    LookupResult filteredResult;
+    for (auto item : lookupResult)
+    {
+        bool optionalConstraintsChecked = true;
+
+        for (auto bb = item.breadcrumbs; bb; bb = bb->next)
+        {
+            auto subtypeWitness = as<DeclaredSubtypeWitness>(bb->val);
+            if (!subtypeWitness)
+                continue;
+
+            auto decl = subtypeWitness->getDeclRef().getDecl();
+            if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
+                continue;
+
+            // Okay, we've found an optional subtype witness. This result needs
+            // to be removed if we're not inside a block that directly checks
+            // if (sub is sup)
+            auto sub = subtypeWitness->getSub();
+            auto sup = subtypeWitness->getSup();
+
+            bool foundCheck = false;
+            for (auto outerStmtInfo = m_outerStmts;
+                 outerStmtInfo;
+                 outerStmtInfo = outerStmtInfo->next)
+            {
+                auto outerStmt = outerStmtInfo->stmt;
+                auto ifStmt = as<IfStmt>(outerStmt);
+
+                if (!ifStmt)
+                    continue;
+
+                IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
+                if (!isType)
+                    continue;
+                VarExpr* var = as<VarExpr>(isType->value);
+                if (!var)
+                    continue;
+                TypeType* typeType = as<TypeType>(var->type);
+
+                // var->type works for `variable is Interface`, while
+                // typeType->getType() is for `T is Interface`.
+                auto type = typeType ? typeType->getType() : var->type.type;
+                if (type == sub || isType->typeExpr.type == sup)
+                {
+                    foundCheck = true;
+                    break;
+                }
+            }
+            if (!foundCheck)
+                optionalConstraintsChecked = false;
+        }
+
+        if (optionalConstraintsChecked)
+            AddToLookupResult(filteredResult, item);
+    }
+    return filteredResult;
+}
+
+LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
+    const LookupResult& lookupResult,
+    SourceLoc loc,
+    bool& outDiagnosed)
+{
+    auto result = filterLookupResultByCheckedOptional(lookupResult);
+    if (lookupResult.isValid() && !result.isValid())
+    {
+        getSink()->diagnose(loc, Diagnostics::requiredConstraintIsNotChecked, lookupResult.item.declRef);
+        outDiagnosed = true;
+
+        if (getShared()->isInLanguageServer())
+        {
+            return lookupResult;
+        }
+    }
+    return result;
+}
+
 LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inResult)
 {
     // If the result isn't actually overloaded, it is fine as-is
@@ -4073,7 +4153,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         valueType = typeType->getType();
 
     // If value is a subtype of `type`, then this expr is always true.
-    auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::AllowOptional);
+    auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
     auto declWitness = as<DeclaredSubtypeWitness>(witness);
     bool optionalWitness = declWitness && declWitness->isOptional();
 
@@ -5166,6 +5246,7 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
+    lookupResult = filterLookupResultByCheckedOptionalAndDiagnose(lookupResult, expr->loc, diagnosed);
     if (!lookupResult.isValid())
     {
         return lookupMemberResultFailure(expr, baseType, diagnosed);

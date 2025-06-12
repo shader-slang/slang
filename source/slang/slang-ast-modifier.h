@@ -221,7 +221,7 @@ class IgnoreForLookupModifier : public Modifier
 
 /// A modifier that indicates an `TypeConstraintDecl` is optional.
 FIDDLE()
-class OptionalConstraintModifier : public IgnoreForLookupModifier
+class OptionalConstraintModifier : public Modifier
 {
     FIDDLE(...)
 };

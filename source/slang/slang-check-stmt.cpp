@@ -522,9 +522,10 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
 {
+    WithOuterStmt subContext(this, stmt);
     stmt->predicate = checkPredicateExpr(stmt->predicate);
-    checkStmt(stmt->positiveStatement);
-    checkStmt(stmt->negativeStatement);
+    subContext.checkStmt(stmt->positiveStatement);
+    subContext.checkStmt(stmt->negativeStatement);
 }
 
 void SemanticsStmtVisitor::visitUnparsedStmt(UnparsedStmt*)

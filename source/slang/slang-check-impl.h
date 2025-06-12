@@ -31,12 +31,6 @@ enum class IsSubTypeOptions
     /// A type may not be finished 'DeclCheckState::ReadyForLookup` while `isSubType` is called.
     /// We should not cache any negative results when this flag is set.
     NoCaching = 1 << 0,
-
-    /// Allow optional constraints as the witness of a subtype relationship.
-    /// Still prioritizes non-optional relationships if present. If not set,
-    /// optional constraints are assumed to not be fulfilled. We should only use
-    /// this when the potentially optional witness is checked afterwards.
-    AllowOptional = 1 << 1,
 };
 
 /// Should the given `decl` be treated as a static rather than instance declaration?
@@ -1374,6 +1368,12 @@ public:
     bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
     LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
     LookupResult filterLookupResultByVisibilityAndDiagnose(
+        const LookupResult& lookupResult,
+        SourceLoc loc,
+        bool& outDiagnosed);
+
+    LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
+    LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
         const LookupResult& lookupResult,
         SourceLoc loc,
         bool& outDiagnosed);

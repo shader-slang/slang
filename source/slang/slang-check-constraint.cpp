@@ -487,8 +487,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 // in the next iteration.
                 //
                 auto joinType = TryJoinTypes(system, type, cType);
-
-
                 if (!joinType)
                 {
                     if (c.isOptional)
