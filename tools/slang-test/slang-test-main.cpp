@@ -4579,6 +4579,10 @@ void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
+    
+    // Sort the files to ensure consistent test execution order
+    files.sort();
+    
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
