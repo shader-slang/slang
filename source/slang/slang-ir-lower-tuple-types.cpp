@@ -87,14 +87,11 @@ struct TupleLoweringContext
     }
 
 
-    List<IRInst*> maybeExtractValueOperands(IRInst* inst)
+    List<IRInst*> maybeExtractValueOperands(IRInst* inst, IRBuilder* builder)
     {
         List<IRInst*> ops;
-        IRBuilder builderStorage(module);
-        auto builder = &builderStorage;
-        builder->setInsertAfter(inst);
-
-        // Unwrap a Var. We need to check because __constref is implicit with `NonCopyable`
+        // Unwrap a Var __ref if provided. This is possible if using a Tuple as a param
+        // since Tuple are `NonCopyable`.
         if (auto varInst = as<IRVar>(inst))
         {
             if (AddressSpace::Generic == varInst->getDataType()->getAddressSpace())
@@ -135,8 +132,8 @@ struct TupleLoweringContext
         // `i` is the fields we have matched-up-to
         for (Index i = 0; i < info->fields.getCount();)
         {
-            // If a parameter is `__constref` we will require to handle a `Var<Ptr<Tuple>>`
-            List<IRInst*> valueOperands = maybeExtractValueOperands(inst->getOperand(i));
+            // Unpack compound values that need unwrapping.
+            List<IRInst*> valueOperands = maybeExtractValueOperands(inst->getOperand(i), builder);
             for (int valueOpIndex = 0; valueOpIndex < valueOperands.getCount();)
             {
                 // We have too many ops. This should not happen.
