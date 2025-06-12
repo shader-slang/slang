@@ -1588,14 +1588,12 @@ extension Tuple<T>
     __init(expand each T);
 }
 
-/// Construct a tuple from several values in order
+///// Construct a tuple from several values in order
 __intrinsic_op($(kIROp_MakeTuple))
-Tuple<T> makeTuple<each T>(T v) where noncopyable(T);
+Tuple<T> makeTuple<each T>(T v);
 
-/// Return a tuple containing the values of both input tuples in order
+///// Return a tuple containing the values of both input tuples in order
 Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
-    where noncopyable(T)
-    where noncopyable(U)
 {
     return makeTuple(expand each t, expand each u);
 }
