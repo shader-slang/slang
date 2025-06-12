@@ -988,7 +988,9 @@ void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase* unuse
     // class hierarchy, we treat all pointers to `NodeBase`-derived
     // types as variants for serialization purposes.
     //
+    TESS_TRACE("SLANG_SCOPED_SERIALIZER_VARIANT(serializer);");
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
+    TESS_TRACE("serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));");
     serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));
 }
 

@@ -1376,6 +1376,7 @@ void SerialReader::beginVariant()
 
 void SerialReader::endVariant()
 {
+    TESS_TRACE("SerialReader::endVariant this:%p _state.type:%d", this, _state.type);
     _popState();
 }
 
