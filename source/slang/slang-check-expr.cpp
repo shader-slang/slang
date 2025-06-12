@@ -4179,7 +4179,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // subtype witness for runtime checks.
 
     expr->value = maybeOpenExistential(originalVal);
-    expr->witnessArg = witness;
+    expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
