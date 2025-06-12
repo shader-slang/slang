@@ -7313,11 +7313,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 builderType = builder.getVectorType(builderType, elementCount);
             }
 
-            auto unsignedV = emitOpUConvert(
-                parent,
-                nullptr,
-                builderType,
-                inst->getOperand(0));
+            auto unsignedV = emitOpUConvert(parent, nullptr, builderType, inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
         else if (fromInfo.isSigned)
