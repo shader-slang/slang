@@ -2086,7 +2086,6 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 
 static void _dump(FossilizedValPtr valPtr, int depth = 0)
 {
-    fprintf(stderr, "\n");
     for (auto i = 0; i < depth; ++i)
         fprintf(stderr, "  ");
 
@@ -2105,12 +2104,12 @@ static void _dump(FossilizedValPtr valPtr, int depth = 0)
     switch (valPtr->getKind())
     {
     case FossilizedValKind::VariantObj:
-        fprintf(stderr, "variant");
+        fprintf(stderr, "variant\n");
         _dump(getVariantContentPtr(as<FossilizedVariantObj>(valPtr)));
         break;
 
     default:
-        fprintf(stderr, "unhandled: %d", int(valPtr->getKind()));
+        fprintf(stderr, "unhandled: %d\n", int(valPtr->getKind()));
         return;
     }
 }
@@ -2131,7 +2130,10 @@ ModuleDecl* readSerializedModuleAST(
     auto rootVal = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
     _dump(rootVal);
 
+    TESS_TRACE("rootVal: %p", rootVal.get());
     auto fossilizedModuleInfo = cast<Fossilized<ASTModuleInfo>>(rootVal);
+    TESS_TRACE("fossilizedModuleInfo: %p", fossilizedModuleInfo.get());
+
 
     auto sharedDecodingContext = RefPtr(new ASTSerialReadContext(
         linkage,
@@ -2168,7 +2170,12 @@ ModuleDecl* readSerializedModuleAST(
     // into this binary).
     //
     Fossilized<ASTModuleInfo>* rawFossilizedModuleInfo = fossilizedModuleInfo;
-
+    TESS_TRACE("rawFossilizedModuleInfo: %p", rawFossilizedModuleInfo);
+    TESS_TRACE("rawFossilizedModuleInfo->moduleDecl: %p", rawFossilizedModuleInfo->moduleDecl.get());
+    TESS_TRACE("rawFossilizedModuleInfo->declsToRegister.getBuffer(): %p", rawFossilizedModuleInfo->declsToRegister.getBuffer());
+    TESS_TRACE("rawFossilizedModuleInfo->declsToRegister.getCount(): %d", int(rawFossilizedModuleInfo->declsToRegister.getElementCount()));
+    TESS_TRACE("rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer(): %p", rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer());
+    TESS_TRACE("rawFossilizedModuleInfo->mapMangledNameToDecl.getCount(): %d", int(rawFossilizedModuleInfo->mapMangledNameToDecl.getElementCount()));
 
     ModuleDecl* moduleDecl = as<ModuleDecl>(
         sharedDecodingContext->readFossilizedDecl(rawFossilizedModuleInfo->moduleDecl));
