@@ -2,11 +2,13 @@
 #ifndef SLANG_FOSSIL_H
 #define SLANG_FOSSIL_H
 
+#include "../core/slang-relative-ptr.h"
 #include <stdarg.h>
 #include <stdio.h>
 
 static inline void _tessTrace(char const* message, ...)
 {
+    #if 0
     va_list args;
     va_start(args, message);
 
@@ -14,6 +16,9 @@ static inline void _tessTrace(char const* message, ...)
     vsnprintf(buffer, sizeof(buffer), message, args);
 
     fprintf(stderr, "TESS: %s\n", buffer);
+    #else
+    SLANG_UNUSED(message);
+    #endif
 }
 
 #define TESS_TRACE(...) \
@@ -54,8 +59,10 @@ namespace Slang
 
 namespace Fossil
 {
-template<typename T>
-using RelativePtr = RelativePtr32<T>;
+    template<typename T>
+    using RelativePtr = RelativePtr32<T>;
+
+    static_assert(sizeof(RelativePtr<void>) == sizeof(uint32_t));
 }
 
 // Various other parts of the format need to store offsets or counts,
@@ -175,12 +182,17 @@ protected:
 };
 
 template<typename T>
-struct FossilizedPtr : FossilizedVal, Fossil::RelativePtr<T>
+struct FossilizedPtr : FossilizedVal
 {
 public:
     using Layout = FossilizedPtrLikeLayout;
 
-    using Fossil::RelativePtr<T>::RelativePtr;
+    T* get() const { return _ptr.get(); }
+    operator T*() const { return _ptr.get(); }
+    T* operator->() const { return _ptr.get(); }
+
+private:
+    Fossil::RelativePtr<T> _ptr;
 };
 
 static_assert(sizeof(FossilizedPtr<void>) == sizeof(FossilUInt));
@@ -342,7 +354,7 @@ public:
     operator UnownedTerminatedStringSlice() const { return get(); }
 
 private:
-    FossilizedPtr<FossilizedStringObj> _obj;
+    Fossil::RelativePtr<FossilizedStringObj> _obj;
 };
 
 inline int compare(FossilizedString const& lhs, UnownedStringSlice const& rhs)
@@ -381,6 +393,7 @@ SLANG_DECLARE_FOSSILIZED_TYPE(String, FossilizedString);
 SLANG_DECLARE_FOSSILIZED_TYPE(UnownedStringSlice, FossilizedString);
 SLANG_DECLARE_FOSSILIZED_TYPE(UnownedTerminatedStringSlice, FossilizedString);
 
+static_assert(std::is_same_v<Fossilized<String>, FossilizedString>);
 static_assert(sizeof(Fossilized<String>) == sizeof(FossilUInt));
 
 //
@@ -438,7 +451,7 @@ public:
     T const* end() const { return getBuffer() + getElementCount(); }
 
 private:
-    FossilizedPtr<FossilizedContainerObj<T>> _obj;
+    Fossil::RelativePtr<FossilizedContainerObj<T>> _obj;
 };
 
 
@@ -606,7 +619,7 @@ public:
     T const& operator*() const { return *_value.get(); }
 
 private:
-    FossilizedPtr<T> _value;
+    Fossil::RelativePtr<T> _value;
 };
 
 template<typename T>
@@ -653,7 +666,7 @@ public:
     FossilizedVal const* getContentDataPtr() const { return this; }
 
 private:
-    // Before the `this` address, there is a `FossilizedPtr<FossilizedValLayout>`
+    // Before the `this` address, there is a `Fossil::RelativePtr<FossilizedValLayout>`
     // with the layout of the content.
     //
     // The content itself starts at the `this` address, with its
@@ -664,7 +677,7 @@ struct FossilizedVariant : FossilizedVal
 {
 public:
 private:
-    FossilizedPtr<FossilizedVariantObj> _obj;
+    Fossil::RelativePtr<FossilizedVariantObj> _obj;
 };
 
 static_assert(sizeof(FossilizedVariant) == sizeof(FossilUInt));
@@ -705,19 +718,19 @@ struct FossilizedPtrLikeLayout
     // has (non-static) data members.
 
     FossilizedValKind kind;
-    FossilizedPtr<FossilizedValLayout> elementLayout;
+    Fossil::RelativePtr<FossilizedValLayout> elementLayout;
 };
 
 struct FossilizedContainerLayout
 {
     FossilizedValKind kind;
-    FossilizedPtr<FossilizedValLayout> elementLayout;
+    Fossil::RelativePtr<FossilizedValLayout> elementLayout;
     FossilUInt elementStride;
 };
 
 struct FossilizedRecordElementLayout
 {
-    FossilizedPtr<FossilizedValLayout> layout;
+    Fossil::RelativePtr<FossilizedValLayout> layout;
     FossilUInt offset;
 };
 
@@ -1219,7 +1232,7 @@ public:
     static bool _isMatchingKind(Kind kind) { return kind == Kind::Ptr; }
 
 private:
-    FossilizedPtr<FossilizedVal> _value;
+    Fossil::RelativePtr<FossilizedVal> _value;
 };
 #endif
 
@@ -1284,7 +1297,7 @@ FossilizedValPtr getVariantContentPtr(FossilizedVariantObj* variantPtr);
 
 namespace Fossil
 {
-using RelativePtrOffset = FossilizedPtr<void>::Offset;
+using RelativePtrOffset = Fossil::RelativePtr<void>::Offset;
 
 /// Header for a fossil-format file or blob.
 ///
@@ -1314,7 +1327,7 @@ struct Header
     /// of the root object can be arbitrary, so applications may
     /// store multiple values using an array, struct, etc.
     ///
-    FossilizedPtr<FossilizedVariantObj> rootValue;
+    Fossil::RelativePtr<FossilizedVariantObj> rootValue;
 };
 
 static_assert(sizeof(Header) == 32);

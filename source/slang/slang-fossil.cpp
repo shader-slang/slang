@@ -99,7 +99,7 @@ Count FossilizedContainerObjBase::getElementCount() const
 
 FossilizedValLayout* FossilizedVariantObj::getContentLayout() const
 {
-    auto layoutPtrPtr = (FossilizedPtr<FossilizedValLayout>*)this - 1;
+    auto layoutPtrPtr = (Fossil::RelativePtr<FossilizedValLayout>*)this - 1;
     return (*layoutPtrPtr).get();
 }
 
