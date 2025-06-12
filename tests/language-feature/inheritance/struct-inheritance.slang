@@ -6,6 +6,8 @@
 // Test that we can define a `struct` type
 // that inherits from another `struct`.
 
+#pragma warning(disable:30816)
+
 struct Base
 {
 	int a;

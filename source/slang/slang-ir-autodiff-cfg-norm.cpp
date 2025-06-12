@@ -755,9 +755,10 @@ void normalizeCFG(
     sortBlocksInFunc(func);
     legalizeDefUse(func);
 
-    disableIRValidationAtInsert();
-    constructSSA(module, func);
-    enableIRValidationAtInsert();
+    {
+        auto validationScope = disableIRValidationScope();
+        constructSSA(module, func);
+    }
 
     module->invalidateAnalysisForInst(func);
 #if _DEBUG
