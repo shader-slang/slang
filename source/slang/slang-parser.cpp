@@ -3525,8 +3525,17 @@ static Decl* ParseBufferBlockDecl(
         }
         else
         {
-            bufferVarDecl->nameAndLoc.name =
-                generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            if (!strcmp(bufferWrapperTypeName.begin(), "ConstantBuffer"))
+            {
+                bufferVarDecl->nameAndLoc.name =
+                    parser->getNamePool()->getName(String(reflectionNameToken.getContent()));
+            }
+            else
+            {
+                bufferVarDecl->nameAndLoc.name = generateName(
+                    parser,
+                    "parameterGroup_" + String(reflectionNameToken.getContent()));
+            }
         }
 
         // We also need to make the declaration "transparent" so that their
