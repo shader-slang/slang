@@ -2,6 +2,28 @@
 #ifndef SLANG_FOSSIL_H
 #define SLANG_FOSSIL_H
 
+#include <stdarg.h>
+#include <stdio.h>
+
+static void _tessTrace(char const* message, ...)
+{
+    va_list args;
+    va_start(args, message);
+
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), message, args);
+
+    fprintf(stderr, "TESS: %s\n", buffer);
+}
+
+#define TESS_TRACE(...) \
+    do                          \
+    {                           \
+        _tessTrace(__VA_ARGS__);\
+    } while (0)
+
+
+
 //
 // This file defines a memory-mappable binary format for
 // serialized object graphs. To distinguish this specific
@@ -716,6 +738,11 @@ public:
     ///
     FossilizedValKind getKind() const
     {
+        TESS_TRACE("DynRefBase::getKind()");
+        TESS_TRACE("    this:%p", this);
+        TESS_TRACE("    _dataPtr:%p", _dataPtr);
+        TESS_TRACE("    _layout:%p", _layout);
+
         SLANG_ASSERT(getLayout());
         return getLayout()->kind;
     }
@@ -933,8 +960,12 @@ DynPtr<T> cast(DynPtr<U> valPtr)
 template<typename T, typename U>
 DynPtr<T> as(DynPtr<U> valPtr)
 {
+    TESS_TRACE("if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))");
     if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))
+    {
+        TESS_TRACE("return DynPtr<T>();");
         return DynPtr<T>();
+    }
 
     return DynPtr<T>(
         static_cast<T*>(valPtr->getDataPtr()),

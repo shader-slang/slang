@@ -1358,12 +1358,15 @@ void SerialReader::beginVariant()
     TESS_TRACE("SerialReader::beginVariant this:%p _state.type:%d", this, _state.type);
 
     auto valPtr = _readPotentiallyIndirectValPtr();
+    TESS_TRACE("if (auto variantPtr = as<FossilizedVariantObj>(valPtr))");
     if (auto variantPtr = as<FossilizedVariantObj>(valPtr))
     {
+        TESS_TRACE("auto contentValPtr = getVariantContentPtr(variantPtr.get());");
         auto contentValPtr = getVariantContentPtr(variantPtr.get());
         valPtr = contentValPtr;
     }
 
+    TESS_TRACE("auto recordPtr = as<FossilizedRecordVal>(valPtr);");
     auto recordPtr = as<FossilizedRecordVal>(valPtr);
 
     _pushState();
