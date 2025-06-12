@@ -1993,14 +1993,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitNoneWitness(NoneWitness*)
     {
         auto builder = getBuilder();
-        auto uint2Type = builder->getVectorType(
-            builder->getUIntType(),
-            builder->getIntValue(builder->getIntType(), 2));
-        IRInst* uint2Args[] = {
-            builder->getIntValue(builder->getUIntType(), -1),
-            builder->getIntValue(builder->getUIntType(), 0)};
-        auto uint2seqID = builder->emitMakeVector(uint2Type, 2, uint2Args);
-        return LoweredValInfo::simple(uint2seqID);
+        auto voidType = builder->getVoidType();
+        return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
