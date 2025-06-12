@@ -674,6 +674,9 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
                 structDecl->addMember(conformanceDecl);
                 structDecl->parentDecl = parent;
+                structDecl->ownedScope = m_astBuilder->create<Scope>();
+                structDecl->ownedScope->containerDecl = structDecl;
+                structDecl->ownedScope->parent = getScope(parent);
 
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
