@@ -351,9 +351,10 @@ endif()
 
 if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
     message(
-        SEND_ERROR
-        "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
+        STATUS
+        "OptiX is not supported without CUDA. Automatically disabling SLANG_ENABLE_OPTIX."
     )
+    set(SLANG_ENABLE_OPTIX OFF)
 endif()
 
 if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
