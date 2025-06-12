@@ -127,8 +127,6 @@ struct TupleLoweringContext
         auto info = getLoweredTupleType(builder, inst->getDataType());
 
         List<IRInst*> operands;
-        // inst operand index
-        Index operandIndex = 0;
         // `i` is the fields we have matched-up-to
         for (Index i = 0; i < info->fields.getCount();)
         {
@@ -144,8 +142,6 @@ struct TupleLoweringContext
                 // next value op is needed, iterate valueOp index
                 valueOpIndex++;
             }
-            // next inst operand must be compared
-            operandIndex++;
         }
         auto makeStruct = builder->emitMakeStruct(info->structType, operands);
         inst->replaceUsesWith(makeStruct);
