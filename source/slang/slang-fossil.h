@@ -963,7 +963,7 @@ DynPtr<T> as(DynPtr<U> valPtr)
     TESS_TRACE("if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))");
     if (valPtr)
     {
-        TESS_TACE("valPtr->getKind(): %d", int(valPtr->getKind()));
+        TESS_TRACE("valPtr->getKind(): %d", int(valPtr->getKind()));
     }
     if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))
     {
