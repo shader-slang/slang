@@ -961,6 +961,10 @@ template<typename T, typename U>
 DynPtr<T> as(DynPtr<U> valPtr)
 {
     TESS_TRACE("if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))");
+    if (valPtr)
+    {
+        TESS_TACE("valPtr->getKind(): %d", int(valPtr->getKind()));
+    }
     if (!valPtr || !detail::DynamicCastHelper<T>::isMatchingKind(valPtr->getKind()))
     {
         TESS_TRACE("return DynPtr<T>();");
