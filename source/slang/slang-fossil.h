@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-static void _tessTrace(char const* message, ...)
+static inline void _tessTrace(char const* message, ...)
 {
     va_list args;
     va_start(args, message);
