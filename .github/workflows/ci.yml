@@ -115,7 +115,7 @@ jobs:
             echo "should-run=true" >> $GITHUB_OUTPUT
           else
             echo "Only documentation files changed, skipping remaining steps"
-            echo "should-run=false" >> $GITHUB_OUTPUT
+            echo "should-run=true" >> $GITHUB_OUTPUT
           fi
       - name: Install dependencies
         run: |
