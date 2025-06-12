@@ -369,6 +369,14 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
+extension<T:__BuiltinIntegerType> T
+{
+    __init(__BuiltinIntegerType value)
+    {
+        this = __intCast<T>(value);
+    }
+}
+
 /// Represents a `int` or `uint` type.
 [sealed]
 [builtin]
@@ -816,6 +824,14 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
     static This getPi();
+}
+
+extension<T:__BuiltinFloatingPointType> T
+{
+    __init(__BuiltinFloatingPointType value)
+    {
+        this = __realCast<T>(value);
+    }
 }
 
 //@ hidden:
