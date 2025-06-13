@@ -555,8 +555,6 @@ struct ASTDumpContext
     }
     void dump(const ExpandedSpecializationArg& arg) { dump(arg.witness); }
 
-    void dump(const TransparentMemberInfo& memInfo) { dump(memInfo.decl); }
-
     void dumpRemaining()
     {
         // Have to keep checking count, as dumping objects can add objects
@@ -568,6 +566,32 @@ struct ASTDumpContext
                 dumpObjectFull(info.m_object, i);
             }
         }
+    }
+
+    void dump(ContainerDeclDirectMemberDecls const& decls)
+    {
+        m_writer->emit(" { \n");
+        m_writer->indent();
+        bool first = true;
+        for (auto decl : decls.getDecls())
+        {
+            if (!first)
+            {
+                m_writer->emit(",\n");
+            }
+            first = false;
+
+            if (decl)
+            {
+                dump(decl);
+            }
+            else
+            {
+                m_writer->emit("null");
+            }
+        }
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     void dump(ContainerDecl* decl)

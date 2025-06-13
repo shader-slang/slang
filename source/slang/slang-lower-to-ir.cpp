@@ -3094,9 +3094,10 @@ struct StmtLoweringVisitor;
 
 void maybeEmitDebugLine(
     IRGenContext* context,
-    StmtLoweringVisitor& visitor,
+    StmtLoweringVisitor* visitor,
     Stmt* stmt,
-    SourceLoc loc = SourceLoc());
+    SourceLoc loc = SourceLoc(),
+    bool allowNullStmt = false);
 
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
@@ -3857,7 +3858,7 @@ struct ExprLoweringContext
             auto genDecl = genSubst->getGenericDecl();
 
             Index argCounter = 0;
-            for (auto memberDecl : genDecl->members)
+            for (auto memberDecl : genDecl->getDirectMemberDecls())
             {
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
                 {
@@ -3868,12 +3869,10 @@ struct ExprLoweringContext
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
                 }
             }
-            for (auto memberDecl : genDecl->members)
+            for (auto constraintDecl :
+                 genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
-                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
-                }
+                _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
             }
         }
         // TODO: also need to handle this-type substitution here?
@@ -5223,6 +5222,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto afterBlock = builder->createBlock();
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
 
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+
         // ifElse(<first param>, %true-block, %false-block, %after-block)
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
@@ -6213,6 +6214,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
+        maybeEmitDebugLine(context, this, stmt, condExpr->loc);
+
         IRInst* ifInst = nullptr;
 
         if (elseStmt)
@@ -6325,7 +6328,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (const auto condExpr = stmt->predicateExpression)
         {
-            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition =
                 getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
@@ -6385,7 +6388,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(continueLabel);
         if (auto incrExpr = stmt->sideEffectExpression)
         {
-            maybeEmitDebugLine(context, *this, stmt, incrExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, incrExpr->loc);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -6434,7 +6437,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
@@ -6500,7 +6503,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            maybeEmitDebugLine(context, *this, stmt, stmt->predicate->loc);
+            maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
@@ -7400,24 +7403,29 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 
 void maybeEmitDebugLine(
     IRGenContext* context,
-    StmtLoweringVisitor& visitor,
+    StmtLoweringVisitor* visitor,
     Stmt* stmt,
-    SourceLoc loc)
+    SourceLoc loc,
+    bool allowNullStmt)
 {
     if (!context->includeDebugInfo)
         return;
-    if (as<EmptyStmt>(stmt))
-        return;
-    if (!loc.isValid())
-        loc = stmt->loc;
+
+    if (!allowNullStmt)
+    {
+        if (as<EmptyStmt>(stmt))
+            return;
+        if (!loc.isValid())
+            loc = stmt->loc;
+    }
+
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(loc);
+    auto sourceView = sourceManager->findSourceView(loc);
     if (!sourceView)
         return;
 
     IRInst* debugSourceInst = nullptr;
-    auto humaneLoc =
-        context->getLinkage()->getSourceManager()->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
 
     // Do a best-effort attempt to retrieve the nominal source file.
     auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
@@ -7436,7 +7444,8 @@ void maybeEmitDebugLine(
     {
         debugSourceInst = getOrEmitDebugSource(context, pathInfo);
     }
-    visitor.startBlockIfNeeded(stmt);
+    if (visitor)
+        visitor->startBlockIfNeeded(stmt);
     context->irBuilder->emitDebugLine(
         debugSourceInst,
         humaneLoc.line,
@@ -7473,7 +7482,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
 
     try
     {
-        maybeEmitDebugLine(context, visitor, stmt, stmt->loc);
+        maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -8115,7 +8124,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto& member : decl->members)
+        for (auto& member : decl->getDirectMemberDecls())
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -9210,17 +9219,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
             if (as<GenericDecl>(requirementDecl))
                 requirementDecl = getInner(requirementDecl);
 
             if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
             {
-                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
+                for (auto accessorDecl :
+                     as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
-                    if (as<AccessorDecl>(accessorDecl))
-                        operandCount++;
+                    SLANG_UNUSED(accessorDecl);
+                    operandCount++;
                 }
             }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
@@ -9359,7 +9369,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
             }
         };
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
@@ -9373,19 +9383,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
-                    for (auto member : as<ContainerDecl>(requirementDecl)->members)
+                    for (auto accessorDecl : as<ContainerDecl>(requirementDecl)
+                                                 ->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (auto accessorDecl = as<AccessorDecl>(member))
+                        auto accessorKey = getInterfaceRequirementKey(accessorDecl);
+                        if (accessorKey)
                         {
-                            auto accessorKey = getInterfaceRequirementKey(accessorDecl);
-                            if (accessorKey)
-                            {
-                                auto accessorDeclRef = createDefaultSpecializedDeclRef(
-                                    subContext,
-                                    nullptr,
-                                    accessorDecl);
-                                addEntry(accessorKey, accessorDeclRef);
-                            }
+                            auto accessorDeclRef =
+                                createDefaultSpecializedDeclRef(subContext, nullptr, accessorDecl);
+                            addEntry(accessorKey, accessorDeclRef);
                         }
                     }
                 }
@@ -9914,7 +9920,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->members)
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
             if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
             {
@@ -9937,12 +9943,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->members)
+        for (auto constraintDecl :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
-            {
-                emitGenericConstraintDecl(subContext, constraintDecl);
-            }
+            emitGenericConstraintDecl(subContext, constraintDecl);
         }
 
         return irGeneric;
@@ -11934,21 +11938,21 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
     //
     if (auto containerDecl = as<AggTypeDeclBase>(decl))
     {
-        for (auto memberDecl : containerDecl->members)
+        for (auto memberDecl : containerDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto namespaceDecl = as<NamespaceDecl>(decl))
     {
-        for (auto memberDecl : namespaceDecl->members)
+        for (auto memberDecl : namespaceDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto fileDecl = as<FileDecl>(decl))
     {
-        for (auto memberDecl : fileDecl->members)
+        for (auto memberDecl : fileDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
@@ -12025,7 +12029,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->getModuleDecl()->members)
+    for (auto decl : translationUnit->getModuleDecl()->getDirectMemberDecls())
     {
         ensureAllDeclsRec(context, decl);
     }
