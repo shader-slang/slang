@@ -4598,7 +4598,7 @@ void runTestsInDirectory(TestContext* context)
     // https://github.com/shader-slang/slang/issues/7388
     //
     // TODO: We need a way to shuffle the list in a deterministic manner.
-    files.sort();
+    //files.sort();
 
     auto processFile = [&](String file)
     {
