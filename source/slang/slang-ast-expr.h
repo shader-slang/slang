@@ -734,6 +734,17 @@ class ThisTypeExpr : public Expr
     Scope* scope = nullptr;
 };
 
+
+/// A type expression of the form `ThisInterface`
+///
+/// Refers to the interface type itself, not the conforming type from an interface decl.
+///
+FIDDLE()
+class ThisInterfaceExpr : public VarExpr
+{
+    FIDDLE(...)
+};
+
 /// A type expression of the form `Left & Right`.
 FIDDLE()
 class AndTypeExpr : public Expr

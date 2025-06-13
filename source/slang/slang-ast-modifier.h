@@ -731,6 +731,14 @@ class HLSLVolatileModifier : public Modifier
     FIDDLE(...)
 };
 
+// Indicate that an interface method requirement has a default impl.
+FIDDLE()
+class HasInterfaceDefaultImplModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() Decl* defaultImplDecl = nullptr;
+};
 
 FIDDLE()
 class AttributeTargetModifier : public Modifier
