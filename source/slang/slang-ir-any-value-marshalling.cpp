@@ -149,6 +149,7 @@ struct AnyValueMarshallingContext
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_BoolType:
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
@@ -336,6 +337,7 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -580,6 +582,7 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -879,6 +882,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
         return alignUp(offset, 2) + 2;
     case kIROp_UInt8Type:
     case kIROp_Int8Type:
