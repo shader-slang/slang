@@ -717,7 +717,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         SIMPLE_EXTENSION_FEATURE(
             extendedFeatures.computeShaderDerivativeFeatures,
             computeDerivativeGroupLinear,
-            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
             "computeDerivativeGroupLinear");
 
         // Only enable raytracing validation if both requested and supported

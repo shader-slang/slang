@@ -82,6 +82,7 @@ struct InputBufferDesc
 struct InputSamplerDesc
 {
     bool isCompareSampler = false;
+    TextureFilteringMode filteringMode = TextureFilteringMode::Linear;
 };
 
 struct TextureData
