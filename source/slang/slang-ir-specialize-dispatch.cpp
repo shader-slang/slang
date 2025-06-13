@@ -255,7 +255,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
                 else
                 {
                     // NoneWitness, has special ID of -1.
-                    seqID = -1;
+                    seqID = uint32_t(-1);
                 }
                 linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
             }
