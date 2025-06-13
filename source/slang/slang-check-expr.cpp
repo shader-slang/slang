@@ -1293,15 +1293,17 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 
 bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl)
 {
-    // A struct can be used as its own differential type if all its members are differentiable
-    // and their differential types are the same as the original types.
+    // A struct can be used as its own differential type if all its members are differentiable, and
+    // none of the member is decorated with "no_diff", and their differential types are the same as
+    // the original types.
     //
     bool canBeUsed = true;
     for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
         // Try to get the differential type of the member.
         Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
-        if (!diffType || !diffType->equals(varDecl->getType()))
+        if (!diffType || !diffType->equals(varDecl->getType()) ||
+            varDecl->findModifier<NoDiffModifier>())
         {
             canBeUsed = false;
             break;
