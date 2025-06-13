@@ -375,11 +375,7 @@ SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
         return new (_arena) ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Ptr:
-        return new (_arena) ContainerLayoutObj(
-            kind,
-            nullptr,
-            sizeof(FossilInt),
-            sizeof(FossilInt));
+        return new (_arena) ContainerLayoutObj(kind, nullptr, sizeof(FossilInt), sizeof(FossilInt));
 
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
@@ -1679,9 +1675,9 @@ FossilizedAnyValPtr SerialReader::_readPotentiallyIndirectValPtr()
     TESS_TRACE("if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))");
     if (auto basePtrPtr = as<FossilizedPtr<void>>(baseValPtr))
     {
-    TESS_TRACE("auto targetValRef = basePtrPtr->getTarget()");
+        TESS_TRACE("auto targetValRef = basePtrPtr->getTarget()");
         auto targetValRef = basePtrPtr->getTargetValRef();
-    TESS_TRACE("FossilizedValPtr(targetValRef)");
+        TESS_TRACE("FossilizedValPtr(targetValRef)");
         return DynPtr(targetValRef);
     }
     TESS_TRACE("return baseValPtr");

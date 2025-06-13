@@ -3,12 +3,13 @@
 #define SLANG_FOSSIL_H
 
 #include "../core/slang-relative-ptr.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 
 static inline void _tessTrace(char const* message, ...)
 {
-    #if 0
+#if 0
     va_list args;
     va_start(args, message);
 
@@ -16,17 +17,16 @@ static inline void _tessTrace(char const* message, ...)
     vsnprintf(buffer, sizeof(buffer), message, args);
 
     fprintf(stderr, "TESS: %s\n", buffer);
-    #else
+#else
     SLANG_UNUSED(message);
-    #endif
+#endif
 }
 
-#define TESS_TRACE(...) \
-    do                          \
-    {                           \
-        _tessTrace(__VA_ARGS__);\
+#define TESS_TRACE(...)          \
+    do                           \
+    {                            \
+        _tessTrace(__VA_ARGS__); \
     } while (0)
-
 
 
 //
@@ -94,10 +94,7 @@ public:
 
     using Layout = FossilizedPtrLikeLayout;
 
-    static bool isMatchingKind(FossilizedValKind kind)
-    {
-        return kind == FossilizedValKind::Ptr;
-    }
+    static bool isMatchingKind(FossilizedValKind kind) { return kind == FossilizedValKind::Ptr; }
 };
 
 static_assert(sizeof(FossilizedPtr<void>) == sizeof(uint32_t));
@@ -193,9 +190,10 @@ public:
     }
 
     template<typename U>
-    DynRefBase(DynRefBase<U> ref, std::enable_if_t < std::is_convertible_v<U*, T*>, void>* = nullptr)
+    DynRefBase(DynRefBase<U> ref, std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
         : _data(ref.getDataPtr()), _layout((Layout const*)ref.getLayout())
-    {}
+    {
+    }
 
     /// Get a pointer to the value being referenced.
     ///
@@ -204,7 +202,10 @@ public:
     /// Get a reference to the value being referenced.
     ///
     template<typename U = T>
-    std::enable_if_t<!std::is_same_v<U,void>,T>& getDataRef() const { return *_data; }
+    std::enable_if_t<!std::is_same_v<U, void>, T>& getDataRef() const
+    {
+        return *_data;
+    }
 
     /// Get the layout of the value being referenced.
     ///
@@ -220,7 +221,7 @@ public:
         return getLayout()->kind;
     }
 
-//    operator T&() const { return *_data; }
+    //    operator T&() const { return *_data; }
 
 protected:
     T* _data = nullptr;
@@ -264,9 +265,10 @@ public:
     }
 
     template<typename U>
-    DynPtr(DynPtr<U> ptr, std::enable_if_t < std::is_convertible_v<U*, T*>, void>* = nullptr)
+    DynPtr(DynPtr<U> ptr, std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
         : _ref(*ptr)
-    {}
+    {
+    }
 
     T* getDataPtr() const { return _ref.getDataPtr(); }
     TargetLayout* getLayout() const { return _ref.getLayout(); }
@@ -629,7 +631,6 @@ public:
     }
 
     FossilizedAnyValRef getElement(Index index) const;
-
 };
 
 template<typename T>
@@ -971,7 +972,6 @@ static_assert(sizeof(FossilizedVariant) == sizeof(FossilUInt));
     }
 
 
-
 template<typename T>
 struct DynRef<FossilizedPtr<T>> : DynRefBase<FossilizedPtr<T>>
 {
@@ -986,7 +986,7 @@ public:
 
     DynPtr<T> getTargetValPtr() const { return DynPtr<T>(getTargetValRef()); }
 
-//    DynRef<T> operator*() const;
+    //    DynRef<T> operator*() const;
 };
 
 struct FossilizedContainerLayout
