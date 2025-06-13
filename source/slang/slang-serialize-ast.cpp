@@ -79,7 +79,8 @@ template<>
 struct FossilizedTypeTraits<RefObject>
 {
     struct FossilizedType
-    {};
+    {
+    };
 };
 
 //
@@ -965,7 +966,8 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
 template<typename T>
 void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase* unused)
 {
-    TESS_TRACE("serializeObject(NodeBase) impl:%p context:%p value:%p &value:%p unused:%p",
+    TESS_TRACE(
+        "serializeObject(NodeBase) impl:%p context:%p value:%p &value:%p unused:%p",
         serializer.getImpl(),
         serializer.getContext(),
         value,
@@ -988,7 +990,8 @@ void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase* unuse
     //
     TESS_TRACE("SLANG_SCOPED_SERIALIZER_VARIANT(serializer);");
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
-    TESS_TRACE("serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));");
+    TESS_TRACE(
+        "serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));");
     serializer.getContext()->handleASTNode(serializer, reinterpret_cast<NodeBase*&>(value));
 }
 
@@ -2201,11 +2204,21 @@ ModuleDecl* readSerializedModuleAST(
     //
     Fossilized<ASTModuleInfo>* rawFossilizedModuleInfo = fossilizedModuleInfoPtr;
     TESS_TRACE("rawFossilizedModuleInfo: %p", rawFossilizedModuleInfo);
-    TESS_TRACE("rawFossilizedModuleInfo->moduleDecl: %p", rawFossilizedModuleInfo->moduleDecl.get());
-    TESS_TRACE("rawFossilizedModuleInfo->declsToRegister.getBuffer(): %p", rawFossilizedModuleInfo->declsToRegister.getBuffer());
-    TESS_TRACE("rawFossilizedModuleInfo->declsToRegister.getCount(): %d", int(rawFossilizedModuleInfo->declsToRegister.getElementCount()));
-    TESS_TRACE("rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer(): %p", rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer());
-    TESS_TRACE("rawFossilizedModuleInfo->mapMangledNameToDecl.getCount(): %d", int(rawFossilizedModuleInfo->mapMangledNameToDecl.getElementCount()));
+    TESS_TRACE(
+        "rawFossilizedModuleInfo->moduleDecl: %p",
+        rawFossilizedModuleInfo->moduleDecl.get());
+    TESS_TRACE(
+        "rawFossilizedModuleInfo->declsToRegister.getBuffer(): %p",
+        rawFossilizedModuleInfo->declsToRegister.getBuffer());
+    TESS_TRACE(
+        "rawFossilizedModuleInfo->declsToRegister.getCount(): %d",
+        int(rawFossilizedModuleInfo->declsToRegister.getElementCount()));
+    TESS_TRACE(
+        "rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer(): %p",
+        rawFossilizedModuleInfo->mapMangledNameToDecl.getBuffer());
+    TESS_TRACE(
+        "rawFossilizedModuleInfo->mapMangledNameToDecl.getCount(): %d",
+        int(rawFossilizedModuleInfo->mapMangledNameToDecl.getElementCount()));
 
     ModuleDecl* moduleDecl = as<ModuleDecl>(
         sharedDecodingContext->readFossilizedDecl(rawFossilizedModuleInfo->moduleDecl));
@@ -2234,8 +2247,7 @@ ModuleDecl* readSerializedModuleAST(
     return moduleDecl;
 }
 
-Decl* ModuleDecl::_findSerializedDeclByMangledExportName(
-    UnownedStringSlice const& mangledName)
+Decl* ModuleDecl::_findSerializedDeclByMangledExportName(UnownedStringSlice const& mangledName)
 {
     TESS_TRACE("ModuleDecl::_findSerializedDeclByMangledExportName");
 
