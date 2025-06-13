@@ -2260,6 +2260,12 @@ alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 /// [Compound]
 alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
+/// hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
+/// capdef specifically for the hitobject variant.
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias raytracing_lss_ho = raytracing_lss | raygen;
+
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;
