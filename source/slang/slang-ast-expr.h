@@ -752,9 +752,17 @@ class ModifiedTypeExpr : public Expr
     FIDDLE() TypeExp base;
 };
 
-/// A type expression that rrepresents a pointer type, e.g. T*
+/// A type expression that represents a pointer type, e.g. T*
 FIDDLE()
 class PointerTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+/// A type expression that represents a some type, e.g. `some T`
+FIDDLE()
+class SomeTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() TypeExp base;

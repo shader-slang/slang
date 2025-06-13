@@ -1204,6 +1204,16 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
+    // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
+    // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
+    if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        // We do not immediatly error since conversions may still happen
+        // later on
+        if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+            return true;
+    }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1871,6 +1881,70 @@ bool SemanticsVisitor::_coerce(
         getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
     }
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
+}
+
+static bool isDynType(Type* type)
+{
+    return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
+}
+
+bool SemanticsVisitor::tryCoerceSomeType(
+    CoercionSite site,
+    Type* toType,
+    Expr** outToExpr,
+    QualType fromType,
+    Expr* fromExpr,
+    DiagnosticSink* sink,
+    ConversionCost* outCost)
+{
+    // Restrictions
+    if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
+    {
+        // Handles the following case: `some T = some U` `some T = unbound_some U`.
+        // We do not error if `some` is an argument since `some` can be passed as an argument to a
+        // `some` parameter.
+        if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
+        {
+            if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
+                return false;
+            }
+        }
+        // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
+        else if (isDynType(fromType))
+        {
+            sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
+            return false;
+        }
+
+        // implicit unwrap
+        return _coerce(
+            site,
+            someTypeDecl.getDecl()->interfaceType.type,
+            outToExpr,
+            fromType,
+            fromExpr,
+            sink,
+            outCost);
+    }
+
+    // If we have a SomeType on RHS, we are only allowed to copy if LHS is `dyn`
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        if (isDynType(toType))
+            return _coerce(
+                site,
+                toType,
+                outToExpr,
+                someTypeDeclRef.getDecl()->interfaceType.type,
+                fromExpr,
+                sink,
+                outCost);
+    }
+    return false;
 }
 
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(
