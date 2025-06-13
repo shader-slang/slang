@@ -26,7 +26,6 @@
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-peephole.h"
-#include "slang-ir-potential-infinite-loop.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-ssa.h"
@@ -12231,9 +12230,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::None, true);
-
-        // Check for potential infinite loops (loops with no break)
-        checkForPotentialInfiniteLoops(module, compileRequest->getSink(), true);
 
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
