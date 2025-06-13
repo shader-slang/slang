@@ -31,6 +31,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip.h"
+#include "slang-ir-potential-infinite-loop.h"
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
@@ -12230,6 +12231,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::None, true);
+
+        checkForPotentialInfiniteLoops(module, compileRequest->getSink(), true);
 
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
