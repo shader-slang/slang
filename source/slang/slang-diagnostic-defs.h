@@ -845,10 +845,18 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30301,
     Error,
-    isAsOperatorCannotUseInterfaceAsRHS,
-    "'is' and 'as' operators do not support interface types as the right-hand "
+    isOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'is' operator with an interface type as the right-hand "
     "side without a corresponding optional constraint. Use a concrete type "
     "instead, or add an optional constraint for the interface type.")
+
+DIAGNOSTIC(
+    30302,
+    Error,
+    asOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'as' operator with an interface type as the right-hand "
+    "side. Use a concrete type instead. If you want to use an optional "
+    "constraint, use an 'if (T is IInterface)' block instead.")
 
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 

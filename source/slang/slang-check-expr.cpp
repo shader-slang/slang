@@ -4168,10 +4168,12 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         return expr;
     }
 
-    // Check if the right-hand side type is an interface type
+    // Check if the right-hand side type is an interface type. For 'is'
+    // statements, that's only allowed if it's related to an optional
+    // constraint.
     if (isInterfaceType(expr->typeExpr.type) && !optionalWitness)
     {
-        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        getSink()->diagnose(expr, Diagnostics::isOperatorCannotUseInterfaceAsRHS);
         return expr;
     }
 
@@ -4201,7 +4203,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // Check if the right-hand side type is an interface type
     if (isInterfaceType(typeExpr.type))
     {
-        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        getSink()->diagnose(expr, Diagnostics::asOperatorCannotUseInterfaceAsRHS);
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
