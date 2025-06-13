@@ -25,12 +25,12 @@ const char Fossil::Header::kMagic[16] = {
     '\n'    // byte 15
 };
 
-FossilizedValPtr getRootValue(ISlangBlob* blob)
+FossilizedAnyValPtr getRootValue(ISlangBlob* blob)
 {
     return getRootValue(blob->getBufferPointer(), blob->getBufferSize());
 }
 
-FossilizedValPtr getRootValue(void const* data, Size size)
+FossilizedAnyValPtr getRootValue(void const* data, Size size)
 {
     if (!data)
     {
@@ -72,9 +72,7 @@ FossilizedValPtr getRootValue(void const* data, Size size)
         SLANG_UNEXPECTED("bad format for fossil");
     }
 
-    return FossilizedValPtr(
-        rootValueVariant->getContentDataPtr(),
-        rootValueVariant->getContentLayout());
+    return getVariantContentPtr(rootValueVariant);
 }
 
 } // namespace Fossil
@@ -99,7 +97,7 @@ Count FossilizedContainerObjBase::getElementCount() const
 
 FossilizedValLayout* FossilizedVariantObj::getContentLayout() const
 {
-    auto layoutPtrPtr = (Fossil::RelativePtr<FossilizedValLayout>*)this - 1;
+    auto layoutPtrPtr = (FossilizedPtr<FossilizedValLayout>*)this - 1;
     return (*layoutPtrPtr).get();
 }
 
@@ -133,7 +131,7 @@ Count getElementCount(FossilizedContainerObjRef containerRef)
 }
 #endif
 
-DynRef<FossilizedVal> DynRef<FossilizedContainerObjBase>::getElement(Index index) const
+FossilizedAnyValRef DynRef<FossilizedContainerObjBase>::getElement(Index index) const
 {
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < getElementCount());
@@ -143,8 +141,8 @@ DynRef<FossilizedVal> DynRef<FossilizedContainerObjBase>::getElement(Index index
     auto elementStride = containerLayout->elementStride;
 
     auto elementsPtr = (Byte*)getDataPtr();
-    auto elementPtr = (FossilizedVal*)(elementsPtr + elementStride * index);
-    return FossilizedValRef(elementPtr, elementLayout);
+    auto elementPtr = (void*)(elementsPtr + elementStride * index);
+    return FossilizedAnyValRef(elementPtr, elementLayout);
 }
 
 #if 0
@@ -154,6 +152,7 @@ Count getFieldCount(FossilizedRecordValRef recordRef)
     return recordLayout->fieldCount;
 }
 #endif
+
 FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
@@ -163,7 +162,7 @@ FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) con
     return fieldsPtr + index;
 }
 
-DynRef<FossilizedVal> DynRef<FossilizedRecordVal>::getField(Index index) const
+FossilizedAnyValRef DynRef<FossilizedRecordVal>::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < getFieldCount());
@@ -172,8 +171,8 @@ DynRef<FossilizedVal> DynRef<FossilizedRecordVal>::getField(Index index) const
     auto fieldInfo = recordLayout->getField(index);
 
     auto fieldsPtr = (Byte*)getDataPtr();
-    auto fieldPtr = (FossilizedVal*)(fieldsPtr + fieldInfo->offset);
-    return FossilizedValRef(fieldPtr, fieldInfo->layout);
+    auto fieldPtr = (void*)(fieldsPtr + fieldInfo->offset);
+    return FossilizedAnyValRef(fieldPtr, fieldInfo->layout);
 }
 
 #if 0
@@ -183,14 +182,9 @@ FossilizedValRef getVariantContent(FossilizedVariantObjRef variantRef)
 }
 #endif
 
-FossilizedValRef getVariantContentRef(FossilizedVariantObj* variantPtr)
+FossilizedAnyValPtr getVariantContentPtr(FossilizedVariantObj* variantPtr)
 {
-    return FossilizedValRef(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
-}
-
-FossilizedValPtr getVariantContentPtr(FossilizedVariantObj* variantPtr)
-{
-    return FossilizedValPtr(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
+    return FossilizedAnyValPtr(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
 }
 
 } // namespace Slang

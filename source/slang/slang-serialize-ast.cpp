@@ -78,10 +78,8 @@ void serialize(Serializer const&, RefObject&)
 template<>
 struct FossilizedTypeTraits<RefObject>
 {
-    // Every type derived from `RefObject` is assumed to be encoded
-    // as a record (the catch-all that covers `struct`s and tuples).
-    //
-    using FossilizedType = FossilizedStructVal;
+    struct FossilizedType
+    {};
 };
 
 //
@@ -137,7 +135,7 @@ struct FossilizedTypeTraits<MatrixCoord>
     // for fossilized data, so we declare it here as a custom
     // `struct`.
     //
-    struct FossilizedType : FossilizedTupleVal
+    struct FossilizedType
     {
         // The contents of a fossilized struct will typically
         // just be the fossilized representation of each of
@@ -2074,7 +2072,7 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
     TESS_TRACE("Fossil::SerialReader reader");
     Fossil::SerialReader reader(
         _readContext,
-        *contentValPtr,
+        contentValPtr,
         Fossil::SerialReader::InitialStateType::PseudoPtr);
     ASTSerializer serializer(&reader, this);
 
@@ -2084,7 +2082,7 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
     return decl;
 }
 
-static void _dump(FossilizedValPtr valPtr, int depth = 0)
+static void _dump(FossilizedAnyValPtr valPtr, int depth = 0)
 {
     for (auto i = 0; i < depth; ++i)
         fprintf(stderr, "  ");
@@ -2114,7 +2112,37 @@ static void _dump(FossilizedValPtr valPtr, int depth = 0)
     }
 }
 
+// Hello, Future Tess -
+//
+// The assertions here are obviously incorrect, given how the C++
+// standard defines standard-layout types and the cases where the
+// empty base class optimization takes place. The central problem
+// is that you've made it so that *everything* inherits from
+// `FossilizedVal`, which means that the first field in anything
+// you've defined will be a `FossilizedVal`, within a type that
+// inherits from `FossilizedVal`, and the letter of the C++ spec
+// is that the empty base class optimization is not mandated in
+// that case (and a pedantic view of things would be that it's
+// a problem that the address of the `FossilizedVal` sub-object
+// for an aggregate is the same as the `FossilizedVal` sub-object
+// for its first field.
+//
+// The fix is going to be getting rid of the inheritance-based
+// approach, and either using template traits to look up the
+// corresponding layout type, or clean up the whole approach
+// to dynamic references to values, since it all feels kind
+// of gross anyway...
+//
+// Note: no, Tess, you cannot just make user-defined things
+// inherit from something like `FossilizedRecordVal` either,
+// because that won't work if a record's first field is
+// itself a record...
+//
+
 static_assert(sizeof(Fossilized_ASTModuleInfo) == 12);
+static_assert(offsetof(Fossilized_ASTModuleInfo, moduleDecl) == 0);
+static_assert(offsetof(Fossilized_ASTModuleInfo, declsToRegister) == 4);
+static_assert(offsetof(Fossilized_ASTModuleInfo, mapMangledNameToDecl) == 8);
 
 ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
@@ -2129,12 +2157,12 @@ ModuleDecl* readSerializedModuleAST(
 
     auto dataChunk = as<RIFF::DataChunk>(chunk);
 
-    auto rootVal = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
-    _dump(rootVal);
+    auto rootValPtr = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    _dump(rootValPtr);
 
-    TESS_TRACE("rootVal: %p", rootVal.get());
-    auto fossilizedModuleInfo = cast<Fossilized<ASTModuleInfo>>(rootVal);
-    TESS_TRACE("fossilizedModuleInfo: %p", fossilizedModuleInfo.get());
+    TESS_TRACE("rootVal: %p", rootValPtr.get());
+    auto fossilizedModuleInfoPtr = cast<Fossilized<ASTModuleInfo>>(rootValPtr);
+    TESS_TRACE("fossilizedModuleInfo: %p", fossilizedModuleInfoPtr.get());
 
 
     auto sharedDecodingContext = RefPtr(new ASTSerialReadContext(
@@ -2143,7 +2171,7 @@ ModuleDecl* readSerializedModuleAST(
         sink,
         sourceLocReader,
         requestingSourceLoc,
-        fossilizedModuleInfo,
+        fossilizedModuleInfoPtr,
         blobHoldingSerializedData));
 
     // TODO: we want to be careful and not deserialize everything here.
@@ -2171,7 +2199,7 @@ ModuleDecl* readSerializedModuleAST(
     // written (we are assuming the format written matches what was compiled
     // into this binary).
     //
-    Fossilized<ASTModuleInfo>* rawFossilizedModuleInfo = fossilizedModuleInfo;
+    Fossilized<ASTModuleInfo>* rawFossilizedModuleInfo = fossilizedModuleInfoPtr;
     TESS_TRACE("rawFossilizedModuleInfo: %p", rawFossilizedModuleInfo);
     TESS_TRACE("rawFossilizedModuleInfo->moduleDecl: %p", rawFossilizedModuleInfo->moduleDecl.get());
     TESS_TRACE("rawFossilizedModuleInfo->declsToRegister.getBuffer(): %p", rawFossilizedModuleInfo->declsToRegister.getBuffer());

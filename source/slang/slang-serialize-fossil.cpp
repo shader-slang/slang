@@ -56,7 +56,7 @@ void SerialWriter::_initialize(ChunkBuilder* chunk)
     // that the last field of the header is a relative pointer
     // to the root-value chunk.
     //
-    headerChunk->writeRelativePtr<Fossil::RelativePtrOffset>(rootValueChunk);
+    headerChunk->writeRelativePtr<FossilInt>(rootValueChunk);
 
     // The root value should always be a variant, and we want to
     // set up to write into it in a reasonable way.
@@ -378,8 +378,8 @@ SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
         return new (_arena) ContainerLayoutObj(
             kind,
             nullptr,
-            sizeof(Fossil::RelativePtrOffset),
-            sizeof(Fossil::RelativePtrOffset));
+            sizeof(FossilInt),
+            sizeof(FossilInt));
 
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
@@ -557,7 +557,7 @@ Size SerialWriter::ValInfo::getAlignment() const
     switch (kind)
     {
     case Kind::RelativePtr:
-        return sizeof(Fossil::RelativePtrOffset);
+        return sizeof(FossilInt);
 
     case Kind::ContentsOfChunk:
         return chunk->getAlignment();
@@ -727,7 +727,7 @@ void SerialWriter::_writeValueRaw(ValInfo const& val)
 
     case ValInfo::Kind::RelativePtr:
         _ensureChunkExists();
-        _state.chunk->writeRelativePtr<Fossil::RelativePtrOffset>(val.chunk);
+        _state.chunk->writeRelativePtr<FossilInt>(val.chunk);
         break;
 
     case ValInfo::Kind::ContentsOfChunk:
@@ -910,7 +910,7 @@ void SerialWriter::_flush()
     for (auto variantInfo : _variants)
     {
         auto layoutChunk = _getOrCreateChunkForLayout(variantInfo.layout);
-        variantInfo.chunk->addPrefixRelativePtr<Fossil::RelativePtrOffset>(layoutChunk);
+        variantInfo.chunk->addPrefixRelativePtr<FossilInt>(layoutChunk);
     }
 }
 
@@ -958,7 +958,7 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
             auto containerLayout = (ContainerLayoutObj*)layout;
             auto elementLayout = containerLayout->baseLayout;
             auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
-            chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
+            chunk->writeRelativePtr<FossilInt>(elementLayoutChunk);
         }
         break;
 
@@ -968,7 +968,7 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
             auto containerLayout = (ContainerLayoutObj*)layout;
             auto elementLayout = containerLayout->baseLayout;
             auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
-            chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
+            chunk->writeRelativePtr<FossilInt>(elementLayoutChunk);
 
             UInt32 elementStride = 0;
             if (elementLayout)
@@ -993,7 +993,7 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
             {
                 auto& field = recordLayout->fields[i];
                 auto fieldLayoutChunk = _getOrCreateChunkForLayout(field.layout);
-                chunk->writeRelativePtr<Fossil::RelativePtrOffset>(fieldLayoutChunk);
+                chunk->writeRelativePtr<FossilInt>(fieldLayoutChunk);
 
                 auto fieldOffset = UInt32(field.offset);
                 chunk->writeData(&fieldOffset, sizeof(fieldOffset));
@@ -1143,7 +1143,7 @@ void SerialWriter::LayoutObjKey::hashInto(Hasher& hasher) const
 
 SerialReader::SerialReader(
     ReadContext& context,
-    FossilizedValRef valRef,
+    FossilizedAnyValPtr valPtr,
     InitialStateType initialState)
     : _context(context)
 {
@@ -1164,7 +1164,7 @@ SerialReader::SerialReader(
         break;
     }
 
-    _state.baseValPtr = DynPtr(valRef);
+    _state.baseValPtr = valPtr;
     _state.elementIndex = 0;
     _state.elementCount = 1;
 }
@@ -1211,7 +1211,7 @@ SerialReader::~SerialReader()
     _context._readerCount--;
 }
 
-FossilizedValPtr SerialReader::readValPtr()
+FossilizedAnyValPtr SerialReader::readValPtr()
 {
     return _readValPtr();
 }
@@ -1362,7 +1362,7 @@ void SerialReader::beginVariant()
     if (auto variantPtr = as<FossilizedVariantObj>(valPtr))
     {
         TESS_TRACE("auto contentValPtr = getVariantContentPtr(variantPtr.get());");
-        auto contentValPtr = getVariantContentPtr(variantPtr.get());
+        auto contentValPtr = getVariantContentPtr(variantPtr);
         valPtr = contentValPtr;
     }
 
@@ -1412,7 +1412,7 @@ void SerialReader::endTuple()
 void SerialReader::beginOptional()
 {
     auto valPtr = _readIndirectValPtr();
-    auto optionalPtr = as<FossilizedOptionalObj<FossilizedVal>>(valPtr);
+    auto optionalPtr = as<FossilizedOptionalObjBase>(valPtr);
 
     _pushState();
 
@@ -1429,7 +1429,7 @@ void SerialReader::endOptional()
 
 void SerialReader::handleSharedPtr(void*& value, Callback callback, void* context)
 {
-    FossilizedValPtr targetValPtr;
+    FossilizedAnyValPtr targetValPtr;
 
     if (_state.type == State::Type::PseudoPtr)
     {
@@ -1439,8 +1439,8 @@ void SerialReader::handleSharedPtr(void*& value, Callback callback, void* contex
     else
     {
         auto valPtr = _readValPtr();
-        auto ptrPtr = as<FossilizedPtr<FossilizedVal>>(valPtr);
-        targetValPtr = *ptrPtr;
+        auto ptrPtr = as<FossilizedPtr<void>>(valPtr);
+        targetValPtr = ptrPtr->getTargetValPtr();
     }
 
     // The logic here largely mirrors what appears in
@@ -1615,7 +1615,7 @@ void SerialReader::_flush()
     }
 }
 
-FossilizedValPtr SerialReader::_readValPtr()
+FossilizedAnyValPtr SerialReader::_readValPtr()
 {
     TESS_TRACE("SerialReader::_readValPtr");
     switch (_state.type)
@@ -1634,7 +1634,7 @@ FossilizedValPtr SerialReader::_readValPtr()
             auto index = _state.elementIndex++;
 
             auto recordPtr = as<FossilizedRecordVal>(_state.baseValPtr);
-            return FossilizedValPtr(recordPtr->getField(index));
+            return getAddress(recordPtr->getField(index));
         }
 
     case State::Type::Optional:
@@ -1642,8 +1642,8 @@ FossilizedValPtr SerialReader::_readValPtr()
             SLANG_ASSERT(_state.elementCount == 1);
             SLANG_ASSERT(_state.elementIndex == 0);
 
-            auto optionalPtr = as<FossilizedOptionalObj<FossilizedVal>>(_state.baseValPtr);
-            return FossilizedValPtr(optionalPtr->getValue());
+            auto optionalPtr = as<FossilizedOptionalObjBase>(_state.baseValPtr);
+            return getAddress(optionalPtr->getValue());
         }
 
     case State::Type::Array:
@@ -1653,7 +1653,7 @@ FossilizedValPtr SerialReader::_readValPtr()
             auto index = _state.elementIndex++;
 
             auto containerPtr = as<FossilizedContainerObjBase>(_state.baseValPtr);
-            return FossilizedValPtr(containerPtr->getElement(index));
+            return DynPtr(containerPtr->getElement(index));
         }
 
     default:
@@ -1662,27 +1662,27 @@ FossilizedValPtr SerialReader::_readValPtr()
     }
 }
 
-FossilizedValPtr SerialReader::_readIndirectValPtr()
+FossilizedAnyValPtr SerialReader::_readIndirectValPtr()
 {
     auto baseValPtr = _readValPtr();
-    auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr);
+    auto basePtrPtr = as<FossilizedPtr<void>>(baseValPtr);
 
-    auto targetValRef = basePtrPtr->getTarget();
-    return FossilizedValPtr(targetValRef);
+    auto targetValPtr = basePtrPtr->getTargetValPtr();
+    return targetValPtr;
 }
 
 
-FossilizedValPtr SerialReader::_readPotentiallyIndirectValPtr()
+FossilizedAnyValPtr SerialReader::_readPotentiallyIndirectValPtr()
 {
     TESS_TRACE("SerialReader::_readPotentiallyIndirectValPtr");
     auto baseValPtr = _readValPtr();
     TESS_TRACE("if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))");
-    if (auto basePtrPtr = as<FossilizedPtr<FossilizedVal>>(baseValPtr))
+    if (auto basePtrPtr = as<FossilizedPtr<void>>(baseValPtr))
     {
     TESS_TRACE("auto targetValRef = basePtrPtr->getTarget()");
-        auto targetValRef = basePtrPtr->getTarget();
+        auto targetValRef = basePtrPtr->getTargetValRef();
     TESS_TRACE("FossilizedValPtr(targetValRef)");
-        return FossilizedValPtr(targetValRef);
+        return DynPtr(targetValRef);
     }
     TESS_TRACE("return baseValPtr");
     return baseValPtr;
