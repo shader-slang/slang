@@ -7594,7 +7594,9 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
                        .as<ExtensionDecl>();
     auto targetType = getTargetType(m_astBuilder, declRef);
 
-    for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+    // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
+    auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
+    for (auto inheritanceDecl : inheritanceDecls)
     {
         checkConformance(targetType, inheritanceDecl, decl);
     }
@@ -7645,7 +7647,7 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // just with `abstract` methods that replicate things?
         // (That's what C# does).
 
-        // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
+        // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
         auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
         for (auto inheritanceDecl : inheritanceDecls)
         {
@@ -7858,7 +7860,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         {
             getSink()->diagnose(
                 inheritanceDecl,
-                Diagnostics::baseOfStructMustBeStructOrInterface,
+                Diagnostics::baseOfStructMustBeInterface,
                 decl,
                 baseType);
             continue;
@@ -7870,6 +7872,26 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         }
         else if (auto baseStructDeclRef = baseDeclRef.as<StructDecl>())
         {
+            if (!isFromCoreModule(decl))
+            {
+                // In Slang 2026, we no longer allow structs to inherit from other structs.
+                if (isSlang2026OrLater(this))
+                {
+                    getSink()->diagnose(
+                        inheritanceDecl,
+                        Diagnostics::baseOfStructMustBeInterface,
+                        decl,
+                        baseType);
+                }
+                else
+                {
+                    // For legacy langauge versions, we still allow struct inheritance to avoid
+                    // breaking existing code, but we will emit a warning to inform the user
+                    // that this feature is unstable and may be removed in the future.
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::inheritanceUnstable);
+                }
+            }
+
             // To simplify the task of reading and maintaining code,
             // we require that when a `struct` inherits from another
             // `struct`, the base `struct` is the first item in
@@ -7892,7 +7914,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         {
             getSink()->diagnose(
                 inheritanceDecl,
-                Diagnostics::baseOfStructMustBeStructOrInterface,
+                Diagnostics::baseOfStructMustBeInterface,
                 decl,
                 baseType);
             continue;

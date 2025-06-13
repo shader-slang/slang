@@ -1,3 +1,4 @@
+#pragma warning(disable:30816)
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj

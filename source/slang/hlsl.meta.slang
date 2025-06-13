@@ -533,6 +533,7 @@ interface ITexelElement
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    [OverloadRank(-1)]
     __init(Element x);
 }
 
@@ -20661,7 +20662,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -20686,7 +20687,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -20717,7 +20718,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsSphereHit()
     {
         __target_switch
@@ -20739,7 +20740,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsLssHit()
     {
         __target_switch

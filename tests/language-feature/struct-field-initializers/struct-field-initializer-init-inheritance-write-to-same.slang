@@ -3,6 +3,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain
 
+#pragma warning(disable:30816)
+
+
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 

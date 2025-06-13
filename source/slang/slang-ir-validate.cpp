@@ -273,14 +273,19 @@ void validateIRInstOperands(IRValidateContext* context, IRInst* inst)
 }
 
 static thread_local bool _enableIRValidationAtInsert = false;
-void disableIRValidationAtInsert()
+
+// RAII class implementation for exception-safe IR validation state management
+IRValidationScope::IRValidationScope(bool enableValidation)
+    : m_previousState(_enableIRValidationAtInsert)
 {
-    _enableIRValidationAtInsert = false;
+    _enableIRValidationAtInsert = enableValidation;
 }
-void enableIRValidationAtInsert()
+
+IRValidationScope::~IRValidationScope()
 {
-    _enableIRValidationAtInsert = true;
+    _enableIRValidationAtInsert = m_previousState;
 }
+
 void validateIRInstOperands(IRInst* inst)
 {
     if (!_enableIRValidationAtInsert)
