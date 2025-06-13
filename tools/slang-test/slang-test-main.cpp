@@ -1979,16 +1979,26 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             &initParams,
             JSONValue::makeInt(0))))
     {
+        context->destroyLanguageServer();
         return TestResult::Fail;
     }
-    if (SLANG_FAILED(connection->waitForResult(-1)))
+
+    if (SLANG_FAILED(connection->waitForResult(context->connectionTimeOutInMs)))
     {
+        context->destroyLanguageServer();
+        return TestResult::Fail;
+    }
+
+    if (!connection->hasMessage())
+    {
+        context->destroyLanguageServer();
         return TestResult::Fail;
     }
 
     LanguageServerProtocol::InitializeResult initResult;
     if (SLANG_FAILED(connection->getMessage(&initResult)))
     {
+        context->destroyLanguageServer();
         return TestResult::Fail;
     }
 
@@ -1997,6 +2007,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
     if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
     {
+        context->destroyLanguageServer();
         return TestResult::Fail;
     }
 
