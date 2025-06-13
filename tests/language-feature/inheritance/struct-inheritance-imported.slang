@@ -1,6 +1,6 @@
 //TEST_IGNORE_FILE:
 // struct-inheritance-imported.slang
-
+#pragma warning(disable:30816)
 public struct Base
 {
     public int a;

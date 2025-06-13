@@ -450,14 +450,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 // then we need to add the extension itself as a facet.
                 //
                 auto extDeclRef =
-                    createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, extensionDecl);
-                auto selfExtFacet = new (arena) Facet::Impl(
+                    createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, extensionDecl)
+                        .as<ExtensionDecl>();
+                auto extInheritanceInfo = getInheritanceInfo(extDeclRef, circularityInfo);
+                addDirectBaseFacet(
                     Facet::Kind::Extension,
-                    Facet::Directness::Direct,
-                    extDeclRef,
                     selfType,
-                    astBuilder->getTypeEqualityWitness(selfType));
-                allFacets.add(selfExtFacet);
+                    selfIsSelf,
+                    extDeclRef,
+                    extInheritanceInfo);
             }
         }
 

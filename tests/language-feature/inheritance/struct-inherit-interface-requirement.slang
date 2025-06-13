@@ -5,6 +5,7 @@
 
 // Test that a `struct` type can use an inherited
 // member to satisfy an interface requirement.
+#pragma warning(disable:30816)
 
 interface ITweak
 {

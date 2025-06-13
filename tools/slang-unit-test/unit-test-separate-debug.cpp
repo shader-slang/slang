@@ -106,8 +106,13 @@ SLANG_UNIT_TEST(separateDebug)
     ComPtr<slang::IMetadata> metadata;
     const char* debugBuildIdentifier = nullptr;
 
+    // IComponentType2 is a separate interface from IComponentType, so we need
+    // to query for it, and then use it to get the results.
     ComPtr<slang::ICompileResult> compileResult;
-    auto result = linkedProgram->getEntryPointCompileResult(
+    ComPtr<slang::IComponentType2> linkedProgram2;
+    SLANG_CHECK(
+        linkedProgram->queryInterface(SLANG_IID_PPV_ARGS(linkedProgram2.writeRef())) == SLANG_OK);
+    auto result = linkedProgram2->getEntryPointCompileResult(
         0,
         0,
         compileResult.writeRef(),

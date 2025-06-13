@@ -533,6 +533,7 @@ interface ITexelElement
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    [OverloadRank(-1)]
     __init(Element x);
 }
 

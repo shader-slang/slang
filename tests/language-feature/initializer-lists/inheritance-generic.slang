@@ -1,6 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
 
+#pragma warning(disable:30816)
+
+
 struct Base<let ND:int>
 {
     int a = 1;

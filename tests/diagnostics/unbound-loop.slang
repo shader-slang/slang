@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -entry computeMain -target hlsl -profile cs_6_5
+//TEST:SIMPLE(filecheck=CHECK): -entry computeMain -target hlsl -profile cs_6_5
 
 
 RWStructuredBuffer<float> outputBuffer;
