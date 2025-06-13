@@ -249,7 +249,7 @@ public:
     /// Construct a null pointer.
     ///
     DynPtr() {}
-    DynPtr(nullptr_t) {}
+    DynPtr(std::nullptr_t) {}
 
     /// Construct a pointer to the given `data`, assuming it has the given `layout`.
     ///
