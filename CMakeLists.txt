@@ -66,6 +66,13 @@ auto_option(
     CUDAToolkit
     "Enable CUDA tests using CUDA found in CUDA_PATH"
 )
+# Check if SLANG_ENABLE_OPTIX was explicitly set by user before auto_option
+set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED FALSE)
+get_property(_SLANG_ENABLE_OPTIX_CACHE_TYPE CACHE SLANG_ENABLE_OPTIX PROPERTY TYPE)
+if(DEFINED SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_OPTIX STREQUAL "AUTO" AND _SLANG_ENABLE_OPTIX_CACHE_TYPE STREQUAL "BOOL")
+    set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED TRUE)
+endif()
+
 auto_option(
     SLANG_ENABLE_OPTIX
     OptiX
@@ -350,11 +357,18 @@ if(NOT SLANG_EMBED_CORE_MODULE AND NOT SLANG_EMBED_CORE_MODULE_SOURCE)
 endif()
 
 if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
-    message(
-        STATUS
-        "OptiX is not supported without CUDA. Automatically disabling SLANG_ENABLE_OPTIX."
-    )
-    set(SLANG_ENABLE_OPTIX OFF)
+    if(_SLANG_ENABLE_OPTIX_USER_SPECIFIED)
+        message(
+            SEND_ERROR
+            "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
+        )
+    else()
+        message(
+            STATUS
+            "OptiX is not supported without CUDA. Automatically disabling SLANG_ENABLE_OPTIX."
+        )
+        set(SLANG_ENABLE_OPTIX OFF)
+    endif()
 endif()
 
 if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
