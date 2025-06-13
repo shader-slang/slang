@@ -5319,6 +5319,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     }
     if (guid == IModulePrecompileService_Experimental::getTypeGuid())
         return static_cast<slang::IModulePrecompileService_Experimental*>(this);
+    if (guid == IComponentType2::getTypeGuid())
+        return static_cast<slang::IComponentType2*>(this);
     return nullptr;
 }
 
@@ -5565,33 +5567,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
-    SlangInt entryPointIndex,
-    Int targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    auto linkage = getLinkage();
-    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
-        return SLANG_E_INVALID_ARG;
-    auto target = linkage->targets[targetIndex];
-
-    auto targetProgram = getTargetProgram(target);
-
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
-    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-    if (artifact == nullptr)
-        return SLANG_E_NOT_AVAILABLE;
-
-    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
-    (*outCompileResult)->addRef();
-    return SLANG_OK;
-}
-
 RefPtr<ComponentType> ComponentType::specialize(
     SpecializationArg const* inSpecializationArgs,
     SlangInt specializationArgCount,
@@ -5731,6 +5706,47 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
         static_cast<ComponentType*>(linked)->getOptionSet().load(count, entries);
     }
 
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
     return SLANG_OK;
 }
 
@@ -5924,20 +5940,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
         return SLANG_E_NOT_AVAILABLE;
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
-    return SLANG_OK;
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
-    Int targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
-    if (artifact == nullptr)
-        return SLANG_E_NOT_AVAILABLE;
-
-    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
-    //(*outCompileResult)->addRef(); // TODO: Needed if using a ComPtr.
     return SLANG_OK;
 }
 
