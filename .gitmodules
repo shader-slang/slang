@@ -44,3 +44,6 @@
 [submodule "external/lua"]
 	path = external/lua
 	url = https://github.com/lua/lua.git
+[submodule "external/optix-dev"]
+	path = external/optix-dev
+	url = https://github.com/NVIDIA/optix-dev.git

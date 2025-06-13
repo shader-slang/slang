@@ -451,6 +451,22 @@ static SlangResult _compileProgramImpl(
         specializedEntryPoints.add(specializedEntryPoint);
     }
 
+    // If no explicit entry points were provided, check if the module has any
+    // defined entry points (e.g., functions marked with [shader(...)] attributes)
+    if (explicitEntryPointCount == 0 && !options.dontAddDefaultEntryPoints)
+    {
+        SlangInt32 definedEntryPointCount = module->getDefinedEntryPointCount();
+        for (SlangInt32 ee = 0; ee < definedEntryPointCount; ++ee)
+        {
+            ComPtr<slang::IEntryPoint> entryPoint;
+            SLANG_RETURN_ON_FAIL(module->getDefinedEntryPoint(ee, entryPoint.writeRef()));
+
+            // For now, we'll assume no specialization is needed for discovered entry points
+            // If specialization is needed, this would need to be updated
+            specializedEntryPoints.add(entryPoint);
+        }
+    }
+
     if (input.passThrough == SLANG_PASS_THROUGH_NONE)
     {
         componentsRawPtr.add(specializedModule);
