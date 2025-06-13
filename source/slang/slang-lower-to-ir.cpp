@@ -7710,6 +7710,27 @@ void assignExpr(
     }
 }
 
+bool isSignedType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_FloatType:
+    case kIROp_DoubleType:
+        return true;
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return true;
+    case kIROp_VectorType:
+        return isSignedType(as<IRVectorType>(type)->getElementType());
+    case kIROp_MatrixType:
+        return isSignedType(as<IRMatrixType>(type)->getElementType());
+    default:
+        return false;
+    }
+};
+
 void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo const& inRight)
 {
     LoweredValInfo left = inLeft;
@@ -7823,6 +7844,14 @@ top:
                     // we simply form a pointer to each of the vector
                     // elements and write to them individually.
                     IRInst* irRightVal = getSimpleVal(context, right);
+
+                    // If there is a mismatch between the signedness of the left and rigth values
+                    // then emit a cast
+                    if (isSignedType(swizzleInfo->type) != isSignedType(irRightVal->getDataType()))
+                    {
+                        irRightVal = builder->emitCast(swizzleInfo->type, irRightVal);
+                    }
+
                     swizzledStore(
                         loweredBase.val,
                         irRightVal,
