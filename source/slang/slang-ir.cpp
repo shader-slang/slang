@@ -3424,7 +3424,10 @@ IRInst* IRBuilder::emitDebugVar(
 {
     if (argIndex)
     {
-        IRInst* args[] = {source, line, col, argIndex};
+        // Note +1 logic for argIndex is to follow the convention that
+        // 1-based index of the argument is used by GLSLANG/DXC NSDI.
+        IRInst* newArgIndex = getIntValue(getUIntType(), getIntVal(argIndex) + 1);
+        IRInst* args[] = {source, line, col, newArgIndex};
         return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
     }
     else
