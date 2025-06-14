@@ -1051,21 +1051,19 @@ SlangResult NVRTCDownstreamCompiler::compile(
         SemanticVersion version(3);
 
         // Newer releases of NVRTC only support newer CUDA architectures.
-        if (m_desc.version.m_major >= 12)
+        if (m_desc.version.m_major > 12 ||
+            (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
             // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
             // The exact warning message is:
             //   nvrtc 12.8: nvrtc: warning : Architectures prior to '<compute/sm>_75' are
             //   deprecated and may be removed in a future release
-            if (m_desc.version.m_minor >= 8)
-            {
-                version = SemanticVersion(7, 5);
-            }
-            else
-            {
-                // NVRTC 12.0 supports `compute_50` and up
-                version = SemanticVersion(5, 0);
-            }
+            version = SemanticVersion(7, 5);
+        }
+        else if (m_desc.version.m_major == 12)
+        {
+            // NVRTC 12.0 supports `compute_50` and up
+            version = SemanticVersion(5, 0);
         }
         else if (m_desc.version.m_major == 11)
         {
