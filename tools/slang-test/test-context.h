@@ -137,6 +137,8 @@ public:
     Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
     void destroyRPCConnection();
 
+    void destroyLanguageServer();
+
     /// Ctor
     TestContext();
     /// Dtor

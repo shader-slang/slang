@@ -231,6 +231,15 @@ SlangResult TestContext::createLanguageServerJSONRPCConnection(RefPtr<JSONRPCCon
     return SLANG_OK;
 }
 
+void TestContext::destroyLanguageServer()
+{
+    if (m_languageServerConnection)
+    {
+        m_languageServerConnection->disconnect();
+        m_languageServerConnection.setNull();
+    }
+}
+
 void TestContext::destroyRPCConnection()
 {
     if (m_jsonRpcConnections[slangTestThreadIndex])
