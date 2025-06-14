@@ -5346,6 +5346,12 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             }
             return expr;
         }
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
 #if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
@@ -5401,12 +5407,33 @@ Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
             expr->type.type = thisTypeType;
             return expr;
         }
-
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
         scope = scope->parent;
     }
 
     getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
     return CreateErrorExpr(expr);
+}
+
+Expr* SemanticsExprVisitor::visitThisInterfaceExpr(ThisInterfaceExpr* expr)
+{
+    auto scope = expr->scope;
+
+    auto containerDecl = findParentInterfaceDecl(scope->containerDecl);
+
+    // ThisInterfaceExpr can only be synthesized by the compiler during parsing
+    // an interface decl with default implementation, so container must always
+    // be an interface decl.
+    SLANG_ASSERT(containerDecl);
+    expr->declRef =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, getDefaultDeclRef(containerDecl));
+    expr->type = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, expr->declRef));
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
