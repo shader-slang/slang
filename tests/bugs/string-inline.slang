@@ -13,9 +13,15 @@ interface IPrintable
     int getHash();
 };
 
+__generic<int N>
+extension StringLiteral<N> : IPrintable
+{
+	int getHash() { return getStringHash<N>(this); }
+}
+
 extension String : IPrintable
 {
-    int getHash() { return getStringHash(this); }
+	int getHash() { return getStringHash(this); }
 }
 
 int getHash(IPrintable p) { return p.getHash(); }
@@ -25,9 +31,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x;
 
-    int hash = getHash("Hello World!");
-    
-	float inVal = float(tid) + hash;
+	String str = "Hello World! String";
+	int hash = getHash("Hello World! Literal");
+	int hash2 = getHash(str);
+	float inVal = float(tid) + (hash + hash2);
 
 	outputBuffer[tid] = inVal;
 }
