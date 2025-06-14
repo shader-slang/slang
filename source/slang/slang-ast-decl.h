@@ -879,6 +879,22 @@ class TypeCoercionConstraintDecl : public Decl
     FIDDLE() TypeExp toType;
 };
 
+enum class TypeRestrictionConstraint
+{
+    None = 0,
+    NonCopyable,
+};
+
+// A constraint that "restricts" type functionality
+FIDDLE()
+class TypeRestrictionConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() TypeExp type;
+    TypeRestrictionConstraint restriction;
+};
+
 FIDDLE()
 class GenericValueParamDecl : public VarDeclBase
 {

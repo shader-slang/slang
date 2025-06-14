@@ -1288,8 +1288,24 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
 }
 
-void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+void ASTPrinter::addWhereParams(const DeclRef<GenericDecl>& genericDeclRef)
 {
+    auto& sb = m_builder;
+    for (auto paramDeclRef : getMembers(m_astBuilder, genericDeclRef))
+    {
+        if (auto typeRestrictionConstraint = as<TypeRestrictionConstraintDecl>(paramDeclRef))
+        {
+            sb << " where noncopyable(" << typeRestrictionConstraint.getDecl()->type << ")";
+        }
+        else if (auto typeCoercionConstraint = as<TypeCoercionConstraintDecl>(paramDeclRef))
+        {
+            sb << " where " << typeCoercionConstraint.getDecl()->toType << "("
+               << typeCoercionConstraint.getDecl()->fromType << ")";
+        }
+    }
+}
+void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+    {
     auto& sb = m_builder;
 
     sb << "<";
@@ -1444,6 +1460,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         addDeclParams(
             m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner),
             outParamRange);
+
+        addWhereParams(genericDeclRef);
     }
     else
     {
