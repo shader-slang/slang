@@ -13,7 +13,8 @@ interface IThing
 
 struct MyThing: IThing
 {
-    int val = 0;
+    int val;
+
     [mutating]
     int thing(int index)
     {
@@ -25,7 +26,7 @@ struct MyThing: IThing
 
 struct NotMyThing
 {
-    int val = 1;
+    int val;
 }
 
 void f<T>(inout T t, int index) where optional T: IThing
@@ -44,8 +45,8 @@ void f<T>(inout T t, int index) where optional T: IThing
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    MyThing mt;
-    NotMyThing nt;
+    MyThing mt = MyThing(0);
+    NotMyThing nt = NotMyThing(1);
 
     // CHECK: 1
     // CHECK-NEXT: 2
