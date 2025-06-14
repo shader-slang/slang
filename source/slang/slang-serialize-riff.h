@@ -162,8 +162,8 @@ private:
         /// Callback that can be invoked to serialize the object's data.
         Callback callback;
 
-        /// User-data pointer for `callback`
-        void* userData;
+        /// Context pointer for `callback`
+        void* context;
     };
 
     /// The chunk where object definitions are listed.
@@ -237,10 +237,10 @@ private:
     virtual void beginOptional() override;
     virtual void endOptional() override;
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
         override;
 };
 
@@ -261,6 +261,19 @@ public:
     /// might be pending.
     ///
     ~RIFFSerialReader();
+
+    /// Read a chunk from the current cursor position.
+    ///
+    /// This operation can be used to skip over an entire value
+    /// that might otherwise need to be read with a sequence of
+    /// operations of the `ISerializerImpl` interface.
+    ///
+    /// The saved pointer can then be used to construct another
+    /// `RIFFSerialReader` to read the contents of the chunk
+    /// at some later time, or code can simply navigate the
+    /// chunk in memory using their own logic.
+    ///
+    RIFF::Chunk const* readChunk();
 
 private:
     /// Representation of a read cursor in the serialized RIFF data.
@@ -344,8 +357,8 @@ private:
         /// The callback to apply to read data into the `valuePtr`
         Callback callback;
 
-        /// The user-data pointer for the `callback`.
-        void* userData;
+        /// The context pointer for the `callback`.
+        void* context;
     };
 
     /// Deferred actions that are still pending.
@@ -427,10 +440,10 @@ private:
     virtual void beginOptional() override;
     virtual void endOptional() override;
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
         override;
 };
 

@@ -1,10 +1,12 @@
 // slang-ast-forward-declarations.h
 #pragma once
 
+#include "../core/slang-basic.h"
+
 namespace Slang
 {
 
-enum class ASTNodeType
+enum class ASTNodeType : Int32
 {
 #if 0 // FIDDLE TEMPLATE:
 %for _, T in ipairs(Slang.NodeBase.subclasses) do

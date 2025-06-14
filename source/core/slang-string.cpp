@@ -727,6 +727,22 @@ UnownedStringSlice UnownedStringSlice::subString(Index idx, Index len) const
     return UnownedStringSlice(m_begin + idx, m_begin + idx + len);
 }
 
+int compare(UnownedStringSlice const& lhs, UnownedStringSlice const& rhs)
+{
+    auto lhsSize = lhs.getLength();
+    auto rhsSize = rhs.getLength();
+
+    auto lhsData = lhs.begin();
+    auto rhsData = rhs.begin();
+
+    auto sharedPrefixSize = std::min(lhsSize, rhsSize);
+    int sharedPrefixCmp = memcmp(lhsData, rhsData, sharedPrefixSize);
+    if (sharedPrefixCmp != 0)
+        return sharedPrefixCmp;
+
+    return int(lhsSize - rhsSize);
+}
+
 bool UnownedStringSlice::operator==(ThisType const& other) const
 {
     // Note that memcmp is undefined when passed in null ptrs, so if we want to handle

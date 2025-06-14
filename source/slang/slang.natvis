@@ -667,4 +667,55 @@
         </Expand>
     </Type>
     <!--~UIntSet-->
+
+	<Type Name="Slang::FossilizedPtr&lt;*&gt;">
+		<SmartPointer Usage="Minimal">_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</SmartPointer>
+		<DisplayString Condition="_offset == 0">{($T1*)0}</DisplayString>
+		<DisplayString Condition="_offset != 0">{($T1*)((char*)this + _offset)}</DisplayString>
+		<Expand>
+			<ExpandedItem>_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</ExpandedItem>
+		</Expand>
+	</Type>
+
+
+	<Type Name="Slang::FossilizedString">
+		<DisplayString Condition="_obj._offset == 0">""</DisplayString>
+		<DisplayString Condition="_obj._offset != 0">{((char*)this + _obj._offset),s8}</DisplayString>
+		<!--
+	<Expand>
+		<ExpandedItem>(_text._offset == 0 ? "" : ((char*)this + _text._offset)),s8</ExpandedItem>
+	</Expand>
+	-->
+	</Type>
+
+	<Type Name="Slang::FossilizedArray&lt;*&gt;">
+		<DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
+		<DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
+		<Expand>
+			<Item Name="[count]">*((UInt32*)this - 1)</Item>
+			<ArrayItems>
+				<Size>*((UInt32*)this - 1)</Size>
+				<ValuePointer>($T1*)((char*)this + _obj._offset)</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="Slang::FossilizedDictionary&lt;*,*&gt;">
+		<DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
+		<DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
+		<Expand>
+			<Item Name="[count]">*((UInt32*)this - 1)</Item>
+			<ArrayItems>
+				<Size>*((UInt32*)this - 1)</Size>
+				<!--
+			<ValuePointer>($T1*)((char*)this + _elements._offset)</ValuePointer>
+			-->
+				<ValuePointer>(Slang::KeyValuePair&lt;$T1,$T2&gt; *) ((char*)this + _obj._offset)</ValuePointer>
+				<!--
+			<ValuePointer>(Slang::KeyValuePair&lt;$T1,$T2&gt;*)((char*)this + _elements._offset)</ValuePointer>
+			-->
+			</ArrayItems>
+		</Expand>
+	</Type>
+
 </AutoVisualizer>
