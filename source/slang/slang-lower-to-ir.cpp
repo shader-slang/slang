@@ -1495,6 +1495,15 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     else if (const auto varDecl = as<VarDeclBase>(requirementDecl))
     {
     }
+    else if (as<AccessorDecl>(requirementDecl))
+    {
+    }
+    else if (as<InterfaceDefaultImplDecl>(requirementDecl))
+    {
+        // A default impl stub function represents a concrete function, not
+        // a requirement.
+        return false;
+    }
     else if (const auto genericDecl = as<GenericDecl>(requirementDecl))
     {
         return shouldDeclBeTreatedAsInterfaceRequirement(genericDecl->inner);
@@ -1511,17 +1520,17 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 
 IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
+    // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
+    // Other types of decls are allowed but not regarded as a requirement.
+    if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+        return nullptr;
+
     // TODO: this special case logic can be removed if we also clean up
     // `doesGenericSignatureMatchRequirement` Currently `doesGenericSignatureMatchRequirement` will
     // use the inner func decl as the key in AST WitnessTable. Therefore we need to match this
     // behavior by always using the inner decl as the requirement key.
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
-
-    // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
-    // Other types of decls are allowed but not regarded as a requirement.
-    if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
-        return nullptr;
 
     IRStructKey* requirementKey = nullptr;
     if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
@@ -3046,6 +3055,14 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
         return thisType;
     }
 
+    if (auto defaultImplDeclRef = parentDeclRef.as<InterfaceDefaultImplDecl>())
+    {
+        auto thisType = DeclRefType::create(
+            context->astBuilder,
+            DeclRef<Decl>(defaultImplDeclRef.getDecl()->thisTypeDecl));
+        return thisType;
+    }
+
     return nullptr;
 }
 
@@ -3257,6 +3274,10 @@ void collectParameterLists(
     ParameterListCollectMode mode,
     ParameterDirection thisParamDirection)
 {
+    // Don't collect any parameters beyond certain decls.
+    if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
+        return;
+
     // The parameters introduced by any "parent" declarations
     // will need to come first, so we'll deal with that
     // logic here.
@@ -9221,28 +9242,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->getDirectMemberDecls())
         {
+            auto innerRequirementDecl = requirementDecl;
+            if (as<InterfaceDefaultImplDecl>(requirementDecl))
+                continue;
             if (as<GenericDecl>(requirementDecl))
-                requirementDecl = getInner(requirementDecl);
+                innerRequirementDecl = getInner(requirementDecl);
 
-            if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
+            if (as<SubscriptDecl>(innerRequirementDecl) || as<PropertyDecl>(innerRequirementDecl))
             {
-                for (auto accessorDecl :
-                     as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
+                for (auto accessorDecl : as<ContainerDecl>(innerRequirementDecl)
+                                             ->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
                     SLANG_UNUSED(accessorDecl);
                     operandCount++;
                 }
             }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
-            {
                 continue;
-            }
 
             operandCount++;
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
             // into requirement keys for this interface.
-            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
+            if (auto associatedTypeDecl = as<AssocTypeDecl>(innerRequirementDecl))
             {
                 operandCount +=
                     associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
@@ -9374,6 +9396,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
             {
+                if (as<InterfaceDefaultImplDecl>(requirementDecl))
+                    continue;
                 if (auto genericDecl = as<GenericDecl>(requirementDecl))
                 {
                     // We need to form a declref into the inner decls in case of a generic
@@ -11361,33 +11385,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericDecl(GenericDecl* genDecl)
     {
-        // TODO: Should this just always visit/lower the inner decl?
-
-        if (auto innerFuncDecl = as<FunctionDeclBase>(genDecl->inner))
-            return ensureDecl(context, innerFuncDecl);
-        else if (auto innerStructDecl = as<StructDecl>(genDecl->inner))
-        {
-            ensureDecl(context, innerStructDecl);
-            return LoweredValInfo();
-        }
-        else if (auto extensionDecl = as<ExtensionDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, extensionDecl);
-        }
-        else if (auto interfaceDecl = as<InterfaceDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, interfaceDecl);
-        }
-        else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, typedefDecl);
-        }
-        else if (auto subscriptDecl = as<SubscriptDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, subscriptDecl);
-        }
-        SLANG_RELEASE_ASSERT(false);
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return ensureDecl(context, genDecl->inner);
     }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
