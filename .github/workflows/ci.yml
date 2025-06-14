@@ -225,7 +225,7 @@ jobs:
             "$bin_dir/slang-test" \
               -use-test-server \
               -server-count ${{ matrix.server-count }} \
-              -category ${{ matrix.test-category }} \
+              -category full \
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
@@ -233,7 +233,7 @@ jobs:
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
-              -category ${{ matrix.test-category }} \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -243,7 +243,7 @@ jobs:
           else
             "$bin_dir/slang-test" \
               -use-test-server \
-              -category ${{ matrix.test-category }} \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -258,8 +258,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -273,8 +273,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -288,8 +288,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -303,8 +303,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -318,8 +318,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -333,8 +333,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -348,8 +348,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -363,8 +363,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -378,8 +378,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -393,8 +393,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -408,8 +408,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -423,8 +423,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -438,8 +438,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -453,8 +453,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -468,8 +468,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -483,8 +483,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -498,8 +498,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -513,8 +513,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -528,8 +528,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -543,8 +543,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -558,8 +558,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -573,8 +573,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -588,8 +588,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -603,8 +603,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -618,8 +618,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -633,8 +633,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -648,8 +648,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -663,8 +663,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -678,8 +678,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -693,8 +693,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -708,8 +708,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -723,8 +723,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -738,8 +738,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -753,8 +753,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -768,8 +768,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -783,8 +783,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -798,8 +798,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -813,8 +813,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -828,8 +828,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -843,8 +843,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -858,8 +858,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -873,8 +873,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -888,8 +888,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -903,8 +903,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -918,8 +918,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -933,8 +933,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -948,8 +948,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -963,8 +963,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -978,8 +978,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -993,8 +993,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1008,8 +1008,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1023,8 +1023,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1038,8 +1038,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1053,8 +1053,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1068,8 +1068,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1083,8 +1083,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1098,8 +1098,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1113,8 +1113,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1128,8 +1128,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1143,8 +1143,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1158,8 +1158,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1173,8 +1173,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1188,8 +1188,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1203,8 +1203,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1218,8 +1218,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1233,8 +1233,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1248,8 +1248,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1263,8 +1263,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1278,8 +1278,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1293,8 +1293,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1308,8 +1308,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1323,8 +1323,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1338,8 +1338,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1353,8 +1353,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1368,8 +1368,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1383,8 +1383,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1398,8 +1398,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1413,8 +1413,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1428,8 +1428,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1443,8 +1443,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1458,8 +1458,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1473,8 +1473,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1488,8 +1488,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1503,8 +1503,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1518,8 +1518,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1533,8 +1533,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1548,8 +1548,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1563,8 +1563,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1578,8 +1578,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1593,8 +1593,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1608,8 +1608,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1623,8 +1623,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1638,8 +1638,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1653,8 +1653,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1668,8 +1668,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1683,8 +1683,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1698,8 +1698,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1713,8 +1713,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1728,8 +1728,8 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 2 \
-              -category ${{ matrix.test-category }} \
+              -server-count 8 \
+              -category full \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
@@ -1757,7 +1757,7 @@ jobs:
           "$bin_dir/slang-test" \
             -use-test-server \
             -server-count ${{ matrix.server-count }} \
-            -category ${{ matrix.test-category }} \
+            -category full \
             -emit-spirv-via-glsl \
             -api vk \
             -expected-failure-list tests/expected-failure.txt \
