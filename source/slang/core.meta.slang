@@ -1720,6 +1720,57 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 }
 
 //@public:
+__generic<T, let N:int>
+__magic_type(ArrayExpressionType)
+struct Array : IRWArray<T>
+{
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
+}
+
+//@public:
+__generic<int N>
+__magic_type(StringLiteralExpressionType)
+__intrinsic_type($(kIROp_StringLiteralType))
+struct StringLiteral : IArray<uint>
+{
+    __intrinsic_op($(kIROp_GetStringLiteralLength))
+    [__unsafeForceInlineEarly]
+    int getCount();
+
+    property uint length
+    {
+        [__unsafeForceInlineEarly] get { return (uint)getCount(); }
+    }
+
+    __intrinsic_op($(kIROp_GetStringLiteralAsArray))
+    [__unsafeForceInlineEarly]
+    Array<uint, N> getArray();
+
+    [__unsafeForceInlineEarly]
+    uint _getElementFromArray(uint i)
+    {
+        return getArray()[i];
+    }
+
+    __intrinsic_op($(kIROp_GetElement))
+    [__unsafeForceInlineEarly]
+    [require(cpp)]
+    uint _getElementFromNative(uint i);
+
+    __subscript(uint i) -> uint
+    {
+        [__unsafeForceInlineEarly] get {
+            uint res;
+            __target_switch
+            {
+                case cpp: res = _getElementFromNative(i);
+                default: res = _getElementFromArray(i);
+            }
+            return res;
+         }
+    }
+};
 
 /// Represents a string.
 /// This type can only be used on the CPU target.
@@ -1755,6 +1806,11 @@ struct String
     __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_MakeString))
     __init(NativeString value);
+
+    [__unsafeForceInlineEarly]
+    __implicit_conversion($(kConversionCost_None))
+    __intrinsic_op($(kIROp_MakeString))
+    __init<int N>(StringLiteral<N> value);
 
     /// Returns the length of the string.
     [require(cpp)]
@@ -1880,14 +1936,6 @@ extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
-}
-
-__generic<T, let N:int>
-__magic_type(ArrayExpressionType)
-struct Array : IRWArray<T>
-{
-    __intrinsic_op($(kIROp_GetArrayLength))
-    int getCount();
 }
 
 /// @category math_types Math types
@@ -3015,6 +3063,11 @@ void unmodified(out T){}
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_GetStringHash))
+int getStringHash<int N>(StringLiteral<N> string);
+
+[__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
 int getStringHash(String string);
 

@@ -642,6 +642,13 @@ class StringTypeBase : public BuiltinType
     FIDDLE(...)
 };
 
+FIDDLE()
+class StringLiteralExpressionType : public StringTypeBase
+{
+    FIDDLE(...)
+    IntVal* getLength();
+};
+
 // The regular built-in `String` type
 FIDDLE()
 class StringType : public StringTypeBase

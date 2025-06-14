@@ -40,6 +40,7 @@ local insts = {
 			{
 				StringTypeBase = {
 					hoistable = true,
+					{ ShortString = { struct_name = "ShortString", min_operands = 1 } },
 					{ String = { struct_name = "StringType" } },
 					{ NativeString = { struct_name = "NativeStringType" } },
 				},
@@ -1895,6 +1896,7 @@ local insts = {
 	{ alignOf = { min_operands = 1 } },
 	{ countOf = { min_operands = 1 } },
 	{ GetArrayLength = { min_operands = 1 } },
+	{ GetShortStringAsArray = { min_operands = 1} },
 	{ IsType = { min_operands = 3 } },
 	{ TypeEquals = { min_operands = 2 } },
 	{ IsInt = { min_operands = 1 } },
