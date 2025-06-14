@@ -1,2 +1,0 @@
-type: float
-6.0

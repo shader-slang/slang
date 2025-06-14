@@ -1,4 +1,0 @@
-﻿void main()
-{
-}
-//TEST:SIMPLE:
