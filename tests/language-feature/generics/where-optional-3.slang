@@ -17,7 +17,6 @@ struct Container<K, V>
 {
     K k[2];
     V v[2];
-    int val = 0;
 
     [mutating]
     void erase(int index)
@@ -50,7 +49,7 @@ struct LightEntry
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     { // Neither is IReleaseable
-        Container<LightEntry, LightEntry> c;
+        var c = Container<LightEntry, LightEntry>();
         c.k[0] = LightEntry(1);
         c.k[1] = LightEntry(2);
         c.v[0] = LightEntry(3);
@@ -59,7 +58,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         c.erase(1);
     }
     { // K is IReleaseable
-        Container<HeavyEntry, LightEntry> c;
+        var c = Container<HeavyEntry, LightEntry>();
         c.k[0] = HeavyEntry(0,1);
         c.k[1] = HeavyEntry(1,2);
         c.v[0] = LightEntry(3);
@@ -70,7 +69,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         c.erase(1);
     }
     { // V is IReleaseable
-        Container<LightEntry, HeavyEntry> c;
+        var c = Container<LightEntry, HeavyEntry>();
         c.k[0] = LightEntry(1);
         c.k[1] = LightEntry(2);
         c.v[0] = HeavyEntry(2,3);
@@ -81,7 +80,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         c.erase(1);
     }
     { // K and V are IReleaseable
-        Container<HeavyEntry, HeavyEntry> c;
+        var c = Container<HeavyEntry, HeavyEntry>();
         c.k[0] = HeavyEntry(4,5);
         c.k[1] = HeavyEntry(6,7);
         c.v[0] = HeavyEntry(5,6);
