@@ -204,6 +204,7 @@ jobs:
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
+            echo "Printing CUDA version: ..." && nvcc --version
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
