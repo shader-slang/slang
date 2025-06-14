@@ -2353,6 +2353,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
+DIAGNOSTIC(41008, Warning, potentialInfiniteLoop, "loop might execute indefinitely")
 DIAGNOSTIC(
     41009,
     Error,
