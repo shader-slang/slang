@@ -71,15 +71,17 @@ struct EmptyArrayLoweringContext
             [&](IRGetElementPtr* gep)
             {
                 const auto base = gep->getBase();
-                return hasEmptyArrayPtrType(base) || base->getOp() == kIROp_undefined
+                return hasEmptyArrayPtrType(gep) || hasEmptyArrayPtrType(base) ||
+                               base->getOp() == kIROp_undefined
                            ? builder.emitUndefined(gep->getDataType())
                            : nullptr;
             },
             [&](IRFieldAddress* gep)
             {
                 const auto base = gep->getBase();
-                return base->getOp() == kIROp_undefined ? builder.emitUndefined(gep->getDataType())
-                                                        : nullptr;
+                return hasEmptyArrayPtrType(gep) || base->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(gep->getDataType())
+                           : nullptr;
             },
             [&](IRLoad* load)
             {
