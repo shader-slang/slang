@@ -998,6 +998,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         {
             newArgs.add(subTypeWitness);
         }
+        else if (constraintDecl->hasModifier<OptionalConstraintModifier>())
+        {
+            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
+        }
         else
         {
             if (context.mode != OverloadResolveContext::Mode::JustTrying)

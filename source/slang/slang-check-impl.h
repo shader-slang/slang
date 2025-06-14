@@ -1372,6 +1372,12 @@ public:
         SourceLoc loc,
         bool& outDiagnosed);
 
+    LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
+    LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
+        const LookupResult& lookupResult,
+        SourceLoc loc,
+        bool& outDiagnosed);
+
     Val* resolveVal(Val* val)
     {
         if (!val)
@@ -2640,6 +2646,7 @@ public:
     struct ValUnificationContext
     {
         Index indexInTypePack = 0;
+        bool optionalConstraint = false;
     };
 
     // Try to find a unification for two values

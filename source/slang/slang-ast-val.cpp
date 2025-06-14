@@ -896,6 +896,18 @@ Val* TypeCoercionWitness::_resolveImplOverride()
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NoneWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void NoneWitness::_toTextOverride(StringBuilder& out)
+{
+    out.append("none");
+}
+
+Val* NoneWitness::_resolveImplOverride()
+{
+    return this;
+}
+
 // UNormModifierVal
 
 void UNormModifierVal::_toTextOverride(StringBuilder& out)
