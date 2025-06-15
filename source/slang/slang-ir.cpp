@@ -811,9 +811,20 @@ void fixUpFuncType(IRFunc* func, IRType* resultType)
     builder.setInsertBefore(func);
 
     List<IRType*> paramTypes;
-    for (auto param : func->getParams())
+    if (func->isDefinition())
     {
-        paramTypes.add(param->getFullType());
+        for (auto param : func->getParams())
+        {
+            paramTypes.add(param->getFullType());
+        }
+    }
+    else
+    {
+        auto funcType = as<IRFuncType>(func->getFullType());
+        for (auto paramType : funcType->getParamTypes())
+        {
+            paramTypes.add(paramType);
+        }
     }
 
     auto funcType = builder.getFuncType(paramTypes, resultType);
