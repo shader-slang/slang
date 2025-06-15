@@ -100,17 +100,7 @@ slang_add_target(
 # generated lookup tables
 #
 
-if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${slang_SOURCE_DIR}/external/spirv-headers/include"
-        )
-    else()
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers/include"
-        )
-    endif()
-endif()
+get_target_property(SLANG_SPIRV_HEADERS_INCLUDE_DIR SPIRV-Headers::SPIRV-Headers INTERFACE_INCLUDE_DIRECTORIES)
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"
@@ -164,7 +154,7 @@ slang_add_target(
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    LINK_WITH_PRIVATE core SPIRV-Headers
+    LINK_WITH_PRIVATE core SPIRV-Headers::SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
 )
@@ -226,7 +216,7 @@ set(slang_link_args
     slang-capability-lookup
     slang-fiddle-output
     slang-lookup-tables
-    SPIRV-Headers
+    SPIRV-Headers::SPIRV-Headers
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args

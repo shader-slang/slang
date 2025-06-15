@@ -977,6 +977,35 @@ static void _lookUpInScopes(
                     nullptr);
             }
 
+            if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+            {
+                // If we are checking an interface default method implementation,
+                // we should look up members from implicit `this` whose type is the explicit `This`
+                // generic parameter, and skip looking up in the interface decl itself.
+
+                // Instead of looking up in the interface decl itself, we should
+                // look up in the `This` type instead.
+                if (getText(name) != "This")
+                {
+                    BreadcrumbInfo breadcrumb;
+                    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
+                    breadcrumb.thisParameterMode = thisParameterMode;
+                    breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
+                    breadcrumb.prev = nullptr;
+                    Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
+                    _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
+                }
+
+                // We need to skip looking up in the interface decl itself, since we are
+                // looking up in the implicit `this` type.
+                for (; scope && !as<InterfaceDecl>(scope->containerDecl); scope = scope->parent)
+                {
+                    // We need to skip looking up in the interface decl itself, since we are
+                    // looking up in the implicit `this` type.
+                }
+                break;
+            }
+
             // Before we proceed up to the next outer scope to perform lookup
             // again, we need to consider what the current scope tells us
             // about how to interpret uses of implicit `this` or `This`. For
