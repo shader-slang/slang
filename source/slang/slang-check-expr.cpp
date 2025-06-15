@@ -1023,6 +1023,54 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
     return result;
 }
 
+bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
+{
+    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
+    if (!declaredWitness)
+        return false;
+
+    auto decl = declaredWitness->getDeclRef().getDecl();
+    if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
+        return false;
+
+    // Okay, we've found an optional subtype witness. This result needs
+    // to be removed if we're not inside a block that directly checks
+    // if (sub is sup)
+    auto sub = witness->getSub();
+    auto sup = witness->getSup();
+
+    for (auto outerStmtInfo = m_outerStmts;
+         outerStmtInfo;
+         outerStmtInfo = outerStmtInfo->next)
+    {
+        auto outerStmt = outerStmtInfo->stmt;
+        auto ifStmt = as<IfStmt>(outerStmt);
+
+        if (!ifStmt)
+            continue;
+
+        IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
+        if (!isType)
+            continue;
+        VarExpr* var = as<VarExpr>(isType->value);
+        if (!var)
+            continue;
+        TypeType* typeType = as<TypeType>(var->type);
+
+        // var->type works for `variable is Interface`, while
+        // typeType->getType() is for `T is Interface`.
+        auto type = typeType ? typeType->getType() : var->type.type;
+        if (type == sub && isType->typeExpr.type == sup)
+        {
+            return false;
+        }
+    }
+
+    // If we got this far, it's both an optional witness and there's no
+    // statement checking its validity.
+    return true;
+}
+
 LookupResult SemanticsVisitor::filterLookupResultByCheckedOptional(const LookupResult& lookupResult)
 {
     LookupResult filteredResult;
@@ -1032,50 +1080,15 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptional(const LookupR
 
         for (auto bb = item.breadcrumbs; bb; bb = bb->next)
         {
-            auto subtypeWitness = as<DeclaredSubtypeWitness>(bb->val);
-            if (!subtypeWitness)
+            auto witness = as<SubtypeWitness>(bb->val);
+            if (!witness)
                 continue;
 
-            auto decl = subtypeWitness->getDeclRef().getDecl();
-            if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
-                continue;
-
-            // Okay, we've found an optional subtype witness. This result needs
-            // to be removed if we're not inside a block that directly checks
-            // if (sub is sup)
-            auto sub = subtypeWitness->getSub();
-            auto sup = subtypeWitness->getSup();
-
-            bool foundCheck = false;
-            for (auto outerStmtInfo = m_outerStmts;
-                 outerStmtInfo;
-                 outerStmtInfo = outerStmtInfo->next)
+            if (isWitnessUncheckedOptional(witness))
             {
-                auto outerStmt = outerStmtInfo->stmt;
-                auto ifStmt = as<IfStmt>(outerStmt);
-
-                if (!ifStmt)
-                    continue;
-
-                IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
-                if (!isType)
-                    continue;
-                VarExpr* var = as<VarExpr>(isType->value);
-                if (!var)
-                    continue;
-                TypeType* typeType = as<TypeType>(var->type);
-
-                // var->type works for `variable is Interface`, while
-                // typeType->getType() is for `T is Interface`.
-                auto type = typeType ? typeType->getType() : var->type.type;
-                if (type == sub || isType->typeExpr.type == sup)
-                {
-                    foundCheck = true;
-                    break;
-                }
-            }
-            if (!foundCheck)
                 optionalConstraintsChecked = false;
+                break;
+            }
         }
 
         if (optionalConstraintsChecked)

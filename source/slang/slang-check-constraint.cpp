@@ -701,13 +701,16 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 subTypeWitness = nullptr;
         }
 
-        if (subTypeWitness)
+        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
         {
             // We found a witness, so it will become an (implicit) argument.
             args.add(subTypeWitness);
             outBaseCost += subTypeWitness->getOverloadResolutionCost();
         }
-        else if (constraintDecl->hasModifier<OptionalConstraintModifier>())
+        else if (!subTypeWitness && constraintIsOptional)
         {
             // Optional witness failed to resolve; not an error.
             auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();

@@ -1372,6 +1372,7 @@ public:
         SourceLoc loc,
         bool& outDiagnosed);
 
+    bool isWitnessUncheckedOptional(SubtypeWitness* witness);
     LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
     LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
         const LookupResult& lookupResult,
