@@ -83,6 +83,9 @@ struct LanguageServerStartupOptions
     // Are we working with Visual Studio client?
     bool isVisualStudio = false;
 
+    // A flag to control periodic diagnostic update. Defaults to true.
+    bool periodicDiagnosticUpdate = true;
+
     SLANG_API void parse(int argc, const char* const* argv);
 };
 
