@@ -7710,27 +7710,6 @@ void assignExpr(
     }
 }
 
-bool isSignedType(IRType* type)
-{
-    switch (type->getOp())
-    {
-    case kIROp_FloatType:
-    case kIROp_DoubleType:
-        return true;
-    case kIROp_IntType:
-    case kIROp_Int16Type:
-    case kIROp_Int64Type:
-    case kIROp_Int8Type:
-        return true;
-    case kIROp_VectorType:
-        return isSignedType(as<IRVectorType>(type)->getElementType());
-    case kIROp_MatrixType:
-        return isSignedType(as<IRMatrixType>(type)->getElementType());
-    default:
-        return false;
-    }
-};
-
 void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo const& inRight)
 {
     LoweredValInfo left = inLeft;
