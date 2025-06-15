@@ -1589,6 +1589,32 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void legalizeSPIRVLinkageFunc(IRFunc* func)
+    {
+        // Check the HLSL export decoration and Downstream export decoration. We assume that the
+        // target is spirv if and only if the decoration has `HLSLExport` and not
+        // `DownstreamModuleExport`. If the function has `HLSLExport` and target is spirv, will emit
+        // decoration `SPIRVExport` and then add linkage decoration for this in SPIR-V binary.
+        auto hlslExportDecor = func->findDecoration<IRHLSLExportDecoration>();
+        auto downstreamExportDecor = func->findDecoration<IRDownstreamModuleExportDecoration>();
+        if (hlslExportDecor && !downstreamExportDecor)
+        {
+            IRBuilder builder(func);
+            builder.addDecoration(func, kIROp_SpirVExportDecoration);
+        }
+        // Check the User extern decoration and Downstream import decoration. We assume that the
+        // target is spirv if and only if the decoration has `UserExtern` and not
+        // `DownstreamModuleImport`. If the function has `UserExtern` and target is spirv, will emit
+        // decoration `SPIRVExtern` and then add linkage decoration for this in SPIR-V binary.
+        auto userExternDecor = func->findDecoration<IRUserExternDecoration>();
+        auto downstreamImportDecor = func->findDecoration<IRDownstreamModuleImportDecoration>();
+        if (userExternDecor && !downstreamImportDecor)
+        {
+            IRBuilder builder(func);
+            builder.addDecoration(func, kIROp_SpirVExternDecoration);
+        }
+    }
+
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
         auto stage = entryPointDecor->getProfile().getStage();
@@ -2265,6 +2291,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (auto func = as<IRFunc>(globalInst))
             {
+                legalizeSPIRVLinkageFunc(func);
                 if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
                 {
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
