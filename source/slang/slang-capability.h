@@ -141,6 +141,13 @@ public:
     /// Is this capability set incompatible with the given `other` atomic capability.
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
+    /// Is this capability set a super-set (only accounting for abstract atoms)
+    /// in regards to `other`?
+    /// Output a List of abstract atoms that are incompatible. 
+    bool isSuperSetOfAbstractAtoms(
+        CapabilitySet const& other,
+        List<CapabilityAtomSet>& missingAbstractAtoms) const;
+
     enum class ImpliesReturnFlags : int
     {
         NotImplied = 0,
@@ -186,7 +193,7 @@ public:
         CapabilitySet const& targetCaps,
         bool& isEqual) const;
 
-    /// Find any capability sets which are in 'available' but not in 'required'. Return false if
+    /// Identify capability sets which are in 'available' but not in 'required'. Return false if
     /// this situation occurs.
     static bool checkCapabilityRequirement(
         CapabilitySet const& available,
@@ -370,6 +377,7 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);
 
 const CapabilityAtomSet& getAtomSetOfTargets();
 const CapabilityAtomSet& getAtomSetOfStages();

@@ -1185,19 +1185,19 @@ alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
 alias cooperative_matrix = spvCooperativeMatrixKHR;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
-alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
+alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV+cooperative_matrix;
 /// Capabilities needed to convert cooperative matrices
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV+cooperative_matrix;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
-alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
+alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV+cooperative_matrix;
 /// Capabilities needed to load or store with tensor_addressing extension
 /// [Compound]
-alias cooperative_matrix_tensor_addressing = spvCooperativeMatrixTensorAddressingNV;
+alias cooperative_matrix_tensor_addressing = spvCooperativeMatrixTensorAddressingNV+cooperative_matrix;
 /// Capabilities needed to use decodeFunc with cooperative matrix load
 /// [Compound]
-alias cooperative_matrix_block_load = spvCooperativeMatrixBlockLoadsNV;
+alias cooperative_matrix_block_load = spvCooperativeMatrixBlockLoadsNV+cooperative_matrix;
 /// Capabilities needed to use tensor addressing
 /// [Compound]
 alias tensor_addressing = spvTensorAddressingNV;

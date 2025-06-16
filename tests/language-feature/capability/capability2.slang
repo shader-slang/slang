@@ -1,14 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
-// CHECK_IGNORE_CAPS-NOT: error 36104
+// CHECK_IGNORE_CAPS-NOT: error 36118
 module test;
 
-[require(spvAtomicFloat16AddEXT)]
 interface IFoo
 {
     [require(spvRayQueryKHR)]
+    [require(spvAtomicFloat16AddEXT)]
     void method1();
 
+    [require(spvAtomicFloat16AddEXT)]
     void method2();
 }
 
@@ -41,14 +42,14 @@ struct Impl1 : IFoo
 
 struct Impl2 : IFoo
 {
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36118: {{.*}}spvGroupNonUniformArithmetic
     void method1()
     {
         useRayQueryKHR(); // OK.
         useNonUniformArithmetic(); // error.
     }
 
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36118: {{.*}}spvGroupNonUniformArithmetic
     void method2()
     {
         useAtomicFloat16();

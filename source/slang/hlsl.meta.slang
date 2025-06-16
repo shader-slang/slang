@@ -65,12 +65,12 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
@@ -4941,6 +4941,7 @@ struct ConsumeStructuredBuffer
     }
 };
 
+[require(glsl_hlsl_spirv, domain_hull)]
 __intrinsic_op($(kIROp_GetElement))
 T __getElement<T, U, I>(U collection, I index);
 
@@ -5353,7 +5354,7 @@ ${{{{
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [require(atomic_glsl_hlsl_nvapi_cuda_metal_float1, structuredbuffer_rw)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -5394,7 +5395,7 @@ ${{{{
     /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl_spirv)]
+    [require(cuda_hlsl_spirv, structuredbuffer_rw)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
@@ -5496,7 +5497,7 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [require(atomic_glsl_hlsl_nvapi_cuda_metal_float1, structuredbuffer_rw)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
@@ -6111,6 +6112,7 @@ __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
+    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6122,6 +6124,7 @@ struct PointStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
+    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch
@@ -6141,6 +6144,7 @@ __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
+    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6152,6 +6156,7 @@ struct LineStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
+    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch
@@ -6171,6 +6176,7 @@ __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
+    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6182,6 +6188,7 @@ struct TriangleStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
+    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch
