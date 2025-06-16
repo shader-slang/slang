@@ -141,13 +141,6 @@ public:
     /// Is this capability set incompatible with the given `other` atomic capability.
     bool isIncompatibleWith(CapabilitySet const& other) const;
 
-    /// Is this capability set a super-set (only accounting for abstract atoms)
-    /// in regards to `other`?
-    /// Output a List of abstract atoms that are incompatible. 
-    bool isSuperSetOfAbstractAtoms(
-        CapabilitySet const& other,
-        List<CapabilityAtomSet>& missingAbstractAtoms) const;
-
     enum class ImpliesReturnFlags : int
     {
         NotImplied = 0,

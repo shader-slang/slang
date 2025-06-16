@@ -1129,6 +1129,16 @@ DIAGNOSTIC(
     "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to "
     "require inferred capabilities '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
+DIAGNOSTIC(
+    36104,
+    Error,
+    useOfUndeclaredCapabilityOfInterfaceRequirement,
+    "'$0' uses capability '$1' that is missing from the interface requirement.")
+DIAGNOSTIC(
+    36104,
+    Error,
+    useOfUndeclaredCapabilityOfInheritanceDecl,
+    "'$0' is not a subset of parent, uses additional undeclared capabilities '$1'.")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(
@@ -1178,16 +1188,6 @@ DIAGNOSTIC(
     Error,
     declHasDependenciesNotCompatibleOnStage,
     "'$0' uses features that are not available in '$1' stage.")
-DIAGNOSTIC(
-    36118,
-    Error,
-    useOfUndeclaredCapabilityOfInterfaceRequirement,
-    "'$0' uses capability '$1' that is missing from the interface requirement.")
-DIAGNOSTIC(
-    36119,
-    Error,
-    parentMustSupportAbstractAtomsChildUses,
-    "parent '$0' must implement all targets a member may support, parent is missing capabilities '$1'")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

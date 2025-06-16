@@ -482,41 +482,6 @@ bool CapabilitySet::isIncompatibleWith(CapabilitySet const& other) const
     return true;
 }
 
-bool CapabilitySet::isSuperSetOfAbstractAtoms(
-    CapabilitySet const& other,
-    List<CapabilityAtomSet>& missingAbstractAtoms) const
-{
-    // If empty we are a super set because we resolve empty capability sets to 
-    // "support all permutation of target+stage".
-    if (other.isEmpty() || isEmpty())
-        return true;
-
-    for (auto& otherSet : other.m_targetSets)
-    {
-        auto targetSet = this->m_targetSets.tryGetValue(otherSet.first);
-        if (!targetSet)
-        {
-            CapabilityAtomSet set;
-            set.add((UInt)otherSet.first);
-            missingAbstractAtoms.add(set);
-            continue;
-        }
-        for (auto& otherStageSet : otherSet.second.shaderStageSets)
-        {
-            auto stageSet = targetSet->shaderStageSets.tryGetValue(otherStageSet.first);
-            if (!stageSet)
-            {
-                CapabilityAtomSet set;
-                set.add((UInt)otherSet.first);
-                set.add((UInt)otherStageSet.first);
-                missingAbstractAtoms.add(set);
-            }
-            continue;
-        }
-    }
-    return missingAbstractAtoms.getCount() == 0;
-}
-
 const CapabilityAtomSet& getAtomSetOfTargets()
 {
     return kAnyTargetUIntSetBuffer;

@@ -65,12 +65,12 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, consumestructuredbuffer)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
@@ -4941,7 +4941,6 @@ struct ConsumeStructuredBuffer
     }
 };
 
-[require(glsl_hlsl_spirv, domain_hull)]
 __intrinsic_op($(kIROp_GetElement))
 T __getElement<T, U, I>(U collection, I index);
 
@@ -5017,6 +5016,7 @@ This type is supported natively when targeting HLSL.
 */
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
+[require(byteaddressbuffer_rw)]
 struct $(item.name)
 {
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
@@ -5025,7 +5025,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -5054,7 +5054,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint Load(int location)
     {
         __target_switch
@@ -5067,7 +5067,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint Load(int location, out uint status)
     {
         __target_switch
@@ -5093,7 +5093,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -5106,7 +5106,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5123,7 +5123,7 @@ struct $(item.name)
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -5136,7 +5136,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint2 Load2(uint location, out uint status)
     {
         __target_switch
@@ -5161,7 +5161,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -5174,7 +5174,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5191,7 +5191,7 @@ struct $(item.name)
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -5204,7 +5204,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint3 Load3(uint location, out uint status)
     {
         __target_switch
@@ -5228,7 +5228,7 @@ struct $(item.name)
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -5241,7 +5241,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5258,7 +5258,7 @@ struct $(item.name)
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -5271,7 +5271,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint4 Load4(uint location, out uint status)
     {
         __target_switch
@@ -5282,7 +5282,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
@@ -5290,7 +5290,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
@@ -5303,7 +5303,7 @@ struct $(item.name)
     ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -5354,7 +5354,7 @@ ${{{{
     __cuda_sm_version(2.0)
     [__requiresNVAPI]
     [ForceInline]
-    [require(atomic_glsl_hlsl_nvapi_cuda_metal_float1, structuredbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         __target_switch
@@ -5395,7 +5395,7 @@ ${{{{
     /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl_spirv, structuredbuffer_rw)]
+    [require(cuda_hlsl_spirv)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
@@ -5420,6 +5420,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
+    [require(sm_5_0)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5459,6 +5460,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
+    [require(sm_5_0)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5497,7 +5499,7 @@ ${{{{
     [__requiresNVAPI]
     [ForceInline]
     __cuda_sm_version(2.0)
-    [require(atomic_glsl_hlsl_nvapi_cuda_metal_float1, structuredbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         __target_switch
@@ -5735,7 +5737,7 @@ ${{{{
     /// @param value The operand of the atomic operation.
     /// @param original_value The original value at `dest` before the $(op.internalName) operation.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void Interlocked$(op.name)(
         UINT dest,
         UINT value,
@@ -5751,7 +5753,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void Interlocked$(op.name)(
         UINT dest,
         UINT value)
@@ -5778,7 +5780,7 @@ ${{{{
     /// translates to `InterlockedCompareExchange`.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
@@ -5803,7 +5805,7 @@ ${{{{
     /// translates to `InterlockedCompareStore`.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
@@ -5824,7 +5826,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store(uint address, uint value)
     {
         __target_switch
@@ -5841,7 +5843,7 @@ ${{{{
     ///@param value Two input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store2(uint address, uint2 value)
     {
         __target_switch
@@ -5854,7 +5856,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store2(uint address, uint2 value, uint alignment)
     {
         __target_switch
@@ -5870,7 +5872,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 8.
     ///@param value Two input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store2Aligned(uint address, uint2 value)
     {
         __target_switch
@@ -5886,7 +5888,7 @@ ${{{{
     ///@param value Three input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store3(uint address, uint3 value)
     {
         __target_switch
@@ -5898,7 +5900,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store3(uint address, uint3 value, uint alignment)
     {
         __target_switch
@@ -5914,7 +5916,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 12.
     ///@param value Three input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv)]
     void Store3Aligned(uint address, uint3 value)
     {
         __target_switch
@@ -5930,7 +5932,7 @@ ${{{{
     ///@param value Four input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv)]
     void Store4(uint address, uint4 value)
     {
         __target_switch
@@ -5943,7 +5945,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store4(uint address, uint4 value, uint alignment)
     {
         __target_switch
@@ -5959,7 +5961,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 16.
     ///@param value Four input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
@@ -6112,7 +6114,6 @@ __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
-    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6124,7 +6125,6 @@ struct PointStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
-    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch
@@ -6144,7 +6144,6 @@ __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
-    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6156,7 +6155,6 @@ struct LineStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
-    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch
@@ -6176,7 +6174,6 @@ __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
     [KnownBuiltin("GeometryStreamAppend")]
-    [require(glsl_hlsl_spirv, geometry)]
     void Append(T value)
     {
         __target_switch
@@ -6188,7 +6185,6 @@ struct TriangleStream
     }
 
     [KnownBuiltin("GeometryStreamRestart")]
-    [require(glsl_hlsl_spirv, geometry)]
     void RestartStrip()
     {
         __target_switch

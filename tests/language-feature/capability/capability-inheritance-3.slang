@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
 // Test that all children conform to parent capabilities
-// CHECK: error 36119
+// CHECK: error 36108
 
 [require(glsl)]
 interface IFoo2

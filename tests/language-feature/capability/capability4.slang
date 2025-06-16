@@ -5,11 +5,17 @@
 // Check that a non-static member method implictly requires capabilities
 // defined in ThisType.
 
-// CHECK: error 36119:{{.*}}glsl
+//CHECK: error 36108: {{.*}} 'glsl'.
+//CHECK: note: see using of 'Type'
 [require(hlsl)]
 struct Type
 {
     int member;
+    [require(glsl)]
+    [mutating]
+    void f()
+    {
+    }
 
     [require(glsl)]
     static void f1()

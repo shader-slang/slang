@@ -63,8 +63,7 @@ For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShad
 
 ## Requirements in Parent Scope
 
-The capability requirement of a decl is always merged with the requirements declared in its parents. If the decl declares requirements for additional compilation targets, they are added
-to the requirement set as a separate disjunction.
+The capability requirement of a member is always merged with the requirements declared in its parents. If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
 For example, given:
 ```csharp
 [require(glsl)]
@@ -79,7 +78,7 @@ struct MyType
 `MyType.method` will have requirement `glsl | hlsl + hlsl_nvapi | spirv`.
 
 The `[require]` attribute can also be used on module declarations, so that the requirement will
-apply to all decls within the module. For example:
+apply to all members within the module. For example:
 ```csharp
 [require(glsl)]
 [require(hlsl)]
@@ -91,6 +90,44 @@ public void myFunc()
 {
 }
 ```
+
+For inheritance/implementing-interfaces the story is a bit different.
+We require that any child has a subset of capabilities to the parent.
+
+For example:
+```csharp
+[require(glsl)]
+interface IFoo2
+{
+}
+[require(hlsl)]
+interface IFoo1
+{
+}
+[require(hlsl)]
+struct Foo1 : IFoo1, IFoo2
+{
+}
+```
+We error here since `IFoo2` is not a subset to `Foo1`. `IFoo2` includes `glsl` support while `Foo1` does not support `glsl`.
+
+
+```csharp
+[require(sm_4_0)]
+interface IFoo2
+{
+}
+[require(sm_5_0)]
+interface IFoo1
+{
+}
+// Good, IFoo2 and IFoo1 are subsets of Foo1
+[require(sm_6_0)]
+struct Foo1 : IFoo1, IFoo2
+{
+}
+```
+We do not error here since `IFoo2` and `IFoo1` are subsets to `Foo1`.
 
 ## Inference of Capability Requirements
 

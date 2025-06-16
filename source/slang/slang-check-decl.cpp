@@ -13672,15 +13672,46 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
 {
-    // Get capabilities from require/entry-point attribute
+    // Merge a decls's declared capability set with all parent declarations.
+    // For every existing target, we want to join their requirements together.
+    // If the the parent defines additional targets, we want to add them to the disjunction set.
+    // For example:
+    //    [require(glsl)]
+    //    struct Parent {
+    //        [require(glsl, glsl_ext_1)]
+    //        [require(spirv)]
+    //        void foo();
+    //    }
+    // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
+    //
     CapabilitySet declaredCaps;
     CapabilityAtom stageToJoin = CapabilityAtom::Invalid;
-    for (auto mod : decl->modifiers)
+    for (Decl* parent = decl; parent; parent = getParentDecl(parent))
     {
-        if (auto decoration = as<RequireCapabilityAttribute>(mod))
-            declaredCaps.unionWith(decoration->capabilitySet);
-        else if (auto entrypoint = as<EntryPointAttribute>(mod))
-            stageToJoin = entrypoint->capabilitySet.getTargetStage();
+        CapabilitySet localDeclaredCaps;
+        bool shouldBreak = false;
+        if (!as<AggTypeDeclBase>(parent) || parent->inferredCapabilityRequirements.isEmpty())
+        {
+            for (auto mod : parent->modifiers)
+            {
+                if (auto decoration = as<RequireCapabilityAttribute>(mod))
+                    localDeclaredCaps.unionWith(decoration->capabilitySet);
+                else if (auto entrypoint = as<EntryPointAttribute>(mod))
+                    stageToJoin = entrypoint->capabilitySet.getTargetStage();
+            }
+        }
+        else
+        {
+            localDeclaredCaps = parent->inferredCapabilityRequirements;
+            shouldBreak = true;
+        }
+        // Merge decl's capability declaration with the parent.
+        declaredCaps.nonDestructiveJoin(localDeclaredCaps);
+
+        // If the parent already has inferred capability requirements, we should stop now
+        // since that already covers transitive parents.
+        if (shouldBreak)
+            break;
     }
     if (!declaredCaps.isEmpty() && stageToJoin != CapabilityAtom::Invalid)
         declaredCaps.join(CapabilitySet((CapabilityName)stageToJoin));
@@ -13689,62 +13720,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
 
 void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
-    // Rules For Most Decls:
-    // 1. visit children so they fill in their capabilities.
-    // 2. if we do not have pre-set-capabilites (like through a `require`), end here.
-    // 3. if we have pre-set-capabilites (like through a `require`), fill in capabilites
-    //    of parent and check if children are not incompatable with the parent given these
-    //    rules:
-    //    * Parent can support more target+stage than the child
-    //      * Child Cannot have more target+stage than parent
-    //    * Parent can support less capabilities than child for shared target+stage
-    // 
-    // Example of what is allowed:
-    //
-    // namespace
-    // {
-    //     [require(glsl)] void foo(){} // allowed
-    //     [require(hlsl)] void bar(){} // allowed
-    // }
-    //
-    // [require(hlsl+sm_5_1)]
-    // namespace
-    // {
-    //     [require(metal)] void foo1(){} // error, parent does not support `metal`
-    //     [require(hlsl)] void foo2(){} // allowed
-    //     [require(sm_5_0)] void foo3(){} // allowed
-    // 
-    // }
-    //
-    // Justification for logic:
-    //     We do not force members of a container to be a complete-subset
-    // of the parent container. This is the case because we may have 1 member
-    // where we require 1 very specific capability. In this case we do not
-    // want the `struct` to require this 1 very specific capability since
-    // we may not need this method. The solution is to only care about the
-    // capability at the method use-site.
-
+    // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
+    // to ensure consistency (children get parent capabilities which are un-set through `getDeclaredCapabilitySet`).
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
-
-    for (auto m : decl->members)
-    {
-        ensureDecl(m, DeclCheckState::CapabilityChecked);
-     
-        List<CapabilityAtomSet> missingAbstractAtoms{};
-        if (!decl->inferredCapabilityRequirements.isSuperSetOfAbstractAtoms(
-                m->inferredCapabilityRequirements, missingAbstractAtoms))
-        {
-            for (const auto& i : missingAbstractAtoms)
-                maybeDiagnose(
-                    getSink(),
-                    getOptionSet(),
-                    DiagnosticCategory::Capability,
-                    m->loc,
-                    Diagnostics::parentMustSupportAbstractAtomsChildUses,
-                    decl,
-                    i);
-        }
-    }
 }
 
 void SemanticsDeclCapabilityVisitor::validateCapabilitiesOfDeclAfterVisitingChildren(Decl* decl)
@@ -13796,7 +13774,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     // visit the members & body of our funcDecl
     for (auto member : funcDecl->members)
     {
-        this->ensureDecl(member, DeclCheckState::CapabilityChecked);
+        ensureDecl(member, DeclCheckState::CapabilityChecked);
         _propagateRequirement(
             this,
             funcDecl->inferredCapabilityRequirements,
@@ -13824,13 +13802,31 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
 
+    // non-static function join's capabilities with parent
+    // to become a super-set of the parent.
+    if (!isEffectivelyStatic(funcDecl))
+    {
+        auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
+        if (parentAggTypeDecl)
+        {
+            ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
+            _propagateRequirement(
+                this,
+                funcDecl->inferredCapabilityRequirements,
+                funcDecl,
+                parentAggTypeDecl,
+                parentAggTypeDecl->inferredCapabilityRequirements,
+                funcDecl->loc);
+        }
+    }
+
     validateCapabilitiesOfDeclAfterVisitingChildren(funcDecl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
 {
-    // Propegate capabilities of inheritance `base` to parent
-    // using `InheritanceDecl` as an intermediate
+    // Propegate capabilities of inheritance `base` to
+    // `InheritanceDecl`
     visitReferencedDecls(
         *this,
         inheritanceDecl->base,
@@ -13851,11 +13847,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
     if (inheritanceDecl->witnessTable)
     {
-        auto witnessTable = inheritanceDecl->witnessTable;
-
-        // Ensure method implementations are a superset of capabilities to 
-        // the declaration
-        for (auto& kv : witnessTable->m_requirementDictionary)
+        for (auto& kv : inheritanceDecl->witnessTable->m_requirementDictionary)
         {
             if (kv.value.getFlavor() != RequirementWitness::Flavor::declRef)
                 continue;
@@ -13882,6 +13874,21 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                     failedAvailableCapabilityConjunction);
             }
         }
+    }
+
+    // validate that parent is a super set of inheritance
+    auto parent = inheritanceDecl->parentDecl;
+    ensureDecl(parent, DeclCheckState::CapabilityChecked);
+    CapabilityAtomSet failedAvailableCapabilityConjunction;
+    if (!CapabilitySet::checkCapabilityRequirement(
+            parent->inferredCapabilityRequirements,
+            inheritanceDecl->inferredCapabilityRequirements,
+            failedAvailableCapabilityConjunction))
+    {
+        diagnoseUndeclaredCapability(
+            inheritanceDecl,
+            Diagnostics::useOfUndeclaredCapabilityOfInheritanceDecl,
+            failedAvailableCapabilityConjunction);
     }
 }
 

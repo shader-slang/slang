@@ -3,7 +3,7 @@
 
 // Test that all children conform to parent capabilities
 // CHECK_IGNORE_CAPS-NOT: main
-// CHECK: error 36119
+// CHECK: error 36108
 
 [require(glsl)]
 interface IFoo2
