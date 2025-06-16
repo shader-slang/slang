@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile gs_5_0
+//TEST:COMPARE_HLSL: -profile hs_5_0
 
 struct VS_OUT { float3 p : POSITION; };
 
