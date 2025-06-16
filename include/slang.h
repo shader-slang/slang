@@ -737,6 +737,17 @@ typedef uint32_t SlangSizeT;
     };
 
     /*!
+    @brief Options to control floating-point denorm mode for a target.
+    */
+    typedef unsigned int SlangFpDenormModeIntegral;
+    enum SlangFpDenormMode : SlangFpDenormModeIntegral
+    {
+        SLANG_FP_DENORM_MODE_ANY = 0,
+        SLANG_FP_DENORM_MODE_PRESERVE,
+        SLANG_FP_DENORM_MODE_FTZ,
+    };
+
+    /*!
     @brief Options to control emission of `#line` directives
     */
     typedef unsigned int SlangLineDirectiveModeIntegral;
@@ -913,6 +924,7 @@ typedef uint32_t SlangSizeT;
         DisableDynamicDispatch,    // bool
         DisableSpecialization,     // bool
         FloatingPointMode,         // intValue0: FloatingPointMode
+        FpDenormMode,              // intValue0: FpDenormMode
         DebugInformation,          // intValue0: DebugInfoLevel
         LineDirectiveMode,
         Optimization, // intValue0: OptimizationLevel

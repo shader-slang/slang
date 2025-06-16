@@ -643,6 +643,28 @@ struct IRNumThreadsDecoration : IRDecoration
     IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
 };
 
+struct IRDenormPreserveDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DenormPreserveDecoration
+    };
+    IR_LEAF_ISA(DenormPreserveDecoration)
+
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+struct IRDenormFlushToZeroDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_DenormFlushToZeroDecoration
+    };
+    IR_LEAF_ISA(DenormFlushToZeroDecoration)
+
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRWaveSizeDecoration : IRDecoration
 {
     enum
@@ -4142,6 +4164,8 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
+    IRInst* addDenormPreserveDecoration(IRInst* inst, IRInst* width);
+    IRInst* addDenormFlushToZeroDecoration(IRInst* inst, IRInst* width);
     IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(

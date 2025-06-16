@@ -1740,6 +1740,22 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             SLANG_ASSERT(!"Unhandled floating point mode");
         }
 
+        switch (getTargetProgram()->getOptionSet().getEnumOption<FpDenormMode>(
+            CompilerOptionName::FpDenormMode))
+        {
+        case FpDenormMode::Any:
+            options.fpDenormMode = DownstreamCompileOptions::FpDenormMode::Any;
+            break;
+        case FpDenormMode::Preserve:
+            options.fpDenormMode = DownstreamCompileOptions::FpDenormMode::Preserve;
+            break;
+        case FpDenormMode::Ftz:
+            options.fpDenormMode = DownstreamCompileOptions::FpDenormMode::Ftz;
+            break;
+        default:
+            SLANG_ASSERT(!"Unhandled fp denorm mode");
+        }
+
         {
             // We need to look at the stage of the entry point(s) we are
             // being asked to compile, since this will determine the

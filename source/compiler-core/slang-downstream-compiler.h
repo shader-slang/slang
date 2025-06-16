@@ -197,6 +197,13 @@ struct DownstreamCompileOptions
         Precise,
     };
 
+    enum class FpDenormMode : uint8_t
+    {
+        Any,
+        Preserve,
+        Ftz,
+    };
+
     enum PipelineType : uint8_t
     {
         Unknown,
@@ -277,6 +284,9 @@ struct DownstreamCompileOptions
 
     // The debug info format to use.
     SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
+
+    // NOTE: New fields must be added at the end for versioning compatibility
+    FpDenormMode fpDenormMode = FpDenormMode::Any;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
@@ -482,6 +492,7 @@ struct DownstreamCompilerUtilBase
     typedef CompileOptions::DebugInfoType DebugInfoType;
 
     typedef CompileOptions::FloatingPointMode FloatingPointMode;
+    typedef CompileOptions::FpDenormMode FpDenormMode;
 
     typedef DownstreamProductFlag ProductFlag;
     typedef DownstreamProductFlags ProductFlags;

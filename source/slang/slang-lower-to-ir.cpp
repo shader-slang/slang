@@ -11218,6 +11218,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             derivativeGroupLinearDecor,
             numThreadsDecor);
 
+        // Add DenormPreserve and DenormFlushToZero decorations based on FpDenormMode option
+        auto linkage = context->getLinkage();
+        if (linkage->m_optionSet.hasOption(CompilerOptionName::FpDenormMode))
+        {
+            auto fpDenormMode = linkage->m_optionSet.getFpDenormMode();
+            if (fpDenormMode == FpDenormMode::Preserve)
+            {
+                auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
+                getBuilder()->addDenormPreserveDecoration(irFunc, width32);
+            }
+            else if (fpDenormMode == FpDenormMode::Ftz)
+            {
+                auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
+                getBuilder()->addDenormFlushToZeroDecoration(irFunc, width32);
+            }
+        }
+
         if (!isInline)
         {
             // If there are any constant expr rate parameters, we should inline this function.
