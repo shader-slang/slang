@@ -67,6 +67,21 @@ class InternalModifier : public VisibilityModifier
 };
 
 FIDDLE()
+class OverrideModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks that a decl is verified to be overriding another decl defined in a base type.
+FIDDLE()
+class IsOverridingModifier : public Modifier
+{
+    FIDDLE(...)
+
+    FIDDLE() Decl* overridedDecl;
+};
+
+FIDDLE()
 class RequireModifier : public Modifier
 {
     FIDDLE(...)

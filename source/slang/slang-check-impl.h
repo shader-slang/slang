@@ -1892,6 +1892,8 @@ public:
         DeclRef<CallableDecl> requirement,
         DeclRef<CallableDecl> method);
 
+    void markOverridingDecl(Decl* memberDecl, DeclRef<Decl> requiredMemberDeclRef);
+
     /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
     ///

@@ -5055,6 +5055,23 @@ HasInterfaceDefaultImplModifier* hasDefaultImpl(DeclRef<Decl> declRef)
     return nullptr;
 }
 
+void SemanticsVisitor::markOverridingDecl(Decl* memberDecl, DeclRef<Decl> requiredMemberDeclRef)
+{
+    if (hasDefaultImpl(requiredMemberDeclRef))
+    {
+        memberDecl = maybeGetInner(memberDecl);
+        // If the required member has a default implementation,
+        // we need to make sure the member we found is marked as 'override'.
+        if (!memberDecl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(memberDecl, Diagnostics::missingOverride);
+        }
+    }
+    auto overridingModifier = m_astBuilder->create<IsOverridingModifier>();
+    overridingModifier->overridedDecl = requiredMemberDeclRef.getDecl();
+    addModifier(memberDecl, overridingModifier);
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -5345,6 +5362,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         return false;
                     }
                 }
+
+                markOverridingDecl(callee.getDecl(), requiredMemberDeclRef);
             }
         }
     }
@@ -7232,6 +7251,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     QualifiedDeclPath(requiredMemberDeclRef));
                 return false;
             }
+            markOverridingDecl(member.declRef.getDecl(), requiredMemberDeclRef);
             return true;
         }
     }
@@ -7738,6 +7758,33 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // only the types that are affected by these interface decls.
         //
         astBuilder->incrementEpoch();
+
+        // For all members marked as `override`, we need to ensure they are actually
+        // overriding something.
+        for (auto member : decl->getMembers())
+        {
+            auto innerMember = maybeGetInner(member);
+            bool hasOverride = false;
+            bool isOverriding = false;
+            for (auto modifier : innerMember->modifiers)
+            {
+                if (as<OverrideModifier>(modifier))
+                {
+                    hasOverride = true;
+                }
+                else if (as<IsOverridingModifier>(modifier))
+                {
+                    isOverriding = true;
+                }
+            }
+            if (hasOverride && !isOverriding)
+            {
+                getSink()->diagnose(
+                    innerMember,
+                    Diagnostics::overrideModifierNotOverridingBaseDecl,
+                    innerMember);
+            }
+        }
     }
 }
 
