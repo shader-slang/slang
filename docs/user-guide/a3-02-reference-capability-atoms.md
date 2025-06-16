@@ -153,10 +153,10 @@ Versions
 > Represents HLSL NVAPI support.
 
 `hlsl_2018`
-> Represet HLSL compatibility support.
+> Represent HLSL compatibility support.
 
 `hlsl_coopvec_poc`
-> Represet compatibility support for the deprecated POC DXC
+> Represent compatibility support for the deprecated POC DXC
 
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
@@ -1273,6 +1273,11 @@ Compound Capabilities
 `raytracing_lss`
 > Collection of capabilities for linear swept spheres.
 
+`raytracing_lss_ho`
+> hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
+> capdef specifically for the hitobject variant.
+> Collection of capabilities for linear swept spheres.
+
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 
@@ -1321,6 +1326,9 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities which may be deprecated*
+
+`optix_coopvec`
+> Represents capabilities required for optix cooperative vector support.
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

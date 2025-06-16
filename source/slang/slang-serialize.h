@@ -859,7 +859,7 @@ void serialize(S const& serializer, Dictionary<K, V>& value)
         value.clear();
         while (hasElements(serializer))
         {
-            KeyValuePair<K, V> pair;
+            KeyValuePair<K, V> pair{K(), V()};
             serialize(serializer, pair);
             value.add(pair.key, pair.value);
         }
@@ -880,7 +880,7 @@ void serialize(S const& serializer, OrderedDictionary<K, V>& value)
         value.clear();
         while (hasElements(serializer))
         {
-            KeyValuePair<K, V> pair;
+            KeyValuePair<K, V> pair{K(), V()};
             serialize(serializer, pair);
             value.add(pair.key, pair.value);
         }

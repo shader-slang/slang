@@ -285,6 +285,7 @@ class ComponentTypeVisitor;
 ///
 class ComponentType : public RefObject,
                       public slang::IComponentType,
+                      public slang::IComponentType2,
                       public slang::IModulePrecompileService_Experimental
 {
 public:
@@ -359,6 +360,19 @@ public:
         slang::CompilerOptionEntry* entries,
         ISlangBlob** outDiagnostics) override;
 
+    //
+    // slang::IComponentType2 interface
+    //
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
     //
     // slang::IModulePrecompileService interface
@@ -974,6 +988,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -1251,6 +1286,27 @@ public:
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE
     {
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
     }
 
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -1579,6 +1635,27 @@ public:
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE
     {
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
     }
 
     /// Get a serialized representation of the checked module.
@@ -3356,6 +3433,10 @@ private:
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+    SlangResult _maybeWriteDebugArtifact(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest
