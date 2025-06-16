@@ -110,7 +110,8 @@ struct TextureData
     }
     void* addSlice(size_t elemCount)
     {
-        void* dst = ::malloc(m_formatSize * elemCount);
+        const size_t totalSize = m_formatSize * elemCount;
+        void* dst = ::malloc(totalSize);
         m_slices.add(Slice::make(dst, elemCount));
         return dst;
     }

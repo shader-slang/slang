@@ -142,9 +142,9 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     }
 
     // Metal doesn't support mip maps for 1D textures.
-    if (device->getDeviceType() == DeviceType::Metal &&
-        (textureDesc.type == TextureType::Texture1D ||
-         textureDesc.type == TextureType::Texture1DArray))
+    if ((isMS) || (device->getDeviceType() == DeviceType::Metal &&
+                   (textureDesc.type == TextureType::Texture1D ||
+                    textureDesc.type == TextureType::Texture1DArray)))
     {
         textureDesc.mipCount = 1;
     }
@@ -172,7 +172,16 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         }
     }
 
-    textureOut = device->createTexture(textureDesc, initSubresources.getBuffer());
+    if (isMS)
+    {
+        textureDesc.usage |= TextureUsage::RenderTarget;
+        textureOut = device->createTexture(textureDesc);
+        clearTexture(textureOut.get(), inputDesc.content, device);
+    }
+    else
+    {
+        textureOut = device->createTexture(textureDesc, initSubresources.getBuffer());
+    }
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
@@ -182,7 +191,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     size_t bufferSize,
     const void* initData,
     IDevice* device,
-    Slang::ComPtr<IBuffer>& bufferOut)
+    ComPtr<IBuffer>& bufferOut)
 {
     BufferDesc bufferDesc;
     bufferDesc.size = bufferSize;
@@ -199,6 +208,103 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     }
 
     bufferOut = bufferResource;
+    return SLANG_OK;
+}
+
+/* static */ Result ShaderRendererUtil::clearTexture(
+    ITexture* texture,
+    InputTextureContent content,
+    IDevice* device)
+{
+    SLANG_ASSERT(texture);
+    ComPtr<ICommandQueue> queue;
+    SLANG_RETURN_ON_FAIL(device->getQueue(QueueType::Graphics, queue.writeRef()));
+
+    ComPtr<ICommandEncoder> commandEncoder;
+    SLANG_RETURN_ON_FAIL(queue->createCommandEncoder(commandEncoder.writeRef()));
+
+    TextureDesc desc = texture->getDesc();
+    SubresourceRange range;
+    range.layer = 0;
+    range.layerCount = texture->getDesc().arrayLength;
+    range.mip = 0;
+    range.mipCount = texture->getDesc().mipCount;
+
+    FormatInfo formatInfo = getFormatInfo(desc.format);
+
+
+    switch (formatInfo.kind)
+    {
+    case FormatKind::Float:
+        {
+            float clearValue[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1.0f;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureFloat(texture, range, clearValue);
+            break;
+        }
+    case FormatKind::Integer:
+        {
+            uint32_t clearValue[4] = {0U, 0U, 0U, 0U};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1U;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureUint(texture, range, clearValue);
+            break;
+        }
+    case FormatKind::Normalized:
+        {
+            int32_t clearValue[4] = {0, 0, 0, 0};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureSint(texture, range, clearValue);
+            break;
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(queue->submit(commandEncoder->finish()));
+
     return SLANG_OK;
 }
 
