@@ -842,7 +842,15 @@ DIAGNOSTIC(
     isOperatorValueMustBeInterfaceType,
     "'is'/'as' operator requires an interface-typed expression.")
 
+DIAGNOSTIC(
+    30301,
+    Error,
+    isAsOperatorCannotUseInterfaceAsRHS,
+    "'is' and 'as' operators do not support interface types as the right-hand side. Use a concrete "
+    "type instead.")
+
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
+
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
@@ -1654,8 +1662,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30811,
     Error,
-    baseOfStructMustBeStructOrInterface,
-    "struct '$0' cannot inherit from type '$1' that is neither a struct nor an interface")
+    baseOfStructMustBeInterface,
+    "struct '$0' cannot inherit from non-interface type '$1'")
 DIAGNOSTIC(
     30812,
     Error,
@@ -1673,7 +1681,12 @@ DIAGNOSTIC(
     baseOfClassMustBeClassOrInterface,
     "class '$0' cannot inherit from type '$1' that is neither a class nor an interface")
 DIAGNOSTIC(30815, Error, circularityInExtension, "circular extension is not allowed.")
-
+DIAGNOSTIC(
+    30816,
+    Warning,
+    inheritanceUnstable,
+    "support for inheritance is unstable and will be removed in future language versions, consider "
+    "using composition instead.")
 DIAGNOSTIC(
     30820,
     Error,

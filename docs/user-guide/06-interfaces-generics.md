@@ -43,7 +43,20 @@ struct MyType : IFoo, IBar
     uint myMethod2(uint2 x) {...}
 }
 ```
+
 In this case, the definition of `MyType` must satisfy the requirements from both the `IFoo` and `IBar` interfaces by providing both the `myMethod` and `myMethod2` methods.
+
+Interface methods can have a default implementation, which will be used if a conforming type doesn't provide an overriding implementation. For example:
+
+```slang
+interface IFoo
+{
+    int getVal() { return 0; }
+}
+
+// OK, MyType.getVal() will use the default implementation provided in `IFoo`.
+struct MyType : IFoo {}
+```
 
 Generics
 ---------------------

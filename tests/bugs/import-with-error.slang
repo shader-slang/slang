@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE:
+//TEST:SIMPLE:
 
 // Confirm that we correctly issue a diagnostic when
 // we `import` a module that has some errors in it.
