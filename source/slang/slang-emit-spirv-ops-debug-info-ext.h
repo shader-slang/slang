@@ -681,4 +681,26 @@ SpvInst* emitOpDebugForwardRefsComposite(
         flags);
 }
 
+template<typename T>
+SpvInst* emitOpDebugBuildIdentifier(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* buildIdentifier,
+    IRInst* flags)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(105),
+        buildIdentifier,
+        flags);
+}
+
 #endif // SLANG_IN_SPIRV_EMIT_CONTEXT

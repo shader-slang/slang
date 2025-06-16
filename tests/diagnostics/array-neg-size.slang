@@ -10,4 +10,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     bar();
 }
 //CHECK: ([[# @LINE+1]]): error 30025
-func bar() -> int[0];
+func bar() -> int[-1];

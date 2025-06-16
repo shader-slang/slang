@@ -390,6 +390,13 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
                     diffTypeList.getBuffer());
         }
 
+    case kIROp_OptionalType:
+        {
+            auto origOptionalType = as<IROptionalType>(primalType);
+            auto diffValueType = differentiateType(builder, origOptionalType->getValueType());
+            return builder->getOptionalType(diffValueType);
+        }
+
     default:
         return (IRType*)maybeCloneForPrimalInst(
             builder,

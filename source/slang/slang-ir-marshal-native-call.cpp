@@ -17,6 +17,17 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
         return builder.getNativePtrType(type);
     case kIROp_ComPtrType:
         return builder.getNativePtrType((IRType*)as<IRComPtrType>(type)->getOperand(0));
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = as<IRArrayType>(type);
+            auto elementType = arrayType->getElementType();
+            auto nativeElementType = getNativeType(builder, elementType);
+            return builder.getArrayTypeBase(
+                elementType->getOp(),
+                nativeElementType,
+                arrayType->getElementCount());
+        }
     case kIROp_InOutType:
     case kIROp_RefType:
     case kIROp_ConstRefType:

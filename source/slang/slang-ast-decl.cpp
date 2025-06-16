@@ -49,75 +49,217 @@ bool isInterfaceRequirement(Decl* decl)
     return false;
 }
 
-void ContainerDecl::buildMemberDictionary()
+//
+// ContainerDecl
+//
+
+List<Decl*> const& ContainerDecl::getDirectMemberDecls()
 {
-    // Don't rebuild if already built
-    if (isMemberDictionaryValid())
+    return _directMemberDecls.decls;
+}
+
+Count ContainerDecl::getDirectMemberDeclCount()
+{
+    return _directMemberDecls.decls.getCount();
+}
+
+Decl* ContainerDecl::getDirectMemberDecl(Index index)
+{
+    return _directMemberDecls.decls[index];
+}
+
+Decl* ContainerDecl::getFirstDirectMemberDecl()
+{
+    if (getDirectMemberDeclCount() == 0)
+        return nullptr;
+    return getDirectMemberDecl(0);
+}
+
+DeclsOfNameList ContainerDecl::getDirectMemberDeclsOfName(Name* name)
+{
+    return DeclsOfNameList(findLastDirectMemberDeclOfName(name));
+}
+
+Decl* ContainerDecl::findLastDirectMemberDeclOfName(Name* name)
+{
+    _ensureLookupAcceleratorsAreValid();
+    if (auto found = _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.tryGetValue(name))
+        return *found;
+    return nullptr;
+}
+
+Decl* ContainerDecl::getPrevDirectMemberDeclWithSameName(Decl* decl)
+{
+    SLANG_ASSERT(decl);
+    SLANG_ASSERT(decl->parentDecl == this);
+
+    _ensureLookupAcceleratorsAreValid();
+    return decl->_prevInContainerWithSameName;
+}
+
+void ContainerDecl::addDirectMemberDecl(Decl* decl)
+{
+    if (!decl)
         return;
 
-    // If it's < 0 it means that the dictionaries are entirely invalid
-    if (dictionaryLastCount < 0)
+    decl->parentDecl = this;
+    _directMemberDecls.decls.add(decl);
+}
+
+List<Decl*> const& ContainerDecl::getTransparentDirectMemberDecls()
+{
+    _ensureLookupAcceleratorsAreValid();
+    return _directMemberDecls.accelerators.filteredListOfTransparentDecls;
+}
+
+bool ContainerDecl::_areLookupAcceleratorsValid()
+{
+    return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
+           _directMemberDecls.decls.getCount();
+}
+
+void ContainerDecl::_invalidateLookupAccelerators()
+{
+    _directMemberDecls.accelerators.declCountWhenLastUpdated = -1;
+}
+
+void ContainerDecl::_ensureLookupAcceleratorsAreValid()
+{
+    if (_areLookupAcceleratorsValid())
+        return;
+
+    // If the `declCountWhenLastUpdated` is less than zero, it means that
+    // the accelerators are entirely invalidated, and must be rebuilt
+    // from scratch.
+    //
+    if (_directMemberDecls.accelerators.declCountWhenLastUpdated < 0)
     {
-        dictionaryLastCount = 0;
-        memberDictionary.clear();
-        transparentMembers.clear();
+        _directMemberDecls.accelerators.declCountWhenLastUpdated = 0;
+        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.clear();
+        _directMemberDecls.accelerators.filteredListOfTransparentDecls.clear();
     }
 
     // are we a generic?
     GenericDecl* genericDecl = as<GenericDecl>(this);
 
-    const Index membersCount = members.getCount();
+    Count memberCount = _directMemberDecls.decls.getCount();
+    Count memberCountWhenLastUpdated = _directMemberDecls.accelerators.declCountWhenLastUpdated;
 
-    SLANG_ASSERT(dictionaryLastCount >= 0 && dictionaryLastCount <= membersCount);
+    SLANG_ASSERT(memberCountWhenLastUpdated >= 0 && memberCountWhenLastUpdated <= memberCount);
 
-    for (Index i = dictionaryLastCount; i < membersCount; ++i)
+    for (Index i = memberCountWhenLastUpdated; i < memberCount; ++i)
     {
-        Decl* m = members[i];
+        Decl* memberDecl = _directMemberDecls.decls[i];
 
-        auto name = m->getName();
-
-        // Add any transparent members to a separate list for lookup
-        if (m->hasModifier<TransparentModifier>())
+        // Transparent member declarations will go into a separate list,
+        // so that they can be conveniently queried later for lookup
+        // operations.
+        //
+        // TODO: Rather than track these using a separate table, we
+        // could design a scheme where transparent members are put into
+        // the same lookup dictionary as everything else, just under
+        // a pseudo-name that identifies transparent members.
+        //
+        if (memberDecl->hasModifier<TransparentModifier>())
         {
-            TransparentMemberInfo info;
-            info.decl = m;
-            transparentMembers.add(info);
+            _directMemberDecls.accelerators.filteredListOfTransparentDecls.add(memberDecl);
         }
 
-        // Ignore members with no name
-        if (!name)
+        // Members that don't have a name don't go into the lookup dictionary.
+        //
+        auto memberName = memberDecl->getName();
+        if (!memberName)
             continue;
 
-        // Ignore the "inner" member of a generic declaration
-        if (genericDecl && m == genericDecl->inner)
+        // As a special case, we ignore the `inner` member of a
+        // `GenericDecl`, since it will always have the same name
+        // as the outer generic, and should not be found by lookup.
+        //
+        // TODO: We really ought to change up our entire encoding
+        // of generic declarations in the AST.
+        //
+        if (genericDecl && memberDecl == genericDecl->inner)
             continue;
 
-        m->nextInContainerWithSameName = nullptr;
+        // It is possible that we have encountered previous declarations
+        // that have the same name as `memberDecl`, and in that
+        // case we want to wire them up into a singly-linked list.
+        //
+        // This list makes it easy for a lookup operation to find, e.g.,
+        // all of the overloaded functions with a given name.
+        //
+        Decl* prevMemberWithSameName = nullptr;
+        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.tryGetValue(
+            memberName,
+            prevMemberWithSameName);
+        memberDecl->_prevInContainerWithSameName = prevMemberWithSameName;
 
-        Decl* next = nullptr;
-        if (memberDictionary.tryGetValue(name, next))
-            m->nextInContainerWithSameName = next;
-
-        memberDictionary[name] = m;
+        // Whether or not there was a previous declaration with this
+        // name, the current `memberDecl` is the last member declaration
+        // with that name encountered so far, and it is what we will
+        // store in the lookup dictionary.
+        //
+        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName[memberName] = memberDecl;
     }
 
-    dictionaryLastCount = membersCount;
-    SLANG_ASSERT(isMemberDictionaryValid());
+    _directMemberDecls.accelerators.declCountWhenLastUpdated = memberCount;
+    SLANG_ASSERT(_areLookupAcceleratorsValid());
 }
 
-Index ContainerDecl::getDeclIndex(Decl* decl)
+void ContainerDecl::
+    _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
+        UnscopedEnumAttribute* unscopedEnumAttr,
+        TransparentModifier* transparentModifier)
 {
-    if (Index* ptr = mapDeclMemberToIndex.tryGetValue(decl))
-    {
-        return *ptr;
-    }
-    Index res = members.findFirstIndex([&](Decl* d) { return d == decl; });
-    if (res >= Index(0))
-    {
-        mapDeclMemberToIndex[decl] = res;
-    }
-    return res;
+    SLANG_ASSERT(unscopedEnumAttr);
+    SLANG_ASSERT(transparentModifier);
+
+    SLANG_UNUSED(unscopedEnumAttr);
+    SLANG_UNUSED(transparentModifier);
+
+    _invalidateLookupAccelerators();
 }
+
+void ContainerDecl::
+    _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
+        ConstructorDecl* decl)
+{
+    SLANG_ASSERT(decl);
+
+    _invalidateLookupAccelerators();
+    _directMemberDecls.decls.remove(decl);
+}
+
+void ContainerDecl::
+    _replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyDeclThatWasSynthesizedForIt(
+        Index index,
+        VarDecl* oldDecl,
+        PropertyDecl* newDecl)
+{
+    SLANG_ASSERT(oldDecl);
+    SLANG_ASSERT(newDecl);
+    SLANG_ASSERT(index >= 0 && index < getDirectMemberDeclCount());
+    SLANG_ASSERT(getDirectMemberDecl(index) == oldDecl);
+
+    SLANG_UNUSED(oldDecl);
+    _invalidateLookupAccelerators();
+    _directMemberDecls.decls[index] = newDecl;
+}
+
+void ContainerDecl::_insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMember(
+    Index index,
+    VarDecl* backingVarDecl)
+{
+    SLANG_ASSERT(backingVarDecl);
+    SLANG_ASSERT(index >= 0 && index <= getDirectMemberDeclCount());
+
+    _invalidateLookupAccelerators();
+    _directMemberDecls.decls.insert(index, backingVarDecl);
+}
+
+//
+//
+//
 
 bool isLocalVar(const Decl* decl)
 {
@@ -137,14 +279,12 @@ bool isLocalVar(const Decl* decl)
 
 ThisTypeDecl* InterfaceDecl::getThisTypeDecl()
 {
-    for (auto member : members)
+    auto thisTypeDecl = findFirstDirectMemberDeclOfType<ThisTypeDecl>();
+    if (!thisTypeDecl)
     {
-        if (auto thisTypeDeclCandidate = as<ThisTypeDecl>(member))
-        {
-            return thisTypeDeclCandidate;
-        }
+        SLANG_UNEXPECTED("InterfaceDecl does not have a ThisType decl.");
     }
-    SLANG_UNREACHABLE("InterfaceDecl does not have a ThisType decl.");
+    return thisTypeDecl;
 }
 
 InterfaceDecl* ThisTypeConstraintDecl::getInterfaceDecl()

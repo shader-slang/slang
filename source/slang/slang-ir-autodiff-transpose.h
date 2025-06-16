@@ -1476,6 +1476,9 @@ struct DiffTransposePass
         case kIROp_GetElement:
             return transposeGetElement(builder, as<IRGetElement>(fwdInst), revValue);
 
+        case kIROp_GetOptionalValue:
+            return transposeGetOptionalValue(builder, as<IRGetOptionalValue>(fwdInst), revValue);
+
         case kIROp_Return:
             return transposeReturn(builder, as<IRReturn>(fwdInst), revValue);
 
@@ -1531,7 +1534,8 @@ struct DiffTransposePass
             return transposeMakeTuple(builder, fwdInst, revValue);
         case kIROp_MakeArrayFromElement:
             return transposeMakeArrayFromElement(builder, fwdInst, revValue);
-
+        case kIROp_MakeOptionalValue:
+            return transposeMakeOptionalValue(builder, fwdInst, revValue);
         case kIROp_UpdateElement:
             return transposeUpdateElement(builder, fwdInst, revValue);
 
@@ -1671,6 +1675,20 @@ struct DiffTransposePass
             fwdGetElement->getBase(),
             revValue,
             fwdGetElement)));
+    }
+
+    TranspositionResult transposeGetOptionalValue(
+        IRBuilder* builder,
+        IRGetOptionalValue* fwdGetOptionalValue,
+        IRInst* revValue)
+    {
+        // dP = GetOptionalValue(dVal) -> dVal = MakeOptionalValue(dP)
+        auto optionalVal = fwdGetOptionalValue->getOperand(0);
+        return TranspositionResult(List<RevGradient>(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdGetOptionalValue->getOperand(0),
+            builder->emitMakeOptionalValue(optionalVal->getDataType(), revValue),
+            fwdGetOptionalValue)));
     }
 
     TranspositionResult transposeMakePair(
@@ -1979,6 +1997,29 @@ struct DiffTransposePass
         }
 
         // (A = MakeTuple(F1, F2, F3)) -> [(dF1 += dA.F1), (dF2 += dA.F2), (dF3 += dA.F3)]
+        return TranspositionResult(gradients);
+    }
+
+    TranspositionResult transposeMakeOptionalValue(
+        IRBuilder* builder,
+        IRInst* fwdMakeOptionalValue,
+        IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+
+        auto gradAtField = builder->emitGetOptionalValue(revValue);
+        auto diffZero = diffTypeContext.emitDZeroOfDiffInstType(
+            builder,
+            tryGetPrimalTypeFromDiffInst(fwdMakeOptionalValue->getOperand(0)));
+        IRInst* selectArgs[] = {builder->emitOptionalHasValue(revValue), gradAtField, diffZero};
+        builder->emitIntrinsicInst(gradAtField->getDataType(), kIROp_Select, 3, selectArgs);
+        gradients.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMakeOptionalValue->getOperand(0),
+            gradAtField,
+            fwdMakeOptionalValue));
+
+        // (A = MakeOptionalValue(F)) -> [(dF += dA.hasValue?dA.value:dzero)]
         return TranspositionResult(gradients);
     }
 

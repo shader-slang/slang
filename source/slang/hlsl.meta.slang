@@ -533,6 +533,7 @@ interface ITexelElement
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    [OverloadRank(-1)]
     __init(Element x);
 }
 
@@ -10628,7 +10629,15 @@ bool isinf(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsInf $x};
     case wgsl:
-        __intrinsic_asm "($0 > 0x1.fffffep+127f) || ($0 < -0x1.fffffep+127f)";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac == 0u;
+        }
+        return false;
     }
 }
 
@@ -10684,7 +10693,15 @@ bool isnan(T x)
     case spirv:
         return spirv_asm { result:$$bool = OpIsNan $x};
     case wgsl:
-         __intrinsic_asm "$0 != $0";
+        static_assert(T is float, "isnan is implemented only for float type");
+        if (let f = x as float)
+        {
+            let bits = asuint(f);
+            let exp = (bits >> 23) & 0xffu;
+            let frac = bits & 0x7fffffu;
+            return exp == 0xffu && frac != 0u;
+        }
+        return false;
     }
 }
 
@@ -20645,7 +20662,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -20670,7 +20687,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -20701,7 +20718,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsSphereHit()
     {
         __target_switch
@@ -20723,7 +20740,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsLssHit()
     {
         __target_switch
@@ -24366,6 +24383,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
     {
         this.copyFrom(other);
@@ -24405,6 +24423,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
     { 
         __target_switch 
@@ -24413,6 +24432,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
             __intrinsic_asm ".CopyFrom";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecCvt<$TR>(*($0));";
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -24422,7 +24443,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 this = __real_cast<T>(other);
             else if (__isInt<T>() && __isInt<U>())
                 this = __int_cast<T>(other);
-        } 
+        }
     }
 
     /// Fill all elements of this CoopVec with the specified value.
@@ -24575,6 +24596,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [__NoSideEffect]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     static CoopVec<T, N> load(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -24590,6 +24612,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -24602,6 +24626,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [__NoSideEffect]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     static CoopVec<T, N> load(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -24617,6 +24642,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -24686,6 +24713,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [__NoSideEffect]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
@@ -24700,6 +24728,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             CoopVec<T, N> ret;
             ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return ret;
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
         default:
             CoopVec<T,N> result;
             for(int i = 0; i < N; ++i)
@@ -24906,6 +24936,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     This add(This other)
     {
         __target_switch
@@ -24916,6 +24947,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             This ret = this;
             ret.__mutAdd(other);
             return ret;
+        case optix_coopvec: 
+            __intrinsic_asm "optixCoopVecAdd($0, $1)";
         default: return __pureAdd(other);
         }
     }
@@ -24941,6 +24974,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     This sub(This other)
     {
         __target_switch
@@ -24951,6 +24985,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             This ret = this;
             ret.__mutSub(other);
             return ret;
+        case optix_coopvec: 
+            __intrinsic_asm "optixCoopVecSub($0, $1)";
         default: return __pureSub(other);
         }
     }
@@ -24976,6 +25012,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     This mul(This other)
     {
         __target_switch
@@ -24986,6 +25023,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             This ret = this;
             ret.__mutMul(other);
             return ret;
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecMul($0, $1)";
         default: return __pureMul(other);
         }
     }
@@ -25605,6 +25644,7 @@ CoopVec<T, N> operator *(const T lhs, CoopVec<T, N> rhs)
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -25620,6 +25660,8 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
         CoopVec<T, N> ret = x;
         ret.__mutMin(y);
         return ret;
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecMin($0, $1)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -25632,6 +25674,7 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -25647,6 +25690,8 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
         CoopVec<T, N> ret = x;
         ret.__mutMax(y);
         return ret;
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecMax($0, $1)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -25793,6 +25838,7 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
 // [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> edge, CoopVec<T, N> x)
 {
     __target_switch
@@ -25809,6 +25855,8 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 Step $edge $x;
         };
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecStep($0, $1)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -25874,6 +25922,43 @@ CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 // [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
+CoopVec<T, N> log2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = log2(x[i]);
+        return ret;
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecLog2($0)";
+    }
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
+CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = exp2(x[i]);
+        return ret;
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecExp2($0)";
+    }
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
@@ -25890,6 +25975,8 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 Tanh $x;
         };
+    case optix_coopvec: 
+        __intrinsic_asm "optixCoopVecTanh($0)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -25928,6 +26015,7 @@ CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yO
 // [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, CoopVec<T, N> b, CoopVec<T, N> c)
 {
     // TODO: Investigate, why does this fail if it's not inlined
@@ -25947,6 +26035,8 @@ CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, 
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 Fma $a $b $c;
         };
+    case optix_coopvec: 
+        __intrinsic_asm "optixCoopVecFFMA($0, $1, $2)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -26679,6 +26769,7 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulAdd(
     CoopVec<U, K> input,
@@ -26730,6 +26821,7 @@ if(buffer.isRW)
 /// @param matrixInterpretation Specifies how to interpret the values in the matrix.
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
     CoopVec<T, N> b,
@@ -26757,6 +26849,8 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
             OpCapability CooperativeVectorTrainingNV;
             OpCooperativeVectorOuterProductAccumulateNV $matrixPtr $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
         };
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
     default:
         for (int i = 0; i < M; ++i)
         {
@@ -26820,6 +26914,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// @param offset Byte offset into the buffer.
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     CoopVec<T, N> v,
     $(buffer.type) buffer,
@@ -26839,6 +26934,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
             OpCapability CooperativeVectorTrainingNV;
             OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $offset $v;
         };
+    case optix_coopvec:
+        __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
     default:
         for (int i = 0; i < N; ++i)
         {

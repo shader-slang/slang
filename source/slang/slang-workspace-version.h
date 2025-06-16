@@ -159,7 +159,7 @@ struct OwnedPreprocessorMacroDefinition
     String name;
     String value;
 };
-class Workspace : public ISlangFileSystem, public ComObject
+class Workspace : public ComObject, public ISlangFileSystem
 {
 private:
     RefPtr<WorkspaceVersion> currentVersion;

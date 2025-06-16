@@ -863,13 +863,7 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
 
     SubtypeWitness* openedWitness = getSubtypeWitness();
 
-    ThisTypeDecl* thisTypeDecl = nullptr;
-    for (auto member : interfaceDecl->members)
-        if (as<ThisTypeDecl>(member))
-        {
-            thisTypeDecl = as<ThisTypeDecl>(member);
-            break;
-        }
+    ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
     SLANG_ASSERT(thisTypeDecl);
 
     DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef =

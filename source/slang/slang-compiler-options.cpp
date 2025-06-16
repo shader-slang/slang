@@ -198,6 +198,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
+    case CompilerOptionName::TypeConformance:
         return true;
     }
     return false;

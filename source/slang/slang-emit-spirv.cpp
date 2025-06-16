@@ -2284,6 +2284,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 return result;
             }
+        case kIROp_DebugBuildIdentifier:
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
+                auto debugBuildIdentifier = as<IRDebugBuildIdentifier>(inst);
+                return emitOpDebugBuildIdentifier(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    debugBuildIdentifier->getBuildIdentifier(),
+                    debugBuildIdentifier->getFlags());
+            }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
         case kIROp_AttributedType:
@@ -9181,6 +9193,10 @@ SlangResult emitSPIRVFromIR(
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+        {
+            context.ensureInst(inst);
+        }
+        if (as<IRDebugBuildIdentifier>(inst))
         {
             context.ensureInst(inst);
         }

@@ -343,6 +343,14 @@ Treat enums types as unscoped by default.
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
 
 
+<a id="conformance"></a>
+### -conformance
+
+**-conformance &lt;typeName&gt;:&lt;interfaceName&gt;\[=&lt;sequentialID&gt;\]**
+
+Include additional type conformance during linking for dynamic dispatch. 
+
+
 <a id="reflection-json"></a>
 ### -reflection-json
 
@@ -640,6 +648,11 @@ Verify IR in the front-end.
 <a id="dump-module"></a>
 ### -dump-module
 Disassemble and print the module IR. 
+
+
+<a id="separate-debug-info"></a>
+### -separate-debug-info
+Emit debug data to a separate file, and strip it from the main output file. 
 
 
 
@@ -1099,6 +1112,7 @@ A capability describes an optional feature that a target may or may not support.
 * `hlsl_nvapi` 
 * `hlsl_2018` 
 * `hlsl_coopvec_poc` 
+* `optix_coopvec` 
 * `vertex` 
 * `fragment` 
 * `compute` 
@@ -1499,6 +1513,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
 * `raytracing_lss` 
+* `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 

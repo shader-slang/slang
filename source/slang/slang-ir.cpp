@@ -3393,6 +3393,13 @@ IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSli
     IRInst* args[] = {getStringValue(fileName), getStringValue(source)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
 }
+IRInst* IRBuilder::emitDebugBuildIdentifier(
+    UnownedStringSlice buildIdentifier,
+    IRIntegerValue flags)
+{
+    IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
@@ -3511,6 +3518,14 @@ IRLiveRangeEnd* IRBuilder::emitLiveRangeEnd(IRInst* referenced)
 IRInst* IRBuilder::emitExtractExistentialValue(IRType* type, IRInst* existentialValue)
 {
     auto inst = createInst<IRInst>(this, kIROp_ExtractExistentialValue, type, 1, &existentialValue);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitIsNullExistential(IRInst* existentialValue)
+{
+    auto inst =
+        createInst<IRInst>(this, kIROp_IsNullExistential, getBoolType(), 1, &existentialValue);
     addInst(inst);
     return inst;
 }
@@ -4141,7 +4156,10 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     {
         return _getTypeStyleId(matrixType->getElementType());
     }
+    // Try to simplify style if we can, otherwise just handle it unsimplified
     auto style = getTypeStyle(type->getOp());
+    if (style == kIROp_Invalid)
+        style = type->getOp();
     switch (style)
     {
     case kIROp_IntType:
@@ -8648,6 +8666,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:
