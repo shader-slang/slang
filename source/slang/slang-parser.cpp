@@ -9467,6 +9467,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("writeonly", parseWriteonlyModifier),
     _makeParseModifier("export", getSyntaxClass<HLSLExportModifier>()),
     _makeParseModifier("dynamic_uniform", getSyntaxClass<DynamicUniformModifier>()),
+    _makeParseModifier("override", getSyntaxClass<OverrideModifier>()),
 
     // Modifiers for geometry shader input
     _makeParseModifier("point", getSyntaxClass<HLSLPointModifier>()),

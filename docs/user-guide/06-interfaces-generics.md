@@ -58,6 +58,17 @@ interface IFoo
 struct MyType : IFoo {}
 ```
 
+A concrete type that provides its overriding implementation to an interface method requirement that has a default implementation must be explicitly marked as 'override'. For example:
+
+```slang
+struct MyType2 : IFoo
+{
+    // Explicitly mark `getVal` as `override` is needed
+    // because `IFoo.getVal` has a body.
+    override int getVal() { return 1; }
+}
+```
+
 Generics
 ---------------------
 
