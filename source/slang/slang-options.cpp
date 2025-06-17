@@ -186,12 +186,6 @@ void initCommandOptions(CommandOptions& options)
             UserValue(ValueCategory::FloatingPointMode));
         options.addValues(TypeTextUtil::getFloatingPointModeInfos());
 
-        options.addCategory(
-            CategoryKind::Value,
-            "denorm-mode-fp16",
-            "16-bit Floating Point Denormal Mode",
-            UserValue(ValueCategory::FpDenormMode));
-        options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -200,12 +194,6 @@ void initCommandOptions(CommandOptions& options)
             UserValue(ValueCategory::FpDenormMode));
         options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
-        options.addCategory(
-            CategoryKind::Value,
-            "denorm-mode-fp64",
-            "64-bit Floating Point Denormal Mode",
-            UserValue(ValueCategory::FpDenormMode));
-        options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
         options.addCategory(
             CategoryKind::Value,
