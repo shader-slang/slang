@@ -213,6 +213,8 @@ SlangResult TestContext::createLanguageServerJSONRPCConnection(RefPtr<JSONRPCCon
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "slangd"));
+        cmdLine.addArg("-periodic-diagnostic-update");
+        cmdLine.addArg("false");
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
 
