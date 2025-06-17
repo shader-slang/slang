@@ -3252,7 +3252,9 @@ void maybeAddReturnDestinationParam(
     if (as<SubscriptDecl>(callableDeclRef.getParent()))
         return;
 
-    // If we lack a function body we cannot return using a ref, skip adding param.
+    // If we lack a function body we cannot return using a ref since we have 
+    // no body to replace `return` with, skip adding param.
+    // This is fine since intrinsics already can return a ref directly.
     auto functionDeclBase = as<FunctionDeclBase>(callableDeclRef.getDecl());
     if (!functionDeclBase)
         return;
@@ -3511,11 +3513,7 @@ void _lowerFuncDeclBaseTypeInfo(
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
         irResultType = context->irBuilder->getVoidType();
-
-        // Cannot return ref as last param if a `RefAccessor`, semantically meaningless.
-        // We also cannot return a forwarding decl by ref since there is no body to change
-        // return through.
-        outInfo.returnViaLastRefParam = !declRef.as<RefAccessorDecl>() && declRef.getDecl()->body;
+        outInfo.returnViaLastRefParam = true;
     }
     else
     {
@@ -3599,6 +3597,8 @@ static LoweredValInfo _emitCallToAccessor(
     if (info.returnViaLastRefParam)
     {
          // Create a temporary variable to hold the result.
+         // we will rewrite the return to alias the final
+         // param later.
          auto tempVar = context->irBuilder->emitVar(
              tryGetPointedToType(context->irBuilder, info.paramTypes.getLast()));
          allArgs.add(tempVar);
