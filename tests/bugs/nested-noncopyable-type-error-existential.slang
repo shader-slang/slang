@@ -10,6 +10,7 @@ struct NonCopyableType
 }
 
 T sum<T>(IArray<T> array)
+    where noncopyable(T)
 {
     return array[0];
 }

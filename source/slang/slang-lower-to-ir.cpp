@@ -3241,18 +3241,35 @@ void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* 
     ioParameterLists->params.add(info);
 }
 
-void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
+void maybeAddReturnDestinationParam(
+    ParameterLists* ioParameterLists,
+    DeclRef<CallableDecl> callableDeclRef,
+    Type* realResultType)
 {
-    if (isNonCopyableType(resultType))
-    {
-        IRLoweringParameterInfo info;
-        info.type = resultType;
-        info.decl = nullptr;
-        info.direction = kParameterDirection_Ref;
-        info.declaredDirection = info.direction;
-        info.isReturnDestination = true;
-        ioParameterLists->params.add(info);
-    }
+    // We will have a double `ref` added if __subscript{get;}
+    // since __subscript is not "returning" a value, it is just an intermediate
+    // we can ignore adding a param in this case.
+    if (as<SubscriptDecl>(callableDeclRef.getParent()))
+        return;
+
+    // If we lack a function body we cannot return using a ref, skip adding param.
+    auto functionDeclBase = as<FunctionDeclBase>(callableDeclRef.getDecl());
+    if (!functionDeclBase)
+        return;
+    if(!as<FunctionDeclBase>(callableDeclRef.getDecl())->body)
+        return;
+
+    // We should only be returning with a ref if our return is noncopyable
+    if (!isNonCopyableType(callableDeclRef.getDecl()->returnType))
+        return;
+    
+    IRLoweringParameterInfo info;
+    info.type = realResultType;
+    info.decl = nullptr;
+    info.direction = kParameterDirection_Ref;
+    info.declaredDirection = info.direction;
+    info.isReturnDestination = true;
+    ioParameterLists->params.add(info);
 }
 
 void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
@@ -3366,15 +3383,12 @@ void collectParameterLists(
                 ioParameterLists->params.add(paramInfo);
             }
 
-            // We will have a double `ref` added as out if __subscript{get;}
-            // since __subscript is not "returning" a value, it is just an intermediate.
-            //
-            // Not the case with property{get;} since we ignore this intermediate.
-            // 
-            if (!as<SubscriptDecl>(declRef.getParent()))
-                maybeAddReturnDestinationParam(
-                    ioParameterLists,
-                    getResultType(context->astBuilder, callableDeclRef));
+            maybeAddReturnDestinationParam(
+                ioParameterLists,
+                // pass in the original type because `getResultType` may remove important modifiers
+                // after subsitution
+                callableDeclRef,
+                getResultType(context->astBuilder, callableDeclRef));
         }
     }
 }
@@ -3490,12 +3504,18 @@ void _lowerFuncDeclBaseTypeInfo(
 
     auto& irResultType = outInfo.resultType;
 
+    // Should be based on original definition of function.
+    // Generic may resolve result as a copyable, but if definition 
+    // is NonCopyable we need to ensure we emit a function compatible
+    // assuming a NonCopyable param.
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
         irResultType = context->irBuilder->getVoidType();
 
-        // cannot return ref as last param if a `RefAccessor`, semantically meaningless.
-        outInfo.returnViaLastRefParam = !declRef.as<RefAccessorDecl>();
+        // Cannot return ref as last param if a `RefAccessor`, semantically meaningless.
+        // We also cannot return a forwarding decl by ref since there is no body to change
+        // return through.
+        outInfo.returnViaLastRefParam = !declRef.as<RefAccessorDecl>() && declRef.getDecl()->body;
     }
     else
     {
