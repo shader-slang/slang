@@ -298,7 +298,6 @@ cd docs
 .\build_toc.ps1
 
 # Add to git commit
-git add gfx-user-guide/toc.html
 git add user-guide/toc.html
 ```
 
