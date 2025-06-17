@@ -516,8 +516,6 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     {
     default:
     case CompileOptions::FpDenormMode::Any:
-        args.add(L"-denorm");
-        args.add(L"any");
         break;
 
     case CompileOptions::FpDenormMode::Preserve:
