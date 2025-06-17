@@ -11221,7 +11221,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Add DenormPreserve and DenormFlushToZero decorations
         {
             auto linkage = context->getLinkage();
-            
+
             // Handle FP16 denorm mode
             if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16))
             {
@@ -11237,7 +11237,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getBuilder()->addDenormFlushToZeroDecoration(irFunc, width16);
                 }
             }
-            
+
             // Handle FP32 denorm mode
             if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32))
             {
@@ -11253,7 +11253,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getBuilder()->addDenormFlushToZeroDecoration(irFunc, width32);
                 }
             }
-            
+
             // Handle FP64 denorm mode
             if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64))
             {
