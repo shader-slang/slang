@@ -7352,7 +7352,6 @@ float16_t asfloat16(uint16_t value)
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
 {
     __target_switch
@@ -7374,7 +7373,6 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 int16_t asint16(float16_t value) 
 {
     __target_switch
@@ -7390,8 +7388,7 @@ int16_t asint16(float16_t value)
 }
 
 [__unsafeForceInlineEarly]
-[__readNone] 
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
+[__readNone]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) 
 {
     __target_switch
@@ -7404,7 +7401,6 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
 matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) 
 {
     __target_switch
@@ -7415,8 +7411,7 @@ matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> valu
 }
 
 [__readNone]
-[__unsafeForceInlineEarly] 
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
+[__unsafeForceInlineEarly]
 float16_t asfloat16(int16_t value) 
 {
     __target_switch
@@ -7433,7 +7428,6 @@ float16_t asfloat16(int16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) 
 {
     __target_switch
@@ -7449,7 +7443,6 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) 
 {
     __target_switch
@@ -26018,8 +26011,10 @@ CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yO
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
+[require(GL_ARB_gpu_shader5)]
 CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, CoopVec<T, N> b, CoopVec<T, N> c)
 {
     // TODO: Investigate, why does this fail if it's not inlined
