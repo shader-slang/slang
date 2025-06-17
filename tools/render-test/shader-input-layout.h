@@ -155,9 +155,9 @@ struct TextureData
     uint8_t m_formatSize = 0;
 
     Slang::List<Slice> m_slices;
-    int m_textureSize;
-    int m_mipLevels;
-    int m_arraySize;
+    int m_textureSize = 0;
+    int m_mipLevels = 1;
+    int m_arraySize = 1;
 };
 
 class ShaderInputLayout

@@ -231,8 +231,6 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     range.mipCount = texture->getDesc().mipCount;
 
     FormatInfo formatInfo = getFormatInfo(desc.format);
-
-
     switch (formatInfo.kind)
     {
     case FormatKind::Float:
@@ -300,6 +298,36 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
             }
             commandEncoder->clearTextureSint(texture, range, clearValue);
             break;
+        }
+    case FormatKind::DepthStencil:
+        {
+            float depthValue = 0.f;
+            uint8_t stencilValue = 0U;
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                depthValue = 1;
+                stencilValue = 1U;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder
+                ->clearTextureDepthStencil(texture, range, true, depthValue, true, stencilValue);
+            break;
+        }
+    default:
+        {
+            SLANG_ASSERT(!"Unsupported FormatKind type");
+            return SLANG_FAIL;
         }
     }
 
