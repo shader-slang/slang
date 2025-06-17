@@ -5100,7 +5100,6 @@ SlangResult innerMain(int argc, char** argv)
                     printf("Retrying unit tests...\n");
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
-		    spawnType = SpawnType::Default;
                 }
 
                 // Run the unit tests
@@ -5167,14 +5166,7 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    SlangResult res = SLANG_OK;
-    for (int i = 0 ; i < 1; ++i)
-    {
-        res = innerMain(argc, argv);
-        if (SLANG_FAILED(res))
-            break;
-    }
-
+    SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();
 
