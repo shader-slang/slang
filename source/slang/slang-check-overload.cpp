@@ -71,7 +71,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericDecl> genericRef)
 {
     ParamCounts counts = {0, 0};
-    for (auto m : genericRef.getDecl()->members)
+    for (auto m : genericRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDecl>(m))
         {
@@ -1169,9 +1169,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     const auto& decl = subscriptDeclRef.getDecl();
-                    for (auto member : decl->members)
+                    for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                        if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
                         {
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
@@ -1186,7 +1186,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // Otherwise, if the accessor is [nonmutating], we can
                             // also consider the result of the subscript call as l-value
                             // regardless of the base.
-                            if (member->findModifier<NonmutatingAttribute>())
+                            if (accessorDecl->findModifier<NonmutatingAttribute>())
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;
@@ -1321,6 +1321,34 @@ int SemanticsVisitor::CompareLookupResultItems(
     LookupResultItem const& left,
     LookupResultItem const& right)
 {
+    auto leftDeclRefParent = getParentDeclRef(left.declRef);
+    auto rightDeclRefParent = getParentDeclRef(right.declRef);
+
+    bool leftIsExtension = false;
+    bool rightIsExtension = false;
+    bool leftIsFreeFormExtension = false;
+    bool rightIsFreeFormExtension = false;
+
+    // Prefer declarations that are not in free-form generic extensions, i.e.
+    // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
+    if (auto leftExt = as<ExtensionDecl>(leftDeclRefParent.getDecl()))
+    {
+        leftIsExtension = true;
+        if (isDeclRefTypeOf<GenericTypeParamDeclBase>(leftExt->targetType))
+            leftIsFreeFormExtension = true;
+    }
+    if (auto rightExt = as<ExtensionDecl>(rightDeclRefParent.getDecl()))
+    {
+        rightIsExtension = true;
+        if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
+            rightIsFreeFormExtension = true;
+    }
+
+    // If one of the candidates is a free-form extension, it is always worse than
+    // a non-free-form extension.
+    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
+
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
     // We always want to favor a concrete method over an interface
@@ -1334,16 +1362,12 @@ int SemanticsVisitor::CompareLookupResultItems(
     // directly (it is only visible through the requirement witness
     // information for inheritance declarations).
     //
-    auto leftDeclRefParent = getParentDeclRef(left.declRef);
-    auto rightDeclRefParent = getParentDeclRef(right.declRef);
     bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
         return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
     // Prefer non-extension declarations over extension declarations.
-    bool leftIsExtension = as<ExtensionDecl>(leftDeclRefParent.getDecl()) != nullptr;
-    bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
     if (leftIsExtension != rightIsExtension)
     {
         // Add a special case for constructors, where we prefer the one that is not synthesized,

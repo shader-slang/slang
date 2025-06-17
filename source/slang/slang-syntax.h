@@ -61,7 +61,7 @@ inline FilteredMemberRefList<Decl> getGenericMembers(
 {
     return FilteredMemberRefList<Decl>(
         astBuilder,
-        genericInnerDecl.getParent().getDecl()->members,
+        genericInnerDecl.getParent().getDecl()->getDirectMemberDecls(),
         genericInnerDecl,
         filterStyle);
 }
@@ -73,7 +73,7 @@ inline FilteredMemberRefList<Decl> getMembers(
 {
     return FilteredMemberRefList<Decl>(
         astBuilder,
-        declRef.getDecl()->members,
+        declRef.getDecl()->getDirectMemberDecls(),
         declRef,
         filterStyle);
 }
@@ -84,7 +84,22 @@ inline FilteredMemberRefList<T> getMembersOfType(
     DeclRef<ContainerDecl> declRef,
     MemberFilterStyle filterStyle = MemberFilterStyle::All)
 {
-    return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->members, declRef, filterStyle);
+    // TODO: This should in principle be using:
+    //
+    //      declRef.getDecl()->getDirectMemberDeclsOfType<T>()
+    //
+    // instead of:
+    //
+    //      declRef.getDecl()->getDirectMemberDecls()
+    //
+    // and then the `FilteredMemberRefList` would only be responsible for
+    // filtering, plus associated each `T*` in the list with a `DeclRef<T>`.
+    //
+    return FilteredMemberRefList<T>(
+        astBuilder,
+        declRef.getDecl()->getDirectMemberDecls(),
+        declRef,
+        filterStyle);
 }
 
 void _foreachDirectOrExtensionMemberOfType(
@@ -285,6 +300,14 @@ inline Decl* getInner(DeclRef<GenericDecl> declRef)
     return declRef.getDecl()->inner;
 }
 
+inline Decl* maybeGetInner(Decl* decl)
+{
+    if (auto genericDeclRef = as<GenericDecl>(decl))
+    {
+        return genericDeclRef->inner;
+    }
+    return decl;
+}
 //
 
 inline Type* getType(ASTBuilder* astBuilder, SubstExpr<Expr> expr)
@@ -389,11 +412,13 @@ ModuleDecl* getModuleDecl(Scope* scope);
 Module* getModule(Decl* decl);
 
 /// Get the parent decl, skipping any generic decls in between.
-Decl* getParentDecl(Decl* decl);
-Decl* getParentAggTypeDecl(Decl* decl);
-Decl* getParentAggTypeDeclBase(Decl* decl);
-Decl* getParentFunc(Decl* decl);
+ContainerDecl* getParentDecl(Decl* decl);
+AggTypeDecl* getParentAggTypeDecl(Decl* decl);
+AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl);
+FunctionDeclBase* getParentFunc(Decl* decl);
 
+/// Get the parent declref, skipping any generic decls in between.
+DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef);
 } // namespace Slang
 
 #endif

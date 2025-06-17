@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
@@ -3792,9 +3793,6 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // function `foo` has been defined), and direct member
             // lookup will only give us the first.
             //
-            Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
-            //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
             //
@@ -3804,7 +3802,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // as possible in the parser, and we'd rather be
             // as permissive as possible right now.
             //
-            for (Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+            for (auto d : parentDecl->getDirectMemberDeclsOfName(nameAndLoc.name))
             {
                 namespaceDecl = as<NamespaceDecl>(d);
                 if (namespaceDecl)
@@ -5133,9 +5131,103 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
+static void parseInterfaceDefaultMethodAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* interfaceDecl)
+{
+    // If we parsed an interface method with a body,
+    // parse it again as an explicit generic decl on ThisType.
+    auto astBuilder = parser->astBuilder;
+    InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
+    parser->PushScope(genericDecl);
+
+    // Create GenericTypeParamDecl for `This`.
+    auto thisTypeDecl = astBuilder->create<GenericTypeParamDecl>();
+    thisTypeDecl->nameAndLoc.name = getName(parser, "This");
+    thisTypeDecl->parameterIndex = 0;
+    genericDecl->thisTypeDecl = thisTypeDecl;
+    AddMember(genericDecl, thisTypeDecl);
+
+    // Create GenericTypeConstraintDecl for `This:IFoo`.
+    auto thisTypeConstraint = astBuilder->create<GenericTypeConstraintDecl>();
+    auto thisTypeVarExpr = astBuilder->create<VarExpr>();
+    thisTypeVarExpr->name = getName(parser, "This");
+    thisTypeVarExpr->scope = parser->currentScope;
+    thisTypeConstraint->sub.exp = thisTypeVarExpr;
+
+    // Since we can't form a DeclRef to the parent interface decl yet (because we are still parsing
+    // it), we will use a `ThisInterfaceExpr` here to represent the interface type.
+    auto thisInterfaceExpr = astBuilder->create<ThisInterfaceExpr>();
+    thisInterfaceExpr->scope = parser->currentScope;
+    thisTypeConstraint->sup.exp = thisInterfaceExpr;
+    genericDecl->thisTypeConstraintDecl = thisTypeConstraint;
+    AddMember(genericDecl, thisTypeConstraint);
+
+    parser->FillPosition(genericDecl);
+    parser->genericDepth++;
+    auto newInnerDecl = as<Decl>(ParseDecl(parser, genericDecl));
+    genericDecl->inner = newInnerDecl;
+    newInnerDecl->parentDecl = genericDecl;
+    parser->genericDepth--;
+    parser->PopScope();
+    AddMember(interfaceDecl, genericDecl);
+
+    // Mark the requirement decl with `HasInterfaceDefaultImplModifier`.
+    auto hasDefaultImplModifier = astBuilder->create<HasInterfaceDefaultImplModifier>();
+    hasDefaultImplModifier->defaultImplDecl = genericDecl;
+    addModifier(parsedDecl, hasDefaultImplModifier);
+
+    // Update the name of the generic and newly parsed func, to ensure
+    // the mangled name of the default impl func doesn't clash with the
+    // requirement.
+    StringBuilder sb;
+    sb << getText(newInnerDecl->getName()) << "$defaultImpl";
+    genericDecl->nameAndLoc.name = getName(parser, sb.produceString());
+
+    newInnerDecl->nameAndLoc.name = genericDecl->getName();
+    if (auto newInnerGenDecl = as<GenericDecl>(newInnerDecl))
+    {
+        // If the method itself is generic, continue to update the inner function's name.
+        if (newInnerGenDecl->inner)
+        {
+            newInnerGenDecl->inner->nameAndLoc.name = genericDecl->getName();
+        }
+    }
+
+    // Remove the body from the requirement decl.
+    auto requirementFunc = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementFunc))
+        funcDecl->body = nullptr;
+}
+
+static void maybeReparseInterfaceFuncAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* containerDecl,
+    TokenReader tokenReader)
+{
+    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
+    if (!funcDecl || !funcDecl->body)
+        return;
+
+    auto interfaceDecl = as<InterfaceDecl>(containerDecl);
+    if (!interfaceDecl)
+        return;
+
+    if (parser->sink->getErrorCount() != 0)
+        return;
+
+    Parser newParser(*parser);
+    newParser.tokenReader = tokenReader;
+    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+}
+
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
 {
+    TokenReader tokenReader;
     Token closingBraceToken;
+    bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
         if (parser->options.allowGLSLInput)
@@ -5143,7 +5235,58 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
         }
-        ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+            tokenReader = parser->tokenReader;
+        auto decl = ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+        {
+            // If we parsed an interface method with a body (for the default implementation),
+            // we will create a duplicate decl where it is nested inside an explicit generic
+            // decl, such that `ThisType` is a generic type parameter.
+            // For an example, if the user writes:
+            // ```
+            // interface IFoo {
+            //  int getVal();
+            //  int getGreaterVal() { return getVal() + 1; }
+            // }
+            // ```
+            // We will represent `IFoo` as:
+            // ```
+            // interface IFoo {
+            //     int getVal();
+            //
+            //     [HasInterfaceDefaultImplModifier(getGreaterVal_defaultImpl)]
+            //     int getGreaterVal();
+            //
+            //     __interface_default_impl_generic<This:IFoo>
+            //     int getGreaterVal_defaultImpl() {
+            //        // `this` here will have type `This` (generic param).
+            //        return this.getVal() + 1;
+            //     }
+            // }
+            // ```
+            // Where `__interface_default_impl_generic` is a sub-class of `__generic`, and
+            // acts exactly like a generic. The sub-class is just to make it easy to
+            // identify a default impl. An interface default impl decl will not be treated
+            // as an interface requirement and lowered as an entry in the witness table,
+            // instead it is just an ordinary member decl that will be lowered into an
+            // `IRGeneric`.
+            //
+            // Ideally we would achieve the same result by parsing the function once, and
+            // then clone the AST nodes to represent `getGreaterVal_defaultImpl`, but we
+            // don't have the infrastructure to do that just yet. So we will play a dirty
+            // trick to achieve the same effect by re-parsing the method body as an
+            // explicit generic decl. Fortunately, this redundant parsing won't actually
+            // cause too much redundant work, because the function bodies are only parsed
+            // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
+            // process. Once we have the functionality to systematically clone AST nodes,
+            // we can eliminate this reparsing hack.
+            maybeReparseInterfaceFuncAsExplicitGeneric(
+                parser,
+                as<Decl>(decl),
+                containerDecl,
+                tokenReader);
+        }
     }
     containerDecl->closingSourceLoc = closingBraceToken.loc;
 }
@@ -9343,6 +9486,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("writeonly", parseWriteonlyModifier),
     _makeParseModifier("export", getSyntaxClass<HLSLExportModifier>()),
     _makeParseModifier("dynamic_uniform", getSyntaxClass<DynamicUniformModifier>()),
+    _makeParseModifier("override", getSyntaxClass<OverrideModifier>()),
 
     // Modifiers for geometry shader input
     _makeParseModifier("point", getSyntaxClass<HLSLPointModifier>()),

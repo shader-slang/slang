@@ -722,7 +722,7 @@ typedef uint32_t SlangSizeT;
         // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-    constexpr static SlangTargetFlags kDefaultTargetFlags =
+    inline constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
     /*!
@@ -1025,6 +1025,7 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
+        EmitSeparateDebug, // bool
         CountOf,
     };
 
@@ -4163,8 +4164,31 @@ struct IMetadata : public ISlangCastable
         SlangUInt spaceIndex,            // `space` for D3D12, `set` for Vulkan
         SlangUInt registerIndex,         // `register` for D3D12, `binding` for Vulkan
         bool& outUsed) = 0;
+
+    /*
+    Returns the debug build identifier for a base and debug spirv pair.
+    */
+    virtual const char* getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+/** Compile result for storing and retrieving multiple output blobs.
+    This is needed for features such as separate debug compilation which
+    output both base and debug spirv.
+ */
+struct ICompileResult : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x5fa9380e,
+        0xb62f,
+        0x41e5,
+        {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
+
+    virtual uint32_t getItemCount() = 0;
+    virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
+    virtual SlangResult getMetadata(IMetadata** outMetadata) = 0;
+};
+    #define SLANG_UUID_ICompileResult ICompileResult::getTypeGuid()
 
 /** A component type is a unit of shader code layout, reflection, and linking.
 
@@ -4401,6 +4425,35 @@ struct ITypeConformance : public IComponentType
     SLANG_COM_INTERFACE(0x73eb3147, 0xe544, 0x41b5, {0xb8, 0xf0, 0xa2, 0x44, 0xdf, 0x21, 0x94, 0xb})
 };
     #define SLANG_UUID_ITypeConformance ITypeConformance::getTypeGuid()
+
+/** IComponentType2 is a component type used for getting separate debug data.
+
+This interface is used for getting separate debug data, introduced here to
+avoid breaking backwards compatibility of the IComponentType interface.
+
+The `getTargetCompileResult` and `getEntryPointCompileResult` functions
+are used to get the base and debug spirv, and metadata containing the
+debug build identifier.
+*/
+struct IComponentType2 : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0x9c2a4b3d,
+        0x7f68,
+        0x4e91,
+        {0xa5, 0x2c, 0x8b, 0x19, 0x3e, 0x45, 0x7a, 0x9f})
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+};
+    #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 
 /** A module is the granularity of shader code compilation and loading.
 

@@ -1847,6 +1847,8 @@ public:
         /// The type for which conformances are being checked
         Type* conformingType;
 
+        Witness* conformingWitness;
+
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
@@ -1899,6 +1901,11 @@ public:
         WitnessTable* witnessTable,
         DeclRef<CallableDecl> requirement,
         DeclRef<CallableDecl> method);
+
+    void markOverridingDecl(
+        ConformanceCheckingContext* context,
+        Decl* memberDecl,
+        DeclRef<Decl> requiredMemberDeclRef);
 
     /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
@@ -2036,6 +2043,13 @@ public:
 
     // Check and register a type if it is differentiable.
     void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+
+    // Find the default implementation of an interface requirement,
+    // and insert it to the witness table, if it exists.
+    bool findDefaultInterfaceImpl(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
 
     // Find the appropriate member of a declared type to
     // satisfy a requirement of an interface the type
@@ -2999,6 +3013,7 @@ public:
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);

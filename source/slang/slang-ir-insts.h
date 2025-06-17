@@ -3472,6 +3472,13 @@ struct IRDebugSource : IRInst
     IRInst* getSource() { return getOperand(1); }
 };
 
+struct IRDebugBuildIdentifier : IRInst
+{
+    IR_LEAF_ISA(DebugBuildIdentifier)
+    IRInst* getBuildIdentifier() { return getOperand(0); }
+    IRInst* getFlags() { return getOperand(1); }
+};
+
 struct IRDebugLine : IRInst
 {
     IR_LEAF_ISA(DebugLine)
@@ -4041,6 +4048,8 @@ public:
     }
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
+    IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
+    IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,
@@ -4976,7 +4985,7 @@ public:
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        int index = 0)
+        IRIntegerValue index = 0)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,

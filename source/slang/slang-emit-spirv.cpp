@@ -2284,6 +2284,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 return result;
             }
+        case kIROp_DebugBuildIdentifier:
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
+                auto debugBuildIdentifier = as<IRDebugBuildIdentifier>(inst);
+                return emitOpDebugBuildIdentifier(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    inst->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    debugBuildIdentifier->getBuildIdentifier(),
+                    debugBuildIdentifier->getFlags());
+            }
         case kIROp_GetStringHash:
             return emitGetStringHash(inst);
         case kIROp_AttributedType:
@@ -7751,27 +7763,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             List<IRInst*>::makeRepeated(scalar, Index(numElems)));
     }
 
-    bool isSignedType(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-            return true;
-        case kIROp_IntType:
-        case kIROp_Int16Type:
-        case kIROp_Int64Type:
-        case kIROp_Int8Type:
-            return true;
-        case kIROp_VectorType:
-            return isSignedType(as<IRVectorType>(type)->getElementType());
-        case kIROp_MatrixType:
-            return isSignedType(as<IRMatrixType>(type)->getElementType());
-        default:
-            return false;
-        }
-    }
-
     bool isFloatType(IRInst* type)
     {
         switch (type->getOp())
@@ -9181,6 +9172,10 @@ SlangResult emitSPIRVFromIR(
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
+        {
+            context.ensureInst(inst);
+        }
+        if (as<IRDebugBuildIdentifier>(inst))
         {
             context.ensureInst(inst);
         }

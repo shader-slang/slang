@@ -1,4 +1,4 @@
-//DISABLE_TEST:LANG_SERVER:
+//TEST:LANG_SERVER:
 //HOVER:6,15
 
 // Test that we can specialize a generic method called through a dynamic interface.

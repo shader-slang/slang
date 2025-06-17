@@ -420,6 +420,8 @@ public:
     }
 
     bool visitThisTypeExpr(ThisTypeExpr*) { return false; }
+    bool visitThisInterfaceExpr(ThisInterfaceExpr*) { return false; }
+
     bool visitAndTypeExpr(AndTypeExpr* expr)
     {
         if (dispatchIfNotNull(expr->left.exp))
@@ -847,7 +849,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             }
             if (shouldInspectChildren)
             {
-                for (auto member : container->members)
+                for (auto member : container->getDirectMemberDecls())
                 {
                     if (_findAstNodeImpl(context, member))
                         return true;
