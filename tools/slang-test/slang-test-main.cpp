@@ -951,7 +951,7 @@ static Result _executeRPC(
     {
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: getOrCreateJSONRPCConnection().");
+            "JSON RPC failure: getOrCreateJSONRPCConnection()");
         return SLANG_FAIL;
     }
 
@@ -960,7 +960,7 @@ static Result _executeRPC(
     {
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: sendCall().");
+            "JSON RPC failure: sendCall()");
 
         context->destroyRPCConnection();
         return SLANG_FAIL;
@@ -971,14 +971,14 @@ static Result _executeRPC(
     {
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: waitForResult().");
+            "JSON RPC failure: waitForResult()");
     }
 
     if (!rpcConnection->hasMessage())
     {
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: hasMessage().");
+            "JSON RPC failure: hasMessage()");
 
         // We can assume somethings gone wrong. So lets kill the connection and fail.
         context->destroyRPCConnection();
