@@ -964,8 +964,6 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     CapabilitySet getDeclaredCapabilitySet(Decl* decl);
 
-    void validateCapabilitiesOfDeclAfterVisitingChildren(Decl* decl);
-
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
@@ -14062,48 +14060,6 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
-void SemanticsDeclCapabilityVisitor::validateCapabilitiesOfDeclAfterVisitingChildren(Decl* decl)
-{
-    // Get require of decl + add parents
-    auto declaredCaps = getDeclaredCapabilitySet(decl);
-    auto vis = getDeclVisibility(decl);
-
-    // If 0 capabilities were annotated on this function,
-    // capabilities are inferred from the children.
-    if (declaredCaps.isEmpty())
-    {
-        declaredCaps = decl->inferredCapabilityRequirements;
-    }
-    else
-    {
-        if (vis == DeclVisibility::Public)
-        {
-            // We need to enforce that the function
-            // only uses capabilities that this decl declares. To do this
-            // we compare capabilities used in the `body` of the function
-            CapabilityAtomSet failedAvailableCapabilityConjunction;
-            if (!CapabilitySet::checkCapabilityRequirement(
-                    declaredCaps,
-                    decl->inferredCapabilityRequirements,
-                    failedAvailableCapabilityConjunction))
-            {
-                diagnoseUndeclaredCapability(
-                    decl,
-                    Diagnostics::useOfUndeclaredCapability,
-                    failedAvailableCapabilityConjunction);
-            }
-            decl->inferredCapabilityRequirements = declaredCaps;
-        }
-        else
-        {
-            // For internal decls, their inferred capability should be joined
-            // with the declared capabilities since we are assuming the stdlib
-            // is not wrong.
-            decl->inferredCapabilityRequirements.join(declaredCaps);
-        }
-    }
-}
-
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -14157,7 +14113,44 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         }
     }
 
-    validateCapabilitiesOfDeclAfterVisitingChildren(funcDecl);
+    // Get require of decl + add parents
+    auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
+    auto vis = getDeclVisibility(funcDecl);
+
+    // If 0 capabilities were annotated on this function,
+    // capabilities are inferred from the children.
+    if (declaredCaps.isEmpty())
+    {
+        declaredCaps = funcDecl->inferredCapabilityRequirements;
+    }
+    else
+    {
+        if (vis == DeclVisibility::Public)
+        {
+            // We need to enforce that the function
+            // only uses capabilities that this decl declares. To do this
+            // we compare capabilities used in the `body` of the function
+            CapabilityAtomSet failedAvailableCapabilityConjunction;
+            if (!CapabilitySet::checkCapabilityRequirement(
+                    declaredCaps,
+                    funcDecl->inferredCapabilityRequirements,
+                    failedAvailableCapabilityConjunction))
+            {
+                diagnoseUndeclaredCapability(
+                    funcDecl,
+                    Diagnostics::useOfUndeclaredCapability,
+                    failedAvailableCapabilityConjunction);
+            }
+            funcDecl->inferredCapabilityRequirements = declaredCaps;
+        }
+        else
+        {
+            // For internal decls, their inferred capability should be joined
+            // with the declared capabilities since we are assuming the stdlib
+            // is not wrong.
+            funcDecl->inferredCapabilityRequirements.join(declaredCaps);
+        }
+    }
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
