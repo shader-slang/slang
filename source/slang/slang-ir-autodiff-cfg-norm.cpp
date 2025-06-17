@@ -40,7 +40,7 @@ struct RegionEndpoint
 
 struct BreakableRegionInfo
 {
-    IRVar* breakVar;
+    IRVar* keepRunningVar;
     IRBlock* breakBlock;
     IRBlock* headerBlock;
 };
@@ -119,7 +119,7 @@ struct CFGNormalizationPass
 
         builder->setInsertInto(currBlock);
 
-        builder->emitStore(info->breakVar, builder->getBoolValue(false));
+        builder->emitStore(info->keepRunningVar, builder->getBoolValue(false));
         builder->emitBranch(afterBlock);
 
         // Is after-block unreachable?
@@ -240,9 +240,13 @@ struct CFGNormalizationPass
             auto afterSplitAfterBlock = builder.emitBlock();
 
             builder.setInsertInto(afterSplitBlock);
-            auto breakFlagValue = builder.emitLoad(parentRegion->breakVar);
+            auto keepRunningFlagValue = builder.emitLoad(parentRegion->keepRunningVar);
 
-            builder.emitIfElse(breakFlagValue, block, afterSplitAfterBlock, afterSplitAfterBlock);
+            builder.emitIfElse(
+                keepRunningFlagValue,
+                block,
+                afterSplitAfterBlock,
+                afterSplitAfterBlock);
 
             // At this point, we need to place afterSplitAfterBlock between
             // at the _end_ of this region, but we aren't there yet (and
@@ -514,13 +518,13 @@ struct CFGNormalizationPass
                 // Emit var into parent block.
                 builder.setInsertBefore(as<IRBlock>(branchInst->getParent())->getTerminator());
 
-                // Create and initialize break var to true
+                // Create and initialize keepRunning var to true
                 // true -> no break yet.
                 // false -> atleast one break statement hit.
                 //
-                info.breakVar = builder.emitVar(builder.getBoolType());
-                builder.addNameHintDecoration(info.breakVar, UnownedStringSlice("_bflag"));
-                builder.emitStore(info.breakVar, builder.getBoolValue(true));
+                info.keepRunningVar = builder.emitVar(builder.getBoolType());
+                builder.addNameHintDecoration(info.keepRunningVar, UnownedStringSlice("_runFlag"));
+                builder.emitStore(info.keepRunningVar, builder.getBoolValue(true));
 
                 // If the loop is trivial (i.e. single iteration, with no
                 // edges actually in a loop), we're just going to remove
@@ -624,7 +628,7 @@ struct CFGNormalizationPass
                     auto cond = ifElse->getCondition();
 
                     builder.setInsertBefore(ifElse);
-                    auto breakFlagVal = builder.emitLoad(info.breakVar);
+                    auto breakFlagVal = builder.emitLoad(info.keepRunningVar);
 
                     // Need to invert the break flag if the loop is
                     // on the false side.
@@ -665,8 +669,8 @@ struct CFGNormalizationPass
                 // true -> no break yet.
                 // false -> atleast one break statement hit.
                 //
-                info.breakVar = builder.emitVar(builder.getBoolType());
-                builder.emitStore(info.breakVar, builder.getBoolValue(true));
+                info.keepRunningVar = builder.emitVar(builder.getBoolType());
+                builder.emitStore(info.keepRunningVar, builder.getBoolValue(true));
 
                 // Go over case labels and normalize all sub-regions.
                 for (UIndex ii = 0; ii < switchInst->getCaseCount(); ii++)
