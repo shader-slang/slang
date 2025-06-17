@@ -1900,13 +1900,6 @@ struct Array : IRWArray<T>
     int getCount();
 }
 
-__generic<T, let N : int>
-extension Array<T, N>
-{
-    __intrinsic_op($(kIROp_GetArrayLength))
-    int getCount();
-}
-
 /// @category math_types Math types
 /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
