@@ -5055,8 +5055,25 @@ HasInterfaceDefaultImplModifier* hasDefaultImpl(DeclRef<Decl> declRef)
     return nullptr;
 }
 
-void SemanticsVisitor::markOverridingDecl(Decl* memberDecl, DeclRef<Decl> requiredMemberDeclRef)
+void SemanticsVisitor::markOverridingDecl(
+    ConformanceCheckingContext* context,
+    Decl* memberDecl,
+    DeclRef<Decl> requiredMemberDeclRef)
 {
+    if (!memberDecl->isChildOf(context->parentDecl))
+    {
+        // If the member being checked isn't the child of the container decl containing
+        // the inheritance decl that triggers the conformance check, don't modify/diagnose
+        // anything since it should have already been diagnosed when checking its parent.
+        // This can happen when we check for things like:
+        //    extension float : IComparable{}
+        // where the method used to satisfy IComparable comes from outside the extension decl.
+        // we don't want to diagnose or check anything about the found memberDecl that doesn't
+        // belong to this extension decl (context->parentDecl).
+        //
+        return;
+    }
+
     if (hasDefaultImpl(requiredMemberDeclRef))
     {
         memberDecl = maybeGetInner(memberDecl);
@@ -5363,7 +5380,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     }
                 }
 
-                markOverridingDecl(callee.getDecl(), requiredMemberDeclRef);
+                markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
             }
         }
     }
@@ -7251,7 +7268,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     QualifiedDeclPath(requiredMemberDeclRef));
                 return false;
             }
-            markOverridingDecl(member.declRef.getDecl(), requiredMemberDeclRef);
+            markOverridingDecl(context, member.declRef.getDecl(), requiredMemberDeclRef);
             return true;
         }
     }

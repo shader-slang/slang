@@ -78,7 +78,7 @@ class IsOverridingModifier : public Modifier
 {
     FIDDLE(...)
 
-    FIDDLE() Decl* overridedDecl;
+    FIDDLE() Decl* overridedDecl = nullptr;
 };
 
 FIDDLE()
