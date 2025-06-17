@@ -3252,9 +3252,9 @@ void maybeAddReturnDestinationParam(
     if (as<SubscriptDecl>(callableDeclRef.getParent()))
         return;
 
-    // If we lack a function body we cannot return using a ref since we have 
-    // no body to replace `return` with, skip adding param.
-    // This is fine since intrinsics already can return a ref directly.
+    // There is no-body to replace `return` with, skip adding param.
+    // This is functionally fine since intrinsics (when we lack a body) can
+    // already return a ref directly.
     auto functionDeclBase = as<FunctionDeclBase>(callableDeclRef.getDecl());
     if (!functionDeclBase)
         return;
