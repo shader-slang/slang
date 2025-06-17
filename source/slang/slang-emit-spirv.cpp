@@ -5125,8 +5125,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto width = int32_t(getIntVal(denormDecor->getWidth()));
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
                 requireSPIRVCapability(SpvCapabilityDenormFlushToZero);
-                requireSPIRVExecutionMode(
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
                     decoration,
+                    SpvOpExecutionMode,
                     dstID,
                     SpvExecutionModeDenormFlushToZero,
                     SpvLiteralInteger::from32(width));
