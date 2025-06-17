@@ -4947,6 +4947,7 @@ T __getElement<T, U, I>(U collection, I index);
 
 /// @category stage_io Stage IO types
 __generic<T, let N : int>
+[require(glsl_hlsl_spirv, geometry)]
 [require(glsl_hlsl_spirv, hull)]
 __magic_type(HLSLInputPatchType)
 __intrinsic_type($(kIROp_HLSLInputPatchType))
