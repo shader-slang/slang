@@ -7763,27 +7763,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             List<IRInst*>::makeRepeated(scalar, Index(numElems)));
     }
 
-    bool isSignedType(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-            return true;
-        case kIROp_IntType:
-        case kIROp_Int16Type:
-        case kIROp_Int64Type:
-        case kIROp_Int8Type:
-            return true;
-        case kIROp_VectorType:
-            return isSignedType(as<IRVectorType>(type)->getElementType());
-        case kIROp_MatrixType:
-            return isSignedType(as<IRMatrixType>(type)->getElementType());
-        default:
-            return false;
-        }
-    }
-
     bool isFloatType(IRInst* type)
     {
         switch (type->getOp())
