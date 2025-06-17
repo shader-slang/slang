@@ -1305,7 +1305,7 @@ void ASTPrinter::addWhereParams(const DeclRef<GenericDecl>& genericDeclRef)
     }
 }
 void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
-    {
+{
     auto& sb = m_builder;
 
     sb << "<";

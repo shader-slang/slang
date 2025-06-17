@@ -3258,13 +3258,13 @@ void maybeAddReturnDestinationParam(
     auto functionDeclBase = as<FunctionDeclBase>(callableDeclRef.getDecl());
     if (!functionDeclBase)
         return;
-    if(!as<FunctionDeclBase>(callableDeclRef.getDecl())->body)
+    if (!as<FunctionDeclBase>(callableDeclRef.getDecl())->body)
         return;
 
     // We should only be returning with a ref if our return is noncopyable
     if (!isNonCopyableType(callableDeclRef.getDecl()->returnType))
         return;
-    
+
     IRLoweringParameterInfo info;
     info.type = realResultType;
     info.decl = nullptr;
@@ -3507,7 +3507,7 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& irResultType = outInfo.resultType;
 
     // Should be based on original definition of function.
-    // Generic may resolve result as a copyable, but if definition 
+    // Generic may resolve result as a copyable, but if definition
     // is NonCopyable we need to ensure we emit a function compatible
     // assuming a NonCopyable param.
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
@@ -3596,14 +3596,14 @@ static LoweredValInfo _emitCallToAccessor(
     LoweredValInfo resultOfRefParam;
     if (info.returnViaLastRefParam)
     {
-         // Create a temporary variable to hold the result.
-         // we will rewrite the return to alias the final
-         // param later.
-         auto tempVar = context->irBuilder->emitVar(
-             tryGetPointedToType(context->irBuilder, info.paramTypes.getLast()));
-         allArgs.add(tempVar);
-         resultOfRefParam = LoweredValInfo::ptr(tempVar);
-     }
+        // Create a temporary variable to hold the result.
+        // we will rewrite the return to alias the final
+        // param later.
+        auto tempVar = context->irBuilder->emitVar(
+            tryGetPointedToType(context->irBuilder, info.paramTypes.getLast()));
+        allArgs.add(tempVar);
+        resultOfRefParam = LoweredValInfo::ptr(tempVar);
+    }
 
     LoweredValInfo resultOfCall = emitCallToDeclRef(
         context,
@@ -3615,7 +3615,7 @@ static LoweredValInfo _emitCallToAccessor(
         TryClauseEnvironment());
 
     applyOutArgumentFixups(context, fixups);
-    
+
     if (info.returnViaLastRefParam)
         return resultOfRefParam;
     return resultOfCall;
