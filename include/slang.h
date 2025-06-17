@@ -924,7 +924,9 @@ typedef uint32_t SlangSizeT;
         DisableDynamicDispatch,    // bool
         DisableSpecialization,     // bool
         FloatingPointMode,         // intValue0: FloatingPointMode
-        FpDenormMode,              // intValue0: FpDenormMode
+        DenormModeFp16,            // intValue0: FpDenormMode
+        DenormModeFp32,            // intValue0: FpDenormMode
+        DenormModeFp64,            // intValue0: FpDenormMode
         DebugInformation,          // intValue0: DebugInfoLevel
         LineDirectiveMode,
         Optimization, // intValue0: OptimizationLevel

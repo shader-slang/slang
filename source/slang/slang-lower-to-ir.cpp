@@ -11218,20 +11218,56 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             derivativeGroupLinearDecor,
             numThreadsDecor);
 
-        // Add DenormPreserve and DenormFlushToZero decorations based on FpDenormMode option
-        auto linkage = context->getLinkage();
-        if (linkage->m_optionSet.hasOption(CompilerOptionName::FpDenormMode))
+        // Add DenormPreserve and DenormFlushToZero decorations
         {
-            auto fpDenormMode = linkage->m_optionSet.getFpDenormMode();
-            if (fpDenormMode == FpDenormMode::Preserve)
+            auto linkage = context->getLinkage();
+            
+            // Handle FP16 denorm mode
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16))
             {
-                auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
-                getBuilder()->addDenormPreserveDecoration(irFunc, width32);
+                auto fpDenormMode = linkage->m_optionSet.getDenormModeFp16();
+                if (fpDenormMode == FpDenormMode::Preserve)
+                {
+                    auto width16 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 16);
+                    getBuilder()->addDenormPreserveDecoration(irFunc, width16);
+                }
+                else if (fpDenormMode == FpDenormMode::Ftz)
+                {
+                    auto width16 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 16);
+                    getBuilder()->addDenormFlushToZeroDecoration(irFunc, width16);
+                }
             }
-            else if (fpDenormMode == FpDenormMode::Ftz)
+            
+            // Handle FP32 denorm mode
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32))
             {
-                auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
-                getBuilder()->addDenormFlushToZeroDecoration(irFunc, width32);
+                auto fpDenormMode = linkage->m_optionSet.getDenormModeFp32();
+                if (fpDenormMode == FpDenormMode::Preserve)
+                {
+                    auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
+                    getBuilder()->addDenormPreserveDecoration(irFunc, width32);
+                }
+                else if (fpDenormMode == FpDenormMode::Ftz)
+                {
+                    auto width32 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 32);
+                    getBuilder()->addDenormFlushToZeroDecoration(irFunc, width32);
+                }
+            }
+            
+            // Handle FP64 denorm mode
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64))
+            {
+                auto fpDenormMode = linkage->m_optionSet.getDenormModeFp64();
+                if (fpDenormMode == FpDenormMode::Preserve)
+                {
+                    auto width64 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 64);
+                    getBuilder()->addDenormPreserveDecoration(irFunc, width64);
+                }
+                else if (fpDenormMode == FpDenormMode::Ftz)
+                {
+                    auto width64 = getBuilder()->getIntValue(getBuilder()->getUIntType(), 64);
+                    getBuilder()->addDenormFlushToZeroDecoration(irFunc, width64);
+                }
             }
         }
 

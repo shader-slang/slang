@@ -188,8 +188,22 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
-            "fp-denorm-mode",
-            "Floating Point Denormal Mode",
+            "denorm-mode-fp16",
+            "16-bit Floating Point Denormal Mode",
+            UserValue(ValueCategory::FpDenormMode));
+        options.addValues(TypeTextUtil::getFpDenormModeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "denorm-mode-fp32",
+            "32-bit Floating Point Denormal Mode",
+            UserValue(ValueCategory::FpDenormMode));
+        options.addValues(TypeTextUtil::getFpDenormModeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "denorm-mode-fp64",
+            "64-bit Floating Point Denormal Mode",
             UserValue(ValueCategory::FpDenormMode));
         options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
@@ -589,10 +603,18 @@ void initCommandOptions(CommandOptions& options)
          "-fp-mode,-floating-point-mode",
          "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>",
          "Control floating point optimizations"},
-        {OptionKind::FpDenormMode,
-         "-fp-denorm-mode",
-         "-fp-denorm-mode <mode>",
-         "Control handling of denormal floating point values (any, preserve, ftz)"},
+        {OptionKind::DenormModeFp16,
+         "-denorm-mode-fp16",
+         "-denorm-mode-fp16 <mode>",
+         "Control handling of 16-bit denormal floating point values (any, preserve, ftz)"},
+        {OptionKind::DenormModeFp32,
+         "-denorm-mode-fp32",
+         "-denorm-mode-fp32 <mode>",
+         "Control handling of 32-bit denormal floating point values (any, preserve, ftz)"},
+        {OptionKind::DenormModeFp64,
+         "-denorm-mode-fp64",
+         "-denorm-mode-fp64 <mode>",
+         "Control handling of 64-bit denormal floating point values (any, preserve, ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",
@@ -2818,11 +2840,25 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 setFloatingPointMode(getCurrentTarget(), value);
                 break;
             }
-        case OptionKind::FpDenormMode:
+        case OptionKind::DenormModeFp16:
             {
                 FpDenormMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
-                linkage->m_optionSet.set(CompilerOptionName::FpDenormMode, value);
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp16, value);
+                break;
+            }
+        case OptionKind::DenormModeFp32:
+            {
+                FpDenormMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp32, value);
+                break;
+            }
+        case OptionKind::DenormModeFp64:
+            {
+                FpDenormMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp64, value);
                 break;
             }
         case OptionKind::Optimization:

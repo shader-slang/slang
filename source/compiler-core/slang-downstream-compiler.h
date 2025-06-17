@@ -285,8 +285,10 @@ struct DownstreamCompileOptions
     // The debug info format to use.
     SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
 
-    // NOTE: New fields must be added at the end for versioning compatibility
-    FpDenormMode fpDenormMode = FpDenormMode::Any;
+    // The denormal mode to use for each floating point precision
+    FpDenormMode denormModeFp16 = FpDenormMode::Any;
+    FpDenormMode denormModeFp32 = FpDenormMode::Any;
+    FpDenormMode denormModeFp64 = FpDenormMode::Any;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 

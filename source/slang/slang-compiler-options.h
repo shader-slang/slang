@@ -376,9 +376,19 @@ struct CompilerOptionSet
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
     }
 
-    FpDenormMode getFpDenormMode()
+    FpDenormMode getDenormModeFp16()
     {
-        return getEnumOption<FpDenormMode>(CompilerOptionName::FpDenormMode);
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp16);
+    }
+
+    FpDenormMode getDenormModeFp32()
+    {
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp32);
+    }
+
+    FpDenormMode getDenormModeFp64()
+    {
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp64);
     }
 
     LineDirectiveMode getLineDirectiveMode()

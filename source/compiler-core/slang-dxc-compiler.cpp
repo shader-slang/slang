@@ -512,7 +512,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         break;
     }
 
-    switch (options.fpDenormMode)
+    switch (options.denormModeFp32)
     {
     default:
     case CompileOptions::FpDenormMode::Any:
