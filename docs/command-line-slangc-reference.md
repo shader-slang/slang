@@ -1308,6 +1308,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
+* `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
 * `ser` 
