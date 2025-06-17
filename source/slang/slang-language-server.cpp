@@ -252,7 +252,18 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 
 SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams& args)
 {
-    return m_core.didOpenTextDocument(args);
+    // When periodic diagnostic updates are disabled (e.g., for testing),
+    // the main server loop will not automatically publish diagnostics.
+    // In this case, we must manually trigger a diagnostic publication
+    // after any action that could affect the results, such as opening a document.
+    // The same logic applies to didChange and didClose handlers.
+    resetDiagnosticUpdateTime();
+    auto result = m_core.didOpenTextDocument(args);
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    return result;
 }
 
 static bool isBoolType(Type* t)
@@ -2541,7 +2552,12 @@ void LanguageServer::processCommands()
 SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParams& args)
 {
     resetDiagnosticUpdateTime();
-    return m_core.didCloseTextDocument(args);
+    auto result = m_core.didCloseTextDocument(args);
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    return result;
 }
 
 SlangResult LanguageServerCore::didCloseTextDocument(const DidCloseTextDocumentParams& args)
@@ -2554,7 +2570,12 @@ SlangResult LanguageServerCore::didCloseTextDocument(const DidCloseTextDocumentP
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
 {
     resetDiagnosticUpdateTime();
-    return m_core.didChangeTextDocument(args);
+    auto result = m_core.didChangeTextDocument(args);
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    return result;
 }
 
 SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumentParams& args)
@@ -2583,7 +2604,8 @@ void LanguageServer::update()
 {
     if (!m_core.m_workspace)
         return;
-    publishDiagnostics();
+    if (m_core.m_options.periodicDiagnosticUpdate)
+        publishDiagnostics();
 }
 
 void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
@@ -2689,7 +2711,24 @@ SLANG_API void LanguageServerStartupOptions::parse(int argc, const char* const* 
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-vs") == 0)
+        {
             isVisualStudio = true;
+        }
+        else if (strcmp(argv[i], "-periodic-diagnostic-update") == 0)
+        {
+            periodicDiagnosticUpdate = true;
+            if (i + 1 < argc)
+            {
+                const char* value = argv[i + 1];
+                if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                    value[0] == '0' ||
+                    ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+                {
+                    periodicDiagnosticUpdate = false;
+                }
+                i++;
+            }
+        }
     }
 }
 

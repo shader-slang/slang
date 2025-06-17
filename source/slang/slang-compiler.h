@@ -285,6 +285,7 @@ class ComponentTypeVisitor;
 ///
 class ComponentType : public RefObject,
                       public slang::IComponentType,
+                      public slang::IComponentType2,
                       public slang::IModulePrecompileService_Experimental
 {
 public:
@@ -324,16 +325,6 @@ public:
         slang::IMetadata** outMetadata,
         slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
-        slang::ICompileResult** outCompileResult,
-        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
-    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
-        SlangInt targetIndex,
-        slang::ICompileResult** outCompileResult,
-        slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
-
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -369,6 +360,19 @@ public:
         slang::CompilerOptionEntry* entries,
         ISlangBlob** outDiagnostics) override;
 
+    //
+    // slang::IComponentType2 interface
+    //
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
     //
     // slang::IModulePrecompileService interface
