@@ -970,7 +970,7 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
-    
+
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
     void visitParamDecl(ParamDecl* paramDecl) { checkVarDeclCommon(paramDecl); }
@@ -14057,13 +14057,14 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
 void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
-    // to ensure consistency (children get parent capabilities which are un-set through `getDeclaredCapabilitySet`).
+    // to ensure consistency (children get parent capabilities which are un-set through
+    // `getDeclaredCapabilitySet`).
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
 void SemanticsDeclCapabilityVisitor::validateCapabilitiesOfDeclAfterVisitingChildren(Decl* decl)
 {
-    //Get require of decl + add parents
+    // Get require of decl + add parents
     auto declaredCaps = getDeclaredCapabilitySet(decl);
     auto vis = getDeclVisibility(decl);
 
