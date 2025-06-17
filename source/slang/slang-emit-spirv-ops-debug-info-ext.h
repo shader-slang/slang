@@ -517,7 +517,8 @@ SpvInst* emitOpDebugLocalVariable(
         // Note +1 logic for argIndex is to follow the convention that
         // 1-based index of the argument is used by GLSLANG/DXC NSDI.
         IRBuilder builder(argIndex);
-        IRInst* newArgIndex = builder.getIntValue(builder.getUIntType(), as<IRIntLit>(argIndex)->getValue() + 1);
+        IRInst* newArgIndex =
+            builder.getIntValue(builder.getUIntType(), as<IRIntLit>(argIndex)->getValue() + 1);
 
         return emitInst(
             parent,
