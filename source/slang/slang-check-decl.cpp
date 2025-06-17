@@ -970,7 +970,7 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
-    
+
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
     void visitParamDecl(ParamDecl* paramDecl) { checkVarDeclCommon(paramDecl); }
@@ -5055,6 +5055,40 @@ HasInterfaceDefaultImplModifier* hasDefaultImpl(DeclRef<Decl> declRef)
     return nullptr;
 }
 
+void SemanticsVisitor::markOverridingDecl(
+    ConformanceCheckingContext* context,
+    Decl* memberDecl,
+    DeclRef<Decl> requiredMemberDeclRef)
+{
+    if (!memberDecl->isChildOf(context->parentDecl))
+    {
+        // If the member being checked isn't the child of the container decl containing
+        // the inheritance decl that triggers the conformance check, don't modify/diagnose
+        // anything since it should have already been diagnosed when checking its parent.
+        // This can happen when we check for things like:
+        //    extension float : IComparable{}
+        // where the method used to satisfy IComparable comes from outside the extension decl.
+        // we don't want to diagnose or check anything about the found memberDecl that doesn't
+        // belong to this extension decl (context->parentDecl).
+        //
+        return;
+    }
+
+    if (hasDefaultImpl(requiredMemberDeclRef))
+    {
+        memberDecl = maybeGetInner(memberDecl);
+        // If the required member has a default implementation,
+        // we need to make sure the member we found is marked as 'override'.
+        if (!memberDecl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(memberDecl, Diagnostics::missingOverride);
+        }
+    }
+    auto overridingModifier = m_astBuilder->create<IsOverridingModifier>();
+    overridingModifier->overridedDecl = requiredMemberDeclRef.getDecl();
+    addModifier(memberDecl, overridingModifier);
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -5345,6 +5379,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         return false;
                     }
                 }
+
+                markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
             }
         }
     }
@@ -7232,6 +7268,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     QualifiedDeclPath(requiredMemberDeclRef));
                 return false;
             }
+            markOverridingDecl(context, member.declRef.getDecl(), requiredMemberDeclRef);
             return true;
         }
     }
@@ -7738,6 +7775,33 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // only the types that are affected by these interface decls.
         //
         astBuilder->incrementEpoch();
+
+        // For all members marked as `override`, we need to ensure they are actually
+        // overriding something.
+        for (auto member : decl->getMembers())
+        {
+            auto innerMember = maybeGetInner(member);
+            bool hasOverride = false;
+            bool isOverriding = false;
+            for (auto modifier : innerMember->modifiers)
+            {
+                if (as<OverrideModifier>(modifier))
+                {
+                    hasOverride = true;
+                }
+                else if (as<IsOverridingModifier>(modifier))
+                {
+                    isOverriding = true;
+                }
+            }
+            if (hasOverride && !isOverriding)
+            {
+                getSink()->diagnose(
+                    innerMember,
+                    Diagnostics::overrideModifierNotOverridingBaseDecl,
+                    innerMember);
+            }
+        }
     }
 }
 
@@ -13993,13 +14057,14 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
 void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
-    // to ensure consistency (children get parent capabilities which are un-set through `getDeclaredCapabilitySet`).
+    // to ensure consistency (children get parent capabilities which are un-set through
+    // `getDeclaredCapabilitySet`).
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
 void SemanticsDeclCapabilityVisitor::validateCapabilitiesOfDeclAfterVisitingChildren(Decl* decl)
 {
-    //Get require of decl + add parents
+    // Get require of decl + add parents
     auto declaredCaps = getDeclaredCapabilitySet(decl);
     auto vis = getDeclVisibility(decl);
 

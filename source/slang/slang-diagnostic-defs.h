@@ -1736,6 +1736,17 @@ DIAGNOSTIC(
     invalidExtensionOnInterface,
     "cannot extend interface type '$0'. consider using a generic extension: `extension<T:$0> T "
     "{...}`.")
+DIAGNOSTIC(
+    30853,
+    Error,
+    missingOverride,
+    "missing 'override' keyword for methods that overrides the default implementation in the "
+    "interface.")
+DIAGNOSTIC(
+    30854,
+    Error,
+    overrideModifierNotOverridingBaseDecl,
+    "'$0' marked as 'override' is not overriding any base declarations.")
 
 // 309xx: subscripts
 DIAGNOSTIC(

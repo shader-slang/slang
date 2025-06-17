@@ -30,7 +30,7 @@ struct Impl2 : IFoo<2>
     }
     
     // overriding default implementation.
-    int getGreaterVal<int x>()
+    override int getGreaterVal<int x>()
     {
         return 100 + x;
     }
