@@ -22,7 +22,7 @@ static const char* kDeclKeywords[] = {
     "protected",  "typedef",        "typealias", "uniform",  "export",  "groupshared",
     "extension",  "associatedtype", "namespace", "This",     "using",   "__generic",
     "__exported", "import",         "enum",      "cbuffer",  "tbuffer", "func",
-    "functype",   "typename",       "each",      "expand",   "where"};
+    "functype",   "typename",       "each",      "expand",   "where",   "override"};
 static const char* kStmtKeywords[] = {
     "if",
     "else",
@@ -96,6 +96,8 @@ static const char* hlslSemanticNames[] = {
     "packoffset",
     "read",
     "write",
+    "SV_BaseInstanceID",
+    "SV_BaryCentrics",
     "SV_ClipDistance",
     "SV_CullDistance",
     "SV_Coverage",
@@ -126,6 +128,8 @@ static const char* hlslSemanticNames[] = {
     "SV_VertexID",
     "SV_ViewID",
     "SV_ViewportArrayIndex",
+    "SV_VulkanVertexID",
+    "SV_VulkanInstanceID",
     "SV_ShadingRate",
     "SV_StartVertexLocation",
     "SV_StartInstanceLocation",
