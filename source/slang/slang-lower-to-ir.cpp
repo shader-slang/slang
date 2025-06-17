@@ -7855,6 +7855,14 @@ top:
                     // we simply form a pointer to each of the vector
                     // elements and write to them individually.
                     IRInst* irRightVal = getSimpleVal(context, right);
+
+                    // If there is a mismatch between the signedness of the left and rigth values
+                    // then emit a cast
+                    if (isSignedType(swizzleInfo->type) != isSignedType(irRightVal->getDataType()))
+                    {
+                        irRightVal = builder->emitCast(swizzleInfo->type, irRightVal);
+                    }
+
                     swizzledStore(
                         loweredBase.val,
                         irRightVal,
