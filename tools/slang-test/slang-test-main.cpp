@@ -949,21 +949,37 @@ static Result _executeRPC(
     JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
     if (!rpcConnection)
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getOrCreateJSONRPCConnection().");
         return SLANG_FAIL;
     }
 
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: sendCall().");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
 
     // Wait for the result
-    rpcConnection->waitForResult(context->connectionTimeOutInMs);
+    if (SLANG_FAILED(rpcConnection->waitForResult(context->connectionTimeOutInMs)))
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: waitForResult().");
+    }
 
     if (!rpcConnection->hasMessage())
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: hasMessage().");
+
         // We can assume somethings gone wrong. So lets kill the connection and fail.
         context->destroyRPCConnection();
         return SLANG_FAIL;
@@ -971,6 +987,10 @@ static Result _executeRPC(
 
     if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getMessageType() != JSONRPCMessageType::Result");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
@@ -979,6 +999,10 @@ static Result _executeRPC(
     TestServerProtocol::ExecutionResult exeRes;
     if (SLANG_FAILED(rpcConnection->getMessage(&exeRes)))
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getMessage()");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
@@ -4780,8 +4804,8 @@ static SlangResult runUnitTestModule(
                 }
 
                 // If the test failed and it is not an expected failure, add it to the list of
-                // failed unit tests.
-                if (isFailed &&
+                // failed unit tests so that we can retry.
+                if (isFailed && !context->isRetry &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
