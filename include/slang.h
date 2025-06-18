@@ -963,7 +963,7 @@ typedef uint32_t SlangSizeT;
         PreprocessorOutput,
         OutputIncludes,
         ReproFileSystem,
-        SerialIr,    // bool
+        REMOVED_SerialIR, // deprecated and removed
         SkipCodeGen, // bool
         ValidateIr,  // bool
         VerbosePaths,

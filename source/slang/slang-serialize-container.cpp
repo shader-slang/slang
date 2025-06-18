@@ -32,9 +32,9 @@ public:
     ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
         : _options(options), _stream(stream), _containerStringPool(StringSlicePool::Style::Default)
     {
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            _sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
+            _sourceLocWriter = new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
         _cursor = RIFF::BuildCursor(_riff);
@@ -141,7 +141,7 @@ public:
         IRSerialWriter writer;
 
         SLANG_RETURN_ON_FAIL(
-            writer.write(irModule, _sourceLocWriter, _options.optionFlags, &serialData));
+            writer.write(irModule, _sourceLocWriter, &serialData));
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
 
         return SLANG_OK;
@@ -185,9 +185,6 @@ public:
 
     SlangResult encode(Module* module)
     {
-        if (!(_options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
-            return SLANG_OK;
-
         SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleFourCC);
 
         // The first piece that we write for a module is its header.
@@ -216,31 +213,23 @@ public:
             encodeModuleDependencyPaths(module);
         }
 
-        // If serialization of Slang IR modules is enabled, and there
-        // is IR available for this module, then we we encode it.
+        // If there is IR available for this module, then we we encode it.
         //
-        if ((_options.optionFlags & SerialOptionFlag::IRModule))
+        if (auto irModule = module->getIRModule())
         {
-            if (auto irModule = module->getIRModule())
-            {
-                IRSerialData serialData;
-                IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(
-                    writer.write(irModule, _sourceLocWriter, _options.optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
-            }
+            IRSerialData serialData;
+            IRSerialWriter writer;
+            SLANG_RETURN_ON_FAIL(
+                writer.write(irModule, _sourceLocWriter, &serialData));
+            SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
         }
 
-        // If serialization of AST information is enabled, and we have AST
-        // information available, then we serialize it here.
+        // If we have AST information available, then we serialize it here.
         //
-        if (_options.optionFlags & SerialOptionFlag::ASTModule)
+        if (auto moduleDecl = module->getModuleDecl())
         {
-            if (auto moduleDecl = module->getModuleDecl())
-            {
-                SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
-                writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
-            }
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
+            writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
         }
 
         return SLANG_OK;
@@ -643,16 +632,16 @@ SlangResult decodeModuleIR(
 
         RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
+            sourceLocWriter = new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
         {
-            // Write IR out to serialData - copying over SourceLoc information directly
+            // Write IR out to `irData`
             IRSerialWriter writer;
             SLANG_RETURN_ON_FAIL(
-                writer.write(module, sourceLocWriter, options.optionFlags, &irData));
+                writer.write(module, sourceLocWriter, &irData));
         }
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(irData, cursor));
 
@@ -672,7 +661,7 @@ SlangResult decodeModuleIR(
     memoryStream.seek(SeekOrigin::Start, 0);
 
     SourceManager workSourceManager;
-    workSourceManager.initialize(options.sourceManager, nullptr);
+    workSourceManager.initialize(options.sourceManagerToUseWhenSerializingSourceLocs, nullptr);
 
     // The read ir module
     RefPtr<IRModule> irReadModule;
@@ -695,7 +684,7 @@ SlangResult decodeModuleIR(
         RefPtr<SerialSourceLocReader> sourceLocReader;
 
         // If we have debug info then find and read it
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
             auto debugChunk = DebugChunk::find(moduleChunk);
             if (!debugChunk)
@@ -742,23 +731,7 @@ SlangResult decodeModuleIR(
         return SLANG_FAIL;
     }
 
-    if (options.optionFlags & SerialOptionFlag::RawSourceLocation)
-    {
-        SLANG_ASSERT(readInsts[0] == originalInsts[0]);
-        // All the source locs should be identical
-        for (Index i = 1; i < readInsts.getCount(); ++i)
-        {
-            IRInst* origInst = originalInsts[i];
-            IRInst* readInst = readInsts[i];
-
-            if (origInst->sourceLoc.getRaw() != readInst->sourceLoc.getRaw())
-            {
-                SLANG_ASSERT(!"Source locs don't match");
-                return SLANG_FAIL;
-            }
-        }
-    }
-    else if (options.optionFlags & SerialOptionFlag::SourceLocation)
+    if (options.sourceManagerToUseWhenSerializingSourceLocs)
     {
         // They should be on the same line nos
         for (Index i = 1; i < readInsts.getCount(); ++i)
@@ -772,7 +745,7 @@ SlangResult decodeModuleIR(
             }
 
             // Work out the
-            SourceView* origSourceView = options.sourceManager->findSourceView(origInst->sourceLoc);
+            SourceView* origSourceView = options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(origInst->sourceLoc);
             SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
 
             // if both are null we are done
