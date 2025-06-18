@@ -25101,7 +25101,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     __intrinsic_op($(kIROp_Neg))
-    This __pureNeg(This other);
+    static This __pureNeg(This other);
 
     /// Returns a new cooperative vector where each component has its sign negated.
     /// @return A new cooperative vector containing the negated values.
