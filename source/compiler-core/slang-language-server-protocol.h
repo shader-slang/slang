@@ -611,6 +611,13 @@ struct CompletionItem
     String detail;
 
     /**
+     * A string that should be used when comparing this item
+     * with other items. When omitted the label is used
+     * as the sort text for this item.
+     */
+    JSONOptional<String> sortText;
+
+    /**
      * A human-readable string that represents a doc-comment.
      */
     MarkupContent documentation;
