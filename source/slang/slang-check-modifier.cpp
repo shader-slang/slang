@@ -2149,6 +2149,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         // an error if the modifier is not allowed on the declaration.
         if (as<SharedModifiers>(modifier))
             ignoreUnallowedModifier = true;
+        else if (
+            getLinkage()->contentAssistInfo.checkingMode == ContentAssistCheckingMode::Completion)
+            ignoreUnallowedModifier = true;
 
         // may return a list of modifiers
         auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
