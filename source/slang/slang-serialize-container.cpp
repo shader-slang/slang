@@ -18,7 +18,6 @@ namespace Slang
 struct ModuleEncodingContext
 {
 private:
-    SerialContainerUtil::WriteOptions const& _options;
     Stream* _stream = nullptr;
 
     // The string pool used across the whole of the container
@@ -30,7 +29,7 @@ private:
 
 public:
     ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
-        : _options(options), _stream(stream), _containerStringPool(StringSlicePool::Style::Default)
+        : _stream(stream), _containerStringPool(StringSlicePool::Style::Default)
     {
         if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
