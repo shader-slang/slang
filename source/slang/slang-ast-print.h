@@ -156,6 +156,9 @@ public:
     /// Add generic parameters
     void addGenericParams(const DeclRef<GenericDecl>& genericDeclRef);
 
+    /// Add constraints which exclusively apply to `where`
+    void addWhereParams(const DeclRef<GenericDecl>& genericDeclRef);
+
     /// Get the specified part type. Returns empty slice if not found
     UnownedStringSlice getPartSlice(Part::Type partType) const;
     /// Get the slice for a part

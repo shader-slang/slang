@@ -3241,18 +3241,51 @@ void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* 
     ioParameterLists->params.add(info);
 }
 
-void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
+void maybeAddReturnDestinationParam(
+    ParameterLists* ioParameterLists,
+    DeclRef<CallableDecl> callableDeclRef,
+    Type* realResultType)
 {
-    if (isNonCopyableType(resultType))
-    {
-        IRLoweringParameterInfo info;
-        info.type = resultType;
-        info.decl = nullptr;
-        info.direction = kParameterDirection_Ref;
-        info.declaredDirection = info.direction;
-        info.isReturnDestination = true;
-        ioParameterLists->params.add(info);
-    }
+    // We will have a double `ref` added if __subscript{get;}
+    // since __subscript is not "returning" a value, it is just an intermediate
+    // we can ignore adding a param in this case.
+    if (callableDeclRef.as<SubscriptDecl>())
+        return;
+
+    // Any accessor without a body is a unpredictable and
+    // will not make use of a final parameter for ref-output
+    // since we won't be-able to re-write the body (there is no body).
+    if (auto accessorDecl = callableDeclRef.as<RefAccessorDecl>())
+        return;
+    //if (auto accessorDecl = callableDeclRef.as<AccessorDecl>())
+    //{
+    //    if (!accessorDecl.getDecl()->body)
+    //        return;
+    //}
+
+    // Intrinsics are magic injections as of now. This means that if we add a
+    // random extra parameter, there is a very good chance that it will be 
+    // ignored because the intrinsic did not expect the param.
+    //
+    // solution down the line? Ban intrinsic functions, only allow intrinsics
+    // return a magic value (this way we can legalize all functions the same way
+    // and only worry about values?).
+    // 
+    // ... also, RayQuery uses this behavior...
+    //if (callableDeclRef.getDecl()->hasModifier<IntrinsicOpModifier>())
+    //    return;
+
+    // We should only be returning with a ref if our return is noncopyable
+    if (!isNonCopyableType(callableDeclRef.getDecl()->returnType))
+        return;
+
+    IRLoweringParameterInfo info;
+    info.type = realResultType;
+    info.decl = nullptr;
+    info.direction = kParameterDirection_Ref;
+    info.declaredDirection = info.direction;
+    info.isReturnDestination = true;
+    ioParameterLists->params.add(info);
 }
 
 void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
@@ -3365,8 +3398,12 @@ void collectParameterLists(
                     makeVaryingInputParamConstRef(paramInfo);
                 ioParameterLists->params.add(paramInfo);
             }
+
             maybeAddReturnDestinationParam(
                 ioParameterLists,
+                // pass in the original type because `getResultType` may remove important modifiers
+                // after subsitution
+                callableDeclRef,
                 getResultType(context->astBuilder, callableDeclRef));
         }
     }
@@ -3421,7 +3458,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -3484,6 +3520,10 @@ void _lowerFuncDeclBaseTypeInfo(
 
     auto& irResultType = outInfo.resultType;
 
+    // Should be based on original definition of function.
+    // Generic may resolve result as a copyable, but if definition
+    // is NonCopyable we need to ensure we emit a function compatible
+    // assuming a NonCopyable param.
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
         irResultType = context->irBuilder->getVoidType();
@@ -3567,7 +3607,19 @@ static LoweredValInfo _emitCallToAccessor(
 
     allArgs.addRange(args, argCount);
 
-    LoweredValInfo result = emitCallToDeclRef(
+    LoweredValInfo resultOfRefParam;
+    if (info.returnViaLastRefParam)
+    {
+        // Create a temporary variable to hold the result.
+        // we will rewrite the return to alias the final
+        // param later.
+        auto tempVar = context->irBuilder->emitVar(
+            tryGetPointedToType(context->irBuilder, info.paramTypes.getLast()));
+        allArgs.add(tempVar);
+        resultOfRefParam = LoweredValInfo::ptr(tempVar);
+    }
+
+    LoweredValInfo resultOfCall = emitCallToDeclRef(
         context,
         type,
         accessorDeclRef,
@@ -3578,7 +3630,9 @@ static LoweredValInfo _emitCallToAccessor(
 
     applyOutArgumentFixups(context, fixups);
 
-    return result;
+    if (info.returnViaLastRefParam)
+        return resultOfRefParam;
+    return resultOfCall;
 }
 
 template<typename Derived>

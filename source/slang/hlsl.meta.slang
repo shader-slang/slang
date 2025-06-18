@@ -61,7 +61,8 @@ struct ScalarDataLayout : IBufferDataLayout
 __generic<T, L : IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
 __magic_type(GLSLShaderStorageBufferType)
-struct GLSLShaderStorageBuffer {}
+struct GLSLShaderStorageBuffer where noncopyable(T) 
+{}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
@@ -79,7 +80,8 @@ uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
-uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
+uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer)
+    where noncopyable(T);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
@@ -6002,12 +6004,18 @@ ${{{{
 static const struct {
     IROp op;
     char const* name;
+    bool copyable;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
-    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
+    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer", false },
+    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", true },
 };
 for(auto item : kMutableStructuredBufferCases) {
+    String whereCondition = "";
+    if (!item.copyable) 
+    {
+        whereCondition = "where noncopyable(T)";
+    }
 }}}}
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
@@ -6028,7 +6036,7 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name)
+struct $(item.name) $(whereCondition)
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
@@ -22622,22 +22630,23 @@ struct DynamicResourceTypeInfo
     const char* kind;
     const char* dynamicKind;
     const char* access;
+    bool isNonCopyable;
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
-    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ByteAddressBuffer", "Buffer", "General", "Read" },
-    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
-    { "SamplerState", "Sampler", "Sampler", "Unknown" },
-    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
-    { "ConstantBuffer<T, L>", "Buffer", "General", "Read"},
-    { "TextureBuffer<T>", "Buffer", "General", "Read"},
-    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read"},
+    { "StructuredBuffer<T, L>", "Buffer", "General", "Read", false},
+    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", true},
+    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", false},
+    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", false},
+    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", false},
+    { "ByteAddressBuffer", "Buffer", "General", "Read", false },
+    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite", false },
+    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite", false},
+    { "SamplerState", "Sampler", "Sampler", "Unknown", false },
+    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown", false},
+    { "ConstantBuffer<T, L>", "Buffer", "General", "Read", false},
+    { "TextureBuffer<T>", "Buffer", "General", "Read", false},
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read", false},
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
@@ -22652,6 +22661,10 @@ for (auto type : kDynamicResourceCastableTypes) {
 }}}}
 
 extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
+${{{{
+    if(type.isNonCopyable)
+        sb << " where noncopyable(T)\n";
+}}}}
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
@@ -22921,6 +22934,7 @@ extension<T, L : IBufferDataLayout> StructuredBuffer<T, L> : IArray<T>
 }
 
 extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
+    where noncopyable(T)
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
