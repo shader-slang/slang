@@ -3252,8 +3252,25 @@ void maybeAddReturnDestinationParam(
     if (callableDeclRef.as<SubscriptDecl>())
         return;
 
-    // RefAccessorDecl expects to return ref by `return` stmt, not final param.
-    if (callableDeclRef.as<RefAccessorDecl>())
+    // Any accessor without a body is a unpredictable and
+    // will not make use of a final parameter for ref-output
+    // since we won't be-able to re-write the body (there is no body).
+    if (auto accessorDecl = callableDeclRef.as<AccessorDecl>())
+    {
+        if (!accessorDecl.getDecl()->body)
+            return;
+    }
+
+
+
+    // Intrinsics are magic injections as of now. This means that if we add a
+    // random extra parameter, there is a very good chance that it will be 
+    // ignored because the intrinsic did not expect the param.
+    //
+    // solution down the line? Ban intrinsic functions, only allow intrinsics
+    // return a magic value (this way we can legalize all functions the same way
+    // and only worry about values?).
+    if (callableDeclRef.getDecl()->hasModifier<IntrinsicOpModifier>())
         return;
 
     // We should only be returning with a ref if our return is noncopyable
