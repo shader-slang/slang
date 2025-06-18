@@ -231,8 +231,8 @@ static int _peek(Lexer* lexer, int offset = 0)
     } while (offset--);
 
     // If we encounter a \0, return kEOF.
-    if (c == 0)
-        return kEOF;
+    // if (c == 0)
+    //    return kEOF;
     return c;
 }
 
@@ -298,7 +298,6 @@ static int _advance(Lexer* lexer)
         if (c == 0 || isInvalidStream)
         {
             lexer->m_cursor = lexer->m_end;
-            return kEOF;
         }
 
         // Default case is to return the raw byte we saw.
