@@ -3255,11 +3255,13 @@ void maybeAddReturnDestinationParam(
     // Any accessor without a body is a unpredictable and
     // will not make use of a final parameter for ref-output
     // since we won't be-able to re-write the body (there is no body).
-    if (auto accessorDecl = callableDeclRef.as<AccessorDecl>())
-    {
-        if (!accessorDecl.getDecl()->body)
-            return;
-    }
+    if (auto accessorDecl = callableDeclRef.as<RefAccessorDecl>())
+        return;
+    //if (auto accessorDecl = callableDeclRef.as<AccessorDecl>())
+    //{
+    //    if (!accessorDecl.getDecl()->body)
+    //        return;
+    //}
 
     // Intrinsics are magic injections as of now. This means that if we add a
     // random extra parameter, there is a very good chance that it will be 
