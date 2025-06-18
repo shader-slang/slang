@@ -1157,15 +1157,17 @@ LanguageServerResult<CompletionResult> LanguageServerCore::completion(
     }
 
     // Ajust cursor position to the beginning of the current/last identifier.
+    Index firstTokenCharOffset = cursorOffset;
     cursorOffset--;
     while (cursorOffset > 0 && _isIdentifierChar(doc->getText()[cursorOffset]))
     {
+        firstTokenCharOffset = cursorOffset;
         cursorOffset--;
     }
 
     // Never show suggestions when the user is typing a number.
-    if (cursorOffset + 1 >= 0 && cursorOffset + 1 < doc->getText().getLength() &&
-        CharUtil::isDigit(doc->getText()[cursorOffset + 1]))
+    if (firstTokenCharOffset >= 0 && firstTokenCharOffset < doc->getText().getLength() &&
+        CharUtil::isDigit(doc->getText()[firstTokenCharOffset]))
     {
         return std::nullopt;
     }
@@ -1180,12 +1182,32 @@ LanguageServerResult<CompletionResult> LanguageServerCore::completion(
     version->linkage->contentAssistInfo.cursorCol = utf8Col;
     Slang::CompletionContext context;
     context.server = this;
-    context.cursorOffset = cursorOffset;
+    context.cursorOffset = firstTokenCharOffset;
     context.version = version;
     context.doc = doc.Ptr();
     context.canonicalPath = canonicalPath.getUnownedSlice();
     context.line = utf8Line;
     context.col = utf8Col;
+    Int firstNonWhiteSpace = 0;
+    auto lineContent = doc->getLine(utf8Line);
+    while (firstNonWhiteSpace < lineContent.getLength() &&
+           CharUtil::isWhitespace(lineContent[firstNonWhiteSpace]))
+        firstNonWhiteSpace++;
+    context.indent = doc->getLine(utf8Line).head(firstNonWhiteSpace);
+    doc->offsetToLineCol(firstTokenCharOffset, utf8Line, utf8Col);
+    doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+        utf8Line,
+        utf8Col,
+        context.requestRange.start.line,
+        context.requestRange.start.character);
+
+    auto utf8TokenLen = doc->getTokenLength(firstTokenCharOffset);
+    doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+        utf8Line,
+        utf8Col + utf8TokenLen,
+        context.requestRange.end.line,
+        context.requestRange.end.character);
+
     context.commitCharacterBehavior = m_commitCharacterBehavior;
     if (args.context.triggerKind == kCompletionTriggerKindTriggerCharacter &&
         (args.context.triggerCharacter == " " || args.context.triggerCharacter == "[" ||

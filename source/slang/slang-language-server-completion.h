@@ -42,7 +42,10 @@ struct CompletionContext
     CommitCharacterBehavior commitCharacterBehavior;
     Int line;
     Int col;
+    String indent;
 
+    // The token range of original request, in 0-based UTF16 code units.
+    LanguageServerProtocol::Range requestRange;
     LanguageServerResult<CompletionResult> tryCompleteMemberAndSymbol();
     LanguageServerResult<CompletionResult> tryCompleteHLSLSemantic();
     LanguageServerResult<CompletionResult> tryCompleteAttributes();
@@ -55,6 +58,11 @@ struct CompletionContext
 
 
     CompletionResult collectMembersAndSymbols();
+    String formatDeclForCompletion(
+        DeclRef<Decl> decl,
+        ASTBuilder* astBuilder,
+        CompletionSuggestions::FormatMode formatMode,
+        int& outNameStart);
     void createSwizzleCandidates(
         List<LanguageServerProtocol::CompletionItem>& result,
         Type* type,

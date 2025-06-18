@@ -5,6 +5,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-file-system.h"
 #include "slang-ast-all.h"
+#include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-language-server-ast-lookup.h"
 #include "slang-language-server.h"
@@ -22,7 +23,7 @@ static const char* kDeclKeywords[] = {
     "protected",  "typedef",        "typealias", "uniform",  "export",  "groupshared",
     "extension",  "associatedtype", "namespace", "This",     "using",   "__generic",
     "__exported", "import",         "enum",      "cbuffer",  "tbuffer", "func",
-    "functype",   "typename",       "each",      "expand",   "where"};
+    "functype",   "typename",       "each",      "expand",   "where",   "override"};
 static const char* kStmtKeywords[] = {
     "if",
     "else",
@@ -96,6 +97,8 @@ static const char* hlslSemanticNames[] = {
     "packoffset",
     "read",
     "write",
+    "SV_BaseInstanceID",
+    "SV_BaryCentrics",
     "SV_ClipDistance",
     "SV_CullDistance",
     "SV_Coverage",
@@ -126,6 +129,8 @@ static const char* hlslSemanticNames[] = {
     "SV_VertexID",
     "SV_ViewID",
     "SV_ViewportArrayIndex",
+    "SV_VulkanVertexID",
+    "SV_VulkanInstanceID",
     "SV_ShadingRate",
     "SV_StartVertexLocation",
     "SV_StartInstanceLocation",
@@ -511,10 +516,72 @@ LanguageServerResult<CompletionResult> CompletionContext::tryCompleteMemberAndSy
     return collectMembersAndSymbols();
 }
 
+String CompletionContext::formatDeclForCompletion(
+    DeclRef<Decl> declRef,
+    ASTBuilder* astBuilder,
+    CompletionSuggestions::FormatMode formatMode,
+    int& outNameStart)
+{
+    outNameStart = 0;
+    switch (formatMode)
+    {
+    case CompletionSuggestions::FormatMode::Name:
+        return getText(declRef.getDecl()->getName());
+    default:
+        break;
+    }
+
+    ASTPrinter printer(astBuilder, ASTPrinter::OptionFlag::ParamNames);
+    if (auto genDecl = as<GenericDecl>(declRef))
+        declRef = astBuilder->getMemberDeclRef(genDecl, genDecl.getDecl()->inner);
+    auto callableDecl = as<CallableDecl>(declRef);
+    if (!callableDecl)
+        return String();
+    if (formatMode == CompletionSuggestions::FormatMode::FullSignature)
+    {
+        printer.addType(callableDecl.getDecl()->returnType.type);
+        printer.getStringBuilder() << " ";
+    }
+    outNameStart = (int)printer.getStringBuilder().getLength();
+    printer.getStringBuilder() << getText(declRef.getDecl()->getName());
+    auto outerGeneric = as<GenericDecl>(declRef.getParent());
+    if (outerGeneric)
+    {
+        printer.addGenericParams(outerGeneric);
+    }
+    printer.addDeclParams(declRef);
+    if (callableDecl.getDecl()->errorType.type != astBuilder->getBottomType() &&
+        callableDecl.getDecl()->errorType.type != astBuilder->getErrorType())
+    {
+        printer.getStringBuilder() << " throws ";
+        printer.addType(callableDecl.getDecl()->errorType);
+    }
+    if (outerGeneric)
+    {
+        for (auto constraint :
+             outerGeneric.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+        {
+            printer.getStringBuilder() << "\n";
+            bool indentUsingTab = indent.startsWith("\t");
+            if (indentUsingTab)
+                printer.getStringBuilder() << "\t";
+            else
+                printer.getStringBuilder() << "    ";
+            printer.getStringBuilder() << "where ";
+            printer.addType(constraint->sub.type);
+            if (constraint->isEqualityConstraint)
+                printer.getStringBuilder() << " == ";
+            else
+                printer.getStringBuilder() << " : ";
+            printer.addType(constraint->sup.type);
+        }
+    }
+    return printer.getString();
+}
+
 CompletionResult CompletionContext::collectMembersAndSymbols()
 {
     List<LanguageServerProtocol::CompletionItem> result;
-
     auto linkage = version->linkage;
     if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
         CompletionSuggestions::ScopeKind::Swizzle)
@@ -563,7 +630,14 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
         if (!member->getName())
             continue;
         LanguageServerProtocol::CompletionItem item;
-        item.label = member->getName()->text;
+        int nameStart = 0;
+        item.label = formatDeclForCompletion(
+            suggestedItem.declRef,
+            linkage->m_astBuilder,
+            linkage->contentAssistInfo.completionSuggestions.formatMode,
+            nameStart);
+        if (item.label.getLength() == 0)
+            continue;
         item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
         if (as<TypeConstraintDecl>(member))
         {
@@ -627,7 +701,27 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
             item.kind = LanguageServerProtocol::kCompletionItemKindClass;
         }
         item.data = String(i);
+        if (linkage->contentAssistInfo.completionSuggestions.formatMode !=
+            CompletionSuggestions::FormatMode::Name)
+        {
+            item.sortText =
+                (StringBuilder() << i << ":" << getText(member->getName())).produceString();
+        }
+
         result.add(item);
+        if (nameStart > 1)
+        {
+            // If the completion item is for a full function signature, add the return type part too
+            // as a separate item.
+            item.label = item.label.getUnownedSlice().head(nameStart - 1);
+            item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+            item.sortText =
+                (StringBuilder()
+                 << linkage->contentAssistInfo.completionSuggestions.candidateItems.getCount()
+                 << ":" << item.label)
+                    .produceString();
+            result.add(item);
+        }
     }
     if (addKeywords)
     {
