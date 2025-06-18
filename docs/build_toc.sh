@@ -99,7 +99,7 @@ if ! mcs -r:System.Core "$temp_dir/temp_program.cs" -out:"$temp_dir/toc-builder.
   exit 1
 fi
 
-for dir in "user-guide" "gfx-user-guide"; do
+for dir in "user-guide"; do
   if [ -d "$docs_dir/$dir" ]; then
     if [ "$check_only" -eq 1 ]; then
       # Ensure working directory is clean
