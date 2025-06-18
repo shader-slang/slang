@@ -34,7 +34,8 @@ public:
     {
         if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            _sourceLocWriter = new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
+            _sourceLocWriter =
+                new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
         _cursor = RIFF::BuildCursor(_riff);
@@ -140,8 +141,7 @@ public:
         IRSerialData serialData;
         IRSerialWriter writer;
 
-        SLANG_RETURN_ON_FAIL(
-            writer.write(irModule, _sourceLocWriter, &serialData));
+        SLANG_RETURN_ON_FAIL(writer.write(irModule, _sourceLocWriter, &serialData));
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
 
         return SLANG_OK;
@@ -219,8 +219,7 @@ public:
         {
             IRSerialData serialData;
             IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(
-                writer.write(irModule, _sourceLocWriter, &serialData));
+            SLANG_RETURN_ON_FAIL(writer.write(irModule, _sourceLocWriter, &serialData));
             SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
         }
 
@@ -634,14 +633,14 @@ SlangResult decodeModuleIR(
 
         if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            sourceLocWriter = new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
+            sourceLocWriter =
+                new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
         {
             // Write IR out to `irData`
             IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(
-                writer.write(module, sourceLocWriter, &irData));
+            SLANG_RETURN_ON_FAIL(writer.write(module, sourceLocWriter, &irData));
         }
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(irData, cursor));
 
@@ -745,7 +744,9 @@ SlangResult decodeModuleIR(
             }
 
             // Work out the
-            SourceView* origSourceView = options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(origInst->sourceLoc);
+            SourceView* origSourceView =
+                options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(
+                    origInst->sourceLoc);
             SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
 
             // if both are null we are done
