@@ -420,6 +420,8 @@ public:
     }
 
     bool visitThisTypeExpr(ThisTypeExpr*) { return false; }
+    bool visitThisInterfaceExpr(ThisInterfaceExpr*) { return false; }
+
     bool visitAndTypeExpr(AndTypeExpr* expr)
     {
         if (dispatchIfNotNull(expr->left.exp))

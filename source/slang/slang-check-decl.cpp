@@ -353,6 +353,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkDifferentiableCallableCommon(CallableDecl* decl);
 
+    void checkInterfaceRequirement(Decl* decl);
+
     void checkCallableDeclCommon(CallableDecl* decl);
 
     void visitFuncDecl(FuncDecl* funcDecl);
@@ -738,6 +740,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisExpr(ThisExpr*) { return; }
 
     void visitThisTypeExpr(ThisTypeExpr*) { return; }
+    void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
         dispatchIfNotNull(expr->left.type);
@@ -5043,6 +5046,51 @@ static void removeNonStaticLookupItems(LookupResult& lookupResult)
     }
 }
 
+// Returns true if declRef points to an interface method requirement that has a default
+// implementation.
+HasInterfaceDefaultImplModifier* hasDefaultImpl(DeclRef<Decl> declRef)
+{
+    if (auto modifier = declRef.getDecl()->findModifier<HasInterfaceDefaultImplModifier>())
+        return modifier;
+    if (auto genericParent = as<GenericDecl>(declRef.getDecl()->parentDecl))
+        return genericParent->findModifier<HasInterfaceDefaultImplModifier>();
+    return nullptr;
+}
+
+void SemanticsVisitor::markOverridingDecl(
+    ConformanceCheckingContext* context,
+    Decl* memberDecl,
+    DeclRef<Decl> requiredMemberDeclRef)
+{
+    if (!memberDecl->isChildOf(context->parentDecl))
+    {
+        // If the member being checked isn't the child of the container decl containing
+        // the inheritance decl that triggers the conformance check, don't modify/diagnose
+        // anything since it should have already been diagnosed when checking its parent.
+        // This can happen when we check for things like:
+        //    extension float : IComparable{}
+        // where the method used to satisfy IComparable comes from outside the extension decl.
+        // we don't want to diagnose or check anything about the found memberDecl that doesn't
+        // belong to this extension decl (context->parentDecl).
+        //
+        return;
+    }
+
+    if (hasDefaultImpl(requiredMemberDeclRef))
+    {
+        memberDecl = maybeGetInner(memberDecl);
+        // If the required member has a default implementation,
+        // we need to make sure the member we found is marked as 'override'.
+        if (!memberDecl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(memberDecl, Diagnostics::missingOverride);
+        }
+    }
+    auto overridingModifier = m_astBuilder->create<IsOverridingModifier>();
+    overridingModifier->overridedDecl = requiredMemberDeclRef.getDecl();
+    addModifier(memberDecl, overridingModifier);
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -5091,17 +5139,19 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // With the big picture spelled out, we can settle into
     // the work of constructing our synthesized method.
     //
-
     bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
 
     // First, we check that the differentiabliity of the method matches the requirement,
     // and we don't attempt to synthesize a method if they don't match.
-    if (!isInWrapperType && getShared()->getFuncDifferentiableLevel(
-                                as<FunctionDeclBase>(lookupResult.item.declRef.getDecl())) <
-                                getShared()->getFuncDifferentiableLevel(
-                                    as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
+    if (lookupResult.isValid())
     {
-        return false;
+        if (!isInWrapperType && getShared()->getFuncDifferentiableLevel(
+                                    as<FunctionDeclBase>(lookupResult.item.declRef.getDecl())) <
+                                    getShared()->getFuncDifferentiableLevel(
+                                        as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
+        {
+            return false;
+        }
     }
 
     ThisExpr* synThis = nullptr;
@@ -5331,6 +5381,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         return false;
                     }
                 }
+
+                markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
             }
         }
     }
@@ -6899,6 +6951,95 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     return true;
 }
 
+bool SemanticsVisitor::findDefaultInterfaceImpl(
+    ConformanceCheckingContext* context,
+    DeclRef<Decl> requiredMemberDeclRef,
+    RefPtr<WitnessTable> witnessTable)
+{
+    // Only functions can have default implemnetation at the moment.
+    DeclRef<FuncDecl> requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>();
+    if (!requiredFuncDeclRef)
+    {
+        // If requiredMember is a generic func, form a direct declref to the inner func.
+        if (auto requiredGenericDeclRef = requiredMemberDeclRef.as<GenericDecl>())
+        {
+            auto inner = getInner(requiredGenericDeclRef);
+            if (auto func = as<FuncDecl>(inner))
+            {
+                requiredFuncDeclRef = m_astBuilder->getMemberDeclRef(requiredGenericDeclRef, func);
+            }
+        }
+    }
+    if (!requiredFuncDeclRef)
+        return false;
+
+    // If the interface requirement comes with a default impl, it should have a
+    // HasInterfaceDefaultImplModifier.
+    auto defaultModifier = hasDefaultImpl(requiredMemberDeclRef);
+    if (!defaultModifier)
+        return false;
+
+    // If we have a default implementation, return a declref to the default stub decl directly.
+    // We can grab a declref to the stub decl standing for the generic default impl from
+    // the InterfaceDefaultImplModifier on the requiredMemberDeclRef, that should have been
+    // created during checking of the required method decl.
+    //
+    // For example, given:
+    //    ```
+    //    interface IFoo { int bar() { return 1; } }
+    //    struct Foo : IFoo { /*needing witness synthesis*/ }
+    //    ```
+    // After parsing `IFoo`, we will have a default impl stub decl for `bar`:
+    //    ```
+    //    interface IFoo {
+    //        [HasInterfaceDefaultImpl(bar_defaultImpl)] // <-- `defaultModifier`
+    //        int bar(); // this is the requirement.
+    //
+    //        // This is the default impl stub decl.
+    //        __interface_default_impl_generic<This:IFoo>
+    //        int bar_defaultImpl() { return 1; }
+    //    }
+    //    ```
+    // Given this, we can simply form a GenericAppDeclRef to `IFoo::bar_defaultImpl`
+    // with `This` being `context->conformingType` and `This:IFoo` being
+    // `context->conformingWitness`.
+    //
+    // The following logic will create this declref, and register it to the witness table.
+    //
+    auto interfaceDeclRef = getParentDeclRef(requiredMemberDeclRef);
+    if (!as<InterfaceDecl>(interfaceDeclRef.getDecl()))
+        return false;
+
+    auto genericDeclOfDefaultImplStub =
+        as<InterfaceDefaultImplDecl>(defaultModifier->defaultImplDecl);
+    if (!genericDeclOfDefaultImplStub)
+        return false;
+
+    // Form a declref to unspecialized `IFoo::bar_defaultImpl`.
+    DeclRef<Decl> resultDeclRef =
+        m_astBuilder->getMemberDeclRef(interfaceDeclRef, genericDeclOfDefaultImplStub);
+    List<Val*> specArgs;
+    specArgs.add(context->conformingType);
+    specArgs.add(context->conformingWitness);
+
+    // Form a declref to `IFoo::bar_defaultImpl<conformingType>`.
+    resultDeclRef = m_astBuilder->getGenericAppDeclRef(
+        resultDeclRef.as<GenericDecl>(),
+        specArgs.getArrayView());
+
+    // If `bar_defaultImpl` is a generic method, we need to form an explicit
+    // declref to the inner method decl to stay consistent the existing format of
+    // witness table entries.
+    if (auto genDeclRef = as<GenericDecl>(resultDeclRef))
+        resultDeclRef = m_astBuilder->getMemberDeclRef(genDeclRef, genDeclRef.getDecl()->inner);
+
+    // Register the declref to the witness table.
+    auto callableDeclRef = as<CallableDecl>(resultDeclRef);
+    SLANG_ASSERT(callableDeclRef);
+    _addMethodWitness(witnessTable, requiredFuncDeclRef, callableDeclRef);
+    return true;
+}
+
 bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     ConformanceCheckingContext* context,
     Type* subType,
@@ -7043,7 +7184,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         {
             // If we failed to look up a member with the name of the
             // requirement, it may be possible that we can still synthesis the
-            // implementation if this is one of the known builtin requirements.
+            // implementation if this is one of the known builtin requirements,
+            // or if the interface method contains a default impl.
             // Otherwise, report diagnostic now.
 
             if (requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() ||
@@ -7057,6 +7199,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 (as<ArrayExpressionType>(context->conformingType) ||
                  as<VectorExpressionType>(context->conformingType) ||
                  as<MatrixExpressionType>(context->conformingType)))
+            {
+            }
+            else if (hasDefaultImpl(requiredMemberDeclRef))
             {
             }
             else
@@ -7125,6 +7270,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     QualifiedDeclPath(requiredMemberDeclRef));
                 return false;
             }
+            markOverridingDecl(context, member.declRef.getDecl(), requiredMemberDeclRef);
             return true;
         }
     }
@@ -7146,6 +7292,12 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     {
         return true;
     }
+
+    // Finally, if there is a default implementation for the required member,
+    // we can use that as a witness.
+    //
+    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+        return true;
 
     // We failed to find a member of the type that can be used
     // to satisfy the requirement (even via synthesis), so we
@@ -7311,6 +7463,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
         if (isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
             continue;
         if (requiredMemberDecl.as<DerivativeRequirementDecl>())
+            continue;
+        if (as<InterfaceDefaultImplDecl>(requiredMemberDecl.getDecl()))
             continue;
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
@@ -7512,7 +7666,7 @@ bool SemanticsVisitor::checkConformance(
     ConformanceCheckingContext context;
     context.conformingType = subType;
     context.parentDecl = parentDecl;
-
+    context.conformingWitness = subIsSuperWitness;
 
     RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
     if (!witnessTable)
@@ -7545,7 +7699,9 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
                        .as<ExtensionDecl>();
     auto targetType = getTargetType(m_astBuilder, declRef);
 
-    for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+    // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
+    auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
+    for (auto inheritanceDecl : inheritanceDecls)
     {
         checkConformance(targetType, inheritanceDecl, decl);
     }
@@ -7596,7 +7752,7 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // just with `abstract` methods that replicate things?
         // (That's what C# does).
 
-        // Make a copy of inhertanceDecls firstsince `checkConformance` may modify decl->members.
+        // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
         auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
         for (auto inheritanceDecl : inheritanceDecls)
         {
@@ -7621,7 +7777,107 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // only the types that are affected by these interface decls.
         //
         astBuilder->incrementEpoch();
+
+        // For all members marked as `override`, we need to ensure they are actually
+        // overriding something.
+        for (auto member : decl->getMembers())
+        {
+            auto innerMember = maybeGetInner(member);
+            bool hasOverride = false;
+            bool isOverriding = false;
+            for (auto modifier : innerMember->modifiers)
+            {
+                if (as<OverrideModifier>(modifier))
+                {
+                    hasOverride = true;
+                }
+                else if (as<IsOverridingModifier>(modifier))
+                {
+                    isOverriding = true;
+                }
+            }
+            if (hasOverride && !isOverriding)
+            {
+                getSink()->diagnose(
+                    innerMember,
+                    Diagnostics::overrideModifierNotOverridingBaseDecl,
+                    innerMember);
+
+                if (getShared()->isInLanguageServer() &&
+                    member->getName() == getShared()->getSession()->getCompletionRequestTokenName())
+                {
+                    // If we encountered a completion request for a decl name where an 'override'
+                    // keyword is specified, we should suggest all the base decls that can be
+                    // overridden, but have not been overridden yet.
+                    //
+                    calcOverridableCompletionCandidates(type, decl, member);
+                }
+            }
+        }
     }
+}
+
+
+void SemanticsVisitor::calcOverridableCompletionCandidates(
+    Type* aggType,
+    ContainerDecl* aggTypeDecl,
+    Decl* memberDecl)
+{
+    // We are in language server and the user requested to list
+    // all base interface methods that can be overrided in a conforming type.
+    // Collect all base interfaces methods that hasn't been overridden and
+    // suggest them as completion candidates.
+    if (as<InterfaceDecl>(aggTypeDecl))
+    {
+        // If the aggType is an interface, we don't have any base methods to suggest.
+        return;
+    }
+    auto inheritanceInfo = getShared()->getInheritanceInfo(aggType);
+    HashSet<Decl*> overridenDecls;
+    for (auto member : aggTypeDecl->getMembers())
+    {
+        member = maybeGetInner(member);
+        if (!as<FuncDecl>(member))
+            continue;
+        if (auto overridedDeclModifier = member->findModifier<IsOverridingModifier>())
+        {
+            overridenDecls.add(overridedDeclModifier->overridedDecl);
+        }
+    }
+    auto& contentAssistInfo = getShared()->getLinkage()->contentAssistInfo;
+    contentAssistInfo.completionSuggestions.scopeKind = CompletionSuggestions::ScopeKind::Decl;
+    auto varDeclBase = as<VarDeclBase>(memberDecl);
+    contentAssistInfo.completionSuggestions.formatMode =
+        varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
+                    : CompletionSuggestions::FormatMode::FullSignature;
+
+    List<LookupResultItem> candidateItems;
+    for (auto facet : inheritanceInfo.facets)
+    {
+        // Extensions don't contribute overridable members.
+        if (facet->kind == Facet::Kind::Extension)
+            continue;
+
+        auto interfaceDecl = facet->getDeclRef().as<InterfaceDecl>();
+        if (!interfaceDecl)
+            continue;
+        for (auto requirement : interfaceDecl.getDecl()->getMembers())
+        {
+            requirement = maybeGetInner(requirement);
+            if (!as<FuncDecl>(requirement))
+                continue;
+            if (!overridenDecls.contains(requirement))
+            {
+                auto requirementDeclRef = DeclRef<Decl>(requirement);
+                requirementDeclRef =
+                    createDefaultSubstitutionsIfNeeded(m_astBuilder, this, requirementDeclRef);
+                candidateItems.add(LookupResultItem(requirementDeclRef));
+            }
+        }
+    }
+    // Insert overridable candidates at the front of the list, so they are preferred over
+    // the completion results from checking ordinary type exprs.
+    contentAssistInfo.completionSuggestions.candidateItems.insertRange(0, candidateItems);
 }
 
 void SemanticsDeclBasesVisitor::_validateCrossModuleInheritance(
@@ -7809,7 +8065,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         {
             getSink()->diagnose(
                 inheritanceDecl,
-                Diagnostics::baseOfStructMustBeStructOrInterface,
+                Diagnostics::baseOfStructMustBeInterface,
                 decl,
                 baseType);
             continue;
@@ -7821,6 +8077,26 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         }
         else if (auto baseStructDeclRef = baseDeclRef.as<StructDecl>())
         {
+            if (!isFromCoreModule(decl))
+            {
+                // In Slang 2026, we no longer allow structs to inherit from other structs.
+                if (isSlang2026OrLater(this))
+                {
+                    getSink()->diagnose(
+                        inheritanceDecl,
+                        Diagnostics::baseOfStructMustBeInterface,
+                        decl,
+                        baseType);
+                }
+                else
+                {
+                    // For legacy langauge versions, we still allow struct inheritance to avoid
+                    // breaking existing code, but we will emit a warning to inform the user
+                    // that this feature is unstable and may be removed in the future.
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::inheritanceUnstable);
+                }
+            }
+
             // To simplify the task of reading and maintaining code,
             // we require that when a `struct` inherits from another
             // `struct`, the base `struct` is the first item in
@@ -7843,7 +8119,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         {
             getSink()->diagnose(
                 inheritanceDecl,
-                Diagnostics::baseOfStructMustBeStructOrInterface,
+                Diagnostics::baseOfStructMustBeInterface,
                 decl,
                 baseType);
             continue;
@@ -10008,6 +10284,26 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     }
 }
 
+void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
+{
+    if (isInterfaceRequirement(decl))
+    {
+        if (auto funcBase = as<FunctionDeclBase>(decl))
+        {
+            if (!as<FuncDecl>(decl) && funcBase->body != nullptr)
+            {
+                getSink()->diagnose(decl, Diagnostics::nonMethodInterfaceRequirementCannotHaveBody);
+                return;
+            }
+        }
+        // Interface requirement cannot be `override`.
+        if (decl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(decl, Diagnostics::interfaceRequirementCannotBeOverride);
+        }
+    }
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -10037,6 +10333,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         }
     }
 
+    checkInterfaceRequirement(decl);
     checkVisibility(decl);
 }
 
@@ -10441,7 +10738,10 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
     //
 
     bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
-
+    for (auto accessor : decl->getMembersOfType<AccessorDecl>())
+    {
+        checkInterfaceRequirement(accessor);
+    }
     if (!anyAccessors)
     {
         GetterDecl* getterDecl = m_astBuilder->create<GetterDecl>();

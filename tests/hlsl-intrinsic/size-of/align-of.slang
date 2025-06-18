@@ -7,6 +7,8 @@
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
+#pragma warning(disable:30816)
+
 RWStructuredBuffer<int> outputBuffer;
 
 enum Enum : int8_t

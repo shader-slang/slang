@@ -722,7 +722,7 @@ typedef uint32_t SlangSizeT;
         // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-    constexpr static SlangTargetFlags kDefaultTargetFlags =
+    inline constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
     /*!
@@ -4408,16 +4408,6 @@ struct IComponentType : public ISlangUnknown
         SlangInt targetIndex,
         IMetadata** outMetadata,
         IBlob** outDiagnostics = nullptr) = 0;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
-        SlangInt targetIndex,
-        ICompileResult** outCompileResult,
-        IBlob** outDiagnostics = nullptr) = 0;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
-        ICompileResult** outCompileResult,
-        IBlob** outDiagnostics = nullptr) = 0;
 };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
@@ -4435,6 +4425,35 @@ struct ITypeConformance : public IComponentType
     SLANG_COM_INTERFACE(0x73eb3147, 0xe544, 0x41b5, {0xb8, 0xf0, 0xa2, 0x44, 0xdf, 0x21, 0x94, 0xb})
 };
     #define SLANG_UUID_ITypeConformance ITypeConformance::getTypeGuid()
+
+/** IComponentType2 is a component type used for getting separate debug data.
+
+This interface is used for getting separate debug data, introduced here to
+avoid breaking backwards compatibility of the IComponentType interface.
+
+The `getTargetCompileResult` and `getEntryPointCompileResult` functions
+are used to get the base and debug spirv, and metadata containing the
+debug build identifier.
+*/
+struct IComponentType2 : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0x9c2a4b3d,
+        0x7f68,
+        0x4e91,
+        {0xa5, 0x2c, 0x8b, 0x19, 0x3e, 0x45, 0x7a, 0x9f})
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ICompileResult** outCompileResult,
+        IBlob** outDiagnostics = nullptr) = 0;
+};
+    #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 
 /** A module is the granularity of shader code compilation and loading.
 

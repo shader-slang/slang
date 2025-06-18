@@ -284,6 +284,14 @@ inline Decl* getInner(DeclRef<GenericDecl> declRef)
     return declRef.getDecl()->inner;
 }
 
+inline Decl* maybeGetInner(Decl* decl)
+{
+    if (auto genericDeclRef = as<GenericDecl>(decl))
+    {
+        return genericDeclRef->inner;
+    }
+    return decl;
+}
 //
 
 inline Type* getType(ASTBuilder* astBuilder, SubstExpr<Expr> expr)
@@ -393,6 +401,8 @@ AggTypeDecl* getParentAggTypeDecl(Decl* decl);
 AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl);
 FunctionDeclBase* getParentFunc(Decl* decl);
 
+/// Get the parent declref, skipping any generic decls in between.
+DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef);
 } // namespace Slang
 
 #endif

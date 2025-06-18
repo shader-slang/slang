@@ -8,6 +8,8 @@
 #include "slang-json-parser.h"
 #include "slang-source-loc.h"
 
+#include <optional>
+
 namespace Slang
 {
 
@@ -438,6 +440,39 @@ protected:
     List<JSONValue> m_arrayValues;
     List<JSONKeyValue> m_objectValues;
 };
+
+template<typename T>
+class JSONOptional
+{
+public:
+    bool hasValue = false;
+    T value;
+    JSONOptional() = default;
+    JSONOptional(std::nullopt_t) {}
+    JSONOptional(const T& inValue)
+        : hasValue(true), value(inValue)
+    {
+    }
+};
+
+template<typename T>
+struct GetRttiInfo<JSONOptional<T>>
+{
+    static const OptionalRttiInfo _make()
+    {
+        OptionalRttiInfo info;
+        info.init<JSONOptional<T>>(RttiInfo::Kind::Optional);
+        info.m_elementType = GetRttiInfo<T>::get();
+        info.m_valueOffset = (uint32_t)offsetof(JSONOptional<T>, value);
+        return info;
+    }
+    static const RttiInfo* get()
+    {
+        static const OptionalRttiInfo g_info = _make();
+        return &g_info;
+    }
+};
+
 
 class JSONBuilder : public JSONListener
 {

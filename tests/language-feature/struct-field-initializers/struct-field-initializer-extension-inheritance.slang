@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 RWStructuredBuffer<int> outputBuffer;
 
+#pragma warning(disable:30816)
+
 //CHECK: error 30851
 
 struct DefaultStructNoInit_base
