@@ -3261,8 +3261,6 @@ void maybeAddReturnDestinationParam(
             return;
     }
 
-
-
     // Intrinsics are magic injections as of now. This means that if we add a
     // random extra parameter, there is a very good chance that it will be 
     // ignored because the intrinsic did not expect the param.
@@ -3270,8 +3268,10 @@ void maybeAddReturnDestinationParam(
     // solution down the line? Ban intrinsic functions, only allow intrinsics
     // return a magic value (this way we can legalize all functions the same way
     // and only worry about values?).
-    if (callableDeclRef.getDecl()->hasModifier<IntrinsicOpModifier>())
-        return;
+    // 
+    // ... also, RayQuery uses this behavior...
+    //if (callableDeclRef.getDecl()->hasModifier<IntrinsicOpModifier>())
+    //    return;
 
     // We should only be returning with a ref if our return is noncopyable
     if (!isNonCopyableType(callableDeclRef.getDecl()->returnType))
