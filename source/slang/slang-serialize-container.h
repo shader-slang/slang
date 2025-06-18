@@ -26,7 +26,8 @@ struct SerialContainerUtil
         /// create any `SourceLoc`s that appear in the module(s) that get
         /// written.
         ///
-        SourceManager* sourceManagerToUseWhenSerializingSourceLocs = nullptr; ///< The source manager used for the SourceLoc in the input
+        SourceManager* sourceManagerToUseWhenSerializingSourceLocs =
+            nullptr; ///< The source manager used for the SourceLoc in the input
     };
 
     struct ReadOptions
