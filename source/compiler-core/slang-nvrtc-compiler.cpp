@@ -710,7 +710,7 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
     candidatePaths.add("/usr/local/include");
     candidatePaths.add("/usr/local/cuda/include");
     candidatePaths.add("/usr/include");
-    
+
     for (const String& includePath : candidatePaths)
     {
         if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
