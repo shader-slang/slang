@@ -140,6 +140,7 @@ jobs:
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
+          echo "cmake version: $(cmake --version)"
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
@@ -204,6 +205,7 @@ jobs:
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
+            echo "Printing CUDA version: ..." && nvcc --version
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
@@ -278,46 +280,38 @@ jobs:
             -skip-reference-image-generation \
             -show-adapter-info
       - name: Run slang-rhi tests
-        if: false # steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
-        shell: pwsh
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
-          if (!(Test-Path -Path "external/slang-rhi/build")) {
-            Write-Host "Building slang-rhi if it doesn't exist"
-            Push-Location external/slang-rhi
-            cmake --preset msvc -S . -B build
-            cmake --build build --config ${{matrix.config}}
-            Write-Host "Copying DLLs from bin directory to slang-rhi build location..."
-            Copy-Item -Path "$bin_dir\*.dll" -Destination "build\${{matrix.config}}" -Force
-            Pop-Location
-          }
-          $testExe = Get-ChildItem -Path "external/slang-rhi/build" -Recurse -Filter "slang-rhi-tests.exe" | Select-Object -First 1
-          if ($testExe) {
-              Write-Host "Found slang-rhi tests executable at: $($testExe.FullName)"
-              $testDir = $testExe.Directory.FullName
-              Push-Location $testDir
-              Write-Host "Running slang-rhi tests..."
-              .\slang-rhi-tests.exe -check-devices -tce="ray-tracing-*,cmd-query-resolve-host"
-              Pop-Location
-          } else {
-              Write-Error "Could not find slang-rhi-tests.exe"
-              exit 1
-          }
+          "$bin_dir/slang-rhi-tests" -check-devices -tce=ray-tracing-*,cmd-query-resolve-host,fence-*
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
         run: |
           python --version
-          Write-Host "Cleaning up existing installations..."
-          Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
-          Write-Host "Installing slangpy..."
-          python -m pip install --no-cache-dir --verbose slangpy --user
-          Write-Host "Getting Python site-packages directory and copying library files (DLL, SO, DYLIB)..."
+          Write-Host "Cleaning up existing installations and installing slangpy..."
+          try {
+            $SLANGPY_LOCATION = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+            Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
+            if (Test-Path $SLANGPY_LOCATION) {
+              Write-Host "Removing existing slangpy directory at: $SLANGPY_LOCATION"
+              Remove-Item -Path $SLANGPY_LOCATION -Recurse -Force
+            }
+          } catch {
+            Write-Host "slangpy not found or already removed"
+          }
+          python -m pip install --verbose slangpy --user
           $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+          $bin_dir = $env:bin_dir -replace '^/c/', 'C:\' -replace '/', '\'
           Write-Host "Site packages directory: $SITE_PACKAGES"
-          Write-Host "Copying library files..."
-          Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Continue
+          Write-Host "bin_dir location: $bin_dir"
+          try {
+            Copy-Item -Path "$bin_dir\slang*.dll" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Stop
+          } catch {
+            Write-Error "Failed to copy library files: $_"
+            exit 1
+          }
           Write-Host "Listing files in slangpy directory..."
-          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | Write-Host
+          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
