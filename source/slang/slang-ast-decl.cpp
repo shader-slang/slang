@@ -42,7 +42,8 @@ bool isInterfaceRequirement(Decl* decl)
     {
         if (as<InterfaceDecl>(ancestor))
             return true;
-
+        if (as<InterfaceDefaultImplDecl>(ancestor))
+            return false;
         if (as<ExtensionDecl>(ancestor))
             return false;
     }

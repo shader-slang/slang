@@ -1443,8 +1443,7 @@ static NameLoc ParseDeclName(Parser* parser)
     }
     else
     {
-        nameToken = parser->ReadToken(TokenType::Identifier);
-        return NameLoc(nameToken);
+        return expectIdentifier(parser);
     }
 }
 
@@ -2037,6 +2036,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
     switch (parser->tokenReader.peekTokenType())
     {
     case TokenType::Identifier:
+    case TokenType::CompletionRequest:
         {
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
@@ -5046,6 +5046,20 @@ static DeclBase* ParseDeclWithModifiers(
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
+        }
+        break;
+    case TokenType::CompletionRequest:
+        {
+            if (modifiers.hasModifier<OverrideModifier>())
+            {
+                auto resultDecl = parser->astBuilder->create<EmptyDecl>();
+                resultDecl->nameAndLoc = expectIdentifier(parser);
+                decl = resultDecl;
+            }
+            else
+            {
+                decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
+            }
         }
         break;
     // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
