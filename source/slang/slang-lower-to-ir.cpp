@@ -3249,16 +3249,11 @@ void maybeAddReturnDestinationParam(
     // We will have a double `ref` added if __subscript{get;}
     // since __subscript is not "returning" a value, it is just an intermediate
     // we can ignore adding a param in this case.
-    if (as<SubscriptDecl>(callableDeclRef.getParent()))
+    if (callableDeclRef.as<SubscriptDecl>())
         return;
 
-    // There is no-body to replace `return` with, skip adding param.
-    // This is functionally fine since intrinsics (when we lack a body) can
-    // already return a ref directly.
-    auto functionDeclBase = as<FunctionDeclBase>(callableDeclRef.getDecl());
-    if (!functionDeclBase)
-        return;
-    if (!as<FunctionDeclBase>(callableDeclRef.getDecl())->body)
+    // RefAccessorDecl expects to return ref by `return` stmt, not final param.
+    if (callableDeclRef.as<RefAccessorDecl>())
         return;
 
     // We should only be returning with a ref if our return is noncopyable
