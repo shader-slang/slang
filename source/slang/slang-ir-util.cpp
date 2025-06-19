@@ -2351,15 +2351,15 @@ bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 IROp getUnsignedType(IRType* type)
 {
     IROp op = type->getOp();
-    switch(op)
+    switch (op)
     {
-        case kIROp_MatrixType:
-        case kIROp_VectorType:
-            return getUnsignedType(type->getDataType());
-        case kIROp_IntType:
-            return getOppositeSignIntTypeOp(op);
-        default:
-            return kIROp_Invalid;
+    case kIROp_MatrixType:
+    case kIROp_VectorType:
+        return getUnsignedType(type->getDataType());
+    case kIROp_IntType:
+        return getOppositeSignIntTypeOp(op);
+    default:
+        return kIROp_Invalid;
     }
 }
 
