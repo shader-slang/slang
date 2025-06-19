@@ -419,6 +419,8 @@ constexpr bool anyOf(Range&& range, Predicate&& pred)
 }
 
 IROp getUnsignedType(IRType* type);
+
+bool isSignedType(IRType* type);
 } // namespace Slang
 
 #endif

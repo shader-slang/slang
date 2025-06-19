@@ -353,6 +353,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkDifferentiableCallableCommon(CallableDecl* decl);
 
+    void checkInterfaceRequirement(Decl* decl);
+
     void checkCallableDeclCommon(CallableDecl* decl);
 
     void visitFuncDecl(FuncDecl* funcDecl);
@@ -5055,6 +5057,40 @@ HasInterfaceDefaultImplModifier* hasDefaultImpl(DeclRef<Decl> declRef)
     return nullptr;
 }
 
+void SemanticsVisitor::markOverridingDecl(
+    ConformanceCheckingContext* context,
+    Decl* memberDecl,
+    DeclRef<Decl> requiredMemberDeclRef)
+{
+    if (!memberDecl->isChildOf(context->parentDecl))
+    {
+        // If the member being checked isn't the child of the container decl containing
+        // the inheritance decl that triggers the conformance check, don't modify/diagnose
+        // anything since it should have already been diagnosed when checking its parent.
+        // This can happen when we check for things like:
+        //    extension float : IComparable{}
+        // where the method used to satisfy IComparable comes from outside the extension decl.
+        // we don't want to diagnose or check anything about the found memberDecl that doesn't
+        // belong to this extension decl (context->parentDecl).
+        //
+        return;
+    }
+
+    if (hasDefaultImpl(requiredMemberDeclRef))
+    {
+        memberDecl = maybeGetInner(memberDecl);
+        // If the required member has a default implementation,
+        // we need to make sure the member we found is marked as 'override'.
+        if (!memberDecl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(memberDecl, Diagnostics::missingOverride);
+        }
+    }
+    auto overridingModifier = m_astBuilder->create<IsOverridingModifier>();
+    overridingModifier->overridedDecl = requiredMemberDeclRef.getDecl();
+    addModifier(memberDecl, overridingModifier);
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -5345,6 +5381,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         return false;
                     }
                 }
+
+                markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
             }
         }
     }
@@ -7232,6 +7270,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     QualifiedDeclPath(requiredMemberDeclRef));
                 return false;
             }
+            markOverridingDecl(context, member.declRef.getDecl(), requiredMemberDeclRef);
             return true;
         }
     }
@@ -7738,7 +7777,107 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // only the types that are affected by these interface decls.
         //
         astBuilder->incrementEpoch();
+
+        // For all members marked as `override`, we need to ensure they are actually
+        // overriding something.
+        for (auto member : decl->getMembers())
+        {
+            auto innerMember = maybeGetInner(member);
+            bool hasOverride = false;
+            bool isOverriding = false;
+            for (auto modifier : innerMember->modifiers)
+            {
+                if (as<OverrideModifier>(modifier))
+                {
+                    hasOverride = true;
+                }
+                else if (as<IsOverridingModifier>(modifier))
+                {
+                    isOverriding = true;
+                }
+            }
+            if (hasOverride && !isOverriding)
+            {
+                getSink()->diagnose(
+                    innerMember,
+                    Diagnostics::overrideModifierNotOverridingBaseDecl,
+                    innerMember);
+
+                if (getShared()->isInLanguageServer() &&
+                    member->getName() == getShared()->getSession()->getCompletionRequestTokenName())
+                {
+                    // If we encountered a completion request for a decl name where an 'override'
+                    // keyword is specified, we should suggest all the base decls that can be
+                    // overridden, but have not been overridden yet.
+                    //
+                    calcOverridableCompletionCandidates(type, decl, member);
+                }
+            }
+        }
     }
+}
+
+
+void SemanticsVisitor::calcOverridableCompletionCandidates(
+    Type* aggType,
+    ContainerDecl* aggTypeDecl,
+    Decl* memberDecl)
+{
+    // We are in language server and the user requested to list
+    // all base interface methods that can be overrided in a conforming type.
+    // Collect all base interfaces methods that hasn't been overridden and
+    // suggest them as completion candidates.
+    if (as<InterfaceDecl>(aggTypeDecl))
+    {
+        // If the aggType is an interface, we don't have any base methods to suggest.
+        return;
+    }
+    auto inheritanceInfo = getShared()->getInheritanceInfo(aggType);
+    HashSet<Decl*> overridenDecls;
+    for (auto member : aggTypeDecl->getMembers())
+    {
+        member = maybeGetInner(member);
+        if (!as<FuncDecl>(member))
+            continue;
+        if (auto overridedDeclModifier = member->findModifier<IsOverridingModifier>())
+        {
+            overridenDecls.add(overridedDeclModifier->overridedDecl);
+        }
+    }
+    auto& contentAssistInfo = getShared()->getLinkage()->contentAssistInfo;
+    contentAssistInfo.completionSuggestions.scopeKind = CompletionSuggestions::ScopeKind::Decl;
+    auto varDeclBase = as<VarDeclBase>(memberDecl);
+    contentAssistInfo.completionSuggestions.formatMode =
+        varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
+                    : CompletionSuggestions::FormatMode::FullSignature;
+
+    List<LookupResultItem> candidateItems;
+    for (auto facet : inheritanceInfo.facets)
+    {
+        // Extensions don't contribute overridable members.
+        if (facet->kind == Facet::Kind::Extension)
+            continue;
+
+        auto interfaceDecl = facet->getDeclRef().as<InterfaceDecl>();
+        if (!interfaceDecl)
+            continue;
+        for (auto requirement : interfaceDecl.getDecl()->getMembers())
+        {
+            requirement = maybeGetInner(requirement);
+            if (!as<FuncDecl>(requirement))
+                continue;
+            if (!overridenDecls.contains(requirement))
+            {
+                auto requirementDeclRef = DeclRef<Decl>(requirement);
+                requirementDeclRef =
+                    createDefaultSubstitutionsIfNeeded(m_astBuilder, this, requirementDeclRef);
+                candidateItems.add(LookupResultItem(requirementDeclRef));
+            }
+        }
+    }
+    // Insert overridable candidates at the front of the list, so they are preferred over
+    // the completion results from checking ordinary type exprs.
+    contentAssistInfo.completionSuggestions.candidateItems.insertRange(0, candidateItems);
 }
 
 void SemanticsDeclBasesVisitor::_validateCrossModuleInheritance(
@@ -10145,6 +10284,26 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     }
 }
 
+void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
+{
+    if (isInterfaceRequirement(decl))
+    {
+        if (auto funcBase = as<FunctionDeclBase>(decl))
+        {
+            if (!as<FuncDecl>(decl) && funcBase->body != nullptr)
+            {
+                getSink()->diagnose(decl, Diagnostics::nonMethodInterfaceRequirementCannotHaveBody);
+                return;
+            }
+        }
+        // Interface requirement cannot be `override`.
+        if (decl->hasModifier<OverrideModifier>())
+        {
+            getSink()->diagnose(decl, Diagnostics::interfaceRequirementCannotBeOverride);
+        }
+    }
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -10174,6 +10333,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         }
     }
 
+    checkInterfaceRequirement(decl);
     checkVisibility(decl);
 }
 
@@ -10578,7 +10738,10 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
     //
 
     bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
-
+    for (auto accessor : decl->getMembersOfType<AccessorDecl>())
+    {
+        checkInterfaceRequirement(accessor);
+    }
     if (!anyAccessors)
     {
         GetterDecl* getterDecl = m_astBuilder->create<GetterDecl>();
