@@ -264,6 +264,8 @@ static void parseDecls(Parser* parser, ContainerDecl* parent, MatchedTokenType m
 /// Parse a body consisting of declarations enclosed in `{}`, as the children of `parent`.
 static void parseDeclBody(Parser* parser, ContainerDecl* parent);
 
+static SomeTypeExpr* ParseSomeExpr(Parser* parser);
+
 static Decl* parseEnumDecl(Parser* parser);
 
 static Modifiers _parseOptSemantics(Parser* parser);
@@ -2881,6 +2883,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
     }
+    else if (AdvanceIf(parser, "some"))
+    {
+        typeSpec.expr = ParseSomeExpr(parser);
+        return typeSpec;
+    }
 
     bool inGlobalScope = false;
     if (AdvanceIf(parser, TokenType::Scope))
@@ -5483,6 +5490,14 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
     }
 
     return decl;
+}
+
+static SomeTypeExpr* ParseSomeExpr(Parser* parser)
+{
+    SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
+    parser->FillPosition(expr);
+    expr->base = parser->ParseTypeExp();
+    return expr;
 }
 
 static Decl* parseEnumDecl(Parser* parser)
@@ -8565,6 +8580,10 @@ static Expr* parsePrefixExpr(Parser* parser)
                 {
                     return parseEachExpr(parser, tokenLoc);
                 }
+            }
+            else if (AdvanceIf(parser, "some"))
+            {
+                return ParseSomeExpr(parser);
             }
             return parsePostfixExpr(parser);
         }

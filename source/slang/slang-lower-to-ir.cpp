@@ -3421,7 +3421,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -5596,6 +5595,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'some' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -8296,6 +8301,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
+    }
+
+    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
+    {
+        auto declRefType = as<DeclRefType>(decl->interfaceType.type);
+        SLANG_ASSERT(declRefType);
+        auto loweredType = lowerType(this->context, declRefType);
+        if (!loweredType->findDecoration<IRSomeTypeDecoration>())
+            context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
+        return loweredType;
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
