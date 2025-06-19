@@ -1619,7 +1619,12 @@ DIAGNOSTIC(
     Error,
     invalidConstraintSubType,
     "type '$0' is not a valid left hand side of a type constraint.")
-DIAGNOSTIC(30403, Error, requiredConstraintIsNotChecked, "the constraint providing '$0' is optional and must be checked with an 'is' statement before usage.")
+DIAGNOSTIC(
+    30403,
+    Error,
+    requiredConstraintIsNotChecked,
+    "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
+    "usage.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
