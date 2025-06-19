@@ -674,6 +674,9 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
                 structDecl->addMember(conformanceDecl);
                 structDecl->parentDecl = parent;
+                structDecl->ownedScope = m_astBuilder->create<Scope>();
+                structDecl->ownedScope->containerDecl = structDecl;
+                structDecl->ownedScope->parent = getScope(parent);
 
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
@@ -1290,15 +1293,17 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 
 bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl)
 {
-    // A struct can be used as its own differential type if all its members are differentiable
-    // and their differential types are the same as the original types.
+    // A struct can be used as its own differential type if all its members are differentiable, and
+    // none of the member is decorated with "no_diff", and their differential types are the same as
+    // the original types.
     //
     bool canBeUsed = true;
     for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
         // Try to get the differential type of the member.
         Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
-        if (!diffType || !diffType->equals(varDecl->getType()))
+        if (!diffType || !diffType->equals(varDecl->getType()) ||
+            varDecl->findModifier<NoDiffModifier>())
         {
             canBeUsed = false;
             break;
@@ -5341,6 +5346,12 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             }
             return expr;
         }
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
 #if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
@@ -5396,12 +5407,33 @@ Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
             expr->type.type = thisTypeType;
             return expr;
         }
-
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
         scope = scope->parent;
     }
 
     getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
     return CreateErrorExpr(expr);
+}
+
+Expr* SemanticsExprVisitor::visitThisInterfaceExpr(ThisInterfaceExpr* expr)
+{
+    auto scope = expr->scope;
+
+    auto containerDecl = findParentInterfaceDecl(scope->containerDecl);
+
+    // ThisInterfaceExpr can only be synthesized by the compiler during parsing
+    // an interface decl with default implementation, so container must always
+    // be an interface decl.
+    SLANG_ASSERT(containerDecl);
+    expr->declRef =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, getDefaultDeclRef(containerDecl));
+    expr->type = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, expr->declRef));
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)

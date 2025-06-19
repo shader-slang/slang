@@ -4579,6 +4579,16 @@ void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
+
+    // NTFS on Windows stores files in sorted order but not on Linux/Macos.
+    // Because of that, the testing on Linux/Macos were randomly failing, which
+    // is a good thing because it reveals problems. But it is useless
+    // if we cannot reproduce the failures deterministrically.
+    // https://github.com/shader-slang/slang/issues/7388
+    //
+    // TODO: We need a way to shuffle the list in a deterministic manner.
+    files.sort();
+
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))

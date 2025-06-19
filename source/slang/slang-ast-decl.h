@@ -823,6 +823,14 @@ class GenericDecl : public ContainerDecl
     FIDDLE() Decl* inner = nullptr;
 };
 
+FIDDLE()
+class InterfaceDefaultImplDecl : public GenericDecl
+{
+    FIDDLE(...)
+    FIDDLE() GenericTypeParamDecl* thisTypeDecl;
+    FIDDLE() GenericTypeConstraintDecl* thisTypeConstraintDecl;
+};
+
 FIDDLE(abstract)
 class GenericTypeParamDeclBase : public SimpleTypeDecl
 {
