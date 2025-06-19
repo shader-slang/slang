@@ -617,6 +617,82 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
     }
 }
 
+// Add DenormPreserve and DenormFlushToZero decorations to all entry point functions
+static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
+{
+    auto linkage = codeGenContext->getLinkage();
+    
+    // Only add decorations if we have denorm mode options set
+    bool hasDenormOptions = 
+        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16) ||
+        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32) ||
+        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64);
+    
+    if (!hasDenormOptions)
+        return;
+    
+    IRBuilder builder(irModule);
+    
+    // Apply denorm decorations to all entry point functions
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            // Check if this is an entry point function
+            if (func->findDecoration<IREntryPointDecoration>())
+            {
+                // Handle FP16 denorm mode
+                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16))
+                {
+                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp16();
+                    if (fpDenormMode == FpDenormMode::Preserve)
+                    {
+                        auto width16 = builder.getIntValue(builder.getUIntType(), 16);
+                        builder.addDenormPreserveDecoration(func, width16);
+                    }
+                    else if (fpDenormMode == FpDenormMode::Ftz)
+                    {
+                        auto width16 = builder.getIntValue(builder.getUIntType(), 16);
+                        builder.addDenormFlushToZeroDecoration(func, width16);
+                    }
+                }
+
+                // Handle FP32 denorm mode
+                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32))
+                {
+                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp32();
+                    if (fpDenormMode == FpDenormMode::Preserve)
+                    {
+                        auto width32 = builder.getIntValue(builder.getUIntType(), 32);
+                        builder.addDenormPreserveDecoration(func, width32);
+                    }
+                    else if (fpDenormMode == FpDenormMode::Ftz)
+                    {
+                        auto width32 = builder.getIntValue(builder.getUIntType(), 32);
+                        builder.addDenormFlushToZeroDecoration(func, width32);
+                    }
+                }
+
+                // Handle FP64 denorm mode
+                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64))
+                {
+                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp64();
+                    if (fpDenormMode == FpDenormMode::Preserve)
+                    {
+                        auto width64 = builder.getIntValue(builder.getUIntType(), 64);
+                        builder.addDenormPreserveDecoration(func, width64);
+                    }
+                    else if (fpDenormMode == FpDenormMode::Ftz)
+                    {
+                        auto width64 = builder.getIntValue(builder.getUIntType(), 64);
+                        builder.addDenormFlushToZeroDecoration(func, width64);
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Helper function to convert a 20 byte SHA1 to a hexadecimal string,
 // needed for the build identifier instruction.
 String getBuildIdentifierString(ComponentType* component)
@@ -754,6 +830,14 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     checkEntryPointDecorations(irModule, target, sink);
+
+    // Add denorm mode decorations to entry point functions based on compiler options.
+    // This is done post-linking to ensure all entry points from linked modules are processed.
+    addDenormModeDecorations(irModule, codeGenContext);
+#if 0
+    dumpIRIfEnabled(codeGenContext, irModule, "DENORM DECORATIONS ADDED");
+#endif
+    validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Another transformation that needed to wait until we
     // had layout information on parameters is to take uniform
