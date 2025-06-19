@@ -14,6 +14,7 @@
 
 namespace Slang
 {
+
 // pre-declare
 static Name* getName(Parser* parser, String const& text);
 
@@ -264,7 +265,9 @@ static void parseDecls(Parser* parser, ContainerDecl* parent, MatchedTokenType m
 /// Parse a body consisting of declarations enclosed in `{}`, as the children of `parent`.
 static void parseDeclBody(Parser* parser, ContainerDecl* parent);
 
-static SomeTypeExpr* ParseSomeExpr(Parser* parser);
+static SomeTypeExpr* parseSomeTypeExpr(Parser* parser);
+
+static DynTypeExpr* parseDynTypeExpr(Parser* parser);
 
 static Decl* parseEnumDecl(Parser* parser);
 
@@ -714,6 +717,29 @@ bool AdvanceIf(Parser* parser, char const* text)
     return false;
 }
 
+// This is an N token lookahead, Y token advance.
+// This is not a good idea to use unless left
+// without any other option.
+bool AdvanceIf(Parser* parser, List<char const*> text, uint32_t tokensToAdvance)
+{
+    TokenReader startState = parser->tokenReader;
+    for (int i = 0; i < text.getCount(); i++)
+    {
+        if (AdvanceIf(parser, text[i]))
+            continue;
+        parser->tokenReader = startState;
+        return false;
+    }
+
+    parser->tokenReader = startState;
+    while (tokensToAdvance > 0)
+    {
+        tokensToAdvance--;
+        parser->ReadToken();
+    }
+    return true;
+}
+
 bool AdvanceIf(Parser* parser, char const* text, Token* outToken)
 {
     if (parser->LookAheadToken(text))
@@ -1082,6 +1108,7 @@ static Token peekToken(Parser* parser)
     return parser->tokenReader.peekToken();
 }
 
+template<bool allowAnySyntaxDecl, typename T>
 static SyntaxDecl* tryLookUpSyntaxDecl(
     Parser* parser,
     Name* name,
@@ -1097,10 +1124,44 @@ static SyntaxDecl* tryLookUpSyntaxDecl(
         syntaxLookupMask,
         true);
 
-    // If we didn't find anything, or the result was overloaded,
-    // then we aren't going to be able to extract a single decl.
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
+    // If we didn't find anything, we aren't going to be able to 
+    // extract a decl.
+    if (!lookupResult.isValid())
         return nullptr;
+
+    // Ensure we only have 1 valid syntax decl to parse.
+    if (!lookupResult.isOverloaded())
+    {
+        if constexpr (!allowAnySyntaxDecl)
+        {
+            auto syntaxDecl = as<SyntaxDecl>(overloadedItem.declRef.getDecl());
+            if (!syntaxDecl)
+                return nullptr;
+            if (!syntaxDecl->syntaxClass.isSubClassOf<T>())
+                return nullptr;
+        }
+    }
+    else if (lookupResult.isOverloaded())
+    {
+        bool foundItem = false;
+        for (auto overloadedItem : lookupResult.items)
+        {
+            auto syntaxDecl = as<SyntaxDecl>(overloadedItem.declRef.getDecl());
+            if (!syntaxDecl)
+                continue;
+
+            if (syntaxDecl->syntaxClass.isSubClassOf<T>())
+            {
+                // ambiguous, we have multiple possible syntax-decl's to pick-from
+                if (foundItem)
+                    return nullptr;
+
+                // set the first syntax decl that could fit our needs
+                foundItem = true;
+                lookupResult.item = overloadedItem;
+            }
+        }
+    }
 
     auto decl = lookupResult.item.declRef.getDecl();
     if (auto syntaxDecl = as<SyntaxDecl>(decl))
@@ -1180,7 +1241,7 @@ bool tryParseUsingSyntaxDecl(
     auto nameToken = peekToken(parser);
     auto name = nameToken.getName();
 
-    auto syntaxDecl = tryLookUpSyntaxDecl(parser, name, syntaxLookupMask);
+    auto syntaxDecl = tryLookUpSyntaxDecl<false, T>(parser, name, syntaxLookupMask);
 
     if (!syntaxDecl)
         return false;
@@ -1251,6 +1312,14 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                         continue;
                     }
                 }
+                //else if (AdvanceIf(parser, {"dyn", "interface"}, 1))
+                //{
+                //    // no validation is needed so we are safe to add a modifier with our LL(2) operation
+                //    parsedModifier = parser->astBuilder->create<DynModifier>();
+                //    parsedModifier->loc = nameToken.loc;
+                //    AddModifier(&modifierLink, parsedModifier);
+                //    continue;
+                //}
                 // If there was no match for a modifier keyword, then we
                 // must be at the end of the modifier sequence
                 return modifiers;
@@ -2883,11 +2952,16 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
     }
-    else if (AdvanceIf(parser, "some"))
-    {
-        typeSpec.expr = ParseSomeExpr(parser);
-        return typeSpec;
-    }
+    //else if (AdvanceIf(parser, "some"))
+    //{
+    //    typeSpec.expr = parseSomeTypeExpr(parser);
+    //    return typeSpec;
+    //}
+    //else if (AdvanceIf(parser, "dyn"))
+    //{
+    //    typeSpec.expr = parseDynTypeExpr(parser);
+    //    return typeSpec;
+    //}
 
     bool inGlobalScope = false;
     if (AdvanceIf(parser, TokenType::Scope))
@@ -4398,6 +4472,8 @@ NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
     return (NodeBase*)syntaxClass.createInstanceImpl(parser->astBuilder);
 }
 
+struct AllowAnySyntaxType{};
+
 // Parse a declaration of a keyword that can be used to define further syntax.
 static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
 {
@@ -4435,8 +4511,8 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         auto existingKeywordNameAndLoc = expectIdentifier(parser);
-
-        auto existingSyntax = tryLookUpSyntaxDecl(parser, existingKeywordNameAndLoc.name);
+        auto existingSyntax =
+            tryLookUpSyntaxDecl<true, SyntaxClass<NodeBase>>(parser, existingKeywordNameAndLoc.name);
         if (!existingSyntax)
         {
             // TODO: diagnose: keyword did not name syntax
@@ -5478,13 +5554,21 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
     return decl;
 }
 
-static SomeTypeExpr* ParseSomeExpr(Parser* parser)
-{
-    SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
-    parser->FillPosition(expr);
-    expr->base = parser->ParseTypeExp();
-    return expr;
-}
+//static SomeTypeExpr* parseSomeTypeExpr(Parser* parser)
+//{
+//    SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
+//    parser->FillPosition(expr);
+//    expr->base = parser->ParseTypeExp();
+//    return expr;
+//}
+//
+//static DynTypeExpr* parseDynTypeExpr(Parser* parser)
+//{
+//    DynTypeExpr* expr = parser->astBuilder->create<DynTypeExpr>();
+//    parser->FillPosition(expr);
+//    expr->base = parser->ParseTypeExp();
+//    return expr;
+//}
 
 static Decl* parseEnumDecl(Parser* parser)
 {
@@ -6097,7 +6181,7 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     {
         if (tokenPreview.peekToken().getContent() == token)
             return true;
-        else if (auto syntaxDecl = tryLookUpSyntaxDecl(parser, tokenPreview.peekToken().getName()))
+        else if (auto syntaxDecl = tryLookUpSyntaxDecl<false, Modifier>(parser, tokenPreview.peekToken().getName()))
         {
             if (syntaxDecl->syntaxClass.isSubClassOf<Modifier>())
             {
@@ -6956,6 +7040,29 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::RParent);
 
     return alignOfExpr;
+}
+
+static NodeBase* parseSomeTypeExpr(Parser* parser, void* /*userData*/)
+{
+    SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
+    parser->FillPosition(expr);
+    expr->base = parser->ParseTypeExp();
+    return expr;
+}
+
+static NodeBase* parseDynTypeExpr(Parser* parser, void* /*userData*/)
+{
+    if (AdvanceIf(parser, "interface"))
+    {
+        auto interfaceDecl = as<ModifiableSyntaxNode>(parseInterfaceDecl(parser, {}));
+        addModifier(interfaceDecl, parser->astBuilder->create<DynModifier>());
+        return interfaceDecl;
+    }
+
+    DynTypeExpr* expr = parser->astBuilder->create<DynTypeExpr>();
+    parser->FillPosition(expr);
+    expr->base = parser->ParseTypeExp();
+    return expr;
 }
 
 static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
@@ -8567,10 +8674,14 @@ static Expr* parsePrefixExpr(Parser* parser)
                     return parseEachExpr(parser, tokenLoc);
                 }
             }
-            else if (AdvanceIf(parser, "some"))
-            {
-                return ParseSomeExpr(parser);
-            }
+            //else if (AdvanceIf(parser, "some"))
+            //{
+            //    return parseSomeTypeExpr(parser);
+            //}
+            //else if (AdvanceIf(parser, "dyn"))
+            //{
+            //    return parseDynTypeExpr(parser);
+            //}
             return parsePostfixExpr(parser);
         }
     default:
@@ -9433,6 +9544,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__transparent_block", parseTransparentBlockDecl),
     _makeParseDecl("__file_decl", parseFileDecl),
     _makeParseDecl("__require_capability", parseRequireCapabilityDecl),
+    _makeParseExpr("dyn", parseDynTypeExpr),
 
     // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
 
@@ -9463,8 +9575,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("require", getSyntaxClass<RequireModifier>()),
     _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
     _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
-
-    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
 
     _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
     _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
@@ -9549,6 +9659,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("some", parseSomeTypeExpr),
+    _makeParseExpr("dyn", parseDynTypeExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
