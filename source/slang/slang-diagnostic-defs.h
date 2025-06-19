@@ -1142,6 +1142,11 @@ DIAGNOSTIC(
     Error,
     useOfUndeclaredCapabilityOfInterfaceRequirement,
     "'$0' uses capability '$1' that is missing from the interface requirement.")
+DIAGNOSTIC(
+    36104,
+    Error,
+    useOfUndeclaredCapabilityOfInheritanceDecl,
+    "'$0' is not a subset of parent, uses additional undeclared capabilities '$1'.")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(

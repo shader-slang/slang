@@ -966,12 +966,10 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     CapabilitySet getDeclaredCapabilitySet(Decl* decl);
 
-
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
-    void visitAggTypeDeclBase(AggTypeDeclBase* decl);
-    void visitNamespaceDeclBase(NamespaceDeclBase* decl);
+    void visitContainerDecl(ContainerDecl* decl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -14153,30 +14151,24 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     return declaredCaps;
 }
 
-void SemanticsDeclCapabilityVisitor::visitAggTypeDeclBase(AggTypeDeclBase* decl)
+void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
+    // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
+    // to ensure consistency (children get parent capabilities which are un-set through
+    // `getDeclaredCapabilitySet`).
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
-void SemanticsDeclCapabilityVisitor::visitNamespaceDeclBase(NamespaceDeclBase* decl)
+void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
-    decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
-}
+    setParentFuncOfVisitor(funcDecl);
 
-template<typename ProcessFunc, typename ParentDiagnosticFunc>
-static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(
-    SemanticsVisitor* visitor,
-    FunctionDeclBase* funcDecl,
-    const ProcessFunc& processFunc,
-    const ParentDiagnosticFunc& parentDiagnosticFunc)
-{
-    visitor->setParentFuncOfVisitor(funcDecl);
-
+    // visit the members & body of our funcDecl
     for (auto member : funcDecl->getDirectMemberDecls())
     {
-        visitor->ensureDecl(member, DeclCheckState::CapabilityChecked);
+        ensureDecl(member, DeclCheckState::CapabilityChecked);
         _propagateRequirement(
-            visitor,
+            this,
             funcDecl->inferredCapabilityRequirements,
             funcDecl,
             member,
@@ -14185,37 +14177,10 @@ static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(
     }
 
     visitReferencedDecls(
-        *visitor,
+        *this,
         funcDecl->body,
         funcDecl->loc,
         funcDecl->findModifier<RequireCapabilityAttribute>(),
-        processFunc,
-        parentDiagnosticFunc);
-
-    if (!isEffectivelyStatic(funcDecl))
-    {
-        auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
-        if (parentAggTypeDecl)
-        {
-            visitor->ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
-            _propagateRequirement(
-                visitor,
-                funcDecl->inferredCapabilityRequirements,
-                funcDecl,
-                parentAggTypeDecl,
-                parentAggTypeDecl->inferredCapabilityRequirements,
-                funcDecl->loc);
-        }
-    }
-}
-
-void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
-{
-    // If the function is an entrypoint and specifies a target stage, add the capabilities to
-    // our function capabilities.
-    _dispatchCapabilitiesVisitorOfFunctionDecl(
-        this,
-        funcDecl,
         [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
         {
             _propagateRequirement(
@@ -14229,12 +14194,30 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
 
-    auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
+    // non-static function join's capabilities with parent
+    // to become a super-set of the parent.
+    if (!isEffectivelyStatic(funcDecl))
+    {
+        auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
+        if (parentAggTypeDecl)
+        {
+            ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
+            _propagateRequirement(
+                this,
+                funcDecl->inferredCapabilityRequirements,
+                funcDecl,
+                parentAggTypeDecl,
+                parentAggTypeDecl->inferredCapabilityRequirements,
+                funcDecl->loc);
+        }
+    }
 
+    // Get require of decl + add parents
+    auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
     auto vis = getDeclVisibility(funcDecl);
 
-    // If 0 capabilities were annotated on a function, capabilities are inferred from the
-    // function body
+    // If 0 capabilities were annotated on this function,
+    // capabilities are inferred from the children.
     if (declaredCaps.isEmpty())
     {
         declaredCaps = funcDecl->inferredCapabilityRequirements;
@@ -14243,11 +14226,9 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     {
         if (vis == DeclVisibility::Public)
         {
-            // For public decls, we need to enforce that the function
-            // only uses capabilities that it declares.
-            // At a minimum we will propagate shader requirements to our
-            // function from calling children in all cases so the parent
-            // can enforce shader targets correctly and propagate to `main`
+            // We need to enforce that the function
+            // only uses capabilities that this decl declares. To do this
+            // we compare capabilities used in the `body` of the function
             CapabilityAtomSet failedAvailableCapabilityConjunction;
             if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
@@ -14258,15 +14239,14 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                     funcDecl,
                     Diagnostics::useOfUndeclaredCapability,
                     failedAvailableCapabilityConjunction);
-                funcDecl->inferredCapabilityRequirements = declaredCaps;
             }
-            else
-                funcDecl->inferredCapabilityRequirements.nonDestructiveJoin(declaredCaps);
+            funcDecl->inferredCapabilityRequirements = declaredCaps;
         }
         else
         {
             // For internal decls, their inferred capability should be joined
-            // with the declared capabilities.
+            // with the declared capabilities since we are assuming the stdlib
+            // is not wrong.
             funcDecl->inferredCapabilityRequirements.join(declaredCaps);
         }
     }
@@ -14274,8 +14254,26 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
 {
-    // Check that the implementation of an interface requirement is not using more capabilities
-    // than what's declared on the interface method.
+    // Propegate capabilities of inheritance `base` to
+    // `InheritanceDecl`
+    visitReferencedDecls(
+        *this,
+        inheritanceDecl->base,
+        inheritanceDecl->loc,
+        nullptr,
+        [this, inheritanceDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        {
+            _propagateRequirement(
+                this,
+                inheritanceDecl->inferredCapabilityRequirements,
+                inheritanceDecl,
+                node,
+                nodeCaps,
+                refLoc);
+        },
+        [this, inheritanceDecl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, inheritanceDecl, category); });
+
     if (inheritanceDecl->witnessTable)
     {
         for (auto& kv : inheritanceDecl->witnessTable->m_requirementDictionary)
@@ -14305,6 +14303,21 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                     failedAvailableCapabilityConjunction);
             }
         }
+    }
+
+    // validate that parent is a super set of inheritance
+    auto parent = inheritanceDecl->parentDecl;
+    ensureDecl(parent, DeclCheckState::CapabilityChecked);
+    CapabilityAtomSet failedAvailableCapabilityConjunction;
+    if (!CapabilitySet::checkCapabilityRequirement(
+            parent->inferredCapabilityRequirements,
+            inheritanceDecl->inferredCapabilityRequirements,
+            failedAvailableCapabilityConjunction))
+    {
+        diagnoseUndeclaredCapability(
+            inheritanceDecl,
+            Diagnostics::useOfUndeclaredCapabilityOfInheritanceDecl,
+            failedAvailableCapabilityConjunction);
     }
 }
 
@@ -14594,9 +14607,6 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     const CapabilityAtomSet& failedAtomsInsideAvailableSet)
 {
     if (decl->inferredCapabilityRequirements.isEmpty())
-        return;
-    if (failedAtomsInsideAvailableSet.isEmpty() ||
-        failedAtomsInsideAvailableSet.contains((UInt)CapabilityAtom::Invalid))
         return;
 
     // There are two causes for why type checking failed on failedAvailableSet.

@@ -964,7 +964,7 @@ bool CapabilitySet::checkCapabilityRequirement(
     CapabilitySet const& required,
     CapabilityAtomSet& outFailedAvailableSet)
 {
-    // Requirements x are met by available disjoint capabilities (a | b) iff
+    // 'required' capabilities x are met by 'available' disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
     // If we have a caller function F() decorated with:
     //     [require(hlsl, _sm_6_3)] [require(spirv, _spv_ray_tracing)] void F() { g(); }
@@ -975,20 +975,18 @@ bool CapabilitySet::checkCapabilityRequirement(
     // such that X implies Y.
     //
 
-    // if empty there is no body, all capabilities are supported.
-    if (required.isEmpty())
+    // If empty, all capabilities are supported.
+    // Either, we require no capabilities (return true)
+    // or we have no capability requirements (return true)
+    if (required.isEmpty() || available.isEmpty())
         return true;
 
+    // invalid isn't a fail because the capabilities already threw an error.
     if (required.isInvalid())
     {
         outFailedAvailableSet.add((UInt)CapabilityAtom::Invalid);
-        return false;
+        return true;
     }
-
-    // If F's capability is empty, we can satisfy any non-empty requirements.
-    //
-    if (available.isEmpty() && !required.isEmpty())
-        return false;
 
 
     // if all sets in `available` are not a super-set to at least 1 `required` set, then we have an
@@ -1031,6 +1029,10 @@ bool CapabilitySet::checkCapabilityRequirement(
                         outFailedAvailableSet,
                         *lastBadStage,
                         availableStageSet);
+
+                    // Not a failiure if nothing is missing
+                    if (outFailedAvailableSet.isEmpty())
+                        return true;
                     return false;
                 }
             }
@@ -1097,7 +1099,7 @@ UnownedStringSlice capabilityNameToStringWithoutPrefix(CapabilityName capability
     return name;
 }
 
-void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet)
 {
     bool isFirst = true;
     for (auto atom : atomSet.newSetWithoutImpliedAtoms())

@@ -878,6 +878,7 @@ def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
+def _GL_NV_cooperative_vector : _GLSL_450;
 
 // GLSL extension and SPV extension associations.
 
@@ -1121,6 +1122,10 @@ alias GL_NV_shader_texture_footprint = _GL_NV_shader_texture_footprint | spvImag
 /// [EXT]
 alias GL_NV_cluster_acceleration_structure = _GL_NV_cluster_acceleration_structure | spvRayTracingClusterAccelerationStructureNV;
 
+/// Represents the GL_NV_cooperative_vector extension.
+/// [EXT]
+alias GL_NV_cooperative_vector = _GL_NV_cooperative_vector | spvCooperativeVectorNV + spvCooperativeVectorTrainingNV;
+
 // Define feature names not reliant on shader stages
 
 /// NVAPI capability for HLSL
@@ -1177,11 +1182,10 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 /// Note that cpp and cuda are supported via a fallback non-cooperative implementation
 /// No HLSL shader model bound yet
 /// [Compound]
-alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
-alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
-
+alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
 alias cooperative_matrix = spvCooperativeMatrixKHR;
