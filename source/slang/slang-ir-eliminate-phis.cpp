@@ -939,8 +939,9 @@ struct PhiEliminationContext
         for (UInt i = 0, j = 0; i < (UInt)phiInfos.getCount(); i++)
         {
             if (phiInfos[i].param.temp)
-                branch->removeOperand(newOperandCount+j);
-            else ++j;
+                branch->removeOperand(newOperandCount + j);
+            else
+                ++j;
         }
     }
 
