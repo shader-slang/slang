@@ -5101,6 +5101,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
             break;
+        case kIROp_DenormPreserveDecoration:
+            {
+                auto denormDecor = cast<IRDenormPreserveDecoration>(decoration);
+                auto width = int32_t(getIntVal(denormDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormPreserve);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormPreserve,
+                    SpvLiteralInteger::from32(width));
+            }
+            break;
+        case kIROp_DenormFlushToZeroDecoration:
+            {
+                auto denormDecor = cast<IRDenormFlushToZeroDecoration>(decoration);
+                auto width = int32_t(getIntVal(denormDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormFlushToZero);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormFlushToZero,
+                    SpvLiteralInteger::from32(width));
+            }
+            break;
         case kIROp_MaxVertexCountDecoration:
             // Don't do anything here, instead wait until we see OutputTopologyDecoration
             // and emit them together to ensure MaxVertexCount always appears before

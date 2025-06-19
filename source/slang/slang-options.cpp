@@ -53,6 +53,7 @@ enum class ValueCategory
     Target,
     Language,
     FloatingPointMode,
+    FpDenormMode,
     ArchiveType,
     Stage,
     LineDirectiveMode,
@@ -85,6 +86,7 @@ SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
 SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
 SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
 SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
+SLANG_GET_VALUE_CATEGORY(FpDenormMode, FpDenormMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
@@ -183,6 +185,13 @@ void initCommandOptions(CommandOptions& options)
             "Floating Point Mode",
             UserValue(ValueCategory::FloatingPointMode));
         options.addValues(TypeTextUtil::getFloatingPointModeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "denorm-mode-fp<16|32|64>",
+            "Floating Point Denormal Mode",
+            UserValue(ValueCategory::FpDenormMode));
+        options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -580,6 +589,18 @@ void initCommandOptions(CommandOptions& options)
          "-fp-mode,-floating-point-mode",
          "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>",
          "Control floating point optimizations"},
+        {OptionKind::DenormModeFp16,
+         "-denorm-mode-fp16",
+         "-denorm-mode-fp16 <mode>",
+         "Control handling of 16-bit denormal floating point values (any, preserve, ftz)"},
+        {OptionKind::DenormModeFp32,
+         "-denorm-mode-fp32",
+         "-denorm-mode-fp32 <mode>",
+         "Control handling of 32-bit denormal floating point values (any, preserve, ftz)"},
+        {OptionKind::DenormModeFp64,
+         "-denorm-mode-fp64",
+         "-denorm-mode-fp64 <mode>",
+         "Control handling of 64-bit denormal floating point values (any, preserve, ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",
@@ -2803,6 +2824,27 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 FloatingPointMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 setFloatingPointMode(getCurrentTarget(), value);
+                break;
+            }
+        case OptionKind::DenormModeFp16:
+            {
+                FpDenormMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp16, value);
+                break;
+            }
+        case OptionKind::DenormModeFp32:
+            {
+                FpDenormMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp32, value);
+                break;
+            }
+        case OptionKind::DenormModeFp64:
+            {
+                FpDenormMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp64, value);
                 break;
             }
         case OptionKind::Optimization:

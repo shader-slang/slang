@@ -14,6 +14,7 @@ using slang::CompilerOptionValueKind;
 enum MatrixLayoutMode : SlangMatrixLayoutModeIntegral;
 enum class LineDirectiveMode : SlangLineDirectiveModeIntegral;
 enum class FloatingPointMode : SlangFloatingPointModeIntegral;
+enum class FpDenormMode : SlangFpDenormModeIntegral;
 enum class OptimizationLevel : SlangOptimizationLevelIntegral;
 enum class DebugInfoLevel : SlangDebugInfoLevelIntegral;
 enum class CodeGenTarget : SlangCompileTargetIntegral;
@@ -373,6 +374,21 @@ struct CompilerOptionSet
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
+    }
+
+    FpDenormMode getDenormModeFp16()
+    {
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp16);
+    }
+
+    FpDenormMode getDenormModeFp32()
+    {
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp32);
+    }
+
+    FpDenormMode getDenormModeFp64()
+    {
+        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp64);
     }
 
     LineDirectiveMode getLineDirectiveMode()

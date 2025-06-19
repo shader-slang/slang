@@ -879,6 +879,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MaxVertexCountDecoration,          maxVertexCount,         1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
+    INST(DenormPreserveDecoration,          denormPreserve,         1, 0)
+    INST(DenormFlushToZeroDecoration,       denormFlushToZero,      1, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
 
     INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
