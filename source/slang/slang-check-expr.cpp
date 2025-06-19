@@ -1039,9 +1039,7 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
     auto sub = witness->getSub();
     auto sup = witness->getSup();
 
-    for (auto outerStmtInfo = m_outerStmts;
-         outerStmtInfo;
-         outerStmtInfo = outerStmtInfo->next)
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
     {
         auto outerStmt = outerStmtInfo->stmt;
         auto ifStmt = as<IfStmt>(outerStmt);
@@ -1105,7 +1103,10 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(loc, Diagnostics::requiredConstraintIsNotChecked, lookupResult.item.declRef);
+        getSink()->diagnose(
+            loc,
+            Diagnostics::requiredConstraintIsNotChecked,
+            lookupResult.item.declRef);
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -5261,7 +5262,8 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
-    lookupResult = filterLookupResultByCheckedOptionalAndDiagnose(lookupResult, expr->loc, diagnosed);
+    lookupResult =
+        filterLookupResultByCheckedOptionalAndDiagnose(lookupResult, expr->loc, diagnosed);
     if (!lookupResult.isValid())
     {
         return lookupMemberResultFailure(expr, baseType, diagnosed);

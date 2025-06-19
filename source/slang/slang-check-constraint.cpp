@@ -361,7 +361,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
         ValUnificationContext unificationContext;
-        unificationContext.optionalConstraint = constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        unificationContext.optionalConstraint =
+            constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
         if (!TryUnifyTypes(
                 *system,
                 unificationContext,

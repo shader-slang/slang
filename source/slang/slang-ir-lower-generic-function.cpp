@@ -357,7 +357,8 @@ struct GenericFunctionLoweringContext
         if (witnessTableType->getConformanceType()->findDecoration<IRComInterfaceDecoration>())
             return;
 
-        IRInterfaceType* conformanceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+        IRInterfaceType* conformanceType =
+            as<IRInterfaceType>(witnessTableType->getConformanceType());
 
         // NoneWitness generates conformance types which aren't interfaces. In
         // that case, the method can just be skipped entirely, since there's no

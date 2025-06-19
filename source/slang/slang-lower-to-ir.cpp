@@ -5522,8 +5522,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         auto rightType = lowerType(context, expr->typeExpr.type);
         IRInst* args[] = {leftType, rightType};
-        auto irVal =
-            builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
+        auto irVal = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 

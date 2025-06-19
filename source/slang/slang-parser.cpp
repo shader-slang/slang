@@ -1704,9 +1704,11 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 parser->FillPosition(constraint);
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
-                if(optional)
+                if (optional)
                 {
-                    addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+                    addModifier(
+                        constraint,
+                        parser->astBuilder->create<OptionalConstraintModifier>());
                 }
                 AddMember(genericParent, constraint);
                 if (!AdvanceIf(parser, TokenType::Comma))
@@ -1721,7 +1723,7 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->FillPosition(constraint);
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
-            if(optional)
+            if (optional)
             {
                 addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
             }
