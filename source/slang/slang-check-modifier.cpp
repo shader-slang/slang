@@ -1529,6 +1529,8 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         return isGlobalDecl(decl) || isEffectivelyStatic(decl);
     case ASTNodeType::DynModifier:
         return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
+    case ASTNodeType::OverrideModifier:
+        return as<FunctionDeclBase>(decl) && as<AggTypeDecl>(getParentDecl(decl));
     default:
         return true;
     }
@@ -2147,6 +2149,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         // an error if the modifier is not allowed on the declaration.
         if (as<SharedModifiers>(modifier))
             ignoreUnallowedModifier = true;
+        else if (
+            getLinkage()->contentAssistInfo.checkingMode == ContentAssistCheckingMode::Completion)
+            ignoreUnallowedModifier = true;
 
         // may return a list of modifiers
         auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
@@ -2220,7 +2225,6 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
     {
         auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
         auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
-
         bool hasReadModifier = readModifier != nullptr;
         bool hasWriteModifier = writeModifier != nullptr;
 

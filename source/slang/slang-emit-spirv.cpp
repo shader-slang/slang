@@ -4850,7 +4850,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (mode == SpvExecutionModeMax)
             return;
 
-        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
+        // Vulkan spec requires DepthReplacing exec mode when storing to FragDepth,
+        // in addition to DepthLess/DepthGreater modes.
+        requireSPIRVExecutionMode(
+            nullptr,
+            getIRInstSpvID(entryPoint),
+            SpvExecutionModeDepthReplacing);
+
+        if (mode != SpvExecutionModeDepthReplacing)
+            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
@@ -7761,27 +7769,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst,
             spvVecTy,
             List<IRInst*>::makeRepeated(scalar, Index(numElems)));
-    }
-
-    bool isSignedType(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-            return true;
-        case kIROp_IntType:
-        case kIROp_Int16Type:
-        case kIROp_Int64Type:
-        case kIROp_Int8Type:
-            return true;
-        case kIROp_VectorType:
-            return isSignedType(as<IRVectorType>(type)->getElementType());
-        case kIROp_MatrixType:
-            return isSignedType(as<IRMatrixType>(type)->getElementType());
-        default:
-            return false;
-        }
     }
 
     bool isFloatType(IRInst* type)

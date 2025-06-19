@@ -1314,15 +1314,13 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             first = false;
 
             {
-                ScopePart scopePart(this, Part::Type::GenericParamValue);
-                sb << getText(genericValParam.getName());
-            }
-
-            sb << ":";
-
-            {
                 ScopePart scopePart(this, Part::Type::GenericParamValueType);
                 addType(getType(m_astBuilder, genericValParam));
+            }
+            sb << " ";
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << getText(genericValParam.getName());
             }
         }
         else if (auto genericTypePackParam = paramDeclRef.as<GenericTypePackParamDecl>())
