@@ -69,6 +69,8 @@ Slang::Result loadComputeProgram(
     programDesc.slangGlobalScope = composedProgram.get();
 
     auto shaderProgram = device->createProgram(programDesc);
+    if (!shaderProgram)
+        return SLANG_FAIL;
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;

@@ -82,6 +82,7 @@ struct InputBufferDesc
 struct InputSamplerDesc
 {
     bool isCompareSampler = false;
+    TextureFilteringMode filteringMode = TextureFilteringMode::Linear;
 };
 
 struct TextureData
@@ -109,7 +110,8 @@ struct TextureData
     }
     void* addSlice(size_t elemCount)
     {
-        void* dst = ::malloc(m_formatSize * elemCount);
+        const size_t totalSize = m_formatSize * elemCount;
+        void* dst = ::malloc(totalSize);
         m_slices.add(Slice::make(dst, elemCount));
         return dst;
     }
@@ -153,9 +155,9 @@ struct TextureData
     uint8_t m_formatSize = 0;
 
     Slang::List<Slice> m_slices;
-    int m_textureSize;
-    int m_mipLevels;
-    int m_arraySize;
+    int m_textureSize = 0;
+    int m_mipLevels = 1;
+    int m_arraySize = 1;
 };
 
 class ShaderInputLayout

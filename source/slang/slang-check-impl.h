@@ -1892,6 +1892,11 @@ public:
         DeclRef<CallableDecl> requirement,
         DeclRef<CallableDecl> method);
 
+    void markOverridingDecl(
+        ConformanceCheckingContext* context,
+        Decl* memberDecl,
+        DeclRef<Decl> requiredMemberDeclRef);
+
     /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
     ///
@@ -2094,6 +2099,11 @@ public:
     bool checkConformance(Type* type, InheritanceDecl* inheritanceDecl, ContainerDecl* parentDecl);
 
     void checkExtensionConformance(ExtensionDecl* decl);
+
+    void calcOverridableCompletionCandidates(
+        Type* aggType,
+        ContainerDecl* aggTypeDecl,
+        Decl* memberDecl);
 
     void checkAggTypeConformance(AggTypeDecl* decl);
 

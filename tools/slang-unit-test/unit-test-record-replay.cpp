@@ -256,6 +256,16 @@ static SlangResult runExample(
         hashLines.add(line);
     }
 
+    if (hashLines.getCount() == 0)
+    {
+        msgBuilder << "Hash value is not found for '" << exampleName << "'\n";
+        msgBuilder << "Process ret code: " << exeRes.resultCode << "\n";
+        msgBuilder << "Standard output:\n" << exeRes.standardOutput << "\n";
+        msgBuilder << "Standard error:\n" << exeRes.standardError << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        return SLANG_FAIL;
+    }
+
     res = parseHashes(hashLines, outHashes);
     if (SLANG_FAILED(res))
     {
