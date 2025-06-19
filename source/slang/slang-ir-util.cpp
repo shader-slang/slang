@@ -2357,6 +2357,9 @@ IROp getUnsignedType(IRType* type)
     case kIROp_VectorType:
         return getUnsignedType(type->getDataType());
     case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
         return getOppositeSignIntTypeOp(op);
     default:
         return kIROp_Invalid;
