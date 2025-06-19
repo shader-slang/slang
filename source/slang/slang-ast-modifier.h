@@ -67,6 +67,21 @@ class InternalModifier : public VisibilityModifier
 };
 
 FIDDLE()
+class OverrideModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks that a decl is verified to be overriding another decl defined in a base type.
+FIDDLE()
+class IsOverridingModifier : public Modifier
+{
+    FIDDLE(...)
+
+    FIDDLE() Decl* overridedDecl = nullptr;
+};
+
+FIDDLE()
 class RequireModifier : public Modifier
 {
     FIDDLE(...)
@@ -731,6 +746,14 @@ class HLSLVolatileModifier : public Modifier
     FIDDLE(...)
 };
 
+// Indicate that an interface method requirement has a default impl.
+FIDDLE()
+class HasInterfaceDefaultImplModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() Decl* defaultImplDecl = nullptr;
+};
 
 FIDDLE()
 class AttributeTargetModifier : public Modifier

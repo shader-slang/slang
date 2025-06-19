@@ -127,7 +127,7 @@ protected:
         nvrtcProgram m_program;
     };
 
-    SlangResult _findCUDAIncludePath(String& outIncludePath);
+    SlangResult _findCUDAIncludePath(String& outPath);
     SlangResult _getCUDAIncludePath(String& outIncludePath);
 
     SlangResult _findOptixIncludePath(String& outIncludePath);
@@ -711,10 +711,13 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
     }
 
 #if SLANG_LINUX_FAMILY
-    // Try /usr/include
-    {
-        String includePath = "/usr/include";
+    List<String> candidatePaths;
+    candidatePaths.add("/usr/local/include");
+    candidatePaths.add("/usr/local/cuda/include");
+    candidatePaths.add("/usr/include");
 
+    for (const String& includePath : candidatePaths)
+    {
         if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
         {
             outPath = includePath;
@@ -722,7 +725,6 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
         }
     }
 #endif
-
     return SLANG_E_NOT_FOUND;
 }
 
@@ -1082,10 +1084,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
         SemanticVersion version(3);
 
         // Newer releases of NVRTC only support newer CUDA architectures.
-        if (m_desc.version.m_major >= 12)
+        if (m_desc.version.m_major > 12 ||
+            (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
-            // NVRTC in CUDA 12 only supports `compute_50` and up
-            // (with everything before `compute_52` being deprecated).
+            // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
+            // The exact warning message is:
+            //   nvrtc 12.8: nvrtc: warning : Architectures prior to '<compute/sm>_75' are
+            //   deprecated and may be removed in a future release
+            version = SemanticVersion(7, 5);
+        }
+        else if (m_desc.version.m_major == 12)
+        {
+            // NVRTC 12.0 supports `compute_50` and up
             version = SemanticVersion(5, 0);
         }
         else if (m_desc.version.m_major == 11)

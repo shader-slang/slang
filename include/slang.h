@@ -722,7 +722,7 @@ typedef uint32_t SlangSizeT;
         // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-    constexpr static SlangTargetFlags kDefaultTargetFlags =
+    inline constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
     /*!

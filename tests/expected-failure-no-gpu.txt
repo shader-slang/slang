@@ -1,0 +1,6 @@
+slang-unit-test-tool/RecordReplay_triangle.internal
+slang-unit-test-tool/RecordReplay_ray_tracing.internal
+slang-unit-test-tool/RecordReplay_ray_tracing_pipeline.internal
+slang-unit-test-tool/RecordReplay_autodiff_texture.internal
+slang-unit-test-tool/RecordReplay_gpu_printing.internal
+slang-unit-test-tool/cudaCodeGenBug.internal

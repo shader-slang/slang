@@ -336,6 +336,7 @@ RttiTypeFuncs RttiUtil::getDefaultTypeFuncs(const RttiInfo* rttiInfo)
     case RttiInfo::Kind::List:
         return ListFuncs::getFuncs();
     case RttiInfo::Kind::Struct:
+    case RttiInfo::Kind::Optional:
         return StructArrayFuncs::getFuncs();
     default:
         break;
@@ -556,6 +557,10 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
             const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
             return otherRttiInfo->m_isDefaultFunc && otherRttiInfo->m_isDefaultFunc(rttiInfo, src);
         }
+    case RttiInfo::Kind::Optional:
+        {
+            return *(const bool*)src == (_getIntDefaultValue(defaultValue) != 0);
+        }
     default:
         {
             return false;
@@ -660,6 +665,11 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
             return true;
         }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo = static_cast<const OptionalRttiInfo*>(type);
+            return canMemCpy(optionalRttiInfo->m_elementType);
+        }
     default:
         {
             return type->isBuiltIn();
@@ -723,6 +733,11 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
             return true;
         }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo = static_cast<const OptionalRttiInfo*>(type);
+            return canZeroInit(optionalRttiInfo->m_elementType);
+        }
     default:
         {
             return type->isBuiltIn();
@@ -782,6 +797,11 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                 structRttiInfo = structRttiInfo->m_super;
             } while (structRttiInfo);
             return false;
+        }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo = static_cast<const OptionalRttiInfo*>(type);
+            return hasDtor(optionalRttiInfo->m_elementType);
         }
     default:
         {
@@ -892,6 +912,19 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                 structRttiInfo = structRttiInfo->m_super;
             } while (structRttiInfo);
 
+            return;
+        }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo =
+                static_cast<const OptionalRttiInfo*>(rttiInfo);
+            ctorArray(typeMap, GetRttiInfo<bool>::get(), dst, stride, count);
+            ctorArray(
+                typeMap,
+                optionalRttiInfo->m_elementType,
+                dst + optionalRttiInfo->m_valueOffset,
+                stride,
+                count);
             return;
         }
     }
@@ -1005,6 +1038,20 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
             return;
         }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo =
+                static_cast<const OptionalRttiInfo*>(rttiInfo);
+            copyArray(typeMap, GetRttiInfo<bool>::get(), dst, src, stride, count);
+            copyArray(
+                typeMap,
+                optionalRttiInfo->m_elementType,
+                dst + optionalRttiInfo->m_valueOffset,
+                src + optionalRttiInfo->m_valueOffset,
+                stride,
+                count);
+            return;
+        }
     }
 
     SLANG_ASSERT(!"Unexpected");
@@ -1089,6 +1136,19 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
                 structRttiInfo = structRttiInfo->m_super;
             } while (structRttiInfo);
 
+            return;
+        }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo =
+                static_cast<const OptionalRttiInfo*>(rttiInfo);
+            dtorArray(typeMap, GetRttiInfo<bool>::get(), dst, stride, count);
+            dtorArray(
+                typeMap,
+                optionalRttiInfo->m_elementType,
+                dst + optionalRttiInfo->m_valueOffset,
+                stride,
+                count);
             return;
         }
     }
