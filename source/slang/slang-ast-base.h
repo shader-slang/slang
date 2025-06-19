@@ -767,7 +767,7 @@ public:
     /// method, which ensures that the `_prevInContainerWithSameName` fields
     /// have been properly set for all declarations in that container.
     ///
-    Decl* _prevInContainerWithSameName = nullptr;
+    FIDDLE() Decl* _prevInContainerWithSameName = nullptr;
 
     bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)

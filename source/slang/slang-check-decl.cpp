@@ -3494,14 +3494,8 @@ struct SemanticsDeclDifferentialConformanceVisitor
     }
 };
 
-/// Recursively register any builtin declarations that need to be attached to the `session`.
-///
-/// This function should only be needed for declarations in the core module.
-///
-static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
+void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
 {
-    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
-
     if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
     {
         sharedASTBuilder->registerBuiltinDecl(decl, builtinMod);
@@ -3514,6 +3508,25 @@ static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
+}
+
+
+void registerBuiltinDecl(ASTBuilder* astBuilder, Decl* decl)
+{
+    registerBuiltinDecl(astBuilder->getSharedASTBuilder(), decl);
+}
+
+
+/// Recursively register any builtin declarations that need to be attached to the `session`.
+///
+/// This function should only be needed for declarations in the core module.
+///
+static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
+{
+    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+
+    registerBuiltinDecl(sharedASTBuilder, decl);
+
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
         for (auto childDecl : containerDecl->getDirectMemberDecls())
@@ -3533,6 +3546,42 @@ static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
 void registerBuiltinDecls(Session* session, Decl* decl)
 {
     _registerBuiltinDeclsRec(session, decl);
+}
+
+void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecls)
+{
+    if (decl->findModifier<BuiltinTypeModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<MagicTypeModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<BuiltinRequirementModifier>())
+    {
+        ioDecls.add(decl);
+    }
+
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        for (auto childDecl : containerDecl->getDirectMemberDecls())
+        {
+            if (as<ScopeDecl>(childDecl))
+                continue;
+
+            _collectBuiltinDeclsThatNeedRegistrationRec(childDecl, ioDecls);
+        }
+    }
+    if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        _collectBuiltinDeclsThatNeedRegistrationRec(genericDecl->inner, ioDecls);
+    }
+}
+
+void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
+{
+    _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
 }
 
 Type* unwrapArrayType(Type* type)
