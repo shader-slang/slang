@@ -13,25 +13,6 @@ namespace Slang
 {
 class Module;
 
-// Options for IR/AST/Debug serialization
-
-struct SerialOptionFlag
-{
-    typedef uint32_t Type;
-    enum Enum : Type
-    {
-        RawSourceLocation =
-            0x01, ///< If set will store directly SourceLoc - only useful if current source locs
-                  ///< will be identical when read in (typically this is *NOT* the case)
-        SourceLocation = 0x02, ///< If set will output SourceLoc information, that can be
-                               ///< reconstructed when read after being stored.
-        ASTModule = 0x04, ///< If set will output AST modules - typically required, but potentially
-                          ///< not desired (for example with obsfucation)
-        IRModule = 0x08,  ///< If set will output IR modules - typically required
-    };
-};
-typedef SerialOptionFlag::Type SerialOptionFlags;
-
 struct SerialStringData
 {
     enum class StringIndex : uint32_t;

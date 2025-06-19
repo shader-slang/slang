@@ -205,7 +205,7 @@ static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName 
         CASE(PreprocessorOutput);
         CASE(OutputIncludes);
         CASE(ReproFileSystem);
-        CASE(SerialIr);
+        CASE(REMOVED_SerialIR);
         CASE(SkipCodeGen);
         CASE(ValidateIr);
         CASE(VerbosePaths);
