@@ -4850,7 +4850,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (mode == SpvExecutionModeMax)
             return;
 
-        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
+        // Vulkan spec requires DepthReplacing exec mode when storing to FragDepth,
+        // in addition to DepthLess/DepthGreater modes.
+        requireSPIRVExecutionMode(
+            nullptr,
+            getIRInstSpvID(entryPoint),
+            SpvExecutionModeDepthReplacing);
+
+        if (mode != SpvExecutionModeDepthReplacing)
+            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.

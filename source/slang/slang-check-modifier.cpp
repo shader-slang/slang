@@ -2225,7 +2225,6 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
     {
         auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
         auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
-
         bool hasReadModifier = readModifier != nullptr;
         bool hasWriteModifier = writeModifier != nullptr;
 
