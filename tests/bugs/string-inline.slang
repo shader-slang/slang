@@ -13,7 +13,8 @@ interface IPrintable
     int getHash();
 };
 
-extension String : IPrintable
+__generic<int N>
+extension StringLiteral<N> : IPrintable
 {
     int getHash() { return getStringHash(this); }
 }

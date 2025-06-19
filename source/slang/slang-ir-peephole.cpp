@@ -306,6 +306,39 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
+        case kIROp_GetStringLiteralLength:
+            if (auto strLitType = as<IRStringLiteralType>(inst->getOperand(0)->getDataType()))
+            {
+                inst->replaceUsesWith(strLitType->getLength());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_GetStringLiteralAsArray:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto sv = strLit->getStringSlice();
+                List<IRInst*> chars;
+                chars.reserve(sv.getLength());
+                for (uint32_t i = 0; i < sv.getLength(); ++i)
+                {
+                    // TODO check encoding
+                    uint32_t c = uint8_t(sv[i]);
+                    chars.add(builder.getIntValue(builder.getUIntType(), c));
+                }
+                auto arrayType = builder.getArrayType(
+                    builder.getUIntType(),
+                    builder.getIntValue(chars.getCount()));
+                auto asArray =
+                    builder.emitMakeArray(arrayType, chars.getCount(), chars.getBuffer());
+                inst->replaceUsesWith(asArray);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
@@ -495,6 +528,25 @@ struct PeepholeContext : InstPassBase
                 inst->getOperand(0)->getOp() == kIROp_MakeVectorFromScalar)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
+                if (!index)
+                    break;
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto sv = strLit->getStringSlice();
+                uint32_t c = 0;
+                if (index->getValue() < sv.getLength())
+                {
+                    c = sv[index->getValue()];
+                }
+                // else diagnose an out of bound error
+                inst->replaceUsesWith(builder.getIntValue(builder.getUIntType(), c));
                 maybeRemoveOldInst(inst);
                 changed = true;
             }

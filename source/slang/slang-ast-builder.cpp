@@ -349,6 +349,13 @@ PtrTypeBase* ASTBuilder::getPtrType(
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
+StringLiteralExpressionType* ASTBuilder::getStringLiteralType(IntVal* length)
+{
+    Val* args[] = {length};
+    return as<StringLiteralExpressionType>(
+        getSpecializedBuiltinType(makeArrayView(args), "StringLiteralExpressionType"));
+}
+
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
     if (!elementCount)

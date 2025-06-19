@@ -322,6 +322,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "TypeInfo*";
             return SLANG_OK;
         }
+    case kIROp_StringLiteralType:
     case kIROp_NativeStringType:
         {
             out << "const char*";

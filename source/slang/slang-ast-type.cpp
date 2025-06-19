@@ -318,6 +318,13 @@ Type* TupleType::getTypePack() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringLiteralExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+IntVal* StringLiteralExpressionType::getLength()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Type* ArrayExpressionType::getElementType()
