@@ -569,6 +569,10 @@ struct PhiEliminationContext
             // to keep `param` around.
             //
             param->removeAndDeallocate();
+
+            // Avoid referencing `param` after it's been deallocated. There
+            // should be no uses left.
+            m_registerAllocation.mapInstToRegister.remove(param);
         }
     }
 
