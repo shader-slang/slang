@@ -122,6 +122,8 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
     }
 
+    SubtypeWitness* failureWitness = nullptr;
+
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
     //
@@ -148,9 +150,19 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // If the `superType` appears in the flattened inheritance list
         // for the `subType`, then we know that the subtype relationship
-        // holds. Conveniently, the `facet` stores a pre-computed witness
-        // for the subtype relationship, which we can return here.
-        //
+        // holds.
+
+        // If the witness is optional, we should only return it if no certain
+        // witness was found.
+        auto declWitness = as<DeclaredSubtypeWitness>(facet->subtypeWitness);
+        if (declWitness && declWitness->isOptional())
+        {
+            failureWitness = facet->subtypeWitness;
+            continue;
+        }
+
+        // Conveniently, the `facet` stores a pre-computed witness for the
+        // subtype relationship, which we can use here.
         return facet->subtypeWitness;
     }
     //
@@ -271,7 +283,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         return m_astBuilder->getEachSubtypeWitness(subType, superType, elementWitness);
     }
     // default is failure
-    return nullptr;
+    return failureWitness;
 }
 
 bool SemanticsVisitor::isValidGenericConstraintType(Type* type)

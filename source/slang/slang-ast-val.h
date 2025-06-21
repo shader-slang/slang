@@ -697,6 +697,13 @@ class DeclaredSubtypeWitness : public SubtypeWitness
         return false;
     }
 
+    bool isOptional()
+    {
+        if (auto declRef = getDeclRef().as<GenericTypeConstraintDecl>())
+            return declRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        return false;
+    }
+
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -830,6 +837,16 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     ConversionCost _getOverloadResolutionCostOverride();
+};
+
+/// A witness for the "none" value of optional constraints.
+FIDDLE()
+class NoneWitness : public Witness
+{
+    FIDDLE(...)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
 };
 
 /// A value that represents a modifier attached to some other value

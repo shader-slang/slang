@@ -360,9 +360,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
+        ValUnificationContext unificationContext;
+        unificationContext.optionalConstraint =
+            constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
         if (!TryUnifyTypes(
                 *system,
-                ValUnificationContext(),
+                unificationContext,
                 getSub(m_astBuilder, constraintDeclRef),
                 getSup(m_astBuilder, constraintDeclRef)))
             return DeclRef<Decl>();
@@ -487,8 +490,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    // failure!
-                    return DeclRef<Decl>();
+                    if (c.isOptional)
+                        joinType = type;
+                    else
+                        // failure!
+                        return DeclRef<Decl>();
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
@@ -696,11 +702,21 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 subTypeWitness = nullptr;
         }
 
-        if (subTypeWitness)
+        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
         {
             // We found a witness, so it will become an (implicit) argument.
             args.add(subTypeWitness);
             outBaseCost += subTypeWitness->getOverloadResolutionCost();
+        }
+        else if (!subTypeWitness && constraintIsOptional)
+        {
+            // Optional witness failed to resolve; not an error.
+            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            args.add(noneWitness);
+            outBaseCost += kConversionCost_FailedOptionalConstraint;
         }
         else
         {
@@ -946,6 +962,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
+    constraint.isOptional = unificationContext.optionalConstraint;
     constraints.constraints.add(constraint);
 
     return true;
