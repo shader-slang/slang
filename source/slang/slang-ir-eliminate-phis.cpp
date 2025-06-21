@@ -569,6 +569,10 @@ struct PhiEliminationContext
             // to keep `param` around.
             //
             param->removeAndDeallocate();
+
+            // Avoid referencing `param` after it's been deallocated. There
+            // should be no uses left.
+            m_registerAllocation.mapInstToRegister.remove(param);
         }
     }
 
@@ -904,20 +908,21 @@ struct PhiEliminationContext
         }
 
         // Once we are sure all the assignment operations have been performed,
-        // we can set about replacing the unconditional branch itself.
+        // we can set about removing the phi arguments from the unconditional
+        // branch itself.
         //
-        replaceBranch(branch);
+        updateBranch(branch);
     }
 
-    // Replacing the branch instruction at the end of a predecessor block
+    // Updating the branch instruction at the end of a predecessor block
     // is relatively simple, and just a bit of busy-work.
     //
-    void replaceBranch(IRUnconditionalBranch* oldBranch)
+    void updateBranch(IRUnconditionalBranch* branch)
     {
         // When creating a replacement instruction here, we need to make sure
         // that we keep all the operands that weren't phi arguments.
         //
-        Count oldOperandCount = oldBranch->getOperandCount();
+        Count oldOperandCount = branch->getOperandCount();
         Count paramCount = getParamCount();
         Count newOperandCount = oldOperandCount - paramCount;
 
@@ -934,32 +939,14 @@ struct PhiEliminationContext
         static const Count kMaxNewOperandCount = 3;
         SLANG_ASSERT(newOperandCount <= kMaxNewOperandCount);
 
-        ShortList<IRInst*> newOperands;
-        for (Index i = 0; i < newOperandCount; ++i)
+        // Eliminate phi parameters
+        for (UInt i = 0, j = 0; i < (UInt)phiInfos.getCount(); i++)
         {
-            newOperands.add(oldBranch->getOperand(i));
+            if (phiInfos[i].param.temp)
+                branch->removeOperand(newOperandCount + j);
+            else
+                ++j;
         }
-
-        // Add operands for any remaining phi parameters that has not been eliminated.
-        for (UInt i = 0; i < (UInt)phiInfos.getCount(); i++)
-        {
-            if (!phiInfos[i].param.temp)
-                newOperands.add(oldBranch->getArg(i));
-        }
-
-        auto newBranch = m_builder.emitIntrinsicInst(
-            oldBranch->getFullType(),
-            oldBranch->getOp(),
-            newOperands.getCount(),
-            newOperands.getArrayView().getBuffer());
-        oldBranch->transferDecorationsTo(newBranch);
-        newBranch->sourceLoc = oldBranch->sourceLoc;
-
-        // TODO: We could consider just modifying `branch` in-place by clearing
-        // the relevant operands for the phi arguments and setting its operand
-        // count to a lower value.
-        //
-        oldBranch->removeAndDeallocate();
     }
 
     bool canLoadBeFoldedAtInst(IRInst* load, IRInst* useSite)
