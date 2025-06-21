@@ -189,6 +189,11 @@ void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule
                         toRemove.add(block);
                     }
                     builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
+                    if (auto exportDecoration = funcInst->findDecoration<IRExportDecoration>())
+                    {
+                        SLANG_ASSERT(!funcInst->findDecoration<IRImportDecoration>());
+                        builder.addImportDecoration(funcInst, exportDecoration->getMangledName());
+                    }
                 }
             }
         }
