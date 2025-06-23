@@ -872,10 +872,14 @@ bool SemanticsVisitor::TryUnifyVals(
     const auto fstNoneWitness = as<NoneWitness>(fst);
     const auto sndNoneWitness = as<NoneWitness>(snd);
     if (fstSubtypeWitness && sndSubtypeWitness)
-        return TryUnifyTypes(constraints, unifyCtx, fstSubtypeWitness->getSup(), sndSubtypeWitness->getSup());
-    else if(fstNoneWitness && sndNoneWitness)
+        return TryUnifyTypes(
+            constraints,
+            unifyCtx,
+            fstSubtypeWitness->getSup(),
+            sndSubtypeWitness->getSup());
+    else if (fstNoneWitness && sndNoneWitness)
         return true;
-    else if((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
+    else if ((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
         return false;
 
     SLANG_UNIMPLEMENTED_X("value unification case");
