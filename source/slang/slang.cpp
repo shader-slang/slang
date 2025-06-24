@@ -745,6 +745,7 @@ SlangResult Session::_readBuiltinModule(
         linkage,
         astBuilder,
         nullptr, // no sink
+        fileContents,
         astChunk,
         sourceLocReader,
         SourceLoc());
@@ -754,11 +755,6 @@ SlangResult Session::_readBuiltinModule(
     }
     moduleDecl->module = module;
     module->setModuleDecl(moduleDecl);
-
-    if (isFromCoreModule(moduleDecl))
-    {
-        registerBuiltinDecls(this, moduleDecl);
-    }
 
     // After the AST module has been read in, we next look
     // to deserialize the IR module.
@@ -2994,17 +2990,14 @@ static void collectExportedConstantInContainer(
     ASTBuilder* builder,
     ContainerDecl* containerDecl)
 {
-    for (auto m : containerDecl->members)
+    for (auto varMember : containerDecl->getDirectMemberDeclsOfType<VarDeclBase>())
     {
-        auto varMember = as<VarDeclBase>(m);
-        if (!varMember)
-            continue;
         if (!varMember->val)
             continue;
         bool isExported = false;
         bool isConst = false;
         bool isExtern = false;
-        for (auto modifier : m->modifiers)
+        for (auto modifier : varMember->modifiers)
         {
             if (as<HLSLExportModifier>(modifier))
                 isExported = true;
@@ -3018,14 +3011,14 @@ static void collectExportedConstantInContainer(
         }
         if (isExported && isConst)
         {
-            auto mangledName = getMangledName(builder, m);
+            auto mangledName = getMangledName(builder, varMember);
             if (isExtern && dict.containsKey(mangledName))
                 continue;
             dict[mangledName] = varMember->val;
         }
     }
 
-    for (auto member : containerDecl->members)
+    for (auto member : containerDecl->getDirectMemberDecls())
     {
         if (as<NamespaceDecl>(member) || as<FileDecl>(member))
         {
@@ -4201,6 +4194,7 @@ void Linkage::loadParsedModule(
 }
 
 RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* libraryChunk,
     DiagnosticSink* sink)
@@ -4247,6 +4241,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     return loadSerializedModule(
         moduleName,
         modulePathInfo,
+        blobHoldingSerializedData,
         moduleChunk,
         libraryChunk,
         SourceLoc(),
@@ -4256,6 +4251,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
 RefPtr<Module> Linkage::loadSerializedModule(
     Name* moduleName,
     const PathInfo& moduleFilePathInfo,
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* containerChunk,
     SourceLoc const& requestingLoc,
@@ -4289,6 +4285,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
         if (SLANG_FAILED(loadSerializedModuleContents(
                 module,
                 moduleFilePathInfo,
+                blobHoldingSerializedData,
                 moduleChunk,
                 containerChunk,
                 sink)))
@@ -4355,6 +4352,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     RefPtr<Module> module = loadSerializedModule(
         moduleName,
         moduleFilePathInfo,
+        moduleFileContents,
         moduleChunk,
         rootChunk,
         requestingLoc,
@@ -4475,9 +4473,6 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
     if (errorCountAfter != errorCountBefore && !isInLanguageServer())
     {
         _diagnoseErrorInImportedModule(sink);
-    }
-    if (errorCountAfter && !isInLanguageServer())
-    {
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
@@ -5262,7 +5257,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     // If it's a container process it's children
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
-        for (auto child : containerDecl->members)
+        for (auto child : containerDecl->getDirectMemberDecls())
         {
             _processFindDeclsExportSymbolsRec(child);
         }
@@ -5275,7 +5270,27 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     }
 }
 
-NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
+Decl* Module::findExportedDeclByMangledName(const UnownedStringSlice& mangledName)
+{
+    // If this module is a serialized module that is being
+    // deserialized on-demand, then we want to use the
+    // mangled name mapping that was baked into the serialized
+    // data, rather than attempt to enumerate all of the declarations
+    // in the module (as would be done if we proceeded to call
+    // `ensureExportLookupAcceleratorBuilt()`).
+    //
+    if (this->m_moduleDecl->isUsingOnDemandDeserializationForExports())
+    {
+        return m_moduleDecl->_findSerializedDeclByMangledExportName(mangledName);
+    }
+
+    ensureExportLookupAcceleratorBuilt();
+
+    const Index index = m_mangledExportPool.findIndex(mangledName);
+    return (index >= 0) ? m_mangledExportSymbols[index] : nullptr;
+}
+
+void Module::ensureExportLookupAcceleratorBuilt()
 {
     // Will be non zero if has been previously attempted
     if (m_mangledExportSymbols.getCount() == 0)
@@ -5290,9 +5305,25 @@ NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
             m_mangledExportSymbols.add(nullptr);
         }
     }
+}
 
-    const Index index = m_mangledExportPool.findIndex(slice);
-    return (index >= 0) ? m_mangledExportSymbols[index] : nullptr;
+Count Module::getExportedDeclCount()
+{
+    ensureExportLookupAcceleratorBuilt();
+
+    return m_mangledExportPool.getSlicesCount();
+}
+
+Decl* Module::getExportedDecl(Index index)
+{
+    ensureExportLookupAcceleratorBuilt();
+    return m_mangledExportSymbols[index];
+}
+
+UnownedStringSlice Module::getExportedDeclMangledName(Index index)
+{
+    ensureExportLookupAcceleratorBuilt();
+    return m_mangledExportPool.getSlices()[index];
 }
 
 // ComponentType
@@ -5325,6 +5356,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
     }
     if (guid == IModulePrecompileService_Experimental::getTypeGuid())
         return static_cast<slang::IModulePrecompileService_Experimental*>(this);
+    if (guid == IComponentType2::getTypeGuid())
+        return static_cast<slang::IComponentType2*>(this);
     return nullptr;
 }
 
@@ -5571,33 +5604,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
-    SlangInt entryPointIndex,
-    Int targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    auto linkage = getLinkage();
-    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
-        return SLANG_E_INVALID_ARG;
-    auto target = linkage->targets[targetIndex];
-
-    auto targetProgram = getTargetProgram(target);
-
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
-    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-    if (artifact == nullptr)
-        return SLANG_E_NOT_AVAILABLE;
-
-    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
-    (*outCompileResult)->addRef();
-    return SLANG_OK;
-}
-
 RefPtr<ComponentType> ComponentType::specialize(
     SpecializationArg const* inSpecializationArgs,
     SlangInt specializationArgCount,
@@ -5737,6 +5743,47 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
         static_cast<ComponentType*>(linked)->getOptionSet().load(count, entries);
     }
 
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
+    SlangInt entryPointIndex,
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
+    Int targetIndex,
+    slang::ICompileResult** outCompileResult,
+    slang::IBlob** outDiagnostics)
+{
+    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
+    if (artifact == nullptr)
+        return SLANG_E_NOT_AVAILABLE;
+
+    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
+    (*outCompileResult)->addRef();
     return SLANG_OK;
 }
 
@@ -5930,20 +5977,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
         return SLANG_E_NOT_AVAILABLE;
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
-    return SLANG_OK;
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
-    Int targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    IArtifact* artifact = getTargetArtifact(targetIndex, outDiagnostics);
-    if (artifact == nullptr)
-        return SLANG_E_NOT_AVAILABLE;
-
-    *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
-    //(*outCompileResult)->addRef(); // TODO: Needed if using a ComPtr.
     return SLANG_OK;
 }
 
@@ -6661,6 +6694,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* containerChunk,
     DiagnosticSink* sink)
@@ -6757,6 +6791,7 @@ SlangResult Linkage::loadSerializedModuleContents(
         this,
         astBuilder,
         sink,
+        blobHoldingSerializedData,
         astChunk,
         sourceLocReader,
         serializedModuleLoc);
@@ -6809,12 +6844,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
-    for (auto globalDecl : moduleDecl->members)
+    for (auto fileDecl : moduleDecl->getDirectMemberDeclsOfType<FileDecl>())
     {
-        if (auto fileDecl = as<FileDecl>(globalDecl))
-        {
-            addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
-        }
+        addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
 
     return SLANG_OK;
@@ -7406,8 +7438,10 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
+    auto libBlob = RawBlob::create((const Byte*)libData, libDataSize);
+
     SLANG_RETURN_ON_FAIL(
-        loadModuleLibrary((const Byte*)libData, libDataSize, basePath, this, library));
+        loadModuleLibrary(libBlob, (const Byte*)libData, libDataSize, basePath, this, library));
 
     // Create an artifact without any name (as one is not provided)
     auto artifact =

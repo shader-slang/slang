@@ -455,21 +455,24 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
                 // Another exception is if we are accessing a property
                 // that provides a [nonmutating] setter.
-                if (!expr->type.isLeftValue && as<PropertyDecl>(declRef.getDecl()))
+                if (!expr->type.isLeftValue)
                 {
-                    bool isLValue = false;
-                    for (auto member : as<ContainerDecl>(declRef.getDecl())->members)
+                    if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                     {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                        bool isLValue = false;
+                        for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
                         {
-                            if (member->findModifier<NonmutatingAttribute>())
+                            if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                             {
-                                isLValue = true;
+                                if (member->findModifier<NonmutatingAttribute>())
+                                {
+                                    isLValue = true;
+                                }
+                                break;
                             }
-                            break;
                         }
+                        expr->type.isLeftValue = isLValue;
                     }
-                    expr->type.isLeftValue = isLValue;
                 }
             }
             else
@@ -479,7 +482,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                 {
                     bool isLValue = false;
-                    for (auto member : propertyDecl->members)
+                    for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
                         if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                         {
@@ -671,6 +674,9 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
                 structDecl->addMember(conformanceDecl);
                 structDecl->parentDecl = parent;
+                structDecl->ownedScope = m_astBuilder->create<Scope>();
+                structDecl->ownedScope->containerDecl = structDecl;
+                structDecl->ownedScope->parent = getScope(parent);
 
                 synthesizedDecl = structDecl;
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
@@ -681,12 +687,11 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                     createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
 
                 typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
-                structDecl->members.add(typeDef);
+                structDecl->addDirectMemberDecl(typeDef);
 
                 synthesizedDecl->nameAndLoc.name = item.declRef.getName();
                 synthesizedDecl->loc = parent->loc;
-                parent->addMember(synthesizedDecl);
-                parent->invalidateMemberDictionary();
+                parent->addDirectMemberDecl(synthesizedDecl);
 
                 // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can
                 // differentiate it from user-provided definitions, and proceed to fill in its
@@ -711,8 +716,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
 
                 synthesizedDecl = parent;
 
-                parent->addMember(typeDef);
-                parent->invalidateMemberDictionary();
+                parent->addDirectMemberDecl(typeDef);
 
                 markSelfDifferentialMembersOfType(parent, subType);
             }
@@ -1289,21 +1293,20 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 
 bool SemanticsVisitor::canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl)
 {
-    // A struct can be used as its own differential type if all its members are differentiable
-    // and their differential types are the same as the original types.
+    // A struct can be used as its own differential type if all its members are differentiable, and
+    // none of the member is decorated with "no_diff", and their differential types are the same as
+    // the original types.
     //
     bool canBeUsed = true;
-    for (auto member : aggTypeDecl->members)
+    for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
-        if (auto varDecl = as<VarDecl>(member))
+        // Try to get the differential type of the member.
+        Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
+        if (!diffType || !diffType->equals(varDecl->getType()) ||
+            varDecl->findModifier<NoDiffModifier>())
         {
-            // Try to get the differential type of the member.
-            Type* diffType = tryGetDifferentialType(getASTBuilder(), varDecl->getType());
-            if (!diffType || !diffType->equals(varDecl->getType()))
-            {
-                canBeUsed = false;
-                break;
-            }
+            canBeUsed = false;
+            break;
         }
     }
     return canBeUsed;
@@ -4290,7 +4293,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     {
         nameBuilder << getText(m_parentFunc->getName());
         nameBuilder << "_";
-        nameBuilder << m_parentFunc->members.getCount();
+        nameBuilder << m_parentFunc->getDirectMemberDeclCount();
     }
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
@@ -4315,7 +4318,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     synthesizer.popScope();
 
     funcDecl->body = lambdaExpr->bodyStmt;
-    for (auto param : lambdaExpr->paramScopeDecl->members)
+    for (auto param : lambdaExpr->paramScopeDecl->getDirectMemberDecls())
     {
         funcDecl->addMember(param);
     }
@@ -5343,6 +5346,12 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             }
             return expr;
         }
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
 #if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
@@ -5398,12 +5407,33 @@ Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
             expr->type.type = thisTypeType;
             return expr;
         }
-
+        else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+        {
+            expr->type.type =
+                DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            return expr;
+        }
         scope = scope->parent;
     }
 
     getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
     return CreateErrorExpr(expr);
+}
+
+Expr* SemanticsExprVisitor::visitThisInterfaceExpr(ThisInterfaceExpr* expr)
+{
+    auto scope = expr->scope;
+
+    auto containerDecl = findParentInterfaceDecl(scope->containerDecl);
+
+    // ThisInterfaceExpr can only be synthesized by the compiler during parsing
+    // an interface decl with default implementation, so container must always
+    // be an interface decl.
+    SLANG_ASSERT(containerDecl);
+    expr->declRef =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, getDefaultDeclRef(containerDecl));
+    expr->type = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, expr->declRef));
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)

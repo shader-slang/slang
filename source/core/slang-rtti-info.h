@@ -181,7 +181,7 @@ struct RttiInfo
         Enum,
         List,
         Dictionary,
-
+        Optional,
         CountOf,
     };
 
@@ -295,6 +295,12 @@ SLANG_FORCE_INLINE StructRttiInfo::Flags combine(
 {
     return StructRttiInfo::Flags(defaultValue) | flags;
 }
+
+struct OptionalRttiInfo : public RttiInfo
+{
+    const RttiInfo* m_elementType;
+    uint32_t m_valueOffset;
+};
 
 struct ListRttiInfo : public RttiInfo
 {

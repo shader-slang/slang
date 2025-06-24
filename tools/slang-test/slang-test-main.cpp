@@ -949,21 +949,37 @@ static Result _executeRPC(
     JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
     if (!rpcConnection)
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getOrCreateJSONRPCConnection()");
         return SLANG_FAIL;
     }
 
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: sendCall()");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
 
     // Wait for the result
-    rpcConnection->waitForResult(context->connectionTimeOutInMs);
+    if (SLANG_FAILED(rpcConnection->waitForResult(context->connectionTimeOutInMs)))
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: waitForResult()");
+    }
 
     if (!rpcConnection->hasMessage())
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: hasMessage()");
+
         // We can assume somethings gone wrong. So lets kill the connection and fail.
         context->destroyRPCConnection();
         return SLANG_FAIL;
@@ -971,6 +987,10 @@ static Result _executeRPC(
 
     if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getMessageType() != JSONRPCMessageType::Result");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
@@ -979,6 +999,10 @@ static Result _executeRPC(
     TestServerProtocol::ExecutionResult exeRes;
     if (SLANG_FAILED(rpcConnection->getMessage(&exeRes)))
     {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "JSON RPC failure: getMessage()");
+
         context->destroyRPCConnection();
         return SLANG_FAIL;
     }
@@ -4579,6 +4603,16 @@ void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
+
+    // NTFS on Windows stores files in sorted order but not on Linux/Macos.
+    // Because of that, the testing on Linux/Macos were randomly failing, which
+    // is a good thing because it reveals problems. But it is useless
+    // if we cannot reproduce the failures deterministrically.
+    // https://github.com/shader-slang/slang/issues/7388
+    //
+    // TODO: We need a way to shuffle the list in a deterministic manner.
+    files.sort();
+
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
@@ -4770,8 +4804,8 @@ static SlangResult runUnitTestModule(
                 }
 
                 // If the test failed and it is not an expected failure, add it to the list of
-                // failed unit tests.
-                if (isFailed &&
+                // failed unit tests so that we can retry.
+                if (isFailed && !context->isRetry &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5013,12 +5047,6 @@ SlangResult innerMain(int argc, char** argv)
         options.includeCategories.add(fullTestCategory, fullTestCategory);
     }
 
-    // Don't include OptiX tests unless the client has explicit opted into them.
-    if (!options.includeCategories.containsKey(optixTestCategory))
-    {
-        options.excludeCategories.add(optixTestCategory, optixTestCategory);
-    }
-
     // Exclude rendering tests when building under AppVeyor.
     //
     // TODO: this is very ad hoc, and we should do something cleaner.
@@ -5132,7 +5160,7 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    const SlangResult res = innerMain(argc, argv);
+    SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();
 

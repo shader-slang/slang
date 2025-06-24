@@ -1507,6 +1507,17 @@ DIAGNOSTIC(
     "requirement in the form of a simple value must be declared as 'static const'.")
 DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
 
+DIAGNOSTIC(
+    30311,
+    Error,
+    nonMethodInterfaceRequirementCannotHaveBody,
+    "non-method interface requirement cannot have a body.")
+DIAGNOSTIC(
+    30312,
+    Error,
+    interfaceRequirementCannotBeOverride,
+    "interface requirement cannot override a base declaration.")
+
 // Interop
 DIAGNOSTIC(
     30400,
@@ -1662,8 +1673,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30811,
     Error,
-    baseOfStructMustBeStructOrInterface,
-    "struct '$0' cannot inherit from type '$1' that is neither a struct nor an interface")
+    baseOfStructMustBeInterface,
+    "struct '$0' cannot inherit from non-interface type '$1'")
 DIAGNOSTIC(
     30812,
     Error,
@@ -1681,7 +1692,12 @@ DIAGNOSTIC(
     baseOfClassMustBeClassOrInterface,
     "class '$0' cannot inherit from type '$1' that is neither a class nor an interface")
 DIAGNOSTIC(30815, Error, circularityInExtension, "circular extension is not allowed.")
-
+DIAGNOSTIC(
+    30816,
+    Warning,
+    inheritanceUnstable,
+    "support for inheritance is unstable and will be removed in future language versions, consider "
+    "using composition instead.")
 DIAGNOSTIC(
     30820,
     Error,
@@ -1726,6 +1742,17 @@ DIAGNOSTIC(
     invalidExtensionOnInterface,
     "cannot extend interface type '$0'. consider using a generic extension: `extension<T:$0> T "
     "{...}`.")
+DIAGNOSTIC(
+    30853,
+    Error,
+    missingOverride,
+    "missing 'override' keyword for methods that overrides the default implementation in the "
+    "interface.")
+DIAGNOSTIC(
+    30854,
+    Error,
+    overrideModifierNotOverridingBaseDecl,
+    "'$0' marked as 'override' is not overriding any base declarations.")
 
 // 309xx: subscripts
 DIAGNOSTIC(

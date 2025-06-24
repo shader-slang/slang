@@ -3,16 +3,8 @@ name: Release
 on:
   workflow_dispatch:
   push:
-    # Also run on pushes to the main branch so that we can keep the llvm and sccache
-    # caches filled in a scope available to everyone
-    branches:
-      - master
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
+    # We are not caching the builds so we don't want to run the release workflow for every push to master;
+    # The release workflow is only triggered by tags or manual dispatch
     tags:
       - "v*"
 jobs:
