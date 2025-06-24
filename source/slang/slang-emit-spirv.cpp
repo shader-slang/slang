@@ -3483,7 +3483,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // all loops gets a header block.
             for (auto irInst : irBlock->getChildren())
             {
-                if (irInst->getOp() == kIROp_loop)
+                if (irInst->getOp() == kIROp_Loop)
                 {
                     emitOpLabel(spvFunc, irInst);
                 }
@@ -3545,9 +3545,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (as<IRVar>(irInst))
                     continue;
                 emitLocalInst(spvBlock, irInst);
-                if (irInst->getOp() == kIROp_loop)
+                if (irInst->getOp() == kIROp_Loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
-                if (irInst->getOp() == kIROp_discard && !shouldEmitDiscardAsDemote())
+                if (irInst->getOp() == kIROp_Discard && !shouldEmitDiscardAsDemote())
                 {
                     // If we emitted OpKill for discard, we should stop emitting anything
                     // after this inst in the block, because OpKill is a terminator inst.
@@ -3589,7 +3589,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto use = block->firstUse; use; use = use->nextUse)
         {
-            if (use->getUser()->getOp() == kIROp_loop &&
+            if (use->getUser()->getOp() == kIROp_Loop &&
                 as<IRLoop>(use->getUser())->getTargetBlock() == block)
             {
                 loopInst = use->getUser();
@@ -3981,7 +3981,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SwizzledStore:
             result = emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
             break;
-        case kIROp_swizzleSet:
+        case kIROp_SwizzleSet:
             result = emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
             break;
         case kIROp_RWStructuredBufferGetElementPtr:
@@ -3994,7 +3994,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetUntypedBufferPtr:
             result = emitGetBufferPtr(parent, inst);
             break;
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             result = emitSwizzle(parent, as<IRSwizzle>(inst));
             break;
         case kIROp_IntCast:
@@ -4158,7 +4158,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             else
                 result = emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
             break;
-        case kIROp_discard:
+        case kIROp_Discard:
             if (shouldEmitDiscardAsDemote())
             {
                 ensureExtensionDeclarationBeforeSpv16(
@@ -4183,7 +4183,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_EndFragmentShaderInterlock:
             result = emitOpEndInvocationInterlockEXT(parent, inst);
             break;
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
             {
                 // If we are jumping to the main block of a loop,
                 // emit a branch to the loop header instead.
@@ -4196,7 +4196,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
                 break;
             }
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 // Return loop header block in its own block.
                 auto blockId = getIRInstSpvID(inst);
@@ -4213,7 +4213,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = block;
                 break;
             }
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
@@ -4257,7 +4257,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Unreachable:
             result = emitOpUnreachable(parent, inst);
             break;
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
             break;
         case kIROp_MakeVector:
@@ -4309,7 +4309,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetStringHash:
             result = emitGetStringHash(inst);
             break;
-        case kIROp_undefined:
+        case kIROp_Undefined:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
         case kIROp_SPIRVAsm:
@@ -6416,10 +6416,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UInt argStartIndex = 0;
                     switch (branchInst->getOp())
                     {
-                    case kIROp_unconditionalBranch:
+                    case kIROp_UnconditionalBranch:
                         argStartIndex = 1;
                         break;
-                    case kIROp_loop:
+                    case kIROp_Loop:
                         argStartIndex = 3;
                         break;
                     default:

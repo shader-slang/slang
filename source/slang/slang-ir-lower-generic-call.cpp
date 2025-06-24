@@ -269,7 +269,7 @@ struct GenericCallLoweringContext
             // modified in this pass.
             SLANG_UNEXPECTED("Nested generics specialization.");
         }
-        else if (loweredFunc->getOp() == kIROp_LookupWitness)
+        else if (loweredFunc->getOp() == kIROp_LookupWitnessMethod)
         {
             lowerCallToInterfaceMethod(
                 callInst,

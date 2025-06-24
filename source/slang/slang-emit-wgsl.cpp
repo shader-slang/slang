@@ -726,15 +726,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    if (inst->getParent()->getOp() == kIROp_Module)
+    if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
     }
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_CastFloatToInt:

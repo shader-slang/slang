@@ -547,7 +547,7 @@ Result IRSerialReader::read(
     {
         // Check that insts[1] is the module inst
         const Ser::Inst& srcInst = data.m_insts[1];
-        SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_Module);
+        SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_ModuleInst);
         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
 
         // The root IR instruction for the module will already have

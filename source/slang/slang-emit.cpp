@@ -414,7 +414,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         result.generics = true;
         break;
     case kIROp_Specialize:

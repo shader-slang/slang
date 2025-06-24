@@ -187,11 +187,11 @@ struct DeferLoweringContext : InstPassBase
                 switch (terminator->getOp())
                 {
                 case kIROp_Return:
-                case kIROp_discard:
+                case kIROp_Discard:
                 case kIROp_Throw:
                     exits = true;
                     break;
-                case kIROp_unconditionalBranch:
+                case kIROp_UnconditionalBranch:
                     {
                         auto targetBlock = as<IRBlock>(terminator->getOperand(0));
                         if (!scopeBlocksSet.contains(targetBlock))
@@ -200,7 +200,7 @@ struct DeferLoweringContext : InstPassBase
                         }
                     }
                     break;
-                case kIROp_conditionalBranch:
+                case kIROp_ConditionalBranch:
                     {
                         auto trueBlock = as<IRBlock>(terminator->getOperand(1));
                         auto falseBlock = as<IRBlock>(terminator->getOperand(2));

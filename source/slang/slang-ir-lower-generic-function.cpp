@@ -97,7 +97,7 @@ struct GenericFunctionLoweringContext
                 }
                 break;
             case kIROp_Specialize:
-            case kIROp_LookupWitness:
+            case kIROp_LookupWitnessMethod:
                 childrenToDemote.add(clonedChild);
                 break;
             default:

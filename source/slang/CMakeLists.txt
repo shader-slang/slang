@@ -225,7 +225,6 @@ set(slang_link_args
     slang-capability-defs
     slang-capability-lookup
     slang-fiddle-output
-    slang-ir-defs
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
 )

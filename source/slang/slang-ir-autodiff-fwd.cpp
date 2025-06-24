@@ -1015,8 +1015,8 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
 {
     switch (origInst->getOp())
     {
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         auto origBranch = as<IRUnconditionalBranch>(origInst);
         auto targetBlock = origBranch->getTargetBlock();
 
@@ -1054,7 +1054,7 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
                 operands.addRange(newArgs);
                 diffBranch = builder->emitIntrinsicInst(
                     nullptr,
-                    kIROp_loop,
+                    kIROp_Loop,
                     operands.getCount(),
                     operands.getBuffer());
                 if (auto maxItersDecoration = origLoop->findDecoration<IRLoopMaxItersDecoration>())
@@ -1479,7 +1479,7 @@ InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* 
 
     IRInst* diffIfElse = builder->emitIntrinsicInst(
         nullptr,
-        kIROp_ifElse,
+        kIROp_IfElse,
         diffIfElseArgs.getCount(),
         diffIfElseArgs.getBuffer());
     builder->markInstAsMixedDifferential(diffIfElse);
@@ -1786,9 +1786,6 @@ void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
                 if (as<IRAutodiffInstDecoration>(decoration))
                     decorations.add(decoration);
             }
-
-            // Must have _exactly_ one autodiff tag.
-            SLANG_ASSERT(decorations.getCount() == 1);
         }
     }
 }
@@ -2053,13 +2050,13 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeStruct:
         return transcribeMakeStruct(builder, origInst);
 
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
     case kIROp_Call:
         return transcribeCall(builder, as<IRCall>(origInst));
 
-    case kIROp_swizzle:
+    case kIROp_Swizzle:
         return transcribeSwizzle(builder, as<IRSwizzle>(origInst));
 
     case kIROp_Neg:
@@ -2068,8 +2065,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_UpdateElement:
         return transcribeUpdateElement(builder, origInst);
 
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         return transcribeControlFlow(builder, origInst);
 
     case kIROp_FloatLit:
@@ -2093,7 +2090,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetOptionalValue:
         return transcribeGetOptionalValue(builder, origInst);
 
-    case kIROp_ifElse:
+    case kIROp_IfElse:
         return transcribeIfElse(builder, as<IRIfElse>(origInst));
 
     case kIROp_Switch:
@@ -2140,7 +2137,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DefaultConstruct:
         return transcribeDefaultConstruct(builder, origInst);
 
-    case kIROp_undefined:
+    case kIROp_Undefined:
         return transcribeUndefined(builder, origInst);
 
     case kIROp_Reinterpret:

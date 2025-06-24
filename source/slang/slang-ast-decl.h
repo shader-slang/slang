@@ -3,8 +3,10 @@
 #pragma once
 
 #include "slang-ast-base.h"
-#include "slang-ast-decl.h.fiddle"
 #include "slang-fossil.h"
+
+//
+#include "slang-ast-decl.h.fiddle"
 
 FIDDLE()
 namespace Slang

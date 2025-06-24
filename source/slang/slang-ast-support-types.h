@@ -1,5 +1,4 @@
-#ifndef SLANG_AST_SUPPORT_TYPES_H
-#define SLANG_AST_SUPPORT_TYPES_H
+#pragma once
 
 #include "../compiler-core/slang-doc-extractor.h"
 #include "../compiler-core/slang-lexer.h"
@@ -7,13 +6,15 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
-#include "slang-ast-support-types.h.fiddle"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
 #include <assert.h>
 #include <type_traits>
+
+//
+#include "slang-ast-support-types.h.fiddle"
 
 FIDDLE(hidden class RefObject;)
 
@@ -1730,5 +1731,3 @@ FIDDLE() namespace Slang
     };
 
 } // namespace Slang
-
-#endif

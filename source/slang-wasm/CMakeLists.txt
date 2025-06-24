@@ -17,7 +17,6 @@ if(EMSCRIPTEN)
             compiler-core
             slang-capability-defs
             slang-capability-lookup
-            slang-ir-defs
             slang-fiddle-output
             slang-lookup-tables
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
