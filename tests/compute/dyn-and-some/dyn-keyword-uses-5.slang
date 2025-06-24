@@ -17,18 +17,13 @@ struct StructForIFoo : IFoo
 
 dyn interface ReturnsSomeTypeAndSomeParam
 {
-// CHECK_2025_OR_EXP-NOT: error 33086
-// CHECK_2026-DAG: error 33086
-    some IFoo getIFoo()
-	{
-		return StructForIFoo(1);
-	}
+    // CHECK_2025_OR_EXP-NOT: error 33085
+    // CHECK_2026-DAG:([[# @LINE+1]]): error 33085
+    some IFoo getIFoo();
 
-// CHECK_2025_OR_EXP-NOT: error 33087
-// CHECK_2026-DAG: error 33087
-    void lookAtIFoo(some IFoo v)
-	{
-	}
+    // CHECK_2025_OR_EXP-NOT: error 33085
+    // CHECK_2026-DAG:([[# @LINE+1]]): error 33085
+    void lookAtIFoo(some IFoo v);
 }
 
 RWStructuredBuffer<int> outputBuffer;

@@ -2938,23 +2938,28 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
 {
     // Start by checking the base expression and arguments.
 
+    // Disallow `dyn`, `some`, and unbound types
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+            (UInt)SemanticsContextState::SomeTypeIsUnbound |
+            (UInt)SemanticsContextState::SomeTypeIsAllowed |
+            (UInt)SemanticsContextState::DynTypeIsAllowed));
+
     // Disable the short-circuiting logic expression when the experssion is in
     // the generic parameter.
     if (this->m_shouldShortCircuitLogicExpr)
     {
-        auto subContext = disableShortCircuitLogicalExpr();
+        auto subContext = subVisitor.disableShortCircuitLogicalExpr();
         return dispatchExpr(genericAppExpr, subContext);
     }
-
     auto& baseExpr = genericAppExpr->functionExpr;
-    baseExpr = CheckTerm(baseExpr);
+    baseExpr = subVisitor.CheckTerm(baseExpr);
     auto& args = genericAppExpr->arguments;
     for (auto& arg : args)
     {
-        arg = CheckTerm(arg);
+        arg = subVisitor.CheckTerm(arg);
     }
 
-    return checkGenericAppWithCheckedArgs(genericAppExpr);
+    return subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
 }
 
 /// Check a generic application where the operands have already been checked.
@@ -2977,11 +2982,6 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
     {
         if (IsErrorExpr(argExpr))
         {
-            return CreateErrorExpr(genericAppExpr);
-        }
-        if (as<SomeTypeExpr>(argExpr))
-        {
-            this->getSink()->diagnose(argExpr, Diagnostics::someCannotAppearInComplexExpression);
             return CreateErrorExpr(genericAppExpr);
         }
     }

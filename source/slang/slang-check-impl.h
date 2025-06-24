@@ -42,8 +42,6 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
-bool isSlang2026OrLater(SemanticsVisitor* visitor);
-
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -1142,6 +1140,40 @@ public:
         return m_shared->getGLSLBindingOffsetTracker();
     }
 
+    enum class SemanticsContextState : UInt
+    {
+        DefaultState = 0,
+        SomeTypeIsUnbound = 0b1,
+        SomeTypeIsAllowed = 0b10,
+        DynTypeIsAllowed = 0b100,
+    };
+
+    SemanticsContext withSemanticsContextState(SemanticsContextState state)
+    {
+        SemanticsContext result(*this);
+        result.m_semanticsContextState = state;
+        return result;
+    }
+    SemanticsContext withoutSemanticsContextState(SemanticsContextState state)
+    {
+        SemanticsContext result(*this);
+        result.m_semanticsContextState =
+            SemanticsContextState((UInt)m_semanticsContextState & ~(UInt)state);
+        return result;
+    }
+    bool hasSemanticsContextState(SemanticsContextState state)
+    {
+        return (UInt)m_semanticsContextState & (UInt)state;
+    }
+
+    SemanticsContext withModifierPropagationTarget(ModifiableSyntaxNode* node)
+    {
+        SemanticsContext result(*this);
+        result.m_modifierPropagationTarget = node;
+        return result;
+    }
+    ModifiableSyntaxNode* getModifierPropagationTarget() { return m_modifierPropagationTarget; }
+
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
@@ -1196,6 +1228,15 @@ protected:
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
     Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+
+    // TODO: By default semanticsContextState should always be set to defaultState.
+    // This is currently not done.
+    // Based on context of visited nodes, restrict/permit legal AST nodes
+    SemanticsContextState m_semanticsContextState = {};
+
+    //  Store the parent node that is a modifier target, relative to
+    // a chain of visited AST nodes
+    ModifiableSyntaxNode* m_modifierPropagationTarget = nullptr;
 };
 
 struct OuterScopeContextRAII
@@ -2909,6 +2950,15 @@ public:
     void checkRayPayloadStructFields(StructDecl* structDecl);
 
     CatchStmt* findMatchingCatchStmt(Type* errorType);
+
+    bool isSlang2026OrLater()
+    {
+        // reflection may not have a m_module
+        if (!getShared()->m_module)
+            return false;
+        return getShared()->m_module->getModuleDecl()->languageVersion >=
+               SLANG_LANGUAGE_VERSION_2026;
+    }
 };
 
 
@@ -2933,6 +2983,12 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+
+    Expr* visitPrefixWithTypeExpr(PrefixWithTypeExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an PrefixWithTypeExpr.");
+        UNREACHABLE_RETURN(nullptr);
+    }
 
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
@@ -3019,6 +3075,7 @@ public:
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
     Expr* visitSomeTypeExpr(SomeTypeExpr* expr);
+    Expr* visitDynTypeExpr(DynTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
@@ -3120,6 +3177,12 @@ private:
     void validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink);
 
     void generateUniqueIDForStmt(BreakableStmt* stmt);
+};
+
+struct SemanticsTypeContext
+{
+    SemanticsTypeContext() {}
+    bool exprIsDyn = false;
 };
 
 struct SemanticsDeclVisitorBase : public SemanticsVisitor

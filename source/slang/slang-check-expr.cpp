@@ -2390,8 +2390,14 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
-    bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
+
+   auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsUnbound |
+        (UInt)SemanticsContextState::SomeTypeIsAllowed |
+        (UInt)SemanticsContextState::DynTypeIsAllowed));
+
+   bool needDeref = false;
+   auto baseExpr = subVisitor.checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
         CheckBaseContext::Subscript,
         needDeref);
@@ -2401,10 +2407,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // the subscript
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
-    auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(disableShortCircuitLogicalExpr())
-                          : *this;
-
+    subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
+                     ? SemanticsVisitor(subVisitor.disableShortCircuitLogicalExpr())
+                     : subVisitor;
+    
     for (auto& arg : subscriptExpr->indexExprs)
     {
         arg = subVisitor.CheckTerm(arg);
@@ -2427,7 +2433,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         IntVal* elementCount = nullptr;
         if (subscriptExpr->indexExprs.getCount() == 1)
         {
-            elementCount = CheckIntegerConstantExpression(
+            elementCount = subVisitor.CheckIntegerConstantExpression(
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
@@ -2444,20 +2450,14 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
-            // Validate that the base-array type is of valid type
-            if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(baseTypeType->getType()))
-            {
-                getSink()->diagnose(
-                    subscriptExpr,
-                    Diagnostics::someCannotAppearInComplexExpression);
-            }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
             getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
         }
 
-        auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
+        auto elementType =
+            subVisitor.CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
         auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
@@ -5532,32 +5532,87 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
     return expr;
 }
 
-static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
-{
-    auto decl = astBuilder->create<SomeTypeDecl>();
-    decl->loc = expr->loc;
-    decl->interfaceType = expr->base;
-    return astBuilder->getTypeType(DeclRefType::create(astBuilder, decl));
-}
-
 Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
 {
-    expr->base = CheckProperType(expr->base);
+    // For now we need to tell the children to generate a `some T`, otherwise
+    // we have the problem that we can't actually know if a `some T` was already
+    // implicitly generated or if an invalid expression was passes (`some some T`, etc.)
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsAllowed |
+        (UInt)SemanticsContextState::DynTypeIsAllowed));
+    
+    // We do not check for a proper type here since that would run validation
+    // and implicitly assign `some` to our expr->base.type. This is an issue
+    // since we would have no way of telling if a `some` was implicitly added
+    // without major hacks that we do not want in the final `some` type support.
+    expr->base = subVisitor.TranslateTypeNode(expr->base);
+    
+    auto& type = expr->base.type;
+    auto& result = expr->type;
+    auto& typeExp = expr->base;
 
-    if (as<ErrorType>(expr->base.type))
-        expr->type = expr->base.type;
+    if (as<ErrorType>(type))
+        result = type;
     else
     {
-        if (!isDeclRefTypeOf<InterfaceDecl>(expr->base.type))
+        if (!isDeclRefTypeOf<InterfaceDecl>(type))
         {
-            getSink()->diagnose(
-                expr,
-                Diagnostics::cannotDeclareNonInterfaceSomeType,
-                expr->base.type);
+            getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, type);
+            result = m_astBuilder->getErrorType();
         }
         else
         {
-            expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+            SomeTypeDecl* decl;
+            if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
+                decl = m_astBuilder->create<UnboundSomeTypeDecl>();
+            else
+                decl = m_astBuilder->create<SomeTypeDecl>();
+            decl->loc = expr->loc;
+            decl->interfaceType = typeExp;
+            decl->parentDecl = getOuterScope()->containerDecl;
+            result = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, decl));
+        }
+    }
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitDynTypeExpr(DynTypeExpr* expr)
+{
+    // For now we need to tell the children to generate a `dyn T` to keep logic
+    // close to how `some` works
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsAllowed |
+        (UInt)SemanticsContextState::DynTypeIsAllowed));
+
+    // We do not check for a proper type here since that would run validation.
+    expr->base = subVisitor.TranslateTypeNode(expr->base);
+
+    auto& type = expr->base.type;
+    auto& result = expr->type;
+
+    if (as<ErrorType>(type))
+        result = type;
+    else
+    {
+        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(type);
+        if (!interfaceDeclRef)
+        {
+            getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceDynType, type);
+            result = m_astBuilder->getErrorType();
+        }
+        else
+        {
+            result = m_astBuilder->getTypeType(type);
+
+            // Validation has no reason to check for a `dyn` type without
+            // a parent decl since in these cases, `dyn` is treated exactly
+            // as if it is a regular type. Therefore, if we lack
+            // a propagation target, we can just ignore adding `dyn`.
+            auto targetToAddDynTo = getModifierPropagationTarget();
+            if (targetToAddDynTo)
+            {
+                addModifier(targetToAddDynTo, this->getASTBuilder()->create<DynModifier>());
+            }
         }
     }
     return expr;

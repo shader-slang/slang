@@ -877,6 +877,18 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "<unknown-type>";
         }
     }
+    else if (const auto dynTypeExpr = as<DynTypeExpr>(expr))
+    {
+        sb << "dyn ";
+        if (dynTypeExpr->base.type)
+        {
+            addType(dynTypeExpr->base.type);
+        }
+        else
+        {
+            sb << "<unknown-type>";
+        }
+    }
     else if (const auto funcTypeExpr = as<FuncTypeExpr>(expr))
     {
         sb << "(";

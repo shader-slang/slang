@@ -251,7 +251,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         return cacheResult(true);
 
     // Slang 2026 language fix: an interface type is not C-style.
-    if (isSlang2026OrLater(this))
+    if (isSlang2026OrLater())
     {
         // TODO: some/dyn types are also not C-style.
         if (isDeclRefTypeOf<InterfaceDecl>(type))
@@ -1885,7 +1885,7 @@ bool SemanticsVisitor::_coerce(
 
 static bool isDynType(Type* type)
 {
-    return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
+    return isDeclRefTypeOf<InterfaceDecl>(type);
 }
 
 bool SemanticsVisitor::tryCoerceSomeType(
@@ -1900,6 +1900,8 @@ bool SemanticsVisitor::tryCoerceSomeType(
     // Restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
+        //TODO: remove all `CoercionSite` checks.
+        //
         // Handles the following case: `some T = some U` `some T = unbound_some U`.
         // We do not error if `some` is an argument since `some` can be passed as an argument to a
         // `some` parameter.

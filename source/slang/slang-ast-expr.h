@@ -19,6 +19,13 @@ class IncompleteExpr : public Expr
     FIDDLE(...)
 };
 
+// Representation for expressions of the form `prefix TypeName`
+FIDDLE()
+class PrefixWithTypeExpr : public Expr
+{
+    FIDDLE(...)
+};
+
 // Base class for expressions that will reference declarations
 FIDDLE(abstract)
 class DeclRefExpr : public Expr
@@ -162,14 +169,14 @@ class GetArrayLengthExpr : public Expr
 };
 
 FIDDLE()
-class ExpandExpr : public Expr
+class ExpandExpr : public PrefixWithTypeExpr
 {
     FIDDLE(...)
     FIDDLE() Expr* baseExpr = nullptr;
 };
 
 FIDDLE()
-class EachExpr : public Expr
+class EachExpr : public PrefixWithTypeExpr
 {
     FIDDLE(...)
     FIDDLE() Expr* baseExpr = nullptr;
@@ -771,9 +778,20 @@ class PointerTypeExpr : public Expr
     FIDDLE() TypeExp base;
 };
 
-/// A type expression that represents a some type, e.g. `some T`
+/// A type expression that represents a `dyn interface` or `dyn T`.
+/// This is not a concrete type. This resolves into the DynModifier
 FIDDLE()
-class SomeTypeExpr : public Expr
+class DynTypeExpr : public PrefixWithTypeExpr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+/// A type expression that represents a some type, e.g. `some T`.
+/// This is not a concrete type, but a placeholder for a type that will be
+/// resolved later.
+FIDDLE()
+class SomeTypeExpr : public PrefixWithTypeExpr
 {
     FIDDLE(...)
     FIDDLE() TypeExp base;

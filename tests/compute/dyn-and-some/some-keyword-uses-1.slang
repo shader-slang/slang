@@ -35,7 +35,7 @@ struct StructForIFoo2 : IFoo
 void logic(inout some IFoo v1, in some IFoo v2)
 {
     // cannot assign `some` to `some`
-    // CHECK_2026: error 33091
+    // CHECK_2026: error 33088
     v1 = v2;
     some IFoo data4 = v2;
 }
@@ -48,7 +48,7 @@ void computeMain()
     dyn IFoo data3 = StructForIFoo1(1);
 
     // cannot assign `dyn` to `some`
-    // CHECK_2026: error 33092
+    // CHECK_2026: error 33087
     data1 = data3;
     logic(data1, data2);
     buffer[0] = data1.getVal() + data2.getVal();

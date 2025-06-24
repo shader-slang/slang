@@ -285,6 +285,11 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base.exp);
         }
+        void visitDynTypeExpr(DynTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->base.exp);
+        }
         void visitAsTypeExpr(AsTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

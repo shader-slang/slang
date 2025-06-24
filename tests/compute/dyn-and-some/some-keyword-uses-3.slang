@@ -17,20 +17,20 @@ struct myS : IFoo
 
 // not allowed `some` members
 //
-// CHECK-DAG: error 33084
-// CHECK-DAG: error 33084
 struct someStructMember1
 {
+    // CHECK-DAG: ([[# @LINE+1]]): error 33085:
     some IFoo v;
 };
 __generic<T>
 struct someStructMember3
 {
+    // CHECK-DAG: ([[# @LINE+1]]): error 33085:
     some IFoo v;
 };
 
 // not allowed `some` global
-// CHECK-DAG: error 33085
+// CHECK-DAG: ([[# @LINE+1]]): error 33085:
 static some IFoo globalSomeVariable;
 
 RWStructuredBuffer<int> buffer;
@@ -42,7 +42,7 @@ void computeMain()
     some myS bad1;
 
 // `dyn` and `some` is disallowed
-// CHECK-DAG: error 33089
+// CHECK-DAG: error 33086
     dyn some IFooDyn bad6;     
 
     buffer[0] = 0;

@@ -27,7 +27,6 @@ struct StructForIFooGeneric : IFooGeneric<T>
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-
     some IFooGeneric<float> data1;
     data1 = StructForIFooGeneric<float>(1);
     some IFooGeneric<float> data2 = StructForIFooGeneric<float>(1);

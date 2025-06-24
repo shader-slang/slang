@@ -4140,6 +4140,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
     LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
 
+    LoweredValInfo visitPrefixWithTypeExpr(PrefixWithTypeExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an PrefixWithTypeExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
         SLANG_UNEXPECTED("a valid ast should not contain an IncompleteExpr.");
@@ -5601,6 +5607,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'some' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitDynTypeExpr(DynTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("dyn' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 

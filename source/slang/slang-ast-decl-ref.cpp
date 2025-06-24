@@ -368,7 +368,19 @@ void DeclRefBase::toText(StringBuilder& out)
     {
         auto decl = declRef->getDecl();
         if (!first)
+        {
+            if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
+            {
+                out << "Unbound_Some<" << unboundSomeTypeDecl->interfaceType << ">";
+            }
+            else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+            {
+                // output `some` type as `parentDecl.Some<type>` instead of `parentDecl.some type`
+                // for clarity reasons.
+                out << "Some<" << someTypeDecl->interfaceType << ">";
+            }
             out << ".";
+        }
         first = false;
 
         if (auto name = decl->getName())
@@ -404,10 +416,6 @@ void DeclRefBase::toText(StringBuilder& out)
             {
                 getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
             }
-        }
-        else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
-        {
-            out << "some " << someTypeDecl->interfaceType;
         }
     }
 }
