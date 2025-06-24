@@ -2941,8 +2941,7 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     // Disallow `dyn`, `some`, and unbound types
     auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
             (UInt)SemanticsContextState::SomeTypeIsUnbound |
-            (UInt)SemanticsContextState::SomeTypeIsAllowed |
-            (UInt)SemanticsContextState::DynTypeIsAllowed));
+            (UInt)SemanticsContextState::SomeTypeIsAllowed));
 
     // Disable the short-circuiting logic expression when the experssion is in
     // the generic parameter.

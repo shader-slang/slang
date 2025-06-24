@@ -2153,7 +2153,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
            // `some` cannot be a struct member.
            // `some` cannot be a global.
-           if (!as<StructDecl>(varDecl->parentDecl) && !isGlobalDecl(varDecl))
+           if ( !as<StructDecl>(varDecl->parentDecl) && !isGlobalDecl(varDecl))
                semanticsContextState = SemanticsContextState::SomeTypeIsAllowed;
            semanticsContextState = SemanticsContextState(
                (UInt)semanticsContextState | 

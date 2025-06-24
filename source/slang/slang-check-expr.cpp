@@ -2393,8 +2393,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
         (UInt)SemanticsContextState::SomeTypeIsUnbound |
-        (UInt)SemanticsContextState::SomeTypeIsAllowed |
-        (UInt)SemanticsContextState::DynTypeIsAllowed));
+        (UInt)SemanticsContextState::SomeTypeIsAllowed));
 
    bool needDeref = false;
    auto baseExpr = subVisitor.checkBaseForMemberExpr(
