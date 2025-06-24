@@ -188,6 +188,10 @@ jobs:
               cmake --workflow --preset "${{matrix.config}}"
             fi
           fi
+
+      - name: Check documented compiler versions
+        run: bash extras/verify-documented-compiler-version.sh
+
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
