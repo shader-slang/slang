@@ -44,6 +44,3 @@
 [submodule "external/lua"]
 	path = external/lua
 	url = https://github.com/lua/lua.git
-[submodule "external/rapidyaml"]
-	path = external/rapidyaml
-	url = https://github.com/biojppm/rapidyaml
