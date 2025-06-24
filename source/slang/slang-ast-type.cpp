@@ -149,7 +149,7 @@ Val* DeclRefType::_substituteImplOverride(
         {
             (*ioDiff)++;
             SomeTypeDecl* decl;
-            if (as<UnboundSomeTypeDecl>(subst.declRef->getDecl()))
+            if (as<UnboundSomeTypeDecl>(isDeclRefTypeOf<SomeTypeDecl>(this)))
                 decl = astBuilder->create<UnboundSomeTypeDecl>();
             else
                 decl = astBuilder->create<SomeTypeDecl>();
