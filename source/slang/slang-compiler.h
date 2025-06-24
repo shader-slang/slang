@@ -1794,7 +1794,16 @@ public:
 
     /// Given a mangled name finds the exported NodeBase associated with this module.
     /// If not found returns nullptr.
-    NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
+    Decl* findExportedDeclByMangledName(const UnownedStringSlice& mangledName);
+
+    /// Ensure that the any accelerator(s) used for `findExportedDeclByMangledName`
+    /// have already been built.
+    ///
+    void ensureExportLookupAcceleratorBuilt();
+
+    Count getExportedDeclCount();
+    Decl* getExportedDecl(Index index);
+    UnownedStringSlice getExportedDeclMangledName(Index index);
 
     /// Get the ASTBuilder
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
@@ -1906,7 +1915,7 @@ private:
     // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
     // and m_mangledExportSymbols holds the NodeBase* values for each index.
     StringSlicePool m_mangledExportPool;
-    List<NodeBase*> m_mangledExportSymbols;
+    List<Decl*> m_mangledExportSymbols;
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
@@ -2458,6 +2467,7 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
@@ -2465,6 +2475,7 @@ public:
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
@@ -2473,6 +2484,7 @@ public:
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);

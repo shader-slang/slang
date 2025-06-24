@@ -11,15 +11,11 @@ DiagnosticSink* _sink = nullptr;
 StringBuilder* _builder = nullptr;
 Count _templateCounter = 0;
 
-void diagnoseLuaError(lua_State* L)
+static void _writeLuaMessage(Severity severity, String const& message)
 {
-    size_t size = 0;
-    char const* buffer = lua_tolstring(L, -1, &size);
-    String message = UnownedStringSlice(buffer, size);
-    message = message + "\n";
     if (_sink)
     {
-        _sink->diagnoseRaw(Severity::Error, message.getBuffer());
+        _sink->diagnoseRaw(severity, message.getUnownedSlice());
     }
     else
     {
@@ -27,10 +23,35 @@ void diagnoseLuaError(lua_State* L)
     }
 }
 
-int _handleLuaError(lua_State* L)
+int _trace(lua_State* L)
 {
-    diagnoseLuaError(L);
-    return lua_error(L);
+    int argCount = lua_gettop(L);
+
+    for (int i = 0; i < argCount; ++i)
+    {
+        lua_pushliteral(L, " ");
+        luaL_tolstring(L, i + 1, nullptr);
+    }
+    lua_concat(L, 2 * argCount);
+
+    size_t size = 0;
+    char const* buffer = lua_tolstring(L, -1, &size);
+
+    String message;
+    message.append("fiddle:");
+    message.append(UnownedStringSlice(buffer, size));
+    message.append("\n");
+
+    _writeLuaMessage(Severity::Note, message);
+    return 0;
+}
+
+int _handleLuaErrorRaised(lua_State* L)
+{
+    lua_pushliteral(L, "\n");
+    luaL_traceback(L, L, nullptr, 1);
+    lua_concat(L, 3);
+    return 1;
 }
 
 int _original(lua_State* L)
@@ -57,14 +78,9 @@ int _splice(lua_State* L)
     _builder = &spliceBuilder;
 
     lua_pushvalue(L, 1);
-    auto result = lua_pcall(L, 0, 1, 0);
+    lua_call(L, 0, 1);
 
     _builder = savedBuilder;
-
-    if (result != LUA_OK)
-    {
-        return _handleLuaError(L);
-    }
 
     // The actual string value follows whatever
     // got printed to the output (unless it is
@@ -89,11 +105,7 @@ int _template(lua_State* L)
     _builder->append("\n");
 
     lua_pushvalue(L, 1);
-    auto result = lua_pcall(L, 0, 0, 0);
-    if (result != LUA_OK)
-    {
-        return _handleLuaError(L);
-    }
+    lua_call(L, 0, 0);
 
     _builder->append("\n#endif\n");
 
@@ -109,6 +121,9 @@ void ensureLuaInitialized()
 
     L = luaL_newstate();
     luaL_openlibs(L);
+
+    lua_pushcclosure(L, &_trace, 0);
+    lua_setglobal(L, "TRACE");
 
     lua_pushcclosure(L, &_original, 0);
     lua_setglobal(L, "ORIGINAL");
@@ -132,7 +147,11 @@ lua_State* getLuaState()
 }
 
 
-String evaluateScriptCode(String originalFileName, String scriptSource, DiagnosticSink* sink)
+String evaluateScriptCode(
+    SourceLoc loc,
+    String originalFileName,
+    String scriptSource,
+    DiagnosticSink* sink)
 {
     StringBuilder builder;
     _builder = &builder;
@@ -141,6 +160,8 @@ String evaluateScriptCode(String originalFileName, String scriptSource, Diagnost
     ensureLuaInitialized();
 
     String luaChunkName = "@" + originalFileName;
+
+    lua_pushcfunction(L, &_handleLuaErrorRaised);
 
     if (LUA_OK != luaL_loadbuffer(
                       L,
@@ -152,17 +173,19 @@ String evaluateScriptCode(String originalFileName, String scriptSource, Diagnost
         char const* buffer = lua_tolstring(L, -1, &size);
         String message = UnownedStringSlice(buffer, size);
         message = message + "\n";
-        sink->diagnoseRaw(Severity::Error, message.getBuffer());
+
+        sink->diagnose(loc, fiddle::Diagnostics::scriptLoadError, message);
         SLANG_ABORT_COMPILATION("fiddle failed during Lua script loading");
     }
 
-    if (LUA_OK != lua_pcall(L, 0, 0, 0))
+    if (LUA_OK != lua_pcall(L, 0, 0, -2))
     {
         size_t size = 0;
         char const* buffer = lua_tolstring(L, -1, &size);
         String message = UnownedStringSlice(buffer, size);
         message = message + "\n";
-        sink->diagnoseRaw(Severity::Error, message.getBuffer());
+
+        sink->diagnose(loc, fiddle::Diagnostics::scriptExecutionError, message);
         SLANG_ABORT_COMPILATION("fiddle failed during Lua script execution");
     }
 
