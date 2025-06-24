@@ -18,6 +18,7 @@ list(
     PREPEND "${SLANG_FIDDLE_INPUT_DIR}/"
     OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS
 )
+glob_append(SLANG_FIDDLE_LUA_INPUTS "*.lua")
 
 list(
     TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
@@ -32,7 +33,8 @@ add_custom_command(
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
-    DEPENDS ${SLANG_FIDDLE_INPUTS} slang-fiddle
+    DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
+    WORKING_DIRECTORY /home/e/work/slang
     VERBATIM
 )
 add_library(
@@ -45,40 +47,6 @@ set_target_properties(slang-fiddle-output PROPERTIES FOLDER generated)
 target_include_directories(
     slang-fiddle-output
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
-)
-
-#
-# Invoke the "inst-def-gen" tool to generate source
-#
-
-set(SLANG_INST_GEN_INPUT "${CMAKE_CURRENT_LIST_DIR}/slang-ir-inst-defs.yaml")
-set(SLANG_INST_GEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/inst-defs")
-set(SLANG_INST_GEN_OUTPUT_ENUM
-    "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-insts-enum.h"
-)
-set(SLANG_INST_GEN_OUTPUT_INFO
-    "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-insts-info.cpp"
-)
-
-add_custom_command(
-    OUTPUT ${SLANG_INST_GEN_OUTPUT_ENUM} ${SLANG_INST_GEN_OUTPUT_INFO}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_INST_GEN_OUTPUT_DIR}
-    COMMAND
-        slang-generate-ir-defs "${SLANG_INST_GEN_INPUT}" --ir-enum-file
-        "${SLANG_INST_GEN_OUTPUT_ENUM}" --ir-info-file
-        "${SLANG_INST_GEN_OUTPUT_INFO}"
-    DEPENDS ${SLANG_INST_GEN_INPUT} slang-generate-ir-defs
-    VERBATIM
-)
-slang_add_target(
-    slang-ir-defs
-    OBJECT
-    EXPLICIT_SOURCE ${SLANG_INST_GEN_OUTPUT_INFO}
-    LINK_WITH_PRIVATE core
-    INCLUDE_DIRECTORIES_PRIVATE "${slang_SOURCE_DIR}/source/slang"
-    INCLUDE_DIRECTORIES_PUBLIC ${SLANG_INST_GEN_OUTPUT_DIR}
-    EXCLUDE_FROM_ALL
-    FOLDER generated
 )
 
 #
@@ -138,7 +106,11 @@ slang_add_target(
 # generated lookup tables
 #
 
-get_target_property(SLANG_SPIRV_HEADERS_INCLUDE_DIR SPIRV-Headers::SPIRV-Headers INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(
+    SLANG_SPIRV_HEADERS_INCLUDE_DIR
+    SPIRV-Headers::SPIRV-Headers
+    INTERFACE_INCLUDE_DIRECTORIES
+)
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"

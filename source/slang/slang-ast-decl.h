@@ -962,7 +962,8 @@ class SyntaxDecl : public Decl
 {
     FIDDLE(...)
     // What type of syntax node will be produced when parsing with this keyword?
-    FIDDLE() SyntaxClass<NodeBase> syntaxClass;
+    FIDDLE()
+    SyntaxClass<NodeBase> syntaxClass;
 
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback parseCallback = nullptr;

@@ -6,8 +6,7 @@ insts:
             flags:
               - Hoistable
             insts:
-              - Void:
-                  type_name: VoidType
+              - Void: type_name:VoidType
               - Bool:
                   type_name: BoolType
               - Int8:
@@ -291,15 +290,15 @@ insts:
         - TextureShape1DType:
             flags:
               - Hoistable
-        - TextureShape1DType:
+        - TextureShape2DType:
             type_name: TextureShape2DType
             flags:
               - Hoistable
-        - TextureShape1DType:
+        - TextureShape3DType:
             type_name: TextureShape3DType
             flags:
               - Hoistable
-        - TextureShape1DType:
+        - TextureShapeCubeDType:
             type_name: TextureShapeCubeType
             flags:
               - Hoistable
@@ -594,7 +593,7 @@ insts:
             type_name: PtrLit
         - string_constant:
             type_name: StringLit
-        - string_constant:
+        - blob_constant:
             type_name: BlobLit
         - void_constant:
             type_name: VoidLit
@@ -679,7 +678,7 @@ insts:
       operands: 1
   - makeStruct: {}
   - makeTuple: {}
-  - makeTuple:
+  - makeTargetTuple:
       type_name: MakeTargetTuple
   - makeValuePack: {}
   - getTargetTupleElement: {}
@@ -1590,7 +1589,7 @@ insts:
               - primitives:
                   type_name: PrimitivesDecoration
                   operands: 1
-        - payload:
+        - HLSLMeshPayloadDecoration:
             type_name: HLSLMeshPayloadDecoration
         - perprimitive:
             type_name: GLSLPrimitivesRateDecoration
@@ -1987,10 +1986,10 @@ insts:
         - stage:
             type_name: StageAttr
             operands: 1
-        - fieldLayout:
+        - structFieldLayout:
             type_name: StructFieldLayoutAttr
             operands: 2
-        - fieldLayout:
+        - tupleFieldLayout:
             type_name: TupleFieldLayoutAttr
             operands: 1
         - caseLayout:
@@ -2051,7 +2050,7 @@ insts:
       flags:
         - Hoistable
   - BeginFragmentShaderInterlock: {}
-  - BeginFragmentShaderInterlock:
+  - EndFragmentShaderInterlock:
       type_name: EndFragmentShaderInterlock
   - DebugSource:
       comment: DebugInfo

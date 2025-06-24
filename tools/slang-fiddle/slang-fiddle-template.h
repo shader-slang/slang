@@ -1,4 +1,4 @@
-// slang-fiddle-template.h
+// lang-fiddle-template.h
 #pragma once
 
 #include "compiler-core/slang-source-loc.h"

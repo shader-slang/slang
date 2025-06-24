@@ -25,20 +25,6 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
-# rapidyaml
-if(NOT ${SLANG_USE_SYSTEM_RAPIDYAML})
-    if(NOT SLANG_OVERRIDE_RAPIDYAML_PATH)
-        add_subdirectory(rapidyaml EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_RAPIDYAML_PATH}/rapidyaml
-            rapidyaml
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
-    endif()
-endif()
-
 # Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)

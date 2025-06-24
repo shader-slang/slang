@@ -1,9 +1,12 @@
 // slang-fiddle-script.cpp
 #include "slang-fiddle-script.h"
 
+#include "compiler-core/slang-diagnostic-sink.h"
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
 #include "lua/lualib.h"
+
+#include <cstdio>
 
 namespace fiddle
 {
@@ -114,6 +117,34 @@ int _template(lua_State* L)
 
 lua_State* L = nullptr;
 
+// Add a custom searcher that handles absolute paths
+static int path_searcher(lua_State* L)
+{
+    const char* modname = luaL_checkstring(L, 1);
+
+    if (luaL_loadfile(L, modname) == LUA_OK)
+    {
+        lua_pushstring(L, modname); // Push filename as second return
+        return 2;
+    }
+
+    // Not found
+    lua_pushfstring(L, "\n\tno file '%s'", modname);
+    return 1;
+}
+
+void install_path_searcher(lua_State* L)
+{
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "searchers");
+
+    // Insert at position 2 (after preload)
+    lua_pushcfunction(L, path_searcher);
+    lua_rawseti(L, -2, 2);
+
+    lua_pop(L, 2);
+}
+
 void ensureLuaInitialized()
 {
     if (L)
@@ -137,6 +168,8 @@ void ensureLuaInitialized()
     lua_pushcclosure(L, &_template, 0);
     lua_setglobal(L, "TEMPLATE");
 
+    install_path_searcher(L);
+
     // TODO: register custom stuff here...
 }
 
@@ -146,6 +179,33 @@ lua_State* getLuaState()
     return L;
 }
 
+static void setupLuaEnvironment(const String& originalFileName)
+{
+    ensureLuaInitialized();
+
+    lua_pushstring(L, originalFileName.getBuffer());
+    lua_setglobal(L, "THIS_FILE");
+
+    lua_pushcfunction(L, &_handleLuaErrorRaised);
+}
+
+static void handleLuaError(
+    SourceLoc loc,
+    DiagnosticSink* sink,
+    const char* errorType,
+    DiagnosticInfo diagnosticID)
+{
+    size_t size = 0;
+    char const* buffer = lua_tolstring(L, -1, &size);
+    String message = UnownedStringSlice(buffer, size);
+    message = message + "\n";
+
+    sink->diagnose(loc, diagnosticID, message);
+
+    String abortMessage = "fiddle failed during Lua ";
+    abortMessage = abortMessage + errorType;
+    SLANG_ABORT_COMPILATION(abortMessage.getBuffer());
+}
 
 String evaluateScriptCode(
     SourceLoc loc,
@@ -157,11 +217,9 @@ String evaluateScriptCode(
     _builder = &builder;
     _templateCounter = 0;
 
-    ensureLuaInitialized();
+    setupLuaEnvironment(originalFileName);
 
     String luaChunkName = "@" + originalFileName;
-
-    lua_pushcfunction(L, &_handleLuaErrorRaised);
 
     if (LUA_OK != luaL_loadbuffer(
                       L,
@@ -169,27 +227,69 @@ String evaluateScriptCode(
                       scriptSource.getLength(),
                       luaChunkName.getBuffer()))
     {
-        size_t size = 0;
-        char const* buffer = lua_tolstring(L, -1, &size);
-        String message = UnownedStringSlice(buffer, size);
-        message = message + "\n";
-
-        sink->diagnose(loc, fiddle::Diagnostics::scriptLoadError, message);
-        SLANG_ABORT_COMPILATION("fiddle failed during Lua script loading");
+        handleLuaError(loc, sink, "script loading", fiddle::Diagnostics::scriptLoadError);
     }
 
     if (LUA_OK != lua_pcall(L, 0, 0, -2))
     {
-        size_t size = 0;
-        char const* buffer = lua_tolstring(L, -1, &size);
-        String message = UnownedStringSlice(buffer, size);
-        message = message + "\n";
-
-        sink->diagnose(loc, fiddle::Diagnostics::scriptExecutionError, message);
-        SLANG_ABORT_COMPILATION("fiddle failed during Lua script execution");
+        handleLuaError(loc, sink, "script execution", fiddle::Diagnostics::scriptExecutionError);
     }
 
     _builder = nullptr;
     return builder.produceString();
+}
+
+String evaluateLuaExpression(
+    SourceLoc loc,
+    String originalFileName,
+    String luaExpression,
+    DiagnosticSink* sink)
+{
+    setupLuaEnvironment(originalFileName);
+
+    String luaChunkName = "@" + originalFileName;
+
+    // Wrap expression in return statement to get its value
+    String wrappedExpression = "return " + luaExpression;
+
+    if (LUA_OK != luaL_loadbuffer(
+                      L,
+                      wrappedExpression.getBuffer(),
+                      wrappedExpression.getLength(),
+                      luaChunkName.getBuffer()))
+    {
+        handleLuaError(loc, sink, "expression loading", fiddle::Diagnostics::scriptLoadError);
+    }
+
+    // Execute and expect 1 return value
+    if (LUA_OK != lua_pcall(L, 0, 1, -2))
+    {
+        handleLuaError(
+            loc,
+            sink,
+            "expression evaluation",
+            fiddle::Diagnostics::scriptExecutionError);
+    }
+
+    // Convert the result to string
+    size_t resultSize = 0;
+    const char* resultBuffer = lua_tolstring(L, -1, &resultSize);
+
+    if (!resultBuffer)
+    {
+        sink->diagnose(
+            loc,
+            fiddle::Diagnostics::scriptExecutionError,
+            "Lua expression did not return a string value\n");
+        SLANG_ABORT_COMPILATION("fiddle failed: non-string expression result");
+    }
+
+    String result;
+    result.append(resultBuffer, resultSize);
+
+    // Pop the result and error handler
+    lua_pop(L, 2);
+
+    return result;
 }
 } // namespace fiddle
