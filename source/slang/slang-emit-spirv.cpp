@@ -3468,7 +3468,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     spvBlock,
                     spvFunc,
                     irDebugFunc,
-                    irFunc->getDataType());
+                    irFunc->getDataType(),
+                    irFunc);
             }
             if (funcDebugScope)
             {
@@ -7964,7 +7965,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* firstBlock,
         SpvInst* spvFunc,
         IRDebugFunction* debugFunc,
-        IRFuncType* debugType)
+        IRFuncType* debugType,
+        IRFunc* irFunc = nullptr)
     {
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
@@ -8001,6 +8003,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugFunc->getName(),
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
+
+        if (irFunc)
+        {
+            registerDebugInst(irFunc, debugFuncInfo);
+        }
 
         if (firstBlock && spvFunc)
         {
