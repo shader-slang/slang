@@ -86,13 +86,13 @@ apply to all members within the module. For example:
 module myModule;
 
 // myFunc has requirement glsl|hlsl|spirv
-public void myFunc()
+public void myFunc()s
 {
 }
 ```
 
 For inheritance/implementing-interfaces the story is a bit different.
-We require that any child has a subset of capabilities to the parent.
+We require that the sub-type (`Foo1`) has a super-set of capabilities to the super-types (`IFoo1` and `IFoo2`).
 
 For example:
 ```csharp
