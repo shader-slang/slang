@@ -56,32 +56,84 @@ fi
 # Extract major.minor version only
 COMPILER_MAJOR_MINOR=$(echo "$COMPILER_VERSION" | cut -d'.' -f1,2)
 
-# Parse the documentation for the expected version
-# Look for pattern: _COMPILER_ xx.yy is tested in CI
-EXPECTED_VERSION=""
+# Function to extract versions from a line
+extract_versions() {
+  local line="$1"
+  local is_msvc="$2"
+
+  # Extract the part between compiler name and "are/is tested in CI"
+  local version_part
+  version_part=$(echo "$line" | sed -E 's/^_[^_]+_ //; s/ (are|is) tested in CI.*//')
+
+  # Split by "and" and extract version numbers
+  local versions=()
+  if [[ "$is_msvc" == "true" ]]; then
+    # For MSVC, just extract numbers
+    while IFS= read -r version; do
+      version=$(echo "$version" | grep -oE '[0-9]+' | head -1)
+      [[ -n "$version" ]] && versions+=("$version")
+    done < <(echo "$version_part" | tr ',' '\n' | sed 's/ and /\n/g')
+  else
+    # For GCC/Clang, extract major.minor versions
+    while IFS= read -r version; do
+      version=$(echo "$version" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+      [[ -n "$version" ]] && versions+=("$version")
+    done < <(echo "$version_part" | tr ',' '\n' | sed 's/ and /\n/g')
+  fi
+
+  echo "${versions[@]}"
+}
+
+# Parse the documentation for the expected versions
+EXPECTED_VERSIONS=()
+VERSION_FOUND=false
 
 case "$COMPILER_TYPE" in
 "GCC")
-  EXPECTED_VERSION=$(grep -E "^_GCC_ [0-9]+\.[0-9]+ is tested in CI" "$DOCS_FILE" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+  DOC_LINE=$(grep -E "^_GCC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  if [[ -n "$DOC_LINE" ]]; then
+    # shellcheck disable=SC2207
+    EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "false"))
+  fi
   ;;
 "Clang")
-  EXPECTED_VERSION=$(grep -E "^_Clang_ [0-9]+\.[0-9]+ is tested in CI" "$DOCS_FILE" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+  DOC_LINE=$(grep -E "^_Clang_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  if [[ -n "$DOC_LINE" ]]; then
+    # shellcheck disable=SC2207
+    EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "false"))
+  fi
   ;;
 "MSVC")
   # For MSVC, we only compare major version
-  EXPECTED_VERSION=$(grep -E "^_MSVC_ [0-9]+ is tested in CI" "$DOCS_FILE" | grep -oE '[0-9]+' | head -1)
+  DOC_LINE=$(grep -E "^_MSVC_ .+ (are|is) tested in CI" "$DOCS_FILE" | head -1)
+  if [[ -n "$DOC_LINE" ]]; then
+    # shellcheck disable=SC2207
+    EXPECTED_VERSIONS=($(extract_versions "$DOC_LINE" "true"))
+  fi
   COMPILER_MAJOR_MINOR=$(echo "$COMPILER_VERSION" | cut -d'.' -f1)
   ;;
 esac
 
-if [[ -z "$EXPECTED_VERSION" ]]; then
+if [[ ${#EXPECTED_VERSIONS[@]} -eq 0 ]]; then
   echo "::warning::Could not find expected version for $COMPILER_TYPE in $DOCS_FILE"
   exit 0
 fi
 
-# Compare versions
-if [[ "$COMPILER_MAJOR_MINOR" != "$EXPECTED_VERSION" ]]; then
-  echo "::warning::Compiler version mismatch for $COMPILER_TYPE: $DOCS_FILE says $EXPECTED_VERSION but found $COMPILER_MAJOR_MINOR (full version: $COMPILER_VERSION)"
+# Check if current version matches any expected version
+for expected in "${EXPECTED_VERSIONS[@]}"; do
+  if [[ "$COMPILER_MAJOR_MINOR" == "$expected" ]]; then
+    VERSION_FOUND=true
+    break
+  fi
+done
+
+# Report results
+if [[ "$VERSION_FOUND" == "false" ]]; then
+  EXPECTED_LIST=$(
+    IFS=', '
+    echo "${EXPECTED_VERSIONS[*]}"
+  )
+  echo "::warning::Compiler version mismatch for $COMPILER_TYPE: Documentation says $EXPECTED_LIST but found $COMPILER_MAJOR_MINOR (full version: $COMPILER_VERSION)"
 else
   echo "✓ Compiler version matches: $COMPILER_TYPE $COMPILER_MAJOR_MINOR"
 fi

@@ -343,7 +343,7 @@ Please keep the exact formatting '_Foo_ xx.yy is tested in CI' as there is a
 script which checks that this is still up to date.
 -->
 
-_GCC_ 11.4 is tested in CI and is the recommended minimum version. GCC 10 is
+_GCC_ 11.4 and 13.3 are tested in CI and is the recommended minimum version. GCC 10 is
 supported on a best-effort basis, i.e. PRs supporting this version are
 encouraged but it isn't a continuously maintained setup.
 
