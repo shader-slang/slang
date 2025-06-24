@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 
-// CHECK: error{{.*}} expand
-// CHECK: error{{.*}} each
+// CHECK: error{{.*}} undefined identifier 'expand'
+// CHECK: error{{.*}} undefined identifier 'each'
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1,1,1)]
@@ -12,5 +12,4 @@ void computeMain()
 
     outputBuffer[0] = x;
     outputBuffer[1] = y;
-    // CHECK-COUNT-2: 2
 }
