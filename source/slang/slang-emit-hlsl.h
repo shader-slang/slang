@@ -26,8 +26,20 @@ public:
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
+    const bool* getCachedCapability(CapabilityAtom stage) const
+    {
+        return m_capabilityCache.tryGetValue(stage);
+    }
+    void addCachedCapability(CapabilityAtom stage, bool value)
+    {
+        m_capabilityCache.addIfNotExists(stage, value);
+    }
+
 protected:
     RefPtr<HLSLExtensionTracker> m_extensionTracker;
+
+    // Allow caching of capability results for easier lookup.
+    Dictionary<CapabilityAtom, bool> m_capabilityCache{};
 
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,

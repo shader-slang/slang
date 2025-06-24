@@ -39,6 +39,7 @@ void* ModuleLibrary::castAs(const Guid& guid)
 }
 
 SlangResult loadModuleLibrary(
+    ISlangBlob* blobHoldingSerializedData,
     const Byte* inData,
     size_t dataSize,
     String path,
@@ -69,8 +70,11 @@ SlangResult loadModuleLibrary(
 
     for (auto moduleChunk : container->getModules())
     {
-        auto loadedModule =
-            linkage->findOrLoadSerializedModuleForModuleLibrary(moduleChunk, container, sink);
+        auto loadedModule = linkage->findOrLoadSerializedModuleForModuleLibrary(
+            blobHoldingSerializedData,
+            moduleChunk,
+            container,
+            sink);
         if (!loadedModule)
             return SLANG_FAIL;
 
@@ -111,6 +115,7 @@ SlangResult loadModuleLibrary(
     // Load the module
     ComPtr<IModuleLibrary> library;
     SLANG_RETURN_ON_FAIL(loadModuleLibrary(
+        blob,
         (const Byte*)blob->getBufferPointer(),
         blob->getBufferSize(),
         path,

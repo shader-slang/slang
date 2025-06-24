@@ -533,6 +533,7 @@ interface ITexelElement
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    [OverloadRank(-1)]
     __init(Element x);
 }
 
@@ -8564,6 +8565,37 @@ T determinant(matrix<T,N,N> m)
         OpExtInst $$T result glsl450 Determinant $m
     };
     case wgsl: __intrinsic_asm "determinant";
+    default:
+        static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
+        if (N == 1)
+        {
+            return m[0][0];
+        }
+        else if (N == 2)
+        {
+            return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        }
+        else if (N == 3)
+        {
+            return
+                m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+              - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+              + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+        else// if (N == 4)
+        {
+            T a = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+            T b = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+            T c = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+            T d = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+            T e = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+            T f = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+            return
+                m[0][0] * (m[1][1] * a - m[1][2] * b + m[1][3] * c)
+              - m[0][1] * (m[1][0] * a - m[1][2] * d + m[1][3] * e)
+              + m[0][2] * (m[1][0] * b - m[1][1] * d + m[1][3] * f)
+              - m[0][3] * (m[1][0] * c - m[1][1] * e + m[1][2] * f);
+        }
     }
 }
 
@@ -20661,7 +20693,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -20686,7 +20718,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -20717,7 +20749,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsSphereHit()
     {
         __target_switch
@@ -20739,7 +20771,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss)]
+    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsLssHit()
     {
         __target_switch
@@ -25100,7 +25132,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     __intrinsic_op($(kIROp_Neg))
-    This __pureNeg(This other);
+    static This __pureNeg(This other);
 
     /// Returns a new cooperative vector where each component has its sign negated.
     /// @return A new cooperative vector containing the negated values.

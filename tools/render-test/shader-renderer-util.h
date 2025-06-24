@@ -39,6 +39,12 @@ struct ShaderRendererUtil
         const void* initData,
         IDevice* device,
         ComPtr<IBuffer>& bufferOut);
+
+    /// Clear a texture with the specified content
+    static Slang::Result clearTexture(
+        ITexture* texture,
+        InputTextureContent content,
+        IDevice* device);
 };
 
 } // namespace renderer_test

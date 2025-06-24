@@ -181,7 +181,7 @@ static int _peek(Lexer* lexer, int offset = 0)
 
     do
     {
-        if (lexer->m_cursor + pos == lexer->m_end)
+        if (lexer->m_cursor + pos >= lexer->m_end)
             return kEOF;
 
         c = lexer->m_cursor[pos++];
@@ -219,11 +219,20 @@ static int _peek(Lexer* lexer, int offset = 0)
         {
             // Consume all unicode characters.
             pos--;
-            c = getUnicodePointFromUTF8([&]() { return lexer->m_cursor[pos++]; });
+            c = getUnicodePointFromUTF8(
+                [&]()
+                {
+                    if (lexer->m_cursor + pos >= lexer->m_end)
+                        return (char)0;
+                    return lexer->m_cursor[pos++];
+                });
         }
         // Default case is to just hand along the byte we read as an ASCII code point.
     } while (offset--);
 
+    // If we encounter a \0, return kEOF.
+    // if (c == 0)
+    //    return kEOF;
     return c;
 }
 
@@ -235,7 +244,7 @@ static int _advance(Lexer* lexer)
     for (;;)
     {
         // If we are at the end of the input, then the task is easy.
-        if (lexer->m_cursor == lexer->m_end)
+        if (lexer->m_cursor >= lexer->m_end)
             return kEOF;
 
         // Look at the next raw byte, and decide what to do
@@ -269,15 +278,49 @@ static int _advance(Lexer* lexer)
         }
 
         // Consume all unicode characters.
+        bool isInvalidStream = false;
         if (isUtf8LeadingByte((Byte)c))
         {
             lexer->m_cursor--;
-            c = getUnicodePointFromUTF8([&]() { return *lexer->m_cursor++; });
+            c = getUnicodePointFromUTF8(
+                [&]()
+                {
+                    if (lexer->m_cursor >= lexer->m_end)
+                    {
+                        isInvalidStream = true;
+                        return (char)0;
+                    }
+                    return *lexer->m_cursor++;
+                });
+        }
+
+        // If we encounter a \0, return kEOF, and move stream cursor to the end.
+        if (c == 0 || isInvalidStream)
+        {
+            lexer->m_cursor = lexer->m_end;
         }
 
         // Default case is to return the raw byte we saw.
         return c;
     }
+}
+
+static const int kMaxLexErrorCount = 100;
+
+template<typename P, typename... Args>
+static void diagnose(
+    DiagnosticSink* sink,
+    const P& loc,
+    const DiagnosticInfo& info,
+    const Args&... args)
+{
+    if (!sink)
+        return;
+
+    // Cap max errors to avoid flooding the sink memory.
+    if (sink->getErrorCount() > kMaxLexErrorCount)
+        return;
+    sink->diagnose(loc, info, args...);
 }
 
 static void _handleNewLine(Lexer* lexer)
@@ -439,7 +482,8 @@ static void _lexDigits(Lexer* lexer, int base)
             if (auto sink = lexer->getDiagnosticSink())
             {
                 char buffer[] = {(char)c, 0};
-                sink->diagnose(
+                diagnose(
+                    sink,
                     _getSourceLoc(lexer),
                     LexerDiagnostics::invalidDigitForBase,
                     buffer,
@@ -855,7 +899,7 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             { // Empty char literal - size must be exactly 1.
                 if (auto sink = lexer->getDiagnosticSink())
                 {
-                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+                    diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
                 }
             }
             _advance(lexer);
@@ -868,7 +912,7 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
         { // Char literal about to have more than 1 char.
             if (auto sink = lexer->getDiagnosticSink())
             {
-                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
             }
         }
 
@@ -877,7 +921,7 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
         case kEOF:
             if (auto sink = lexer->getDiagnosticSink())
             {
-                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
+                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
             }
             return;
 
@@ -885,7 +929,7 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
         case '\r':
             if (auto sink = lexer->getDiagnosticSink())
             {
-                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
+                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
             }
             return;
 
@@ -978,7 +1022,7 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
             {
                 if (auto sink = lexer->getDiagnosticSink())
                 {
-                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::quoteCannotBeDelimiter);
+                    diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::quoteCannotBeDelimiter);
                 }
             }
             else
@@ -1002,7 +1046,7 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
         case kEOF:
             if (auto sink = lexer->getDiagnosticSink())
             {
-                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
+                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
             }
             return;
         default:
@@ -1303,7 +1347,7 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             case '9':
                 if (auto sink = lexer->getDiagnosticSink())
                 {
-                    sink->diagnose(loc, LexerDiagnostics::octalLiteral);
+                    diagnose(sink, loc, LexerDiagnostics::octalLiteral);
                 }
                 return _lexNumber(lexer, 8);
             }
@@ -1658,16 +1702,17 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             if (c >= 0x20 && c <= 0x7E)
             {
                 char buffer[] = {(char)c, 0};
-                sink->diagnose(loc, LexerDiagnostics::illegalCharacterPrint, buffer);
+                diagnose(sink, loc, LexerDiagnostics::illegalCharacterPrint, buffer);
             }
             else if (c == kEOF)
             {
-                sink->diagnose(loc, LexerDiagnostics::unexpectedEndOfInput);
+                diagnose(sink, loc, LexerDiagnostics::unexpectedEndOfInput);
             }
             else
             {
                 // Fallback: print as hexadecimal
-                sink->diagnose(
+                diagnose(
+                    sink,
                     loc,
                     LexerDiagnostics::illegalCharacterHex,
                     String((unsigned char)c, 16));

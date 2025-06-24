@@ -62,6 +62,7 @@ public:
 class TextTemplateFile : public RefObject
 {
 public:
+    SourceLoc loc;
     UnownedStringSlice originalFileContent;
     List<RefPtr<TextTemplate>> textTemplates;
 };

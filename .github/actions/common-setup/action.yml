@@ -100,20 +100,13 @@ runs:
         path: ${{ github.workspace }}/build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
 
-    - name: Set environment variable for CMake and sccache
+    - name: Set environment variable for CMake
       shell: bash
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
           echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
           echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
-
-        # Set CMake to use sccache if it's available
-        if command -v sccache; then
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
-          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> "$GITHUB_ENV"
-        fi
-        echo SCCACHE_IGNORE_SERVER_IO_ERROR=1 >> "$GITHUB_ENV"
 
     # Install swiftshader
     - uses: robinraju/release-downloader@v1.11

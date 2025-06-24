@@ -7,6 +7,8 @@
 // an empty initializer list) is still possible
 // when using `struct` inheritance.
 
+#pragma warning(disable:30816)
+
 struct Base
 {
     int a = 1;
