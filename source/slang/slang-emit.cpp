@@ -621,18 +621,17 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     auto linkage = codeGenContext->getLinkage();
-    
+
     // Only add decorations if we have denorm mode options set
-    bool hasDenormOptions = 
-        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16) ||
-        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32) ||
-        linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64);
-    
+    bool hasDenormOptions = linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16) ||
+                            linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32) ||
+                            linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64);
+
     if (!hasDenormOptions)
         return;
-    
+
     IRBuilder builder(irModule);
-    
+
     // Apply denorm decorations to all entry point functions
     for (auto inst : irModule->getGlobalInsts())
     {
