@@ -188,8 +188,8 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
-            "denorm-mode-fp<16|32|64>",
-            "Floating Point Denormal Mode",
+            "denorm-mode",
+            "Floating Point Denormal Handling Mode",
             UserValue(ValueCategory::FpDenormMode));
         options.addValues(TypeTextUtil::getFpDenormModeInfos());
 
@@ -591,16 +591,16 @@ void initCommandOptions(CommandOptions& options)
          "Control floating point optimizations"},
         {OptionKind::DenormModeFp16,
          "-denorm-mode-fp16",
-         "-denorm-mode-fp16 <mode>",
-         "Control handling of 16-bit denormal floating point values (any, preserve, ftz)"},
+         "-denorm-mode-fp16 <denorm-mode>",
+         "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz)"},
         {OptionKind::DenormModeFp32,
          "-denorm-mode-fp32",
-         "-denorm-mode-fp32 <mode>",
-         "Control handling of 32-bit denormal floating point values (any, preserve, ftz)"},
+         "-denorm-mode-fp32 <denorm-mode>",
+         "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz)"},
         {OptionKind::DenormModeFp64,
          "-denorm-mode-fp64",
-         "-denorm-mode-fp64 <mode>",
-         "Control handling of 64-bit denormal floating point values (any, preserve, ftz)"},
+         "-denorm-mode-fp64 <denorm-mode>",
+         "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",
