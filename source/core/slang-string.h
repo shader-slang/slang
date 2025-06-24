@@ -218,6 +218,14 @@ protected:
     char const* m_end;
 };
 
+/// Three-way comparison of string slices.
+///
+/// * Returns 0 if `lhs == rhs`
+/// * Returns a value < 0 if `lhs < rhs`
+/// * Returns a value > 0 if `lhs > rhs`
+///
+int compare(UnownedStringSlice const& lhs, UnownedStringSlice const& rhs);
+
 // A more convenient way to make slices from *string literals*
 template<size_t SIZE>
 SLANG_FORCE_INLINE UnownedStringSlice toSlice(const char (&in)[SIZE])
