@@ -592,15 +592,18 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DenormModeFp16,
          "-denorm-mode-fp16",
          "-denorm-mode-fp16 <denorm-mode>",
-         "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz)"},
+         "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
         {OptionKind::DenormModeFp32,
          "-denorm-mode-fp32",
          "-denorm-mode-fp32 <denorm-mode>",
-         "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz)"},
+         "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, "
+         "preserve, ftz)"},
         {OptionKind::DenormModeFp64,
          "-denorm-mode-fp64",
          "-denorm-mode-fp64 <denorm-mode>",
-         "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz)"},
+         "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",

@@ -172,7 +172,8 @@ static const NamesDescriptionValue s_floatingPointModes[] = {
     {SLANG_FLOATING_POINT_MODE_DEFAULT, "default", "Default floating point mode"}};
 
 static const NamesDescriptionValue s_fpDenormModes[] = {
-    {SLANG_FP_DENORM_MODE_ANY, "any",
+    {SLANG_FP_DENORM_MODE_ANY,
+     "any",
      "Use any denormal handling mode (default). The mode used is implementation defined."},
     {SLANG_FP_DENORM_MODE_PRESERVE, "preserve", "Preserve denormal values"},
     {SLANG_FP_DENORM_MODE_FTZ, "ftz", "Flush denormals to zero"},
