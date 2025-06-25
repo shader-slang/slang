@@ -61,7 +61,7 @@ their corresponding group.
 If two capability requirements contain different atoms that are conflicting with each other, these two requirements are considered __incompatible__.
 For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShaderClockKHR + vertex` are incompatible, because `fragment` conflicts with `vertex`.
 
-## Requirements in Parent Scope
+## Capabilities Between Parent To Members
 
 The capability requirement of a member is always merged with the requirements declared in its parent(s). If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
 For example, given:
@@ -90,6 +90,8 @@ public void myFunc()
 {
 }
 ```
+
+## Capabilities Between Sub-Type and Super-Type
 
 For inheritance/implementing-interfaces the story is a bit different.
 We require that the sub-type (`Foo1`) have a sub-set of capabilities to the super-type (`IFoo1`).
@@ -147,6 +149,33 @@ struct Foo5 : IFoo5
 {
 }
 ```
+
+## Capabilities Between Requirement and Implementation
+
+We require that all requirement capabilities are super-sets of their implementation (if capabilities are explicitly annotated).
+```csharp
+public interface IAtomicAddable_Pass
+{
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension int64_t : IAtomicAddable_Pass
+{
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+
+public interface IAtomicAddable_Error
+{
+    [require(glsl, sm_4_0)]
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension uint : IAtomicAddable_Error
+{
+    // Error, implementation has capability super-set, sm_6_0 (from `InterlockedAddI64`) vs. sm_4_0
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+```
+
+
 
 ## Inference of Capability Requirements
 
