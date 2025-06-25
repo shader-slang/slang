@@ -281,6 +281,8 @@ struct PeepholeContext : InstPassBase
                         baseType,
                         &sizeAlignment)))
                     break;
+                if (sizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
+                    break;
 
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
