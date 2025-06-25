@@ -13,23 +13,23 @@ struct Foo1 : IFoo1
 {
 }
 
-// child is superset of parent
-[require(sm_5_0)]
+// sub-type is superset
+[require(sm_4_0)]
 interface IFoo2
 {
 }
-[require(sm_4_0)]
+[require(sm_5_0)]
 // CHECK-DAG: ([[# @LINE+1]]): error 36104{{.*}}sm_5_0
 struct Foo2 : IFoo2
 {
 }
 
-// child is subset of parent
-[require(sm_4_0)]
+// sub-type is subset
+[require(sm_5_0)]
 interface IFoo3
 {
 }
-[require(sm_5_0)]
+[require(sm_4_0)]
 struct Foo3 : IFoo3
 {
 }

@@ -14203,8 +14203,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
 void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
-    // to ensure consistency (children get parent capabilities which are un-set through
-    // `getDeclaredCapabilitySet`).
+    // to ensure consistency
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
@@ -14359,8 +14358,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     ensureDecl(parent, DeclCheckState::CapabilityChecked);
     CapabilityAtomSet failedAvailableCapabilityConjunction;
     if (!CapabilitySet::checkCapabilityRequirement(
-            parent->inferredCapabilityRequirements,
             inheritanceDecl->inferredCapabilityRequirements,
+            parent->inferredCapabilityRequirements,
             failedAvailableCapabilityConjunction))
     {
         diagnoseUndeclaredCapability(
