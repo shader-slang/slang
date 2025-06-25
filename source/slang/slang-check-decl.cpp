@@ -14202,8 +14202,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
 
 void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
-    // Any potential parent must get it's capabilities from `getDeclaredCapabilitySet`
-    // to ensure consistency
+    // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl);
 }
 
@@ -14353,7 +14352,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
         }
     }
 
-    // validate that parent is a super set of inheritance
+    // validate that super-type is a super set of capabilities
     auto parent = inheritanceDecl->parentDecl;
     ensureDecl(parent, DeclCheckState::CapabilityChecked);
     CapabilityAtomSet failedAvailableCapabilityConjunction;
