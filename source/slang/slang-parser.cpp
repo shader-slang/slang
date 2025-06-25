@@ -1692,6 +1692,20 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
+        if (AdvanceIf(parser, "noncopyable"))
+        {
+            parser->ReadToken(TokenType::LParent);
+            auto targetType = parser->ParseTypeExp();
+            auto constraint = parser->astBuilder->create<TypeRestrictionConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->type = targetType;
+            constraint->restriction = TypeRestrictionConstraint::NonCopyable;
+            parser->FillPosition(constraint);
+            AddMember(genericParent, constraint);
+            parser->ReadToken(TokenType::RParent);
+            continue;
+        }
+
         auto subType = parser->ParseTypeExp();
         if (AdvanceIf(parser, TokenType::Colon))
         {

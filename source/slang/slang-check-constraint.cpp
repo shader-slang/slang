@@ -330,6 +330,40 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
+bool SemanticsVisitor::validateGenericTypeRestrictions(
+    DeclRef<GenericDecl> genericDeclRef,
+    List<Val*>& args,
+    bool shouldDiagnose)
+{
+    for (auto constraintDecl :
+         genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDeclBase>())
+    {
+        ensureDecl(constraintDecl, DeclCheckState::SignatureChecked);
+
+        if (args.getCount() < constraintDecl->parameterIndex)
+            break;
+
+        auto type = as<Type>(args[constraintDecl->parameterIndex]);
+
+        if (!type)
+            continue;
+
+        // If T is not non-copyable, verify that the sub-type is not non-copyable.
+        if (!constraintDecl->hasModifier<NonCopyableTypeAttribute>() && isNonCopyableType(type))
+        {
+            if (shouldDiagnose)
+                getSink()->diagnose(
+                    constraintDecl,
+                    Diagnostics::genericTypeDefaultAttributeCopyableViolated,
+                    constraintDecl,
+                    type);
+
+            return false;
+        }
+    }
+    return true;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -379,7 +413,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // solution for how to assign the parameters in a way that satisfies all
     // the constraints.
     //
-    ShortList<Val*> args;
+    List<Val*> args;
 
     // If the context is such that some of the arguments are already specified
     // or known, we need to go ahead and use those arguments direclty (whether
@@ -642,11 +676,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
     {
         DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView,
-                    constraintDecl)
+            m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView(), constraintDecl)
                 .as<GenericTypeConstraintDecl>();
 
         // Extract the (substituted) sub- and super-type from the constraint.
@@ -730,11 +760,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
     {
         DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView,
-                    constraintDecl)
+            m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView(), constraintDecl)
                 .as<TypeCoercionConstraintDecl>();
         auto fromType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->fromType.Ptr());
         auto toType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->toType.Ptr());
@@ -770,6 +796,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
     }
 
+    if (!validateGenericTypeRestrictions(genericDeclRef, args, false))
+        return DeclRef<Decl>();
+
     // Add a flat cost to all unconstrained generic params.
     for (auto typeParamDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
     {
@@ -777,7 +806,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             outBaseCost += kConversionCost_UnconstraintGenericParam;
     }
 
-    return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView);
+    return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView());
 }
 
 bool SemanticsVisitor::TryUnifyVals(

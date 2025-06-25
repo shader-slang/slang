@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//CHECK: OpEntryPoint
+
+//CHECK-NOT: OpEntryPoint
+//CHECK: error
 
 struct Test {
     Atomic<int> test;

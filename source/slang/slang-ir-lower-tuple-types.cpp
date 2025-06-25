@@ -86,6 +86,38 @@ struct TupleLoweringContext
         workListSet.add(inst);
     }
 
+
+    List<IRInst*> maybeExtractValueOperands(IRInst* inst, IRBuilder* builder)
+    {
+        List<IRInst*> ops;
+        // Unwrap a Var __ref if provided. This is possible if using a Tuple as a param
+        // since Tuple are `NonCopyable`.
+        if (auto varInst = as<IRVar>(inst))
+        {
+            if (AddressSpace::Generic == varInst->getDataType()->getAddressSpace())
+            {
+                auto value = builder->emitLoad(inst);
+                if (LoweredTupleInfo* loweredTupleInfo =
+                        getLoweredTupleType(builder, value->getDataType()))
+                {
+                    for (auto field : loweredTupleInfo->fields)
+                    {
+                        auto getElement = builder->emitFieldExtract(
+                            field->getFieldType(),
+                            value,
+                            field->getKey());
+                        ops.add(getElement);
+                    }
+                }
+            }
+        }
+
+        // base case is to treat the inst as the value
+        if (ops.getCount() == 0)
+            ops.add(inst);
+        return ops;
+    }
+
     void processMakeTuple(IRInst* inst)
     {
         IRBuilder builderStorage(module);
@@ -93,11 +125,23 @@ struct TupleLoweringContext
         builder->setInsertBefore(inst);
 
         auto info = getLoweredTupleType(builder, inst->getDataType());
+
         List<IRInst*> operands;
-        for (Index i = 0; i < info->fields.getCount(); i++)
+        // `i` is the fields we have matched-up-to
+        for (Index i = 0; i < info->fields.getCount();)
         {
-            SLANG_ASSERT(i < (Index)inst->getOperandCount());
-            operands.add(inst->getOperand(i));
+            // Unpack compound values that need unwrapping.
+            List<IRInst*> valueOperands = maybeExtractValueOperands(inst->getOperand(i), builder);
+            for (int valueOpIndex = 0; valueOpIndex < valueOperands.getCount();)
+            {
+                // We have too many ops. This should not happen.
+                SLANG_ASSERT(i < info->fields.getCount());
+                operands.add(valueOperands[valueOpIndex]);
+                // matched op to tuple-field
+                i++;
+                // next value op is needed, iterate valueOp index
+                valueOpIndex++;
+            }
         }
         auto makeStruct = builder->emitMakeStruct(info->structType, operands);
         inst->replaceUsesWith(makeStruct);

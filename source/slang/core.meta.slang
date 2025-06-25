@@ -873,6 +873,7 @@ interface __EnumType : ILogical
 /// }
 /// ```
 interface IArray<T>
+    where noncopyable(T)
 {
     /// Returns the number of elements in the conforming type.
     int getCount();
@@ -922,6 +923,7 @@ interface IArray<T>
 /// }
 /// ```
 interface IRWArray<T> : IArray<T>
+    where noncopyable(T)
 {
     /// The subscript operator to be provided by a conforming type. Provides both a `get` and a `set` accessor.
     __subscript(int index)->T
@@ -1259,7 +1261,7 @@ struct __none_t
 __generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
-struct Ptr
+struct Ptr where noncopyable(T)
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
@@ -1573,17 +1575,24 @@ extension<T> Optional<T>
 /// The number of elements in a tuple is given by the `countof` function.
 __generic<each T>
 __magic_type(TupleType)
-struct Tuple
+struct Tuple where noncopyable(T)
 {
     __intrinsic_op($(kIROp_MakeTuple))
     __init(expand each T);
 }
 
-/// Construct a tuple from several values in order
+__generic<each T>
+extension Tuple<T>
+{
+    __intrinsic_op($(kIROp_MakeTuple))
+    __init(expand each T);
+}
+
+///// Construct a tuple from several values in order
 __intrinsic_op($(kIROp_MakeTuple))
 Tuple<T> makeTuple<each T>(T v);
 
-/// Return a tuple containing the values of both input tuples in order
+///// Return a tuple containing the values of both input tuples in order
 Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
 {
     return makeTuple(expand each t, expand each u);
@@ -1885,6 +1894,7 @@ extension int16_t : IRangedValue
 __generic<T, let N:int>
 __magic_type(ArrayExpressionType)
 struct Array : IRWArray<T>
+    where noncopyable(T)
 {
     __intrinsic_op($(kIROp_GetArrayLength))
     int getCount();
@@ -3570,6 +3580,7 @@ extension half : IArithmeticAtomicable {}
 /// operate on `Atomic<T>`.
 __magic_type(AtomicType)
 __intrinsic_type($(kIROp_AtomicType))
+[__NonCopyableType]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 struct Atomic<T : IAtomicable>
 {

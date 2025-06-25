@@ -1334,12 +1334,39 @@ Type* removeParamDirType(Type* type)
 
 bool isNonCopyableType(Type* type)
 {
-    auto declRefType = as<DeclRefType>(type);
-    if (!declRefType)
+    Decl* decl = nullptr;
+
+    if (auto array = as<ArrayExpressionType>(type))
+    {
+        return isNonCopyableType(array->getElementType());
+    }
+    else if (auto tuple = as<TupleType>(type))
+    {
+        return isNonCopyableType(tuple->getTypePack());
+    }
+    else if (auto concreteTypePack = as<ConcreteTypePack>(type))
+    {
+        // If any type-pack element is non-copyable, the entire type-pack is non-copyable.
+        for (auto i = 0; i < concreteTypePack->getTypeCount(); i++)
+        {
+            if (isNonCopyableType(concreteTypePack->getElementType(i)))
+                return true;
+        }
         return false;
-    if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
-        return true;
-    return false;
+    }
+    else if (auto declRefTypeGenericType = isDeclRefTypeOf<GenericTypeParamDeclBase>(type))
+    {
+        // handle the case where we have a generic arg to resolve.
+        decl = declRefTypeGenericType.getDecl();
+    }
+    else if (auto declRefTypeAggType = isDeclRefTypeOf<AggTypeDecl>(type))
+    {
+        decl = declRefTypeAggType.getDecl();
+    }
+
+    if (!decl)
+        return false;
+    return decl->findModifier<NonCopyableTypeAttribute>();
 }
 
 } // namespace Slang

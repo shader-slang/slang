@@ -341,6 +341,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
 
+    void visitTypeRestrictionConstraintDecl(TypeRestrictionConstraintDecl* decl);
+
     void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
 
     void visitGenericDecl(GenericDecl* genericDecl);
@@ -2609,6 +2611,65 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     }
 }
 
+// Validates case where type uses `Atomic` somewhere in its type
+static void validateAtomicElementTypeUseSite(SemanticsVisitor* visitor, Type* type, SourceLoc loc)
+{
+    if (!type)
+        return;
+
+    GenericAppDeclRef* genericAppDeclRef = nullptr;
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        genericAppDeclRef = as<GenericAppDeclRef>(declRefType->getDeclRefBase());
+    }
+
+    if (!genericAppDeclRef)
+        return;
+
+    // Start checking generic args, `Atomic` can only be direct child to
+    // Ptr, RWStructuredBuffer, GLSLShaderStorageBuffer, and Array.
+    for (auto i : genericAppDeclRef->getArgs())
+    {
+        if (as<AtomicType>(i))
+        {
+            if (!as<PtrType>(type) && !as<HLSLRWStructuredBufferType>(type) &&
+                !as<GLSLShaderStorageBufferType>(type) && !as<ArrayExpressionType>(type))
+                visitor->getSink()->diagnose(loc, Diagnostics::InvalidAtomicTypeUseSite);
+            continue;
+        }
+        validateAtomicElementTypeUseSite(visitor, as<Type>(i), loc);
+    }
+}
+
+void SemanticsVisitor::ensureValidAtomicTypeUseSite(DeclRef<Decl> declRef)
+{
+    auto sink = getSink();
+    if (auto varDeclRef = as<VarDeclBase>(declRef))
+    {
+        auto varDecl = varDeclRef.getDecl();
+        auto type = getType(getASTBuilder(), varDeclRef);
+
+        // Allowed group shared `Atomic`.
+        // Not allowed simple `Atomic` type
+        if (!varDecl->hasModifier<HLSLGroupSharedModifier>() && as<AtomicType>(type))
+        {
+            sink->diagnose(varDecl, Diagnostics::localAndGlobalVarCannotBeAtomicType);
+            return;
+        }
+
+        validateAtomicElementTypeUseSite(this, type, varDecl->loc);
+    }
+    else if (auto aggTypeDeclRef = as<AggTypeDecl>(declRef))
+    {
+        // Ensure `Atomic` appears as a valid member
+        for (auto m : aggTypeDeclRef.getDecl()->getMembersOfType<VarDeclBase>())
+        {
+            ensureValidAtomicTypeUseSite(m);
+        }
+    }
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -2825,6 +2886,8 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 getSink()->diagnose(varDecl, Diagnostics::doYouMeanUniform);
         }
     }
+
+    ensureValidAtomicTypeUseSite(DeclRef(varDecl));
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
@@ -3235,6 +3298,14 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
+void SemanticsDeclHeaderVisitor::visitTypeRestrictionConstraintDecl(
+    TypeRestrictionConstraintDecl* decl)
+{
+    CheckConstraintSubType(decl->type);
+    if (!decl->type.type)
+        decl->type = TranslateTypeNodeForced(decl->type);
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
     // TODO: are there any other validations we can do at this point?
@@ -3285,6 +3356,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     //
     // Accessing the members via index side steps the issue.
 
+    HashSet<Decl*> genericTypeParams;
     int parameterIndex = 0;
     for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
     {
@@ -3294,6 +3366,8 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         {
             ensureDecl(typeParam, DeclCheckState::ReadyForReference);
             typeParam->parameterIndex = parameterIndex++;
+
+            genericTypeParams.add(typeParam);
         }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
@@ -3303,6 +3377,42 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         else if (auto constraint = as<GenericTypeConstraintDecl>(m))
         {
             ensureDecl(constraint, DeclCheckState::ReadyForReference);
+        }
+    }
+
+    // At this step we will look at all generic-type-restrictions annotated to this GenericDecl
+    // and apply info to the restricted as needed, considering a restriction to be a type-contract.
+    //
+    // There are 2 cases
+    // 1. The type specified by the restriction is part of `this`. Here we will add info to the
+    // type.
+    // 2. The type specified by the restriction is not part of `this`. We will error for now since
+    //    such an operation is not currently supported by Slang.
+    for (auto constraint : genericDecl->getMembersOfType<TypeRestrictionConstraintDecl>())
+    {
+        ensureDecl(constraint, DeclCheckState::SignatureChecked);
+        auto declRefTypeOfConstraint =
+            isDeclRefTypeOf<GenericTypeParamDeclBase>(constraint->type.type);
+        if (!declRefTypeOfConstraint ||
+            !genericTypeParams.contains(declRefTypeOfConstraint.getDecl()))
+        {
+            getSink()->diagnose(
+                constraint,
+                Diagnostics::cannotApplyTypeRestrictionToTypeNotChildOfParentGeneric,
+                constraint->type.type);
+            continue;
+        }
+
+        switch (constraint->restriction)
+        {
+        case TypeRestrictionConstraint::NonCopyable:
+            addModifier(
+                declRefTypeOfConstraint.getDecl(),
+                getASTBuilder()->create<NonCopyableTypeAttribute>());
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("Unhandled type restriction");
+            break;
         }
     }
 }
@@ -10089,6 +10199,8 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
         getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
     }
 
+    ensureValidAtomicTypeUseSite(aggTypeDecl);
+
     auto structDecl = as<StructDecl>(aggTypeDecl);
     if (!structDecl)
         return;
@@ -10137,6 +10249,17 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
             structDecl
                 ->_removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
                     structDeclInfo.defaultCtor);
+        }
+    }
+
+    // Ensure if a member is non-copyable, StructDecl is non-copyable.
+    if (!structDecl->hasModifier<NonCopyableTypeAttribute>())
+    {
+        for (auto m : structDecl->getMembersOfType<VarDeclBase>())
+        {
+            if (!isNonCopyableType(m->getType()))
+                continue;
+            addModifier(structDecl, m_astBuilder->create<NonCopyableTypeAttribute>());
         }
     }
 }
