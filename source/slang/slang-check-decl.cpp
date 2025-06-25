@@ -2914,9 +2914,9 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
             context->parentDecl->findLastDirectMemberDeclOfName(requirementDeclRef.getName()))
     {
         // Remove the `ToBeSynthesizedModifier`.
-        if (as<ToBeSynthesizedModifier>(existingDecl->modifiers.first))
+        if (auto mod = existingDecl->modifiers.findModifier<ToBeSynthesizedModifier>())
         {
-            existingDecl->modifiers.first = existingDecl->modifiers.first->next;
+            removeModifier(existingDecl, mod);
         }
         else
         {
@@ -3133,14 +3133,9 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
 
     addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
 
-    // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-    if (requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
-    {
-        auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
-        auto thisVisibility = getDeclVisibility(context->parentDecl);
-        auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(aggTypeDecl, visibility);
-    }
+    // The visibility of synthesized decl should be the same of the parent decl.
+    auto thisVisibility = getDeclVisibility(context->parentDecl);
+    addVisibilityModifier(aggTypeDecl, thisVisibility);
 
     // Synthesize the rest of IDifferential method conformances by recursively checking
     // conformance on the synthesized decl.
@@ -14290,6 +14285,9 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     }
     else
     {
+        auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeeclaredCapabilityModifier>();
+        declaredCapModifier->declaredCapabilityRequirements = declaredCaps;
+        addModifier(funcDecl, declaredCapModifier);
         if (vis == DeclVisibility::Public)
         {
             // For public decls, we need to enforce that the function

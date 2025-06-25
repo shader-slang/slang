@@ -682,6 +682,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
                 typeDef->parentDecl = structDecl;
+                addVisibilityModifier(structDecl, getDeclVisibility(parent));
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
 
                 auto synthDeclRef =
                     createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
@@ -714,6 +716,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 typeDef->type.type =
                     calcThisType(subType->getDeclRef().getDecl()->getDefaultDeclRef());
 
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
                 synthesizedDecl = parent;
 
                 parent->addDirectMemberDecl(typeDef);

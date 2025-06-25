@@ -416,6 +416,8 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
+    ensureDecl(structDecl, DeclCheckState::AttributesChecked);
+
     if (!structDecl)
         return false;
 
@@ -656,8 +658,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 auto toMakeArrayFromElementExpr = m_astBuilder->create<MakeArrayFromElementExpr>();
                 toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
                 toMakeArrayFromElementExpr->type = QualType(toType);
-
-                *outToExpr = toMakeArrayFromElementExpr;
+                if (outToExpr)
+                    *outToExpr = toMakeArrayFromElementExpr;
                 return true;
             }
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -748,8 +750,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
                 defaultConstructExpr->type = QualType(toType);
-
-                *outToExpr = defaultConstructExpr;
+                if (outToExpr)
+                    *outToExpr = defaultConstructExpr;
                 return true;
             }
 
