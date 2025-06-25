@@ -1512,6 +1512,17 @@ DIAGNOSTIC(
     "requirement in the form of a simple value must be declared as 'static const'.")
 DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
 
+DIAGNOSTIC(
+    30311,
+    Error,
+    nonMethodInterfaceRequirementCannotHaveBody,
+    "non-method interface requirement cannot have a body.")
+DIAGNOSTIC(
+    30312,
+    Error,
+    interfaceRequirementCannotBeOverride,
+    "interface requirement cannot override a base declaration.")
+
 // Interop
 DIAGNOSTIC(
     30400,

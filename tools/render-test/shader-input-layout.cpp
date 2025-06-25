@@ -171,6 +171,19 @@ struct ShaderInputLayoutParser
         {
             val->samplerDesc.isCompareSampler = true;
         }
+        else if (word == "filteringMode")
+        {
+            parser.Read("=");
+            auto contentWord = parser.ReadWord();
+            if (contentWord == "point")
+            {
+                val->samplerDesc.filteringMode = TextureFilteringMode::Point;
+            }
+            else
+            {
+                val->samplerDesc.filteringMode = TextureFilteringMode::Linear;
+            }
+        }
         else
         {
             return SLANG_FAIL;
@@ -643,14 +656,15 @@ struct ShaderInputLayoutParser
 
         default:
             throw ShaderInputLayoutFormatException(
-                String("Unexpected '") + parser.NextToken().Content + String("' at line") +
+                String("Unexpected '") + parser.NextToken().Content + String("' at line ") +
                 String(parser.NextToken().Position.Line));
         }
     }
 
     RefPtr<ShaderInputLayout::Val> parseVal(Misc::TokenReader& parser)
     {
-        auto word = parser.NextToken().Content;
+        auto nextToken = parser.NextToken();
+        auto word = nextToken.Content;
         if (parser.AdvanceIf("begin_array"))
         {
             RefPtr<ShaderInputLayout::ArrayVal> val = new ShaderInputLayout::ArrayVal;
@@ -820,8 +834,8 @@ struct ShaderInputLayoutParser
         else
         {
             throw ShaderInputLayoutFormatException(
-                String("Unknown shader input type '") + word + String("' at line") +
-                String(parser.NextToken().Position.Line));
+                String("Unknown shader input type '") + word + String("' at line: ") +
+                String(nextToken.Position.Line));
         }
         parser.ReadToken();
         return nullptr;
@@ -997,8 +1011,10 @@ struct ShaderInputLayoutParser
         parentVal = rootVal;
 
         auto lines = Misc::Split(source, '\n');
+        int lineNum = 0;
         for (auto& line : lines)
         {
+            lineNum++;
             if (line.startsWith("//TEST_INPUT:"))
             {
                 auto lineContent = line.subString(13, line.getLength() - 13);
@@ -1010,7 +1026,7 @@ struct ShaderInputLayoutParser
                 catch (const Misc::TextFormatException&)
                 {
                     StringBuilder msg;
-                    msg << "Invalid input syntax at line " << parser.NextToken().Position.Line;
+                    msg << "Invalid input syntax at line " << lineNum << ": " << line;
                     throw ShaderInputLayoutFormatException(msg);
                 }
             }

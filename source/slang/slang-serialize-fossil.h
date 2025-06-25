@@ -260,7 +260,7 @@ private:
 
         /// Callback information used by the ISerializer interface.
         Callback callback = nullptr;
-        void* userData = nullptr;
+        void* context = nullptr;
     };
 
     List<FossilizedObjectInfo*> _fossilizedObjects;
@@ -465,10 +465,10 @@ private:
     void _pushPotentiallyIndirectValueScope(FossilizedValKind kind);
     ChunkBuilder* _popPotentiallyIndirectValueScope();
 
-    /// Determine if a potentially-indirect value of `kind` should be
+    /// Determine if a potentially-indirect value of should be
     /// emitted indirectly, in the current state.
     ///
-    bool _shouldEmitWithPointerIndirection(FossilizedValKind kind);
+    bool _shouldEmitPotentiallyIndirectValueWithPointerIndirection();
 
     /// Helper function to share details between `_popIndirectValueScope`
     /// and `_popPotentiallyIndirectValueScope`.
@@ -548,10 +548,10 @@ private:
 
     virtual void handleFieldKey(char const* name, Int index) override;
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
         override;
 };
 
@@ -559,10 +559,39 @@ private:
 struct SerialReader : ISerializerImpl
 {
 public:
-    SerialReader(FossilizedValRef valRef);
+    struct ReadContext;
+
+    enum class InitialStateType
+    {
+        Root,
+        PseudoPtr,
+    };
+
+    SerialReader(
+        ReadContext& context,
+        Fossil::AnyValPtr valPtr,
+        InitialStateType initialState = InitialStateType::Root);
     ~SerialReader();
 
+    /// Read a value from the current cursor position.
+    ///
+    /// This operation can be used to skip over an entire value
+    /// that might otherwise need to be read with a sequence of
+    /// operations of the `ISerializerImpl` interface.
+    ///
+    /// The saved pointer can then be used to construct another
+    /// `Fossil::SerialReader` to read the contents of the value
+    /// at some later time, or code can simply navigate the
+    /// data in memory using their own logic.
+    ///
+    Fossil::AnyValPtr readValPtr();
+
+    void flush();
+
 private:
+    /// The shared context that this reader is using.
+    ReadContext& _context;
+
     /// A state that the reader can be in.
     struct State
     {
@@ -577,6 +606,8 @@ private:
             Tuple,
             Struct,
             Object,
+
+            PseudoPtr,
         };
 
         /// The type of state.
@@ -588,7 +619,7 @@ private:
         /// that will be read (e.g., for the `Root` case), or it might be
         /// a container that is a parent of the next value to be read.
         ///
-        FossilizedValRef baseValue;
+        Fossil::AnyValPtr baseValPtr;
 
         /// Index of next element to read.
         ///
@@ -613,14 +644,15 @@ private:
     /// Stack of saved states.
     List<State> _stack;
 
-    void _pushState();
-    void _popState();
-
     //
     // Like other `ISerializerImpl`s for reading, we track objects
     // that are in the process of being read in, to avoid possible
     // unbounded recursion (and detect circularities when they
     // occur).
+    //
+    // A key difference here is that the actual mapping is being
+    // stored in the shared `ReadContext`, rather than in the
+    // `SerialReader` itself.
     //
 
     enum class ObjectState
@@ -634,9 +666,8 @@ private:
         ObjectState state = ObjectState::Unread;
 
         void* resurrectedObjectPtr = nullptr;
-        FossilizedValRef fossilizedObjectRef;
+        Fossil::AnyValPtr fossilizedObjectPtr;
     };
-    Dictionary<void*, RefPtr<ObjectInfo>> _mapFossilizedObjectPtrToObjectInfo;
 
     //
     // Again, like other `ISerializerImpl`s for reading, we
@@ -652,9 +683,12 @@ private:
         State savedState;
 
         Callback callback;
-        void* userData;
+        void* context;
     };
-    List<DeferredAction> _deferredActions;
+
+    void _pushState();
+    void _popState();
+
 
     /// Execute all deferred actions that are still pending.
     void _flush();
@@ -663,14 +697,14 @@ private:
     ///
     /// This is the case for scalars, tuples, and structs.
     ///
-    FossilizedValRef _readValRef();
+    Fossil::AnyValPtr _readValPtr();
 
     /// Read an indirect value.
     ///
     /// This is the case for things like optionals, that are
     /// always encoded as a pointer.
     ///
-    FossilizedValRef _readIndirectValRef();
+    Fossil::AnyValPtr _readIndirectValPtr();
 
     /// Read a potentially-indirect value.
     ///
@@ -679,7 +713,31 @@ private:
     ///
     /// Otherwise, this will return a reference to the value itself.
     ///
-    FossilizedValRef _readPotentiallyIndirectValRef();
+    Fossil::AnyValPtr _readPotentiallyIndirectValPtr();
+
+
+    template<typename T>
+    void handleSimpleVal(T& value)
+    {
+        auto valPtr = _readValPtr();
+        value = as<Fossilized<T>>(valPtr)->getDataRef();
+    }
+
+public:
+    struct ReadContext
+    {
+    public:
+        ReadContext() = default;
+
+    private:
+        friend struct SerialReader;
+
+        Dictionary<void*, RefPtr<ObjectInfo>> mapFossilizedObjectPtrToObjectInfo;
+        List<DeferredAction> _deferredActions;
+
+        Count _readerCount = 0;
+    };
+
 
 private:
     //
@@ -728,12 +786,14 @@ private:
     virtual void beginOptional() override;
     virtual void endOptional() override;
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
         override;
 };
+
+using ReadContext = SerialReader::ReadContext;
 
 } // namespace Fossil
 } // namespace Slang

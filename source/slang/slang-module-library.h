@@ -46,6 +46,7 @@ public:
 };
 
 SlangResult loadModuleLibrary(
+    ISlangBlob* blobHoldingSerializedData,
     const Byte* inBytes,
     size_t bytesCount,
     String Path,

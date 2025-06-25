@@ -37,7 +37,7 @@ Sampler1DArray<float4> st1DArray_f32v4;
 //TEST_INPUT: TextureSampler2D(size=4, content = one, arrayLength=2):name st2DArray_f32v4
 Sampler2DArray<float4> st2DArray_f32v4;
 
-//TEST_INPUT: TextureSampler2D(size=4, content = one):name st2DMS_f32v4
+//TEST_INPUT: TextureSampler2D(size=4, content = one, sampleCount = two, mipMaps=1, format=RGBA32Float):name st2DMS_f32v4
  Sampler2DMS<float4> st2DMS_f32v4;
 
 //
@@ -71,9 +71,9 @@ typealias CombinedDepth2d_array = _Texture<
 >;
 
 
-//TEST_INPUT: TextureSampler2D(size=4, content = zero):name cd2D
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, format=D32Float):name cd2D
 CombinedDepth2d<float> cd2D;
-//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2):name cd2DArray
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2, format=D32Float):name cd2DArray
 CombinedDepth2d_array<float> cd2DArray;
 
 uint getNotMapped()

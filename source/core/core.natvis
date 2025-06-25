@@ -102,6 +102,14 @@
     </Expand>
 </Type>
 
+<Type Name="Slang::RelativePtr&lt;*,*&gt;">
+	<SmartPointer Usage="Minimal">_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</SmartPointer>
+	<DisplayString Condition="_offset == 0">{($T1*)0}</DisplayString>
+	<DisplayString Condition="_offset != 0">{($T1*)((char*)this + _offset)}</DisplayString>
+	<Expand>
+		<ExpandedItem>_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</ExpandedItem>
+	</Expand>
+</Type>
 
 <Type Name="Slang::Safe32Ptr&lt;*&gt;">
     <Expand>
