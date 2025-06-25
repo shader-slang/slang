@@ -447,7 +447,12 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
     case RttiInfo::Kind::Struct:
         {
             const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
-
+            // Special case: NullResponse should serialize to JSON null, not empty object
+            if (strcmp(structRttiInfo->m_name, "LanguageServerProtocol::NullResponse") == 0)
+            {
+                out = JSONValue::makeNull();
+                return SLANG_OK;
+            }
             List<JSONKeyValue> pairs;
             SLANG_RETURN_ON_FAIL(_structToJSON(structRttiInfo, in, pairs));
             out = m_container->createObject(pairs.getBuffer(), pairs.getCount());
