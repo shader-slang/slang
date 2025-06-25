@@ -14339,7 +14339,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
             ensureDecl(implDeclRef.declRefBase, DeclCheckState::CapabilityChecked);
-            
+
             // Only if capabilities are opted-into, should we error.
             auto implDecl = implDeclRef.getDecl();
             if (!requirementDecl->findModifier<RequireCapabilityAttribute>() &&
