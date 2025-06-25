@@ -170,7 +170,8 @@ public interface IAtomicAddable_Error
 }
 public extension uint : IAtomicAddable_Error
 {
-    // Error, implementation has capability super-set, sm_6_0 (from `InterlockedAddI64`) vs. sm_4_0
+    // Error: implementation has super-set of capabilites, sm_6_0 vs. sm_4_0
+    // Note: sm_6_0 is inferred from `InterlockedAddI64`
     public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
 }
 ```
