@@ -14342,7 +14342,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             
             // Only if capabilities are opted-into, should we error.
             auto implDecl = implDeclRef.getDecl();
-            if (!requirementDecl->findModifier<RequireCapabilityAttribute>() ||
+            if (!requirementDecl->findModifier<RequireCapabilityAttribute>() &&
                 !implDecl->findModifier<RequireCapabilityAttribute>())
                 continue;
             CapabilityAtomSet failedAvailableCapabilityConjunction;
