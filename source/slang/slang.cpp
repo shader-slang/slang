@@ -837,7 +837,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
-    if (srcSize == dstSize && (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    if (srcSize == dstSize && (size_t(src) & (alignof(T) - 1)) == 0)
     {
         return *(const T*)src;
     }

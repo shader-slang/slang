@@ -263,7 +263,6 @@ convention for interface methods.
     #define SLANG_NO_INLINE __attribute__((noinline))
     #define SLANG_FORCE_INLINE inline __attribute__((always_inline))
     #define SLANG_BREAKPOINT(id) __builtin_trap();
-    #define SLANG_ALIGN_OF(T) __alignof__(T)
 #endif // SLANG_GCC_FAMILY
 
 #if SLANG_GCC_FAMILY || defined(__clang__)
@@ -280,7 +279,6 @@ convention for interface methods.
     #define SLANG_NO_INLINE __declspec(noinline)
     #define SLANG_FORCE_INLINE __forceinline
     #define SLANG_BREAKPOINT(id) __debugbreak();
-    #define SLANG_ALIGN_OF(T) __alignof(T)
 
     #define SLANG_INT64(x) (x##i64)
     #define SLANG_UINT64(x) (x##ui64)
