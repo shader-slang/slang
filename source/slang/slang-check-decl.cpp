@@ -14210,7 +14210,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 {
     setParentFuncOfVisitor(funcDecl);
 
-    // visit the members & body of our funcDecl
+    // visit the members of our funcDecl
     for (auto member : funcDecl->getDirectMemberDecls())
     {
         ensureDecl(member, DeclCheckState::CapabilityChecked);
@@ -14223,6 +14223,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             member->loc);
     }
 
+    // visit the body of our funcDecl, propagate capabilities.
     visitReferencedDecls(
         *this,
         funcDecl->body,
@@ -14328,24 +14329,30 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             if (kv.value.getFlavor() != RequirementWitness::Flavor::declRef)
                 continue;
             auto requirementDecl = kv.key;
-            auto implDecl = kv.value.getDeclRef();
-            if (!implDecl)
+            auto implDeclRef = kv.value.getDeclRef();
+            if (!implDeclRef)
                 continue;
 
-            if (getModuleDecl(implDecl.getDecl())->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY)
+            if (getModuleDecl(implDeclRef.getDecl())->languageVersion ==
+                SLANG_LANGUAGE_VERSION_LEGACY)
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
-            ensureDecl(implDecl.declRefBase, DeclCheckState::CapabilityChecked);
-
+            ensureDecl(implDeclRef.declRefBase, DeclCheckState::CapabilityChecked);
+            
+            // Only if capabilities are opted-into, should we error.
+            auto implDecl = implDeclRef.getDecl();
+            if (!requirementDecl->findModifier<RequireCapabilityAttribute>() ||
+                !implDecl->findModifier<RequireCapabilityAttribute>())
+                continue;
             CapabilityAtomSet failedAvailableCapabilityConjunction;
             if (!CapabilitySet::checkCapabilityRequirement(
                     requirementDecl->inferredCapabilityRequirements,
-                    implDecl.getDecl()->inferredCapabilityRequirements,
+                    implDecl->inferredCapabilityRequirements,
                     failedAvailableCapabilityConjunction))
             {
                 diagnoseUndeclaredCapability(
-                    implDecl.getDecl(),
+                    implDecl,
                     Diagnostics::useOfUndeclaredCapabilityOfInterfaceRequirement,
                     failedAvailableCapabilityConjunction);
             }
