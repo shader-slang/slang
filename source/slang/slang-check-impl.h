@@ -2100,6 +2100,11 @@ public:
 
     void checkExtensionConformance(ExtensionDecl* decl);
 
+    void calcOverridableCompletionCandidates(
+        Type* aggType,
+        ContainerDecl* aggTypeDecl,
+        Decl* memberDecl);
+
     void checkAggTypeConformance(AggTypeDecl* decl);
 
     bool isIntegerBaseType(BaseType baseType);
