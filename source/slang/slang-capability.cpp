@@ -989,7 +989,7 @@ bool CapabilitySet::checkCapabilityRequirement(
     }
 
 
-    // if all sets in `available` are not a super-set to at least 1 `required` set, then we have an
+    // if all sets in `available` are not a super-set, then we have an
     // err
     for (auto& availableTarget : available.m_targetSets)
     {
@@ -1018,7 +1018,7 @@ bool CapabilitySet::checkCapabilityRequirement(
                 {
                     const auto& reqStageSet = reqStage->atomSet.value();
                     if (availableStageSet.contains(reqStageSet))
-                        break;
+                        continue;
                     else
                         lastBadStage = &reqStageSet;
                 }
@@ -1032,7 +1032,7 @@ bool CapabilitySet::checkCapabilityRequirement(
 
                     // Not a failiure if nothing is missing
                     if (outFailedAvailableSet.isEmpty())
-                        return true;
+                        continue;
                     return false;
                 }
             }

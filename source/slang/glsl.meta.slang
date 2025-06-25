@@ -4771,9 +4771,9 @@ public property uint3 gl_LaunchSizeEXT
 // casting conflict due to the spirv implementation of PrimitiveIndex().
 internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 
-public property int gl_PrimitiveID 
+public property int gl_PrimitiveID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch
@@ -4789,9 +4789,9 @@ public property int gl_PrimitiveID
     }
 }
 
-public property int gl_InstanceID 
+public property int gl_InstanceID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch

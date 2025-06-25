@@ -63,7 +63,7 @@ For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShad
 
 ## Requirements in Parent Scope
 
-The capability requirement of a member is always merged with the requirements declared in its parents. If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
+The capability requirement of a member is always merged with the requirements declared in its parent(s). If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
 For example, given:
 ```csharp
 [require(glsl)]
@@ -86,48 +86,67 @@ apply to all members within the module. For example:
 module myModule;
 
 // myFunc has requirement glsl|hlsl|spirv
-public void myFunc()s
+public void myFunc()
 {
 }
 ```
 
 For inheritance/implementing-interfaces the story is a bit different.
-We require that the sub-type (`Foo1`) has a super-set of capabilities to the super-types (`IFoo1` and `IFoo2`).
+We require that the sub-type (`Foo1`) have a sub-set of capabilities to the super-type (`IFoo1`).
 
 For example:
 ```csharp
-[require(glsl)]
-interface IFoo2
-{
-}
-[require(hlsl)]
+[require(sm_4_0)]
 interface IFoo1
 {
 }
-[require(hlsl)]
-struct Foo1 : IFoo1, IFoo2
+[require(sm_6_0)]
+struct Foo1 : IFoo1
 {
 }
 ```
-We error here since `IFoo2` is not a subset to `Foo1`. `IFoo2` includes `glsl` support while `Foo1` does not support `glsl`.
-
+We error here since `Foo1` is not a sub-set to `IFoo1`. `Foo1` has `sm_6_0`, which includes capabilities `sm_4_0` does not have.
 
 ```csharp
-[require(sm_4_0)]
+[require(sm_6_0)]
 interface IFoo2
 {
 }
-[require(sm_5_0)]
+[require(sm_4_0)]
 interface IFoo1
 {
 }
-// Good, IFoo2 and IFoo1 are subsets of Foo1
-[require(sm_6_0)]
+[require(sm_4_0)]
 struct Foo1 : IFoo1, IFoo2
 {
 }
 ```
-We do not error here since `IFoo2` and `IFoo1` are subsets to `Foo1`.
+We do not error here since `IFoo2` and `IFoo1` are super-sets to `Foo1`.
+
+Additionally, all sub-types must support the same shader-stages and targets as the super-type.
+```csharp
+// Error, `hlsl_spirv` has additional stage missing from `hlsl`, `spirv`
+[require(hlsl_spirv)]
+interface IFoo1
+{
+}
+[require(hlsl)]
+struct Foo1 : IFoo1
+{
+}
+
+// Error, `Foo5` is missing `vertex` support
+// mismatch of stage abstract atoms
+[require(fragment)]
+[require(vertex)]
+interface IFoo5
+{
+}
+[require(fragment)]
+struct Foo5 : IFoo5
+{
+}
+```
 
 ## Inference of Capability Requirements
 

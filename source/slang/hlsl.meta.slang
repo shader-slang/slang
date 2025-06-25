@@ -10134,7 +10134,7 @@ vector<T, N> fwidth_coarse(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
 {
     __target_switch
@@ -10196,7 +10196,7 @@ vector<T, N> fwidth_fine(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
 {
     __target_switch

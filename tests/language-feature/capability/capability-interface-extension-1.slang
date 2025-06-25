@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 
 // Test that we do not error (should be implicitly inferring capabilities)
-// CHECK-NOT: error
+// CHECK: OpEntryPoint
 // CHECK-NOT: error
 
 public interface IAtomicAddable

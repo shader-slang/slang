@@ -3,12 +3,12 @@
 // Test if InheritanceDecl fail to conform to parent capabilities
 
 // mismatch of target abstract atoms
-[require(glsl)]
+[require(hlsl_spirv)]
 interface IFoo1
 {
 }
 [require(hlsl)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36108{{.*}}hlsl
+// CHECK-DAG: ([[# @LINE+1]]): error 36108{{.*}}spirv
 struct Foo1 : IFoo1
 {
 }
@@ -24,7 +24,7 @@ struct Foo2 : IFoo2
 {
 }
 
-// sub-type is subset
+// sub-type is subset, no error
 [require(sm_5_0)]
 interface IFoo3
 {
@@ -40,11 +40,24 @@ interface IFoo4
 {
 }
 [require(hlsl, fragment)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36117{{.*}}fragment
+// CHECK-DAG: ([[# @LINE+1]]): error 36117{{.*}}compute
 struct Foo4 : IFoo4
 {
 }
 
+// mismatch of stage abstract atoms
+[require(fragment)]
+[require(vertex)]
+interface IFoo5
+{
+}
+[require(fragment)]
+// CHECK-DAG: ([[# @LINE+1]]): error 36117{{.*}}vertex
+struct Foo5 : IFoo5
+{
+}
+
+[require(hlsl)]
 [numthreads(1,1,1)]
 void computeMain()
 {
