@@ -2020,7 +2020,7 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Div)) This div(This other);
     __intrinsic_op($(kIROp_FRem)) This mod(This other);
     __intrinsic_op($(kIROp_Neg)) This neg();
-    __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    __intrinsic_op($(kIROp_Mul)) This scale<T1 : __BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
     [OverloadRank(-1)]
