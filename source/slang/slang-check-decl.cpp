@@ -343,6 +343,15 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
 
+    void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
+
+    // Helper to recursively check a type for forward references to type parameters
+    void checkTypeForForwardReferences(
+        Type* type,
+        GenericTypeConstraintDecl* constraintDecl,
+        GenericDecl* parentGeneric,
+        Index constraintIndex);
+
     void visitGenericDecl(GenericDecl* genericDecl);
 
     void visitTypeDefDecl(TypeDefDecl* decl);
@@ -3220,6 +3229,119 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     }
 }
 
+void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
+    Type* type,
+    GenericTypeConstraintDecl* constraintDecl,
+    GenericDecl* parentGeneric,
+    Index constraintIndex)
+{
+    if (!type)
+        return;
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto referencedDecl = declRefType->getDeclRef().getDecl();
+        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        {
+            // Check if this type parameter belongs to the same generic and comes after the constraint
+            if (typeParam->parentDecl == parentGeneric)
+            {
+                // Find the type parameter's position
+                for (Index i = constraintIndex + 1; i < parentGeneric->getDirectMemberDeclCount(); ++i)
+                {
+                    if (parentGeneric->getDirectMemberDecl(i) == typeParam)
+                    {
+                        // Found a forward reference, throw an error.
+
+                        // Try to get names of the forward reference and
+                        // the later declaration for better error info.
+                        Name* forwardParamName = typeParam->getName();
+
+                        Name* constraintParamName = nullptr;
+                        if (auto subDeclRefType = as<DeclRefType>(constraintDecl->sub.type))
+                        {
+                            if (auto subDecl = subDeclRefType->getDeclRef().getDecl())
+                            {
+                                constraintParamName = subDecl->getName();
+                            }
+                        }
+
+                        // Report the error using available names
+                        if (constraintParamName && forwardParamName)
+                        {
+                            getSink()->diagnose(
+                                constraintDecl->sup.exp,
+                                Diagnostics::forwardReferenceInGenericConstraint,
+                                constraintParamName,
+                                forwardParamName);
+                        }
+                        else
+                        {
+                            // Fallback for cases where we don't have names
+                            getSink()->diagnose(
+                                constraintDecl->sup.exp,
+                                Diagnostics::forwardReferenceInGenericConstraint,
+                                getName("(unknown)"),
+                                forwardParamName ? forwardParamName : getName("(unnamed)"));
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Also check type arguments in generic applications
+        // This is for cases like:
+        // void example<T : IContainer<U>, U>() { ... }
+        if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRefType->getDeclRef().declRefBase))
+        {
+            auto args = genericAppDeclRef->getArgs();
+            for (auto arg : args)
+            {
+                if (auto argType = as<Type>(arg))
+                {
+                    checkTypeForForwardReferences(argType, constraintDecl, parentGeneric, constraintIndex);
+                }
+            }
+        }
+    }
+}
+
+void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl)
+{
+    // Check if this constraint references type parameters that appear later
+    // in the same GenericDecl's parameter list and a report forward reference error
+    // if it does.
+
+    // Only applies to constraints within GenericDecl contexts where declaration order matters.
+    // If that's not the case, then early out.
+    auto parentGeneric = as<GenericDecl>(decl->parentDecl);
+    if (!parentGeneric)
+        return;
+
+    // Find the constraint's position among the generic parameters and constraints.
+    // If the contraint's superior type is declared at a later index, then we
+    // need to throw an error.
+    Index constraintIndex = -1;
+    for (Index i = 0; i < parentGeneric->getDirectMemberDeclCount(); ++i)
+    {
+        if (parentGeneric->getDirectMemberDecl(i) == decl)
+        {
+            constraintIndex = i;
+            break;
+        }
+    }
+
+    // This probably shouldn't happen, but if the constraint is not found in parent GenericDecl,
+    // just early out as we can't check forward references.
+    if (constraintIndex == -1)
+        return;
+
+    // Check the superior type of the constraint for forward references. If it is declared
+    // after this reference (as the superior type in the constraint), then throw an error.
+    checkTypeForForwardReferences(decl->sup.type, decl, parentGeneric, constraintIndex);
+}
+
 void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->toType);
@@ -3244,6 +3366,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         decl->sub = TranslateTypeNodeForced(decl->sub);
     if (!decl->sup.type)
         decl->sup = TranslateTypeNodeForced(decl->sup);
+
+    // Check for forward references in generic constraints after type translation
+    checkForwardReferencesInGenericConstraint(decl);
 
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
