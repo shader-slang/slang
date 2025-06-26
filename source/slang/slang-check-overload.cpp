@@ -1328,6 +1328,20 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool rightIsExtension = false;
     bool leftIsFreeFormExtension = false;
     bool rightIsFreeFormExtension = false;
+    bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
+    bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
 
     // Prefer declarations that are not in free-form generic extensions, i.e.
     // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
