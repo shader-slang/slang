@@ -1,8 +1,0 @@
-result code = 0
-standard error = {
-tests/diagnostics/bug-6784-for-loop-warning.slang(10): warning 41008: loop might execute indefinitely
-            for (float sample_theta = 0.0; sample_theta < 0.5 * PI; sample_theta + sample_delta) { //
-            ^~~
-}
-standard output = {
-}

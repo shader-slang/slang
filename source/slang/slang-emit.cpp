@@ -165,8 +165,7 @@ EntryPointLayout* findEntryPointLayout(ProgramLayout* programLayout, EntryPoint*
     return nullptr;
 }
 
-/// Given a layout computed for a scope, get the layout to use when lookup up
-/// variables.
+/// Given a layout computed for a scope, get the layout to use when lookup up variables.
 ///
 /// A scope (such as the global scope of a program) groups its
 /// parameters into a pseudo-`struct` type for layout purposes,
@@ -195,8 +194,7 @@ StructTypeLayout* getScopeStructLayout(ScopeLayout* scopeLayout)
     return nullptr;
 }
 
-/// Given a layout computed for a program, get the layout to use when lookup up
-/// variables.
+/// Given a layout computed for a program, get the layout to use when lookup up variables.
 ///
 /// This is just an alias of `getScopeStructLayout`.
 ///
@@ -305,12 +303,13 @@ struct LinkingAndOptimizationOptions
 
 // To improve the performance of our backend, we will try to avoid running
 // passes related to features not used in the user code.
-// To do so, we will scan the IR module once, and determine which passes are
-// needed based on the instructions used in the IR module. This will allow us to
-// skip running passes that are not needed, without having to run all the passes
-// only to find out that no work is needed. This is especially important for the
-// performance of the backend, as some passes have an initialization cost (such
-// as building reference graphs or DOM trees) that can be expensive.
+// To do so, we will scan the IR module once, and determine which passes are needed
+// based on the instructions used in the IR module.
+// This will allow us to skip running passes that are not needed, without having to
+// run all the passes only to find out that no work is needed.
+// This is especially important for the performance of the backend, as some passes
+// have an initialization cost (such as building reference graphs or DOM trees) that
+// can be expensive.
 //
 struct RequiredLoweringPassSet
 {
@@ -339,8 +338,8 @@ struct RequiredLoweringPassSet
     bool missingReturn;
 };
 
-// Scan the IR module and determine which lowering/legalization passes are
-// needed based on the instructions we see.
+// Scan the IR module and determine which lowering/legalization passes are needed based
+// on the instructions we see.
 //
 void calcRequiredLoweringPassSet(
     RequiredLoweringPassSet& result,
@@ -662,10 +661,9 @@ Result linkAndOptimizeIR(
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
 
-    // For now, only emit the debug build identifier if separate debug info is
-    // enabled and only if there are targets.
-    // TODO: We will ultimately need to change this to always emit the
-    // instruction.
+    // For now, only emit the debug build identifier if separate debug info is enabled
+    // and only if there are targets.
+    // TODO: We will ultimately need to change this to always emit the instruction.
     if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
     {
         // Build identifier is a hash of the source code and compile options.
@@ -687,13 +685,12 @@ Result linkAndOptimizeIR(
     // un-specialized IR.
     dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
-    // Scan the IR module and determine which lowering/legalization passes are
-    // needed.
+    // Scan the IR module and determine which lowering/legalization passes are needed.
     RequiredLoweringPassSet requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped
-    // out by targets that opt out of debug info.
+    // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
+    // opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
         (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
          SLANG_DEBUG_INFO_LEVEL_NONE))
@@ -713,7 +710,7 @@ Result linkAndOptimizeIR(
     // Replace any global constants with their values.
     //
     replaceGlobalConstants(irModule);
-#if 1
+#if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL CONSTANTS REPLACED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -857,8 +854,7 @@ Result linkAndOptimizeIR(
             return SLANG_FAIL;
     }
 
-    // Fill in default matrix layout into matrix types that left layout
-    // unspecified.
+    // Fill in default matrix layout into matrix types that left layout unspecified.
     specializeMatrixLayout(targetProgram, irModule);
 
     // It's important that this takes place before defunctionalization as we
@@ -883,8 +879,7 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.autodiff)
     {
-        // Generate warnings for potentially incorrect or badly-performing autodiff
-        // patterns.
+        // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
         checkAutodiffPatterns(targetProgram, irModule, sink);
     }
 
@@ -917,9 +912,8 @@ Result linkAndOptimizeIR(
         {
             // Pre-autodiff, we will attempt to specialize as much as possible.
             //
-            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly
-            // due to missing information, so we defer that to after the auto-dff
-            // step.
+            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly due to
+            // missing information, so we defer that to after the auto-dff step.
             //
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
@@ -938,8 +932,7 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-        // since we may be missing out cases prevented by the functions that we just
-        // specialzied.
+        // since we may be missing out cases prevented by the functions that we just specialzied.
         performMandatoryEarlyInlining(irModule);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
@@ -988,8 +981,8 @@ Result linkAndOptimizeIR(
     finalizeAutoDiffPass(targetProgram, irModule);
     eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
-    // After auto-diff, we can perform more aggressive specialization with
-    // dynamic-dispatch lowering.
+    // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
+    // lowering.
     //
     if (!codeGenContext->isSpecializationDisabled())
     {
@@ -1066,8 +1059,8 @@ Result linkAndOptimizeIR(
         return SLANG_FAIL;
 
     // If we have a target that is GPU like we use the string hashing mechanism
-    // but for that to work we need to inline such that calls (or returns) of
-    // strings boil down into getStringHash(stringLiteral)
+    // but for that to work we need to inline such that calls (or returns) of strings
+    // boil down into getStringHash(stringLiteral)
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
         // We could fail because
@@ -1102,8 +1095,8 @@ Result linkAndOptimizeIR(
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
-        // We could fail because (perhaps, somehow) end up with getStringHash that
-        // the operand is not a string literal
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is
+        // not a string literal
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 
@@ -1120,8 +1113,8 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.enumType)
         lowerEnumType(irModule, sink);
 
-    // Don't need to run any further target-dependent passes if we are generating
-    // code for host vm.
+    // Don't need to run any further target-dependent passes if we are generating code
+    // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
         performForceInlining(irModule);
@@ -1150,12 +1143,10 @@ Result linkAndOptimizeIR(
         lowerCooperativeVectors(irModule, sink);
     }
 
-    // Inline calls to any functions marked with [__unsafeInlineEarly] or
-    // [ForceInline].
+    // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
-    // Push `structuredBufferLoad` to the end of access chain to avoid loading
-    // unnecessary data.
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
     if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
         isWGPUTarget(targetRequest))
         deferBufferLoad(irModule);
@@ -1175,9 +1166,9 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // On non-HLSL targets, there isn't an implementation of
-    // `AppendStructuredBuffer` and `ConsumeStructuredBuffer` types, so we lower
-    // them into normal struct types of `RWStructuredBuffer` typed fields now.
+    // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
+    // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
+    // of `RWStructuredBuffer` typed fields now.
     if (target != CodeGenTarget::HLSL)
     {
         lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
@@ -1316,10 +1307,10 @@ Result linkAndOptimizeIR(
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
-    // Moreover, for Khronos targets, we also want to specialize calls to
-    // functions that takes arrays/structs containing arrays as parameters with
-    // the actual global array object to avoid loading big arrays into SSA
-    // registers, which seems to cause performance issues.
+    // Moreover, for Khronos targets, we also want to specialize calls to functions
+    // that takes arrays/structs containing arrays as parameters with the actual
+    // global array object to avoid loading big arrays into SSA registers, which seems
+    // to cause performance issues.
     specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
@@ -1329,8 +1320,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Process `static_assert` after the specialization is done.
-    // Some information for `static_assert` is available only after the
-    // specialization.
+    // Some information for `static_assert` is available only after the specialization.
     checkStaticAssert(irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
@@ -1468,8 +1458,8 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions);
     }
 
-    // For SPIR-V, this function is called elsewhere, so that it can happen after
-    // address space specialization
+    // For SPIR-V, this function is called elsewhere, so that it can happen after address space
+    // specialization
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
@@ -1647,8 +1637,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-        // For CUDA/OptiX like targets, add our pass to replace inout parameter
-        // copies with direct pointers
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
+        // pointers
         undoParameterCopy(irModule);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
@@ -1667,15 +1657,15 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // TODO: our current dynamic dispatch pass will remove all uses of witness
-    // tables. If we are going to support function-pointer based, "real" modular
-    // dynamic dispatch, we will need to disable this pass.
+    // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
+    // If we are going to support function-pointer based, "real" modular dynamic dispatch,
+    // we will need to disable this pass.
     stripLegalizationOnlyInstructions(irModule);
 
     switch (target)
     {
-    // On targets that don't support default initialization, remove 'raw' default
-    // construct insts because our code-gen will not have any way to emit them.
+    // On targets that don't support default initialization, remove 'raw' default construct
+    // insts because our code-gen will not have any way to emit them.
     //
     case CodeGenTarget::SPIRV:
         if (targetProgram->shouldEmitSPIRVDirectly())
@@ -1707,15 +1697,16 @@ Result linkAndOptimizeIR(
 
     if (isKhronosTarget(targetRequest))
     {
-        // As a fallback, if the above specialization steps failed to remove
-        // resource type parameters, we will inline the functions in question to
-        // make sure we can produce valid GLSL.
+        // As a fallback, if the above specialization steps failed to remove resource type
+        // parameters, we will inline the functions in question to make sure we can produce valid
+        // GLSL.
         performGLSLResourceReturnFunctionInlining(targetProgram, irModule);
     }
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
 
     // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
     //
@@ -1808,8 +1799,7 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
 
-        // If liveness is enabled add liveness ranges based on the accumulated
-        // liveness locations
+        // If liveness is enabled add liveness ranges based on the accumulated liveness locations
 
         if (isEnabled(livenessMode))
         {
@@ -1854,8 +1844,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Run a final round of simplifications to clean up unused things after
-    // phi-elimination.
+    // Run a final round of simplifications to clean up unused things after phi-elimination.
     simplifyNonSSAIR(targetProgram, irModule, fastIRSimplificationOptions);
 
     // We include one final step to (optionally) dump the IR and validate
@@ -1912,9 +1901,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(
         CompilerOptionName::LineDirectiveMode);
-    // We will generally use C-style line directives in order to give the user
-    // good source locations on error messages from downstream compilers, but
-    // there are a few exceptions.
+    // We will generally use C-style line directives in order to give the user good
+    // source locations on error messages from downstream compilers, but there are
+    // a few exceptions.
     if (lineDirectiveMode == LineDirectiveMode::Default)
     {
 
@@ -1938,8 +1927,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     ComPtr<IBoxValue<SourceMap>> sourceMap;
 
-    // If SourceMap is enabled, we create one and associate it with the
-    // sourceWriter
+    // If SourceMap is enabled, we create one and associate it with the sourceWriter
     if (lineDirectiveMode == LineDirectiveMode::SourceMap)
     {
         sourceMap = new BoxValue<SourceMap>;
@@ -1964,8 +1952,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     }
     desc.sourceWriter = &sourceWriter;
 
-    // Define here, because must be in scope longer than the sourceEmitter, as
-    // sourceEmitter might reference items in the linkedIR module
+    // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might
+    // reference items in the linkedIR module
     LinkedIR linkedIR;
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
@@ -2048,8 +2036,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
         auto irModule = linkedIR.module;
 
-        // Perform final simplifications to help emit logic to generate more compact
-        // code.
+        // Perform final simplifications to help emit logic to generate more compact code.
         simplifyForEmit(irModule, targetRequest);
 
         metadata = linkedIR.metadata;
@@ -2068,15 +2055,15 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     // it is time to stitch together the final output.
 
     // There may be global-scope modifiers that we should emit now
-    // Supress emitting line directives when emitting preprocessor directives
-    // since these preprocessor directives may be required to appear in the first
-    // line of the output. An example is that the "#version" line in a GLSL source
-    // must appear before anything else.
+    // Supress emitting line directives when emitting preprocessor directives since
+    // these preprocessor directives may be required to appear in the first line
+    // of the output. An example is that the "#version" line in a GLSL source must
+    // appear before anything else.
     sourceWriter.supressLineDirective();
 
-    // When emitting front matter we can emit the target-language-specific
-    // directives needed to get the default matrix layout to match what was
-    // requested for the given target.
+    // When emitting front matter we can emit the target-language-specific directives
+    // needed to get the default matrix layout to match what was requested
+    // for the given target.
     //
     // Note: we do not rely on the defaults for the target language,
     // because a user could take the HLSL/GLSL generated by Slang and pass
@@ -2111,15 +2098,13 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         break;
     }
 
-    // Emit anything that goes before the contents of the code generated for the
-    // module
+    // Emit anything that goes before the contents of the code generated for the module
     sourceEmitter->emitPreModule();
 
     sourceWriter.resumeLineDirective();
 
     // Get the content built so far from the front matter/prelude/preModule
-    // By getting in this way, the content is no longer referenced by the
-    // sourceWriter.
+    // By getting in this way, the content is no longer referenced by the sourceWriter.
     String finalResult = sourceWriter.getContentAndClear();
 
     // Append the modules output code
@@ -2172,8 +2157,7 @@ public:
         SPV_INDEX_INSTRUCTION_START,
     };
 
-    // An instruction in the SPIRV blob. This points to the first word of the
-    // instruction.
+    // An instruction in the SPIRV blob. This points to the first word of the instruction.
     struct SpvInstruction
     {
         SpvInstruction(SpvWord* word)
@@ -2235,9 +2219,9 @@ public:
     // Get the header words.
     List<SpvWord> getHeaderWords() const { return m_headerWords; }
 
-    // Visit all SPIRV instructions (excluding header words), invoking the
-    // callback for each instruction. The callback should be a function or lambda
-    // with signature: void(const SpvInstruction&).
+    // Visit all SPIRV instructions (excluding header words), invoking the callback for each
+    // instruction. The callback should be a function or lambda with signature: void(const
+    // SpvInstruction&).
     template<typename Func>
     void visitInstructions(Func&& callback)
     {
@@ -2333,8 +2317,8 @@ static SlangResult stripDbgSpirvFromArtifact(
         reinterpret_cast<const uint8_t*>(headerWords.getBuffer()),
         headerWords.getCount() * sizeof(SpvWord));
 
-    // First find the DebugBuildIdentifier instruction, and keep track of which
-    // string it refers to, this string needs to be kept in the final output.
+    // First find the DebugBuildIdentifier instruction, and keep track of which string
+    // it refers to, this string needs to be kept in the final output.
     SpvWord debugStringId = 0;
     spirvInstructionHelper.visitInstructions(
         [&](const SpirvInstructionHelper::SpvInstruction& inst)
@@ -2369,8 +2353,7 @@ static SlangResult stripDbgSpirvFromArtifact(
                 if (!foundDebugString)
                     return;
             }
-            // Also check if the instruction is an extended instruction containing
-            // DebugInfo.
+            // Also check if the instruction is an extended instruction containing DebugInfo.
             if (inst.getOpCode() == SpvOpExtInst)
             {
                 // Ignore this if the instruction contains DebugInfo.
@@ -2539,9 +2522,9 @@ static SlangResult createArtifactFromIR(
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
-            // Check if we need to output a separate SPIRV file containing debug info.
-            // If so then strip all debug instructions from the artifact. The
-            // dbgArtifact will still contain all instructions.
+            // Check if we need to output a separate SPIRV file containing debug info. If so
+            // then strip all debug instructions from the artifact. The dbgArtifact will still
+            // contain all instructions.
             if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
             {
                 auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
