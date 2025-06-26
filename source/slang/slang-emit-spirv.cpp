@@ -2063,14 +2063,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
+                    // If the array type has no stride, it indicates that this array type is only
+                    // used in Private or Function storage class (aka. thread-local or function
+                    // scope variable), in that case SPIRV doesn't allow to decorate the array
+                    // stride.
+                    //
+                    // The only exception is if the array type is unsized, because unsized array
+                    // also has no stride operand, however unsized array can not be used in Private
+                    // or Function, so we are safe to just decorate the stride for unsized array by
+                    // calculating the natural stride.
                     if (auto strideInst = irArrayType->getArrayStride())
                     {
                         stride = (int)getIntVal(strideInst);
                     }
-                    else
+                    else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
-                        // Stride may not have been calculated for basic element types. Calculate it
-                        // here.
                         IRSizeAndAlignment sizeAndAlignment;
                         getNaturalSizeAndAlignment(
                             m_targetProgram->getOptionSet(),
@@ -2079,11 +2086,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
-                    emitOpDecorateArrayStride(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        arrayType,
-                        SpvLiteralInteger::from32(stride));
+                    if (stride != 0)
+                    {
+                        emitOpDecorateArrayStride(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            arrayType,
+                            SpvLiteralInteger::from32(stride));
+                    }
                 }
                 return arrayType;
             }
