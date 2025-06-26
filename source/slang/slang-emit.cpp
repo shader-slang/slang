@@ -620,14 +620,16 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 // Add DenormPreserve and DenormFlushToZero decorations to all entry point functions
 static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
 {
-    auto linkage = codeGenContext->getLinkage();
+    auto optionSet = codeGenContext->getTargetProgram()->getOptionSet();
 
     // Only add decorations if we have denorm mode options set
-    bool hasDenormOptions = linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16) ||
-                            linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32) ||
-                            linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64);
+    auto denormModeFp16 = optionSet.getDenormModeFp16();
+    auto denormModeFp32 = optionSet.getDenormModeFp32();
+    auto denormModeFp64 = optionSet.getDenormModeFp64();
 
-    if (!hasDenormOptions)
+    if (denormModeFp16 == FpDenormMode::Any &&
+        denormModeFp32 == FpDenormMode::Any &&
+        denormModeFp64 == FpDenormMode::Any)
         return;
 
     IRBuilder builder(irModule);
@@ -635,59 +637,46 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
     // Apply denorm decorations to all entry point functions
     for (auto inst : irModule->getGlobalInsts())
     {
-        if (auto func = as<IRFunc>(inst))
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        
+        // Check if this is an entry point function
+        auto entryPoint = func->findDecoration<IREntryPointDecoration>();
+        if (!entryPoint)
+            continue;
+
+        // Handle FP16 denorm mode
+        auto width16 = builder.getIntValue(builder.getUIntType(), 16);
+        if (denormModeFp16 == FpDenormMode::Preserve)
         {
-            // Check if this is an entry point function
-            if (func->findDecoration<IREntryPointDecoration>())
-            {
-                // Handle FP16 denorm mode
-                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp16))
-                {
-                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp16();
-                    if (fpDenormMode == FpDenormMode::Preserve)
-                    {
-                        auto width16 = builder.getIntValue(builder.getUIntType(), 16);
-                        builder.addDenormPreserveDecoration(func, width16);
-                    }
-                    else if (fpDenormMode == FpDenormMode::Ftz)
-                    {
-                        auto width16 = builder.getIntValue(builder.getUIntType(), 16);
-                        builder.addDenormFlushToZeroDecoration(func, width16);
-                    }
-                }
+            builder.addDenormPreserveDecoration(func, width16);
+        }
+        else if (denormModeFp16 == FpDenormMode::Ftz)
+        {
+            builder.addDenormFlushToZeroDecoration(func, width16);
+        }
 
-                // Handle FP32 denorm mode
-                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp32))
-                {
-                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp32();
-                    if (fpDenormMode == FpDenormMode::Preserve)
-                    {
-                        auto width32 = builder.getIntValue(builder.getUIntType(), 32);
-                        builder.addDenormPreserveDecoration(func, width32);
-                    }
-                    else if (fpDenormMode == FpDenormMode::Ftz)
-                    {
-                        auto width32 = builder.getIntValue(builder.getUIntType(), 32);
-                        builder.addDenormFlushToZeroDecoration(func, width32);
-                    }
-                }
+        // Handle FP32 denorm mode
+        auto width32 = builder.getIntValue(builder.getUIntType(), 32);
+        if (denormModeFp32 == FpDenormMode::Preserve)
+        {
+            builder.addDenormPreserveDecoration(func, width32);
+        }
+        else if (denormModeFp32 == FpDenormMode::Ftz)
+        {
+           builder.addDenormFlushToZeroDecoration(func, width32);
+        }
 
-                // Handle FP64 denorm mode
-                if (linkage->m_optionSet.hasOption(CompilerOptionName::DenormModeFp64))
-                {
-                    auto fpDenormMode = linkage->m_optionSet.getDenormModeFp64();
-                    if (fpDenormMode == FpDenormMode::Preserve)
-                    {
-                        auto width64 = builder.getIntValue(builder.getUIntType(), 64);
-                        builder.addDenormPreserveDecoration(func, width64);
-                    }
-                    else if (fpDenormMode == FpDenormMode::Ftz)
-                    {
-                        auto width64 = builder.getIntValue(builder.getUIntType(), 64);
-                        builder.addDenormFlushToZeroDecoration(func, width64);
-                    }
-                }
-            }
+        // Handle FP64 denorm mode
+        auto width64 = builder.getIntValue(builder.getUIntType(), 64);
+        if (denormModeFp64 == FpDenormMode::Preserve)
+        {
+            builder.addDenormPreserveDecoration(func, width64);
+        }
+        else if (denormModeFp64 == FpDenormMode::Ftz)
+        {
+            builder.addDenormFlushToZeroDecoration(func, width64);
         }
     }
 }
