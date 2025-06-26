@@ -296,6 +296,11 @@ void emitType(ManglingContext* context, Type* type)
         for (Index i = 0; i < typePack->getTypeCount(); i++)
             emitType(context, typePack->getElementType(i));
     }
+    else if (auto bwdDiffFuncType = as<BwdDiffFuncType>(type))
+    {
+        emitRaw(context, "Tbwddiff");
+        emitType(context, bwdDiffFuncType->getBase());
+    }
     else if (auto fwdDiffFuncType = as<FwdDiffFuncType>(type))
     {
         emitRaw(context, "Tfwddiff");

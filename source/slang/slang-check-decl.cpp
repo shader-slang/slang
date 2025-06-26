@@ -66,18 +66,17 @@ struct SemanticsDeclScopeWiringVisitor : public SemanticsDeclVisitorBase,
     void visitNamespaceDecl(NamespaceDecl* decl);
 };
 
-struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
-                                        public DeclVisitor<SemanticsDeclAttributesVisitor>
+struct SemanticsDeclDifferentialAttributesVisitor
+    : public SemanticsDeclVisitorBase,
+      public DeclVisitor<SemanticsDeclDifferentialAttributesVisitor>
 {
-    SemanticsDeclAttributesVisitor(SemanticsContext const& outer)
+    SemanticsDeclDifferentialAttributesVisitor(SemanticsContext const& outer)
         : SemanticsDeclVisitorBase(outer)
     {
     }
 
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
-
-    void visitStructDecl(StructDecl* structDecl);
 
     void visitFunctionDeclBase(FunctionDeclBase* decl);
 
@@ -92,6 +91,36 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     void checkPrimalSubstituteOfAttribute(
         FunctionDeclBase* funcDecl,
         PrimalSubstituteOfAttribute* attr);
+};
+
+struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
+                                        public DeclVisitor<SemanticsDeclAttributesVisitor>
+{
+    SemanticsDeclAttributesVisitor(SemanticsContext const& outer)
+        : SemanticsDeclVisitorBase(outer)
+    {
+    }
+
+    void visitDecl(Decl*) {}
+    void visitDeclGroup(DeclGroup*) {}
+
+    void visitStructDecl(StructDecl* structDecl);
+
+    /*
+    void visitFunctionDeclBase(FunctionDeclBase* decl);
+
+    void checkForwardDerivativeOfAttribute(
+        FunctionDeclBase* funcDecl,
+        ForwardDerivativeOfAttribute* attr);
+
+    void checkBackwardDerivativeOfAttribute(
+        FunctionDeclBase* funcDecl,
+        BackwardDerivativeOfAttribute* attr);
+
+    void checkPrimalSubstituteOfAttribute(
+        FunctionDeclBase* funcDecl,
+        PrimalSubstituteOfAttribute* attr);
+    */
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
 
@@ -898,6 +927,16 @@ bool isEffectivelyStatic(Decl* decl, ContainerDecl* parentDecl)
     if (as<FileDecl>(parentDecl))
         return false;
 
+    // For declarations that directly extend functions, their static-ness
+    // is the same as the function they extend.
+    //
+    if (auto extDecl = as<ExtensionDecl>(parentDecl))
+    {
+        if (isDeclRefTypeOf<CallableDecl>(extDecl->targetType))
+            return isEffectivelyStatic(
+                as<DeclRefType>(extDecl->targetType)->getDeclRef().getDecl());
+    }
+
     // Anything explicitly marked `static` and not at module scope
     // counts as a static rather than instance declaration.
     //
@@ -1235,7 +1274,7 @@ DeclRef<ExtensionDecl> applyExtensionToType(
 }
 
 
-Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
 {
     ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
     expr->scope = funcDecl->ownedScope;
@@ -1249,7 +1288,7 @@ Type* getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
     return !(as<ErrorType>(checkedExpr->type.type)) ? (checkedExpr->type.type) : nullptr;
 }
 
-Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
 {
     auto type = getTypeForThisExpr(visitor, funcDeclRef.getDecl());
     if (type)
@@ -1264,7 +1303,35 @@ Type* SemanticsVisitor::resolveType(Type* type)
 {
     {
         // Handle some special types.
-        if (auto fwdDiffFuncType = as<FwdDiffFuncType>(type))
+        if (auto bwdDiffFuncType = as<BwdDiffFuncType>(type))
+        {
+            // If the type is a BwdDiffFuncType, we need to resolve the base
+            // function type and return the differential type.
+            //
+            auto baseFuncType = bwdDiffFuncType->getBase()->resolve();
+            if (isDeclRefTypeOf<FunctionDeclBase>(bwdDiffFuncType->getBase()->resolve()))
+            {
+                auto funcDeclRef =
+                    as<DeclRefType>(baseFuncType)->getDeclRef().as<FunctionDeclBase>();
+                FuncType* funcType = as<FuncType>(
+                    getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
+
+                auto thisType = getTypeForThisExpr(this, funcDeclRef);
+                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+                    thisType = nullptr;
+
+                if (!funcType)
+                    return nullptr;
+
+                Type* resultType = getBackwardDiffFuncType(funcType);
+
+                if (resultType)
+                {
+                    return resultType;
+                }
+            }
+        }
+        else if (auto fwdDiffFuncType = as<FwdDiffFuncType>(type))
         {
             if (isDeclRefTypeOf<FunctionDeclBase>(fwdDiffFuncType->getBase()->resolve()))
             {
@@ -1276,7 +1343,6 @@ Type* SemanticsVisitor::resolveType(Type* type)
                     getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
 
                 auto thisType = getTypeForThisExpr(this, funcDeclRef);
-
                 if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
                     thisType = nullptr;
 
@@ -1305,9 +1371,7 @@ Type* SemanticsVisitor::resolveType(Type* type)
                 FuncType* funcType = as<FuncType>(
                     getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
 
-                auto resultType = funcType->getResultType();
-
-                // Look up "This.FwdCallable" in the current scope.
+                // Look up "This.BwdCallable" in the current scope.
                 //
                 // Build the right member-expr.
                 //
@@ -1355,31 +1419,54 @@ Type* SemanticsVisitor::resolveType(Type* type)
                 FuncType* funcType = as<FuncType>(
                     getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
 
-                // Go through an translate all types (parameter & result) to their differential
-                // variants
-                //
                 List<Type*> paramTypes;
 
+                // First translate the this-type.
+                auto thisType = getTypeForThisExpr(this, funcDeclRef);
+                if (funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+                    thisType = nullptr;
+
+                auto thisTypeDirection = kParameterDirection_In;
+                if (thisType.isLeftValue)
+                    thisTypeDirection = kParameterDirection_InOut;
+
+                if (thisType.type && !as<ErrorType>(thisType.type))
+                {
+                    if (auto diffThisType = tryGetDifferentialType(getASTBuilder(), thisType))
+                    {
+                        if (thisType.isLeftValue)
+                            paramTypes.add(getASTBuilder()->getOutType(diffThisType));
+                        else
+                            paramTypes.add(getASTBuilder()->getInOutType(diffThisType));
+                    }
+                    else
+                        paramTypes.add(getASTBuilder()->getNoneType());
+                }
+
+                // Then, go through an translate all types (parameter & result) to their
+                // differential variants
+                //
                 for (Index i = 0; i < funcType->getParamCount(); i++)
                 {
-                    auto diffType = getDifferentialType(
-                        getASTBuilder(),
-                        funcType->getParamType(i),
-                        funcDeclRef.getLoc());
+                    auto diffType =
+                        tryGetDifferentialType(getASTBuilder(), funcType->getParamType(i));
+
                     if (!diffType)
                     {
-                        // For now, we'll crash (later need to replace this by NoneType)
-                        SLANG_ASSERT(!"Failed to get differential type");
+                        diffType = getASTBuilder()->getNoneType();
                     }
 
                     // Flip the direction of the type..
                     switch (funcType->getParamDirection(i))
                     {
                     case kParameterDirection_Out:
-                        paramTypes.add(diffType);
+                        paramTypes.add(as<OutType>(diffType)->getValueType());
                         break;
                     case kParameterDirection_In:
                         paramTypes.add(getASTBuilder()->getOutType(diffType));
+                        break;
+                    case kParameterDirection_InOut:
+                        paramTypes.add(diffType);
                         break;
                     default:
                         SLANG_ASSERT(!"Unknown parameter direction");
@@ -1388,15 +1475,12 @@ Type* SemanticsVisitor::resolveType(Type* type)
                 }
 
                 auto resultType = funcType->getResultType();
-                auto diffResultType =
-                    getDifferentialType(getASTBuilder(), resultType, funcDeclRef.getLoc());
-                if (!diffResultType)
+                auto diffResultType = tryGetDifferentialType(getASTBuilder(), resultType);
+                if (diffResultType)
                 {
-                    // For now, we'll crash (later need to replace this by NoneType)
-                    SLANG_ASSERT(!"Failed to get differential type");
+                    paramTypes.add(diffResultType);
                 }
 
-                paramTypes.add(diffResultType);
 
                 // Build a new func type out of the parameters with the
                 // result type replaced with the tuple type.
@@ -2643,6 +2727,35 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     }
 }
 
+static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* extensionDecl)
+{
+    // Go through the extension's members and look for a function with the
+    // "bwd_diff" name. Note: we won't use a lookup, since that could trigger the
+    // synthesis again & lead to a cyclic invocation.
+    //
+    auto bwdDiffFuncName = visitor->getName("bwd_diff");
+    Decl* foundLegacyBwdDiffFunc = nullptr;
+    for (auto member : extensionDecl->members)
+    {
+        if (auto funcDeclBase = as<FunctionDeclBase>(member))
+        {
+            if (funcDeclBase->nameAndLoc.name == bwdDiffFuncName)
+            {
+                if (as<FuncDecl>(funcDeclBase) || as<ConstructorDecl>(funcDeclBase))
+                    foundLegacyBwdDiffFunc = funcDeclBase;
+                else if (
+                    as<SynthesizedFuncDecl>(funcDeclBase) &&
+                    as<SynthesizedFuncDecl>(funcDeclBase)->irOp == kIROp_FunctionCopy)
+                {
+                    foundLegacyBwdDiffFunc = funcDeclBase;
+                }
+            }
+        }
+    }
+
+    return foundLegacyBwdDiffFunc;
+}
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -2937,6 +3050,91 @@ bool SemanticsVisitor::trySynthesizeForwardDiffFuncTypeRequirementWitness(
     // Register the resulting type into witness table.
     witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(resultType));
 
+    return true;
+}
+
+bool SemanticsVisitor::trySynthesizeBwdContextTypeRequirementWitness(
+    ConformanceCheckingContext* context,
+    DeclRef<AssocTypeDecl> requirementDeclRef,
+    RefPtr<WitnessTable> witnessTable)
+{
+    // Can't synthesize for non-callable base types.
+    if (!isDeclRefTypeOf<FunctionDeclBase>(context->conformingType))
+        return false;
+
+    auto targetFuncDeclRef =
+        as<DeclRefType>(context->conformingType)->getDeclRef().as<FunctionDeclBase>();
+    auto synStructDecl = getCurrentASTBuilder()->create<SynthesizedStructDecl>();
+
+    // We currently support this type of synthesis only for extensions.
+    SLANG_ASSERT(as<ExtensionDecl>(context->parentDecl));
+    auto legacyBwdDiffFunc = findLegacyBwdDiffFunc(this, as<ExtensionDecl>(context->parentDecl));
+    if (legacyBwdDiffFunc)
+    {
+        synStructDecl->irOp = kIROp_BackwardContextFromLegacyBwdDiffFunc;
+    }
+    else
+    {
+        synStructDecl->irOp = kIROp_BackwardDiffIntermediateContextType;
+    }
+
+    // Put the synthesized struct in the same scope as the requirement.
+    // This is technically improper since struct types shouldn't be defined
+    // inside extensions (or other AggTypeDecl) in this way
+    //
+    synStructDecl->parentDecl = context->parentDecl;
+    synStructDecl->ownedScope = m_astBuilder->create<Scope>();
+
+    // Now, we'll "lift" the declaration out of the parent declarations,
+    // and in the process, clone any necessary generic parents
+    //
+    SubstitutionSet substSet;
+    auto newSynStructDeclRef = liftDeclFromGenericContainers(synStructDecl, substSet);
+
+    synStructDecl->nameAndLoc.name =
+        getNamePool()->getName("$__syn_BwdCallable_" + targetFuncDeclRef.getName()->text);
+
+    // Substitute the target funcDeclRef to reference it from the
+    // new generic context (if any)
+    //
+    synStructDecl->operands.add(
+        substituteDeclRef(substSet, getCurrentASTBuilder(), targetFuncDeclRef)
+            .as<FunctionDeclBase>());
+
+    if (legacyBwdDiffFunc)
+    {
+        // If we are synthesizing using a legacy backward differentiation function,
+        // we will use that as the second operand.
+        synStructDecl->operands.add(substituteDeclRef(
+            substSet,
+            getCurrentASTBuilder(),
+            createDefaultSubstitutionsIfNeeded(
+                getCurrentASTBuilder(),
+                this,
+                legacyBwdDiffFunc->getDefaultDeclRef())));
+    }
+
+    // Insert an InheritanceDecl for SynStruct : IBwdCallable<Self>
+    auto bwdCallableInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
+    bwdCallableInheritanceDecl->parentDecl = synStructDecl;
+    bwdCallableInheritanceDecl->base.type = getCurrentASTBuilder()->getBwdCallableBaseType(
+        DeclRefType::create(getCurrentASTBuilder(), synStructDecl->operands[0]));
+    synStructDecl->members.add(bwdCallableInheritanceDecl);
+
+    checkAggTypeConformance(synStructDecl);
+
+    witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
+
+    if (!doesTypeSatisfyAssociatedTypeConstraintRequirement(
+            DeclRefType::create(getCurrentASTBuilder(), newSynStructDeclRef),
+            requirementDeclRef,
+            witnessTable))
+    {
+        // If the synthesized type does not satisfy the requirement, we will remove it from the
+        // witness table.
+        witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
+        return false;
+    }
     return true;
 }
 
@@ -4705,6 +4903,17 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable);
         }
     }
+    else if (auto synMemberFuncDecl = memberDeclRef.as<SynthesizedFuncDecl>())
+    {
+        if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
+        {
+            // Check signature match.
+            return doesSignatureMatchRequirement(
+                synMemberFuncDecl,
+                requiredFuncDeclRef,
+                witnessTable);
+        }
+    }
     else if (auto memberInitDecl = memberDeclRef.as<ConstructorDecl>())
     {
         if (auto requiredInitDecl = requiredMemberDeclRef.as<ConstructorDecl>())
@@ -4790,6 +4999,231 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
     }
     // Default: just assume that thing aren't being satisfied.
     return false;
+}
+
+// TODO: Merge this with the similar logic in `synthesizeGenericSignatureForRequirementWitness`
+DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
+    Decl* decl,
+    SubstitutionSet& outSubstitutions)
+{
+    List<GenericDecl*> declsToClone;
+    List<GenericDecl*> newGenericDecls;
+
+    for (auto cur = decl->parentDecl; cur; cur = cur->parentDecl)
+    {
+        if (auto genericDecl = as<GenericDecl>(cur))
+        {
+            declsToClone.add(genericDecl);
+        }
+    }
+
+    ContainerDecl* parentDecl = getModuleDecl(decl);
+    Scope* parentScope = getScope(parentDecl);
+
+    auto currentDeclRef = decl->getDefaultDeclRef();
+    currentDeclRef =
+        createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), this, currentDeclRef);
+
+    declsToClone.reverse();
+    Dictionary<Decl*, Decl*> mapSynToOrigTypeParams;
+    for (auto genericDecl : declsToClone)
+    {
+        auto synGenericDecl = m_astBuilder->create<GenericDecl>();
+        synGenericDecl->parentDecl = parentDecl;
+        synGenericDecl->ownedScope = m_astBuilder->create<Scope>();
+        synGenericDecl->ownedScope->containerDecl = synGenericDecl;
+        synGenericDecl->ownedScope->parent = parentScope;
+        newGenericDecls.add(synGenericDecl);
+
+        // For now our synthesized method will use the name and source
+        // location of the requirement we are trying to satisfy.
+        //
+        // TODO: as it stands right now our syntesized method will
+        // get a mangled name, which we don't actually want. Leaving
+        // out the name here doesn't help matters, because then *all*
+        // snthesized methods on a given type would share the same
+        // mangled name!
+        //
+        /*synGenericDecl->nameAndLoc = decl->nameAndLoc;
+        if (synGenericDecl->nameAndLoc.name)
+        {
+            synGenericDecl->nameAndLoc.name =
+                getSession()->getNameObj("$__syn_" + synGenericDecl->nameAndLoc.name->text);
+        }*/
+
+        // Dictionary to map from the original type parameters to the synthesized ones.
+        // Dictionary<Decl*, Decl*> mapOrigToSynTypeParams;
+
+        // Our synthesized method will have parameters matching the names
+        // and types of those on the requirement, and it will use expressions
+        // that reference those parametesr as arguments for the call expresison
+        // that makes up the body.
+        //
+        for (auto member : genericDecl->members)
+        {
+            if (auto typeParamDeclBase = as<GenericTypeParamDeclBase>(member))
+            {
+                auto synTypeParamDeclBase =
+                    (GenericTypeParamDeclBase*)m_astBuilder->createByNodeType(
+                        typeParamDeclBase->astNodeType);
+                synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
+                synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
+                synTypeParamDeclBase->parentDecl = synGenericDecl;
+
+                // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
+                // because initType maybe dependent on the original type parameters,
+                // and if we copy we must also substitute all the original type parameters with the
+                // synthesized ones. It shouldn't be required for the implementing declaration to
+                // define initType anyways, so we'll just save ourselves from the trouble.
+                //
+                synGenericDecl->members.add(synTypeParamDeclBase);
+
+                // mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
+                mapSynToOrigTypeParams.add(synTypeParamDeclBase, typeParamDeclBase);
+
+                // Construct a DeclRefExpr from the type parameter.
+                auto synTypeParamDeclRef = makeDeclRef(synTypeParamDeclBase);
+
+                auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
+                synTypeParamDeclRefExpr->type =
+                    getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
+
+                // synGenericArgs.add(synTypeParamDeclRefExpr);
+            }
+            else if (auto valParamDecl = as<GenericValueParamDecl>(member))
+            {
+                auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
+                synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
+                synValParamDecl->parentDecl = synGenericDecl;
+                synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
+                synValParamDecl->type = valParamDecl->type;
+
+                // Note: we intentionally do not copy GenericValueParamDecl::initExpr here,
+                // because initType maybe dependent on the original type/value parameters,
+                // and if we copy we must also substitute all the original type parameters with the
+                // synthesized ones. It shouldn't be required for the implementing declaration to
+                // define initType anyways, so we'll just save ourselves from the trouble.
+                //
+                synGenericDecl->members.add(synValParamDecl);
+
+                // mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
+                mapSynToOrigTypeParams.add(synValParamDecl, valParamDecl);
+
+                // Construct a DeclRefExpr from the value parameter.
+                auto synValParamDeclRef = makeDeclRef(synValParamDecl);
+
+                auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synValParamDeclRefExpr->declRef = synValParamDeclRef;
+                synValParamDeclRefExpr->type = synValParamDecl->type.type;
+
+                // synGenericArgs.add(synValParamDeclRefExpr);
+            }
+        }
+
+        // With all generic parameters in place, we can now form a partial substitution argument
+        // list without taking into account all the generic constraints.
+
+        // Given `requiredMemberDeclRef` that is `Lookup(ConcreteType:IFoo<int>, IFoo::bar)`, we can
+        // now form a partial specialized declref to `IFoo<int>::bar` with substitution args comming
+        // from the synthesized generic decl, i.e. we want to form:
+        // `Lookup(ConcreteType:IFoo<int>, IFoo::bar)<UImpl>` where `UImpl` is a synthesized generic
+        // parameter.
+        //
+        auto partialDefaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+        DeclRef<Decl> partiallySpecializedRequiredGenericDeclRef =
+            m_astBuilder->getGenericAppDeclRef(genericDecl, partialDefaultArgs.getArrayView());
+
+        // Refine our current specialized decl-ref from src generic heirarchy to the new generic
+        // heirarchy.
+        //
+        currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+            getCurrentASTBuilder(),
+            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+        // With `partiallySpecializedRequiredGenericDeclRef`, we can obtain the right specialized
+        // types from the original requirement decl. For example, we can simply apply declref
+        // substituion on the original type constraint `U:IDerived` to get `UImpl : IDerived`.
+        //
+        for (auto member : genericDecl->members)
+        {
+            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
+            {
+                auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+                synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+                synConstraintDecl->parentDecl = synGenericDecl;
+
+                // For generic constraint Sub : Sup, we need to substitute them with
+                // synthesized generic parameters.
+                //
+                synConstraintDecl->sub = TypeExp((Type*)constraintDecl->sub.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synConstraintDecl->sup = TypeExp((Type*)constraintDecl->sup.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synGenericDecl->members.add(synConstraintDecl);
+                // mapOrigToSynTypeParams.add(constraintDecl, synConstraintDecl);
+                mapSynToOrigTypeParams.add(synConstraintDecl, constraintDecl);
+            }
+        }
+
+        // Override generic pointer to point to the original generic container.
+        // This will create a substitution of the synthesized parameters for the
+        // original parameters.
+        //
+        m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
+        auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+        DeclRef<Decl> fullySpecializedDeclRef =
+            m_astBuilder->getGenericAppDeclRef(genericDecl, defaultArgs.getArrayView());
+
+        // Refine the current substituted decl-ref further (this will fill in the substitutions for
+        // the constraints as well).
+        //
+        currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+            getCurrentASTBuilder(),
+            SubstitutionSet(fullySpecializedDeclRef)));
+
+        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+            genericParentDecl->inner = synGenericDecl;
+
+        // Update parent pointers.
+        parentDecl = synGenericDecl;
+        parentScope = synGenericDecl->ownedScope;
+    }
+
+    decl->parentDecl = parentDecl;
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+        genericParentDecl->inner = decl;
+
+    if (as<ContainerDecl>(decl) && as<ContainerDecl>(decl)->ownedScope)
+        as<ContainerDecl>(decl)->ownedScope->parent = parentScope;
+
+    outSubstitutions = SubstitutionSet(currentDeclRef);
+
+    // DeclRef<Decl> newDeclRef =
+    //     createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), this,
+    //     decl->getDefaultDeclRef());
+    DeclRefBase* newDeclRef = nullptr;
+    for (UIndex i = 0; i < newGenericDecls.getCount(); i++)
+    {
+        auto genericDecl = newGenericDecls[i];
+        auto origGenericDecl = declsToClone[i];
+
+        auto substArgs = getDefaultSubstitutionArgs(m_astBuilder, this, origGenericDecl);
+        newDeclRef = getCurrentASTBuilder()->getGenericAppDeclRef(
+            newDeclRef ? newDeclRef : genericDecl->getDefaultDeclRef(),
+            substArgs.getArrayView(),
+            genericDecl->inner);
+    }
+
+    // If we had to create any new declarations, add them to the parent.
+    // if (newGenericDecls.getCount() > 0)
+    //{
+    //    getModuleDecl(decl)->addMember(newGenericDecls[0]);
+    //}
+
+    return newDeclRef ? DeclRef<Decl>(newDeclRef) : DeclRef<Decl>(decl->getDefaultDeclRef());
 }
 
 GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
@@ -6674,15 +7108,15 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                         builtinAttr->kind);
                 break;
             case BuiltinRequirementKind::ForwardDerivativeFunc:
-                return trySynthesizeForwardDiffFuncRequirementWitness(
+            case BuiltinRequirementKind::BwdApplyFunc:
+            case BuiltinRequirementKind::BwdCallablePropFunc:
+            case BuiltinRequirementKind::BwdCallableGetValFunc:
+            case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+                return trySynthesizeDiffFuncRequirementWitness(
                     context,
                     requiredFuncDeclRef,
-                    witnessTable);
-                break;
-            case BuiltinRequirementKind::BwdCallableContextType:
-            case BuiltinRequirementKind::BwdApplyFunc:
-                // Not implemented yet.
-                return false;
+                    witnessTable,
+                    builtinAttr->kind);
                 break;
             }
         }
@@ -6754,6 +7188,12 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                     context,
                     requiredAssocTypeDeclRef,
                     witnessTable);
+            case BuiltinRequirementKind::BwdCallableContextType:
+                return trySynthesizeBwdContextTypeRequirementWitness(
+                    context,
+                    requiredAssocTypeDeclRef,
+                    witnessTable);
+                break;
             }
         }
         else
@@ -6924,31 +7364,200 @@ bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     return true;
 }
 
-bool SemanticsVisitor::trySynthesizeForwardDiffFuncRequirementWitness(
+bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requirementDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    BuiltinRequirementKind kind)
 {
-    // TODO: also handle func-decl parent & generics in the future.
-    auto extensionDecl = as<ExtensionDecl>(context->parentDecl);
+    // DeclRef<FunctionDeclBase> targetCallableDeclRef;
 
-    if (!isDeclRefTypeOf<FuncDecl>(extensionDecl->targetType))
-        return false;
+    auto synFunc = m_astBuilder->create<SynthesizedFuncDecl>();
+    synFunc->nameAndLoc = requirementDeclRef.getDecl()->getNameAndLoc();
+    auto funcType = as<FuncType>(resolveType(
+        as<Type>(
+            getTypeForDeclRef(m_astBuilder, requirementDeclRef, requirementDeclRef.getLoc()))));
 
-    auto declRefType = as<DeclRefType>(extensionDecl->targetType);
-    auto funcDeclRef = declRefType->getDeclRef().as<FuncDecl>();
+    switch (kind)
+    {
+    case BuiltinRequirementKind::ForwardDerivativeFunc:
+        {
+            // TODO: also handle func-decl parent & generics in the future.
+            auto extensionDecl = as<ExtensionDecl>(context->parentDecl);
+
+            if (!isDeclRefTypeOf<FunctionDeclBase>(extensionDecl->targetType))
+                return false;
+
+            auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+            auto targetCallableDeclRef = declRefType->getDeclRef().as<FunctionDeclBase>();
+            SLANG_ASSERT(targetCallableDeclRef); // Expect a function-decl-base
+            synFunc->operands.add(targetCallableDeclRef);
+            synFunc->irOp = kIROp_ForwardDifferentiate;
+            break;
+        }
+    case BuiltinRequirementKind::BwdApplyFunc:
+        {
+            auto extensionDecl = as<ExtensionDecl>(context->parentDecl);
+
+            if (!isDeclRefTypeOf<FunctionDeclBase>(extensionDecl->targetType))
+                return false;
+
+            // There are two ways of synthesizing an 'apply' func.
+            // 1. Synthesize from primal function body. This is the normal
+            //    case and invokes the full auto-diff infrastructure.
+            //    For this case, we'll create a
+            //    SynthesizedFuncDecl(
+            //         op=IRBackwardDerivativePrimal, targetPrimalFunc)
+            //
+            // 2. Convert a user-provided legacy bwd_diff function into an 'apply' function.
+            //    For this case, we'll create a
+            //    SynthesizedFuncDecl(
+            //         op=IRBackwardPrimalFromLegacyBwdDiffFunc, targetBwdDiffFunc)
+            //
+            // First, we'll need to check if a user-provided bwd_diff function exists.
+            //
+
+            // Add the primal function as the first operand (for both cases).
+            auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+            auto targetCallableDeclRef = declRefType->getDeclRef().as<FunctionDeclBase>();
+            SLANG_ASSERT(targetCallableDeclRef); // Expect a function-decl-base
+            synFunc->operands.add(targetCallableDeclRef);
+
+            if (auto foundLegacyBwdDiffFunc = findLegacyBwdDiffFunc(this, extensionDecl))
+            {
+                // Case 2: Emit a conversion from a legacy bwd_diff function
+                auto foundBwdFuncDeclRef = foundLegacyBwdDiffFunc->getDefaultDeclRef();
+                foundBwdFuncDeclRef =
+                    createDefaultSubstitutionsIfNeeded(m_astBuilder, this, foundBwdFuncDeclRef);
+
+                // Add the legacy bwd_diff func as the second operand.
+                synFunc->operands.add(foundBwdFuncDeclRef);
+                synFunc->irOp = kIROp_BackwardPrimalFromLegacyBwdDiffFunc;
+            }
+            else
+            {
+                // Case 1: Emit an auto-diff invocation.
+                synFunc->irOp = kIROp_BackwardDifferentiatePrimal;
+            }
+            break;
+        }
+    case BuiltinRequirementKind::BwdCallablePropFunc:
+    case BuiltinRequirementKind::BwdCallableGetValFunc:
+        {
+            // Expect a SynthesizedStructDecl as the parent decl.
+            // If we find a regular struct decl, we'll need to diagnose, since
+            // either everything is synthesized, or everything is user defined.
+            //
+            // TODO: turn into a diagnostic
+            auto synStructDecl = as<SynthesizedStructDecl>(context->parentDecl);
+            SLANG_ASSERT(synStructDecl);
+            synFunc->operands.addRange(synStructDecl->operands);
+            if (synStructDecl->irOp == kIROp_BackwardContextFromLegacyBwdDiffFunc)
+            {
+                synFunc->irOp = kIROp_BackwardPropagateFromLegacyBwdDiffFunc;
+            }
+            else if (synStructDecl->irOp == kIROp_BackwardDiffIntermediateContextType)
+            {
+                synFunc->irOp = kIROp_BackwardDifferentiatePropagate;
+            }
+            else
+            {
+                // TODO: turn into a diagnostic
+                SLANG_UNEXPECTED(
+                    "unexpected synthesized struct IR op for backward callable propagation.");
+            }
+            break;
+        }
+    case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+        {
+            auto extensionDecl = as<ExtensionDecl>(context->parentDecl);
+            if (!isDeclRefTypeOf<FunctionDeclBase>(extensionDecl->targetType))
+                return false;
+
+            if (findLegacyBwdDiffFunc(this, extensionDecl))
+            {
+                SLANG_UNEXPECTED("synthesis should not occur if a bwd_diff function is provided.");
+                return false;
+            }
+
+            auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+
+            // Lookup an ".apply_bwd", ".BwdCallable" and ".BwdCallable.operator()" methods.
+            // and pass them all together as operands.
+            //
+
+            // First, lookup the "apply_bwd" method.
+            LookupResult applyBwdLookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                getName("apply_bwd"),
+                declRefType,
+                getScope(extensionDecl));
+            applyBwdLookupResult = resolveOverloadedLookup(applyBwdLookupResult);
+
+            if (!applyBwdLookupResult.item.declRef) // Couldn't find an "apply_bwd", so fail early.
+                return false;
+
+            auto applyBwdDeclRef = applyBwdLookupResult.item.declRef.as<FunctionDeclBase>();
+
+            // Next, lookup the "BwdCallable" type.
+            LookupResult bwdCallableLookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                getName("BwdCallable"),
+                declRefType,
+                getScope(extensionDecl));
+            bwdCallableLookupResult = resolveOverloadedLookup(bwdCallableLookupResult);
+
+            if (!bwdCallableLookupResult.item
+                     .declRef) // Couldn't find a "BwdCallable", so fail early.
+                return false;
+
+            auto bwdCallableDeclRefType =
+                DeclRefType::create(getCurrentASTBuilder(), bwdCallableLookupResult.item.declRef);
+
+            // Finally, lookup the "BwdCallable.operator()" method.
+            LookupResult bwdPropFnLookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                getName("()"),
+                bwdCallableDeclRefType,
+                getScope(extensionDecl));
+
+            bwdPropFnLookupResult = resolveOverloadedLookup(bwdPropFnLookupResult);
+            if (!bwdPropFnLookupResult.item
+                     .declRef) // Couldn't find a "BwdCallable.operator()", so fail early.
+                return false;
+
+            auto bwdPropFnDeclRef = bwdPropFnLookupResult.item.declRef.as<FunctionDeclBase>();
+
+            // Now we have all the necessary components, so we can add them to the synthesized
+            // function.
+            synFunc->irOp = kIROp_BackwardDifferentiate;
+            synFunc->operands.add(applyBwdDeclRef);
+            synFunc->operands.add(bwdCallableLookupResult.item.declRef);
+            synFunc->operands.add(bwdPropFnDeclRef);
+            break;
+        }
+    default:
+        SLANG_UNEXPECTED("unknown builtin requirement kind for diff func synthesis.");
+    }
+    synFunc->parentDecl = context->parentDecl;
 
     /*auto fwdDiffVal = m_astBuilder->getOrCreate<ForwardDifferentiateVal>(funcDeclRef);
 
     auto typeDefDecl = m_astBuilder->create<TypeAliasDecl>();
     typeDefDecl->nameAndLoc = requirementDeclRef.getDecl()->getNameAndLoc();
     typeDefDecl->type.type = fwdDiffVal;*/
-
-    auto synFunc = m_astBuilder->create<SynthesizedFuncDecl>();
-    synFunc->nameAndLoc = requirementDeclRef.getDecl()->getNameAndLoc();
-    auto funcType = as<FuncType>(resolveType(
-        getTypeForDeclRef(m_astBuilder, requirementDeclRef, requirementDeclRef.getLoc())));
-    synFunc->parentDecl = context->parentDecl;
+    /*auto funcType = as<FuncType>(resolveType(
+        as<Type>(getTypeForDeclRef(m_astBuilder, requirementDeclRef, requirementDeclRef.getLoc())
+                     ->substitute(m_astBuilder, SubstitutionSet(targetCallableDeclRef)))));*/
+    /*auto funcType = as<FuncType>(resolveType(
+        as<Type>(getTypeForDeclRef(
+            m_astBuilder,
+            targetCallableDeclRef,
+            targetCallableDeclRef.getLoc()))));*/
+    // requirementDeclRef ()
 
     // Insert synthesized param-decls.
     for (auto paramType : funcType->getParamTypes())
@@ -6961,11 +7570,32 @@ bool SemanticsVisitor::trySynthesizeForwardDiffFuncRequirementWitness(
 
     synFunc->returnType.type = funcType->getResultType();
 
-    // Add static modifier
-    addModifier(synFunc, m_astBuilder->create<HLSLStaticModifier>());
+    // Add static modifier if necessary
+    if (requirementDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        addModifier(synFunc, m_astBuilder->create<HLSLStaticModifier>());
 
-    synFunc->irOp = kIROp_ForwardDifferentiate;
-    synFunc->targetFuncDeclRef = funcDeclRef;
+    auto builtinAttr = requirementDeclRef.getDecl()->findModifier<BuiltinRequirementModifier>();
+
+    /*switch (builtinAttr->kind)
+    {
+    case BuiltinRequirementKind::ForwardDerivativeFunc:
+        synFunc->irOp = kIROp_ForwardDifferentiate;
+        break;
+    case BuiltinRequirementKind::BwdApplyFunc:
+        synFunc->irOp = kIROp_BackwardDifferentiatePrimal;
+        break;
+    case BuiltinRequirementKind::BwdCallablePropFunc:
+        synFunc->irOp = kIROp_BackwardDifferentiatePropagate;
+        break;
+    case BuiltinRequirementKind::BwdCallableGetValFunc:
+        synFunc->irOp = kIROp_BackwardContextGetPrimalVal;
+        break;
+    case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+        synFunc->irOp = kIROp_BackwardDifferentiate;
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown builtin requirement kind.");
+    }*/
 
     context->parentDecl->members.add(synFunc);
     context->parentDecl->invalidateMemberDictionary();
@@ -10337,7 +10967,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             }
         }
     }
-    if (decl->findModifier<DifferentiableAttribute>())
+    if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
     {
         // Add `no_diff` modifiers to parameters.
         // This is necessary to preserve no-diff-ness for generic function before and after
@@ -10365,6 +10995,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 }
             }
         }
+
         if (!isEffectivelyStatic(decl))
         {
             auto constrefAttr = decl->findModifier<ConstRefAttribute>();
@@ -10378,6 +11009,82 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         Diagnostics::cannotUseConstRefOnDifferentiableMemberMethod);
                 }
             }
+        }
+
+        // Translate to AD 2.0 system be creating declarations of the form
+        // extension __func_as_type(decl) : IForwardDifferentiable<__func_as_type(decl)>
+        // { /* ..empty.. */ }
+        // and
+        // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
+        // { /* ..empty.. */ }
+
+        // Skip if this is a requirement (we need to add this as constraints in that case)
+        // TODO: Add as constraints for interface requirements.
+        if (as<FunctionDeclBase>(decl) && !isInterfaceRequirement(decl))
+        {
+            // Forward diff..
+            auto fwdDiffExtension = m_astBuilder->create<ExtensionDecl>();
+            auto funcDeclRef = decl->getDefaultDeclRef();
+            funcDeclRef =
+                createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), this, funcDeclRef);
+            auto funcAsType = DeclRefType::create(m_astBuilder, funcDeclRef);
+
+            // decl->members.add(fwdDiffExtension);
+            fwdDiffExtension->parentDecl = decl;
+            fwdDiffExtension->loc = diffAttr->loc;
+
+            SubstitutionSet substSet;
+            liftDeclFromGenericContainers(fwdDiffExtension, substSet);
+
+            auto funcAsType1 = as<Type>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
+            fwdDiffExtension->targetType.type = funcAsType1;
+            fwdDiffExtension->targetType.exp = m_astBuilder->create<SharedTypeExpr>();
+            fwdDiffExtension->targetType.exp->type =
+                m_astBuilder->getOrCreate<TypeType>(funcAsType1);
+
+            auto fwdDiffInheritanceDecl = m_astBuilder->create<InheritanceDecl>();
+            fwdDiffInheritanceDecl->base.type =
+                m_astBuilder->getForwardDiffFuncInterfaceType(funcAsType1);
+            fwdDiffExtension->addMember(fwdDiffInheritanceDecl);
+
+            // Backward diff..
+            auto bwdDiffExtension = m_astBuilder->create<ExtensionDecl>();
+            bwdDiffExtension->parentDecl = decl;
+            bwdDiffExtension->loc = diffAttr->loc;
+            // decl->members.add(bwdDiffExtension);
+
+            SubstitutionSet substSet2;
+            liftDeclFromGenericContainers(bwdDiffExtension, substSet2);
+
+            auto funcAsType2 = as<Type>(funcAsType->substitute(getCurrentASTBuilder(), substSet2));
+            bwdDiffExtension->targetType.type = funcAsType2;
+            bwdDiffExtension->targetType.exp = m_astBuilder->create<SharedTypeExpr>();
+            bwdDiffExtension->targetType.exp->type =
+                m_astBuilder->getOrCreate<TypeType>(funcAsType2);
+
+            auto bwdDiffInheritanceDecl = m_astBuilder->create<InheritanceDecl>();
+            bwdDiffInheritanceDecl->base.type =
+                m_astBuilder->getBackwardDiffFuncInterfaceType(funcAsType2);
+
+            bwdDiffExtension->addMember(bwdDiffInheritanceDecl);
+
+            // Add the forward diff extension to the module.
+            Decl* outermostFwdDiffDecl = fwdDiffExtension;
+            while (outermostFwdDiffDecl->parentDecl &&
+                   !as<ModuleDecl>(outermostFwdDiffDecl->parentDecl))
+            {
+                outermostFwdDiffDecl = outermostFwdDiffDecl->parentDecl;
+            }
+            getModuleDecl(decl)->addMember(outermostFwdDiffDecl);
+
+            // Add the backward diff extension to the module.
+            Decl* outermostBwdDiffDecl = bwdDiffExtension;
+            while (outermostBwdDiffDecl->parentDecl &&
+                   !as<ModuleDecl>(outermostBwdDiffDecl->parentDecl))
+            {
+                outermostBwdDiffDecl = outermostBwdDiffDecl->parentDecl;
+            }
+            getModuleDecl(decl)->addMember(outermostBwdDiffDecl);
         }
     }
 }
@@ -10682,7 +11389,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* 
 
             return;
         }
-        else if (auto funcDeclRef = targetDeclRefType->getDeclRef().as<FuncDecl>())
+        else if (auto funcDeclRef = targetDeclRefType->getDeclRef().as<FunctionDeclBase>())
         {
             auto funcDecl = funcDeclRef.getDecl();
 
@@ -12188,6 +12895,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
         break;
 
     case DeclCheckState::ReadyForLookup:
+        SemanticsDeclDifferentialAttributesVisitor(shared).dispatch(decl);
         SemanticsDeclBasesVisitor(shared).dispatch(decl);
         break;
 
@@ -12394,7 +13102,14 @@ void checkDerivativeAttributeImpl(
     if (auto declRefExpr = as<DeclRefExpr>(checkedFuncExpr))
     {
         if (declRefExpr->declRef)
-            visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+        {
+            if (auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>())
+            {
+                for (auto paramDecl : callableDeclRef.getDecl()->getMembersOfType<ParamDecl>())
+                    visitor->ensureDecl(paramDecl, DeclCheckState::TypesFullyResolved);
+            }
+            // visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+        }
         else
         {
             visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
@@ -12405,7 +13120,12 @@ void checkDerivativeAttributeImpl(
     {
         for (auto candidate : overloadedExpr->lookupResult2.items)
         {
-            visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
+            // visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
+            if (auto callableDeclRef = candidate.declRef.as<CallableDecl>())
+            {
+                for (auto paramDecl : callableDeclRef.getDecl()->getMembersOfType<ParamDecl>())
+                    visitor->ensureDecl(paramDecl, DeclCheckState::TypesFullyResolved);
+            }
         }
     }
     else
@@ -12413,6 +13133,18 @@ void checkDerivativeAttributeImpl(
         visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
         return;
     }
+
+    /*if (!as<DeclRefExpr>(checkedFuncExpr))
+    {
+        visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+        return;
+    }
+
+    if (!as<DeclRefExpr>(checkedFuncExpr)->declRef)
+    {
+        visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+        return;
+    }*/
 
     // If left value is true, then convert the
     // inner type to an InOutType.
@@ -12989,6 +13721,161 @@ void checkDerivativeOfAttributeImpl(
     visitor->getShared()->registerAssociatedDecl(calleeDeclRef.getDecl(), assocKind, funcDecl);
 }
 
+static void translateFwdDerivativeAttributeToAD2(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    ForwardDerivativeAttribute* attr)
+{
+    //
+    // Translate to AD 2.0 system.
+    //
+
+    // Create an extension for the target function &
+    // and insert a decl that is a reference to that
+    // target
+    //
+    auto astBuilder = visitor->getASTBuilder();
+    auto fwdDiffExtension = astBuilder->create<ExtensionDecl>();
+    auto funcDeclRef = funcDecl->getDefaultDeclRef();
+    funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
+    auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
+
+    fwdDiffExtension->parentDecl = funcDecl;
+    fwdDiffExtension->loc = attr->loc;
+
+    SubstitutionSet substSet;
+    visitor->liftDeclFromGenericContainers(fwdDiffExtension, substSet);
+
+    funcAsType = as<Type>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
+    fwdDiffExtension->targetType.type = funcAsType;
+    fwdDiffExtension->targetType.exp = astBuilder->create<SharedTypeExpr>();
+    fwdDiffExtension->targetType.exp->type = astBuilder->getOrCreate<TypeType>(funcAsType);
+
+    auto fwdDiffInheritanceDecl = astBuilder->create<InheritanceDecl>();
+    fwdDiffInheritanceDecl->base.type = astBuilder->getForwardDiffFuncInterfaceType(funcAsType);
+    fwdDiffExtension->addMember(fwdDiffInheritanceDecl);
+
+    auto userDefinedFwdDiffFunc =
+        substituteDeclRef(substSet, astBuilder, as<DeclRefExpr>(attr->funcExpr)->declRef);
+
+    auto synFunc = astBuilder->create<SynthesizedFuncDecl>();
+    synFunc->nameAndLoc.loc = userDefinedFwdDiffFunc.getLoc();
+    // Name must be "fwd_diff"
+    synFunc->nameAndLoc.name = astBuilder->getNamePool()->getName("fwd_diff");
+    auto funcType = as<FuncType>(
+        visitor->GetTypeForDeclRef(userDefinedFwdDiffFunc, userDefinedFwdDiffFunc.getLoc()));
+    SLANG_ASSERT(funcType);
+
+    // Make synFunc static.
+    auto staticModifier = astBuilder->create<HLSLStaticModifier>();
+    addModifier(synFunc, staticModifier);
+
+    // Insert synthesized param-decls.
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto paramDecl = astBuilder->create<ParamDecl>();
+        paramDecl->type.type = paramType;
+        synFunc->addMember(paramDecl);
+    }
+
+    synFunc->returnType.type = funcType->getResultType();
+    synFunc->irOp = kIROp_FunctionCopy;
+    SLANG_ASSERT(userDefinedFwdDiffFunc.as<FunctionDeclBase>());
+    synFunc->operands.add(userDefinedFwdDiffFunc.as<FunctionDeclBase>());
+
+    fwdDiffExtension->addMember(synFunc);
+
+    // Add the forward diff extension to the module.
+    Decl* outermostFwdDiffDecl = fwdDiffExtension;
+    while (outermostFwdDiffDecl->parentDecl && !as<ModuleDecl>(outermostFwdDiffDecl->parentDecl))
+    {
+        outermostFwdDiffDecl = outermostFwdDiffDecl->parentDecl;
+    }
+
+    getModuleDecl(funcDecl)->addMember(outermostFwdDiffDecl);
+    // End AD 2.0 translation
+}
+
+
+static void translateBwdDerivativeAttributeToAD2(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    BackwardDerivativeAttribute* attr)
+{
+    //
+    // Translate to AD 2.0 system.
+    //
+    // Same logic as in `translateFwdDerivativeAttributeToAD2`, except we
+    // add a `bwd_diff` synthesized function instead of `fwd_diff` &
+    // the conformance is to `IBackwardDifferentiable<Self>`
+    //
+
+    // Create an extension for the target function &
+    // and insert a decl that is a reference to that
+    // target
+    //
+    auto astBuilder = visitor->getASTBuilder();
+    auto bwdDiffExtension = astBuilder->create<ExtensionDecl>();
+    auto funcDeclRef = funcDecl->getDefaultDeclRef();
+    funcDeclRef = createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, funcDeclRef);
+    auto funcAsType = DeclRefType::create(astBuilder, funcDeclRef);
+
+    bwdDiffExtension->parentDecl = funcDecl;
+    bwdDiffExtension->loc = attr->loc;
+
+    SubstitutionSet substSet;
+    visitor->liftDeclFromGenericContainers(bwdDiffExtension, substSet);
+
+    funcAsType = as<Type>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
+    bwdDiffExtension->targetType.type = funcAsType;
+    bwdDiffExtension->targetType.exp = astBuilder->create<SharedTypeExpr>();
+    bwdDiffExtension->targetType.exp->type = astBuilder->getOrCreate<TypeType>(funcAsType);
+
+    auto bwdDiffInheritanceDecl = astBuilder->create<InheritanceDecl>();
+    bwdDiffInheritanceDecl->base.type = astBuilder->getBackwardDiffFuncInterfaceType(funcAsType);
+    bwdDiffExtension->addMember(bwdDiffInheritanceDecl);
+
+    auto userDefinedBwdDiffFunc =
+        substituteDeclRef(substSet, astBuilder, as<DeclRefExpr>(attr->funcExpr)->declRef);
+
+    auto synFunc = astBuilder->create<SynthesizedFuncDecl>();
+    synFunc->nameAndLoc.loc = userDefinedBwdDiffFunc.getLoc();
+    // Name must be "bwd_diff"
+    synFunc->nameAndLoc.name = astBuilder->getNamePool()->getName("bwd_diff");
+    auto funcType = as<FuncType>(
+        visitor->GetTypeForDeclRef(userDefinedBwdDiffFunc, userDefinedBwdDiffFunc.getLoc()));
+    SLANG_ASSERT(funcType);
+
+    // Make synFunc static.
+    // auto staticModifier = astBuilder->create<HLSLStaticModifier>();
+    // addModifier(synFunc, staticModifier);
+
+    // Insert synthesized param-decls.
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto paramDecl = astBuilder->create<ParamDecl>();
+        paramDecl->type.type = paramType;
+        synFunc->addMember(paramDecl);
+    }
+
+    synFunc->returnType.type = funcType->getResultType();
+    synFunc->irOp = kIROp_FunctionCopy;
+    SLANG_ASSERT(userDefinedBwdDiffFunc.as<FunctionDeclBase>());
+    synFunc->operands.add(userDefinedBwdDiffFunc.as<FunctionDeclBase>());
+
+    bwdDiffExtension->addMember(synFunc);
+
+    // Add the forward diff extension to the module.
+    Decl* outermostBwdDiffDecl = bwdDiffExtension;
+    while (outermostBwdDiffDecl->parentDecl && !as<ModuleDecl>(outermostBwdDiffDecl->parentDecl))
+    {
+        outermostBwdDiffDecl = outermostBwdDiffDecl->parentDecl;
+    }
+
+    getModuleDecl(funcDecl)->addMember(outermostBwdDiffDecl);
+    // End AD 2.0 translation
+}
+
 static void checkDerivativeAttribute(
     SemanticsVisitor* visitor,
     FunctionDeclBase* funcDecl,
@@ -13009,6 +13896,14 @@ static void checkDerivativeAttribute(
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
         imaginaryArguments.thisArgDirection);
+
+    if (!as<DeclRefExpr>(attr->funcExpr))
+    {
+        // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
+        return;
+    }
+
+    translateFwdDerivativeAttributeToAD2(visitor, funcDecl, attr);
 }
 
 static void checkDerivativeAttribute(
@@ -13031,6 +13926,14 @@ static void checkDerivativeAttribute(
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
         imaginaryArguments.thisArgDirection);
+
+    if (!as<DeclRefExpr>(attr->funcExpr))
+    {
+        // If the funcExpr did not resolve to a declRefExpr, we can't do anything.
+        return;
+    }
+
+    translateBwdDerivativeAttributeToAD2(visitor, funcDecl, attr);
 }
 
 static void checkDerivativeAttribute(
@@ -13162,7 +14065,7 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 }
 
-void SemanticsDeclAttributesVisitor::checkForwardDerivativeOfAttribute(
+void SemanticsDeclDifferentialAttributesVisitor::checkForwardDerivativeOfAttribute(
     FunctionDeclBase* funcDecl,
     ForwardDerivativeOfAttribute* attr)
 {
@@ -13173,7 +14076,7 @@ void SemanticsDeclAttributesVisitor::checkForwardDerivativeOfAttribute(
         DeclAssociationKind::ForwardDerivativeFunc);
 }
 
-void SemanticsDeclAttributesVisitor::checkBackwardDerivativeOfAttribute(
+void SemanticsDeclDifferentialAttributesVisitor::checkBackwardDerivativeOfAttribute(
     FunctionDeclBase* funcDecl,
     BackwardDerivativeOfAttribute* attr)
 {
@@ -13184,7 +14087,7 @@ void SemanticsDeclAttributesVisitor::checkBackwardDerivativeOfAttribute(
         DeclAssociationKind::BackwardDerivativeFunc);
 }
 
-void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(
+void SemanticsDeclDifferentialAttributesVisitor::checkPrimalSubstituteOfAttribute(
     FunctionDeclBase* funcDecl,
     PrimalSubstituteOfAttribute* attr)
 {
@@ -13511,7 +14414,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     dispatchSomeBitPackedMembers();
 }
 
-void SemanticsDeclAttributesVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
+void SemanticsDeclDifferentialAttributesVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     // Run checking on attributes that can't be fully checked in header checking stage.
     for (auto attr : decl->modifiers)

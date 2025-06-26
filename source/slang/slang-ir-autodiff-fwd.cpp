@@ -703,7 +703,6 @@ IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
 //
 InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* origCall)
 {
-
     IRInst* origCallee = origCall->getCallee();
 
     if (!origCallee)
@@ -732,16 +731,17 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     IRInterfaceRequirementEntry* fwdDiffMethodEntry =
         as<IRInterfaceRequirementEntry>(fwdDiffWitnessInterface->getOperand(0));
 
-    auto assocForwardDiffCallee = builder->emitLookupInterfaceMethodInst(
-        cast<IRFuncType>(resolveFuncType(builder, fwdDiffMethodEntry->getRequirementVal())),
+    auto assocForwardDiffCallee = _lookupWitness(
+        builder,
         fwdDiffWitness,
-        fwdDiffMethodEntry->getRequirementKey());
+        fwdDiffMethodEntry->getRequirementKey(),
+        cast<IRFuncType>(resolveFuncType(builder, fwdDiffMethodEntry->getRequirementVal())));
 
-    auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
+    // auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
 
     IRInst* diffCallee = assocForwardDiffCallee;
 
-    if (diffCallee)
+    /*if (diffCallee)
     {
     }
     else if (substPrimalCallee == primalCallee)
@@ -775,7 +775,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 primalCallee,
                 as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
-    }
+    }*/
 
     if (!diffCallee)
     {
@@ -792,8 +792,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_ASSERT(diffCalleeType);
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
-    auto placeholderCall =
-        builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+    auto undefinedInst = builder->emitUndefined(builder->getTypeKind());
+    auto placeholderCall = builder->emitCallInst(nullptr, undefinedInst, 0, nullptr);
     builder->setInsertBefore(placeholderCall);
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
@@ -970,8 +970,14 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
     placeholderCall->removeAndDeallocate();
+    undefinedInst->removeAndDeallocate();
 
     argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+
+    // Stick a link back the primal callee so that any future passes can
+    // use this info (e.g. backward AD pass would want to retreive the primalCallee
+    // so that it can look up the associated backward derivative).
+    //
     argBuilder.addAutoDiffOriginalValueDecoration(callInst, primalCallee);
 
     *builder = afterBuilder;
@@ -1925,6 +1931,20 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     return result;
 }
 
+
+void ForwardDiffTranscriber::_transcribeFuncImpl(
+    IRBuilder* inBuilder,
+    IRInst* origInst,
+    IRInst*& fwdDiffFunc)
+{
+    auto origFunc = as<IRFunc>(origInst);
+    SLANG_ASSERT(origFunc);
+    InstPair pair = this->transcribeFuncHeader(inBuilder, origFunc);
+    fwdDiffFunc = pair.differential;
+
+    this->transcribeFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
+}
+
 // Transcribe a function definition.
 InstPair ForwardDiffTranscriber::transcribeFunc(
     IRBuilder* inBuilder,
@@ -2282,6 +2302,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
     if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origParam->getFullType()))
     {
         IRInst* diffPairParam = builder->emitParam(diffPairType);
+        builder->markInstAsMixedDifferential(diffPairParam);
 
         auto diffPairVarName = makeDiffPairName(origParam);
         if (diffPairVarName.getLength() > 0)

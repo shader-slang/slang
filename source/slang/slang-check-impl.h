@@ -1940,6 +1940,8 @@ public:
         DeclRef<Decl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
+    /// Clone generic containers.
+    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
 
     enum SynthesisPattern
     {
@@ -1973,10 +1975,12 @@ public:
         RefPtr<WitnessTable> witnessTable,
         SynthesisPattern pattern);
 
-    bool trySynthesizeForwardDiffFuncRequirementWitness(
+    /// AD 2.0 version of `trySynthesizeDifferentialMethodRequirementWitness`.
+    bool trySynthesizeDiffFuncRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
 
     /// Attempt to synthesize an associated `Differential` type for a type that conforms to
     /// `IDifferentiable`.
@@ -1991,6 +1995,11 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool trySynthesizeForwardDiffFuncTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeBwdContextTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
@@ -2983,6 +2992,7 @@ public:
     Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
     Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
     Expr* visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr);
+    Expr* visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr* expr);
     Expr* visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr);
     Expr* visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr);
     Expr* visitFuncResultTypeExpr(FuncResultTypeExpr* expr);

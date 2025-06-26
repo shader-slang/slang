@@ -75,9 +75,8 @@ void computeMain(uint tig : SV_GroupIndex)
 {
     IFoo foo = getFoo(tig % 2);
 
-    // foo.zap --> IBackwardDifferentiable<foo.__table.zap>
-    let bwdCallable = foo.zap.apply_bwd(1.f); // primal_ctx (bwdCallable -> intermediate-context struct + call() function which is bwd-prop)
-    outputBuffer[tig] = bwdCallable.val(); // primal value
+    let bwdCallable = foo.zap.apply_bwd(1.f); 
+    outputBuffer[tig] = bwdCallable.val(); // primal val.
     
     var dx = 0.f;
     bwdCallable(dx, 2.0); // bwd-prop (dresult = 2.0)

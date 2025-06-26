@@ -3558,6 +3558,17 @@ IRInst* IRBuilder::emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* 
     return inst;
 }
 
+IRInst* IRBuilder::emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn)
+{
+    auto inst = createInst<IRForwardDifferentiatePropagate>(
+        this,
+        kIROp_ForwardDifferentiatePropagate,
+        type,
+        baseFn);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential)
 {
     SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(type));
@@ -8360,6 +8371,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
+    if (as<IRTranslateBase>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8536,14 +8550,18 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
-        return false;
-
-    case kIROp_ForwardDifferentiate:
-    case kIROp_BackwardDifferentiate:
-    case kIROp_BackwardDifferentiatePrimal:
-    case kIROp_BackwardDifferentiatePropagate:
     case kIROp_DetachDerivative:
         return false;
+
+        /* TODO: Remove..
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_BackwardContextGetPrimalVal:
+        case kIROp_ForwardDifferentiatePropagate:
+        case kIROp_FunctionCopy:
+            return false;*/
 
     case kIROp_Div:
     case kIROp_IRem:

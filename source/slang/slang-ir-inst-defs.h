@@ -67,11 +67,14 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
     INST(ForwardDiffFuncType, FwdDiffFuncType, 1, HOISTABLE)
+    INST(BackwardDiffFuncType, BwdDiffFuncType, 1, HOISTABLE)
     INST(ApplyForBwdFuncType, ApplyForBwdFuncType, 1, HOISTABLE)
     INST(BwdCallableFuncType, BwdCallableFuncType, 1, HOISTABLE)
     INST(FuncResultType, FuncResultType, 1, HOISTABLE)
 
+    INST(BackwardContextFromLegacyBwdDiffFunc, BackwardContextFromLegacyBwdDiffFunc, 2, HOISTABLE)
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
+    INST_RANGE(TranslatedTypeBase, BackwardContextFromLegacyBwdDiffFunc, BackwardDiffIntermediateContextType)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
@@ -1261,19 +1264,37 @@ INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
 INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
-INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
+    INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, HOISTABLE)
 
-// Produces the primal computation of backward derivatives, will return an intermediate context for
-// backward derivative func.
-INST(BackwardDifferentiatePrimal,            BackwardDifferentiatePrimal,     1, 0)
+    // Produces the primal computation of backward derivatives, will return an intermediate context for
+    // backward derivative func.
+    INST(BackwardDifferentiatePrimal,            BackwardDifferentiatePrimal,     1, HOISTABLE)
 
-// Produces the actual backward derivative propagate function, using the intermediate context returned by the
-// primal func produced from `BackwardDifferentiatePrimal`.
-INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1, 0)
+    // Produces the actual backward derivative propagate function, using the intermediate context returned by the
+    // primal func produced from `BackwardDifferentiatePrimal`.
+    INST(BackwardDifferentiatePropagate,         BackwardDifferentiatePropagate,  1, HOISTABLE)
 
-// Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
-// replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
-INST(BackwardDifferentiate, BackwardDifferentiate, 1, 0)
+    // AD 2.0 inst to get the primal value from the backward context.
+    INST(BackwardContextGetPrimalVal,            BackwardContextGetPrimalVal,     1, HOISTABLE)
+
+    // AD 2.0 inst for internal use. Represents a forward-propagation function that
+    // accepts the bwd-context. 
+    // 
+    INST(ForwardDifferentiatePropagate,        ForwardDifferentiatePropagate,   1, HOISTABLE)
+
+    // AD 2.0 inst for "copying" a function as-is. Useful for representing the same function
+    // under different contexts/names, while retaining a single definition.
+    INST(FunctionCopy, FunctionCopy, 1, HOISTABLE)
+
+    // Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
+    // replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
+    INST(BackwardDifferentiate, BackwardDifferentiate, 3, HOISTABLE)
+
+    // Legacy to AD 2.0 Translation insts.
+    INST(BackwardPrimalFromLegacyBwdDiffFunc, BackwardPrimalFromLegacyBwdDiffFunc, 2, HOISTABLE)
+    INST(BackwardPropagateFromLegacyBwdDiffFunc, BackwardPropagateFromLegacyBwdDiffFunc, 2, HOISTABLE)
+
+INST_RANGE(TranslateBase, ForwardDifferentiate, BackwardPropagateFromLegacyBwdDiffFunc)
 
 INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
 

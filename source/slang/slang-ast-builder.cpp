@@ -134,11 +134,6 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
-Type* SharedASTBuilder::getForwardDiffFuncInterfaceType()
-{
-    return nullptr;
-}
-
 Type* SharedASTBuilder::getIBufferDataLayoutType()
 {
     if (!m_IBufferDataLayoutType)
@@ -283,6 +278,47 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     auto declRef = getBuiltinDeclRef(magicTypeName, genericArgs);
     auto rsType = DeclRefType::create(this, declRef);
     return rsType;
+}
+
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+
+Type* ASTBuilder::getLegacyBackwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("LegacyBwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
 }
 
 PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)

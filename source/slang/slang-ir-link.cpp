@@ -707,7 +707,8 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
                 if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr") ||
                     name == toSlice("IDifferentiableFuncBase") ||
-                    name == toSlice("IForwardDifferentiable"))
+                    name == toSlice("IForwardDifferentiable") ||
+                    name == toSlice("IBackwardDifferentiable") || name == toSlice("IBwdCallable"))
                     return context->getShared()->useAutodiff;
                 break;
             }
@@ -1940,6 +1941,8 @@ bool doesModuleUseAutodiff(IRInst* inst)
             case kIROp_BackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
             case kIROp_BackwardDifferentiatePropagate:
+            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
                 return true;
             }
         }

@@ -24,6 +24,7 @@ inline bool isMixedDifferentialInst(IRInst* inst)
     return inst->findDecoration<IRMixedDifferentialInstDecoration>();
 }
 
+// TODO(Sai): This is unused...
 struct DiffPropagationPass : InstPassBase
 {
     AutoDiffSharedContext* autodiffContext;

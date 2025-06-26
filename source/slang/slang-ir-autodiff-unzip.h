@@ -71,10 +71,12 @@ struct DiffUnzipPass
         // a use from the primal or diff part of the program.
         builder->setInsertBefore(unzippedFunc->getFirstBlock()->getTerminator());
 
-        for (auto primalParam = unzippedFunc->getFirstParam(); primalParam;
-             primalParam = primalParam->getNextParam())
+        /*
+        TODO(sai): old code. remove
+        for (auto fwdParam = unzippedFunc->getFirstParam(); fwdParam;
+             fwdParam = fwdParam->getNextParam())
         {
-            auto type = primalParam->getFullType();
+            auto type = fwdParam->getFullType();
             if (auto ptrType = asRelevantPtrType(type))
             {
                 type = ptrType->getValueType();
@@ -82,15 +84,15 @@ struct DiffUnzipPass
             if (auto pairType = as<IRDifferentialPairType>(type))
             {
                 IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
-                if (auto ptrType = asRelevantPtrType(primalParam->getFullType()))
+                if (auto ptrType = asRelevantPtrType(fwdParam->getFullType()))
                     diffType = builder->getPtrType(ptrType->getOp(), (IRType*)diffType);
-                auto primalRef = builder->emitPrimalParamRef(primalParam);
-                auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
+                auto primalRef = builder->emitPrimalParamRef(fwdParam);
+                auto diffRef = builder->emitDiffParamRef((IRType*)diffType, fwdParam);
                 builder->markInstAsDifferential(diffRef, pairType->getValueType());
-                primalMap[primalParam] = primalRef;
-                diffMap[primalParam] = diffRef;
+                primalMap[fwdParam] = primalRef;
+                diffMap[fwdParam] = diffRef;
             }
-        }
+        }*/
 
         // Functions need to have at least two blocks at this point (one for parameters,
         // and atleast one for code)
@@ -98,9 +100,7 @@ struct DiffUnzipPass
         SLANG_ASSERT(unzippedFunc->getFirstBlock() != nullptr);
         SLANG_ASSERT(unzippedFunc->getFirstBlock()->getNextBlock() != nullptr);
 
-        IRBlock* firstBlock =
-            as<IRUnconditionalBranch>(unzippedFunc->getFirstBlock()->getTerminator())
-                ->getTargetBlock();
+        IRBlock* firstBlock = unzippedFunc->getFirstBlock();
 
         List<IRBlock*> mixedBlocks;
         for (IRBlock* block = firstBlock; block; block = block->getNextBlock())
@@ -142,12 +142,22 @@ struct DiffUnzipPass
             // to be replaced with a brahcn into this block.
             //
             if (block == firstBlock)
-                this->firstDiffBlock = diffBlock;
+                firstDiffBlock = diffBlock;
         }
 
         // Split each block into two.
         for (auto block : mixedBlocks)
         {
+            // Special case the parameter block.
+            if (block == firstBlock)
+            {
+                splitParameterBlock(
+                    block,
+                    as<IRBlock>(primalMap[block]),
+                    as<IRBlock>(diffMap[block]));
+                continue;
+            }
+
             splitBlock(block, as<IRBlock>(primalMap[block]), as<IRBlock>(diffMap[block]));
         }
 
@@ -173,7 +183,7 @@ struct DiffUnzipPass
         }
 
         // Swap the first block's occurences out for the first primal block.
-        firstBlock->replaceUsesWith(firstPrimalBlock);
+        // firstBlock->replaceUsesWith(firstPrimalBlock);
 
         RefPtr<BlockSplitInfo> splitInfo = new BlockSplitInfo();
 
@@ -190,8 +200,8 @@ struct DiffUnzipPass
         IRFunc* func,
         IRFunc* originalFunc,
         HoistedPrimalsInfo* primalsInfo,
-        ParameterBlockTransposeInfo& paramInfo,
-        IRInst*& intermediateType);
+        IRInst*& intermediateType,
+        IRFunc*& getValFunc);
 
     static IRInst* _getOriginalFunc(IRInst* call)
     {
@@ -248,6 +258,142 @@ struct DiffUnzipPass
         auto baseFn = _getOriginalFunc(mixedCall);
         SLANG_RELEASE_ASSERT(baseFn);
 
+        // AD 2.0 logic..
+        auto bwdDiffWitness = diffTypeContext.tryGetWitnessOfKind(
+            baseFn,
+            DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardDifferentiable);
+
+        auto bwdDiffWitnessType = as<IRWitnessTableType>(bwdDiffWitness->getDataType());
+        auto bwdDiffWitnessInterface =
+            as<IRInterfaceType>(bwdDiffWitnessType->getConformanceType());
+        // TODO: remove hardcoded index (use key)
+        IRInterfaceRequirementEntry* applyBwdMethodEntry =
+            as<IRInterfaceRequirementEntry>(bwdDiffWitnessInterface->getOperand(2));
+
+        auto applyBwdFunc = _lookupWitness(
+            primalBuilder,
+            bwdDiffWitness,
+            applyBwdMethodEntry->getRequirementKey(),
+            cast<IRFuncType>(diffTypeContext.resolveType(
+                primalBuilder,
+                applyBwdMethodEntry->getRequirementVal())));
+
+        auto applyBwdFuncType = as<IRFuncType>(applyBwdFunc->getDataType());
+
+        List<IRInst*> applyFuncArgs;
+        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
+        {
+            auto arg = mixedCall->getArg(ii);
+            if (isMixedDifferentialInst(arg))
+                applyFuncArgs.add(lookupPrimalInst(arg));
+            else
+                applyFuncArgs.add(arg);
+        }
+
+        auto contextVal = primalBuilder->emitCallInst(
+            applyBwdFuncType->getResultType(),
+            applyBwdFunc,
+            applyFuncArgs);
+        primalBuilder->markInstAsPrimal(contextVal);
+
+        auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
+            baseFn,
+            DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardPropCallable);
+        auto bwdCallableWitnessType = as<IRWitnessTableType>(bwdCallableWitness->getDataType());
+        auto bwdCallableWitnessInterface =
+            as<IRInterfaceType>(bwdCallableWitnessType->getConformanceType());
+        // TODO: remove hardcoded index (use key)
+        IRInterfaceRequirementEntry* getValMethodEntry =
+            as<IRInterfaceRequirementEntry>(bwdCallableWitnessInterface->getOperand(1));
+
+        auto getValFunc = _lookupWitness(
+            primalBuilder,
+            bwdCallableWitness,
+            getValMethodEntry->getRequirementKey(),
+            cast<IRFuncType>(diffTypeContext.resolveType(
+                primalBuilder,
+                getValMethodEntry->getRequirementVal())));
+        primalBuilder->markInstAsPrimal(getValFunc);
+
+        // Extract the primal return value from the context.
+        // This will serve as the primal part of the mixed call.
+        //
+        auto primalReturnVal = primalBuilder->emitCallInst(
+            as<IRFuncType>(getValFunc->getDataType())->getResultType(),
+            getValFunc,
+            List<IRInst*>(contextVal));
+        primalBuilder->markInstAsPrimal(primalReturnVal);
+
+        //
+        // Now place a call to the forward-propagation function for
+        // the differential part of the mixed call.
+        //
+        // Note that the forward-propagation function is not actually
+        // a real function, just a logically consistent placeholder
+        // that the transpose function can flip (to the backward propagate
+        // func)
+        //
+
+        List<IRInst*> propFuncArgs;
+        propFuncArgs.add(contextVal);
+        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
+        {
+            auto arg = mixedCall->getArg(ii);
+            if (isMixedDifferentialInst(arg))
+                propFuncArgs.add(lookupDiffInst(arg));
+            else
+                propFuncArgs.add(diffBuilder->getVoidValue());
+        }
+
+        // Build forward-prop func type. This is just the .Differential
+        // of each param type & result type.
+        //
+        List<IRType*> fwdPropFuncParamTypes;
+        auto baseFuncType = cast<IRFuncType>(baseFn->getFullType());
+        fwdPropFuncParamTypes.add(contextVal->getDataType());
+        for (UIndex ii = 0; ii < baseFuncType->getParamCount(); ii++)
+        {
+            const auto& [paramDirection, paramType] =
+                splitDirectionAndType(baseFuncType->getParamType(ii));
+            if (auto diffType = diffTypeContext.getDifferentialForType(diffBuilder, paramType))
+            {
+                fwdPropFuncParamTypes.add(
+                    fromDirectionAndType(diffBuilder, paramDirection, (IRType*)diffType));
+            }
+            else
+            {
+                fwdPropFuncParamTypes.add(diffBuilder->getVoidType());
+            }
+        }
+
+        IRType* fwdPropFuncResultType = nullptr;
+        if (auto diffType =
+                diffTypeContext.getDifferentialForType(diffBuilder, baseFuncType->getResultType()))
+        {
+            fwdPropFuncResultType = (IRType*)diffType;
+        }
+        else
+        {
+            fwdPropFuncResultType = diffBuilder->getVoidType();
+        }
+
+        auto fwdPropFuncType =
+            diffBuilder->getFuncType(fwdPropFuncParamTypes, fwdPropFuncResultType);
+
+        // ....
+        auto fwdPropFuncInst =
+            diffBuilder->emitForwardDifferentiatePropagateInst(fwdPropFuncType, baseFn);
+        diffBuilder->markInstAsDifferential(fwdPropFuncInst, fwdPropFuncType, primalReturnVal);
+
+        auto fwdPropCall = diffBuilder->emitCallInst(
+            fwdPropFuncType->getResultType(),
+            fwdPropFuncInst,
+            propFuncArgs);
+        diffBuilder->markInstAsDifferential(fwdPropCall, fwdPropFuncType, primalReturnVal);
+
+        return InstPair(primalReturnVal, fwdPropCall);
+
+        /* old code..
         auto primalFuncType =
             autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
                 primalBuilder,
@@ -448,6 +594,7 @@ struct DiffUnzipPass
             diffBuilder->markInstAsDifferential(diffVal, primalType);
         }
         return InstPair(primalVal, diffVal);
+        */
     }
 
     InstPair splitMakePair(IRBuilder*, IRBuilder*, IRMakeDifferentialPair* mixedPair)
@@ -508,13 +655,13 @@ struct DiffUnzipPass
                 primalBranch,
                 lookupPrimalInst(mixedReturn->getVal()));
 
-            auto pairVal = diffBuilder->emitMakeDifferentialPair(
+            /*auto pairVal = diffBuilder->emitMakeDifferentialPair(
                 pairType,
                 lookupPrimalInst(mixedReturn->getVal()),
                 lookupDiffInst(mixedReturn->getVal()));
-            diffBuilder->markInstAsDifferential(pairVal, primalType);
+            diffBuilder->markInstAsDifferential(pairVal, primalType);*/
 
-            auto returnInst = diffBuilder->emitReturn(pairVal);
+            auto returnInst = diffBuilder->emitReturn(lookupDiffInst(mixedReturn->getVal()));
             diffBuilder->markInstAsDifferential(returnInst, primalType);
 
             return InstPair(primalBranch, returnInst);
@@ -741,6 +888,56 @@ struct DiffUnzipPass
 
         primalMap[inst] = instPair.primal;
         diffMap[inst] = instPair.differential;
+    }
+
+    void splitParameterBlock(IRBlock* paramBlock, IRBlock* primalBlock, IRBlock* diffBlock)
+    {
+        List<IRParam*> fwdParams;
+        for (auto param : paramBlock->getParams())
+            fwdParams.add(param);
+
+        // Split the parameters into two and insert them into the
+        // appropriate blocks.
+        //
+        IRBuilder primalBuilder(autodiffContext->moduleInst->getModule());
+        primalBuilder.setInsertInto(primalBlock);
+
+        IRBuilder diffBuilder(autodiffContext->moduleInst->getModule());
+        diffBuilder.setInsertInto(diffBlock);
+
+        for (auto fwdParam : fwdParams)
+        {
+            // Is this a mixed differential param?
+            if (isMixedDifferentialInst(fwdParam))
+            {
+                const auto& [pairDirection, pairType] =
+                    splitDirectionAndType(fwdParam->getDataType());
+                SLANG_ASSERT(isRelevantDifferentialPair(pairType));
+
+                auto primalType = as<IRDifferentialPairTypeBase>(pairType)->getValueType();
+                auto diffType = (IRType*)diffTypeContext.getDiffTypeFromPairType(
+                    &diffBuilder,
+                    as<IRDifferentialPairTypeBase>(pairType));
+
+                auto primalParam = primalBuilder.emitParam(
+                    fromDirectionAndType(&primalBuilder, pairDirection, primalType));
+                auto diffParam = diffBuilder.emitParam(
+                    fromDirectionAndType(&diffBuilder, pairDirection, diffType));
+                diffBuilder.markInstAsDifferential(diffParam, primalType);
+
+                primalMap[fwdParam] = primalParam;
+                diffMap[fwdParam] = diffParam;
+            }
+            else
+            {
+                // Move to primal block.
+                fwdParam->insertAtEnd(primalBlock);
+                auto diffParam = diffBuilder.emitParam(diffBuilder.getVoidType());
+                primalMap[fwdParam] = fwdParam;
+            }
+        }
+
+        splitControlFlow(&primalBuilder, &diffBuilder, paramBlock->getTerminator());
     }
 
     void splitBlock(IRBlock* block, IRBlock* primalBlock, IRBlock* diffBlock)

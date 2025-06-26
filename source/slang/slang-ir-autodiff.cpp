@@ -31,7 +31,7 @@ IRInst* _lookupWitness(
     IRBuilder* builder,
     IRInst* witness,
     IRInst* requirementKey,
-    IRType* resultType = nullptr)
+    IRType* resultType)
 {
     if (auto witnessTable = as<IRWitnessTable>(witness))
     {
@@ -40,6 +40,7 @@ IRInst* _lookupWitness(
             if (entry->getRequirementKey() == requirementKey)
                 return entry->getSatisfyingVal();
         }
+        SLANG_UNEXPECTED("requirement not found in concrete witness table");
     }
     else if (auto interfaceType = as<IRInterfaceType>(witness))
     {
@@ -49,6 +50,7 @@ IRInst* _lookupWitness(
             if (entry->getRequirementKey() == requirementKey)
                 return entry->getRequirementVal();
         }
+        SLANG_UNEXPECTED("requirement entry not found in concrete interface type");
     }
     else if (as<IRMakeWitnessPack>(witness))
     {
@@ -59,6 +61,7 @@ IRInst* _lookupWitness(
     }
     else
     {
+        // Existential witness table. Emit a lookup instruction.
         SLANG_ASSERT(resultType);
         return builder->emitLookupInterfaceMethodInst(resultType, witness, requirementKey);
     }
@@ -2569,6 +2572,62 @@ void stripTempDecorations(IRInst* inst)
 }
 
 
+std::tuple<IRParameterDirection, IRType*> splitDirectionAndType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_InOutType:
+        return std::make_tuple(IRParameterDirection::InOut, as<IRInOutType>(type)->getValueType());
+    case kIROp_OutType:
+        return std::make_tuple(IRParameterDirection::Out, as<IROutType>(type)->getValueType());
+    case kIROp_RefType:
+        return std::make_tuple(IRParameterDirection::Ref, as<IRRefType>(type)->getValueType());
+    case kIROp_ConstRefType:
+        return std::make_tuple(
+            IRParameterDirection::ConstRef,
+            as<IRConstRefType>(type)->getValueType());
+    default:
+        return std::make_tuple(IRParameterDirection::In, type);
+    }
+}
+
+IRParameterDirection transposeDirection(IRParameterDirection direction)
+{
+    switch (direction)
+    {
+    case IRParameterDirection::In:
+        return IRParameterDirection::Out;
+    case IRParameterDirection::Out:
+        return IRParameterDirection::In;
+    case IRParameterDirection::InOut:
+        return IRParameterDirection::InOut;
+    case IRParameterDirection::Ref:
+        return IRParameterDirection::Ref;
+    case IRParameterDirection::ConstRef:
+        return IRParameterDirection::ConstRef;
+    default:
+        SLANG_UNREACHABLE("Invalid parameter direction");
+    }
+}
+
+IRType* fromDirectionAndType(IRBuilder* builder, IRParameterDirection direction, IRType* type)
+{
+    switch (direction)
+    {
+    case IRParameterDirection::In:
+        return type;
+    case IRParameterDirection::Out:
+        return builder->getOutType(type);
+    case IRParameterDirection::InOut:
+        return builder->getInOutType(type);
+    case IRParameterDirection::ConstRef:
+        return builder->getConstRefType(type);
+    case IRParameterDirection::Ref: // unhandled for now..
+    default:
+        SLANG_UNREACHABLE("Invalid parameter direction");
+    }
+}
+
 struct StripNoDiffTypeAttributePass : InstPassBase
 {
     StripNoDiffTypeAttributePass(IRModule* module)
@@ -2781,11 +2840,14 @@ struct AutoDiffPass : public InstPassBase
                                 {
                                     auto bwdFuncDecor = func->findDecoration<
                                         IRBackwardDerivativePropagateDecoration>();
-
-                                    typeToBwdFuncMap.add(
-                                        type,
-                                        cast<IRGlobalValueWithCode>(
-                                            bwdFuncDecor->getBackwardDerivativePropagateFunc()));
+                                    if (bwdFuncDecor)
+                                    {
+                                        typeToBwdFuncMap.add(
+                                            type,
+                                            cast<IRGlobalValueWithCode>(
+                                                bwdFuncDecor
+                                                    ->getBackwardDerivativePropagateFunc()));
+                                    }
                                 }
 
                                 inst->replaceUsesWith(type);
@@ -2804,9 +2866,12 @@ struct AutoDiffPass : public InstPassBase
         }
         // Now we generate the differential type for the intermediate context type
         // to allow higher order differentiation.
+        /*
+        Disabled for AD 2.0 (dropping support for differentiating bwd-diffed funcs)
         generateDifferentialImplementationForContextType(
             loweredIntermediateTypes,
             typeToBwdFuncMap);
+        */
         return result;
     }
 
@@ -3287,7 +3352,7 @@ struct AutoDiffPass : public InstPassBase
 
     // Returns true if `func` is fully differentiated, i.e. does not have
     // any differentiate insts.
-    bool isFullyDifferentiated(IRFunc* func)
+    /*bool isFullyDifferentiated(IRFunc* func)
     {
         if (fullyDifferentiatedInsts.contains(func))
             return true;
@@ -3311,6 +3376,80 @@ struct AutoDiffPass : public InstPassBase
         }
         fullyDifferentiatedInsts.add(func);
         return true;
+    }*/
+
+    bool isTranslationOp(IRInst* inst)
+    {
+        if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+            return true;
+        return false;
+
+        /*switch (inst->getOp())
+        {
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_ForwardDifferentiatePropagate:
+        case kIROp_BackwardContextGetPrimalVal:
+        case kIROp_BackwardDiffIntermediateContextType:
+            return true;
+        default:
+            return false;
+        }*/
+    }
+
+    bool hasRelevantUses(IRInst* inst)
+    {
+        // Ignore uses that are in witness table entries,
+        // since they're not being used yet.
+        //
+        // TODO: we'll need to consider cases where the witness
+        // table is being used for dynamic dispatch.
+        //
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (as<IRWitnessTableEntry>(user) || as<IRWitnessTable>(user))
+                continue;
+
+            if (isTranslationOp(user))
+            {
+                if (hasRelevantUses(user))
+                    return true;
+                continue;
+            }
+
+            if (auto funcType = as<IRFuncType>(user))
+            {
+                for (auto _use = funcType->firstUse; _use; _use = _use->nextUse)
+                {
+                    if (hasRelevantUses(_use->getUser()))
+                        return true;
+                }
+
+                continue;
+            }
+
+            // If the user is not a decoration, then we have a relevant use.
+            if (!as<IRDecoration>(user))
+                return true;
+        }
+        return false;
+    }
+
+    bool isInstReadyForTranslation(IRInst* inst)
+    {
+        // Check that all operands are not
+        // IRSpecialize or a translate inst.
+        //
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            if (as<IRSpecialize>(operand) || isTranslationOp(operand))
+                return false;
+        }
+        return true;
     }
 
     // Process all differentiate calls, and recursively generate code for forward and backward
@@ -3323,110 +3462,130 @@ struct AutoDiffPass : public InstPassBase
         for (;;)
         {
             bool changed = false;
-            List<IRInst*> autoDiffWorkList;
-            // Collect all `ForwardDifferentiate`/`BackwardDifferentiate` insts from the call
-            // graph.
+            List<IRInst*> translateInsts;
+
+            // Collect all translation insts that are ready.
             processAllReachableInsts(
                 [&](IRInst* inst)
                 {
-                    switch (inst->getOp())
+                    /*switch (inst->getOp())
                     {
                     case kIROp_ForwardDifferentiate:
                     case kIROp_BackwardDifferentiate:
                     case kIROp_BackwardDifferentiatePrimal:
                     case kIROp_BackwardDifferentiatePropagate:
+                    case kIROp_BackwardContextGetPrimalVal:
                     case kIROp_BackwardDiffIntermediateContextType:
-                        // Only process now if the operand is a materialized function.
-                        switch (inst->getOperand(0)->getOp())
+                    case kIROp_FunctionCopy:*/
+                    if (isTranslationOp(inst) && isInstReadyForTranslation(inst))
+                    {
+                        if (hasRelevantUses(inst))
                         {
-                        case kIROp_Func:
-                            if (auto innerFunc =
-                                    as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
-                            {
-                                // Skip functions whose body still has a differentiate inst
-                                // (higher order func).
-                                if (!isFullyDifferentiated(innerFunc))
-                                {
-                                    addToWorkList(inst->getOperand(0));
-                                    return;
-                                }
-                            }
-                            autoDiffWorkList.add(inst);
-                            break;
-                        case kIROp_Specialize:
-                            // Skip. We'll need specialization to complete before
-                            // processing the result.
-                            //
-                            break;
-                        case kIROp_LookupWitness:
-                        case kIROp_Generic:
-                            // Should not see this anymore.
-                            SLANG_UNEXPECTED(
-                                "IRDifferentiate(IRGeneric/IRLookupWitnes) is not expected any "
-                                "more");
-                        default:
-                            autoDiffWorkList.add(inst->getOperand(0));
-                            break;
+                            translateInsts.add(inst);
+                            addToWorkList(inst->getOperand(0));
                         }
-                        break;
-                    case kIROp_PrimalSubstitute:
-                        // Explicit primal subst operator is not yet supported.
-                        SLANG_UNIMPLEMENTED_X("explicit primal_subst operator.");
-                    default:
-                        for (UInt i = 0; i < inst->getOperandCount(); i++)
+                        else
                         {
-                            auto operand = inst->getOperand(i);
-                            addToWorkList(operand);
+                            // Early return.. no need to add the operands of an inst
+                            // that isn't being used yet.
+                            return;
                         }
-                        break;
+                        /*if (auto innerFunc =
+                                as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
+                        {
+                            // Skip functions whose body still has a differentiate inst
+                            // (higher order func).
+                            // if (!isFullyDifferentiated(innerFunc)) // no needed for AD 2.0
+                            //{
+                            addToWorkList(inst->getOperand(0));
+                            return;
+                            //}
+                        }*/
+                    }
+
+                    if (inst->getDataType())
+                        addToWorkList(inst->getDataType());
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        auto operand = inst->getOperand(i);
+                        addToWorkList(operand);
                     }
                 });
 
             // Process collected differentiate insts and replace them with placeholders for
             // differentiated functions.
 
-            for (Index i = 0; i < autoDiffWorkList.getCount(); i++)
+            for (Index i = 0; i < translateInsts.getCount(); i++)
             {
-                auto differentiateInst = autoDiffWorkList[i];
+                auto translateInst = translateInsts[i];
 
-                IRInst* diffFunc = nullptr;
+                IRInst* translationResult = nullptr;
                 IRBuilder subBuilder(*builder);
-                subBuilder.setInsertBefore(differentiateInst);
-                switch (differentiateInst->getOp())
+                subBuilder.setInsertBefore(translateInst);
+                switch (translateInst->getOp())
                 {
                 case kIROp_ForwardDifferentiate:
                     {
-                        auto baseFunc = as<IRForwardDifferentiate>(differentiateInst)->getBaseFn();
-                        diffFunc = forwardTranscriber.transcribe(&subBuilder, baseFunc);
+                        // auto baseFunc = as<IRForwardDifferentiate>(translateInst)->getBaseFn();
+                        // translationResult = forwardTranscriber.transcribe(&subBuilder, baseFunc);
+                        translationResult = fwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
                     }
                     break;
                 case kIROp_BackwardDifferentiatePrimal:
+                case kIROp_BackwardDifferentiatePropagate:
+                case kIROp_BackwardContextGetPrimalVal:
+                case kIROp_BackwardDiffIntermediateContextType:
                     {
-                        auto baseFunc = differentiateInst->getOperand(0);
-                        diffFunc = backwardPrimalTranscriber.transcribe(&subBuilder, baseFunc);
+                        // TODO: old code..
+                        // auto baseFunc = translateInst->getOperand(0);
+                        // translationResult = backwardPropagateTranscriber.transcribe(&subBuilder,
+                        // baseFunc);
+                        translationResult = bwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
                     }
                     break;
-                case kIROp_BackwardDifferentiatePropagate:
+                case kIROp_FunctionCopy:
                     {
-                        auto baseFunc = differentiateInst->getOperand(0);
-                        diffFunc = backwardPropagateTranscriber.transcribe(&subBuilder, baseFunc);
+                        auto funcOperand = translateInst->getOperand(0);
+                        translationResult = funcOperand;
                     }
                     break;
                 case kIROp_BackwardDifferentiate:
                     {
-                        auto baseFunc = differentiateInst->getOperand(0);
-                        diffFunc = backwardTranscriber.transcribe(&subBuilder, baseFunc);
+                        // SLANG_UNEXPECTED("not supported in AD 2.0");
+                        // auto baseFunc = translateInst->getOperand(0);
+                        // translationResult = backwardTranscriber.transcribe(&subBuilder,
+                        // baseFunc);
+                        translationResult = legacyBwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
+                    }
+                case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+                case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+                case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+                    {
+                        // These are legacy backward differentiation functions that we
+                        // translate to the new style.
+                        translationResult = legacyToNewBwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
                     }
                     break;
                 default:
                     break;
                 }
 
-                if (diffFunc)
+                if (translationResult)
                 {
-                    SLANG_ASSERT(diffFunc);
-                    differentiateInst->replaceUsesWith(diffFunc);
-                    differentiateInst->removeAndDeallocate();
+                    translateInst->replaceUsesWith(translationResult);
+                    translateInst->removeAndDeallocate();
                     changed = true;
                 }
             }
@@ -3434,7 +3593,7 @@ struct AutoDiffPass : public InstPassBase
             // Run transcription logic to generate the body of forward/backward derivatives
             // functions. While doing so, we may discover new functions to differentiate, so we
             // keep running until the worklist goes dry.
-            List<IRFunc*> autodiffCleanupList;
+            /*List<IRFunc*> autodiffCleanupList;
             while (autodiffContext->followUpFunctionsToTranscribe.getCount() != 0)
             {
                 changed = true;
@@ -3482,7 +3641,7 @@ struct AutoDiffPass : public InstPassBase
                 stripTempDecorations(diffFunc);
             }
 
-            autodiffCleanupList.clear();
+            autodiffCleanupList.clear();*/
 
 #if _DEBUG
             validateIRModule(module, sink);
@@ -3491,8 +3650,8 @@ struct AutoDiffPass : public InstPassBase
             if (!changed)
                 break;
 
-            if (lowerIntermediateContextType(builder))
-                hasChanges = true;
+            // if (lowerIntermediateContextType(builder))
+            //     hasChanges = true;
 
             // We have done transcribing the functions, now it is time to demote all
             // DifferentialPair types and their operations down to DifferentialPairUserCodeType
@@ -3574,6 +3733,15 @@ protected:
 
     BackwardDiffTranscriber backwardTranscriber;
 
+    // AD 2.0 Translators
+
+    ForwardDiffTranslator fwdDiffTranslator;
+
+    BackwardDiffTranslator bwdDiffTranslator;
+
+    LegacyBackwardDiffTranslator legacyBwdDiffTranslator;
+
+    LegacyToNewBackwardDiffTranslator legacyToNewBwdDiffTranslator;
 
     // Diagnostic object from the compile request for
     // error messages.

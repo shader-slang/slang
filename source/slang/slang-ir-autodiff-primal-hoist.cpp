@@ -1451,8 +1451,10 @@ void applyCheckpointSet(
     for (auto block : func->getBlocks())
     {
         // Skip parameter block and the param prelude block.
-        if (block == func->getFirstBlock() || block == paramPreludeBlock)
-            continue;
+        // if (block == func->getFirstBlock() || block == paramPreludeBlock)
+        // For AD 2.0, no need for any blocks..
+        // if (block == func->getFirstBlock())
+        //    continue;
 
         if (isDifferentialBlock(block))
             continue;
@@ -1582,7 +1584,8 @@ IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
     IRType* baseType,
     const List<IndexTrackingInfo>& defBlockIndices,
-    SourceLoc location)
+    SourceLoc location,
+    bool shouldInitialize = true)
 {
     // Cannot store pointers. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!asRelevantPtrType(baseType));
@@ -1598,7 +1601,8 @@ IRVar* emitIndexedLocalVar(
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
+    if (shouldInitialize)
+        varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
 
     return var;
 }
@@ -1660,19 +1664,36 @@ IRInst* emitIndexedLoadAddressForVar(
     return loadAddr;
 }
 
+static bool isFuncParam(IRInst* inst)
+{
+    return as<IRParam>(inst) && as<IRBlock>(as<IRParam>(inst)->getParent()) &&
+           as<IRBlock>(as<IRParam>(inst)->getParent()) ==
+               inst->getParent()->getParent()->getFirstBlock();
+}
+
 IRVar* storeIndexedValue(
     IRBuilder* builder,
     IRBlock* defaultVarBlock,
     IRInst* instToStore,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
+    // TODO: This is for AD 2.0 (func param storage)
+    // clean this up.. really don't need all this logic.
+    //
+    if (isFuncParam(instToStore))
+        defaultVarBlock = as<IRBlock>(instToStore->getParent());
+
     IRVar* localVar = emitIndexedLocalVar(
         defaultVarBlock,
         instToStore->getDataType(),
         defBlockIndices,
-        instToStore->sourceLoc);
+        instToStore->sourceLoc,
+        !isFuncParam(instToStore));
 
     IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
+
+    if (isFuncParam(instToStore))
+        builder->setInsertAfter(addr);
 
     builder->emitStore(addr, instToStore);
 
@@ -2833,6 +2854,15 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
             {
                 if (loop->getTargetBlock() == parentBlock)
                     return false;
+            }
+        }
+
+        // We can't recompute function parameters. (param is in the first block of a function)
+        if (auto paramParentBlock = as<IRBlock>(param->getParent()))
+        {
+            if (paramParentBlock == paramParentBlock->getParent()->getFirstBlock())
+            {
+                return false;
             }
         }
     }

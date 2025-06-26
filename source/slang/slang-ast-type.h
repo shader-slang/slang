@@ -615,9 +615,27 @@ class BwdDiffFuncInterfaceType : public BuiltinType
     FIDDLE(...)
 };
 
+FIDDLE()
+class LegacyBwdDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
 // Built-in type to translate the type.
 FIDDLE()
 class FwdDiffFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class BwdDiffFuncType : public Type
 {
     FIDDLE(...)
     Type* getBase() { return as<Type>(getOperand(0)); }

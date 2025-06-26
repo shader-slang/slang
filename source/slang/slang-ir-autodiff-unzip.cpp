@@ -116,10 +116,11 @@ struct ExtractPrimalFuncContext
         for (UInt i = 0; i < originalFuncType->getParamCount(); i++)
             paramTypes.add(
                 (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
-        paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
-        auto resultType =
-            (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());
-        auto newFuncType = builder.getFuncType(paramTypes, resultType);
+
+        // paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
+        /*auto resultType =
+            (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());*/
+        auto newFuncType = builder.getFuncType(paramTypes, (IRType*)outIntermediateType);
         return newFuncType;
     }
 
@@ -200,12 +201,100 @@ struct ExtractPrimalFuncContext
             inst);
     }
 
+    // Creates a function that takes the intermediate context type as input
+    // and returns just the return value that was stored into the context type.
+    //
+    IRFunc* createGetValFunc(IRFunc*, IRInst* intermediateType, IRInst* returnValueKey)
+    {
+        IRBuilder builder(module);
+        builder.setInsertBefore(intermediateType);
+
+        IRFunc* getValFunc = builder.createFunc();
+        IRType* returnType = nullptr;
+        // Create the function type
+        {
+            List<IRType*> paramTypes;
+            paramTypes.add(
+                (IRType*)intermediateType); // Take the intermediate type as value, not pointer
+
+            if (returnValueKey)
+            {
+                // Get the return type by looking up the field type
+                auto structType = as<IRStructType>(intermediateType);
+                for (auto field : structType->getFields())
+                {
+                    if (field->getKey() == returnValueKey)
+                    {
+                        returnType = field->getFieldType();
+                        break;
+                    }
+                }
+
+                SLANG_RELEASE_ASSERT(returnType);
+            }
+            else
+            {
+                returnType = builder.getVoidType();
+            }
+
+            auto funcType = builder.getFuncType(paramTypes, returnType);
+            getValFunc->setFullType(funcType);
+        }
+
+        // Add name hint decoration
+        /*if (auto nameHint = intermediateType->findDecoration<IRNameHintDecoration>())
+        {
+            StringBuilder funcName;
+            funcName << "s_getVal_" << nameHint->getName();
+            builder.addNameHintDecoration(getValFunc, UnownedStringSlice(funcName.getBuffer()));
+        }*/
+
+        // Create parameter block
+        builder.setInsertInto(getValFunc);
+        auto paramBlock = builder.emitBlock();
+        builder.setInsertInto(paramBlock);
+        auto intermediateParam = builder.emitParam((IRType*)intermediateType);
+
+        // Create function body block
+        auto bodyBlock = builder.emitBlock();
+        builder.setInsertInto(paramBlock);
+
+        builder.emitBranch(bodyBlock);
+        builder.setInsertInto(bodyBlock);
+
+        // Extract the return value from the intermediate structure
+        if (returnValueKey)
+        {
+            auto returnVal =
+                builder.emitFieldExtract(returnType, intermediateParam, returnValueKey);
+            builder.emitReturn(returnVal);
+        }
+        else
+        {
+            builder.emitReturn();
+        }
+
+        return getValFunc;
+    }
+
+    void setInsertOrdinaryInstIntoBlock(IRBuilder& builder, IRBlock* block)
+    {
+        auto firstOrdinaryInst = block->getFirstOrdinaryInst();
+        if (firstOrdinaryInst)
+            builder.setInsertBefore(firstOrdinaryInst);
+        else
+            builder.setInsertInto(block);
+    }
+
+
     IRFunc* turnUnzippedFuncIntoPrimalFunc(
         IRFunc* unzippedFunc,
         IRFunc* originalFunc,
         HoistedPrimalsInfo* primalsInfo,
-        HashSet<IRInst*>& primalParams,
-        IRInst*& outIntermediateType)
+        // HashSet<IRInst*>& primalParams,
+        IRInst*& outIntermediateType,
+        // TODO(sai): cleanup. temporary extra value
+        IRInst*& returnValueKey)
     {
         IRBuilder builder(module);
 
@@ -217,34 +306,28 @@ struct ExtractPrimalFuncContext
 
         auto paramBlock = func->getFirstBlock();
         builder.setInsertInto(paramBlock);
-        auto oldIntermediateParam = func->getLastParam();
-        auto outIntermediary = builder.emitParam(builder.getOutType((IRType*)intermediateType));
-        oldIntermediateParam->transferDecorationsTo(outIntermediary);
-        primalParams.add(outIntermediary);
-        oldIntermediateParam->replaceUsesWith(outIntermediary);
-        oldIntermediateParam->removeAndDeallocate();
+        // auto oldIntermediateParam = func->getFirstParam();
 
         auto firstBlock = *(paramBlock->getSuccessors().begin());
+        // builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        builder.setInsertBefore(paramBlock->getFirstOrdinaryInst());
+        auto outIntermediary = builder.emitVar((IRType*)intermediateType);
+        // oldIntermediateParam->transferDecorationsTo(outIntermediary);
+        //  primalParams.add(outIntermediary);
+        // oldIntermediateParam->replaceUsesWith(outIntermediary);
+        // oldIntermediateParam->removeAndDeallocate();
 
-        List<IRBlock*> diffBlocksList;
         List<IRBlock*> primalBlocksList;
 
         for (auto block : func->getBlocks())
         {
-            if (block == paramBlock)
-                continue;
-
-            if (isDiffInst(block))
-                diffBlocksList.add(block);
-            else
+            if (!(isDiffInst(block) || block->findDecoration<IRRecomputeBlockDecoration>()))
                 primalBlocksList.add(block);
         }
 
-        // Go over primal blocks and store insts.
+        // Go over primal blocks and store insts that have been classified as requiring storage.
         for (auto block : primalBlocksList)
         {
-            // For primal insts, decide whether or not to store its result in
-            // output intermediary struct.
             for (auto inst : block->getChildren())
             {
                 if (primalsInfo->storeSet.contains(inst))
@@ -272,7 +355,7 @@ struct ExtractPrimalFuncContext
                     else
                     {
                         if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
-                            builder.setInsertBefore(block->getFirstOrdinaryInst());
+                            builder.setInsertAfter(outIntermediary);
                         else
                             builder.setInsertAfter(inst);
                         storeInst(builder, inst, outIntermediary);
@@ -287,10 +370,25 @@ struct ExtractPrimalFuncContext
             builder.setInsertBefore(term);
             if (auto decor = term->findDecoration<IRBackwardDerivativePrimalReturnDecoration>())
             {
-                builder.emitReturn(decor->getBackwardDerivativePrimalReturnValue());
+                auto returnValue = decor->getBackwardDerivativePrimalReturnValue();
+                if (!as<IRVoidType>(returnValue->getDataType()))
+                {
+                    // If we have a non-void return, store it in the output intermediary.
+                    storeInst(builder, returnValue, outIntermediary);
+                    if (returnValue->findDecoration<IRPrimalValueStructKeyDecoration>())
+                    {
+                        returnValueKey =
+                            returnValue->findDecoration<IRPrimalValueStructKeyDecoration>()
+                                ->getStructKey();
+                    }
+                }
+
+                builder.emitReturn(builder.emitLoad(outIntermediary));
                 term->removeAndDeallocate();
             }
         }
+
+        // Remove all Differential & Recompute blocks from the apply func.
 
         List<IRBlock*> unusedBlocks;
         for (auto block : func->getBlocks())
@@ -301,10 +399,11 @@ struct ExtractPrimalFuncContext
         for (auto block : unusedBlocks)
             block->removeAndDeallocate();
 
-        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        setInsertAfterOrdinaryInst(&builder, outIntermediary);
         auto defVal = builder.emitDefaultConstructRaw((IRType*)intermediateType);
         builder.emitStore(outIntermediary, defVal);
 
+        /* old code..
         // Remove any parameters not in `primalParams` set.
         List<IRInst*> params;
         for (auto param = func->getFirstParam(); param;)
@@ -317,6 +416,8 @@ struct ExtractPrimalFuncContext
             }
             param = nextParam;
         }
+        */
+
         return unzippedFunc;
     }
 };
@@ -383,8 +484,9 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     IRFunc* func,
     IRFunc* originalFunc,
     HoistedPrimalsInfo* primalsInfo,
-    ParameterBlockTransposeInfo& paramInfo,
-    IRInst*& intermediateType)
+    // ParameterBlockTransposeInfo& paramInfo,
+    IRInst*& intermediateType,
+    IRFunc*& getValFunc)
 {
     IRBuilder builder(autodiffContext->moduleInst);
     builder.setInsertBefore(func);
@@ -401,6 +503,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             if (auto decor = inst->findDecoration<IRKeepAliveDecoration>())
                 decor->removeAndDeallocate();
 
+    /* old code..
     // Remove propagate func specific primal insts from cloned func.
     for (auto inst : paramInfo.propagateFuncSpecificPrimalInsts)
     {
@@ -417,6 +520,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
         if (paramInfo.primalFuncParams.contains(param))
             newPrimalParams.add(subEnv.mapOldValToNew.getValue(param));
     }
+    */
 
     ExtractPrimalFuncContext context;
     context.init(
@@ -424,12 +528,15 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
         autodiffContext->transcriberSet.primalTranscriber);
 
     intermediateType = nullptr;
+    IRInst* returnValueKey = nullptr;
     auto primalFunc = context.turnUnzippedFuncIntoPrimalFunc(
         clonedFunc,
         originalFunc,
         clonedPrimalsInfo,
-        newPrimalParams,
-        intermediateType);
+        intermediateType,
+        returnValueKey);
+
+    getValFunc = context.createGetValFunc(primalFunc, intermediateType, returnValueKey);
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {
@@ -449,12 +556,12 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     // Copy PrimalValueStructKey decorations from primal func.
     copyPrimalValueStructKeyDecorations(func, subEnv);
 
-    auto firstRecomputeBlock = getFirstRecomputeBlock(func);
-    SLANG_ASSERT(firstRecomputeBlock);
+    auto propParamBlock = getFirstRecomputeBlock(func);
+    SLANG_ASSERT(propParamBlock);
 
-    auto firstBlock = firstRecomputeBlock;
-    builder.setInsertBefore(firstBlock->getFirstInst());
-    auto intermediateVar = func->getLastParam();
+    // Add intermediate context parameter to the front.
+    auto intermediateParam = builder.createParam((IRType*)intermediateType);
+    propParamBlock->insertParamAtHead(intermediateParam);
 
     // Replace all insts that has intermediate results with a load of the intermediate.
     List<IRInst*> instsToRemove;
@@ -486,7 +593,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                         auto valType = cast<IRPtrTypeBase>(inst->getFullType())->getValueType();
                         auto val = builder.emitFieldExtract(
                             valType,
-                            intermediateVar,
+                            intermediateParam,
                             structKeyDecor->getStructKey());
 
                         if (use->getUser()->getOp() == kIROp_Load)
@@ -519,7 +626,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
                         builder.setInsertBefore(user);
                         auto val = builder.emitFieldExtract(
                             inst->getFullType(),
-                            intermediateVar,
+                            intermediateParam,
                             structKeyDecor->getStructKey());
                         val->sourceLoc = user->sourceLoc;
                         builder.replaceOperand(iuse, val);
@@ -537,16 +644,17 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
         inst->removeAndDeallocate();
     }
 
-    auto paramBlock = func->getFirstBlock();
-    auto paramPreludeBlock = paramBlock->getNextBlock();
+    // auto paramBlock = func->getFirstBlock();
+    // auto paramPreludeBlock = paramBlock->getNextBlock();
 
+    // TODO: old code... (remove)
     // Remove primal blocks from the propagate func & wire the param block directly to the first
     // recompute block.
     //
-    {
+    /*{
         auto terminator = cast<IRUnconditionalBranch>(paramPreludeBlock->getTerminator());
         builder.replaceOperand(&(terminator->block), firstRecomputeBlock);
-    }
+    }*/
 
     // Erase all primal blocks (except for the param & prelude blocks).
     // TODO: Lots of ways to clean this up.
@@ -554,8 +662,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     List<IRBlock*> blocksToRemove;
     for (auto block : func->getBlocks())
     {
-        if (block != paramBlock && block != paramPreludeBlock &&
-            !block->findDecoration<IRRecomputeBlockDecoration>() &&
+        if (!block->findDecoration<IRRecomputeBlockDecoration>() &&
             !block->findDecoration<IRDifferentialInstDecoration>())
             blocksToRemove.add(block);
     }

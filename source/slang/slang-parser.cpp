@@ -2746,6 +2746,16 @@ static Expr* parseFwdDiffFuncTypeExpr(Parser* parser)
     return expr;
 }
 
+static Expr* parseBwdDiffFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__bwd_diff_func_type(fn)`
+    BwdDiffFuncTypeExpr* expr = parser->astBuilder->create<BwdDiffFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
 static Expr* parseApplyForBwdFuncTypeExpr(Parser* parser)
 {
     // Parse an expr of the form `__apply_for_fwd_type(fn)`
@@ -3057,6 +3067,12 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "__fwd_diff_func_type"))
     {
         typeSpec.expr = parseFwdDiffFuncTypeExpr(parser);
+        return typeSpec;
+    }
+
+    else if (AdvanceIf(parser, "__bwd_diff_func_type"))
+    {
+        typeSpec.expr = parseBwdDiffFuncTypeExpr(parser);
         return typeSpec;
     }
     else if (AdvanceIf(parser, "__apply_bwd_func_type"))

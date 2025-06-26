@@ -696,15 +696,18 @@ interface IForwardDifferentiable<FType>
     // 
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc)) 
     //static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
-    static __associatedfunc __fwd_diff_func_type(FType) fwd_diff;
+    static __associatedfunc __fwd_diff_func_type(FType) fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
 __magic_type(BwdCallableBaseType)
-[KnownBuiltin("IBwdCallble")]
+[KnownBuiltin("IBwdCallable")]
 interface IBwdCallable<FType>
 {
-    __associatedfunc __bwd_callable_type(FType) operator();
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
+    __associatedfunc __bwd_callable_type(FType) operator(); // -> bwd_prop
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
     __associatedfunc __result_type(FType) val;
 };
 
@@ -713,11 +716,22 @@ __magic_type(BwdDiffFuncInterfaceType)
 interface IBackwardDifferentiable<FType>
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
-    associatedtype BwdCallable : IBwdCallable<FType>;
+    associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
-    static __associatedfunc __apply_bwd_func_type(FType) apply_bwd;
+    __associatedfunc __apply_bwd_func_type(FType) apply_bwd; // -> primal_ctx
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
 };
+
+/*__magic_type(LegacyBwdDiffFuncInterfaceType)
+[KnownBuiltin("ILegacyBackwardDifferentiable")]
+interface ILegacyBackwardDifferentiable<FType>
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
+};*/
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term. 
 /// It is defined as follows:

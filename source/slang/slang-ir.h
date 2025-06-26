@@ -1707,7 +1707,19 @@ struct IRDifferentialPairUserCodeType : IRDifferentialPairTypeBase
     IR_LEAF_ISA(DifferentialPairUserCodeType)
 };
 
-struct IRBackwardDiffIntermediateContextType : IRType
+struct IRTranslatedTypeBase : IRType
+{
+    IR_PARENT_ISA(TranslatedTypeBase)
+};
+
+struct IRBackwardContextFromLegacyBwdDiffFunc : IRTranslatedTypeBase
+{
+    IRInst* getFunc() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+    IR_LEAF_ISA(BackwardContextFromLegacyBwdDiffFunc)
+};
+
+struct IRBackwardDiffIntermediateContextType : IRTranslatedTypeBase
 {
     IRInst* getFunc() { return getOperand(0); }
     IR_LEAF_ISA(BackwardDiffIntermediateContextType)

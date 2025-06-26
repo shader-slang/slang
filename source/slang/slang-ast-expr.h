@@ -721,6 +721,13 @@ class FwdDiffFuncTypeExpr : public Expr
 };
 
 FIDDLE()
+class BwdDiffFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+FIDDLE()
 class ApplyForBwdFuncTypeExpr : public Expr
 {
     FIDDLE(...)

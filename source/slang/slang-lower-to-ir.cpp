@@ -1829,6 +1829,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder()->emitIntrinsicInst(irType, kIROp_ForwardDiffFuncType, 1, &(operand)));
     }
 
+    LoweredValInfo visitBwdDiffFuncType(BwdDiffFuncType* bwdFuncType)
+    {
+        IRType* irType = lowerType(context, bwdFuncType->getBase());
+        IRInst* operand = (IRInst*)irType;
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, kIROp_BackwardDiffFuncType, 1, &(operand)));
+    }
+
     LoweredValInfo visitApplyForBwdFuncType(ApplyForBwdFuncType* applyForFwdFuncType)
     {
         IRType* irType = lowerType(context, applyForFwdFuncType->getBase());
@@ -2991,6 +2999,8 @@ DeclRef<D> createDefaultSpecializedDeclRef(
     return declRef.as<D>();
 }
 
+Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableDeclRef);
+
 static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> parentDeclRef)
 {
     if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
@@ -2998,6 +3008,12 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
         auto targetType = getTargetType(context->astBuilder, extensionDeclRef);
         if (auto targetDeclRefType = as<DeclRefType>(targetType))
         {
+            // If our extension applies to a function, then the this-type is that function's
+            // this-type.
+            //
+            if (isDeclRefTypeOf<CallableDecl>(targetDeclRefType))
+                return getThisParamTypeForCallable(context, targetDeclRefType->getDeclRef());
+
             if (auto replacementType =
                     _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
                 return replacementType;
@@ -3045,7 +3061,18 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
 {
     if (auto lookup = as<LookupDeclRef>((callableDeclRef.declRefBase)))
     {
-        return lookup->getLookupSource();
+        auto lookupSource = lookup->getLookupSource();
+        // Hack for AD 2.0..
+        if (isDeclRefTypeOf<CallableDecl>(lookupSource))
+        {
+            return getThisParamTypeForCallable(
+                context,
+                as<DeclRefType>(lookupSource)->getDeclRef());
+        }
+        else
+        {
+            return lookupSource;
+        }
     }
 
     auto parentDeclRef = callableDeclRef.getParent();
@@ -3998,15 +4025,30 @@ struct ExprLoweringContext
             // a member function:
             if (baseExpr)
             {
-                auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
-                auto irThisType = lowerType(context, thisType);
-                addCallArgsForParam(
-                    context,
-                    irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
-                    baseExpr,
-                    &irArgs,
-                    &argFixups);
+                if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
+                {
+                    auto irThisType = lowerType(context, thisType);
+
+                    // For when the invoke expr is a member of a _function_,
+                    // we want to use the base expression for that function,
+                    // instead of function itself.
+                    //
+                    if (auto memberExpr = as<MemberExpr>(baseExpr))
+                    {
+                        if (memberExpr->declRef.as<CallableDecl>())
+                        {
+                            baseExpr = memberExpr->baseExpression;
+                        }
+                    }
+
+                    addCallArgsForParam(
+                        context,
+                        irThisType,
+                        getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
+                        baseExpr,
+                        &irArgs,
+                        &argFixups);
+                }
             }
 
             // Then we have the "direct" arguments to the call.
@@ -4026,18 +4068,20 @@ struct ExprLoweringContext
 
                 if (baseExpr)
                 {
-                    auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
-                    auto irThisType = lowerType(context, thisType);
+                    if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
+                    {
+                        auto irThisType = lowerType(context, thisType);
 
-                    List<IRType*> paramTypes;
-                    paramTypes.add(irThisType);
-                    for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
-                        paramTypes.add(paramType);
+                        List<IRType*> paramTypes;
+                        paramTypes.add(irThisType);
+                        for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
+                            paramTypes.add(paramType);
 
-                    funcTypeInfo.type = context->irBuilder->getFuncType(
-                        paramTypes.getCount(),
-                        paramTypes.getBuffer(),
-                        cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                        funcTypeInfo.type = context->irBuilder->getFuncType(
+                            paramTypes.getCount(),
+                            paramTypes.getBuffer(),
+                            cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                    }
                 }
 
                 addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
@@ -4183,6 +4227,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr*)
+    {
+        SLANG_UNEXPECTED("BwdDiffFuncTypeExpr should not be present in IR.");
     }
 
     LoweredValInfo visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr*)
@@ -9707,6 +9756,61 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 return LoweredValInfo();
             }
         }
+        else if (auto synStructDecl = as<SynthesizedStructDecl>(decl))
+        {
+            /*FuncDeclBaseTypeInfo innerInfo;
+            _lowerFuncDeclBaseTypeInfo(subContext, synStructDecl->targetFuncDeclRef, innerInfo);
+
+            auto targetDeclRefInfo =
+                emitDeclRef(subContext, synStructDecl->targetFuncDeclRef, innerInfo.type);
+
+            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+            auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+            auto synthOp = subBuilder->emitIntrinsicInst(
+                subBuilder->getTypeKind(),
+                (IROp)synStructDecl->irOp,
+                1,
+                &_targetIRFunc);
+
+            irAggType = (IRType*)synthOp;*/
+            List<IRInst*> irOperands;
+            for (auto operand : synStructDecl->operands)
+            {
+                if (auto funcDeclRef = DeclRef<Decl>(operand).as<FunctionDeclBase>())
+                {
+                    FuncDeclBaseTypeInfo innerInfo;
+                    _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+
+                    auto targetDeclRefInfo = emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+
+                    SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                    auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                    irOperands.add(_targetIRFunc);
+                }
+                else
+                {
+                    // Assume that we have a type here...
+                    LoweredValInfo info =
+                        emitDeclRef(subContext, operand, subBuilder->getTypeKind());
+                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                    {
+                        irOperands.add(getSimpleVal(subContext, info));
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                    }
+                }
+
+                auto synthOp = subBuilder->emitIntrinsicInst(
+                    subBuilder->getTypeKind(),
+                    (IROp)synStructDecl->irOp,
+                    (UInt)irOperands.getCount(),
+                    irOperands.getBuffer());
+
+                irAggType = (IRType*)synthOp;
+            }
+        }
         else
         {
             getSink()->diagnose(
@@ -10850,21 +10954,43 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* irFunc = nullptr;
         if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
         {
-            FuncDeclBaseTypeInfo innerInfo;
-            _lowerFuncDeclBaseTypeInfo(subContext, synFuncDecl->targetFuncDeclRef, innerInfo);
+            List<IRInst*> irOperands;
+            for (auto operand : synFuncDecl->operands)
+            {
+                if (auto funcDeclRef = DeclRef<Decl>(operand).as<FunctionDeclBase>())
+                {
+                    FuncDeclBaseTypeInfo innerInfo;
+                    _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
 
-            auto targetDeclRefInfo =
-                emitDeclRef(subContext, synFuncDecl->targetFuncDeclRef, innerInfo.type);
+                    auto targetDeclRefInfo = emitDeclRef(subContext, funcDeclRef, innerInfo.type);
 
-            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-            auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-            auto synthOp = subBuilder->emitIntrinsicInst(
-                _targetIRFunc->getFullType(),
-                (IROp)synFuncDecl->irOp,
-                1,
-                &_targetIRFunc);
+                    SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                    auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                    irOperands.add(_targetIRFunc);
+                }
+                else
+                {
+                    // Assume that we have a type here...
+                    LoweredValInfo info =
+                        emitDeclRef(subContext, operand, subBuilder->getTypeKind());
+                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                    {
+                        irOperands.add(getSimpleVal(subContext, info));
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                    }
+                }
 
-            irFunc = synthOp;
+                auto synthOp = subBuilder->emitIntrinsicInst(
+                    info.type,
+                    (IROp)synFuncDecl->irOp,
+                    (UInt)irOperands.getCount(),
+                    irOperands.getBuffer());
+
+                irFunc = synthOp;
+            }
         }
         else
         {
@@ -11569,6 +11695,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericDecl(GenericDecl* genDecl)
     {
         // TODO: Should this just always visit/lower the inner decl?
+        while (genDecl->inner && as<GenericDecl>(genDecl->inner))
+        {
+            genDecl = as<GenericDecl>(genDecl->inner);
+        }
 
         if (auto innerFuncDecl = as<FunctionDeclBase>(genDecl->inner))
             return ensureDecl(context, innerFuncDecl);

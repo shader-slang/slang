@@ -336,6 +336,33 @@ Val* FwdDiffFuncType::_substituteImplOverride(
     return astBuilder->getOrCreate<FwdDiffFuncType>(substBase)->getCanonicalType();
 }
 
+// ----
+void BwdDiffFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("BwdDiffFuncType<") << getBase() << toSlice(">");
+}
+
+Type* BwdDiffFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new BwdDiffFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<BwdDiffFuncType>(canonicalType);
+    return newType;
+}
+
+Val* BwdDiffFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<BwdDiffFuncType>(substBase)->getCanonicalType();
+}
+
 // --
 void ApplyForBwdFuncType::_toTextOverride(StringBuilder& out)
 {

@@ -549,7 +549,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         considerExtension(directAggTypeDeclRef, nullptr);
     }
-    if (auto directFuncDeclRef = declRef.as<FuncDecl>())
+    if (auto directFuncDeclRef = declRef.as<FunctionDeclBase>())
     {
         considerExtension(directFuncDeclRef, nullptr);
     }

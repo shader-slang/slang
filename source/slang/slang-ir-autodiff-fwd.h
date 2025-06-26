@@ -114,6 +114,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     SlangResult prepareFuncForForwardDiff(IRFunc* func);
 
+    void _transcribeFuncImpl(IRBuilder* inBuilder, IRInst* origInst, IRInst*& fwdDiffFunc);
+
     // Create an empty func to represent the transcribed func of `origFunc`.
     virtual InstPair transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc) override;
 
@@ -127,5 +129,98 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
         return kIROp_ForwardDerivativeDecoration;
     }
 };
+
+struct ForwardDiffTranslationFuncContext
+{
+    struct Result
+    {
+        IRInst* fwdDiffFunc = nullptr;
+    };
+
+    // Shared context holding on to interface definitions, etc..
+    AutoDiffSharedContext* sharedContext;
+
+    // Differentiable type conformance context.
+    DifferentiableTypeConformanceContext diffTypeContext;
+
+    // The function to transcribe.
+    IRFunc* targetFunc;
+
+    // The diagnostic sink to report errors.
+    DiagnosticSink* sink;
+
+    ForwardDiffTranslationFuncContext(
+        IRFunc* targetFunc,
+        AutoDiffSharedContext* shared,
+        DiagnosticSink* sink)
+        : sharedContext(shared), diffTypeContext(shared), targetFunc(targetFunc), sink(sink)
+    {
+        diffTypeContext.setFunc(as<IRFunc>(targetFunc));
+    }
+
+    Result translate(IRBuilder* builder)
+    {
+        // TODO: This is a temporary redirect into the old solution.. once we
+        // know things work, we can just move the logic into this class.
+
+        // Do the reverse-mode translation & return the 4-tuple result.
+        ForwardDiffTranscriber transcriber(sharedContext, sink);
+
+        IRInst* fwdDiffFunc;
+        transcriber._transcribeFuncImpl(builder, targetFunc, fwdDiffFunc);
+
+        return {fwdDiffFunc};
+    }
+};
+
+// AD 2.0 version.
+struct ForwardDiffTranslator
+{
+    // Keep track of global insts that have already been translated.
+    Dictionary<IRGlobalValueWithCode*, ForwardDiffTranslationFuncContext::Result> translationCache;
+
+    IRInst* getBaseForTranslateInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_ForwardDifferentiate:
+            return inst->getOperand(0);
+        default:
+            return nullptr;
+        }
+    }
+
+    IRInst* processTranslationRequest(
+        IRInst* translateInst,
+        AutoDiffSharedContext* sharedContext,
+        DiagnosticSink* sink)
+    {
+        auto baseInst = getBaseForTranslateInst(translateInst);
+
+        auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
+        if (!globalValToTranslate)
+        {
+            // TODO: diagnose
+            SLANG_UNEXPECTED("Expected a global value with code for forward differentiation.");
+        }
+
+        if (translationCache.containsKey(globalValToTranslate))
+        {
+            // If we already have a translation for this function, return the requested value.
+            return translationCache[globalValToTranslate].fwdDiffFunc;
+        }
+
+        // Create a new context for the translation.
+        ForwardDiffTranslationFuncContext context(globalValToTranslate, sharedContext, sink);
+        IRBuilder builder(sharedContext->moduleInst);
+        builder.setInsertAfter(globalValToTranslate);
+
+        // Translate, cache and return the result.
+        ForwardDiffTranslationFuncContext::Result translationResult = context.translate(&builder);
+        translationCache.add(globalValToTranslate, translationResult);
+        return translationResult.fwdDiffFunc;
+    }
+};
+
 
 } // namespace Slang

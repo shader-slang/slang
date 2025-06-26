@@ -1313,9 +1313,14 @@ struct IRDerivativeMemberDecoration : IRDecoration
     IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
+struct IRTranslateBase : public IRInst
+{
+    IR_PARENT_ISA(TranslateBase);
+};
+
 // An instruction that replaces the function symbol
 // with it's derivative function.
-struct IRForwardDifferentiate : IRInst
+struct IRForwardDifferentiate : IRTranslateBase
 {
     enum
     {
@@ -1334,7 +1339,7 @@ struct IRForwardDifferentiate : IRInst
 // of backward derivative computation. It performs the primal
 // computations and returns the intermediates that will be used
 // by the actual backward derivative function.
-struct IRBackwardDifferentiatePrimal : IRInst
+struct IRBackwardDifferentiatePrimal : IRTranslateBase
 {
     enum
     {
@@ -1351,7 +1356,7 @@ struct IRBackwardDifferentiatePrimal : IRInst
 // A backward derivative propagate function is the second pass of backward derivative computation.
 // It uses the intermediates computed in the bacward derivative primal function to perform the
 // actual backward derivative propagation.
-struct IRBackwardDifferentiatePropagate : IRInst
+struct IRBackwardDifferentiatePropagate : IRTranslateBase
 {
     enum
     {
@@ -1364,11 +1369,25 @@ struct IRBackwardDifferentiatePropagate : IRInst
     IR_LEAF_ISA(BackwardDifferentiatePropagate)
 };
 
+// AD 2.0 Internal Use Inst.
+struct IRForwardDifferentiatePropagate : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_ForwardDifferentiatePropagate
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(ForwardDifferentiatePropagate)
+};
+
 // An instruction that replaces the function symbol with its backward derivative function.
 // A backward derivative function is a concept that combines both passes of backward derivative
 // computation. This inst should only be produced by lower-to-ir, and will be replaced with calls to
 // the primal function followed by the propagate function in the auto-diff pass.
-struct IRBackwardDifferentiate : IRInst
+struct IRBackwardDifferentiate : IRTranslateBase
 {
     enum
     {
@@ -1376,10 +1395,41 @@ struct IRBackwardDifferentiate : IRInst
     };
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getApplyFunc() { return getOperand(0); }
+    IRInst* getContextType() { return getOperand(1); }
+    IRInst* getBwdPropFunc() { return getOperand(2); }
 
     IR_LEAF_ISA(BackwardDifferentiate)
 };
+
+struct IRBackwardPrimalFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_BackwardPrimalFromLegacyBwdDiffFunc
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+
+    IR_LEAF_ISA(BackwardPrimalFromLegacyBwdDiffFunc)
+};
+
+struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_BackwardPropagateFromLegacyBwdDiffFunc
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+
+    IR_LEAF_ISA(BackwardPropagateFromLegacyBwdDiffFunc)
+};
+
 
 struct IRIsDifferentialNull : IRInst
 {
@@ -3991,6 +4041,7 @@ public:
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
     IRInst* emitIsDifferentialNull(IRInst* value);
