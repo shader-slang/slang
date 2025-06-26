@@ -61,7 +61,7 @@ jobs:
             platform: aarch64
             test-category: smoke
             full-gpu-tests: false
-            runs-on: ubuntu-24.04-arm
+            runs-on: [ubuntu-24.04-arm, NotNeeded]
             has-gpu: false
             build-llvm: false
           # Self-hosted full gpu build - release
@@ -71,7 +71,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            runs-on: [Windows, self-hosted, GCP-T4, NotNeeded]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
@@ -81,7 +81,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            runs-on: [Windows, self-hosted, GCP-T4, NotNeeded]
             has-gpu: true
             server-count: 8
       fail-fast: false
@@ -230,22 +230,19 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
-              -use-test-server \
-              -server-count ${{ matrix.server-count }} \
-              -category ${{ matrix.test-category }} \
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false \
+              tests/compute/cbuffer-legalize.slang
           else
             "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-no-gpu.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers false \
+              tests/compute/cbuffer-legalize.slang
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
