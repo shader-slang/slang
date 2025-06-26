@@ -14347,7 +14347,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             auto implDecl = implDeclRef.getDecl();
             if (!inheritanceDecl->findModifier<RequireCapabilityAttribute>() &&
                 !inheritanceParentDecl->findModifier<RequireCapabilityAttribute>() &&
-                !requirementDecl->findModifier<RequireCapabilityAttribute>() && 
+                !requirementDecl->findModifier<RequireCapabilityAttribute>() &&
                 !implDecl->findModifier<RequireCapabilityAttribute>())
                 continue;
             CapabilityAtomSet failedAvailableCapabilityConjunction;
