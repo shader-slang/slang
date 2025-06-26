@@ -188,6 +188,10 @@ jobs:
               cmake --workflow --preset "${{matrix.config}}"
             fi
           fi
+
+      - name: Check documented compiler versions
+        run: bash extras/verify-documented-compiler-version.sh
+
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
@@ -311,4 +315,6 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
-          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+          path: |
+            build/dist-${{matrix.config}}/**/ZIP/slang/*
+            build.em/Release
