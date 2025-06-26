@@ -212,6 +212,7 @@ jobs:
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
             echo "Printing CUDA version: ..." && nvcc --version
+            echo "Printing vulkan SDK version: ..." && vulkaninfo | grep Version
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
