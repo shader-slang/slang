@@ -529,6 +529,11 @@ Allow generating code from incomplete libraries with unresolved external functio
 Specify the space index for the system defined global bindless resource array. 
 
 
+<a id="separate-debug-info"></a>
+### -separate-debug-info
+Emit debug data to a separate file, and strip it from the main output file. 
+
+
 
 <a id="Downstream"></a>
 ## Downstream
@@ -648,11 +653,6 @@ Verify IR in the front-end.
 <a id="dump-module"></a>
 ### -dump-module
 Disassemble and print the module IR. 
-
-
-<a id="separate-debug-info"></a>
-### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. 
 
 
 
