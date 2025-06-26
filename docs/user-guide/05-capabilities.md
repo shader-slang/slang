@@ -152,7 +152,7 @@ struct Foo5 : IFoo5
 
 ## Capabilities Between Requirement and Implementation
 
-We require that all requirement capabilities are super-sets of their implementation (if capabilities are explicitly annotated).
+We require that all requirement capabilities are super-sets of their implementation (only required if capabilities are explicitly annotated).
 ```csharp
 public interface IAtomicAddable_Pass
 {
@@ -175,8 +175,6 @@ public extension uint : IAtomicAddable_Error
     public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
 }
 ```
-
-
 
 ## Inference of Capability Requirements
 

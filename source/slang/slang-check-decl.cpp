@@ -14302,6 +14302,9 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
 {
+    auto inheritanceParentDecl = inheritanceDecl->parentDecl;
+    ensureDecl(inheritanceParentDecl, DeclCheckState::CapabilityChecked);
+
     // Propegate capabilities of inheritance `base` to
     // `InheritanceDecl`
     visitReferencedDecls(
@@ -14342,7 +14345,9 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
             // Only if capabilities are opted-into, should we error.
             auto implDecl = implDeclRef.getDecl();
-            if (!requirementDecl->findModifier<RequireCapabilityAttribute>() &&
+            if (!inheritanceDecl->findModifier<RequireCapabilityAttribute>() &&
+                !inheritanceParentDecl->findModifier<RequireCapabilityAttribute>() &&
+                !requirementDecl->findModifier<RequireCapabilityAttribute>() && 
                 !implDecl->findModifier<RequireCapabilityAttribute>())
                 continue;
             CapabilityAtomSet failedAvailableCapabilityConjunction;
@@ -14360,12 +14365,10 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     }
 
     // validate that super-type is a super set of capabilities
-    auto parent = inheritanceDecl->parentDecl;
-    ensureDecl(parent, DeclCheckState::CapabilityChecked);
     CapabilityAtomSet failedAvailableCapabilityConjunction;
     if (!CapabilitySet::checkCapabilityRequirement(
             inheritanceDecl->inferredCapabilityRequirements,
-            parent->inferredCapabilityRequirements,
+            inheritanceParentDecl->inferredCapabilityRequirements,
             failedAvailableCapabilityConjunction))
     {
         diagnoseUndeclaredCapability(
