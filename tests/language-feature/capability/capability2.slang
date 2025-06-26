@@ -48,11 +48,12 @@ struct Impl2 : IFoo
         useNonUniformArithmetic(); // error.
     }
 
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // no error here because requirments were not tagged with a capability
+    // CHECK-NOT: error 36104
     void method2()
     {
         useAtomicFloat16();
-        useNonUniformArithmetic(); // error.
+        useNonUniformArithmetic();
     }
 }
 
