@@ -7319,11 +7319,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Perform unsigned conversion first to an unsigned integer of the same width as the
             // result then perform bit cast to the signed result type. This is done because SPIRV's
             // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
-            auto unsignedV = emitOpUConvert(
-                parent,
-                nullptr,
-                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
-                inst->getOperand(0));
+            auto builderType = getUnsignedTypeFromSignedType(&builder, toTypeV);
+
+            auto unsignedV = emitOpUConvert(parent, nullptr, builderType, inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
         else if (fromInfo.isSigned)
