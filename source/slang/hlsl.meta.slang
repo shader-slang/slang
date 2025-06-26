@@ -8565,6 +8565,37 @@ T determinant(matrix<T,N,N> m)
         OpExtInst $$T result glsl450 Determinant $m
     };
     case wgsl: __intrinsic_asm "determinant";
+    default:
+        static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
+        if (N == 1)
+        {
+            return m[0][0];
+        }
+        else if (N == 2)
+        {
+            return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        }
+        else if (N == 3)
+        {
+            return
+                m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+              - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+              + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+        else// if (N == 4)
+        {
+            T a = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+            T b = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+            T c = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+            T d = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+            T e = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+            T f = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+            return
+                m[0][0] * (m[1][1] * a - m[1][2] * b + m[1][3] * c)
+              - m[0][1] * (m[1][0] * a - m[1][2] * d + m[1][3] * e)
+              + m[0][2] * (m[1][0] * b - m[1][1] * d + m[1][3] * f)
+              - m[0][3] * (m[1][0] * c - m[1][1] * e + m[1][2] * f);
+        }
     }
 }
 
@@ -26462,7 +26493,13 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = matrix.GetBufferPointer();
+
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
         int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -26662,9 +26699,21 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = matrix.GetBufferPointer();
         let biasPtr = bias.GetBufferPointer();
+
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -27005,7 +27054,13 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = __getStructuredBufferPtr(matrix);
+
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
         int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27078,9 +27133,22 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = __getStructuredBufferPtr(matrix);
         let biasPtr = __getStructuredBufferPtr(bias);
+
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
+
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }
