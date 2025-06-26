@@ -627,8 +627,7 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
     auto denormModeFp32 = optionSet.getDenormModeFp32();
     auto denormModeFp64 = optionSet.getDenormModeFp64();
 
-    if (denormModeFp16 == FpDenormMode::Any &&
-        denormModeFp32 == FpDenormMode::Any &&
+    if (denormModeFp16 == FpDenormMode::Any && denormModeFp32 == FpDenormMode::Any &&
         denormModeFp64 == FpDenormMode::Any)
         return;
 
@@ -638,7 +637,7 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
     for (auto inst : irModule->getGlobalInsts())
     {
         IRFunc* func = nullptr;
-        
+
         // Check if this is a direct function
         if (auto directFunc = as<IRFunc>(inst))
         {
@@ -652,10 +651,10 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
                 func = innerFunc;
             }
         }
-        
+
         if (!func)
             continue;
-        
+
         // Check if this is an entry point function
         auto entryPoint = func->findDecoration<IREntryPointDecoration>();
         if (!entryPoint)
@@ -680,7 +679,7 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
         }
         else if (denormModeFp32 == FpDenormMode::Ftz)
         {
-           builder.addDenormFlushToZeroDecoration(func, width32);
+            builder.addDenormFlushToZeroDecoration(func, width32);
         }
 
         // Handle FP64 denorm mode
