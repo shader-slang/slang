@@ -378,16 +378,28 @@ struct CompilerOptionSet
 
     FpDenormMode getDenormModeFp16()
     {
+        if (!hasOption(CompilerOptionName::DenormModeFp16))
+        {
+            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+        }
         return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp16);
     }
 
     FpDenormMode getDenormModeFp32()
     {
+        if (!hasOption(CompilerOptionName::DenormModeFp32))
+        {
+            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+        }
         return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp32);
     }
 
     FpDenormMode getDenormModeFp64()
     {
+        if (!hasOption(CompilerOptionName::DenormModeFp64))
+        {
+            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+        }
         return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp64);
     }
 
