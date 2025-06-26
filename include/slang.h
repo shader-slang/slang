@@ -924,9 +924,6 @@ typedef uint32_t SlangSizeT;
         DisableDynamicDispatch,    // bool
         DisableSpecialization,     // bool
         FloatingPointMode,         // intValue0: FloatingPointMode
-        DenormModeFp16,            // intValue0: FpDenormMode
-        DenormModeFp32,            // intValue0: FpDenormMode
-        DenormModeFp64,            // intValue0: FpDenormMode
         DebugInformation,          // intValue0: DebugInfoLevel
         LineDirectiveMode,
         Optimization, // intValue0: OptimizationLevel
@@ -1041,6 +1038,11 @@ typedef uint32_t SlangSizeT;
 
         EmitSeparateDebug, // bool
         CountOf,
+
+        // Floating point denormal handling modes
+        DenormModeFp16,
+        DenormModeFp32,
+        DenormModeFp64,
     };
 
     enum class CompilerOptionValueKind
