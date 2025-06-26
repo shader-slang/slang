@@ -637,7 +637,22 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
     // Apply denorm decorations to all entry point functions
     for (auto inst : irModule->getGlobalInsts())
     {
-        auto func = as<IRFunc>(inst);
+        IRFunc* func = nullptr;
+        
+        // Check if this is a direct function
+        if (auto directFunc = as<IRFunc>(inst))
+        {
+            func = directFunc;
+        }
+        // Check if this is a generic that contains an entry point function
+        else if (auto generic = as<IRGeneric>(inst))
+        {
+            if (auto innerFunc = as<IRFunc>(findGenericReturnVal(generic)))
+            {
+                func = innerFunc;
+            }
+        }
+        
         if (!func)
             continue;
         
