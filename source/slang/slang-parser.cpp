@@ -8638,7 +8638,7 @@ Expr* Parser::ParseLeafExpression()
 /// Parse an argument to an application of a generic
 static Expr* _parseGenericArg(Parser* parser)
 {
-    // The grammar for generic arguments needs to be a super-set of the
+    // The grammar for generic arguments needs to be a superset of the
     // grammar for types and for expressions, because we do not know
     // which to expect at each argument position during parsing.
     //

@@ -94,7 +94,7 @@ public void myFunc()
 ## Capabilities Between Sub-Type and Super-Type
 
 For inheritance/implementing-interfaces the story is a bit different.
-We require that the sub-type (`Foo1`) have a sub-set of capabilities to the super-type (`IFoo1`).
+We require that the sub-type (`Foo1`) have a subset of capabilities to the super-type (`IFoo1`).
 
 For example:
 ```csharp
@@ -107,7 +107,7 @@ struct Foo1 : IFoo1
 {
 }
 ```
-We error here since `Foo1` is not a sub-set to `IFoo1`. `Foo1` has `sm_6_0`, which includes capabilities `sm_4_0` does not have.
+We error here since `Foo1` is not a subset to `IFoo1`. `Foo1` has `sm_6_0`, which includes capabilities `sm_4_0` does not have.
 
 ```csharp
 [require(sm_6_0)]
@@ -123,7 +123,7 @@ struct Foo1 : IFoo1, IFoo2
 {
 }
 ```
-We do not error here since `IFoo2` and `IFoo1` are super-sets to `Foo1`.
+We do not error here since `IFoo2` and `IFoo1` are supersets to `Foo1`.
 
 Additionally, all sub-types must support the same shader-stages and targets as the super-type.
 ```csharp
@@ -152,7 +152,7 @@ struct Foo5 : IFoo5
 
 ## Capabilities Between Requirement and Implementation
 
-We require that all requirement capabilities are super-sets of their implementation (only required if capabilities are explicitly annotated).
+We require that all requirement capabilities are supersets of their implementation (only required if capabilities are explicitly annotated).
 ```csharp
 public interface IAtomicAddable_Pass
 {
@@ -170,7 +170,7 @@ public interface IAtomicAddable_Error
 }
 public extension uint : IAtomicAddable_Error
 {
-    // Error: implementation has super-set of capabilites, sm_6_0 vs. sm_4_0
+    // Error: implementation has superset of capabilites, sm_6_0 vs. sm_4_0
     // Note: sm_6_0 is inferred from `InterlockedAddI64`
     public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
 }

@@ -989,7 +989,7 @@ bool CapabilitySet::checkCapabilityRequirement(
     }
 
 
-    // if all sets in `available` are not a super-set, then we have an
+    // if all sets in `available` are not a superset, then we have an
     // err
     for (auto& availableTarget : available.m_targetSets)
     {

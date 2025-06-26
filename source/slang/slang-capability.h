@@ -36,7 +36,7 @@ namespace Slang
 // The situation is slightly more complicated for a function. A function
 // might require a specific set of atomic feature, and that is the simple
 // case. In this simple case, we know that a target can run a function
-// if the features of the target are a super-set of those required by
+// if the features of the target are a superset of those required by
 // the function.
 //
 // In the more general case, we might have a function that can be used

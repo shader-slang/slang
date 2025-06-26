@@ -14243,7 +14243,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
 
     // non-static function join's capabilities with parent
-    // to become a super-set of the parent.
+    // to become a superset of the parent.
     if (!isEffectivelyStatic(funcDecl))
     {
         auto parentAggTypeDecl = getParentAggTypeDecl(funcDecl);
