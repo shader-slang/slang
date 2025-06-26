@@ -11157,7 +11157,7 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
@@ -11170,12 +11170,13 @@ T mad(T mvalue, T avalue, T bvalue)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
     };
+    case wgsl: __intrinsic_asm "fma";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
@@ -11186,6 +11187,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
     };
+    case wgsl: __intrinsic_asm "fma";
     default:
         VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
     }
