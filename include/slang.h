@@ -1037,12 +1037,13 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EmitSeparateDebug, // bool
-        CountOf,
 
         // Floating point denormal handling modes
         DenormModeFp16,
         DenormModeFp32,
         DenormModeFp64,
+
+        CountOf,
     };
 
     enum class CompilerOptionValueKind
