@@ -13988,22 +13988,24 @@ struct CapabilityDeclReferenceVisitor
         auto targetCaseCount = stmt->targetCases.getCount();
         for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
         {
-            // The logic here is to collect a list of `case` statment capabilities 
+            // The logic here is to collect a list of `case` statment capabilities
             // so that down-the-line we can specialize according to the compile-capabilities.
-            // 
+            //
             // The additional goal we have is to merge all case-capabilities into 1 set
             // so that we can propegate them to the parent-function so that a user may break-down
-            // a functon into `stage`/`target` specific code. 
-            // 
-            // A few important details
-            // 1. Case statments (other than `default:`) may have overlapping capabilities. This is to allow
-            // "more specialized" `case` statments to support specializing code on higher-feature-levels to 
-            // support writing 1 function to handle cases such as sm_5_0 and sm_6_0 support all in 1 function.
+            // a functon into `stage`/`target` specific code.
             //
-            // 2. All `case:` statments are explicit with their own-capabilities, `default:` statments are not.
-            // `default:` statments have the value `CapabilityName::Invalid`. If we find a `default` statment 
-            // we assign it all shader target/stage capabilities that the other `case` statments did not specify
-            // which is legal for the current calling function (based on the parent function `require` decl).
+            // A few important details
+            // 1. Case statments (other than `default:`) may have overlapping capabilities. This is
+            // to allow "more specialized" `case` statments to support specializing code on
+            // higher-feature-levels to support writing 1 function to handle cases such as sm_5_0
+            // and sm_6_0 support all in 1 function.
+            //
+            // 2. All `case:` statments are explicit with their own-capabilities, `default:`
+            // statments are not. `default:` statments have the value `CapabilityName::Invalid`. If
+            // we find a `default` statment we assign it all shader target/stage capabilities that
+            // the other `case` statments did not specify which is legal for the current calling
+            // function (based on the parent function `require` decl).
             CapabilitySet targetCap;
             if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) ==
                 CapabilityName::Invalid)
@@ -14278,7 +14280,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             // We need to enforce that the function-body
             // only uses capabilities that the function-decl declares.
             //
-            // A small exception to this rule is that the body must 
+            // A small exception to this rule is that the body must
             // implement all shader stages/targets of the functionDecl
             // requirements. The body can support *more* stages/targets,
             // these will just be not accessible (which is fine since a user
