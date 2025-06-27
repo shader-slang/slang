@@ -2343,6 +2343,10 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice, IROp d
     {
         keyInst.typeUse.usedValue = getStringType();
     }
+    else if (desiredType == kIROp_NativeStringType)
+    {
+        keyInst.typeUse.usedValue = getNativeStringType();
+    }
 
     IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
     dstSlice.chars = const_cast<char*>(inSlice.begin());

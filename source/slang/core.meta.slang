@@ -1755,7 +1755,7 @@ struct StringLiteral : IArray<uint>
 
     __intrinsic_op($(kIROp_GetElement))
     [__unsafeForceInlineEarly]
-    [require(cpp)]
+    [require(cpp_cuda)]
     uint _getElementFromNative(uint i);
 
     __subscript(uint i) -> uint
@@ -1765,6 +1765,7 @@ struct StringLiteral : IArray<uint>
             __target_switch
             {
                 case cpp: res = _getElementFromNative(i);
+                case cuda: res = _getElementFromNative(i);
                 default: res = _getElementFromArray(i);
             }
             return res;
@@ -1854,6 +1855,10 @@ struct NativeString
     __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
+
+    __implicit_conversion($(kConversionCost_None))
+    __intrinsic_op($(kIROp_getNativeStr))
+    __init<int N>(StringLiteral<N> value);
 
     __init() { this = NativeString(""); }
 };
@@ -3065,11 +3070,11 @@ void unmodified(out T){}
 /// Given a string returns an integer hash of that string.
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
-int getStringHash<int N>(StringLiteral<N> string);
+uint32_t getStringHash<int N>(StringLiteral<N> string);
 
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
-int getStringHash(String string);
+uint32_t getStringHash(String string);
 
 /// Use will produce a syntax error in downstream compiler
 /// Useful for testing diagnostics around compilation errors of downstream compiler

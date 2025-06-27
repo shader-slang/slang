@@ -103,6 +103,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-string-literals.h"
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
@@ -1125,7 +1126,7 @@ Result linkAndOptimizeIR(
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
     // boil down into getStringHash(stringLiteral)
-    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    // if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
@@ -1899,6 +1900,16 @@ Result linkAndOptimizeIR(
         {
             applyGLSLLiveness(irModule);
         }
+    }
+
+    const bool targetSupportsStringLiterals =
+        (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+         target == CodeGenTarget::CSource);
+    if (!targetSupportsStringLiterals)
+    {
+        StringLiteralsOptions strLitOptions = {};
+        strLitOptions.replaceStringLiteralsWithArray = true;
+        replaceStringLiteralsReturnChanged(targetProgram, irModule, strLitOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)

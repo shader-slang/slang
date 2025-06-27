@@ -5175,9 +5175,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        auto irLit = context->irBuilder->getStringValue(
-            expr->value.getUnownedSlice(),
-            kIROp_StringLiteralType);
+        IROp type = kIROp_StringLiteralType;
+        if (as<StringLiteralExpressionType>(expr->type))
+        {
+            type = kIROp_StringLiteralType;
+        }
+        else if (as<StringType>(expr->type))
+        {
+            type = kIROp_StringType;
+        }
+        else if (as<NativeStringType>(expr->type))
+        {
+            type = kIROp_NativeStringType;
+        }
+        auto irLit = context->irBuilder->getStringValue(expr->value.getUnownedSlice(), type);
         context->shared->m_stringLiterals.add(irLit);
         return LoweredValInfo::simple(irLit);
     }

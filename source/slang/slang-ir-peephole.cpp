@@ -4,6 +4,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-string-literals.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -314,26 +315,42 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
+        case kIROp_GetStringHash:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto slice = strLit->getStringSlice();
+                const auto h = getStableHashCode32(slice.begin(), slice.getLength()).hash;
+                auto replacement = builder.getIntValue(inst->getDataType(), h);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_MakeString:
+        case kIROp_getNativeStr:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                IROp type =
+                    inst->getOp() == kIROp_MakeString ? kIROp_StringType : kIROp_NativeStringType;
+                auto replacement = builder.getStringValue(strLit->getStringSlice(), type);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetStringLiteralAsArray:
             if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
             {
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto sv = strLit->getStringSlice();
-                List<IRInst*> chars;
-                chars.reserve(sv.getLength());
-                for (uint32_t i = 0; i < sv.getLength(); ++i)
-                {
-                    // TODO check encoding
-                    uint32_t c = uint8_t(sv[i]);
-                    chars.add(builder.getIntValue(builder.getUIntType(), c));
-                }
-                auto arrayType = builder.getArrayType(
-                    builder.getUIntType(),
-                    builder.getIntValue(chars.getCount()));
-                auto asArray =
-                    builder.emitMakeArray(arrayType, chars.getCount(), chars.getBuffer());
+                auto asArray = getStringLiteralAsArray(builder, strLit);
                 inst->replaceUsesWith(asArray);
                 maybeRemoveOldInst(inst);
                 changed = true;
