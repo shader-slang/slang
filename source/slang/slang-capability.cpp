@@ -975,11 +975,12 @@ CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
     return CapabilitySet::AtomSets::Iterator(&this->getCapabilityTargetSets()).begin();
 }
 
-bool CapabilitySet::checkCapabilityRequirement(
+void CapabilitySet::checkCapabilityRequirement(
+    CheckCapabilityRequirementOptions options,
     CapabilitySet const& available,
     CapabilitySet const& required,
     CapabilityAtomSet& outFailedAvailableSet,
-    CheckCapabilityRequirementOptions options)
+    CheckCapabilityRequirementResult& result)
 {
     // 'required' capabilities x are met by 'available' disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
@@ -996,13 +997,17 @@ bool CapabilitySet::checkCapabilityRequirement(
     // Either, we require no capabilities (return true)
     // or we have no capability requirements (return true)
     if (required.isEmpty() || available.isEmpty())
-        return true;
+    {
+        result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+        return;
+    }
 
     // invalid isn't a fail because the capabilities already threw an error.
     if (required.isInvalid())
     {
         outFailedAvailableSet.add((UInt)CapabilityAtom::Invalid);
-        return true;
+        result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+        return;
     }
 
     auto availableTargetSets = available.getCapabilityTargetSets();
@@ -1020,15 +1025,17 @@ bool CapabilitySet::checkCapabilityRequirement(
 
             if (requiredTargetSetsCount > availableTargetSetsCount)
             {
+                result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
                 requiredTargets.subtractWith((UIntSet)availableTargets);
                 outFailedAvailableSet.add((UIntSet)requiredTargets);
             }
             else
             {
+                result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
                 availableTargets.subtractWith((UIntSet)requiredTargets);
                 outFailedAvailableSet.add((UIntSet)availableTargets);
             }
-            return false;
+            return;
         }
     }
 
@@ -1040,7 +1047,8 @@ bool CapabilitySet::checkCapabilityRequirement(
         if (!reqTarget)
         {
             outFailedAvailableSet.add((UInt)availableTarget.first);
-            return false;
+            result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+            return;
         }
         
         if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
@@ -1056,15 +1064,17 @@ bool CapabilitySet::checkCapabilityRequirement(
 
                 if (requiredStageSetsCount > availableStageSetsCount)
                 {
+                    result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
                     requiredStages.subtractWith((UIntSet)availableStages);
                     outFailedAvailableSet.add((UIntSet)requiredStages);
                 }
                 else
                 {
+                    result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
                     availableStages.subtractWith((UIntSet)requiredStages);
                     outFailedAvailableSet.add((UIntSet)availableStages);
                 }
-                return false;
+                return;
             }
         }
 
@@ -1074,7 +1084,8 @@ bool CapabilitySet::checkCapabilityRequirement(
             if (!reqStage)
             {
                 outFailedAvailableSet.add((UInt)availableStage.first);
-                return false;
+                result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+                return;
             }
 
             const CapabilityAtomSet* lastBadStage = nullptr;
@@ -1101,13 +1112,15 @@ bool CapabilitySet::checkCapabilityRequirement(
                     // Not a failiure if nothing is missing
                     if (outFailedAvailableSet.isEmpty())
                         continue;
-                    return false;
+                    result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
+                    return;
                 }
             }
         }
     }
 
-    return true;
+    result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+    return;
 }
 
 /// Converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned

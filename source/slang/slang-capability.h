@@ -110,6 +110,17 @@ enum class CheckCapabilityRequirementOptions
     MustHaveEqualAbstractAtoms,
 };
 
+enum class CheckCapabilityRequirementResult
+{
+    // `available` is a superset to `required`
+    AvailableIsASuperSetToRequired,
+    // `available` is not a superset to `required`
+    AvailableIsNotASuperSetToRequired,
+    // `available` has abstract atoms that `required` is missing.
+    // Only possible with CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms
+    RequiredIsMissingAbstractAtoms,
+};
+
 struct CapabilitySet
 {
 public:
@@ -198,11 +209,12 @@ public:
 
     /// Identify capability sets which are in 'available' but not in 'required'. Return false if
     /// this situation occurs.
-    static bool checkCapabilityRequirement(
+    static void checkCapabilityRequirement(
+        CheckCapabilityRequirementOptions options,
         CapabilitySet const& available,
         CapabilitySet const& required,
         CapabilityAtomSet& outFailedAvailableSet,
-        CheckCapabilityRequirementOptions options);
+        CheckCapabilityRequirementResult& result);
 
     // For each element in `elementsToPermutateWith`, create and add a different conjunction
     // permutation by adding to `setToPermutate`.

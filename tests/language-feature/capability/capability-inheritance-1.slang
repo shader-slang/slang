@@ -21,7 +21,7 @@ interface IFoo1
 {
 }
 [require(hlsl)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36108{{.*}}spirv
+// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}spirv
 struct Foo1 : IFoo1
 {
 }
@@ -53,7 +53,7 @@ interface IFoo4
 {
 }
 [require(hlsl, fragment)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36117{{.*}}compute
+// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}compute
 struct Foo4 : IFoo4
 {
 }
@@ -65,7 +65,7 @@ interface IFoo5
 {
 }
 [require(fragment)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36117{{.*}}vertex
+// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}vertex
 struct Foo5 : IFoo5
 {
 }

@@ -982,7 +982,8 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void diagnoseUndeclaredCapability(
         Decl* decl,
         const DiagnosticInfo& diagnosticInfo,
-        const CapabilityAtomSet& failedAtomsInsideAvailableSet);
+        const CapabilityAtomSet& failedAtomsInsideAvailableSet,
+        bool printProvenance);
 };
 
 
@@ -14285,17 +14286,18 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             // may only need hlsl support for a function, using an STD-LIB function
             // implemented for all targets/stages).
             CapabilityAtomSet failedAvailableCapabilityConjunction;
-            if (!CapabilitySet::checkCapabilityRequirement(
-                    declaredCaps,
-                    funcDecl->inferredCapabilityRequirements,
-                    failedAvailableCapabilityConjunction,
-                    CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms))
-            {
-                diagnoseUndeclaredCapability(
-                    funcDecl,
-                    Diagnostics::useOfUndeclaredCapability,
-                    failedAvailableCapabilityConjunction);
-            }
+            CheckCapabilityRequirementResult checkCapabilityResult;
+            CapabilitySet::checkCapabilityRequirement(
+                CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+                declaredCaps,
+                funcDecl->inferredCapabilityRequirements,
+                failedAvailableCapabilityConjunction,
+                checkCapabilityResult);
+            diagnoseUndeclaredCapability(
+                funcDecl,
+                Diagnostics::useOfUndeclaredCapability,
+                failedAvailableCapabilityConjunction,
+                true);
 
             // declared capabilities must be a superset.
             funcDecl->inferredCapabilityRequirements = declaredCaps;
@@ -14351,6 +14353,9 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
+            
+            implDeclRef.getDecl()->capabilityRequirementProvenance.add(
+                ProvenenceNodeWithLoc(inheritanceDecl->base, inheritanceDecl->loc));
             ensureDecl(implDeclRef.declRefBase, DeclCheckState::CapabilityChecked);
 
             // Only if capabilities are opted-into, should we error.
@@ -14360,33 +14365,98 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                 !requirementDecl->findModifier<RequireCapabilityAttribute>() &&
                 !implDecl->findModifier<RequireCapabilityAttribute>())
                 continue;
+
             CapabilityAtomSet failedAvailableCapabilityConjunction;
-            if (!CapabilitySet::checkCapabilityRequirement(
-                    requirementDecl->inferredCapabilityRequirements,
-                    implDecl->inferredCapabilityRequirements,
-                    failedAvailableCapabilityConjunction,
-                    CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms))
+            CheckCapabilityRequirementResult checkCapabilityResult;
+            CapabilitySet::checkCapabilityRequirement(
+                CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
+                requirementDecl->inferredCapabilityRequirements,
+                implDecl->inferredCapabilityRequirements,
+                failedAvailableCapabilityConjunction,
+                checkCapabilityResult);
+
+            if (checkCapabilityResult ==
+                CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired)
             {
                 diagnoseUndeclaredCapability(
                     implDecl,
                     Diagnostics::useOfUndeclaredCapabilityOfInterfaceRequirement,
+                    failedAvailableCapabilityConjunction,
+                    false);
+                maybeDiagnose(
+                    getSink(),
+                    getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    requirementDecl,
+                    Diagnostics::seeDeclarationOf,
+                    requirementDecl);
+            }
+            else if (checkCapabilityResult ==
+                CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
+            {
+                maybeDiagnose(
+                    getSink(),
+                    getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    implDecl,
+                    Diagnostics::requirmentHasSubsetOfAbstractAtomsToImplementation,
+                    implDecl,
                     failedAvailableCapabilityConjunction);
+                maybeDiagnose(
+                    getSink(),
+                    getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    requirementDecl,
+                    Diagnostics::seeDeclarationOf,
+                    requirementDecl);
             }
         }
     }
 
     // validate that super-type is a super set of capabilities
     CapabilityAtomSet failedAvailableCapabilityConjunction;
-    if (!CapabilitySet::checkCapabilityRequirement(
-            inheritanceDecl->inferredCapabilityRequirements,
-            inheritanceParentDecl->inferredCapabilityRequirements,
-            failedAvailableCapabilityConjunction,
-            CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms))
+    CheckCapabilityRequirementResult checkCapabilityResult;
+    CapabilitySet::checkCapabilityRequirement(
+        CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,    
+        inheritanceDecl->inferredCapabilityRequirements,
+        inheritanceParentDecl->inferredCapabilityRequirements,
+        failedAvailableCapabilityConjunction,
+        checkCapabilityResult);
+
+    if (checkCapabilityResult ==
+        CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired)
     {
         diagnoseUndeclaredCapability(
-            inheritanceDecl,
+            inheritanceParentDecl,
             Diagnostics::useOfUndeclaredCapabilityOfInheritanceDecl,
+            failedAvailableCapabilityConjunction,
+            false);
+        maybeDiagnose(
+            getSink(),
+            getOptionSet(),
+            DiagnosticCategory::Capability,
+            inheritanceDecl->base,
+            Diagnostics::seeDeclarationOf,
+            inheritanceDecl->base);
+    }
+    else if (
+        checkCapabilityResult == CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
+    {
+        maybeDiagnose(
+            getSink(),
+            getOptionSet(),
+            DiagnosticCategory::Capability,
+            inheritanceParentDecl,
+            Diagnostics::subTypeHasSubsetOfAbstractAtomsToSuperType,
+            inheritanceParentDecl,
             failedAvailableCapabilityConjunction);
+        maybeDiagnose(
+            getSink(),
+            getOptionSet(),
+            DiagnosticCategory::Capability,
+            inheritanceDecl->base,
+            Diagnostics::seeDeclarationOf,
+            inheritanceDecl->base);
     }
 }
 
@@ -14673,7 +14743,8 @@ void diagnoseCapabilityProvenance(
 void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     Decl* decl,
     const DiagnosticInfo& diagnosticInfo,
-    const CapabilityAtomSet& failedAtomsInsideAvailableSet)
+    const CapabilityAtomSet& failedAtomsInsideAvailableSet,
+    bool printProvenance)
 {
     if (decl->inferredCapabilityRequirements.isEmpty())
         return;
@@ -14701,7 +14772,7 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                decl->loc,
+                decl,
                 Diagnostics::declHasDependenciesNotCompatibleOnTarget,
                 decl,
                 outFailedAtom);
@@ -14716,16 +14787,19 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 getAtomSetOfTargets(),
                 failedAtomSet);
 
-            HashSet<Decl*> printedDecls;
-            for (auto atom : targetsNotUsedSet)
+            if (printProvenance)
             {
-                CapabilityAtom formattedAtom = asAtom(atom);
-                diagnoseCapabilityProvenance(
-                    this->getOptionSet(),
-                    getSink(),
-                    decl,
-                    formattedAtom,
-                    printedDecls);
+                HashSet<Decl*> printedDecls;
+                for (auto atom : targetsNotUsedSet)
+                {
+                    CapabilityAtom formattedAtom = asAtom(atom);
+                    diagnoseCapabilityProvenance(
+                        this->getOptionSet(),
+                        getSink(),
+                        decl,
+                        formattedAtom,
+                        printedDecls);
+                }
             }
             return;
         }
@@ -14756,7 +14830,7 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                decl->loc,
+                decl,
                 Diagnostics::declHasDependenciesNotCompatibleOnStage,
                 decl,
                 formattedAtom);
@@ -14767,18 +14841,21 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                decl->loc,
+                decl,
                 diagnosticInfo,
                 decl,
                 formattedAtom);
         }
-        // Print provenances.
-        diagnoseCapabilityProvenance(
-            this->getOptionSet(),
-            getSink(),
-            decl,
-            formattedAtom,
-            printedDecls);
+        if (printProvenance)
+        {
+            // Print provenances.
+            diagnoseCapabilityProvenance(
+                this->getOptionSet(),
+                getSink(),
+                decl,
+                formattedAtom,
+                printedDecls);
+        }
     }
 }
 
