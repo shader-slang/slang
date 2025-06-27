@@ -6,6 +6,17 @@
 
 namespace Slang
 {
+
+static bool shouldCheckIfBaseInterfaceHasDyn(SemanticsVisitor* visitor)
+{
+    return visitor->isSlang2026OrLater();
+}
+static bool shouldImplicitlySetInterfacesToSome(SemanticsVisitor* visitor)
+{
+    return visitor->isSlang2026OrLater();
+}
+
+
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
     SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
@@ -370,6 +381,84 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = DeclRefType::create(
             getASTBuilder(),
             getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+    }
+
+    // Regularly make a `some`/`dyn` type
+    {
+        bool isDyn = false;            
+
+        // Implicitly make a `some`/`dyn` type.
+        // Important to note:
+        // `dyn` only works with a parent `decl`,`some` works with types and decl.
+        auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(type);
+        auto astBuilder = getASTBuilder();
+        if (interfaceDecl)
+        {
+            auto modifierPropTarget = as<Decl>(getModifierPropagationTarget());
+            if (modifierPropTarget)
+            {
+                ensureDecl(modifierPropTarget, DeclCheckState::ModifiersChecked);
+                isDyn = modifierPropTarget->hasModifier<DynModifier>();
+            }
+            if (!isDyn)
+            {
+                if (shouldImplicitlySetInterfacesToSome(this))
+                {
+                    SomeTypeDecl* decl;
+                    if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
+                        decl = astBuilder->create<UnboundSomeTypeDecl>();
+                    else
+                        decl = astBuilder->create<SomeTypeDecl>();
+                    decl->loc = expr->loc;
+                    decl->interfaceType = typeExp;
+                    decl->parentDecl = this->getOuterScope()->containerDecl;
+                    result = DeclRefType::create(astBuilder, decl);
+                }
+                // we do not tag types as 'dyn'
+                else if (modifierPropTarget)
+                {
+                    isDyn = true;
+                    addModifier(modifierPropTarget, getASTBuilder()->create<DynModifier>());
+                    result = type;
+                }
+            }
+        }
+
+        // validate `dyn`
+        if (isDyn)
+        {
+            if (!hasSemanticsContextState(SemanticsContextState::DynTypeIsAllowed))
+            {
+                getSink()->diagnose(expr, Diagnostics::cannotHaveDynTypeHere);
+                result = getASTBuilder()->getErrorType();
+            }
+
+            // interface type of a `dyn` varDecl must have `dyn` modifier
+            if (shouldCheckIfBaseInterfaceHasDyn(this) &&
+                !interfaceDecl.getDecl()->hasModifier<DynModifier>())
+            {
+                getSink()->diagnose(
+                    expr,
+                    Diagnostics::cannotSpecifyDynDeclIfBaseIsNotDyn,
+                    interfaceDecl.getDecl());
+                result = getASTBuilder()->getErrorType();
+            }
+        }
+
+        // validate `some`
+        auto validateSome = [&](Type* maybeSomeTypeDecl)
+        {
+            if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(maybeSomeTypeDecl))
+            {
+                if (!hasSemanticsContextState(SemanticsContextState::SomeTypeIsAllowed))
+                {
+                    getSink()->diagnose(expr, Diagnostics::cannotHaveSomeTypeHere);
+                    result = getASTBuilder()->getErrorType();
+                }
+            }
+        };
+        validateSome(type);
+        validateSome(result);
     }
 
     // default case: we expect this to already be a proper type

@@ -1266,6 +1266,16 @@ struct IRTreatAsDifferentiableDecoration : IRDecoration
     IR_LEAF_ISA(TreatAsDifferentiableDecoration)
 };
 
+// Mark type as `some`
+struct IRSomeTypeDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_SomeTypeDecoration
+    };
+    IR_LEAF_ISA(SomeTypeDecoration)
+};
+
 // Mark a call as explicitly calling a differentiable function.
 struct IRDifferentiableCallDecoration : IRDecoration
 {

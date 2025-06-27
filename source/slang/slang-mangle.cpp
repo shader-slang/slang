@@ -442,6 +442,18 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         emit(context, genValParamDecl->parameterIndex);
         return;
     }
+    if (auto unboundSomeType = as<UnboundSomeTypeDecl>(declRef.getDecl()))
+    {
+        emit(context, "USome");
+        emitType(context, unboundSomeType->interfaceType.type);
+        return;
+    }
+    else if (auto someType = as<SomeTypeDecl>(declRef.getDecl()))
+    {
+        emit(context, "Some");
+        emitType(context, someType->interfaceType.type);
+        return;
+    }
 
     auto parentDeclRef = declRef.getParent();
     if (as<FileDecl>(parentDeclRef))
