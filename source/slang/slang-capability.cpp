@@ -1012,7 +1012,7 @@ void CapabilitySet::checkCapabilityRequirement(
 
     auto availableTargetSets = available.getCapabilityTargetSets();
     auto requiredTargetSets = required.getCapabilityTargetSets();
-    if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
+    if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
     {
         // If we have a mismatch in capability-target count we clearly have a
         // mismatch and will fail
@@ -1050,8 +1050,8 @@ void CapabilitySet::checkCapabilityRequirement(
             result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
             return;
         }
-        
-        if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
+
+        if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
         {
             // If we have a mismatch in capability-stage count we clearly have a
             // mismatch and will fail
