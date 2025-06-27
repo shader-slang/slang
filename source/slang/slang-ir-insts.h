@@ -3849,7 +3849,7 @@ public:
     IRBasicType* getUInt8Type();
     IRBasicType* getFloatType();
     IRBasicType* getCharType();
-    IRStringLiteralType* getStringLiteralType(IRIntLit* length);
+    IRShortStringType* getShortStringType(IRIntLit* length);
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
     IRNativePtrType* getNativePtrType(IRType* valueType);

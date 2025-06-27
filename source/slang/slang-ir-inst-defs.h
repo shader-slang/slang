@@ -29,10 +29,10 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(BasicType, VoidType, AfterBaseType)
 
     /* StringTypeBase */
-        INST(StringLiteralType, StringLiteral, 1, HOISTABLE)
+        INST(ShortStringType, ShortString, 1, HOISTABLE)
         INST(StringType, String, 0, HOISTABLE)
         INST(NativeStringType, NativeString, 0, HOISTABLE)
-    INST_RANGE(StringTypeBase, StringLiteralType, NativeStringType)
+    INST_RANGE(StringTypeBase, ShortStringType, NativeStringType)
 
     INST(CapabilitySetType, CapabilitySet, 0, HOISTABLE)
 
@@ -1264,8 +1264,8 @@ INST(AlignOf,                           alignOf,                    1, 0)
 INST(CountOf, countOf, 1, 0)
 
 INST(GetArrayLength,                    GetArrayLength,             1, 0)
-INST(GetStringLiteralLength,            GetStringLiteralLength,     1, 0)
-INST(GetStringLiteralAsArray,           GetStringLiteralAsArray,    1, 0)
+INST(GetShortStringLength,            GetShortStringLength,     1, 0)
+INST(GetShortStringAsArray,           GetShortStringAsArray,    1, 0)
 INST(IsType, IsType, 3, 0)
 INST(TypeEquals, TypeEquals, 2, 0)
 INST(IsInt, IsInt, 1, 0)

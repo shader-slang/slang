@@ -1027,10 +1027,10 @@ struct IRStringTypeBase : IRType
     IR_PARENT_ISA(StringTypeBase)
 };
 
-struct IRStringLiteralType : IRStringTypeBase
+struct IRShortStringType : IRStringTypeBase
 {
     IRInst* getLength() { return (IRInst*)getOperand(0); }
-    IR_LEAF_ISA(StringLiteralType)
+    IR_LEAF_ISA(ShortStringType)
 };
 
 SIMPLE_IR_TYPE(StringType, StringTypeBase)

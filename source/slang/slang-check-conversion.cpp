@@ -1209,7 +1209,7 @@ bool SemanticsVisitor::_coerce(
     {
         if (outToExpr)
         {
-            if (as<StringLiteralExpressionType>(toType))
+            if (as<ShortStringType>(toType))
             {
                 *outToExpr = fromExpr;
             }

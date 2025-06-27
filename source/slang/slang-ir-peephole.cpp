@@ -4,7 +4,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
-#include "slang-ir-string-literals.h"
+#include "slang-ir-short-string.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -307,8 +307,8 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
-        case kIROp_GetStringLiteralLength:
-            if (auto strLitType = as<IRStringLiteralType>(inst->getOperand(0)->getDataType()))
+        case kIROp_GetShortStringLength:
+            if (auto strLitType = as<IRShortStringType>(inst->getOperand(0)->getDataType()))
             {
                 inst->replaceUsesWith(strLitType->getLength());
                 maybeRemoveOldInst(inst);
@@ -344,13 +344,13 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
-        case kIROp_GetStringLiteralAsArray:
+        case kIROp_GetShortStringAsArray:
             if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
             {
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto asArray = getStringLiteralAsArray(builder, strLit);
+                auto asArray = getShortStringAsArray(builder, strLit);
                 inst->replaceUsesWith(asArray);
                 maybeRemoveOldInst(inst);
                 changed = true;
