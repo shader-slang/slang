@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.22)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
@@ -28,6 +28,7 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.25")
     cmake_policy(SET CMP0141 NEW)
 endif()
 cmake_policy(SET CMP0091 NEW)
+
 
 # Don't use absolute paths to the build tree in RPATH, this makes the build
 # tree relocatable
