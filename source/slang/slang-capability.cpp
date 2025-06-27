@@ -1007,7 +1007,7 @@ bool CapabilitySet::checkCapabilityRequirement(
 
     auto availableTargetSets = available.getCapabilityTargetSets();
     auto requiredTargetSets = required.getCapabilityTargetSets();
-    if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
+    if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
     {
         // If we have a mismatch in capability-target count we clearly have a
         // mismatch and will fail
@@ -1042,8 +1042,8 @@ bool CapabilitySet::checkCapabilityRequirement(
             outFailedAvailableSet.add((UInt)availableTarget.first);
             return false;
         }
-        
-        if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
+
+        if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
         {
             // If we have a mismatch in capability-stage count we clearly have a
             // mismatch and will fail
