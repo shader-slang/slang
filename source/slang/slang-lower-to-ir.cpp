@@ -5175,10 +5175,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        IROp type = kIROp_StringLiteralType;
-        if (as<StringLiteralExpressionType>(expr->type))
+        IROp type = kIROp_undefined;
+        if (as<ShortStringType>(expr->type))
         {
-            type = kIROp_StringLiteralType;
+            type = kIROp_ShortStringType;
         }
         else if (as<StringType>(expr->type))
         {
@@ -5187,6 +5187,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (as<NativeStringType>(expr->type))
         {
             type = kIROp_NativeStringType;
+        }
+        else
+        {
+            //expr->type
+            StringBuilder sb;
+            sb << "Unexpected type of StringLiteralExpr: ";
+            expr->type.type->toText(sb);
+            context->getSink()->diagnose(expr->loc, Diagnostics::unexpected, sb.getUnownedSlice());
         }
         auto irLit = context->irBuilder->getStringValue(expr->value.getUnownedSlice(), type);
         context->shared->m_stringLiterals.add(irLit);

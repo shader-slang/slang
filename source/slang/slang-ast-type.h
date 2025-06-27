@@ -643,7 +643,7 @@ class StringTypeBase : public BuiltinType
 };
 
 FIDDLE()
-class StringLiteralExpressionType : public StringTypeBase
+class ShortStringType : public StringTypeBase
 {
     FIDDLE(...)
     IntVal* getLength();

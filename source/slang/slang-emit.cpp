@@ -103,7 +103,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
-#include "slang-ir-string-literals.h"
+#include "slang-ir-short-string.h"
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
@@ -1907,9 +1907,9 @@ Result linkAndOptimizeIR(
          target == CodeGenTarget::CSource);
     if (!targetSupportsStringLiterals)
     {
-        StringLiteralsOptions strLitOptions = {};
-        strLitOptions.replaceStringLiteralsWithArray = true;
-        replaceStringLiteralsReturnChanged(targetProgram, irModule, strLitOptions);
+        ShortStringsOptions strLitOptions = {};
+        strLitOptions.replaceShortStringsWithArray = true;
+        replaceShortStringReturnChanged(targetProgram, irModule, strLitOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)

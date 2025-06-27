@@ -1730,11 +1730,11 @@ struct Array : IRWArray<T>
 
 //@public:
 __generic<int N>
-__magic_type(StringLiteralExpressionType)
-__intrinsic_type($(kIROp_StringLiteralType))
-struct StringLiteral : IArray<uint>
+__magic_type(ShortStringType)
+__intrinsic_type($(kIROp_ShortStringType))
+struct ShortString : IArray<uint>
 {
-    __intrinsic_op($(kIROp_GetStringLiteralLength))
+    __intrinsic_op($(kIROp_GetShortStringLength))
     [__unsafeForceInlineEarly]
     int getCount();
 
@@ -1743,12 +1743,12 @@ struct StringLiteral : IArray<uint>
         [__unsafeForceInlineEarly] get { return (uint)getCount(); }
     }
 
-    __intrinsic_op($(kIROp_GetStringLiteralAsArray))
+    __intrinsic_op($(kIROp_GetShortStringAsArray))
     [__unsafeForceInlineEarly]
     Array<uint, N> getArray();
 
     [__unsafeForceInlineEarly]
-    uint _getElementFromArray(uint i)
+    internal uint _getElementFromArray(uint i)
     {
         return getArray()[i];
     }
@@ -1756,7 +1756,7 @@ struct StringLiteral : IArray<uint>
     __intrinsic_op($(kIROp_GetElement))
     [__unsafeForceInlineEarly]
     [require(cpp_cuda)]
-    uint _getElementFromNative(uint i);
+    internal uint _getElementFromNative(uint i);
 
     __subscript(uint i) -> uint
     {
@@ -1809,9 +1809,9 @@ struct String
     __init(NativeString value);
 
     [__unsafeForceInlineEarly]
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_SizedArrayToUnsizedArray))
     __intrinsic_op($(kIROp_MakeString))
-    __init<int N>(StringLiteral<N> value);
+    __init<int N>(ShortString<N> value);
 
     /// Returns the length of the string.
     [require(cpp)]
@@ -1856,9 +1856,9 @@ struct NativeString
     __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
 
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_SizedArrayToUnsizedArray ))
     __intrinsic_op($(kIROp_getNativeStr))
-    __init<int N>(StringLiteral<N> value);
+    __init<int N>(ShortString<N> value);
 
     __init() { this = NativeString(""); }
 };
@@ -3070,7 +3070,7 @@ void unmodified(out T){}
 /// Given a string returns an integer hash of that string.
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
-uint32_t getStringHash<int N>(StringLiteral<N> string);
+uint32_t getStringHash<int N>(ShortString<N> string);
 
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))

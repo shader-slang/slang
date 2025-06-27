@@ -349,11 +349,11 @@ PtrTypeBase* ASTBuilder::getPtrType(
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
-StringLiteralExpressionType* ASTBuilder::getStringLiteralType(IntVal* length)
+ShortStringType* ASTBuilder::getShortStringType(IntVal* length)
 {
     Val* args[] = {length};
-    return as<StringLiteralExpressionType>(
-        getSpecializedBuiltinType(makeArrayView(args), "StringLiteralExpressionType"));
+    return as<ShortStringType>(
+        getSpecializedBuiltinType(makeArrayView(args), "ShortStringType"));
 }
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)

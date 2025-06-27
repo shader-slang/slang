@@ -201,7 +201,7 @@ extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrinta
 }
 
 __generic<int N>
-extension StringLiteral<N> : IPrintable
+extension ShortString<N> : IPrintable
 {
     uint getPrintWordCount() { return 2; }
 
@@ -291,7 +291,7 @@ void println<A : IPrintable, B : IPrintable, C : IPrintable>(
 //
 
 __generic<int N>
-uint _beginPrintf(StringLiteral<N> format, uint wordCount)
+uint _beginPrintf(ShortString<N> format, uint wordCount)
 {
     // A printf command will start with the usual command header word,
     // along with a word for the (hashed) format string. These
@@ -334,7 +334,7 @@ extension uint : IPrintf
     }
 }
 __generic<int N>
-extension StringLiteral<N> : IPrintf
+extension ShortString<N> : IPrintf
 {
     uint getPrintfWordCount() { return 1; }
 
@@ -346,14 +346,14 @@ extension StringLiteral<N> : IPrintf
 
 
 // A `printf()` with no format arguments can just call back to `_beginPrintf()`
-void printf_<int N>(StringLiteral<N> format)
+void printf_<int N>(ShortString<N> format)
 {
     _beginPrintf(format, 0);
 }
 
 // The `printf()` cases with one or more format arguments are all quite similar.
 
-void printf_<A : IPrintf, int N>(StringLiteral<N> format, A a)
+void printf_<A : IPrintf, int N>(ShortString<N> format, A a)
 {
     // We need to compute the words required by each format argument
     // and sum them up.
@@ -372,7 +372,7 @@ void printf_<A : IPrintf, int N>(StringLiteral<N> format, A a)
     a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
 }
 
-void printf_<A : IPrintf, B : IPrintf, int N>(StringLiteral<N> format, A a, B b)
+void printf_<A : IPrintf, B : IPrintf, int N>(ShortString<N> format, A a, B b)
 {
     uint wordCount = 0;
     uint aCount = a.getPrintfWordCount(); wordCount += aCount;

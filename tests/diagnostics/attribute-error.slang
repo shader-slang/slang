@@ -16,7 +16,7 @@ struct DefaultValueAttribute
     int iParam;
 };
 
-//REFLECTION:([[# @LINE+1]]): error 30019: expected an expression of type 'float', got 'StringLiteral<9>'
+//REFLECTION:([[# @LINE+1]]): error 30019: expected an expression of type 'float', got 'ShortString<9>'
 [MyStruct(0, "stringVal")] // attribute arg type mismatch
 struct A
 {

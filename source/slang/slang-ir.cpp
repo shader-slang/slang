@@ -2334,10 +2334,10 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice, IROp d
     auto length = inSlice.getLength();
 
     keyInst.m_op = kIROp_StringLit;
-    if (desiredType == kIROp_StringLiteralType)
+    if (desiredType == kIROp_ShortStringType)
     {
         keyInst.typeUse.usedValue =
-            getStringLiteralType(static_cast<IRIntLit*>(getIntValue(length)));
+            getShortStringType(static_cast<IRIntLit*>(getIntValue(length)));
     }
     else if (desiredType == kIROp_StringType)
     {
@@ -2754,9 +2754,9 @@ IRBasicType* IRBuilder::getCharType()
     return (IRBasicType*)getType(kIROp_CharType);
 }
 
-IRStringLiteralType* IRBuilder::getStringLiteralType(IRIntLit* length)
+IRShortStringType* IRBuilder::getShortStringType(IRIntLit* length)
 {
-    return (IRStringLiteralType*)getType(kIROp_StringLiteralType, length);
+    return (IRShortStringType*)getType(kIROp_ShortStringType, length);
 }
 
 IRStringType* IRBuilder::getStringType()
@@ -8688,7 +8688,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
-    case kIROp_GetStringLiteralLength:
+    case kIROp_GetShortStringLength:
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:

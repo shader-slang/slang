@@ -15,7 +15,7 @@ RWStructuredBuffer<uint> output;
 
 extension RWStructuredBuffer<uint>
 {
-	void print<int N>(const in StringLiteral<N> str, uint offset = 0)
+	void print<int N>(const in ShortString<N> str, uint offset = 0)
 	{
 		for(uint i = 0; i < N; ++i)
 		{

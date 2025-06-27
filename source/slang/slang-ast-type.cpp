@@ -318,9 +318,9 @@ Type* TupleType::getTypePack() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringLiteralExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShortStringType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-IntVal* StringLiteralExpressionType::getLength()
+IntVal* ShortStringType::getLength()
 {
     return as<IntVal>(_getGenericTypeArg(this, 0));
 }

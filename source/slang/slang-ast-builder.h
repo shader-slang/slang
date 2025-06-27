@@ -99,7 +99,7 @@ protected:
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
-    StringLiteralExpressionType* m_stringLiteralType = nullptr;
+    ShortStringType* m_stringLiteralType = nullptr;
     Type* m_stringType = nullptr;
     Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
@@ -525,7 +525,7 @@ public:
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
     PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
 
-    StringLiteralExpressionType* getStringLiteralType(IntVal* length);
+    ShortStringType* getShortStringType(IntVal* length);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 

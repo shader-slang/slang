@@ -1,16 +1,16 @@
-#include "slang-ir-string-literals.h"
+#include "slang-ir-short-string.h"
 
 #include "slang-ir-inst-pass-base.h"
 
 namespace Slang
 {
 
-IRArrayType* getStringLiteralArrayType(IRBuilder& builder, IRStringLiteralType* strLitType)
+IRArrayType* getShortStringArrayType(IRBuilder& builder, IRShortStringType* strLitType)
 {
     return builder.getArrayType(builder.getUIntType(), strLitType->getLength());
 }
 
-IRInst* getStringLiteralAsArray(IRBuilder& builder, IRStringLit* strLit)
+IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* strLit)
 {
     auto sv = strLit->getStringSlice();
     List<IRInst*> chars;
@@ -27,9 +27,9 @@ IRInst* getStringLiteralAsArray(IRBuilder& builder, IRStringLit* strLit)
     return asArray;
 }
 
-struct StringLiteralReplacementPass : InstPassBase
+struct ShortStringReplacementPass : InstPassBase
 {
-    StringLiteralReplacementPass(IRModule* irModule)
+    ShortStringReplacementPass(IRModule* irModule)
         : InstPassBase(irModule)
     {
     }
@@ -38,25 +38,25 @@ struct StringLiteralReplacementPass : InstPassBase
 
     void processInst(IRInst* inst)
     {
-        if (auto strLitType = as<IRStringLiteralType>(inst))
+        if (auto strLitType = as<IRShortStringType>(inst))
         {
             IRBuilder builder(module);
             IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
             builder.setInsertBefore(inst);
-            auto arrayType = getStringLiteralArrayType(builder, strLitType);
+            auto arrayType = getShortStringArrayType(builder, strLitType);
             inst->replaceUsesWith(arrayType);
             inst->removeAndDeallocate();
             changed = true;
         }
         else if (auto strLit = as<IRStringLit>(inst))
         {
-            if (as<IRStringLiteralType>(strLit->getDataType()) ||
+            if (as<IRShortStringType>(strLit->getDataType()) ||
                 as<IRArrayType>(strLit->getDataType()))
             {
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto asArray = getStringLiteralAsArray(builder, strLit);
+                auto asArray = getShortStringAsArray(builder, strLit);
                 inst->replaceUsesWith(asArray);
                 inst->removeAndDeallocate();
                 changed = true;
@@ -70,16 +70,16 @@ struct StringLiteralReplacementPass : InstPassBase
     }
 };
 
-bool replaceStringLiteralsReturnChanged(
+bool replaceShortStringReturnChanged(
     TargetProgram* target,
     IRModule* module,
-    StringLiteralsOptions options)
+    ShortStringsOptions options)
 {
     SLANG_UNUSED(target);
     bool res = false;
-    if (options.replaceStringLiteralsWithArray)
+    if (options.replaceShortStringsWithArray)
     {
-        StringLiteralReplacementPass pass(module);
+        ShortStringReplacementPass pass(module);
         pass.processModule();
         res |= pass.changed;
     }

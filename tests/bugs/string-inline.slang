@@ -14,7 +14,7 @@ interface IPrintable
 };
 
 __generic<int N>
-extension StringLiteral<N> : IPrintable
+extension ShortString<N> : IPrintable
 {
 	int getHash() { return getStringHash<N>(this); }
 }
