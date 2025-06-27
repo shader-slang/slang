@@ -260,8 +260,10 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
     {
         auto version = m_workspace->getCurrentVersion();
         Module* parsedModule = version->getOrLoadModule(canonicalPath);
-        SLANG_UNUSED(parsedModule);
-        // Module loading failure is not fatal for document opening
+        if (!parsedModule)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;
@@ -2636,8 +2638,10 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     {
         auto version = m_workspace->getCurrentVersion();
         Module* parsedModule = version->getOrLoadModule(canonicalPath);
-        SLANG_UNUSED(parsedModule);
-        // Module loading failure is not fatal for document changes
+        if (!parsedModule)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;

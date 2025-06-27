@@ -4161,8 +4161,18 @@ void Linkage::loadParsedModule(
     auto sink = translationUnit->compileRequest->getSink();
 
     int errorCountBefore = sink->getErrorCount();
-    compileRequest->checkAllTranslationUnits();
-    int errorCountAfter = sink->getErrorCount();
+    int errorCountAfter;
+    try
+    {
+        compileRequest->checkAllTranslationUnits();
+        errorCountAfter = sink->getErrorCount();
+    }
+    catch (...)
+    {
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
+        throw;
+    }
     if (isInLanguageServer())
     {
         // Don't generate IR as language server.
