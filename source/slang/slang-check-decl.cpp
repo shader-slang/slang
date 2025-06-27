@@ -14355,7 +14355,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
-            
+
             implDeclRef.getDecl()->capabilityRequirementProvenance.add(
                 ProvenenceNodeWithLoc(inheritanceDecl->base, inheritanceDecl->loc));
             ensureDecl(implDeclRef.declRefBase, DeclCheckState::CapabilityChecked);
@@ -14393,7 +14393,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                     Diagnostics::seeDeclarationOf,
                     requirementDecl);
             }
-            else if (checkCapabilityResult ==
+            else if (
+                checkCapabilityResult ==
                 CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
             {
                 maybeDiagnose(
@@ -14419,7 +14420,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     CapabilityAtomSet failedAvailableCapabilityConjunction;
     CheckCapabilityRequirementResult checkCapabilityResult;
     CapabilitySet::checkCapabilityRequirement(
-        CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,    
+        CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
         inheritanceDecl->inferredCapabilityRequirements,
         inheritanceParentDecl->inferredCapabilityRequirements,
         failedAvailableCapabilityConjunction,
