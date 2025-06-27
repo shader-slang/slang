@@ -8478,9 +8478,6 @@ void IRInst::removeAndDeallocate()
     }
     removeArguments();
     removeFromParent();
-
-    // Run destructor to be sure...
-    this->~IRInst();
 }
 
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()

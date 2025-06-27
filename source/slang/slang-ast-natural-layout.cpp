@@ -153,6 +153,12 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         // Initialize empty
         NaturalSize size = NaturalSize::makeEmpty();
 
+        // We can't compute the size of an abstract type pack yet.
+        if (isAbstractTypePack(tupleType->getTypePack()))
+        {
+            return NaturalSize::makeInvalid();
+        }
+
         // Accumulate over all the member types
         for (auto cur = 0; cur < tupleType->getMemberCount(); cur++)
         {
