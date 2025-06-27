@@ -269,6 +269,22 @@ CapabilityAtomSet CapabilityAtomSet::newSetWithoutImpliedAtoms() const
 
 //// CapabiltySet
 
+CapabilityAtomSet getTargetAtomsInSet(const CapabilitySet& set)
+{
+    CapabilityAtomSet out;
+    for (auto i : set.getCapabilityTargetSets())
+        out.add((UInt)i.first);
+    return out;
+}
+
+CapabilityAtomSet getStageAtomsInSet(const CapabilityTargetSet& set)
+{
+    CapabilityAtomSet out;
+    for (auto i : set.getShaderStageSets())
+        out.add((UInt)i.first);
+    return out;
+}
+
 CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
     auto targetSet = getAtomSetOfTargets();
@@ -962,7 +978,8 @@ CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
 bool CapabilitySet::checkCapabilityRequirement(
     CapabilitySet const& available,
     CapabilitySet const& required,
-    CapabilityAtomSet& outFailedAvailableSet)
+    CapabilityAtomSet& outFailedAvailableSet,
+    CheckCapabilityRequirementOptions options)
 {
     // 'required' capabilities x are met by 'available' disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
@@ -971,7 +988,7 @@ bool CapabilitySet::checkCapabilityRequirement(
     // We'd better make sure that `g()` can be compiled with both (hlsl+_sm_6_3) and
     // (spirv+_spv_ray_tracing) capability sets. In this method, F()'s capability declaration is
     // represented by `available`, and g()'s capability is represented by `required`. We will check
-    // that for every capability conjunction X of F(), there is one capability conjunction Y in g()
+    // that for every capability conjunction X of F(), there is a capability conjunction Y in g()
     // such that X implies Y.
     //
 
@@ -988,21 +1005,72 @@ bool CapabilitySet::checkCapabilityRequirement(
         return true;
     }
 
-
-    // if all sets in `available` are not a superset, then we have an
-    // err
-    for (auto& availableTarget : available.m_targetSets)
+    auto availableTargetSets = available.getCapabilityTargetSets();
+    auto requiredTargetSets = required.getCapabilityTargetSets();
+    if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
     {
-        auto reqTarget = required.m_targetSets.tryGetValue(availableTarget.first);
+        // If we have a mismatch in capability-target count we clearly have a
+        // mismatch and will fail
+        auto availableTargetSetsCount = availableTargetSets.getCount();
+        auto requiredTargetSetsCount = requiredTargetSets.getCount();
+        if (availableTargetSetsCount != requiredTargetSetsCount)
+        {
+            auto availableTargets = getTargetAtomsInSet(available);
+            auto requiredTargets = getTargetAtomsInSet(required);
+
+            if (requiredTargetSetsCount > availableTargetSetsCount)
+            {
+                requiredTargets.subtractWith((UIntSet)availableTargets);
+                outFailedAvailableSet.add((UIntSet)requiredTargets);
+            }
+            else
+            {
+                availableTargets.subtractWith((UIntSet)requiredTargets);
+                outFailedAvailableSet.add((UIntSet)availableTargets);
+            }
+            return false;
+        }
+    }
+
+    // if all sets in `available` are not a superset to `required` then we have an
+    // error.
+    for (auto& availableTarget : availableTargetSets)
+    {
+        auto reqTarget = requiredTargetSets.tryGetValue(availableTarget.first);
         if (!reqTarget)
         {
             outFailedAvailableSet.add((UInt)availableTarget.first);
             return false;
         }
-
-        for (auto& availableStage : availableTarget.second.shaderStageSets)
+        
+        if(options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
         {
-            auto reqStage = reqTarget->shaderStageSets.tryGetValue(availableStage.first);
+            // If we have a mismatch in capability-stage count we clearly have a
+            // mismatch and will fail
+            auto availableStageSetsCount = availableTarget.second.getShaderStageSets().getCount();
+            auto requiredStageSetsCount = reqTarget->getShaderStageSets().getCount();
+            if (availableStageSetsCount != requiredStageSetsCount)
+            {
+                auto availableStages = getStageAtomsInSet(availableTarget.second);
+                auto requiredStages = getStageAtomsInSet(*reqTarget);
+
+                if (requiredStageSetsCount > availableStageSetsCount)
+                {
+                    requiredStages.subtractWith((UIntSet)availableStages);
+                    outFailedAvailableSet.add((UIntSet)requiredStages);
+                }
+                else
+                {
+                    availableStages.subtractWith((UIntSet)requiredStages);
+                    outFailedAvailableSet.add((UIntSet)availableStages);
+                }
+                return false;
+            }
+        }
+
+        for (auto& availableStage : availableTarget.second.getShaderStageSets())
+        {
+            auto reqStage = reqTarget->getShaderStageSets().tryGetValue(availableStage.first);
             if (!reqStage)
             {
                 outFailedAvailableSet.add((UInt)availableStage.first);

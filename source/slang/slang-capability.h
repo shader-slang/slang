@@ -98,6 +98,16 @@ struct CapabilityTargetSet
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
+
+    const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
+};
+
+enum class CheckCapabilityRequirementOptions
+{
+    // `available` can have a subset of the abstract atoms `required` has
+    AvailableCanHaveSubsetOfAbstractAtoms,
+    // `available` and `required` both must have equal abstract stage & target atoms
+    MustHaveEqualAbstractAtoms,
 };
 
 struct CapabilitySet
@@ -191,7 +201,8 @@ public:
     static bool checkCapabilityRequirement(
         CapabilitySet const& available,
         CapabilitySet const& required,
-        CapabilityAtomSet& outFailedAvailableSet);
+        CapabilityAtomSet& outFailedAvailableSet,
+        CheckCapabilityRequirementOptions options);
 
     // For each element in `elementsToPermutateWith`, create and add a different conjunction
     // permutation by adding to `setToPermutate`.

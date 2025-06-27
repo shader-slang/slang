@@ -13988,26 +13988,27 @@ struct CapabilityDeclReferenceVisitor
         auto targetCaseCount = stmt->targetCases.getCount();
         for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
         {
-            // We may recieve a `default:` case for a `__target_switch`. If this is the case,
-            // we must resolve the target capability for a non empty set of
-            // `calling_functions_targets`:
-            //      ``` default_target = calling_functions_targets-{other_case_targets} ```
+            // The logic here is to collect a list of `case` statment capabilities 
+            // so that down-the-line we can specialize according to the compile-capabilities.
+            // 
+            // The additional goal we have is to merge all case-capabilities into 1 set
+            // so that we can propegate them to the parent-function so that a user may break-down
+            // a functon into `stage`/`target` specific code. 
+            // 
+            // A few important details
+            // 1. Case statments (other than `default:`) may have overlapping capabilities. This is to allow
+            // "more specialized" `case` statments to support specializing code on higher-feature-levels to 
+            // support writing 1 function to handle cases such as sm_5_0 and sm_6_0 support all in 1 function.
             //
-            // * `calling_functions_capability` = `requirement attribute` of the calling
-            // function; if missing
-            //    we can assume it is `any_target`
-            //
-            // * `{other_case_targets}` = set of all capabilities all `case` statments target
-            // inside the `__target_switch`
-
-            // If we do not handle `default:`, the codegen will fail when trying to find a
-            // specific codegen target not handled explicitly by a `case` statment. We must also
-            // ensure the `default` case is last so we have priority to hit `case` statments and
-            // can preprocess `case` statments before the `default` case.
+            // 2. All `case:` statments are explicit with their own-capabilities, `default:` statments are not.
+            // `default:` statments have the value `CapabilityName::Invalid`. If we find a `default` statment 
+            // we assign it all shader target/stage capabilities that the other `case` statments did not specify
+            // which is legal for the current calling function (based on the parent function `require` decl).
             CapabilitySet targetCap;
             if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) ==
                 CapabilityName::Invalid)
             {
+                // swap the `default` case to the end so that we process it last
                 if (targetCaseCount - 1 != targetCaseIndex)
                 {
                     for (Index i = targetCaseIndex; i < targetCaseCount - 1; i++)
@@ -14274,20 +14275,29 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     {
         if (vis == DeclVisibility::Public)
         {
-            // We need to enforce that the function
-            // only uses capabilities that this decl declares. To do this
-            // we compare capabilities used in the `body` of the function
+            // We need to enforce that the function-body
+            // only uses capabilities that the function-decl declares.
+            //
+            // A small exception to this rule is that the body must 
+            // implement all shader stages/targets of the functionDecl
+            // requirements. The body can support *more* stages/targets,
+            // these will just be not accessible (which is fine since a user
+            // may only need hlsl support for a function, using an STD-LIB function
+            // implemented for all targets/stages).
             CapabilityAtomSet failedAvailableCapabilityConjunction;
             if (!CapabilitySet::checkCapabilityRequirement(
                     declaredCaps,
                     funcDecl->inferredCapabilityRequirements,
-                    failedAvailableCapabilityConjunction))
+                    failedAvailableCapabilityConjunction,
+                    CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms))
             {
                 diagnoseUndeclaredCapability(
                     funcDecl,
                     Diagnostics::useOfUndeclaredCapability,
                     failedAvailableCapabilityConjunction);
             }
+
+            // declared capabilities must be a superset.
             funcDecl->inferredCapabilityRequirements = declaredCaps;
         }
         else
@@ -14354,7 +14364,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             if (!CapabilitySet::checkCapabilityRequirement(
                     requirementDecl->inferredCapabilityRequirements,
                     implDecl->inferredCapabilityRequirements,
-                    failedAvailableCapabilityConjunction))
+                    failedAvailableCapabilityConjunction,
+                    CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms))
             {
                 diagnoseUndeclaredCapability(
                     implDecl,
@@ -14369,7 +14380,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     if (!CapabilitySet::checkCapabilityRequirement(
             inheritanceDecl->inferredCapabilityRequirements,
             inheritanceParentDecl->inferredCapabilityRequirements,
-            failedAvailableCapabilityConjunction))
+            failedAvailableCapabilityConjunction,
+            CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms))
     {
         diagnoseUndeclaredCapability(
             inheritanceDecl,

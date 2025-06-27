@@ -3,7 +3,20 @@
 // Test if InheritanceDecl fail to conform to parent capabilities
 
 // mismatch of target abstract atoms
-[require(hlsl_spirv)]
+[require(hlsl)]
+interface IFoo0
+{
+}
+[require(hlsl)]
+[require(spirv)]
+// CHECK-DAG: ([[# @LINE+1]]): error 36108{{.*}}spirv
+struct Foo0 : IFoo0
+{
+}
+
+// mismatch of target abstract atoms
+[require(hlsl)]
+[require(spirv)]
 interface IFoo1
 {
 }
@@ -13,7 +26,7 @@ struct Foo1 : IFoo1
 {
 }
 
-// sub-type is superset
+// subtype is superset
 [require(sm_4_0)]
 interface IFoo2
 {
@@ -24,7 +37,7 @@ struct Foo2 : IFoo2
 {
 }
 
-// sub-type is subset, no error
+// subtype is subset, no error
 [require(sm_5_0)]
 interface IFoo3
 {

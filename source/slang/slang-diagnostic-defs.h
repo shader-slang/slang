@@ -1136,17 +1136,17 @@ DIAGNOSTIC(
     missingCapabilityRequirementOnPublicDecl,
     "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to "
     "require inferred capabilities '$1'.")
-DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
+DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'")
 DIAGNOSTIC(
     36104,
     Error,
     useOfUndeclaredCapabilityOfInterfaceRequirement,
-    "'$0' uses capability '$1' that is missing from the interface requirement.")
+    "'$0' uses capability '$1' that is incompatable with the interface requirement")
 DIAGNOSTIC(
     36104,
     Error,
     useOfUndeclaredCapabilityOfInheritanceDecl,
-    "'$0' is not a subset of parent, uses additional undeclared capabilities '$1'.")
+    "'$0' uses capability '$1' that is incompatable with the subtype")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(

@@ -5670,7 +5670,7 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
                         Diagnostics::unknownTargetName,
                         caseName.getContent());
                 }
-                targetCase->capability = int32_t(cap);
+                targetCase->capability = (int32_t)cap;
                 targetCase->capabilityToken = caseName;
                 targetCase->loc = caseName.loc;
                 targetCase->body = bodyStmt;
