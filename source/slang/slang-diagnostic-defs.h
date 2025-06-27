@@ -1153,7 +1153,8 @@ DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' compilation target.")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' compilation "
+    "target.")
 DIAGNOSTIC(
     36108,
     Error,
@@ -1205,7 +1206,8 @@ DIAGNOSTIC(
     36118,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
-    "requirement '$0' must have the same target/stage support as the implementation; '$0' is missing '$1'")
+    "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
+    "missing '$1'")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
