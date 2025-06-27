@@ -3033,23 +3033,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
-    case kIROp_GetStringHash:
-        {
-            auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
-
-            if (stringLit)
-            {
-                auto slice = stringLit->getStringSlice();
-                m_writer->emit(getStableHashCode32(slice.begin(), slice.getLength()).hash);
-            }
-            else
-            {
-                // Couldn't handle
-                diagnoseUnhandledInst(inst);
-            }
-            break;
-        }
     case kIROp_Printf:
         {
             m_writer->emit("printf(");

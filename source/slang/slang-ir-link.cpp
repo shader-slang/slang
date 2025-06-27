@@ -332,7 +332,9 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_StringLit:
         {
             IRConstant* c = (IRConstant*)originalValue;
-            return builder->getStringValue(c->getStringSlice());
+            return builder->getStringValue(
+                c->getStringSlice(),
+                originalValue->getDataType()->getOp());
         }
         break;
 
