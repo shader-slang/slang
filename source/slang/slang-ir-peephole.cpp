@@ -281,7 +281,7 @@ struct PeepholeContext : InstPassBase
                         baseType,
                         &sizeAlignment)))
                     break;
-                if (sizeAlignment.size == 0)
+                if (sizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
                     break;
 
                 IRBuilder builder(module);
