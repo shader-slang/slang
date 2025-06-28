@@ -48,11 +48,13 @@ struct Impl2 : IFoo
         useNonUniformArithmetic(); // error.
     }
 
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // error here because requirments are explicitly tagged on
+    // the requiremnt parent `IFoo`
+    // CHECK-NOT: error 36104: {{.*}}spvGroupNonUniformArithmetic
     void method2()
     {
         useAtomicFloat16();
-        useNonUniformArithmetic(); // error.
+        useNonUniformArithmetic();
     }
 }
 
