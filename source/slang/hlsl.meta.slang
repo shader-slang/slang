@@ -26904,12 +26904,13 @@ if(buffer.isRW)
 /// When `memoryLayout` is `RowMajor`, this function is equivalent to:
 ///
 /// ```
+/// uint8_t* matrixPtr = matrix + matrixOffset;
 /// for (int i = 0; i < M; i++)
 /// {
 ///    for (int j = 0; j < N; j++)
 ///    {
 ///        let elem = a[i] * b[j];
-///        atomicAdd(matrix + (i * N + j), elem);
+///        atomicAdd(matrixPtr + i * matrixStride + j * sizeof(T), elem);
 ///    }
 /// }
 /// ```
