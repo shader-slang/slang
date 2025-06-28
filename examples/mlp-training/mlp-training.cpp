@@ -74,7 +74,6 @@ struct ExampleProgram : public TestBase
 
     ComPtr<slang::ISession> gSlangSession;
     ComPtr<slang::IModule> gSlangModule;
-    Kernel gClearBufferProgram;
     Kernel gLearnGradProgram;
     Kernel gAdjustParamProgram;
 
@@ -127,9 +126,17 @@ struct ExampleProgram : public TestBase
         srand(1072);
         for (int i = 0; i < paramBufferSize / sizeof(NFloat); i++)
         {
-            float v = rand() / (float)RAND_MAX;
-            v = v * 2.0f - 1.0f; // Normalize to [-1, 1]
-            initParams.push_back(floatToHalf(v));
+            if (i < gradientOffset / sizeof(NFloat))
+            {
+                float v = rand() / (float)RAND_MAX;
+                v = v * 2.0f - 1.0f; // Normalize to [-1, 1]
+                initParams.push_back(floatToHalf(v));
+            }
+            else
+            {
+                // Initialize gradients to zero.
+                initParams.push_back(0);
+            }
         }
         auto networkParamsBuffer = createBuffer(paramBufferSize, initParams.data());
 
@@ -169,16 +176,7 @@ struct ExampleProgram : public TestBase
         for (int k = 0; k < 1000; k++)
         {
             clearBuffer(lossBuffer);
-            // Set gradients in row-major buffer to 0.
-            {
-                ClearBufferParams entryPointParams = {};
-                entryPointParams.buffer = networkParamsBuffer->getDeviceAddress() + gradientOffset;
-                entryPointParams.count = (paramBufferSize - gradientOffset) / sizeof(NFloat);
-                dispatchKernel(
-                    gClearBufferProgram,
-                    entryPointParams,
-                    (entryPointParams.count + 255) / 256);
-            }
+
             // Compute gradients.
             {
                 LearnGradParams entryPointParams = {};
@@ -366,10 +364,6 @@ struct ExampleProgram : public TestBase
         gSlangSession = createSlangSession(gDevice);
         gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
         if (!gSlangModule)
-            return SLANG_FAIL;
-
-        gClearBufferProgram = loadComputeProgram(gSlangModule, "clearBuffer");
-        if (!gClearBufferProgram)
             return SLANG_FAIL;
 
         gLearnGradProgram = loadComputeProgram(gSlangModule, "learnGradient");

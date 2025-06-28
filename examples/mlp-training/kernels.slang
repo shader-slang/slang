@@ -6,14 +6,6 @@ import network;
 import adam;
 
 [numthreads(256, 1, 1)]
-void clearBuffer(uint32_t tid : SV_DispatchThreadID, uniform NFloat* buffer, uniform uint32_t count)
-{
-    if (tid >= count)
-        return;
-    buffer[tid] = 0.0h;
-}
-
-[numthreads(256, 1, 1)]
 [require(spvGroupNonUniformBallot, spvGroupNonUniformArithmetic)]
 void learnGradient(
     uint32_t tid : SV_DispatchThreadID,
@@ -41,6 +33,9 @@ void adjustParameters(uint32_t tid : SV_DispatchThreadID, uniform AdamState* sta
     if (tid >= count)
         return;
     if (isnan(gradients[tid]))
+    {
+        gradients[tid] = 0.0h;
         return;
+    }
     AdamOptimizer::step(states[tid], params[tid], gradients[tid]);
 }

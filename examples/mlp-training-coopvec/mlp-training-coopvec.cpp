@@ -56,7 +56,6 @@ struct ExampleProgram : public TestBase
 
     ComPtr<slang::ISession> gSlangSession;
     ComPtr<slang::IModule> gSlangModule;
-    Kernel gClearBufferProgram;
     Kernel gLearnGradProgram;
     Kernel gAdjustParamProgram;
 
@@ -180,17 +179,12 @@ struct ExampleProgram : public TestBase
         {
             clearBuffer(lossBuffer);
 
-            // Set gradients in parameter buffer to 0.
-            {
-                ClearBufferParams entryPointParams = {};
-                entryPointParams.buffer =
-                    networkParamsBuffer->getDeviceAddress() + networkGraidentOffset;
-                entryPointParams.count = networkParamsBufferSize - networkGraidentOffset;
-                dispatchKernel(
-                    gClearBufferProgram,
-                    entryPointParams,
-                    (entryPointParams.count + 255) / 256);
-            }
+            // Clear weight gradients in the parameter buffer to 0.
+            clearBuffer(
+                networkParamsBuffer,
+                rhi::BufferRange{
+                    networkGradientTrainingOffset,
+                    networkParamsBufferSize - networkGradientTrainingOffset});
             // Compute gradients for weights and biases.
             // The weight gradients are stored in the training-optimal layout.
             {
@@ -210,7 +204,7 @@ struct ExampleProgram : public TestBase
                 std::vector<rhi::ConvertCooperativeVectorMatrixDesc> matrixDescs;
                 for (int i = 0; i < kLayerCount; i++)
                 {
-                    rhi::ConvertCooperativeVectorMatrixDesc desc;
+                    rhi::ConvertCooperativeVectorMatrixDesc desc = {};
                     desc.rowCount = kLayerSizes[i + 1];
                     desc.colCount = kLayerSizes[i];
                     desc.dstComponentType = rhi::CooperativeVectorComponentType::Float16;
@@ -224,7 +218,6 @@ struct ExampleProgram : public TestBase
                     desc.srcData.deviceAddress = networkParamsBuffer->getDeviceAddress() +
                                                  layerAllocations[i].weightsGradTrainingOffset;
                     desc.srcLayout = rhi::CooperativeVectorMatrixLayout::TrainingOptimal;
-                    desc.srcStride = 0; // Use default stride.
                     matrixDescs.push_back(desc);
                 }
                 auto encoder = queue->createCommandEncoder();
@@ -353,11 +346,11 @@ struct ExampleProgram : public TestBase
         return gDevice->createBuffer(bufferDesc, initData);
     }
 
-    void clearBuffer(rhi::IBuffer* buffer)
+    void clearBuffer(rhi::IBuffer* buffer, rhi::BufferRange range = rhi::kEntireBuffer)
     {
         auto queue = gDevice->getQueue(rhi::QueueType::Graphics);
         auto encoder = queue->createCommandEncoder();
-        encoder->clearBuffer(buffer);
+        encoder->clearBuffer(buffer, range);
         auto cmdBuffer = encoder->finish();
         queue->submit(cmdBuffer);
     }
@@ -369,10 +362,6 @@ struct ExampleProgram : public TestBase
         gSlangSession = createSlangSession(gDevice);
         gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
         if (!gSlangModule)
-            return SLANG_FAIL;
-
-        gClearBufferProgram = loadComputeProgram(gSlangModule, "clearBuffer");
-        if (!gClearBufferProgram)
             return SLANG_FAIL;
 
         gLearnGradProgram = loadComputeProgram(gSlangModule, "learnGradient");
