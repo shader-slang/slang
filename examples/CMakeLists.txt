@@ -115,7 +115,7 @@ if(SLANG_ENABLE_EXAMPLES)
         example(nv-aftermath-example WIN32_EXECUTABLE)
     endif()
 
-    if (SLANG_ENABLE_SLANG_RHI)
+    if(SLANG_ENABLE_SLANG_RHI)
         example(mlp-training LINK_WITH_PRIVATE slang-rhi)
         example(mlp-training-coopvec LINK_WITH_PRIVATE slang-rhi)
     endif()
