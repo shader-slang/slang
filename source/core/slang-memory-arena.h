@@ -382,9 +382,8 @@ inline const char* MemoryArena::allocateString(const char* chars, size_t numChar
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocate()
 {
-    void* mem = (alignof(T) <= kMinAlignment)
-                    ? allocate(sizeof(T))
-                    : allocateAligned(sizeof(T), alignof(T));
+    void* mem = (alignof(T) <= kMinAlignment) ? allocate(sizeof(T))
+                                              : allocateAligned(sizeof(T), alignof(T));
     return reinterpret_cast<T*>(mem);
 }
 
@@ -392,9 +391,8 @@ SLANG_FORCE_INLINE T* MemoryArena::allocate()
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 {
-    return (numElems > 0)
-               ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)))
-               : nullptr;
+    return (numElems > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)))
+                          : nullptr;
 }
 
 // --------------------------------------------------------------------------
