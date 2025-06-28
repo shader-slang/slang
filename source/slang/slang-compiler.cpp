@@ -1740,60 +1740,60 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             SLANG_ASSERT(!"Unhandled floating point mode");
         }
 
-        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormModeFp16))
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp16))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FpDenormMode>(
-                CompilerOptionName::DenormModeFp16))
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp16))
             {
-            case FpDenormMode::Any:
-                options.denormModeFp16 = DownstreamCompileOptions::FpDenormMode::Any;
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
-            case FpDenormMode::Preserve:
-                options.denormModeFp16 = DownstreamCompileOptions::FpDenormMode::Preserve;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
-            case FpDenormMode::Ftz:
-                options.denormModeFp16 = DownstreamCompileOptions::FpDenormMode::Ftz;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
-                SLANG_ASSERT(!"Unhandled fp16 denorm mode");
+                SLANG_ASSERT(!"Unhandled fp16 denormal handling mode");
             }
         }
 
-        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormModeFp32))
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp32))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FpDenormMode>(
-                CompilerOptionName::DenormModeFp32))
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp32))
             {
-            case FpDenormMode::Any:
-                options.denormModeFp32 = DownstreamCompileOptions::FpDenormMode::Any;
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
-            case FpDenormMode::Preserve:
-                options.denormModeFp32 = DownstreamCompileOptions::FpDenormMode::Preserve;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
-            case FpDenormMode::Ftz:
-                options.denormModeFp32 = DownstreamCompileOptions::FpDenormMode::Ftz;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
-                SLANG_ASSERT(!"Unhandled fp32 denorm mode");
+                SLANG_ASSERT(!"Unhandled fp32 denormal handling mode");
             }
         }
 
-        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormModeFp64))
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp64))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FpDenormMode>(
-                CompilerOptionName::DenormModeFp64))
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp64))
             {
-            case FpDenormMode::Any:
-                options.denormModeFp64 = DownstreamCompileOptions::FpDenormMode::Any;
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
-            case FpDenormMode::Preserve:
-                options.denormModeFp64 = DownstreamCompileOptions::FpDenormMode::Preserve;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
-            case FpDenormMode::Ftz:
-                options.denormModeFp64 = DownstreamCompileOptions::FpDenormMode::Ftz;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
-                SLANG_ASSERT(!"Unhandled fp64 denorm mode");
+                SLANG_ASSERT(!"Unhandled fp64 denormal handling mode");
             }
         }
 

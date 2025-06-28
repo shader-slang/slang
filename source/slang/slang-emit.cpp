@@ -618,22 +618,22 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 }
 
 // Add DenormPreserve and DenormFlushToZero decorations to all entry point functions
-static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
+static void addDenormalModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     auto optionSet = codeGenContext->getTargetProgram()->getOptionSet();
 
-    // Only add decorations if we have denorm mode options set
-    auto denormModeFp16 = optionSet.getDenormModeFp16();
-    auto denormModeFp32 = optionSet.getDenormModeFp32();
-    auto denormModeFp64 = optionSet.getDenormModeFp64();
+    // Only add decorations if we have floating point denormal handling mode options set
+    auto denormalModeFp16 = optionSet.getDenormalModeFp16();
+    auto denormalModeFp32 = optionSet.getDenormalModeFp32();
+    auto denormalModeFp64 = optionSet.getDenormalModeFp64();
 
-    if (denormModeFp16 == FpDenormMode::Any && denormModeFp32 == FpDenormMode::Any &&
-        denormModeFp64 == FpDenormMode::Any)
+    if (denormalModeFp16 == FloatingPointDenormalMode::Any && denormalModeFp32 == FloatingPointDenormalMode::Any &&
+        denormalModeFp64 == FloatingPointDenormalMode::Any)
         return;
 
     IRBuilder builder(irModule);
 
-    // Apply denorm decorations to all entry point functions
+    // Apply floating point denormal handling mode decorations to all entry point functions
     for (auto inst : irModule->getGlobalInsts())
     {
         IRFunc* func = nullptr;
@@ -660,37 +660,37 @@ static void addDenormModeDecorations(IRModule* irModule, CodeGenContext* codeGen
         if (!entryPoint)
             continue;
 
-        // Handle FP16 denorm mode
+        // Handle FP16 denormal handling mode
         auto width16 = builder.getIntValue(builder.getUIntType(), 16);
-        if (denormModeFp16 == FpDenormMode::Preserve)
+        if (denormalModeFp16 == FloatingPointDenormalMode::Preserve)
         {
-            builder.addDenormPreserveDecoration(func, width16);
+            builder.addFpDenormalPreserveDecoration(func, width16);
         }
-        else if (denormModeFp16 == FpDenormMode::Ftz)
+        else if (denormalModeFp16 == FloatingPointDenormalMode::FlushToZero)
         {
-            builder.addDenormFlushToZeroDecoration(func, width16);
+            builder.addFpDenormalFlushToZeroDecoration(func, width16);
         }
 
-        // Handle FP32 denorm mode
+        // Handle FP32 denormal handling mode
         auto width32 = builder.getIntValue(builder.getUIntType(), 32);
-        if (denormModeFp32 == FpDenormMode::Preserve)
+        if (denormalModeFp32 == FloatingPointDenormalMode::Preserve)
         {
-            builder.addDenormPreserveDecoration(func, width32);
+            builder.addFpDenormalPreserveDecoration(func, width32);
         }
-        else if (denormModeFp32 == FpDenormMode::Ftz)
+        else if (denormalModeFp32 == FloatingPointDenormalMode::FlushToZero)
         {
-            builder.addDenormFlushToZeroDecoration(func, width32);
+            builder.addFpDenormalFlushToZeroDecoration(func, width32);
         }
 
-        // Handle FP64 denorm mode
+        // Handle FP64 denormal handling mode
         auto width64 = builder.getIntValue(builder.getUIntType(), 64);
-        if (denormModeFp64 == FpDenormMode::Preserve)
+        if (denormalModeFp64 == FloatingPointDenormalMode::Preserve)
         {
-            builder.addDenormPreserveDecoration(func, width64);
+            builder.addFpDenormalPreserveDecoration(func, width64);
         }
-        else if (denormModeFp64 == FpDenormMode::Ftz)
+        else if (denormalModeFp64 == FloatingPointDenormalMode::FlushToZero)
         {
-            builder.addDenormFlushToZeroDecoration(func, width64);
+            builder.addFpDenormalFlushToZeroDecoration(func, width64);
         }
     }
 }
@@ -833,11 +833,11 @@ Result linkAndOptimizeIR(
 
     checkEntryPointDecorations(irModule, target, sink);
 
-    // Add denorm mode decorations to entry point functions based on compiler options.
+    // Add floating point denormal handling mode decorations to entry point functions based on compiler options.
     // This is done post-linking to ensure all entry points from linked modules are processed.
-    addDenormModeDecorations(irModule, codeGenContext);
+    addDenormalModeDecorations(irModule, codeGenContext);
 #if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "DENORM DECORATIONS ADDED");
+    dumpIRIfEnabled(codeGenContext, irModule, "FP DENORMAL MODE DECORATIONS ADDED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 

@@ -5120,10 +5120,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
             break;
-        case kIROp_DenormPreserveDecoration:
+        case kIROp_FpDenormalPreserveDecoration:
             {
-                auto denormDecor = cast<IRDenormPreserveDecoration>(decoration);
-                auto width = int32_t(getIntVal(denormDecor->getWidth()));
+                auto fpDenormalDecor = cast<IRFpDenormalPreserveDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
                 requireSPIRVCapability(SpvCapabilityDenormPreserve);
                 // emitInst is used instead of requireSPIRVExecutionMode because
@@ -5138,10 +5138,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLiteralInteger::from32(width));
             }
             break;
-        case kIROp_DenormFlushToZeroDecoration:
+        case kIROp_FpDenormalFlushToZeroDecoration:
             {
-                auto denormDecor = cast<IRDenormFlushToZeroDecoration>(decoration);
-                auto width = int32_t(getIntVal(denormDecor->getWidth()));
+                auto fpDenormalDecor = cast<IRFpDenormalFlushToZeroDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
                 requireSPIRVCapability(SpvCapabilityDenormFlushToZero);
                 // emitInst is used instead of requireSPIRVExecutionMode because

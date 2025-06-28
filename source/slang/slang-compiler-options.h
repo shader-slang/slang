@@ -14,7 +14,7 @@ using slang::CompilerOptionValueKind;
 enum MatrixLayoutMode : SlangMatrixLayoutModeIntegral;
 enum class LineDirectiveMode : SlangLineDirectiveModeIntegral;
 enum class FloatingPointMode : SlangFloatingPointModeIntegral;
-enum class FpDenormMode : SlangFpDenormModeIntegral;
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral;
 enum class OptimizationLevel : SlangOptimizationLevelIntegral;
 enum class DebugInfoLevel : SlangDebugInfoLevelIntegral;
 enum class CodeGenTarget : SlangCompileTargetIntegral;
@@ -376,31 +376,31 @@ struct CompilerOptionSet
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
     }
 
-    FpDenormMode getDenormModeFp16()
+    FloatingPointDenormalMode getDenormalModeFp16()
     {
-        if (!hasOption(CompilerOptionName::DenormModeFp16))
+        if (!hasOption(CompilerOptionName::DenormalModeFp16))
         {
-            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
         }
-        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp16);
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp16);
     }
 
-    FpDenormMode getDenormModeFp32()
+    FloatingPointDenormalMode getDenormalModeFp32()
     {
-        if (!hasOption(CompilerOptionName::DenormModeFp32))
+        if (!hasOption(CompilerOptionName::DenormalModeFp32))
         {
-            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
         }
-        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp32);
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp32);
     }
 
-    FpDenormMode getDenormModeFp64()
+    FloatingPointDenormalMode getDenormalModeFp64()
     {
-        if (!hasOption(CompilerOptionName::DenormModeFp64))
+        if (!hasOption(CompilerOptionName::DenormalModeFp64))
         {
-            return (FpDenormMode)SLANG_FP_DENORM_MODE_ANY;
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
         }
-        return getEnumOption<FpDenormMode>(CompilerOptionName::DenormModeFp64);
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp64);
     }
 
     LineDirectiveMode getLineDirectiveMode()

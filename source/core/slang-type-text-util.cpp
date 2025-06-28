@@ -171,7 +171,7 @@ static const NamesDescriptionValue s_floatingPointModes[] = {
      "by the target."},
     {SLANG_FLOATING_POINT_MODE_DEFAULT, "default", "Default floating point mode"}};
 
-static const NamesDescriptionValue s_fpDenormModes[] = {
+static const NamesDescriptionValue s_fpDenormalModes[] = {
     {SLANG_FP_DENORM_MODE_ANY,
      "any",
      "Use any denormal handling mode (default). The mode used is implementation defined."},
@@ -261,9 +261,9 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
     return makeConstArrayView(s_floatingPointModes);
 }
 
-/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormModeInfos()
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormalModeInfos()
 {
-    return makeConstArrayView(s_fpDenormModes);
+    return makeConstArrayView(s_fpDenormalModes);
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()

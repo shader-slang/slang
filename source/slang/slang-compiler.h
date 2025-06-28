@@ -2037,11 +2037,11 @@ enum class FloatingPointMode : SlangFloatingPointModeIntegral
     Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
 };
 
-enum class FpDenormMode : SlangFpDenormModeIntegral
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
 {
     Any = SLANG_FP_DENORM_MODE_ANY,
     Preserve = SLANG_FP_DENORM_MODE_PRESERVE,
-    Ftz = SLANG_FP_DENORM_MODE_FTZ,
+    FlushToZero = SLANG_FP_DENORM_MODE_FTZ,
 };
 
 enum class WriterChannel : SlangWriterChannelIntegral

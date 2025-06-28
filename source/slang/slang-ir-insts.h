@@ -643,24 +643,24 @@ struct IRNumThreadsDecoration : IRDecoration
     IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
 };
 
-struct IRDenormPreserveDecoration : IRDecoration
+struct IRFpDenormalPreserveDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_DenormPreserveDecoration
+        kOp = kIROp_FpDenormalPreserveDecoration
     };
-    IR_LEAF_ISA(DenormPreserveDecoration)
+    IR_LEAF_ISA(FpDenormalPreserveDecoration)
 
     IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRDenormFlushToZeroDecoration : IRDecoration
+struct IRFpDenormalFlushToZeroDecoration : IRDecoration
 {
     enum
     {
-        kOp = kIROp_DenormFlushToZeroDecoration
+        kOp = kIROp_FpDenormalFlushToZeroDecoration
     };
-    IR_LEAF_ISA(DenormFlushToZeroDecoration)
+    IR_LEAF_ISA(FpDenormalFlushToZeroDecoration)
 
     IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
 };
@@ -4164,8 +4164,8 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
-    IRInst* addDenormPreserveDecoration(IRInst* inst, IRInst* width);
-    IRInst* addDenormFlushToZeroDecoration(IRInst* inst, IRInst* width);
+    IRInst* addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width);
+    IRInst* addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width);
     IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(

@@ -53,7 +53,7 @@ enum class ValueCategory
     Target,
     Language,
     FloatingPointMode,
-    FpDenormMode,
+    FloatingPointDenormalMode,
     ArchiveType,
     Stage,
     LineDirectiveMode,
@@ -86,7 +86,7 @@ SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
 SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
 SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
 SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
-SLANG_GET_VALUE_CATEGORY(FpDenormMode, FpDenormMode)
+SLANG_GET_VALUE_CATEGORY(FloatingPointDenormalMode, FloatingPointDenormalMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
@@ -188,10 +188,10 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
-            "denorm-mode",
+            "fp-denormal-mode",
             "Floating Point Denormal Handling Mode",
-            UserValue(ValueCategory::FpDenormMode));
-        options.addValues(TypeTextUtil::getFpDenormModeInfos());
+            UserValue(ValueCategory::FloatingPointDenormalMode));
+        options.addValues(TypeTextUtil::getFpDenormalModeInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -589,19 +589,19 @@ void initCommandOptions(CommandOptions& options)
          "-fp-mode,-floating-point-mode",
          "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>",
          "Control floating point optimizations"},
-        {OptionKind::DenormModeFp16,
+        {OptionKind::DenormalModeFp16,
          "-denorm-mode-fp16",
-         "-denorm-mode-fp16 <denorm-mode>",
+         "-denorm-mode-fp16 <fp-denormal-mode>",
          "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, "
          "ftz)"},
-        {OptionKind::DenormModeFp32,
+        {OptionKind::DenormalModeFp32,
          "-denorm-mode-fp32",
-         "-denorm-mode-fp32 <denorm-mode>",
+         "-denorm-mode-fp32 <fp-denormal-mode>",
          "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, "
          "preserve, ftz)"},
-        {OptionKind::DenormModeFp64,
+        {OptionKind::DenormalModeFp64,
          "-denorm-mode-fp64",
-         "-denorm-mode-fp64 <denorm-mode>",
+         "-denorm-mode-fp64 <fp-denormal-mode>",
          "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, "
          "ftz)"},
         {OptionKind::DebugInformation,
@@ -2829,25 +2829,25 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 setFloatingPointMode(getCurrentTarget(), value);
                 break;
             }
-        case OptionKind::DenormModeFp16:
+        case OptionKind::DenormalModeFp16:
             {
-                FpDenormMode value;
+                FloatingPointDenormalMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
-                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp16, value);
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
                 break;
             }
-        case OptionKind::DenormModeFp32:
+        case OptionKind::DenormalModeFp32:
             {
-                FpDenormMode value;
+                FloatingPointDenormalMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
-                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp32, value);
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
                 break;
             }
-        case OptionKind::DenormModeFp64:
+        case OptionKind::DenormalModeFp64:
             {
-                FpDenormMode value;
+                FloatingPointDenormalMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
-                linkage->m_optionSet.set(CompilerOptionName::DenormModeFp64, value);
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
             }
         case OptionKind::Optimization:

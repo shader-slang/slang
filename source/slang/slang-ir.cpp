@@ -5633,18 +5633,18 @@ IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, I
     return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
 }
 
-IRInst* IRBuilder::addDenormPreserveDecoration(IRInst* inst, IRInst* width)
+IRInst* IRBuilder::addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width)
 {
     IRInst* operands[1] = {width};
 
-    return addDecoration(inst, kIROp_DenormPreserveDecoration, operands, 1);
+    return addDecoration(inst, kIROp_FpDenormalPreserveDecoration, operands, 1);
 }
 
-IRInst* IRBuilder::addDenormFlushToZeroDecoration(IRInst* inst, IRInst* width)
+IRInst* IRBuilder::addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width)
 {
     IRInst* operands[1] = {width};
 
-    return addDecoration(inst, kIROp_DenormFlushToZeroDecoration, operands, 1);
+    return addDecoration(inst, kIROp_FpDenormalFlushToZeroDecoration, operands, 1);
 }
 
 IRInst* IRBuilder::addWaveSizeDecoration(IRInst* inst, IRInst* numLanes)
