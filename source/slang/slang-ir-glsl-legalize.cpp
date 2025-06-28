@@ -666,6 +666,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_DrawID";
         requiredType = builder->getBasicType(BaseType::Int);
     }
+    else if (semanticName == "sv_deviceindex")
+    {
+        name = "gl_DeviceIndex";
+        requiredType = builder->getBasicType(BaseType::Int);
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_device_group"));
+    }
     else if (semanticName == "sv_primitiveid")
     {
         // uint in hlsl, int in glsl
