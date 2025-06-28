@@ -51,7 +51,7 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
             resultGradV,
             inputV,
             (void*)weightsGrad,
-            InputSize * sizeof(NFloat),
+            0,
             CoopVecMatrixLayout.TrainingOptimal,
             kComponentType);
         

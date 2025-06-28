@@ -416,10 +416,10 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
-    ensureDecl(structDecl, DeclCheckState::AttributesChecked);
-
     if (!structDecl)
         return false;
+
+    ensureDecl(structDecl, DeclCheckState::AttributesChecked);
 
     HashSet<Type*> isVisit;
     bool isCStyle = false;
