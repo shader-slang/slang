@@ -1746,13 +1746,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 CompilerOptionName::DenormalModeFp16))
             {
             case FloatingPointDenormalMode::Any:
-                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
             case FloatingPointDenormalMode::Preserve:
-                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
             case FloatingPointDenormalMode::FlushToZero:
-                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
                 SLANG_ASSERT(!"Unhandled fp16 denormal handling mode");
@@ -1765,13 +1768,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 CompilerOptionName::DenormalModeFp32))
             {
             case FloatingPointDenormalMode::Any:
-                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
             case FloatingPointDenormalMode::Preserve:
-                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
             case FloatingPointDenormalMode::FlushToZero:
-                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
                 SLANG_ASSERT(!"Unhandled fp32 denormal handling mode");
@@ -1784,13 +1790,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 CompilerOptionName::DenormalModeFp64))
             {
             case FloatingPointDenormalMode::Any:
-                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Any;
                 break;
             case FloatingPointDenormalMode::Preserve:
-                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
                 break;
             case FloatingPointDenormalMode::FlushToZero:
-                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                options.denormalModeFp64 = 
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
                 break;
             default:
                 SLANG_ASSERT(!"Unhandled fp64 denormal handling mode");

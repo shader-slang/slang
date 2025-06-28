@@ -627,7 +627,8 @@ static void addDenormalModeDecorations(IRModule* irModule, CodeGenContext* codeG
     auto denormalModeFp32 = optionSet.getDenormalModeFp32();
     auto denormalModeFp64 = optionSet.getDenormalModeFp64();
 
-    if (denormalModeFp16 == FloatingPointDenormalMode::Any && denormalModeFp32 == FloatingPointDenormalMode::Any &&
+    if (denormalModeFp16 == FloatingPointDenormalMode::Any &&
+        denormalModeFp32 == FloatingPointDenormalMode::Any &&
         denormalModeFp64 == FloatingPointDenormalMode::Any)
         return;
 
@@ -833,8 +834,9 @@ Result linkAndOptimizeIR(
 
     checkEntryPointDecorations(irModule, target, sink);
 
-    // Add floating point denormal handling mode decorations to entry point functions based on compiler options.
-    // This is done post-linking to ensure all entry points from linked modules are processed.
+    // Add floating point denormal handling mode decorations to entry point functions based on
+    // compiler options. This is done post-linking to ensure all entry points from linked modules
+    // are processed.
     addDenormalModeDecorations(irModule, codeGenContext);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "FP DENORMAL MODE DECORATIONS ADDED");
