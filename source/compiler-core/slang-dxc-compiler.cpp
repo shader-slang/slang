@@ -512,6 +512,22 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         break;
     }
 
+    switch (options.denormalModeFp32)
+    {
+    default:
+    case CompileOptions::FloatingPointDenormalMode::Any:
+        break;
+
+    case CompileOptions::FloatingPointDenormalMode::Preserve:
+        args.add(L"-denorm");
+        args.add(L"preserve");
+        break;
+
+    case CompileOptions::FloatingPointDenormalMode::FlushToZero:
+        args.add(L"-denorm");
+        args.add(L"ftz");
+        break;
+    }
 
     switch (options.optimizationLevel)
     {

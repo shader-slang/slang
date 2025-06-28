@@ -45,6 +45,8 @@ struct TypeTextUtil
     static ConstArrayView<NamesDescriptionValue> getDebugLevelInfos();
     /// Get the floating point modes
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
+    /// Get the floating point denormal handling modes
+    static ConstArrayView<NamesDescriptionValue> getFpDenormalModeInfos();
     // Get the line directive infos
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
     /// Get the optimization level info

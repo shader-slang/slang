@@ -197,6 +197,13 @@ struct DownstreamCompileOptions
         Precise,
     };
 
+    enum class FloatingPointDenormalMode : uint8_t
+    {
+        Any,
+        Preserve,
+        FlushToZero,
+    };
+
     enum PipelineType : uint8_t
     {
         Unknown,
@@ -277,6 +284,11 @@ struct DownstreamCompileOptions
 
     // The debug info format to use.
     SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
+
+    // The floating point denormal handling mode to use for each floating point precision
+    FloatingPointDenormalMode denormalModeFp16 = FloatingPointDenormalMode::Any;
+    FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
+    FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
@@ -482,6 +494,7 @@ struct DownstreamCompilerUtilBase
     typedef CompileOptions::DebugInfoType DebugInfoType;
 
     typedef CompileOptions::FloatingPointMode FloatingPointMode;
+    typedef CompileOptions::FloatingPointDenormalMode FloatingPointDenormalMode;
 
     typedef DownstreamProductFlag ProductFlag;
     typedef DownstreamProductFlags ProductFlags;
