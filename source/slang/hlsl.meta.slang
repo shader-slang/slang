@@ -26610,16 +26610,24 @@ CoopVec<T, M> coopVecMatMulPacked(
     }
 }
 
-/// Multiply a cooperative vector with a matrix.
-/// @param input The input cooperative vector to multiply with the matrix.
+/// Multiply a matrix with a cooperative vector. Given a M-row by K-col `matrix`, and a K-element column vector `input`, computes `matrix * input`, and
+/// returns a M-element vector.
+/// @param input The K-element input cooperative vector to multiply with the matrix.
 /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as 8-bit integers, 16-bit floats, etc).
-/// @param matrix The matrix to multiply with the input vector.
+/// @param matrix The M-by-K matrix to multiply with the input vector.
 /// @param matrixOffset Byte offset into the matrix buffer.
 /// @param matrixInterpretation Specifies how to interpret the values in the matrix (e.g. as 8-bit integers, 16-bit floats, etc).
 /// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
 /// @param transpose Whether to transpose the matrix before multiplication.
 /// @param matrixStride The stride in bytes between rows/columns of the matrix.
 /// @return A new cooperative vector containing the result of the matrix multiplication.
+/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
+/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// find out which interpretations are supported.
+///
+/// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
+/// Not all component types support transposing.
+/// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -26650,7 +26658,9 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-/// Multiply a cooperative vector with a matrix and add a bias vector.
+/// Multiply a matrix with a cooperative vector and add a bias vector to the result.
+/// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
+/// returns a M-element vector.
 /// @param input The input cooperative vector to multiply with the matrix.
 /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
 /// @param k The number of columns in the matrix.
@@ -26667,6 +26677,14 @@ CoopVec<T, M> coopVecMatMul(
 /// @remarks Unlike coopVecMatMulAdd, this function supports packed input interpretations where multiple values
 /// can be packed into each element of the input vector. The k parameter specifies the actual number of
 /// values to use from the packed input.
+///
+/// Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
+/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// find out which interpretations are supported.
+///
+/// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
+/// Not all component types support transposing.
+/// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -26804,7 +26822,9 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     }
 }
 
-/// Multiply a cooperative vector with a matrix and add a bias vector.
+/// Multiply a matrix with a cooperative vector and add a bias vector.
+/// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
+/// returns a M-element vector.
 /// @param input The input cooperative vector to multiply with the matrix.
 /// @param inputInterpretation Specifies how to interpret the values in the input vector.
 /// @param matrix The matrix buffer to multiply with.
@@ -26817,6 +26837,13 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 /// @param transpose Whether to transpose the matrix before multiplication.
 /// @param matrixStride The stride between matrix rows/columns in bytes.
 /// @return A new cooperative vector containing the result of the matrix multiplication plus bias.
+/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
+/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// find out which interpretations are supported.
+///
+/// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
+/// Not all component types support transposing.
+/// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -26862,7 +26889,9 @@ ${{{{
 if(buffer.isRW)
 {
 }}}}
-/// Accumulate the outer product of two cooperative vectors into a matrix.
+/// Atomically accumulates the outer product of two cooperative vectors into a matrix. Given an M-element vector `a`, and an N-element vector `b`,
+/// compute the outer product of `a` and `b`, forming a M-row by N-col matrix. The elements in the matrix is then atomically accumulated
+/// to memory location represented by `matrix`.
 /// @param a The first cooperative vector.
 /// @param b The second cooperative vector.
 /// @param matrix The matrix buffer to accumulate the result into.
@@ -26870,6 +26899,7 @@ if(buffer.isRW)
 /// @param matrixStride The stride between matrix rows/columns in bytes.
 /// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
 /// @param matrixInterpretation Specifies how to interpret the values in the matrix.
+/// @remarks On current hardware, `memoryLayout` must be `TrainingOptimal`.
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
@@ -26959,10 +26989,15 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     }
 }
 
-/// Accumulate the sum of a cooperative vector into a buffer at the specified offset.
+/// Atomically accumulates the elements a cooperative vector into a buffer at the specified offset.
 /// @param v The cooperative vector to sum.
 /// @param buffer The buffer to accumulate the sum into.
 /// @param offset Byte offset into the buffer.
+/// @remarks This function is equivalent to:
+/// ```
+/// for (int i = 0; i < N; i++)
+///     atomicAdd(dest[i], v[i]);
+/// ```
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
@@ -27015,20 +27050,6 @@ static const struct {
 for(auto buffer : kStructuredBufferCases_) {
 }}}}
 
-/// Multiply a cooperative vector with a matrix and return the result.
-/// @param input The input cooperative vector to multiply with the matrix.
-/// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
-/// @param k The number of columns in the matrix.
-/// @param matrix The matrix buffer to multiply with.
-/// @param matrixOffset Byte offset into the matrix buffer.
-/// @param matrixInterpretation Specifies how to interpret the values in the matrix.
-/// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
-/// @param transpose Whether to transpose the matrix before multiplication.
-/// @param matrixStride The stride between matrix rows/columns in bytes.
-/// @return A new cooperative vector containing the result of the matrix multiplication.
-/// @remarks Unlike coopVecMatMul, this function supports packed input interpretations where multiple values
-/// can be packed into each element of the input vector. The k parameter specifies the actual number of
-/// values to use from the packed input.
 [require(spirv, cooperative_vector)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
@@ -28319,4 +28340,10 @@ void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
     {
         originalValue = __atomic_add(*buf, half2(half(0.0), value)).y;
     }
+}
+
+[require(spirv)]
+void InterlockedAddF16x2(half2* dest, half2 value, out half2 originalValue)
+{
+    originalValue = __atomic_add(*dest, value);
 }
