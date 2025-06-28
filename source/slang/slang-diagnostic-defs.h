@@ -1196,7 +1196,7 @@ DIAGNOSTIC(
     36117,
     Error,
     declHasDependenciesNotCompatibleOnStage,
-    "'$0' requires support for stage '$1', but stage is undeclared.")
+    "'$0' requires support for stage '$1', but stage is unsupported.")
 DIAGNOSTIC(
     36118,
     Error,
