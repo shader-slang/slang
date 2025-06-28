@@ -14355,9 +14355,6 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
-
-            implDeclRef.getDecl()->capabilityRequirementProvenance.add(
-                ProvenenceNodeWithLoc(inheritanceDecl->base, inheritanceDecl->loc));
             ensureDecl(implDeclRef.declRefBase, DeclCheckState::CapabilityChecked);
 
             // Only if capabilities are opted-into, should we error.
