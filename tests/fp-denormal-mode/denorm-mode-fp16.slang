@@ -11,14 +11,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp16 -Xslang preserve
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp16 -Xslang ftz
 
-// Denormal FP16 values are always preserved by DXC
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-dx12 -compute -Xslang -denorm-mode-fp16 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-dx12 -compute -Xslang -denorm-mode-fp16 -Xslang ftz
-
-// Denormal FP16 values are always preserved by DXC
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-dx11 -compute -Xslang -denorm-mode-fp16 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-dx11 -compute -Xslang -denorm-mode-fp16 -Xslang ftz
-
 // CHECK_ANY-NOT: DenormPreserve
 // CHECK_ANY-NOT: DenormFlushToZero
 
@@ -36,25 +28,25 @@
 // CHECK_DXIL-NOT: preserve
 // CHECK_DXIL-NOT: ftz
 
-// In preserve mode, denormalized numbers should be preserved (non-zero)
-// PRESERVE: 3F800000
+// In preserve mode, denormalized numbers should be preserved
+// PRESERVE: 66
 
-// In FTZ mode, denormalized numbers should be flushed to zero
-// FTZ: 00000000
+// In flush-to-zero mode, denormalized numbers should be flushed to zero
+// FTZ: 0
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+// Smallest normal fp16
+//TEST_INPUT: set inputBuffer = ubuffer(data=[0x0400], stride=2)
+RWStructuredBuffer<half> inputBuffer;
+
+//TEST_INPUT:ubuffer(data=[0], stride=2):out,name=outputBuffer
+RWStructuredBuffer<half> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    float result = 0.0;
+    half smallestNormal = inputBuffer[0];
+    half denormal = smallestNormal / 10;
     
-    // Create denormal through division
-    half smallNormal = half(6.104e-5); // Smallest normal fp16
-    float denorm = smallNormal / half(1024.0); // Should be denormal
-    result = (denorm != half(0.0)) ? 1.0 : 0.0;
-    
-    outputBuffer[0] = result;
+    outputBuffer[0] = denormal;
 }

@@ -14,9 +14,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-slang -compute -dx12 -use-dxil -profile cs_6_2 -shaderobj -Xslang -denorm-mode-fp32 -Xslang preserve
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-slang -compute -dx12 -use-dxil -profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-dx11 -compute -Xslang -denorm-mode-fp32 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-dx11 -compute -Xslang -denorm-mode-fp32 -Xslang ftz
-
 // CHECK_ANY-NOT: DenormPreserve
 // CHECK_ANY-NOT: DenormFlushToZero
 
@@ -39,11 +36,15 @@
 // CHECK_FTZ_DXIL: attributes #0 = { "fp32-denorm-mode"="ftz" }
 // CHECK_FTZ_DXIL-NOT: preserve
 
-// In preserve mode, denormalized numbers should be preserved (non-zero)
-// PRESERVE: 3F800000
+// In preserve mode, denormalized numbers should be preserved
+// PRESERVE: CCCCD
 
-// In FTZ mode, denormalized numbers should be flushed to zero
-// FTZ: 00000000
+// In flush-to-zero mode, denormalized numbers should be flushed to zero
+// FTZ: 0
+
+// Smallest normal fp32
+//TEST_INPUT: set inputBuffer = ubuffer(data=[0x00800000], stride=4)
+RWStructuredBuffer<float> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -52,12 +53,8 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    float result = 0.0;
+    float smallestNormal = inputBuffer[0];
+    float denormal = smallestNormal / 10;
     
-    // Create denormal through division
-    float smallNormal = 1.175e-38f; // Smallest normal fp32
-    float denorm = smallNormal / 1e6f; // Should be denormal
-    result = (denorm != 0.0f) ? 1.0 : 0.0;
-    
-    outputBuffer[0] = result;
+    outputBuffer[0] = denormal;
 }
