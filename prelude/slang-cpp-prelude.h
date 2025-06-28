@@ -223,7 +223,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-#define SLANG_ALIGN_OF(T) __alignof__(T)
 
 #define SLANG_BREAKPOINT(id) __builtin_trap()
 
@@ -234,7 +233,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // Microsoft VC specific
 #if SLANG_VC
-#define SLANG_ALIGN_OF(T) __alignof(T)
 
 #define SLANG_BREAKPOINT(id) __debugbreak();
 

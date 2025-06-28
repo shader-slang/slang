@@ -3067,7 +3067,7 @@ int __alignOf()
     {
     case cuda :
     case cpp :
-        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+        __intrinsic_asm "alignof($[0])", T;
     }
 }
 
@@ -3078,8 +3078,8 @@ int __alignOf(T v)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
-    case cuda: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    case cpp: __intrinsic_asm "alignof($T0)";
+    case cuda: __intrinsic_asm "alignof($T0)";
     }
 }
 
