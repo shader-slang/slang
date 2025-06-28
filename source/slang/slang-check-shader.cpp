@@ -555,7 +555,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                  SLANG_CAPABILITY_UNKNOWN);
 
             if (auto declaredCapsMod =
-                    entryPointFuncDecl->findModifier<ExplicitlyDeeclaredCapabilityModifier>())
+                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
             {
                 // If the entry point has an explicitly declared capability, then we
                 // will merge that with the target capability set before checking if

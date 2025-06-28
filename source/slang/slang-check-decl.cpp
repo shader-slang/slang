@@ -14285,7 +14285,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     }
     else
     {
-        auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeeclaredCapabilityModifier>();
+        auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
         declaredCapModifier->declaredCapabilityRequirements = declaredCaps;
         addModifier(funcDecl, declaredCapModifier);
         if (vis == DeclVisibility::Public)

@@ -188,7 +188,7 @@ class SynthesizedStaticLambdaFuncModifier : public Modifier
 };
 
 FIDDLE()
-class ExplicitlyDeeclaredCapabilityModifier : public Modifier
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
 {
     FIDDLE(...)
     FIDDLE() CapabilitySet declaredCapabilityRequirements;
