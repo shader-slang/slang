@@ -26621,8 +26621,8 @@ CoopVec<T, M> coopVecMatMulPacked(
 /// @param transpose Whether to transpose the matrix before multiplication.
 /// @param matrixStride The stride in bytes between rows/columns of the matrix.
 /// @return A new cooperative vector containing the result of the matrix multiplication.
-/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
-/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may not be supported.
+/// For example, CoopVecComponentType.Float32 is not widely supported. Developers should query device properties through the host graphics API to
 /// find out which interpretations are supported.
 ///
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
@@ -26678,8 +26678,8 @@ CoopVec<T, M> coopVecMatMul(
 /// can be packed into each element of the input vector. The k parameter specifies the actual number of
 /// values to use from the packed input.
 ///
-/// Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
-/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may not be supported.
+/// For example, CoopVecComponentType.Float32 is not widely supported. Developers should query device properties through the host graphics API to
 /// find out which interpretations are supported.
 ///
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
@@ -26837,8 +26837,8 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 /// @param transpose Whether to transpose the matrix before multiplication.
 /// @param matrixStride The stride between matrix rows/columns in bytes.
 /// @return A new cooperative vector containing the result of the matrix multiplication plus bias.
-/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may be supported.
-/// For example, CoopVecComponentType.Float32 may not be widely supported. Developers should query device properties through the host graphics API to
+/// @remarks Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may not be supported.
+/// For example, CoopVecComponentType.Float32 is not widely supported. Developers should query device properties through the host graphics API to
 /// find out which interpretations are supported.
 ///
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
@@ -26900,6 +26900,19 @@ if(buffer.isRW)
 /// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
 /// @param matrixInterpretation Specifies how to interpret the values in the matrix.
 /// @remarks On current hardware, `memoryLayout` must be `TrainingOptimal`.
+///
+/// When `memoryLayout` is `RowMajor`, this function is equivalent to:
+///
+/// ```
+/// for (int i = 0; i < M; i++)
+/// {
+///    for (int j = 0; j < N; j++)
+///    {
+///        let elem = a[i] * b[j];
+///        atomicAdd(matrix + (i * N + j), elem);
+///    }
+/// }
+/// ```
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
