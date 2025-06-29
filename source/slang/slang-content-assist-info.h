@@ -22,7 +22,17 @@ struct CompletionSuggestions
         HLSLSemantics,
         Capabilities
     };
+
+    enum class FormatMode
+    {
+        Name,
+        FullSignature,
+        FuncSignatureWithoutReturnType
+    };
+
     ScopeKind scopeKind = ScopeKind::Invalid;
+    FormatMode formatMode = FormatMode::Name;
+
     List<LookupResultItem> candidateItems;
     Type* swizzleBaseType = nullptr;
     IntegerLiteralValue elementCount[2] = {0, 0};

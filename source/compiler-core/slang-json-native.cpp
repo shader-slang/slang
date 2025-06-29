@@ -205,6 +205,22 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
             *(UnownedStringSlice*)out = m_container->getString(in);
             return SLANG_OK;
         }
+    case RttiInfo::Kind::Optional:
+        {
+            if (in.getKind() == JSONValue::Kind::Null)
+            {
+                return SLANG_OK;
+            }
+            typedef List<Byte> Type;
+            const OptionalRttiInfo* optionalRttiInfo =
+                static_cast<const OptionalRttiInfo*>(rttiInfo);
+            auto hasValue = (uint8_t*)out;
+            *hasValue = 1;
+            return convert(
+                in,
+                optionalRttiInfo->m_elementType,
+                (uint8_t*)out + optionalRttiInfo->m_valueOffset);
+        }
     case RttiInfo::Kind::List:
         {
             if (in.getKind() == JSONValue::Kind::Null)
@@ -440,6 +456,24 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
     case RttiInfo::Kind::Enum:
         {
             return SLANG_E_NOT_IMPLEMENTED;
+        }
+    case RttiInfo::Kind::Optional:
+        {
+            const OptionalRttiInfo* optionalRttiInfo =
+                static_cast<const OptionalRttiInfo*>(rttiInfo);
+            auto hasValue = (const uint8_t*)in;
+            if (*hasValue)
+            {
+                return convert(
+                    optionalRttiInfo->m_elementType,
+                    (const uint8_t*)in + optionalRttiInfo->m_valueOffset,
+                    out);
+            }
+            else
+            {
+                out = JSONValue::makeNull();
+                return SLANG_OK;
+            }
         }
     case RttiInfo::Kind::List:
         {

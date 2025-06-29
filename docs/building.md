@@ -336,6 +336,21 @@ cmake -B build -G Ninja
 cmake --build build -j
 ```
 
+## Specific supported compiler versions
+
+<!---
+Please keep the exact formatting '_Foo_ xx.yy is tested in CI' as there is a
+script which checks that this is still up to date.
+-->
+
+_GCC_ 11.4 and 13.3 are tested in CI and is the recommended minimum version. GCC 10 is
+supported on a best-effort basis, i.e. PRs supporting this version are
+encouraged but it isn't a continuously maintained setup.
+
+_MSVC_ 19 is tested in CI and is the recommended minimum version.
+
+_Clang_ 15.0 is tested in CI and is the recommended minimum version.
+
 ## Static linking against libslang
 
 If linking against a static `libslang.a` you will need to link against some

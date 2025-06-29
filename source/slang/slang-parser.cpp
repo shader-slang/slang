@@ -1500,8 +1500,7 @@ static NameLoc ParseDeclName(Parser* parser)
     }
     else
     {
-        nameToken = parser->ReadToken(TokenType::Identifier);
-        return NameLoc(nameToken);
+        return expectIdentifier(parser);
     }
 }
 
@@ -1750,6 +1749,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
+        bool optional = AdvanceIf(parser, "optional", &whereToken);
+
         auto subType = parser->ParseTypeExp();
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1760,6 +1761,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 parser->FillPosition(constraint);
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
+                if (optional)
+                {
+                    addModifier(
+                        constraint,
+                        parser->astBuilder->create<OptionalConstraintModifier>());
+                }
                 AddMember(genericParent, constraint);
                 if (!AdvanceIf(parser, TokenType::Comma))
                     break;
@@ -1773,6 +1780,10 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->FillPosition(constraint);
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
             AddMember(genericParent, constraint);
         }
         else if (AdvanceIf(parser, TokenType::LParent))
@@ -2094,6 +2105,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
     switch (parser->tokenReader.peekTokenType())
     {
     case TokenType::Identifier:
+    case TokenType::CompletionRequest:
         {
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
@@ -5110,6 +5122,20 @@ static DeclBase* ParseDeclWithModifiers(
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
+        }
+        break;
+    case TokenType::CompletionRequest:
+        {
+            if (modifiers.hasModifier<OverrideModifier>())
+            {
+                auto resultDecl = parser->astBuilder->create<EmptyDecl>();
+                resultDecl->nameAndLoc = expectIdentifier(parser);
+                decl = resultDecl;
+            }
+            else
+            {
+                decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
+            }
         }
         break;
     // If nothing else matched, we try to parse an "ordinary" declarator-based declaration

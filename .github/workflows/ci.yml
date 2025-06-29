@@ -2,6 +2,8 @@ name: CI
 
 on:
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [master]
   pull_request:
@@ -79,7 +81,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, "GCP-T4"]
+            runs-on: [Windows, self-hosted, GCP-T4]
             has-gpu: true
             server-count: 8
       fail-fast: false
@@ -140,6 +142,7 @@ jobs:
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
+          echo "cmake version: $(cmake --version)"
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
@@ -185,6 +188,10 @@ jobs:
               cmake --workflow --preset "${{matrix.config}}"
             fi
           fi
+
+      - name: Check documented compiler versions
+        run: bash extras/verify-documented-compiler-version.sh
+
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
@@ -205,6 +212,8 @@ jobs:
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
             echo "Printing CUDA version: ..." && nvcc --version
+            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
+
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
@@ -229,27 +238,16 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
-          elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-github-runner.txt \
-              -skip-reference-image-generation \
-              -show-adapter-info  \
-              -enable-debug-layers false
+              -enable-debug-layers true
           else
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
-              -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-github-runner.txt \
+              -expected-failure-list tests/expected-failure-no-gpu.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers true
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
@@ -275,29 +273,42 @@ jobs:
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
-            -expected-failure-list tests/expected-failure.txt \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
             -skip-reference-image-generation \
             -show-adapter-info
       - name: Run slang-rhi tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -tce=ray-tracing-*,cmd-query-resolve-host,fence-*
+          "$bin_dir/slang-rhi-tests" -check-devices
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
         run: |
           python --version
-          Write-Host "Cleaning up existing installations..."
-          Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
-          Write-Host "Installing slangpy..."
-          python -m pip install --no-cache-dir --verbose slangpy --user
-          Write-Host "Getting Python site-packages directory and copying library files (DLL, SO, DYLIB)..."
+          Write-Host "Cleaning up existing installations and installing slangpy..."
+          try {
+            $SLANGPY_LOCATION = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+            Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
+            if (Test-Path $SLANGPY_LOCATION) {
+              Write-Host "Removing existing slangpy directory at: $SLANGPY_LOCATION"
+              Remove-Item -Path $SLANGPY_LOCATION -Recurse -Force
+            }
+          } catch {
+            Write-Host "slangpy not found or already removed"
+          }
+          python -m pip install --verbose slangpy --user
           $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+          $bin_dir = $env:bin_dir -replace '^/c/', 'C:\' -replace '/', '\'
           Write-Host "Site packages directory: $SITE_PACKAGES"
-          Write-Host "Copying library files..."
-          Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Continue
+          Write-Host "bin_dir location: $bin_dir"
+          try {
+            Copy-Item -Path "$bin_dir\slang*.dll" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Stop
+          } catch {
+            Write-Error "Failed to copy library files: $_"
+            exit 1
+          }
           Write-Host "Listing files in slangpy directory..."
-          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | Write-Host
+          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
@@ -306,4 +317,6 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
-          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+          path: |
+            build/dist-${{matrix.config}}/**/ZIP/slang/*
+            build.em/Release

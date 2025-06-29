@@ -123,6 +123,7 @@ FIDDLE() namespace Slang
         kConversionCost_ValToOptional = 150,
         kConversionCost_NullPtrToPtr = 150,
         kConversionCost_PtrToVoidPtr = 150,
+        kConversionCost_FailedOptionalConstraint = 150,
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,
@@ -232,10 +233,12 @@ FIDDLE() namespace Slang
     class Val;
 
     // Helper type for pairing up a name and the location where it appeared
-    struct NameLoc
+    FIDDLE() struct NameLoc
     {
-        Name* name;
-        SourceLoc loc;
+        FIDDLE(...)
+
+        FIDDLE() Name* name;
+        FIDDLE() SourceLoc loc;
 
         NameLoc()
             : name(nullptr)
@@ -572,10 +575,11 @@ FIDDLE() namespace Slang
     struct QualType
     {
         FIDDLE(...)
-        Type* type = nullptr;
-        bool isLeftValue = false;
-        bool hasReadOnlyOnTarget = false;
-        bool isWriteOnly = false;
+
+        FIDDLE() Type* type = nullptr;
+        FIDDLE() bool isLeftValue = false;
+        FIDDLE() bool hasReadOnlyOnTarget = false;
+        FIDDLE() bool isWriteOnly = false;
 
         QualType() = default;
 
@@ -1571,16 +1575,16 @@ FIDDLE() namespace Slang
         void add(Decl* decl, RequirementWitness const& witness);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
-        Type* baseType;
+        FIDDLE() Type* baseType;
 
         // The type witnessesd by the witness table (a concrete type).
-        Type* witnessedType;
+        FIDDLE() Type* witnessedType;
 
         // Whether or not this witness table is an extern declaration.
-        bool isExtern = false;
+        FIDDLE() bool isExtern = false;
 
         // Cached dictionary for looking up satisfying values.
-        RequirementDictionary m_requirementDictionary;
+        FIDDLE() RequirementDictionary m_requirementDictionary;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
     };
@@ -1634,8 +1638,9 @@ FIDDLE() namespace Slang
     class DeclAssociation : public RefObject
     {
         FIDDLE(...)
-        DeclAssociationKind kind;
-        Decl* decl;
+
+        FIDDLE() DeclAssociationKind kind;
+        FIDDLE() Decl* decl;
     };
 
     /// A reference-counted object to hold a list of associated decls for a decl.

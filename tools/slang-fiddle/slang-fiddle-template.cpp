@@ -252,6 +252,7 @@ public:
     RefPtr<TextTemplateFile> parseTextTemplateFile()
     {
         auto textTemplateFile = RefPtr(new TextTemplateFile());
+        textTemplateFile->loc = _inputSourceView->getRange().begin;
         textTemplateFile->originalFileContent = _inputSourceView->getContent();
         while (!atEnd())
         {
@@ -423,6 +424,25 @@ private:
         _builder.append(" end)");
     }
 
+    bool isEntirelyWhitespace(UnownedStringSlice const& text)
+    {
+        for (auto c : text)
+        {
+            switch (c)
+            {
+            default:
+                return false;
+
+            case ' ':
+            case '\t':
+            case '\r':
+            case '\n':
+                continue;
+            }
+        }
+        return true;
+    }
+
     void evaluateTextTemplateStmt(TextTemplateStmt* stmt)
     {
         if (auto seqStmt = as<TextTemplateSeqStmt>(stmt))
@@ -432,9 +452,17 @@ private:
         }
         else if (auto rawStmt = as<TextTemplateRawStmt>(stmt))
         {
-            _builder.append("RAW [==[");
-            _builder.append(rawStmt->text);
-            _builder.append("]==]");
+            auto rawContent = rawStmt->text;
+            if (isEntirelyWhitespace(rawContent))
+            {
+                _builder.append(rawContent);
+            }
+            else
+            {
+                _builder.append("RAW [==[");
+                _builder.append(rawContent);
+                _builder.append("]==]");
+            }
         }
         else if (auto scriptStmt = as<TextTemplateScriptStmt>(stmt))
         {
@@ -471,7 +499,7 @@ void generateTextTemplateOutputs(
     TextTemplateScriptCodeEmitter emitter(file);
     String scriptCode = emitter.emitScriptCodeForTextTemplateFile();
 
-    String output = evaluateScriptCode(originalFileName, scriptCode, sink);
+    String output = evaluateScriptCode(file->loc, originalFileName, scriptCode, sink);
 
     builder.append(output);
     builder.append("\n");
