@@ -4145,7 +4145,7 @@ bool SemanticsVisitor::doesVarMatchRequirement(
     }
 
     IntVal* satisfyingVal = nullptr;
-    if (isScalarIntegerType(satisfyingType))
+    if (isValidCompileTimeConstantType(satisfyingType))
     {
         satisfyingVal =
             tryConstantFoldDeclRef(satisfyingMemberDeclRef, ConstantFoldingKind::LinkTime, nullptr);
