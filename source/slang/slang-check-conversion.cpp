@@ -1229,7 +1229,7 @@ bool SemanticsVisitor::_coerce(
             }
         }
         if (outCost)
-            *outCost = kConversionCost_None;
+            *outCost = kConversionCost_StringToString;
         return true;
     }
 

@@ -1804,12 +1804,12 @@ struct String
     __init(double val);
 
     [require(cpp)]
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_StringToString))
     __intrinsic_op($(kIROp_MakeString))
     __init(NativeString value);
 
     [__unsafeForceInlineEarly]
-    __implicit_conversion($(kConversionCost_SizedArrayToUnsizedArray))
+    __implicit_conversion($(kConversionCost_StringToString))
     __intrinsic_op($(kIROp_MakeString))
     __init<int N>(ShortString<N> value);
 
@@ -1852,12 +1852,12 @@ struct NativeString
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_StringToString))
     __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
 
-    __implicit_conversion($(kConversionCost_SizedArrayToUnsizedArray ))
-    __intrinsic_op($(kIROp_getNativeStr))
+    __implicit_conversion($(kConversionCost_StringToString ))
+    __intrinsic_op($(kIROp_GetNativeStr))
     __init<int N>(ShortString<N> value);
 
     __init() { this = NativeString(""); }
