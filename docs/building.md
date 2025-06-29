@@ -9,7 +9,7 @@ version of Slang.
 
 Please install:
 
-- CMake (3.25 preferred, but 3.22 works[^1])
+- CMake (3.26 preferred, but 3.22 works[^1])
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
 - A CMake compatible backend, for example Visual Studio or Ninja
 - Python3 (a dependency for building spirv-tools)
