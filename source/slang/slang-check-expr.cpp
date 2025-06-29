@@ -2088,7 +2088,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             // to not allow such cases.
             //
             // Note that float-to-inst casts for non-`IntVal`s are allowed.
-            if (!isScalarIntegerType(decl->getType()))
+            if (!isValidCompileTimeConstantType(decl->getType()))
             {
                 getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
                 return nullptr;
