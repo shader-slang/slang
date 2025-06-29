@@ -553,6 +553,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 targetOptionSet.hasOption(CompilerOptionName::Capability) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
                  SLANG_CAPABILITY_UNKNOWN);
+
+            if (auto declaredCapsMod =
+                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
+            {
+                // If the entry point has an explicitly declared capability, then we
+                // will merge that with the target capability set before checking if
+                // there is an implicit upgrade.
+                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
+            }
+
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
