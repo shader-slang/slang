@@ -106,6 +106,9 @@ Stages
 `mesh`
 > Mesh shader stage & mesh shader capabilities
 
+`task`
+> Task shader stage & mesh shader capabilities
+
 `amplification`
 > Amplification shader stage & mesh shader capabilities
 
