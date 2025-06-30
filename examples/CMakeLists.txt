@@ -56,8 +56,7 @@ function(example dir)
             core
             example-base
             slang
-            gfx
-            gfx-util
+            slang-rhi
             platform
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             ${main_wrapper_libraries}
@@ -82,7 +81,7 @@ if(SLANG_ENABLE_EXAMPLES)
         LINK_WITH_PRIVATE
             core
             slang
-            gfx
+            slang-rhi
             platform
             stb
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
