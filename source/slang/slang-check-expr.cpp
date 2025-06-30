@@ -198,34 +198,46 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
 Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef)
 {
     /*
-    * Why we need this Existential logic for a non Existential object:
-    * Since we will need to use `ExistentialType` in the backend, we need to either 'generate a `ExtractExistentialType` accordingly', 'hack at lower-to-ir (at the last moment possible)', or 'create new AST nodes'.
-    * Hacking at lower-to-ir will be non-trivial with bugs.
-        * This is because we need to fetch a look-up to our function-calls, and these may need to be specialized, among other transitive issues. To generate these look-ups we also need a type use-site for a witness-table. To do this logic without bugs we should to create `ExtractExistentialType` around the same time as `OpenExistential` so that we have the correct `expr` to generate.
-        * If we modify, add, or change the Existentials system in any significant way, we will break the `some` logic added.
-    * If we 'create new AST nodes' we will have similar issues 
-        * new AST nodes will mimic how Existential's are currently handled, or we will use a sub/super type relationship to reuse logic. 
-        * This is undesirable since we will have to remove these hacks once we implemented (and depending on approach, changes may break `some`)
-    * 'generate a `ExtractExistentialType` accordingly'
-        * By far the easiest solution to get something that will flawlessly work is to just duplicate `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be removed by replacing 1 return.
+    * Why we will temporarily use Existential logic for a non Existential object:
+    * Since we will need to use `ExistentialType` in the backend, we need to either 'generate a
+      `ExtractExistentialType` accordingly', 'hack at lower-to-ir (at the last moment possible)',
+      or 'create new AST nodes'.
+    * 'hack at lower-to-ir' will be non-trivial with bugs.
+        * This is because we need to fetch a look-up to our function-calls, and these may need to
+          be specialized, this causing other transitive issues once lowering to ir. To generate 
+          these look-ups we also need a type use-site for a witness-table (to specialize the 
+          function-calls in IR). To do this logic without bugs we need to create `ExtractExistentialType`
+          around the same time as `OpenExistential` so that we have the correct
+          `expr` to generate with.
+        * If we modify, add, or change the Existentials system in any significant way, we will
+          break the `some` logic added.
+    * 'create new AST nodes' hack we be hard to remove & a source of issues if modifying
+      `Existential`s.
+        * new AST nodes will mimic how Existential's are currently handled, or we will use a sub/super
+          type relationship to reuse logic.
+        * This is undesirable since we will have to remove these hacks once we implemented (and depending
+          on approach, changes may break `some`).
+    * 'generate a `ExtractExistentialType` around the same time as `OpenExistential`'
+        * By far the easiest solution to get something that will flawlessly work is to just duplicate
+          `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be removed
+          by replacing 1 return.
         * This solution has no bugs as far as I can tell.
-    
-    We currently rely on the existential system until we decouple the backend
-    since currently we generate ExistentialType, which create a lookup for a Existential
-    witness table. This is important because this context allows the IR to then lower
-    interface methods into a StructKey that can then be eventually specialized using the
-    existential witness.
-    */
+        * This solution may be semantically incorrect, but it is the only simple & stable solution.
+        * This solution is the one we will use.
+        */
     return maybeMoveTemp(
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            auto interfaceType =
+            auto exprInterfaceType =
                 isDeclRefTypeOf<SomeTypeDecl>(expr->type.type).getDecl()->interfaceType.type;
+            auto someTypeInnerDeclRef =
+                isDeclRefTypeOf<InterfaceDecl>(declRef.getDecl()->interfaceType.type);
+
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                interfaceType,
-                isDeclRefTypeOf<InterfaceDecl>(interfaceType));
+                exprInterfaceType,
+                someTypeInnerDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
                 m_astBuilder->create<ExtractExistentialValueExpr>();
