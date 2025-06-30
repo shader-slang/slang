@@ -1,86 +1,75 @@
 #pragma once
 
 #include "core/slang-basic.h"
-#include "core/slang-render-api-util.h"
+#include "slang-rhi.h"
 #include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace Slang;
-using namespace gfx;
+using namespace rhi;
+using Slang::RefObject;
+using Slang::RefPtr;
 
 namespace gfx_test
 {
 struct Strides
 {
-    gfx::Size x;
-    gfx::Size y;
-    gfx::Size z;
+    Size x;
+    Size y;
+    Size z;
 };
 
 struct ValidationTextureFormatBase : RefObject
 {
     virtual void validateBlocksEqual(const void* actual, const void* expected) = 0;
 
-    virtual void initializeTexel(
-        void* texel,
-        GfxIndex x,
-        GfxIndex y,
-        GfxIndex z,
-        GfxIndex mipLevel,
-        GfxIndex arrayLayer) = 0;
+    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) = 0;
 };
 
 template<typename T>
 struct ValidationTextureFormat : ValidationTextureFormatBase
 {
-    int componentCount;
+    uint32_t componentCount;
 
-    ValidationTextureFormat(int componentCount)
-        : componentCount(componentCount){};
+    ValidationTextureFormat(uint32_t componentCount)
+        : componentCount(componentCount) {};
 
     virtual void validateBlocksEqual(const void* actual, const void* expected) override
     {
         auto a = (const T*)actual;
         auto e = (const T*)expected;
 
-        for (Int i = 0; i < componentCount; ++i)
+        for (uint32_t i = 0; i < componentCount; ++i)
         {
             SLANG_CHECK(a[i] == e[i]);
         }
     }
 
-    virtual void initializeTexel(
-        void* texel,
-        GfxIndex x,
-        GfxIndex y,
-        GfxIndex z,
-        GfxIndex mipLevel,
-        GfxIndex arrayLayer) override
+    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) override
     {
         auto temp = (T*)texel;
 
         switch (componentCount)
         {
         case 1:
-            temp[0] = T(x + y + z + mipLevel + arrayLayer);
+            temp[0] = T(x + y + z + mip + layer);
             break;
         case 2:
-            temp[0] = T(x + z + arrayLayer);
-            temp[1] = T(y + mipLevel);
+            temp[0] = T(x + z + layer);
+            temp[1] = T(y + mip);
             break;
         case 3:
-            temp[0] = T(x + mipLevel);
-            temp[1] = T(y + arrayLayer);
+            temp[0] = T(x + mip);
+            temp[1] = T(y + layer);
             temp[2] = T(z);
             break;
         case 4:
-            temp[0] = T(x + arrayLayer);
+            temp[0] = T(x + layer);
             temp[1] = (T)y;
             temp[2] = (T)z;
-            temp[3] = (T)mipLevel;
+            temp[3] = (T)mip;
             break;
         default:
-            assert(!"component count should be no greater than 4");
+            assert("component count should be no greater than 4");
             SLANG_CHECK_ABORT(false);
         }
     }
@@ -95,7 +84,10 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
     int aBits;
 
     PackedValidationTextureFormat(int rBits, int gBits, int bBits, int aBits)
-        : rBits(rBits), gBits(gBits), bBits(bBits), aBits(aBits){};
+        : rBits(rBits)
+        , gBits(gBits)
+        , bBits(bBits)
+        , aBits(aBits) {};
 
     virtual void validateBlocksEqual(const void* actual, const void* expected) override
     {
@@ -104,19 +96,13 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
         unpackTexel(*(const T*)actual, a);
         unpackTexel(*(const T*)expected, e);
 
-        for (Int i = 0; i < 4; ++i)
+        for (uint32_t i = 0; i < 4; ++i)
         {
             SLANG_CHECK(a[i] == e[i]);
         }
     }
 
-    virtual void initializeTexel(
-        void* texel,
-        GfxIndex x,
-        GfxIndex y,
-        GfxIndex z,
-        GfxIndex mipLevel,
-        GfxIndex arrayLayer) override
+    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) override
     {
         T temp = 0;
 
@@ -125,19 +111,19 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
         {
             temp |= z;
             temp <<= gBits;
-            temp |= (y + arrayLayer);
+            temp |= (y + layer);
             temp <<= rBits;
-            temp |= (x + mipLevel);
+            temp |= (x + mip);
         }
         else
         {
-            temp |= mipLevel;
+            temp |= mip;
             temp <<= bBits;
             temp |= z;
             temp <<= gBits;
             temp |= y;
             temp <<= rBits;
-            temp |= (x + arrayLayer);
+            temp |= (x + layer);
         }
 
         *(T*)texel = temp;
@@ -163,18 +149,18 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
 struct ValidationTextureData : RefObject
 {
     const void* textureData;
-    ITextureResource::Extents extents;
-    Strides strides;
+    Extent3D extent;
+    Strides pitches;
 
-    void* getBlockAt(GfxIndex x, GfxIndex y, GfxIndex z)
+    void* getBlockAt(uint32_t x, uint32_t y, uint32_t z)
     {
-        assert(x >= 0 && x < extents.width);
-        assert(y >= 0 && y < extents.height);
-        assert(z >= 0 && z < extents.depth);
+        assert(x < extent.width);
+        assert(y < extent.height);
+        assert(z < extent.depth);
 
-        char* layerData = (char*)textureData + z * strides.z;
-        char* rowData = layerData + y * strides.y;
-        return rowData + x * strides.x;
+        char* layerData = (char*)textureData + z * pitches.z;
+        char* rowData = layerData + y * pitches.y;
+        return rowData + x * pitches.x;
     }
 };
 
@@ -183,36 +169,48 @@ struct ValidationTextureData : RefObject
 struct TextureInfo : RefObject
 {
     Format format;
-    ITextureResource::Type textureType;
+    TextureType textureType;
 
-    ITextureResource::Extents extents;
-    GfxCount mipLevelCount;
-    GfxCount arrayLayerCount;
+    Extent3D extent;
+    uint32_t mipCount;
+    uint32_t arrayLength;
 
-    List<RefPtr<ValidationTextureData>> subresourceObjects;
-    List<ITextureResource::SubresourceData> subresourceDatas;
+    std::vector<RefPtr<ValidationTextureData>> subresourceObjects;
+    std::vector<SubresourceData> subresourceDatas;
+
+    ~TextureInfo();
 };
 
-TextureAspect getTextureAspect(Format format);
-gfx::Size getTexelSize(Format format);
-GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer);
-RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
-void generateTextureData(
-    RefPtr<TextureInfo> texture,
-    ValidationTextureFormatBase* validationFormat);
+inline TextureType toArrayType(TextureType type)
+{
+    switch (type)
+    {
+    case TextureType::Texture1D:
+        return TextureType::Texture1DArray;
+    case TextureType::Texture2D:
+        return TextureType::Texture2DArray;
+    case TextureType::Texture2DMS:
+        return TextureType::Texture2DMSArray;
+    case TextureType::TextureCube:
+        return TextureType::TextureCubeArray;
+    default:
+        return type;
+    }
+}
 
-List<uint8_t> removePadding(
-    ISlangBlob* pixels,
-    GfxCount width,
-    GfxCount height,
-    gfx::Size rowPitch,
-    gfx::Size pixelSize);
-Slang::Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height);
-Slang::Result writeImage(
+Size getTexelSize(Format format);
+RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
+void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat);
+
+std::vector<uint8_t> removePadding(ISlangBlob* pixels, uint32_t width, uint32_t height, Size rowPitch, Size pixelSize);
+Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height);
+Result writeImage(
     const char* filename,
     ISlangBlob* pixels,
     uint32_t width,
     uint32_t height,
     uint32_t rowPitch,
-    uint32_t pixelSize);
-} // namespace gfx_test
+    uint32_t pixelSize
+);
+
+} // namespace rhi::testing
