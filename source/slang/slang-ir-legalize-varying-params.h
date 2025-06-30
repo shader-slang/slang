@@ -59,6 +59,7 @@ void depointerizeInputParams(IRFunc* entryPoint);
     M(PointCoord, SV_PointCoord)                         \
     M(PrimitiveID, SV_PrimitiveID)                       \
     M(DrawIndex, SV_DrawIndex)                           \
+    M(DeviceIndex, SV_DeviceIndex)                       \
     M(RenderTargetArrayIndex, SV_RenderTargetArrayIndex) \
     M(SampleIndex, SV_SampleIndex)                       \
     M(StencilRef, SV_StencilRef)                         \
