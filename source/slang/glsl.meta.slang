@@ -127,8 +127,19 @@ public in uvec3 gl_WorkGroupID : SV_GroupID;
 public in uint gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
-public property uint3 gl_NumWorkGroups {
+internal in int _gl_DeviceIndex : SV_DeviceIndex;
+public property int gl_DeviceIndex
+{
+    [__unsafeForceInlineEarly]
+    [require(glsl_spirv, GL_EXT_device_group)]
+    get
+    {
+        return _gl_DeviceIndex;
+    }
+}
 
+public property uint3 gl_NumWorkGroups
+{
     [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
     get 
     {
