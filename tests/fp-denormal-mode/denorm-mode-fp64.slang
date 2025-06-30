@@ -8,7 +8,11 @@
 //TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp64 preserve
 //TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp64 ftz
 
+// Capability shaderDenormPreserveFloat64 is VK_FALSE on the Vulkan device used for CI testing, resulting in
+// runtime error VUID-RuntimeSpirv-shaderDenormPreserveFloat64-06298 during CI testing
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp64 -Xslang preserve
+// Capability shaderDenormFlushToZeroFloat64 is VK_FALSE on the Vulkan device used for CI testing, resulting in
+// runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat64-06301 during CI testing
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp64 -Xslang ftz
 
 // CHECK_ANY-NOT: DenormPreserve
