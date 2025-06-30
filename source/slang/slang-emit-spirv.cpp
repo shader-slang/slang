@@ -4681,8 +4681,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             kResultID,
             subscript->getImage(),
             subscript->getCoord(),
-            subscript->hasSampleCoord() ? subscript->getSampleCoord() : builder.getIntValue(builder.getIntType(), 0)
-        );
+            subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                        : builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
@@ -6023,6 +6023,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDrawIndex, inst);
+                }
+                else if (semanticName == "sv_deviceindex")
+                {
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_device_group"));
+                    requireSPIRVCapability(SpvCapabilityDeviceGroup);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDeviceIndex, inst);
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
