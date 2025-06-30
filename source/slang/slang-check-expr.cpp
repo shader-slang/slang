@@ -203,31 +203,31 @@ Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDe
       `ExistentialType` with `some` for the backend to specialize our interfaces.
       This gives us 3 options:
     * hack in support for `ExistentialType` at lower-to-ir.
-        * This will be non-trivial since we need to fetch a look-up to our function-calls, and call's may need
-          specialization, this causing other transitive issues once lowering to ir.
-        *To generate these look-ups we also need a type use-site for a witness-table (to specialize the 
-          function-calls in IR). To do this logic without bugs we need to create `ExtractExistentialType`
-          around the same time as `OpenExistential` so that we have the correct `expr` to generate with.
-          This means this approach is redundant.
+        * This will be non-trivial since we need to fetch a look-up to our function-calls, and
+    call's may need specialization, this causing other transitive issues once lowering to ir. *To
+    generate these look-ups we also need a type use-site for a witness-table (to specialize the
+          function-calls in IR). To do this logic without bugs we need to create
+    `ExtractExistentialType` around the same time as `OpenExistential` so that we have the correct
+    `expr` to generate with. This means this approach is redundant.
         * If we modify, add, or change the Existentials system in any significant way, we will
           break the `some` logic added since it will be significantly hacked together.
     * generate a `ExtractExistentialType` with `OpenExistential` logic
-        * By far the easiest solution to get something that will flawlessly work is to just duplicate
-          `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be removed
-          by replacing a single return value.
-        * Problem is that we then explicitly need to unwrap `some` type before creating an existential
-          which should never be enforced. We should only sparingly treat the `some` as an existential
-          since `some` should be its own legal type. The end goal is to decouple `some` from the
-          existential system fully, this means we need to minimize areas where we treat `some` as
-          its underlying interface. 
+        * By far the easiest solution to get something that will flawlessly work is to just
+    duplicate `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be
+    removed by replacing a single return value.
+        * Problem is that we then explicitly need to unwrap `some` type before creating an
+    existential which should never be enforced. We should only sparingly treat the `some` as an
+    existential since `some` should be its own legal type. The end goal is to decouple `some` from
+    the existential system fully, this means we need to minimize areas where we treat `some` as its
+    underlying interface.
     * Create new AST nodes mimicing `ExistentialType`s is the middle ground of these options.
       We are implementing this approach.
-        * New AST nodes will mimic how Existential's are currently handled, but will provide thin 
+        * New AST nodes will mimic how Existential's are currently handled, but will provide thin
          "overloads" so that we are more selective about where our hacks are used.
-        * This change is in-hopes that we do not need to hack the actual Existential type system when
-          changing `some` before we fully decouple `some` from the existential system.
-        * The added benifit is that by sharing logic with ExtractExistentialType we won't break `some`
-          every time we add a new existential type system feature.
+        * This change is in-hopes that we do not need to hack the actual Existential type system
+    when changing `some` before we fully decouple `some` from the existential system.
+        * The added benifit is that by sharing logic with ExtractExistentialType we won't break
+    `some` every time we add a new existential type system feature.
         */
     return maybeMoveTemp(
         expr,
@@ -235,9 +235,9 @@ Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDe
         {
             SomeTypeWithContextType* openedType =
                 m_astBuilder->getOrCreate<SomeTypeWithContextType>(
-                varDeclRef,
-                expr->type.type,
-                declRef);
+                    varDeclRef,
+                    expr->type.type,
+                    declRef);
 
             ExtractExistentialValueExpr* openedValue =
                 m_astBuilder->create<ExtractExistentialValueExpr>();
@@ -2532,12 +2532,12 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
 
-   auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
         (UInt)SemanticsContextState::SomeTypeIsUnbound |
         (UInt)SemanticsContextState::SomeTypeIsAllowed));
 
-   bool needDeref = false;
-   auto baseExpr = subVisitor.checkBaseForMemberExpr(
+    bool needDeref = false;
+    auto baseExpr = subVisitor.checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
         CheckBaseContext::Subscript,
         needDeref);
@@ -2550,7 +2550,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
                      ? SemanticsVisitor(subVisitor.disableShortCircuitLogicalExpr())
                      : subVisitor;
-    
+
     for (auto& arg : subscriptExpr->indexExprs)
     {
         arg = subVisitor.CheckTerm(arg);
@@ -5688,13 +5688,13 @@ Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
     auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
         (UInt)SemanticsContextState::SomeTypeIsAllowed |
         (UInt)SemanticsContextState::DynTypeIsAllowed));
-    
+
     // We do not check for a proper type here since that would run validation
     // and implicitly assign `some` to our expr->base.type. This is an issue
     // since we would have no way of telling if a `some` was implicitly added
     // without major hacks that we do not want in the final `some` type support.
     expr->base = subVisitor.TranslateTypeNode(expr->base);
-    
+
     auto& type = expr->base.type;
     auto& result = expr->type;
     auto& typeExp = expr->base;

@@ -98,7 +98,7 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // is possible (a type conversion exists).
     //
     ConversionCost cost;
-    if (canCoerce(toType, fromExpr->type, fromExpr, CoercionSite::Initializer, & cost))
+    if (canCoerce(toType, fromExpr->type, fromExpr, CoercionSite::Initializer, &cost))
     {
         if (cost >= kConversionCost_Explicit)
         {
@@ -1900,11 +1900,11 @@ bool SemanticsVisitor::tryCoerceSomeType(
     // Restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
-        //TODO: remove all `CoercionSite` checks.
+        // TODO: remove all `CoercionSite` checks.
         //
-        // Handles the following case: `some T = some U` `some T = unbound_some U`.
-        // We do not error if `some` is an argument since `some` can be passed as an argument to a
-        // `some` parameter.
+        //  Handles the following case: `some T = some U` `some T = unbound_some U`.
+        //  We do not error if `some` is an argument since `some` can be passed as an argument to a
+        //  `some` parameter.
         if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
             if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))

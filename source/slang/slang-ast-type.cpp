@@ -139,7 +139,7 @@ Val* DeclRefType::_substituteImplOverride(
         return this;
 
     // Any type that has a decl-hiding a inner type that needs specialization requires
-    // a bit of unwrapping (using the same subsitution set) and then repacking to 
+    // a bit of unwrapping (using the same subsitution set) and then repacking to
     // substitute correctly
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(this))
     {
@@ -853,7 +853,7 @@ Val* InterfaceWithContext::_substituteImplOverride(
     (*ioDiff)++;
 
     InterfaceWithContext* substValue = nullptr;
-    if(as<ExtractExistentialType>(this))
+    if (as<ExtractExistentialType>(this))
         substValue = astBuilder->getOrCreate<ExtractExistentialType>(
             substDeclRef,
             as<Type>(substOriginalInterfaceType),
@@ -909,7 +909,6 @@ Type* InterfaceWithContext::getOriginalInterfaceType()
     if (as<ExtractExistentialType>(this))
     {
         return as<Type>(getOperand(1));
-
     }
     else if (as<SomeTypeWithContextType>(this))
     {
@@ -917,7 +916,7 @@ Type* InterfaceWithContext::getOriginalInterfaceType()
     }
     else
     {
-        SLANG_ASSERT(false);     
+        SLANG_ASSERT(false);
     }
 }
 

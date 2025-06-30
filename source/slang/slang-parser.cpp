@@ -130,14 +130,8 @@ public:
     int genericDepth = 0;
 
     SourceLoc savedSourceLoc;
-    SourceLoc getSavedSourceLoc()
-    { 
-        return savedSourceLoc;
-    }
-    void saveNextSourceLoc()
-    { 
-        savedSourceLoc = tokenReader.peekLoc();
-    }
+    SourceLoc getSavedSourceLoc() { return savedSourceLoc; }
+    void saveNextSourceLoc() { savedSourceLoc = tokenReader.peekLoc(); }
 
     // Is the parser in a "recovering" state?
     // During recovery we don't emit additional errors, until we find
@@ -1284,22 +1278,23 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                 }
                 else if (AdvanceIf(parser, {"dyn", "interface"}, 1))
                 {
-					// TODO:
+                    // TODO:
                     // This is non-idomatic code for the Slang parser.
                     // We should be using SyntaxDecl's for all cases of
                     // parsing "dyn".
                     // We have this case to currently work around the ambiguous case of:
                     // "dyn" with `_makeParsePrefixWithTypeExpr` for `dyn Type` parsing;
                     // "dyn" with `_makeParseDecl` to support `dyn interface` parsing.
-                    // 
+                    //
                     // To support the following feature these 2 things must be done first:
                     // 1. Change `tryLookUpSyntaxDecl` to `tryLookUpSyntaxDecl<T>`. Additionally,
                     //    allow overloading syntaxes we look-up, filtering based on type `T`
                     //    (erroring if multiple valid results are found).
                     //    [logic already implemented in `ArielG-NV`->`implement-SP024-some-support`
-                    // 2. Fully reset state if we fail `tryParseUsingSyntaxDeclImpl`. This is important
-                    //    because currently if we just implement #1, parser-context will still be changed,
-                    //    breaking parsing.
+                    // 2. Fully reset state if we fail `tryParseUsingSyntaxDeclImpl`. This is
+                    // important
+                    //    because currently if we just implement #1, parser-context will still be
+                    //    changed, breaking parsing.
                     parsedModifier = parser->astBuilder->create<DynModifier>();
                     parsedModifier->loc = nameToken.loc;
                     AddModifier(&modifierLink, parsedModifier);
@@ -8612,7 +8607,6 @@ static NodeBase* parseEachExpr(Parser* parser, void*)
     eachExpr->loc = parser->getSavedSourceLoc();
     eachExpr->baseExpr = parsePostfixExpr(parser);
     return eachExpr;
-
 }
 
 static Expr* parsePrefixExpr(Parser* parser)
@@ -9489,7 +9483,8 @@ static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCa
 }
 
 static SyntaxParseInfo _makeParsePrefixWithTypeExpr(
-    const char* keywordName, SyntaxParseCallback callback)
+    const char* keywordName,
+    SyntaxParseCallback callback)
 {
     // If we just have class info - use simple parser
     SyntaxParseInfo entry;
