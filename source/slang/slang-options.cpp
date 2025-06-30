@@ -707,7 +707,11 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::BindlessSpaceIndex,
          "-bindless-space-index",
          "-bindless-space-index <index>",
-         "Specify the space index for the system defined global bindless resource array."}};
+         "Specify the space index for the system defined global bindless resource array."},
+        {OptionKind::EmitSeparateDebug,
+         "-separate-debug-info",
+         nullptr,
+         "Emit debug data to a separate file, and strip it from the main output file."}};
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -844,11 +848,7 @@ void initCommandOptions(CommandOptions& options)
          "-verify-debug-serial-ir",
          nullptr,
          "Verify IR in the front-end."},
-        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
-        {OptionKind::EmitSeparateDebug,
-         "-separate-debug-info",
-         nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."}};
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
