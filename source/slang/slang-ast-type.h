@@ -903,8 +903,8 @@ class NamespaceType : public Type
 
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
-FIDDLE()
-class ExtractExistentialType : public Type
+FIDDLE(abstract)
+class InterfaceWithContext : public Type
 {
     FIDDLE(...)
     DeclRef<VarDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
@@ -912,16 +912,8 @@ class ExtractExistentialType : public Type
     // A reference to the original interface this type is known
     // to be a subtype of.
     //
-    Type* getOriginalInterfaceType() { return as<Type>(getOperand(1)); }
-    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef() { return as<DeclRefBase>(getOperand(2)); }
-
-    ExtractExistentialType(
-        DeclRef<VarDeclBase> inDeclRef,
-        Type* inOriginalInterfaceType,
-        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
-    {
-        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
-    }
+    Type* getOriginalInterfaceType();
+    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef();
 
     // A cached decl-ref to the original interface's ThisType Decl, with
     // a witness that refers to the type extracted here.
@@ -954,6 +946,35 @@ class ExtractExistentialType : public Type
     /// This operation may create the decl-ref on demand and cache it.
     ///
     DeclRef<ThisTypeDecl> getThisTypeDeclRef();
+};
+
+// The concrete type for a value wrapped in an existential, accessible
+// when the existential is "opened" in some context.
+FIDDLE()
+class ExtractExistentialType : public InterfaceWithContext
+{
+    FIDDLE(...)
+    ExtractExistentialType(
+        DeclRef<VarDeclBase> inDeclRef,
+        Type* inOriginalInterfaceType,
+        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
+    {
+        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
+    }
+};
+
+// Concrete type for a `SomeType` associated with context for witnesses.
+FIDDLE()
+class SomeTypeWithContextType : public InterfaceWithContext
+{
+    FIDDLE(...)
+    SomeTypeWithContextType(
+        DeclRef<VarDeclBase> inDeclRef,
+        Type* inOriginalType,
+        DeclRef<SomeTypeDecl> inOriginalDeclRef)
+    {
+        setOperands(inDeclRef, inOriginalType, inOriginalDeclRef);
+    }
 };
 
 FIDDLE()

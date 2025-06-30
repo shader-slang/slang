@@ -198,46 +198,46 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
 Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef)
 {
     /*
-    * Why we will temporarily use Existential logic for a non Existential object:
-    * Since we will need to use `ExistentialType` in the backend, we need to either 'generate a
-      `ExtractExistentialType` accordingly', 'hack at lower-to-ir (at the last moment possible)',
-      or 'create new AST nodes'.
-    * 'hack at lower-to-ir' will be non-trivial with bugs.
-        * This is because we need to fetch a look-up to our function-calls, and these may need to
-          be specialized, this causing other transitive issues once lowering to ir. To generate 
-          these look-ups we also need a type use-site for a witness-table (to specialize the 
+    Why we are temporarily using existential logic for a non existential object:
+    * Until we add backend support for legalizing `some`, we will need to use
+      `ExistentialType` with `some` for the backend to specialize our interfaces.
+      This gives us 3 options:
+    * hack in support for `ExistentialType` at lower-to-ir.
+        * This will be non-trivial since we need to fetch a look-up to our function-calls, and call's may need
+          specialization, this causing other transitive issues once lowering to ir.
+        *To generate these look-ups we also need a type use-site for a witness-table (to specialize the 
           function-calls in IR). To do this logic without bugs we need to create `ExtractExistentialType`
-          around the same time as `OpenExistential` so that we have the correct
-          `expr` to generate with.
+          around the same time as `OpenExistential` so that we have the correct `expr` to generate with.
+          This means this approach is redundant.
         * If we modify, add, or change the Existentials system in any significant way, we will
-          break the `some` logic added.
-    * 'create new AST nodes' hack we be hard to remove & a source of issues if modifying
-      `Existential`s.
-        * new AST nodes will mimic how Existential's are currently handled, or we will use a sub/super
-          type relationship to reuse logic.
-        * This is undesirable since we will have to remove these hacks once we implemented (and depending
-          on approach, changes may break `some`).
-    * 'generate a `ExtractExistentialType` around the same time as `OpenExistential`'
+          break the `some` logic added since it will be significantly hacked together.
+    * generate a `ExtractExistentialType` with `OpenExistential` logic
         * By far the easiest solution to get something that will flawlessly work is to just duplicate
           `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be removed
-          by replacing 1 return.
-        * This solution has no bugs as far as I can tell.
-        * This solution may be semantically incorrect, but it is the only simple & stable solution.
-        * This solution is the one we will use.
+          by replacing a single return value.
+        * Problem is that we then explicitly need to unwrap `some` type before creating an existential
+          which should never be enforced. We should only sparingly treat the `some` as an existential
+          since `some` should be its own legal type. The end goal is to decouple `some` from the
+          existential system fully, this means we need to minimize areas where we treat `some` as
+          its underlying interface. 
+    * Create new AST nodes mimicing `ExistentialType`s is the middle ground of these options.
+      We are implementing this approach.
+        * New AST nodes will mimic how Existential's are currently handled, but will provide thin 
+         "overloads" so that we are more selective about where our hacks are used.
+        * This change is in-hopes that we do not need to hack the actual Existential type system when
+          changing `some` before we fully decouple `some` from the existential system.
+        * The added benifit is that by sharing logic with ExtractExistentialType we won't break `some`
+          every time we add a new existential type system feature.
         */
     return maybeMoveTemp(
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            auto exprInterfaceType =
-                isDeclRefTypeOf<SomeTypeDecl>(expr->type.type).getDecl()->interfaceType.type;
-            auto someTypeInnerDeclRef =
-                isDeclRefTypeOf<InterfaceDecl>(declRef.getDecl()->interfaceType.type);
-
-            ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
+            SomeTypeWithContextType* openedType =
+                m_astBuilder->getOrCreate<SomeTypeWithContextType>(
                 varDeclRef,
-                exprInterfaceType,
-                someTypeInnerDeclRef);
+                expr->type.type,
+                declRef);
 
             ExtractExistentialValueExpr* openedValue =
                 m_astBuilder->create<ExtractExistentialValueExpr>();

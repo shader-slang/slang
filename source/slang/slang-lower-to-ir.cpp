@@ -2193,6 +2193,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitMeshOutputType(MeshOutputType* type) { return lowerSimpleIntrinsicType(type); }
 
+    IRType* visitSomeTypeWithContextType(SomeTypeWithContextType* type)
+    {
+        auto declRef = type->getDeclRef();
+        auto loweredType = lowerType(context, getType(context->astBuilder, declRef));
+        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, loweredType));
+        return getBuilder()->emitExtractExistentialType(existentialVal);
+    }
+
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->getDeclRef();

@@ -642,23 +642,7 @@ static void _lookUpMembersInSuperTypeImpl(
     }
 
     
-    if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(superType))
-    {
-        auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(someType.getDecl()->interfaceType).getDecl();
-        
-        // TODO: Use the following once fully-decoupled `some` backend and frontend
-        // from existential type system. Until then, hack-in an Existential look-up
-        ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
-        SLANG_ASSERT(thisTypeDecl);
-        _lookUpMembersInSuperTypeDeclImpl(
-            astBuilder,
-            name,
-            thisTypeDecl,
-            request,
-            ioResult,
-            inBreadcrumbs);
-    }
-    else if (auto declRefType = as<DeclRefType>(superType))
+    if (auto declRefType = as<DeclRefType>(superType))
     {
         auto declRef = declRefType->getDeclRef();
 
@@ -684,14 +668,14 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
-    else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
+    else if (auto interfaceWithContext = as<InterfaceWithContext>(superType))
     {
         // We want lookup to be performed on the underlying interface type of the existential,
         // but we need to have a this-type substitution applied to ensure that the result of
         // lookup will have a comparable substitution applied (allowing things like associated
         // types, etc. used in the signature of a method to resolve correctly).
         //
-        auto thisTypeDeclRef = extractExistentialType->getThisTypeDeclRef();
+        auto thisTypeDeclRef = interfaceWithContext->getThisTypeDeclRef();
         _lookUpMembersInSuperTypeDeclImpl(
             astBuilder,
             name,
