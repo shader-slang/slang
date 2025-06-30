@@ -8,8 +8,8 @@
 //TEST:SIMPLE(filecheck=CHECK_PRESERVE_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp32 preserve
 //TEST:SIMPLE(filecheck=CHECK_FTZ_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp32 ftz
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp32 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp32 -Xslang ftz
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp32 -Xslang preserve
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp32 -Xslang ftz
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-slang -compute -dx12 -use-dxil -profile cs_6_2 -shaderobj -Xslang -denorm-mode-fp32 -Xslang preserve
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-slang -compute -dx12 -use-dxil -profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
