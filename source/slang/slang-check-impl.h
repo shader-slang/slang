@@ -1349,7 +1349,7 @@ public:
     /// See `openExistential` for a discussion of what "opening" an
     /// existential-type value means.
     ///
-    Expr* maybeGetIndirectValToInterface(Expr* expr);
+    Expr* maybeCreateIndirectValToInterface(Expr* expr);
 
     /// If `expr` has Ref<T> Type, convert it into an l-value expr that has T type.
     Expr* maybeOpenRef(Expr* expr);

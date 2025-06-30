@@ -2624,7 +2624,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     for (auto& arg : expr->arguments)
     {
         arg = maybeOpenRef(arg);
-        arg = maybeGetIndirectValToInterface(arg);
+        arg = maybeCreateIndirectValToInterface(arg);
     }
 
     context.originalExpr = expr;
