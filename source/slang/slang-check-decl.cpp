@@ -5124,9 +5124,9 @@ void SemanticsVisitor::markOverridingDecl(
         return;
     }
 
+    memberDecl = maybeGetInner(memberDecl);
     if (hasDefaultImpl(requiredMemberDeclRef))
     {
-        memberDecl = maybeGetInner(memberDecl);
         // If the required member has a default implementation,
         // we need to make sure the member we found is marked as 'override'.
         if (!memberDecl->hasModifier<OverrideModifier>())

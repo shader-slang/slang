@@ -10,6 +10,7 @@ public struct MLVec<int N> : IDifferentiable
     public static MLVec<N> fromArray(NFloat[N] values)
     {
         MLVec<N> result;
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             result.data[i] = values[i];
         return result;
@@ -18,6 +19,7 @@ public struct MLVec<int N> : IDifferentiable
     internal static NFloat[N] coopVecToArray(CoopVec<NFloat, N> v)
     {
         NFloat[N] arr;
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             arr[i] = v[i];
         return arr;
@@ -50,7 +52,7 @@ public struct MLVec<int N> : IDifferentiable
     {
         return {d0.data + d1.data};
     }
-    public static Differential dmul<U:__BuiltinRealType>(U s, Differential d)
+    public override static Differential dmul<U:__BuiltinRealType>(U s, Differential d)
     {
         return {d.data * __realCast<NFloat>(s)};
     }
