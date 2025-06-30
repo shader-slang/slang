@@ -641,7 +641,7 @@ static void _lookUpMembersInSuperTypeImpl(
         }
     }
 
-    
+
     if (auto declRefType = as<DeclRefType>(superType))
     {
         auto declRef = declRefType->getDeclRef();

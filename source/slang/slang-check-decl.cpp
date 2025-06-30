@@ -48,7 +48,7 @@ static void validateDynInterfaceUsage(SemanticsDeclVisitorBase* visitor, Interfa
     auto optionSet = visitor->getOptionSet();
     bool isDyn = decl->hasModifier<DynModifier>();
 
-    // Automatically make an InterfaceDecl a `dyn interface` if 
+    // Automatically make an InterfaceDecl a `dyn interface` if
     if (!isDyn && decl->hasModifier<AnyValueSizeAttribute>())
     {
         isDyn = true;
@@ -2148,19 +2148,18 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // A variable with an explicit type is handled here
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
         subVisitor = subVisitor.withModifierPropagationTarget(varDecl);
-        
+
         SemanticsContextState semanticsContextState = {};
-        // Setup visitor for visiting the type expr of a varDecl 
+        // Setup visitor for visiting the type expr of a varDecl
         if (as<VarDecl>(varDecl))
         {
-           // `some` cannot be a struct member.
-           // `some` cannot be a global.
-           if ( !as<StructDecl>(varDecl->parentDecl) && !isGlobalDecl(varDecl))
-               semanticsContextState = SemanticsContextState::SomeTypeIsAllowed;
-           semanticsContextState = SemanticsContextState(
-               (UInt)semanticsContextState | 
-               (UInt)SemanticsContextState::SomeTypeIsUnbound |
-               (UInt)SemanticsContextState::DynTypeIsAllowed);
+            // `some` cannot be a struct member.
+            // `some` cannot be a global.
+            if (!as<StructDecl>(varDecl->parentDecl) && !isGlobalDecl(varDecl))
+                semanticsContextState = SemanticsContextState::SomeTypeIsAllowed;
+            semanticsContextState = SemanticsContextState(
+                (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsUnbound |
+                (UInt)SemanticsContextState::DynTypeIsAllowed);
         }
         subVisitor = subVisitor.withSemanticsContextState(semanticsContextState);
         TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type, varDecl);
@@ -9645,12 +9644,12 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         SemanticsContextState semanticsContextState = SemanticsContextState::DynTypeIsAllowed;
 
         auto parentScope = getScope(paramDecl)->parent;
-        
+
         // only allowed a `some` type param if parentDecl is not a dyn interface or
         // if we allow experimental dynamic dispatch.
         if (allowExperimentalDynamicDispatch(this, getOptionSet()) ||
             parentScope && parentScope->containerDecl &&
-            !parentScope->containerDecl->hasModifier<DynModifier>())
+                !parentScope->containerDecl->hasModifier<DynModifier>())
         {
             bool setState = false;
             for (auto modifier : paramDecl->modifiers)
@@ -10490,7 +10489,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
             (UInt)SemanticsContextState::SomeTypeIsUnbound);
 
         // not allowed `some` for return-type if we have a `dyn` type parent
-        if (allowExperimentalDynamicDispatch(this, getOptionSet()) || 
+        if (allowExperimentalDynamicDispatch(this, getOptionSet()) ||
             !funcDecl->parentDecl->hasModifier<DynModifier>())
             semanticsContextState = SemanticsContextState(
                 (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsAllowed);
@@ -14499,7 +14498,7 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
             return DeclVisibility::Private;
     }
     if (as<SomeTypeDecl>(decl))
-    {    
+    {
         return getDeclVisibility(decl->parentDecl);
     }
     // Interface members will always have the same visibility as the interface itself.

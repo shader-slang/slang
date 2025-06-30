@@ -888,7 +888,8 @@ DIAGNOSTIC(
     33077,
     Error,
     DynInterfaceCannotInheritNonDynInterface,
-    "interface that is marked 'dyn' '$0' may only inherit 'dyn' interfaces; '$1' is not a 'dyn interface'")
+    "interface that is marked 'dyn' '$0' may only inherit 'dyn' interfaces; '$1' is not a 'dyn "
+    "interface'")
 DIAGNOSTIC(
     33078,
     Error,
@@ -908,7 +909,8 @@ DIAGNOSTIC(
     33081,
     Error,
     cannotHaveNonCopyableMemberWhenInheritingDynInterface,
-    "cannot have non-copyable member '$0' when inheriting from interface '$1' that is marked 'dyn' ")
+    "cannot have non-copyable member '$0' when inheriting from interface '$1' that is marked "
+    "'dyn' ")
 DIAGNOSTIC(
     33082,
     Error,
@@ -919,11 +921,7 @@ DIAGNOSTIC(
     Error,
     cannotDeclareNonInterfaceSomeType,
     "cannot declare non-interface variable '$0' as 'some'")
-DIAGNOSTIC(
-    33084,
-    Error,
-    cannotHaveDynTypeHere,
-    "cannot have a 'dyn' type here")
+DIAGNOSTIC(33084, Error, cannotHaveDynTypeHere, "cannot have a 'dyn' type here")
 DIAGNOSTIC(
     33085,
     Error,

@@ -384,7 +384,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
     // Regularly make a `some`/`dyn` type
     {
-        bool isDyn = false;            
+        bool isDyn = false;
 
         // Implicitly make a `some`/`dyn` type.
         // Important to note:

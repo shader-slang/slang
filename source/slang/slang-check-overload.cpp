@@ -713,7 +713,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 if (!paramType->equals(argType))
                     return {nullptr, nullptr};
             }
-            else if (!canCoerce(paramType, argType, arg.argExpr, CoercionSite::Argument, & cost))
+            else if (!canCoerce(paramType, argType, arg.argExpr, CoercionSite::Argument, &cost))
             {
                 return {nullptr, nullptr};
             }
@@ -2967,8 +2967,8 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
 
     // Disallow `dyn`, `some`, and unbound types
     auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
-            (UInt)SemanticsContextState::SomeTypeIsUnbound |
-            (UInt)SemanticsContextState::SomeTypeIsAllowed));
+        (UInt)SemanticsContextState::SomeTypeIsUnbound |
+        (UInt)SemanticsContextState::SomeTypeIsAllowed));
 
     // Disable the short-circuiting logic expression when the experssion is in
     // the generic parameter.
