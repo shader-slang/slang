@@ -4165,7 +4165,6 @@ void Linkage::loadParsedModule(
     try
     {
         compileRequest->checkAllTranslationUnits();
-        errorCountAfter = sink->getErrorCount();
     }
     catch (...)
     {
@@ -4173,6 +4172,7 @@ void Linkage::loadParsedModule(
         mapNameToLoadedModules.remove(name);
         throw;
     }
+    errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
         // Don't generate IR as language server.

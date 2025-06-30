@@ -271,17 +271,17 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 
 SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams& args)
 {
-    // When periodic diagnostic updates are disabled (e.g., for testing),
-    // the main server loop will not automatically publish diagnostics.
-    // In this case, we must manually trigger a diagnostic publication
-    // after any action that could affect the results, such as opening a document.
-    // The same logic applies to didChange and didClose handlers.
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     if (isSlangSourceFile(canonicalPath))
     {
         resetDiagnosticUpdateTime();
     }
     auto result = m_core.didOpenTextDocument(args);
+    // When periodic diagnostic updates are disabled (e.g., for testing),
+    // the main server loop will not automatically publish diagnostics.
+    // In this case, we must manually trigger a diagnostic publication
+    // after any action that could affect the results, such as opening a document.
+    // The same logic applies to didChange and didClose handlers.
     if (!m_core.m_options.periodicDiagnosticUpdate)
     {
         publishDiagnostics();
