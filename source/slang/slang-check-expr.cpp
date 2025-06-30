@@ -745,6 +745,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
                 typeDef->parentDecl = structDecl;
+                addVisibilityModifier(structDecl, getDeclVisibility(parent));
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
 
                 auto synthDeclRef =
                     createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
@@ -777,6 +779,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 typeDef->type.type =
                     calcThisType(subType->getDeclRef().getDecl()->getDefaultDeclRef());
 
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
                 synthesizedDecl = parent;
 
                 parent->addDirectMemberDecl(typeDef);
@@ -2148,7 +2151,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             // to not allow such cases.
             //
             // Note that float-to-inst casts for non-`IntVal`s are allowed.
-            if (!isScalarIntegerType(decl->getType()))
+            if (!isValidCompileTimeConstantType(decl->getType()))
             {
                 getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
                 return nullptr;

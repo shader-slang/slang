@@ -1809,12 +1809,12 @@ extension Ptr<void>
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
     __generic<T, let addrSpace : uint64_t>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(NativeRef<T> ptr);
 }
