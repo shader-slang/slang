@@ -12,7 +12,7 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    uint3 loc = (uint2(0),0);
+    uint3 loc = (uint2(0), 0);
     uint prevVal;
 //CHECK: %{{.*}} = OpImageTexelPointer %{{.*}} %{{.*}} %{{.*}} %int_1
     InterlockedExchange(rwTexture2DMSArray[loc, 1], 3, prevVal);
