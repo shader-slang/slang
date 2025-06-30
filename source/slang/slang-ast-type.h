@@ -901,6 +901,60 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
+// Concrete type for `some` types, stored with context.
+FIDDLE()
+class ContextWrappedSomeType : public Type
+{
+    FIDDLE(...)
+    DeclRef<VarDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
+
+    // A reference to the original interface this type is known
+    // to be a subtype of.
+    //
+    Type* getOriginalInterfaceType() { return as<Type>(getOperand(1)); }
+    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef() { return as<DeclRefBase>(getOperand(2)); }
+
+    ExtractExistentialType(
+        DeclRef<VarDeclBase> inDeclRef,
+        Type* inOriginalInterfaceType,
+        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
+    {
+        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
+    }
+
+    // A cached decl-ref to the original interface's ThisType Decl, with
+    // a witness that refers to the type extracted here.
+    //
+    // This field is optional and can be filled in on-demand. It does *not*
+    // represent part of the logical value of this `Type`, and should not
+    // be serialized, included in hashes, etc.
+    //
+    DeclRef<ThisTypeDecl> cachedThisTypeDeclRef;
+
+    // A cached pointer to a witness that shows how this type is a subtype
+    // of `originalInterfaceType`.
+    //
+    SubtypeWitness* cachedSubtypeWitness = nullptr;
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
+    ///
+    /// This operation may create the witness on demand and cache it.
+    ///
+    SubtypeWitness* getSubtypeWitness();
+
+    /// Get a decl-ref to the interface's ThisType decl, which represents a substitutable type
+    /// from which lookup can be performed.
+    ///
+    /// This operation may create the decl-ref on demand and cache it.
+    ///
+    DeclRef<ThisTypeDecl> getThisTypeDeclRef();
+};
+
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
 FIDDLE()

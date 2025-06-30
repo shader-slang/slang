@@ -98,7 +98,7 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // is possible (a type conversion exists).
     //
     ConversionCost cost;
-    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    if (canCoerce(toType, fromExpr->type, fromExpr, CoercionSite::Initializer, & cost))
     {
         if (cost >= kConversionCost_Explicit)
         {
@@ -935,7 +935,7 @@ bool SemanticsVisitor::_coerceInitializerList(
     // the initializer list itself; assuming that coercion is closed under
     // composition this shouldn't fail.
     if (!as<InitializerListType>(fromInitializerListExpr->type) &&
-        !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+        !canCoerce(toType, fromInitializerListExpr->type, nullptr, CoercionSite::Initializer))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr, getSink());
 
     // Try to invoke the user-defined constructor if it exists. This call will
@@ -1551,7 +1551,7 @@ bool SemanticsVisitor::_coerce(
     if (auto refType = as<RefTypeBase>(toType))
     {
         ConversionCost cost;
-        if (!canCoerce(refType->getValueType(), fromType, fromExpr, &cost))
+        if (!canCoerce(refType->getValueType(), fromType, fromExpr, site, &cost))
             return false;
         if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
             return false;
@@ -2016,7 +2016,11 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     }
 
     // Verify that the return type of the function is convertible to the function type.
-    if (!canCoerce(toFuncType->getResultType(), invokeFunc->returnType.type, nullptr))
+    if (!canCoerce(
+            toFuncType->getResultType(),
+            invokeFunc->returnType.type,
+            nullptr,
+            CoercionSite::General))
     {
         return false;
     }
@@ -2084,6 +2088,7 @@ bool SemanticsVisitor::canCoerce(
     Type* toType,
     QualType fromType,
     Expr* fromExpr,
+    CoercionSite site,
     ConversionCost* outCost)
 {
     // As an optimization, we will maintain a cache of conversion results
@@ -2119,7 +2124,7 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
-    bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
+    bool rs = _coerce(site, toType, nullptr, fromType, fromExpr, getSink(), &cost);
 
     if (outCost)
         *outCost = cost;
@@ -2217,7 +2222,7 @@ bool SemanticsVisitor::canConvertImplicitly(Type* toType, QualType fromType)
 ConversionCost SemanticsVisitor::getConversionCost(Type* toType, QualType fromType)
 {
     ConversionCost conversionCost = kConversionCost_Impossible;
-    if (!canCoerce(toType, fromType, nullptr, &conversionCost))
+    if (!canCoerce(toType, fromType, nullptr, CoercionSite::General, &conversionCost))
         return kConversionCost_Impossible;
     return conversionCost;
 }

@@ -16,7 +16,6 @@ static bool shouldImplicitlySetInterfacesToSome(SemanticsVisitor* visitor)
     return visitor->isSlang2026OrLater();
 }
 
-
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
     SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
@@ -446,7 +445,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         }
 
         // validate `some`
-        auto validateSome = [&](Type* maybeSomeTypeDecl)
+        auto validateSomeType = [&](Type* maybeSomeTypeDecl)
         {
             if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(maybeSomeTypeDecl))
             {
@@ -457,8 +456,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 }
             }
         };
-        validateSome(type);
-        validateSome(result);
+        validateSomeType(type);
+        validateSomeType(result);
     }
 
     // default case: we expect this to already be a proper type

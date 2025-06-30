@@ -473,7 +473,12 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
                 ConversionCost cost = kConversionCost_None;
-                if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, arg, &cost))
+                if (!canCoerce(
+                        getType(m_astBuilder, valParamRef),
+                        arg->type,
+                        arg,
+                        CoercionSite::Argument,
+                        &cost))
                 {
                     success = false;
                 }
@@ -708,7 +713,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 if (!paramType->equals(argType))
                     return {nullptr, nullptr};
             }
-            else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
+            else if (!canCoerce(paramType, argType, arg.argExpr, CoercionSite::Argument, & cost))
             {
                 return {nullptr, nullptr};
             }

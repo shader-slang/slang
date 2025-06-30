@@ -237,8 +237,10 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
         {
-            auto costConvertRightToLeft = getConversionCost(leftBasic, right);
-            auto costConvertLeftToRight = getConversionCost(rightBasic, left);
+            auto costConvertRightToLeft = 
+                getConversionCost(leftBasic, right);
+            auto costConvertLeftToRight =
+                getConversionCost(rightBasic, left);
 
             // Return the one that had lower conversion cost.
             if (costConvertRightToLeft > costConvertLeftToRight)

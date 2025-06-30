@@ -1767,7 +1767,12 @@ public:
     ///
     /// If conversion is not possible, returns `false`.
     ///
-    bool canCoerce(Type* toType, QualType fromType, Expr* fromExpr, ConversionCost* outCost = 0);
+    bool canCoerce(
+        Type* toType,
+        QualType fromType,
+        Expr* fromExpr,
+        CoercionSite site,
+        ConversionCost* outCost = 0);
 
     TypeCastExpr* createImplicitCastExpr();
 

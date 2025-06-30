@@ -641,9 +641,47 @@ static void _lookUpMembersInSuperTypeImpl(
         }
     }
 
-    // Default case: no dereference needed
+    
+    if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(superType))
+    {
+        auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(someType.getDecl()->interfaceType).getDecl();
+        
+        // TODO: Use the following once fully-decoupled `some` backend and frontend
+        // from existential type system. Until then, hack-in an Existential look-up
+        ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
+        SLANG_ASSERT(thisTypeDecl);
+        _lookUpMembersInSuperTypeDeclImpl(
+            astBuilder,
+            name,
+            thisTypeDecl,
+            request,
+            ioResult,
+            inBreadcrumbs);
 
-    if (auto declRefType = as<DeclRefType>(superType))
+        //auto interfaceType = DeclRefType::create(astBuilder, interfaceDecl);
+        //SubtypeWitness* openedWitness =
+        //    getCurrentASTBuilder()->getOrCreate<ExtractExistentialSubtypeWitness>(
+        //        interfaceType,
+        //        interfaceType,
+        //        interfaceDecl);
+
+        //ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
+        //SLANG_ASSERT(thisTypeDecl);
+
+        //DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef =
+        //    getCurrentASTBuilder()
+        //        ->getLookupDeclRef(openedWitness, thisTypeDecl)
+        //        .as<ThisTypeDecl>();
+
+        //_lookUpMembersInSuperTypeDeclImpl(
+        //    astBuilder,
+        //    name,
+        //    specialiedInterfaceDeclRef,
+        //    request,
+        //    ioResult,
+        //    inBreadcrumbs);
+    }
+    else if (auto declRefType = as<DeclRefType>(superType))
     {
         auto declRef = declRefType->getDeclRef();
 

@@ -14,7 +14,6 @@
 
 namespace Slang
 {
-
 // pre-declare
 static Name* getName(Parser* parser, String const& text);
 
@@ -4888,7 +4887,7 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     // but, order (top down) mattter when parsing atomic_uint offset
     // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
     // Therefore we must parse all in order. The issue then is we will struggle to
-    // subsitute atomic_uint for storage buffers...
+    // substitute atomic_uint for storage buffers...
     if (auto name = declRefExpr->name)
     {
         if (name->text.equals("atomic_uint"))

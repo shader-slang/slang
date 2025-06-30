@@ -140,7 +140,7 @@ Val* DeclRefType::_substituteImplOverride(
 
     // Any type that has a decl-hiding a inner type that needs specialization requires
     // a bit of unwrapping (using the same subsitution set) and then repacking to 
-    // subsitute correctly.
+    // substitute correctly
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(this))
     {
         auto someType = someTypeDeclRef.getDecl();

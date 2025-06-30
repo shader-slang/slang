@@ -2510,6 +2510,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
+
+    if (auto vardeclBase = as<VarDeclBase>(decl))
+    {
+        // SomeType var's must be tagged accordingly
+        if (isDeclRefTypeOf<SomeTypeDecl>(vardeclBase->getType()))
+            builder->addDecoration(inst, kIROp_SomeTypeDecoration);
+    }
 }
 
 /// If `decl` has a modifier that should turn into a
@@ -3960,6 +3967,32 @@ struct ExprLoweringContext
         List<OutArgumentFixup> argFixups;
 
         auto funcExpr = expr->functionExpr;
+
+        // TODO: remove once `some` type do not rely on the
+        // existential-type backend
+        //if (auto memberExpr = as<MemberExpr>(funcExpr))
+        //{
+        //    Expr* base = memberExpr->baseExpression;
+        //    if (auto castToSuper = as<CastToSuperTypeExpr>(memberExpr->baseExpression))
+        //    {
+        //        base = castToSuper->valueArg;
+        //    }
+        //    if (auto varExpr = as<VarExpr>(base))
+        //    {
+        //        if (auto valueVarRef = as<VarDeclBase>(varExpr->declRef))
+        //        {
+        //            auto valueVar = valueVarRef.getDecl();
+        //            auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(valueVar->getType());
+        //            if (someTypeDecl)
+        //            {
+        //                // lower the Invoke as an existential
+        //                int a = 0;
+        //                a = 5;
+        //            }
+        //        }
+        //    }
+        //}
+
         ResolvedCallInfo resolvedInfo;
         if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
         {
@@ -5394,6 +5427,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         if (auto declRefType = as<DeclRefType>(expr->type))
         {
             auto declRef = declRefType->getDeclRef();
+
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
                 // We have an expression that is "up-casting" some concrete value
@@ -5414,6 +5448,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // we should probably extend the AST and IR mechanism here to accept
                 // a sequence of witness tables.
                 //
+                // TODO: Redesign `some` in the backend so that `some` does not rely
+                // on the Slang existential-type system.
                 auto concreteValue = getSimpleVal(context, value);
                 auto existentialValue =
                     getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
@@ -12336,7 +12372,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
         }
     }
-
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
