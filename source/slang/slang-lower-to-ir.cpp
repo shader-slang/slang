@@ -9628,10 +9628,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
-        if (const auto payloadAttribute = decl->findModifier<PayloadAttribute>())
-        {
-            subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
-        }
 
         if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
         {

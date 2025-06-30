@@ -4204,8 +4204,6 @@ attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttri
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
 
-__attributeTarget(StructDecl)
-attribute_syntax [payload] : PayloadAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
