@@ -187,6 +187,13 @@ class SynthesizedStaticLambdaFuncModifier : public Modifier
     FIDDLE(...)
 };
 
+FIDDLE()
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySet declaredCapabilityRequirements;
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
