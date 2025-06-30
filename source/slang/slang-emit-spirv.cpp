@@ -4681,8 +4681,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             kResultID,
             subscript->getImage(),
             subscript->getCoord(),
-            subscript->hasSampleCoord() ? subscript->getSampleCoord() : builder.getIntValue(builder.getIntType(), 0)
-        );
+            subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                        : builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
