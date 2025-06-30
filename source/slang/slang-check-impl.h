@@ -1339,6 +1339,8 @@ public:
     ///
     Expr* openExistential(Expr* expr, DeclRef<InterfaceDecl> interfaceDeclRef);
 
+    Expr* createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef);
+
     /// If `expr` has existential type, then open it.
     ///
     /// Returns an expression that opens `expr` if it had existential type.

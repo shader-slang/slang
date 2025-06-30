@@ -194,6 +194,52 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         });
 }
 
+// Create a SomeType with context required for 
+// resolving the base concrete type
+Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef)
+{
+    // TODO: Associate `some` type with type info, but do not treat as existential
+    // once backend for `some` does not rely on existentials.
+    //
+    // Why we need to rely on existentials despite `some` not being an `existential`:
+    // Since `some` in the backend (IR) relies on existential logic, we currently need
+    // to emit existentials. Otherwise, any changes to existentials in the AST
+    // will completly break the `some` type system in the IR.
+    //
+    // This works since `some` type validation ensures we don't need dynamic dispatch,
+    // we just need the specialization logic for the IR to work.
+    //
+    // We currently rely on the existential system until we decouple the backend
+    // since currently we generate ExistentialType, which create a lookup for a Existential
+    // witness table. This is important because this context allows the IR to then lower
+    // interface methods into a StructKey that can then be eventually specialized using the
+    // existential witness.
+    return maybeMoveTemp(
+        expr,
+        [&](DeclRef<VarDeclBase> varDeclRef)
+        {
+            auto interfaceType =
+                isDeclRefTypeOf<SomeTypeDecl>(expr->type.type).getDecl()->interfaceType.type;
+            ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
+                varDeclRef,
+                interfaceType,
+                isDeclRefTypeOf<InterfaceDecl>(interfaceType));
+
+            ExtractExistentialValueExpr* openedValue =
+                m_astBuilder->create<ExtractExistentialValueExpr>();
+            openedValue->declRef = varDeclRef;
+            openedValue->type = QualType(openedType);
+            openedValue->originalExpr = expr;
+            openedValue->checked = true;
+            if (expr->type.isLeftValue)
+            {
+                openedValue->type.isLeftValue = true;
+            }
+
+            return openedValue;
+        });
+}
+
 /// Returns an expression that opens `expr` if it has an existential type;
 /// else creates an expression to indirectly point to a concrete (`some`) type;
 /// otherwise return `expr` itself.
@@ -213,25 +259,7 @@ Expr* SemanticsVisitor::maybeGetIndirectValToInterface(Expr* expr)
         }
         else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
         {
-            // TODO: Associate `some` type with type info, but do not treat as existential
-            // once backend for `some` does not rely on existentials.
-            // 
-            // Why we need to rely on existentials despite `some` not being an `existential`:
-            // Since `some` in the backend (IR) relies on existential logic, we currently need 
-            // to emit existentials. Otherwise, any changes to existentials in the AST
-            // will completly break the `some` type system in the IR.
-            // 
-            // This works since `some` type validation ensures we don't need dynamic dispatch,
-            // we just need the specialization logic for the IR to work.
-            // 
-            // We currently rely on the existential system until we decouple the backend
-            // since currently we generate ExistentialType, which create a lookup for a Existential
-            // witness table. This is important because this context allows the IR to then lower 
-            // interface methods into a StructKey that can then be eventually specialized using the 
-            // existential witness.
-            return openExistential(
-                expr,
-                isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
+            return createSomeTypeWithContext(expr, someTypeDeclRef);
         }
     }
 
