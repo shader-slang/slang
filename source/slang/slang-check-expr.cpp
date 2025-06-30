@@ -128,13 +128,6 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     return moveTemp(expr, func);
 }
 
-static Type* getWrappedType(Type* type)
-{
-    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
-        return someTypeDeclRef.getDecl()->interfaceType;
-    return type;
-}
-
 /// Return an expression that represents "opening" the existential `expr`.
 ///
 /// The type of `expr` must be an interface type, matching `interfaceDeclRef`.
@@ -166,12 +159,9 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            auto type = getWrappedType(expr->type.type);
-            // Must remove all thin-wrapper types since otherwise it will "block" the type system
-            // from correctly resolving LookupDeclRef. This causes unresolved generics.
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                type,
+                expr->type.type,
                 interfaceDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
@@ -204,15 +194,14 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         });
 }
 
-/// If `expr` has existential type, then open it.
-///
-/// Returns an expression that opens `expr` if it had existential type.
-/// Otherwise returns `expr` itself.
+/// Returns an expression that opens `expr` if it has an existential type;
+/// else creates an expression to indirectly point to a concrete (`some`) type;
+/// otherwise return `expr` itself.
 ///
 /// See `openExistential` for a discussion of what "opening" an
 /// existential-type value means.
 ///
-Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
+Expr* SemanticsVisitor::maybeGetIndirectValToInterface(Expr* expr)
 {
     auto exprType = expr->type.type;
 
@@ -224,8 +213,22 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
         }
         else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
         {
-            int a = 5;
-            a = 0;
+            // TODO: Associate `some` type with type info, but do not treat as existential
+            // once backend for `some` does not rely on existentials.
+            // 
+            // Why we need to rely on existentials despite `some` not being an `existential`:
+            // Since `some` in the backend (IR) relies on existential logic, we currently need 
+            // to emit existentials. Otherwise, any changes to existentials in the AST
+            // will completly break the `some` type system in the IR.
+            // 
+            // This works since `some` type validation ensures we don't need dynamic dispatch,
+            // we just need the specialization logic for the IR to work.
+            // 
+            // We currently rely on the existential system until we decouple the backend
+            // since currently we generate ExistentialType, which create a lookup for a Existential
+            // witness table. This is important because this context allows the IR to then lower 
+            // interface methods into a StructKey that can then be eventually specialized using the 
+            // existential witness.
             return openExistential(
                 expr,
                 isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
@@ -4218,7 +4221,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Otherwise, if the target type is a subtype of value->type, we need to grab the
     // subtype witness for runtime checks.
 
-    expr->value = maybeOpenExistential(originalVal);
+    expr->value = maybeGetIndirectValToInterface(originalVal);
     expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
     if (expr->witnessArg)
     {
@@ -4273,7 +4276,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         {
             getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
         }
-        expr->value = maybeOpenExistential(expr->value);
+        expr->value = maybeGetIndirectValToInterface(expr->value);
         return expr;
     }
 
@@ -5181,7 +5184,7 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     // can expose its structure.
     //
 
-    expr->baseExpression = maybeOpenExistential(expr->baseExpression);
+    expr->baseExpression = maybeGetIndirectValToInterface(expr->baseExpression);
     // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
 }
@@ -5218,7 +5221,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     // and we should "open" the existential here so that we
     // can expose its structure.
     //
-    baseExpr = maybeOpenExistential(baseExpr);
+    baseExpr = maybeGetIndirectValToInterface(baseExpr);
 
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.

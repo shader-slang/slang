@@ -657,29 +657,6 @@ static void _lookUpMembersInSuperTypeImpl(
             request,
             ioResult,
             inBreadcrumbs);
-
-        //auto interfaceType = DeclRefType::create(astBuilder, interfaceDecl);
-        //SubtypeWitness* openedWitness =
-        //    getCurrentASTBuilder()->getOrCreate<ExtractExistentialSubtypeWitness>(
-        //        interfaceType,
-        //        interfaceType,
-        //        interfaceDecl);
-
-        //ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
-        //SLANG_ASSERT(thisTypeDecl);
-
-        //DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef =
-        //    getCurrentASTBuilder()
-        //        ->getLookupDeclRef(openedWitness, thisTypeDecl)
-        //        .as<ThisTypeDecl>();
-
-        //_lookUpMembersInSuperTypeDeclImpl(
-        //    astBuilder,
-        //    name,
-        //    specialiedInterfaceDeclRef,
-        //    request,
-        //    ioResult,
-        //    inBreadcrumbs);
     }
     else if (auto declRefType = as<DeclRefType>(superType))
     {

@@ -3968,31 +3968,6 @@ struct ExprLoweringContext
 
         auto funcExpr = expr->functionExpr;
 
-        // TODO: remove once `some` type do not rely on the
-        // existential-type backend
-        //if (auto memberExpr = as<MemberExpr>(funcExpr))
-        //{
-        //    Expr* base = memberExpr->baseExpression;
-        //    if (auto castToSuper = as<CastToSuperTypeExpr>(memberExpr->baseExpression))
-        //    {
-        //        base = castToSuper->valueArg;
-        //    }
-        //    if (auto varExpr = as<VarExpr>(base))
-        //    {
-        //        if (auto valueVarRef = as<VarDeclBase>(varExpr->declRef))
-        //        {
-        //            auto valueVar = valueVarRef.getDecl();
-        //            auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(valueVar->getType());
-        //            if (someTypeDecl)
-        //            {
-        //                // lower the Invoke as an existential
-        //                int a = 0;
-        //                a = 5;
-        //            }
-        //        }
-        //    }
-        //}
-
         ResolvedCallInfo resolvedInfo;
         if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
         {
