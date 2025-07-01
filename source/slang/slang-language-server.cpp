@@ -105,13 +105,6 @@ String uriToCanonicalPath(const String& uri)
     return canonnicalPath;
 }
 
-static bool isSlangSourceFile(const String& path)
-{
-    auto pathSlice = path.getUnownedSlice();
-    return pathSlice.endsWithCaseInsensitive(".slang") ||
-           pathSlice.endsWithCaseInsensitive(".hlsl");
-}
-
 SlangResult LanguageServer::parseNextMessage()
 {
     const JSONRPCMessageType msgType = m_connection->getMessageType();
@@ -255,15 +248,11 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
 
-    // Trigger module loading for Slang source files to enable diagnostics
-    if (isSlangSourceFile(canonicalPath))
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
-        auto version = m_workspace->getCurrentVersion();
-        Module* parsedModule = version->getOrLoadModule(canonicalPath);
-        if (!parsedModule)
-        {
-            return SLANG_FAIL;
-        }
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -271,17 +260,13 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 
 SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams& args)
 {
-    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-    if (isSlangSourceFile(canonicalPath))
-    {
-        resetDiagnosticUpdateTime();
-    }
-    auto result = m_core.didOpenTextDocument(args);
     // When periodic diagnostic updates are disabled (e.g., for testing),
     // the main server loop will not automatically publish diagnostics.
     // In this case, we must manually trigger a diagnostic publication
     // after any action that could affect the results, such as opening a document.
     // The same logic applies to didChange and didClose handlers.
+    resetDiagnosticUpdateTime();
+    auto result = m_core.didOpenTextDocument(args);
     if (!m_core.m_options.periodicDiagnosticUpdate)
     {
         publishDiagnostics();
@@ -2614,11 +2599,7 @@ SlangResult LanguageServerCore::didCloseTextDocument(const DidCloseTextDocumentP
 
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
 {
-    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
-    if (isSlangSourceFile(canonicalPath))
-    {
-        resetDiagnosticUpdateTime();
-    }
+    resetDiagnosticUpdateTime();
     auto result = m_core.didChangeTextDocument(args);
     if (!m_core.m_options.periodicDiagnosticUpdate)
     {
@@ -2633,15 +2614,11 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
 
-    // Trigger module loading for Slang source files to enable diagnostics
-    if (isSlangSourceFile(canonicalPath))
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
     {
-        auto version = m_workspace->getCurrentVersion();
-        Module* parsedModule = version->getOrLoadModule(canonicalPath);
-        if (!parsedModule)
-        {
-            return SLANG_FAIL;
-        }
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
