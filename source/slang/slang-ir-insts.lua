@@ -32,6 +32,7 @@ local insts = {
 					{ UIntPtr = { struct_name = "UIntPtrType" } },
 				},
 			},
+			{ AfterBaseType = {} },
 			{
 				StringTypeBase = {
 					hoistable = true,
@@ -47,6 +48,7 @@ local insts = {
 					hoistable = true,
 					{ RawPointerType = {} },
 					{ RTTIPointerType = { min_operands = 1 } },
+					{ AfterRawPointerTypeBase = {} },
 				},
 			},
 			{
@@ -1774,7 +1776,8 @@ local insts = {
 				},
 			},
 			{
-				FloatingPointModeOverrideDecoration = {
+				FloatingPointModeOverride = {
+					struct_name = "FloatingPointModeOverrideDecoration",
 					-- Overrides the floating mode for the target function
 					min_operands = 1,
 				},

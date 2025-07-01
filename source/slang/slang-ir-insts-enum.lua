@@ -3,11 +3,9 @@ return {
 		local insts = require("source/slang/slang-ir-insts.lua").insts
 		local output = {}
 
-		-- Post-order traversal
-		local function traverse_post_order(tbl)
+		local function traverse(tbl)
 			local first_child = nil
 			local last_child = nil
-			local child_count = 0
 
 			-- First, process all children
 			for _, i in ipairs(tbl) do
@@ -21,10 +19,9 @@ return {
 						first_child = "kIROp_" .. value.struct_name
 					end
 					last_child = "kIROp_" .. value.struct_name
-					child_count = child_count + 1
 				else
 					-- Parent instruction - recurse first
-					local child_first, child_last = traverse_post_order(value)
+					local child_first, child_last = traverse(value)
 
 					-- Track first and last child across all children
 					if first_child == nil then
@@ -33,7 +30,6 @@ return {
 					if child_last then
 						last_child = child_last
 					end
-					child_count = child_count + 1
 
 					-- Then add parent entries
 					if child_first and child_last then
@@ -46,15 +42,7 @@ return {
 			return first_child, last_child
 		end
 
-		-- Start traversal
-		traverse_post_order(insts)
-
+		traverse(insts)
 		return table.concat(output, "\n")
 	end,
 }
-
--- dump(tostring(Slang.IRInst))
--- dump(isLeaf(Slang.IRInst))
--- dump(isLeaf(Slang.IRVoidType))
--- dump(Slang[tostring(Slang.IRInst)].directSubclasses)
--- dump(Slang.IRVoidType.directSubclasses)
