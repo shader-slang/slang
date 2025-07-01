@@ -809,10 +809,10 @@ void initCommandOptions(CommandOptions& options)
          "-output-includes",
          nullptr,
          "Print the hierarchy of the processed source files."},
-        {OptionKind::SerialIr,
+        {OptionKind::REMOVED_SerialIR,
          "-serial-ir",
          nullptr,
-         "Serialize the IR between front-end and back-end."},
+         "[REMOVED] Serialize the IR between front-end and back-end."},
         {OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase."},
         {OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases."},
         {OptionKind::VerbosePaths,
@@ -2393,9 +2393,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::ReproFileSystem:
             SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg));
-            break;
-        case OptionKind::SerialIr:
-            m_frontEndReq->useSerialIRBottleneck = true;
             break;
         case OptionKind::VerbosePaths:
             m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);

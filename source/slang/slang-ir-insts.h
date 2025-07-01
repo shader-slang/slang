@@ -1646,10 +1646,6 @@ struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
     IR_LEAF_ISA(StageWriteAccessDecoration)
 };
 
-struct IRPayloadDecoration : public IRDecoration
-{
-    IR_LEAF_ISA(PayloadDecoration)
-};
 
 struct IRRayPayloadDecoration : public IRDecoration
 {

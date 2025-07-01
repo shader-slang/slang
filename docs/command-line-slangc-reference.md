@@ -627,7 +627,7 @@ Print the hierarchy of the processed source files.
 
 <a id="serial-ir"></a>
 ### -serial-ir
-Serialize the IR between front-end and back-end. 
+\[REMOVED\] Serialize the IR between front-end and back-end. 
 
 
 <a id="skip-codegen"></a>
