@@ -4,6 +4,7 @@
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
 #include "slang.h"
+#include <cstdio>
 
 using namespace rhi;
 using namespace Slang;
@@ -11,55 +12,67 @@ using namespace Slang;
 struct PlatformTest : public WindowedAppBase
 {
 
-    void onSizeChanged() { printf("onSizeChanged\n"); }
+    void onSizeChanged() { printf("onSizeChanged\n"); fflush(stdout); }
 
-    void onFocus() { printf("onFocus\n"); }
+    void onFocus() { printf("onFocus\n"); fflush(stdout); }
 
-    void onLostFocus() { printf("onLostFocus\n"); }
+    void onLostFocus() { printf("onLostFocus\n"); fflush(stdout); }
 
     void onKeyDown(platform::KeyEventArgs args)
     {
         printf("onKeyDown(key=0x%02x, buttons=0x%02x)\n", (uint32_t)args.key, args.buttons);
+        fflush(stdout);
     }
 
     void onKeyUp(platform::KeyEventArgs args)
     {
-        printf("okKeyUp(key=0x%02x, buttons=0x%02x)\n", (uint32_t)args.key, args.buttons);
+        printf("onKeyUp(key=0x%02x, buttons=0x%02x)\n", (uint32_t)args.key, args.buttons);
+        fflush(stdout);
     }
 
     void onKeyPress(platform::KeyEventArgs args)
     {
         printf("onKeyPress(keyChar=0x%02x)\n", args.keyChar);
+        fflush(stdout);
     }
 
     void onMouseMove(platform::MouseEventArgs args)
     {
-        printf(
-            "onMouseMove(x=%d, y=%d, delta=%d, buttons=0x%02x\n",
-            args.x,
-            args.y,
-            args.delta,
-            args.buttons);
+        // Throttle mouse move events using a simple counter
+        static int mouseMoveCounter = 0;
+        mouseMoveCounter++;
+        if (mouseMoveCounter % 50 == 0) // Only print every 50th mouse move event
+        {
+            printf(
+                "onMouseMove(x=%d, y=%d, delta=%d, buttons=0x%02x)\n",
+                args.x,
+                args.y,
+                args.delta,
+                args.buttons);
+            fflush(stdout);
+        }
     }
 
     void onMouseDown(platform::MouseEventArgs args)
     {
         printf(
-            "onMouseDown(x=%d, y=%d, delta=%d, buttons=0x%02x\n",
+            "onMouseDown(x=%d, y=%d, delta=%d, buttons=0x%02x)\n",
             args.x,
             args.y,
             args.delta,
             args.buttons);
+        fflush(stdout);
     }
 
     void onMouseUp(platform::MouseEventArgs args)
     {
         printf(
-            "onMouseUp(x=%d, y=%d, delta=%d, buttons=0x%02x\n",
+            "onMouseUp(x=%d, y=%d, delta=%d, buttons=0x%02x)\n",
             args.x,
             args.y,
             args.delta,
             args.buttons);
+        fflush(stdout);
     }
 
     void onMouseWheel(platform::MouseEventArgs args)
@@ -70,6 +83,7 @@ struct PlatformTest : public WindowedAppBase
             args.y,
             args.delta,
             args.buttons);
+        fflush(stdout);
     }
 
     Slang::Result initialize()
@@ -80,6 +94,9 @@ struct PlatformTest : public WindowedAppBase
         SLANG_ASSERT(isTestMode() || gWindow);
         if (gWindow)
         {
+            printf("Setting up event handlers...\n");
+            fflush(stdout);
+            
             gWindow->events.sizeChanged = [this]() { onSizeChanged(); };
             gWindow->events.focus = [this]() { onFocus(); };
             gWindow->events.lostFocus = [this]() { onLostFocus(); };
@@ -93,6 +110,12 @@ struct PlatformTest : public WindowedAppBase
             gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
             gWindow->events.mouseWheel = [this](const platform::MouseEventArgs& e)
             { onMouseWheel(e); };
+            printf("Event handlers set up successfully.\n");
+        }
+        else
+        {
+            printf("No window available for event setup.\n");
+            fflush(stdout);
         }
 
         return SLANG_OK;
