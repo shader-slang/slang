@@ -139,6 +139,8 @@ struct DeferBufferLoadContext
             return true;
         if (as<IRVectorType>(type))
             return true;
+        if (as<IRMatrixType>(type))
+            return true;
         return false;
     }
 
