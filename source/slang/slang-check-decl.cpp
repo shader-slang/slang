@@ -7898,7 +7898,7 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     contentAssistInfo.completionSuggestions.formatMode =
         varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
                     : CompletionSuggestions::FormatMode::FullSignature;
-
+    contentAssistInfo.completionSuggestions.currentPartialDecl = memberDecl;
     List<LookupResultItem> candidateItems;
     for (auto facet : inheritanceInfo.facets)
     {

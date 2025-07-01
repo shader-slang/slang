@@ -1168,8 +1168,22 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 {
     auto& sb = m_builder;
 
-    // Find the parent declaration
-    auto parentDeclRef = declRef.getParent();
+    // Find the parent declaration.
+    DeclRef<Decl> parentDeclRef;
+
+    // If this is a lookup decl ref, prefix with the lookup source type instead of the parent.
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        parentDeclRef = DeclRef<Decl>();
+        if (!as<ThisType>(lookupDeclRef->getLookupSource()))
+        {
+            parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+        }
+    }
+    else
+    {
+        parentDeclRef = declRef.getParent();
+    }
 
     // If the immediate parent is a generic, then we probably
     // want the declaration above that...
