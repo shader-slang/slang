@@ -56,8 +56,8 @@ void main(
 // CHECK-DAG: %{{.*}} = OpVariable %_ptr_IncomingRayPayload{{NV|KHR}}_ReflectionRay{{.*}} IncomingRayPayload{{NV|KHR}}
 // CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_ID]]
 // CHECK-DAG: %{{.*}} = OpLoad %{{u?}}int %[[INSTANCE_INDEX]]
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBuffer{{NV|KHR}}_uint %ShaderRecord{{.*}} %int_0
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_IncomingRayPayload{{NV|KHR}}_v4float %{{.*}} %int_0
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_0
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_1
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_2
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_ShaderRecordBuffer{{NV|KHR}}_uint %ShaderRecord{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_IncomingRayPayload{{NV|KHR}}_v4float %{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_0
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_1
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_Input_v3float %{{.*}} %{{u?}}int_2

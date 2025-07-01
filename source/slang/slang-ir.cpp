@@ -5164,6 +5164,20 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
     return inst;
 }
 
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align)
+{
+    if (align)
+    {
+        auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, align);
+        addInst(inst);
+        return inst;
+    }
+    else
+    {
+        return emitLoad(type, ptr);
+    }
+}
+
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
 {
     // Note: a `load` operation does not consider the rate

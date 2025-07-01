@@ -127,16 +127,21 @@ struct DeferBufferLoadContext
         IRInst* result = nullptr;
         if (mapPtrToValue.tryGetValue(ptr, result))
             return result;
+        IRAlignedAttr* align = nullptr;
+        if (auto load = as<IRLoad>(loadInst))
+            align = load->findAttr<IRAlignedAttr>();
         if (!as<IRModuleInst>(ptr->getParent()))
         {
             builder.setInsertAfter(ptr);
-            result = builder.emitLoad(ptr);
+            IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
+            result = builder.emitLoad(valueType, ptr, align);
             mapPtrToValue[ptr] = result;
         }
         else
         {
             builder.setInsertBefore(loadInst);
-            result = builder.emitLoad(ptr);
+            IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
+            result = builder.emitLoad(valueType, ptr, align);
             // Since we are inserting the load in a local scope, we can't register
             // the mapping to the pointer, since the global pointer needs to be
             // loaded once per function.
@@ -146,19 +151,21 @@ struct DeferBufferLoadContext
 
     static bool isSimpleType(IRInst* type)
     {
-        if (as<IRBasicType>(type))
-            return true;
-        if (as<IRVectorType>(type))
-            return true;
-        if (as<IRMatrixType>(type))
-            return true;
-        return false;
+        if (auto modType = as<IRRateQualifiedType>(type))
+            type = modType->getValueType();
+        if (as<IRStructType>(type))
+            return false;
+        if (as<IRTupleType>(type))
+            return false;
+        if (as<IRArrayTypeBase>(type))
+            return false;
+        return true;
     }
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
         // Don't defer the load anymore if the type is simple.
-        if (isSimpleType(loadInst->getDataType()))
+        if (isSimpleType(loadInst->getDataType()) || loadInst->findAttr<IRAlignedAttr>())
         {
             auto materializedVal = materializePointer(builder, loadInst);
             loadInst->transferDecorationsTo(materializedVal);
