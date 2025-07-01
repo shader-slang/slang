@@ -2056,12 +2056,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto irArrayType = static_cast<IRArrayTypeBase*>(inst);
                 const auto elementType = irArrayType->getElementType();
-                bool isOpaqueType = isIROpaqueType(elementType);
                 const auto arrayType =
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                if (shouldEmitArrayStride(irArrayType->getElementType()))
+                // Arrays of opaque types should not emit a stride
+                if (!isIROpaqueType(elementType) && shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
                     // If the array type has no stride, it indicates that this array type is only
@@ -2087,7 +2087,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
-                    if (!isOpaqueType && stride != 0)
+                    if (stride != 0)
                     {
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
