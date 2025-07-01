@@ -3285,19 +3285,14 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     {
         Decl* m = genericDecl->getDirectMemberDecl(i);
 
+        ensureDecl(m, DeclCheckState::ReadyForReference);
         if (auto typeParam = as<GenericTypeParamDeclBase>(m))
         {
-            ensureDecl(typeParam, DeclCheckState::ReadyForReference);
             typeParam->parameterIndex = parameterIndex++;
         }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
-            ensureDecl(valParam, DeclCheckState::ReadyForReference);
             valParam->parameterIndex = parameterIndex++;
-        }
-        else if (auto constraint = as<GenericTypeConstraintDecl>(m))
-        {
-            ensureDecl(constraint, DeclCheckState::ReadyForReference);
         }
     }
 }
