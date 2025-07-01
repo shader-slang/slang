@@ -187,6 +187,13 @@ class SynthesizedStaticLambdaFuncModifier : public Modifier
     FIDDLE(...)
 };
 
+FIDDLE()
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySet declaredCapabilityRequirements;
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
@@ -215,6 +222,13 @@ class ActualGlobalModifier : public Modifier
 /// checks).
 FIDDLE()
 class IgnoreForLookupModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+/// A modifier that indicates an `TypeConstraintDecl` is optional.
+FIDDLE()
+class OptionalConstraintModifier : public Modifier
 {
     FIDDLE(...)
 };
