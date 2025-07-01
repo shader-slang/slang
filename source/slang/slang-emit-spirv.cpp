@@ -2061,7 +2061,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
                 // Arrays of opaque types should not emit a stride
-                if (!isIROpaqueType(elementType) && shouldEmitArrayStride(irArrayType->getElementType()))
+                if (!isIROpaqueType(elementType) &&
+                    shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
                     // If the array type has no stride, it indicates that this array type is only
