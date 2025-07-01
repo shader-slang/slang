@@ -1174,13 +1174,21 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     // If this is a lookup decl ref, prefix with the lookup source type instead of the parent.
     if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
     {
-        parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
-        if (auto thisType = as<ThisTypeDecl>(parentDeclRef.getDecl()))
+        if (auto extractExistentialType =
+                as<ExtractExistentialType>(lookupDeclRef->getLookupSource()))
         {
-            if (auto baseLookupDeclRef = as<LookupDeclRef>(parentDeclRef.declRefBase))
+            parentDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
+        }
+        else
+        {
+            parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+            if (auto thisType = as<ThisTypeDecl>(parentDeclRef.getDecl()))
             {
-                // If the base type is a lookup, we want to use its source type
-                parentDeclRef = isDeclRefTypeOf<Decl>(baseLookupDeclRef->getLookupSource());
+                if (auto baseLookupDeclRef = as<LookupDeclRef>(parentDeclRef.declRefBase))
+                {
+                    // If the base type is a lookup, we want to use its source type
+                    parentDeclRef = isDeclRefTypeOf<Decl>(baseLookupDeclRef->getLookupSource());
+                }
             }
         }
     }
