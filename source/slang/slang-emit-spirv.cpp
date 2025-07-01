@@ -2056,6 +2056,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto irArrayType = static_cast<IRArrayTypeBase*>(inst);
                 const auto elementType = irArrayType->getElementType();
+                bool isOpaqueType = isIROpaqueType(elementType);
                 const auto arrayType =
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
@@ -2086,7 +2087,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
-                    if (stride != 0)
+                    if (!isOpaqueType && stride != 0)
                     {
                         emitOpDecorateArrayStride(
                             getSection(SpvLogicalSectionID::Annotations),
