@@ -952,11 +952,13 @@ __generic<T> __intrinsic_op(select) T operator?: (bool condition, T ifTrue, T if
 
 //@hidden:
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+__generic<T, let N : int, let M : int> __intrinsic_op(select) matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse);
 
 // Users are advised to use `select` instead if non-short-circuiting behavior is intended.
 //@public:
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+__generic<T, let N : int, let M : int> __intrinsic_op(select) matrix<T,N,M> select(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse);
 
 [ForceInline]
 __generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
@@ -973,7 +975,8 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
-    T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+
 //@hidden:
 __intrinsic_op($(kIROp_CastIntToFloat))
 T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);

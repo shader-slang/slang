@@ -16,10 +16,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float2x2 matrix2x2_2 = (float2x2)vector4_2;
 
     outputBuffer[0] = uint(true
-            && all(vector4_1 == float4(1, 2, 3, 4))
-            
-            && all(matrix2x2_2[0] == float2(1,2))
-            && all(matrix2x2_2[1] == float2(3,4))
-        );
+        && all(vector4_1 == float4(1, 2, 3, 4))
+        && all(matrix2x2_2[0] == float2(1,2))
+        && all(matrix2x2_2[1] == float2(3,4))
+    );
     //BUF: 1
 }
