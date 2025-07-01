@@ -361,8 +361,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
 
-        // We validate equality constraints seperately in a seperate pass. If we unify 
-        // these now we may have to `join` 2 generic types (which is always false) due 
+        // We validate equality constraints seperately in a seperate pass. If we unify
+        // these now we may have to `join` 2 generic types (which is always false) due
         // to Sub and Sup type being a GenericTypeParam.
         //
         // This is also semantically fine since 'joining' 2 equality constraints
