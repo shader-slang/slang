@@ -2375,8 +2375,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     // If debug information is enabled, enable writing out source locs
     if (_shouldWriteSourceLocs(linkage))
     {
-        options.optionFlags |= SerialOptionFlag::SourceLocation;
-        options.sourceManager = linkage->getSourceManager();
+        options.sourceManagerToUseWhenSerializingSourceLocs = linkage->getSourceManager();
     }
 
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
@@ -2919,7 +2918,6 @@ bool CodeGenContext::isSpecializationDisabled()
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     OwnedMemoryStream memoryStream(FileAccess::Write);
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
     *outSerializedBlob = RawBlob::create(
@@ -2932,7 +2930,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSeriali
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     FileStream fileStream;
     SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));
     return SerialContainerUtil::write(this, writeOptions, &fileStream);
