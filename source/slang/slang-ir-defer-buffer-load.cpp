@@ -161,6 +161,7 @@ struct DeferBufferLoadContext
         if (isSimpleType(loadInst->getDataType()))
         {
             auto materializedVal = materializePointer(builder, loadInst);
+            loadInst->transferDecorationsTo(materializedVal);
             loadInst->replaceUsesWith(materializedVal);
             return;
         }
@@ -196,6 +197,7 @@ struct DeferBufferLoadContext
         if (needMaterialize)
         {
             auto val = materializePointer(builder, loadInst);
+            loadInst->transferDecorationsTo(val);
             loadInst->replaceUsesWith(val);
             loadInst->removeAndDeallocate();
         }
