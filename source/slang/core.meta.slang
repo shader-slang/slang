@@ -952,12 +952,16 @@ __generic<T> __intrinsic_op(select) T operator?: (bool condition, T ifTrue, T if
 
 //@hidden:
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
+[require(hlsl)]
 __generic<T, let N : int, let M : int> __intrinsic_op(select) matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse);
 
 // Users are advised to use `select` instead if non-short-circuiting behavior is intended.
 //@public:
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
+[require(hlsl)]
 __generic<T, let N : int, let M : int> __intrinsic_op(select) matrix<T,N,M> select(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse);
 
 [ForceInline]
