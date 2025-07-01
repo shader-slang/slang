@@ -3,26 +3,53 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<uint> output;
+
+// CHECK: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+
+// CHECK-NEXT: 0
 
 uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint>>(inout ByteReader utf8Reader)
 {
 	uint codePoint = 0;
 	uint leading = utf8Reader();
 	uint mask = 0x80;
-	uint count = 0;
-	[MaxIters(4)]
-	while ((leading & mask) != 0)
+	int count = 0;
+	while ((leading & mask) != 0 && count < 4)
 	{
 		count++;
 		mask >>= 1;
 	}
 	codePoint = (leading & (mask - 1));
-	for (uint i = 1; i <= count - 1; i++)
+	for (int i = 1; i <= count - 1; i++)
 	{
-		codePoint <<= 6;
-		codePoint += (utf8Reader() & 0x3F);
+		uint next = utf8Reader();
+		if(next != 0)
+		{
+			codePoint <<= 6;
+			codePoint += (next & 0x3F);
+		}
+		else
+		{
+			break;
+		}
 	}
 	return codePoint;
 }
@@ -44,7 +71,13 @@ extension ShortString<N>
 		[mutating]
 		uint operator()()
 		{
-			return (it < N) ? str[it++] : 0;
+			uint res = 0;
+			if(it < N)
+			{
+				res = str[it];
+				++it;
+			}
+			return res;
 		}
 	}
 	
@@ -54,17 +87,24 @@ extension ShortString<N>
 	}
 }
 
+uint test<int N, int M>(const in ShortString<M> str, Array<uint, N> ref, uint offset)
+{
+	var it = str.begin();
+	for(uint i = 0; i < N; ++i)
+	{
+		output[offset + i] = decodeNextUnicodePointFromUTF8(it) - ref[i];
+	}
+	return offset + N;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 gid : SV_DispatchThreadID)
 {
-	Array<uint, 3> c = {'文', '字', '列'};
-	let str = "文字列";
-	var it = str.begin();
-	// CHECK: 0
-	output[0] = (decodeNextUnicodePointFromUTF8(it) - c[0]);
-	// CHECK: 0
-	output[1] = (decodeNextUnicodePointFromUTF8(it) - c[1]);
-	// CHECK: 0
-	output[2] = (decodeNextUnicodePointFromUTF8(it) - c[2]);
+	// https://en.wikipedia.org/wiki/List_of_Unicode_characters
+	uint i = 0;
+	i = test<3>("文字列", {'文', '字', '列'}, i);
+	i = test<5>("∫ℓ@ñγ", {'∫', 'ℓ', '@', 'ñ', 'γ'}, i);
+	i = test<7>("aâäãà🝛🯅", {'a', 'â', 'ä', 'ã', 'à', '🝛', '🯅'}, i);
+	i = test<1>("\xFF", {'\xFF'}, i);
 }
