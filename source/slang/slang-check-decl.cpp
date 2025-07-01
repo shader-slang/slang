@@ -10468,6 +10468,11 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
         getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
         return;
     }
+
+    if (elementCount->isLinkTimeVal())
+    {
+        getSink()->diagnose(varDecl, Diagnostics::linkTimeConstantArraySize);
+    }
 }
 
 bool getExtensionTargetDeclList(
