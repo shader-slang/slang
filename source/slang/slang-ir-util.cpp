@@ -871,8 +871,8 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
         }
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         {
             auto branch = as<IRUnconditionalBranch>(inst);
             // If any pointer typed argument of the branch inst may overlap addr, return true.
@@ -922,7 +922,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;

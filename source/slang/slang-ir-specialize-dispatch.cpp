@@ -34,7 +34,7 @@ IRFunc* specializeDispatchFunction(
         case kIROp_Call:
             callInst = cast<IRCall>(inst);
             break;
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             lookupInst = cast<IRLookupWitnessMethod>(inst);
             break;
         case kIROp_Return:
