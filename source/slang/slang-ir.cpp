@@ -5633,6 +5633,20 @@ IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, I
     return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
 }
 
+IRInst* IRBuilder::addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width)
+{
+    IRInst* operands[1] = {width};
+
+    return addDecoration(inst, kIROp_FpDenormalPreserveDecoration, operands, 1);
+}
+
+IRInst* IRBuilder::addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width)
+{
+    IRInst* operands[1] = {width};
+
+    return addDecoration(inst, kIROp_FpDenormalFlushToZeroDecoration, operands, 1);
+}
+
 IRInst* IRBuilder::addWaveSizeDecoration(IRInst* inst, IRInst* numLanes)
 {
     IRInst* operands[1] = {numLanes};
@@ -8478,9 +8492,6 @@ void IRInst::removeAndDeallocate()
     }
     removeArguments();
     removeFromParent();
-
-    // Run destructor to be sure...
-    this->~IRInst();
 }
 
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()

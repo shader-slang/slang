@@ -41,6 +41,12 @@ static inline Type* convert(SlangReflectionType* type)
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    // Prevent the AtomicType struct from being visible to the user
+    // through the reflection API.
+    if (auto atomicType = as<AtomicType>(type))
+    {
+        return (SlangReflectionType*)atomicType->getElementType();
+    }
     return (SlangReflectionType*)type;
 }
 
@@ -612,7 +618,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
 
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return (SlangReflectionType*)arrayType->getElementType();
+        return convert(arrayType->getElementType());
     }
     else if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
@@ -1052,7 +1058,7 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
 
         if (as<ErrorType>(result))
             return nullptr;
-        return (SlangReflectionType*)result;
+        return convert(result);
     }
     catch (...)
     {
@@ -1184,7 +1190,7 @@ SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(
     if (!typeLayout)
         return nullptr;
 
-    return (SlangReflectionType*)typeLayout->type;
+    return convert(typeLayout->type);
 }
 
 SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout* inTypeLayout)
@@ -4255,7 +4261,7 @@ SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(
         {
             auto constraints =
                 globalGenericParamDecl->getMembersOfType<GenericTypeConstraintDecl>();
-            return (SlangReflectionType*)constraints[index]->sup.Ptr();
+            return convert(constraints[index]->sup.Ptr());
         }
         // TODO: Add case for entry-point generic parameters.
     }

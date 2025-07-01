@@ -1692,10 +1692,6 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(
 
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
-    if (const auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>())
-    {
-        m_writer->emit("[payload] ");
-    }
 
     // Get the target profile to determine if PAQs are supported
     bool enablePAQs = false;
