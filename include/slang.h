@@ -737,6 +737,17 @@ typedef uint32_t SlangSizeT;
     };
 
     /*!
+    @brief Options to control floating-point denormal handling mode for a target.
+    */
+    typedef unsigned int SlangFpDenormalModeIntegral;
+    enum SlangFpDenormalMode : SlangFpDenormalModeIntegral
+    {
+        SLANG_FP_DENORM_MODE_ANY = 0,
+        SLANG_FP_DENORM_MODE_PRESERVE,
+        SLANG_FP_DENORM_MODE_FTZ,
+    };
+
+    /*!
     @brief Options to control emission of `#line` directives
     */
     typedef unsigned int SlangLineDirectiveModeIntegral;
@@ -1026,6 +1037,12 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EmitSeparateDebug, // bool
+
+        // Floating point denormal handling modes
+        DenormalModeFp16,
+        DenormalModeFp32,
+        DenormalModeFp64,
+
         CountOf,
     };
 
