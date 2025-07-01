@@ -1207,6 +1207,8 @@ local insts = {
 			},
 			{ instance = { struct_name = "InstanceDecoration", min_operands = 1 } },
 			{ numThreads = { struct_name = "NumThreadsDecoration", min_operands = 3 } },
+			{ fpDenormalPreserve = { struct_name = "FpDenormalPreserveDecoration", min_operands = 1 } },
+			{ fpDenormalFlushToZero = { struct_name = "FpDenormalFlushToZeroDecoration", min_operands = 1 } },
 			{
 				waveSize = {
 					struct_name = "WaveSizeDecoration",
@@ -1491,7 +1493,6 @@ local insts = {
 			{
 				vkStructOffset = { struct_name = "VkStructOffsetDecoration", min_operands = 1 },
 			},
-			{ payload = { struct_name = "PayloadDecoration" } },
 			{ raypayload = { struct_name = "RayPayloadDecoration" } },
 			{
 				MeshOutputDecoration = {

@@ -275,15 +275,26 @@ static Result _calcSizeAndAlignment(
         {
             auto tupleType = cast<IRTupleType>(type);
             IRSizeAndAlignment resultLayout;
+            IRIntegerValue lastFieldAlignment = 0;
+            IRType* lastFieldType = NULL;
             for (UInt i = 0; i < tupleType->getOperandCount(); i++)
             {
                 auto elementType = tupleType->getOperand(i);
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
                     getSizeAndAlignment(optionSet, rules, (IRType*)elementType, &fieldTypeLayout));
+                resultLayout.size = rules->adjustOffset(
+                    resultLayout.size,
+                    fieldTypeLayout.size,
+                    lastFieldType,
+                    lastFieldAlignment);
                 resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
                 resultLayout.alignment =
                     std::max(resultLayout.alignment, fieldTypeLayout.alignment);
+
+                resultLayout.size += fieldTypeLayout.size;
+                lastFieldType = as<IRType>(elementType);
+                lastFieldAlignment = fieldTypeLayout.alignment;
             }
             *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
             return SLANG_OK;

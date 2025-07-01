@@ -295,9 +295,17 @@ struct GenericCallLoweringContext
             return;
         }
 
-        auto interfaceType = cast<IRInterfaceType>(
+        auto interfaceType = as<IRInterfaceType>(
             cast<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())
                 ->getConformanceType());
+
+        if (!interfaceType)
+        {
+            // NoneWitness -> remove call.
+            callInst->removeAndDeallocate();
+            return;
+        }
+
         if (isBuiltin(interfaceType))
             return;
 

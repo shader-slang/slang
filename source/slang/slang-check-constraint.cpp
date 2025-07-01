@@ -360,9 +360,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
+        ValUnificationContext unificationContext;
+        unificationContext.optionalConstraint =
+            constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
         if (!TryUnifyTypes(
                 *system,
-                ValUnificationContext(),
+                unificationContext,
                 getSub(m_astBuilder, constraintDeclRef),
                 getSup(m_astBuilder, constraintDeclRef)))
             return DeclRef<Decl>();
@@ -487,8 +490,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    // failure!
-                    return DeclRef<Decl>();
+                    if (c.isOptional)
+                        joinType = type;
+                    else
+                        // failure!
+                        return DeclRef<Decl>();
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
@@ -696,11 +702,21 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 subTypeWitness = nullptr;
         }
 
-        if (subTypeWitness)
+        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
         {
             // We found a witness, so it will become an (implicit) argument.
             args.add(subTypeWitness);
             outBaseCost += subTypeWitness->getOverloadResolutionCost();
+        }
+        else if (!subTypeWitness && constraintIsOptional)
+        {
+            // Optional witness failed to resolve; not an error.
+            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            args.add(noneWitness);
+            outBaseCost += kConversionCost_FailedOptionalConstraint;
         }
         else
         {
@@ -851,13 +867,20 @@ bool SemanticsVisitor::TryUnifyVals(
     // Two subtype witnesses can be unified if they exist (non-null) and
     // prove that some pair of types are subtypes of types that can be unified.
     //
-    if (auto fstWit = as<SubtypeWitness>(fst))
-    {
-        if (auto sndWit = as<SubtypeWitness>(snd))
-        {
-            return TryUnifyTypes(constraints, unifyCtx, fstWit->getSup(), sndWit->getSup());
-        }
-    }
+    const auto fstSubtypeWitness = as<SubtypeWitness>(fst);
+    const auto sndSubtypeWitness = as<SubtypeWitness>(snd);
+    const auto fstNoneWitness = as<NoneWitness>(fst);
+    const auto sndNoneWitness = as<NoneWitness>(snd);
+    if (fstSubtypeWitness && sndSubtypeWitness)
+        return TryUnifyTypes(
+            constraints,
+            unifyCtx,
+            fstSubtypeWitness->getSup(),
+            sndSubtypeWitness->getSup());
+    else if (fstNoneWitness && sndNoneWitness)
+        return true;
+    else if ((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
+        return false;
 
     SLANG_UNIMPLEMENTED_X("value unification case");
 
@@ -946,6 +969,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
+    constraint.isOptional = unificationContext.optionalConstraint;
     constraints.constraints.add(constraint);
 
     return true;

@@ -491,6 +491,21 @@ struct IRNumThreadsDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRFpDenormalPreserveDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRFpDenormalFlushToZeroDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+FIDDLE()
 struct IRWaveSizeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
@@ -1289,12 +1304,6 @@ struct IRStageReadAccessDecoration : public IRStageAccessDecoration
 
 FIDDLE()
 struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPayloadDecoration : public IRDecoration
 {
     FIDDLE(leafInst())
 };
@@ -3949,6 +3958,8 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
+    IRInst* addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width);
+    IRInst* addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width);
     IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(

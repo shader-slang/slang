@@ -2063,14 +2063,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
+                    // If the array type has no stride, it indicates that this array type is only
+                    // used in Private or Function storage class (aka. thread-local or function
+                    // scope variable), in that case SPIRV doesn't allow to decorate the array
+                    // stride.
+                    //
+                    // The only exception is if the array type is unsized, because unsized array
+                    // also has no stride operand, however unsized array can not be used in Private
+                    // or Function, so we are safe to just decorate the stride for unsized array by
+                    // calculating the natural stride.
                     if (auto strideInst = irArrayType->getArrayStride())
                     {
                         stride = (int)getIntVal(strideInst);
                     }
-                    else
+                    else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
-                        // Stride may not have been calculated for basic element types. Calculate it
-                        // here.
                         IRSizeAndAlignment sizeAndAlignment;
                         getNaturalSizeAndAlignment(
                             m_targetProgram->getOptionSet(),
@@ -2079,11 +2086,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
-                    emitOpDecorateArrayStride(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        arrayType,
-                        SpvLiteralInteger::from32(stride));
+                    if (stride != 0)
+                    {
+                        emitOpDecorateArrayStride(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            arrayType,
+                            SpvLiteralInteger::from32(stride));
+                    }
                 }
                 return arrayType;
             }
@@ -3468,7 +3478,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     spvBlock,
                     spvFunc,
                     irDebugFunc,
-                    irFunc->getDataType());
+                    irFunc->getDataType(),
+                    irFunc);
             }
             if (funcDebugScope)
             {
@@ -4670,7 +4681,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             kResultID,
             subscript->getImage(),
             subscript->getCoord(),
-            builder.getIntValue(builder.getIntType(), 0));
+            subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                        : builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
@@ -5107,6 +5119,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
                         SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue())));
                 }
+            }
+            break;
+        case kIROp_FpDenormalPreserveDecoration:
+            {
+                auto fpDenormalDecor = cast<IRFpDenormalPreserveDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormPreserve);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormPreserve,
+                    SpvLiteralInteger::from32(width));
+            }
+            break;
+        case kIROp_FpDenormalFlushToZeroDecoration:
+            {
+                auto fpDenormalDecor = cast<IRFpDenormalFlushToZeroDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormFlushToZero);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormFlushToZero,
+                    SpvLiteralInteger::from32(width));
             }
             break;
         case kIROp_MaxVertexCountDecoration:
@@ -6011,6 +6059,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDrawIndex, inst);
+                }
+                else if (semanticName == "sv_deviceindex")
+                {
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_device_group"));
+                    requireSPIRVCapability(SpvCapabilityDeviceGroup);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDeviceIndex, inst);
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
@@ -7308,11 +7362,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Perform unsigned conversion first to an unsigned integer of the same width as the
             // result then perform bit cast to the signed result type. This is done because SPIRV's
             // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
-            auto unsignedV = emitOpUConvert(
-                parent,
-                nullptr,
-                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
-                inst->getOperand(0));
+            auto builderType = getUnsignedTypeFromSignedType(&builder, toTypeV);
+
+            auto unsignedV = emitOpUConvert(parent, nullptr, builderType, inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
         else if (fromInfo.isSigned)
@@ -7964,7 +8016,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* firstBlock,
         SpvInst* spvFunc,
         IRDebugFunction* debugFunc,
-        IRFuncType* debugType)
+        IRFuncType* debugType,
+        IRFunc* irFunc = nullptr)
     {
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
@@ -8001,6 +8054,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugFunc->getName(),
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
+
+        if (irFunc)
+        {
+            registerDebugInst(irFunc, debugFuncInfo);
+        }
 
         if (firstBlock && spvFunc)
         {

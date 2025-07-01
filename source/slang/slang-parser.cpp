@@ -1692,6 +1692,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
+        bool optional = AdvanceIf(parser, "optional", &whereToken);
+
         auto subType = parser->ParseTypeExp();
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1702,6 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 parser->FillPosition(constraint);
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
+                if (optional)
+                {
+                    addModifier(
+                        constraint,
+                        parser->astBuilder->create<OptionalConstraintModifier>());
+                }
                 AddMember(genericParent, constraint);
                 if (!AdvanceIf(parser, TokenType::Comma))
                     break;
@@ -1715,6 +1723,10 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->FillPosition(constraint);
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
             AddMember(genericParent, constraint);
         }
         else if (AdvanceIf(parser, TokenType::LParent))
