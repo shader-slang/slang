@@ -22,7 +22,7 @@ enum IROp : int32_t
 {
 
 #if 0 // FIDDLE TEMPLATE:
-% RAW(require("source/slang/slang-ir.h.lua").instEnums())
+% require("source/slang/slang-ir.h.lua").instEnums()
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-ir-insts-enum.h.fiddle"

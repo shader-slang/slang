@@ -22,7 +22,7 @@ static const IROpMapEntry kIROps[] = {
 // Main ops in order
 
 #if 0 // FIDDLE TEMPLATE:
-% RAW(require("source/slang/slang-ir.h.lua").instInfoEntries())
+% require("source/slang/slang-ir.h.lua").instInfoEntries()
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-ir-insts-info.cpp.fiddle"

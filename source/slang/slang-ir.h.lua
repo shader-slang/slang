@@ -124,8 +124,7 @@ local function instInfoEntries()
 
 	walk_instructions(insts, function(key, value, struct_name, parent_struct)
 		if value.is_leaf then
-			table.insert(
-				output,
+			RAW(
 				"{kIROp_"
 				.. struct_name
 				.. ', {"'
@@ -138,8 +137,6 @@ local function instInfoEntries()
 			)
 		end
 	end)
-
-	return table.concat(output, "\n")
 end
 
 -- The enum table
@@ -157,7 +154,7 @@ local function instEnums()
 			local key, value = next(i)
 			if value.is_leaf then
 				-- Leaf instruction
-				table.insert(output, "    kIROp_" .. value.struct_name .. ",")
+				RAW("    kIROp_" .. value.struct_name .. ",")
 
 				-- Track first and last child
 				if first_child == nil then
@@ -178,8 +175,8 @@ local function instEnums()
 
 				-- Then add parent entries
 				if child_first and child_last then
-					table.insert(output, "    kIROp_First" .. value.struct_name .. " = " .. child_first .. ",")
-					table.insert(output, "    kIROp_Last" .. value.struct_name .. " = " .. child_last .. ",")
+					RAW("    kIROp_First" .. value.struct_name .. " = " .. child_first .. ",")
+					RAW("    kIROp_Last" .. value.struct_name .. " = " .. child_last .. ",")
 				end
 			end
 		end
