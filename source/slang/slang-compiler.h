@@ -2037,6 +2037,13 @@ enum class FloatingPointMode : SlangFloatingPointModeIntegral
     Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
 };
 
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
+{
+    Any = SLANG_FP_DENORM_MODE_ANY,
+    Preserve = SLANG_FP_DENORM_MODE_PRESERVE,
+    FlushToZero = SLANG_FP_DENORM_MODE_FTZ,
+};
+
 enum class WriterChannel : SlangWriterChannelIntegral
 {
     Diagnostic = SLANG_WRITER_CHANNEL_DIAGNOSTIC,
@@ -2658,10 +2665,6 @@ public:
     {
         return translationUnits[index];
     }
-
-    // If true then generateIR will serialize out IR, and serialize back in again. Making
-    // serialization a bottleneck or firewall between the front end and the backend
-    bool useSerialIRBottleneck = false;
 
     // If true will serialize and de-serialize with debug information
     bool verifyDebugSerialization = false;

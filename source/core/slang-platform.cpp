@@ -119,8 +119,8 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
 
-    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
-    const HMODULE h = LoadLibraryA(platformFileName);
+    // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexa
+    const HMODULE h = LoadLibraryExA(platformFileName, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     if (!h)
     {
         const DWORD lastError = GetLastError();

@@ -414,10 +414,18 @@ function(slang_add_target dir type)
     #
     # Link and include from dependencies
     #
-    target_link_libraries(
-        ${target}
-        PRIVATE $<BUILD_LOCAL_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
-    )
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_LOCAL_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    else()
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    endif()
+
     target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -458,10 +466,17 @@ function(slang_add_target dir type)
     endforeach()
     foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
         get_filename_component(inc_abs ${inc} ABSOLUTE)
-        target_include_directories(
-            ${target}
-            PRIVATE "$<BUILD_LOCAL_INTERFACE:${inc_abs}>"
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_LOCAL_INTERFACE:${inc_abs}>"
+            )
+        else()
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
+            )
+        endif()
     endforeach()
 
     #
