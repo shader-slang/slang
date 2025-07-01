@@ -1,3 +1,8 @@
+--
+-- This file contains most of the code generation logic for the ir instructions
+--
+
+-- Helper function
 -- Walk the instruction tree and call a callback for each instruction
 local function walk_instructions(insts, callback, parent_struct)
 	local function walk_insts(tbl, parent)
@@ -20,6 +25,7 @@ local function walk_instructions(insts, callback, parent_struct)
 	end
 end
 
+-- The definitions for leaf instructions
 local leafInst = function(name, args)
 	args = args or {}
 	return args.noIsaImpl and ""
@@ -34,6 +40,7 @@ local leafInst = function(name, args)
 			.. [[ }; ]]
 end
 
+-- The definitions for abstract instruction classes
 local baseInst = function(name, args)
 	args = args or {}
 	return args.noIsaImpl and ""
@@ -71,6 +78,7 @@ local function allOtherInstStructs()
 	return table.concat(output, "\n")
 end
 
+-- Forward declarations for everything
 local function instStructForwardDecls()
 	local insts = require("source/slang/slang-ir-insts.lua").insts
 	local output = {}
@@ -83,6 +91,7 @@ local function instStructForwardDecls()
 	return table.concat(output, "\n")
 end
 
+-- The info table
 local function instInfoEntries()
 	local insts = require("source/slang/slang-ir-insts.lua").insts
 	local output = {}
@@ -117,19 +126,68 @@ local function instInfoEntries()
 		if value.is_leaf then
 			table.insert(
 				output,
-				[[{kIROp_]]
+				"{kIROp_"
 				.. struct_name
-				.. [[, {"]]
+				.. ', {"'
 				.. value.mnemonic
-				.. [[", ]]
+				.. '", '
 				.. tostring(value.min_operands)
-				.. [[, ]]
+				.. ", "
 				.. constructFlags(value)
-				.. [[}},]]
+				.. "}},"
 			)
 		end
 	end)
 
+	return table.concat(output, "\n")
+end
+
+-- The enum table
+local function instEnums()
+	local insts = require("source/slang/slang-ir-insts.lua").insts
+	local output = {}
+
+	-- Walk manually so we can output in postorder
+	local function traverse(tbl)
+		local first_child = nil
+		local last_child = nil
+
+		-- First, process all children
+		for _, i in ipairs(tbl) do
+			local key, value = next(i)
+			if value.is_leaf then
+				-- Leaf instruction
+				table.insert(output, "    kIROp_" .. value.struct_name .. ",")
+
+				-- Track first and last child
+				if first_child == nil then
+					first_child = "kIROp_" .. value.struct_name
+				end
+				last_child = "kIROp_" .. value.struct_name
+			else
+				-- Parent instruction - recurse first
+				local child_first, child_last = traverse(value)
+
+				-- Track first and last child across all children
+				if first_child == nil then
+					first_child = child_first
+				end
+				if child_last then
+					last_child = child_last
+				end
+
+				-- Then add parent entries
+				if child_first and child_last then
+					table.insert(output, "    kIROp_First" .. value.struct_name .. " = " .. child_first .. ",")
+					table.insert(output, "    kIROp_Last" .. value.struct_name .. " = " .. child_last .. ",")
+				end
+			end
+		end
+
+		return first_child, last_child
+	end
+
+	traverse(insts)
 	return table.concat(output, "\n")
 end
 
@@ -143,4 +201,5 @@ return {
 	allOtherInstStructs = allOtherInstStructs,
 	instStructForwardDecls = instStructForwardDecls,
 	instInfoEntries = instInfoEntries,
+	instEnums = instEnums,
 }

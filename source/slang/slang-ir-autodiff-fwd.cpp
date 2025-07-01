@@ -1786,6 +1786,9 @@ void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
                 if (as<IRAutodiffInstDecoration>(decoration))
                     decorations.add(decoration);
             }
+
+            // Must have _exactly_ one autodiff tag.
+            // SLANG_ASSERT(decorations.getCount() == 1);
         }
     }
 }

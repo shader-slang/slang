@@ -1,10 +1,14 @@
 --
--- This file contains the canonical definitions for the instions to the Slang IR
+-- This file contains the canonical definitions for the instions to the Slang IR.
 -- Add new instructions here
 --
 -- The instructions struct name, i.e. something like "IRVoidType" can be specified with struct_name, otherwise it will be a PascalCase version of the instruction key
 --
 -- Flags, such as hoistable, global, parent, use_other are inherited from a parent abstract type
+--
+-- min_operands specifies the number of required operands for an instruction, it defaults to 0
+--
+-- Instructions here will automatically be given a struct definition in slang-ir-insts.h if it is no handwritten
 --
 
 local insts = {
@@ -2171,8 +2175,6 @@ local insts = {
 -- Annotates instructions with whether they are a leaf or not
 -- Calculates flags from the parent flags
 local function process(insts)
-	local flat_insts = {}
-
 	local function to_pascal_case(str)
 		local result = str:gsub("_(.)", function(c)
 			return c:upper()
@@ -2212,6 +2214,7 @@ local function process(insts)
 			current_flags.global = true
 		end
 
+		-- If we have any children, this will be set to false
 		tbl.is_leaf = true
 
 		for _, i in ipairs(tbl) do
@@ -2241,9 +2244,6 @@ local function process(insts)
 				value.min_operands = 0
 			end
 
-			-- Add to flat list (preorder - parent before children)
-			flat_insts[key] = value
-
 			-- Recursively process children
 			process_inst(value, current_flags)
 		end
@@ -2254,7 +2254,6 @@ local function process(insts)
 
 	return {
 		insts = insts,
-		flat_insts = flat_insts,
 	}
 end
 
