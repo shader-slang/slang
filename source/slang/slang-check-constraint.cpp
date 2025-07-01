@@ -364,9 +364,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         // We validate equality constraints seperately in a seperate pass. If we unify 
         // these now we may have to `join` 2 generic types (which is always false) due 
         // to Sub and Sup type being a GenericTypeParam.
-        // //
+        //
         // This is also semantically fine since 'joining' 2 equality constraints
-        // does not mean anything beyond type equality which our solver checks anyways.
+        // does not mean anything beyond type equality which our solver will check
+        // anyways after we solve-types
         if (constraintDeclRef.getDecl()->isEqualityConstraint)
             continue;
 
