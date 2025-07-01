@@ -1787,6 +1787,9 @@ void ForwardDiffTranscriber::checkAutodiffInstDecorations(IRFunc* fwdFunc)
                     decorations.add(decoration);
             }
 
+            // TODO: reenable this assert, it's been nonfunctional since about
+            // 2023 since as<IRUndefined> always returned true until now
+
             // Must have _exactly_ one autodiff tag.
             // SLANG_ASSERT(decorations.getCount() == 1);
         }
