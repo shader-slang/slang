@@ -117,7 +117,8 @@ int _template(lua_State* L)
 
 lua_State* L = nullptr;
 
-// Add a custom searcher that handles absolute paths
+// Add a custom searcher that handles relative paths
+// So we can do things like require("source/slang/foo.lua")
 static int path_searcher(lua_State* L)
 {
     const char* modname = luaL_checkstring(L, 1);

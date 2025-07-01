@@ -153,3 +153,17 @@ For example, given the input above, the generated output for the template might 
 #include "my-class-forward-decls.h.fiddle"
 #endif
 ```
+
+Inside templates there is a global defined `THIS_FILE` which is the file path
+of the C++ source containing the splice. This can be used to load adjacent lua
+files for example.
+
+Lua Function Calls
+------------------
+
+A more lightweight alternative to templates is to call
+`FIDDLE(myLuaFunction(my, parameters))`. This will load a lua file at
+`current_cpp_source_path.cpp.lua` and call the `myLuaFunction` function in the
+table returned by that lua file. Inside such splices a `fiddle` global table is
+available, containing a `current_decl` member if available, pointing to the
+namespace or class/struct containing this splice.

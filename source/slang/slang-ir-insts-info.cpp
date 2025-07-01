@@ -21,7 +21,6 @@ static const IROpMapEntry kIROps[] = {
 
 // Main ops in order
 
-
 #if 0 // FIDDLE TEMPLATE:
 % RAW(require("source/slang/slang-ir.h.lua").instInfoEntries())
 #else // FIDDLE OUTPUT:
