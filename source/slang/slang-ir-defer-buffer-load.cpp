@@ -127,9 +127,20 @@ struct DeferBufferLoadContext
         IRInst* result = nullptr;
         if (mapPtrToValue.tryGetValue(ptr, result))
             return result;
-        builder.setInsertAfter(ptr);
-        result = builder.emitLoad(ptr);
-        mapPtrToValue[ptr] = result;
+        if (!as<IRModuleInst>(ptr->getParent()))
+        {
+            builder.setInsertAfter(ptr);
+            result = builder.emitLoad(ptr);
+            mapPtrToValue[ptr] = result;
+        }
+        else
+        {
+            builder.setInsertBefore(loadInst);
+            result = builder.emitLoad(ptr);
+            // Since we are inserting the load in a local scope, we can't register
+            // the mapping to the pointer, since the global pointer needs to be
+            // loaded once per function.
+        }
         return result;
     }
 
