@@ -1,8 +1,11 @@
+#include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "platform/window.h"
+#include "slang-com-ptr.h"
+#include "slang-rhi.h"
 #include "slang.h"
 
-using namespace gfx;
+using namespace rhi;
 using namespace Slang;
 
 struct PlatformTest : public WindowedAppBase
@@ -95,28 +98,36 @@ struct PlatformTest : public WindowedAppBase
         return SLANG_OK;
     }
 
-    virtual void renderFrame(int frameBufferIndex) override
+    virtual void renderFrame(ITexture* texture) override
     {
-        ComPtr<ICommandBuffer> commandBuffer =
-            gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+        auto commandEncoder = gQueue->createCommandEncoder();
 
-        auto renderEncoder =
-            commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
+        ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = textureView;
+        colorAttachment.loadOp = LoadOp::Clear;
 
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)windowWidth;
-        viewport.extentY = (float)windowHeight;
-        renderEncoder->setViewportAndScissor(viewport);
+        RenderPassDesc renderPass = {};
+        renderPass.colorAttachments = &colorAttachment;
+        renderPass.colorAttachmentCount = 1;
 
-        renderEncoder->endEncoding();
-        commandBuffer->close();
-        gQueue->executeCommandBuffer(commandBuffer);
+        auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
 
-        // We may not have a swapchain if we're running in test mode
-        SLANG_ASSERT(isTestMode() || gSwapchain);
-        if (gSwapchain)
-            gSwapchain->present();
+        RenderState renderState = {};
+        renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+        renderState.scissorRectCount = 1;
+
+        renderEncoder->setRenderState(renderState);
+
+        renderEncoder->end();
+        gQueue->submit(commandEncoder->finish());
+
+        if (!isTestMode())
+        {
+            gSurface->present();
+        }
     }
 };
 
