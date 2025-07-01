@@ -617,6 +617,16 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
     default:
         return result;
     }
+
+    // If we are completing an override function signature, don't add keywords to the result.
+    switch (linkage->contentAssistInfo.completionSuggestions.formatMode)
+    {
+    case CompletionSuggestions::FormatMode::FullSignature:
+    case CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType:
+        addKeywords = false;
+        break;
+    }
+
     HashSet<String> deduplicateSet;
     for (Index i = 0;
          i < linkage->contentAssistInfo.completionSuggestions.candidateItems.getCount();
@@ -639,6 +649,28 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
             nameStart);
         if (item.label.getLength() == 0)
             continue;
+        if (linkage->contentAssistInfo.completionSuggestions.formatMode ==
+            CompletionSuggestions::FormatMode::FullSignature)
+        {
+            // If the completion item is a `static` function, but there is no `static` keyword
+            // on the current incomplete decl, then we will add `static` keyword to the completion
+            // result.
+            if (suggestedItem.declRef.getDecl() &&
+                suggestedItem.declRef.getDecl()->findModifier<HLSLStaticModifier>() &&
+                linkage->contentAssistInfo.completionSuggestions.currentPartialDecl &&
+                !linkage->contentAssistInfo.completionSuggestions.currentPartialDecl
+                     ->findModifier<HLSLStaticModifier>())
+            {
+                item.label = "static " + item.label;
+                nameStart += 7;
+                // Add an item for 'static' keyword.
+                LanguageServerProtocol::CompletionItem staticItem;
+                staticItem.label = "static";
+                staticItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                staticItem.data = "-1"; // Use -1 to indicate this is a keyword.
+                result.add(staticItem);
+            }
+        }
         item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
         if (as<TypeConstraintDecl>(member))
         {

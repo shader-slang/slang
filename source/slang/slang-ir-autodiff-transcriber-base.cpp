@@ -70,7 +70,7 @@ bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* currentParent, I
 {
     if (as<IRGlobalValueWithCode>(origInst))
         return true;
-    if (origInst->parent && origInst->parent->getOp() == kIROp_Module)
+    if (origInst->parent && origInst->parent->getOp() == kIROp_ModuleInst)
         return true;
     if (isChildInstOf(currentParent, origInst->getParent()))
         return true;
@@ -413,7 +413,7 @@ bool AutoDiffTranscriberBase::isExistentialType(IRType* type)
     case kIROp_ExtractExistentialType:
     case kIROp_InterfaceType:
     case kIROp_AssociatedType:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         return true;
     default:
         return false;

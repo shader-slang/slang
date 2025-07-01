@@ -409,7 +409,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     switch (inst->getOp())
     {
-    case kIROp_discard:
+    case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
         return true;
     case kIROp_MetalAtomicCast:

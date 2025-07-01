@@ -187,7 +187,7 @@ struct DiffTransposePass
             case kIROp_Return:
                 return RegionEntryPoint(revBlockMap[currentBlock], nullptr);
 
-            case kIROp_unconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 {
                     auto branchInst = as<IRUnconditionalBranch>(terminator);
                     auto nextBlock = as<IRBlock>(branchInst->getTargetBlock());
@@ -207,7 +207,7 @@ struct DiffTransposePass
                     break;
                 }
 
-            case kIROp_ifElse:
+            case kIROp_IfElse:
                 {
                     auto ifElse = as<IRIfElse>(terminator);
 
@@ -273,7 +273,7 @@ struct DiffTransposePass
                     break;
                 }
 
-            case kIROp_loop:
+            case kIROp_Loop:
                 {
                     auto loop = as<IRLoop>(terminator);
 
@@ -850,7 +850,7 @@ struct DiffTransposePass
                TODO: need a better way to move specialize, lookupwitness,
                extractExistentialType/Value/Witness insts to a proper location that dominates
                all their use sites. Create copies of these insts when necessary. case
-               kIROp_Specialize: case kIROp_LookupWitness: case kIROp_ExtractExistentialType:
+               kIROp_Specialize: case kIROp_LookupWitnessMethod: case kIROp_ExtractExistentialType:
                 case kIROp_ExtractExistentialValue:
                 case kIROp_ExtractExistentialWitnessTable:
             */
@@ -1248,7 +1248,7 @@ struct DiffTransposePass
                 baseFnType);
 
         IRInst* revCallee = nullptr;
-        if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitness)
+        if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitnessMethod)
         {
             // This is an interface method call, we can simply transcribe it here.
             auto specialize = as<IRSpecialize>(baseFn);
@@ -1363,15 +1363,15 @@ struct DiffTransposePass
         auto terminatorInst = block->getTerminator();
         switch (terminatorInst->getOp())
         {
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
         case kIROp_Return:
             return nullptr;
 
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             return as<IRIfElse>(terminatorInst)->getAfterBlock();
         case kIROp_Switch:
             return as<IRSwitch>(terminatorInst)->getBreakLabel();
-        case kIROp_loop:
+        case kIROp_Loop:
             return as<IRLoop>(terminatorInst)->getBreakBlock();
 
         default:
@@ -1467,7 +1467,7 @@ struct DiffTransposePass
         case kIROp_Call:
             return transposeCall(builder, as<IRCall>(fwdInst), revValue);
 
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             return transposeSwizzle(builder, as<IRSwizzle>(fwdInst), revValue);
 
         case kIROp_FieldExtract:
@@ -1558,12 +1558,12 @@ struct DiffTransposePass
         case kIROp_ReverseGradientDiffPairRef:
         case kIROp_DefaultConstruct:
         case kIROp_Specialize:
-        case kIROp_unconditionalBranch:
-        case kIROp_conditionalBranch:
-        case kIROp_ifElse:
-        case kIROp_loop:
+        case kIROp_UnconditionalBranch:
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+        case kIROp_Loop:
         case kIROp_Switch:
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialWitnessTable:
             {
@@ -2163,7 +2163,7 @@ struct DiffTransposePass
             switch (type->getOp())
             {
             case kIROp_ExtractExistentialType:
-            case kIROp_LookupWitness:
+            case kIROp_LookupWitnessMethod:
                 return true;
             default:
                 return false;

@@ -655,6 +655,9 @@ bool JSONContainer::asBool(const JSONValue& value)
         return asInteger(value) != 0;
     case JSONValue::Type::FloatLexeme:
         return asFloat(value) != 0.0;
+    case JSONValue::Type::StringLexeme:
+        return getTransientString(value).caseInsensitiveEquals(toSlice("true")) ||
+               getTransientString(value).caseInsensitiveEquals(toSlice("1"));
     default:
         return value.asBool();
     }
