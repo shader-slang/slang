@@ -18,7 +18,6 @@ struct DeferBufferLoadContext
     Dictionary<IRInst*, IRInst*> mapPtrToValue;
 
     IRFunc* currentFunc = nullptr;
-    IRDominatorTree* dominatorTree = nullptr;
 
     // Ensure that for an original SSA value, we have formed a pointer that can be used to load the
     // value.
@@ -57,6 +56,9 @@ struct DeferBufferLoadContext
                 result = b.emitFieldAddress(ptr, valueInst->getOperand(1));
                 break;
             }
+        case kIROp_Load:
+            result = valueInst->getOperand(0);
+            break;
         }
         if (result)
         {
@@ -65,7 +67,39 @@ struct DeferBufferLoadContext
         return result;
     }
 
-    static bool isStructuredBufferLoad(IRInst* inst)
+    static bool isImmutableLocation(IRInst* loc)
+    {
+        switch (loc->getOp())
+        {
+        case kIROp_GetStructuredBufferPtr:
+        case kIROp_ImageSubscript:
+            return isImmutableLocation(loc->getOperand(0));
+        default:
+            break;
+        }
+
+        auto type = loc->getDataType();
+        if (!type)
+            return false;
+
+        switch (type->getOp())
+        {
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_ConstantBufferType:
+        case kIROp_ParameterBlockType:
+            return true;
+        default:
+            break;
+        }
+
+        if (auto textureType = as<IRTextureType>(type))
+            return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+
+        return false;
+    }
+
+    static bool isImmutableBufferLoad(IRInst* inst)
     {
         // Note: we cannot defer loads from RWStructuredBuffer because there can be other
         // instructions that modify the buffer.
@@ -74,6 +108,11 @@ struct DeferBufferLoadContext
         case kIROp_StructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
             return true;
+        case kIROp_Load:
+            {
+                auto rootAddr = getRootAddr(inst->getOperand(0));
+                return isImmutableLocation(rootAddr);
+            }
         default:
             return false;
         }
@@ -100,8 +139,6 @@ struct DeferBufferLoadContext
             return true;
         if (as<IRVectorType>(type))
             return true;
-        if (as<IRMatrixType>(type))
-            return true;
         return false;
     }
 
@@ -110,11 +147,8 @@ struct DeferBufferLoadContext
         // Don't defer the load anymore if the type is simple.
         if (isSimpleType(loadInst->getDataType()))
         {
-            if (!isStructuredBufferLoad(loadInst))
-            {
-                auto materializedVal = materializePointer(builder, loadInst);
-                loadInst->replaceUsesWith(materializedVal);
-            }
+            auto materializedVal = materializePointer(builder, loadInst);
+            loadInst->replaceUsesWith(materializedVal);
             return;
         }
 
@@ -141,12 +175,8 @@ struct DeferBufferLoadContext
                     }
                     break;
                 default:
-                    if (!isStructuredBufferLoad(loadInst))
-                    {
-                        needMaterialize = true;
-                        return;
-                    }
-                    break;
+                    needMaterialize = true;
+                    return;
                 }
             });
 
@@ -170,7 +200,6 @@ struct DeferBufferLoadContext
         removeRedundancyInFunc(func, false);
 
         currentFunc = func;
-        dominatorTree = func->getModule()->findOrCreateDominatorTree(func);
 
         List<IRInst*> workList;
 
@@ -178,7 +207,7 @@ struct DeferBufferLoadContext
         {
             for (auto inst : block->getChildren())
             {
-                if (isStructuredBufferLoad(inst))
+                if (isImmutableBufferLoad(inst))
                 {
                     workList.add(inst);
                 }

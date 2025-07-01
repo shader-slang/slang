@@ -6824,7 +6824,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
-        return emitOpAccessChain(
+        return emitOpInBoundsAccessChain(
             parent,
             fieldAddress,
             fieldAddress->getFullType(),
@@ -6869,9 +6869,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We might replace resultType with a different storage class equivalent
         auto resultType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(resultType);
-
+        bool isInBounds = false;
         if (const auto basePtrType = as<IRPtrTypeBase>(base->getDataType()))
         {
+            if (as<IRArrayType>(basePtrType->getValueType()))
+                isInBounds = true;
+
             // If the base pointer has a specific address space and the
             // expected result type doesn't, then make sure they match.
             // It's invalid spir-v if they don't match
@@ -6885,12 +6888,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 as<IRPointerLikeType>(base->getDataType()) ||
                 !"invalid IR: base of getElementPtr must be a pointer.");
         }
-        return emitOpAccessChain(
-            parent,
-            inst,
-            inst->getFullType(),
-            baseId,
-            makeArray(inst->getIndex()));
+        if (isInBounds)
+        {
+            return emitOpInBoundsAccessChain(
+                parent,
+                inst,
+                inst->getFullType(),
+                baseId,
+                makeArray(inst->getIndex()));
+        }
+        else
+        {
+            return emitOpAccessChain(
+                parent,
+                inst,
+                inst->getFullType(),
+                baseId,
+                makeArray(inst->getIndex()));
+        }
     }
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)

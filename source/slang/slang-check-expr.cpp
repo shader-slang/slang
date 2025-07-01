@@ -538,6 +538,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     {
         derefExpr->type.isLeftValue = true;
     }
+    else if (isImmutableBufferType(base->type))
+    {
+        derefExpr->type.isLeftValue = false;
+        derefExpr->type.isWriteOnly = false;
+    }
     else
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
