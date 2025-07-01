@@ -34,7 +34,7 @@ add_custom_command(
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
-    WORKING_DIRECTORY /home/e/work/slang
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
 add_library(
