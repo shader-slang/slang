@@ -60,6 +60,8 @@ function(example dir)
             platform
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             ${main_wrapper_libraries}
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_EXAMPLE_NAME=${dir}
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
