@@ -1069,7 +1069,7 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
-static void _maybeDiagnoseMissingVulkanLayoutModifier(
+static bool _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext* context,
     DeclRef<VarDeclBase> const& varDecl)
 {
@@ -1077,7 +1077,7 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     if (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
         varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
     {
-        return;
+        return false;
     }
 
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
@@ -1085,6 +1085,11 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
+        // Don't warn if the declaration already has a vk::binding attribute
+        if (varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        {
+            return false;
+        }
         auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
         if (auto textureType = as<TextureType>(varType))
         {
@@ -1095,7 +1100,7 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
                     registerModifier,
                     Diagnostics::registerModifierButNoVulkanLayout,
                     varDecl.getName());
-                return;
+                return true;
             }
         }
 
@@ -1111,7 +1116,9 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
             Diagnostics::registerModifierButNoVkBindingNorShift,
             varDecl.getName(),
             registerClassName);
+        return true;
     }
+    return false;
 }
 
 static void addExplicitParameterBindings_GLSL(
@@ -1273,8 +1280,7 @@ static void addExplicitParameterBindings_GLSL(
     // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
-        warnedMissingVulkanLayoutModifier = true;
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1301,8 +1307,7 @@ static void addExplicitParameterBindings_GLSL(
         {
             if (!warnedMissingVulkanLayoutModifier)
             {
-                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-                warnedMissingVulkanLayoutModifier = true;
+                warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
             }
             return;
         }
@@ -1323,8 +1328,7 @@ static void addExplicitParameterBindings_GLSL(
     {
         if (!warnedMissingVulkanLayoutModifier)
         {
-            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-            warnedMissingVulkanLayoutModifier = true;
+            warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
         }
     }
 
