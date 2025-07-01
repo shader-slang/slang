@@ -13,5 +13,5 @@ struct Impl : IFoo
     override 
 }
 
-//CHECK: associatedtype B
+//CHECK: associatedtype IFoo.This.B
 //CHECK: static B.AT execute(int x)

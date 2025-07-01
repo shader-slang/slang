@@ -1183,7 +1183,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         {
             parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
         }
-        if (auto thisType = as<ThisTypeDecl>(parentDeclRef.getDecl()))
+        if (as<ThisTypeDecl>(parentDeclRef.getDecl()))
         {
             if (auto baseLookupDeclRef = as<LookupDeclRef>(parentDeclRef.declRefBase))
             {
@@ -1206,7 +1206,11 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
 
     // Depending on what the parent is, we may want to format things specially
-    if (parentDeclRef.as<AggTypeDecl>() || parentDeclRef.as<SimpleTypeDecl>())
+    if (parentDeclRef.as<ThisTypeDecl>())
+    {
+        sb << "This.";
+    }
+    else if (parentDeclRef.as<AggTypeDecl>() || parentDeclRef.as<SimpleTypeDecl>())
     {
         _addDeclPathRec(parentDeclRef, depth + 1);
         sb << toSlice(".");
