@@ -1174,10 +1174,14 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     // If this is a lookup decl ref, prefix with the lookup source type instead of the parent.
     if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
     {
-        parentDeclRef = DeclRef<Decl>();
-        if (!as<ThisType>(lookupDeclRef->getLookupSource()))
+        parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+        if (auto thisType = as<ThisTypeDecl>(parentDeclRef.getDecl()))
         {
-            parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+            if (auto baseLookupDeclRef = as<LookupDeclRef>(parentDeclRef.declRefBase))
+            {
+                // If the base type is a lookup, we want to use its source type
+                parentDeclRef = isDeclRefTypeOf<Decl>(baseLookupDeclRef->getLookupSource());
+            }
         }
     }
     else
@@ -1194,9 +1198,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
 
     // Depending on what the parent is, we may want to format things specially
-    if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
+    if (parentDeclRef.as<AggTypeDecl>() || parentDeclRef.as<SimpleTypeDecl>())
     {
-        _addDeclPathRec(aggTypeDeclRef, depth + 1);
+        _addDeclPathRec(parentDeclRef, depth + 1);
         sb << toSlice(".");
     }
     else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
