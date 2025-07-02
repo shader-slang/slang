@@ -901,8 +901,8 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
-// The concrete type for a value wrapped in an existential, accessible
-// when the existential is "opened" in some context.
+// The concrete type for a value wrapped in an interface, only accessible
+// given context.
 FIDDLE(abstract)
 class InterfaceWithContext : public Type
 {
