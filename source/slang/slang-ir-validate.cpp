@@ -600,13 +600,13 @@ void validateVectorsAndMatrices(
 
             // Verify that the element type is a floating point type, or an allowed integral type
             auto elementType = matrixType->getElementType();
-            uint32_t allowedWidths = 0U;
+            uint32_t allowedWidths = 32U;
             if (isCPUTarget(targetRequest))
-                allowedWidths = 8U | 16U | 32U | 64U;
+                allowedWidths |= 8U | 16U | 64U;
             else if (isCUDATarget(targetRequest))
-                allowedWidths = 32U | 64U;
+                allowedWidths |= 64U;
             else if (isD3DTarget(targetRequest))
-                allowedWidths = 16U | 32U;
+                allowedWidths |= 16U;
             validateVectorOrMatrixElementType(
                 sink,
                 matrixType->sourceLoc,
