@@ -73,8 +73,8 @@ jobs:
             # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: ${{ github.event_name != 'merge_group' }}
             # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
-            runs-on: ${{ github.event_name == 'merge_group' && 'windows-latest' || '[Windows, self-hosted, GCP-T4]' }}
-            has-gpu: ${{ github.event_name != 'merge_group' }}
+            runs-on: ['Windows', 'self-hosted', 'GCP-T4']
+            has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
           - os: windows
@@ -83,8 +83,8 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: ${{ github.event_name != 'merge_group' }}
-            runs-on: ${{ github.event_name == 'merge_group' && 'windows-latest' || '[Windows, self-hosted, GCP-T4]' }}
-            has-gpu: ${{ github.event_name != 'merge_group' }}
+            runs-on: ['Windows', 'self-hosted', 'GCP-T4']
+            has-gpu: true
             server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
