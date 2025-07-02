@@ -2160,6 +2160,79 @@ void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Dif
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(min)
 
+// copysign
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
+[PreferRecompute]
+[ForwardDerivativeOf(copysign)]
+DifferentialPair<T> __d_copysign(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
+{
+    // copysign(x, y) = sign(y) * abs(x)
+    // d/dx copysign(x, y) = sign(y) * sign(x)
+    // d/dy copysign(x, y) = 0 (sign function is not differentiable w.r.t y)
+    let sign_y = select(dpy.p >= T(0.0), T(1.0), T(-1.0));
+    let sign_x = select(dpx.p >= T(0.0), T(1.0), T(-1.0));
+    return DifferentialPair<T>(
+        copysign(dpx.p, dpy.p),
+        __mul_p_d(sign_y * sign_x, dpx.d)
+    );
+}
+
+__generic<T : __BuiltinFloatingPointType>
+[BackwardDifferentiable]
+[PreferRecompute]
+[BackwardDerivativeOf(copysign)]
+void __d_copysign(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
+{
+    let sign_y = select(dpy.p >= T(0.0), T(1.0), T(-1.0));
+    let sign_x = select(dpx.p >= T(0.0), T(1.0), T(-1.0));
+    // Gradient flows only to x since d/dy copysign = 0
+    dpx = diffPair(dpx.p, __mul_p_d(sign_y * sign_x, dOut));
+    dpy = diffPair(dpy.p, T.dzero());
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+[PreferRecompute]
+[ForwardDerivativeOf(copysign)]
+DifferentialPair<vector<T, N>> __d_copysign_vector(
+    DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
+{
+    vector<T, N> result;
+    vector<T, N>.Differential d_result;
+    [ForceUnroll] for (int i = 0; i < N; ++i)
+    {
+        DifferentialPair<T> dp_elem = __d_copysign(
+            DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])),
+            DifferentialPair<T>(dpy.p[i], __slang_noop_cast<T.Differential>(dpy.d[i])));
+        result[i] = dp_elem.p;
+        d_result[i] = __slang_noop_cast<T>(dp_elem.d);
+    }
+    return DifferentialPair<vector<T, N>>(result, d_result);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[BackwardDifferentiable]
+[PreferRecompute]
+[BackwardDerivativeOf(copysign)]
+void __d_copysign_vector(
+    inout DifferentialPair<vector<T, N>> dpx,
+    inout DifferentialPair<vector<T, N>> dpy,
+    vector<T, N>.Differential dOut)
+{
+    vector<T, N>.Differential x_d_result, y_d_result;
+    [ForceUnroll] for (int i = 0; i < N; ++i)
+    {
+        DifferentialPair<T> x_dp = DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i]));
+        DifferentialPair<T> y_dp = DifferentialPair<T>(dpy.p[i], __slang_noop_cast<T.Differential>(dpy.d[i]));
+        __d_copysign(x_dp, y_dp, __slang_noop_cast<T.Differential>(dOut[i]));
+        x_d_result[i] = __slang_noop_cast<T>(x_dp.d);
+        y_d_result[i] = __slang_noop_cast<T>(y_dp.d);
+    }
+    dpx = diffPair(dpx.p, x_d_result);
+    dpy = diffPair(dpy.p, y_d_result);
+}
+
 // Lerp
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
