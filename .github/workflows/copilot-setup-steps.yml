@@ -23,12 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-            submodules: "recursive"
-            fetch-depth: "2"
+          submodules: "recursive"
+          fetch-depth: "2"
       - uses: ./.github/actions/format-setup
       - name: setup environment
         run: |
-            sudo apt-get update
-            sudo apt-get install -y libx11-dev
-
-            
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
