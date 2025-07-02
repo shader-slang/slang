@@ -32,6 +32,7 @@ struct CompletionSuggestions
 
     ScopeKind scopeKind = ScopeKind::Invalid;
     FormatMode formatMode = FormatMode::Name;
+    Decl* currentPartialDecl = nullptr;
 
     List<LookupResultItem> candidateItems;
     Type* swizzleBaseType = nullptr;
@@ -40,10 +41,12 @@ struct CompletionSuggestions
     void clear()
     {
         scopeKind = ScopeKind::Invalid;
+        formatMode = FormatMode::Name;
         candidateItems.clear();
         elementCount[0] = 0;
         elementCount[1] = 0;
         swizzleBaseType = nullptr;
+        currentPartialDecl = nullptr;
     }
 };
 

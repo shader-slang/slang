@@ -7898,7 +7898,7 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     contentAssistInfo.completionSuggestions.formatMode =
         varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
                     : CompletionSuggestions::FormatMode::FullSignature;
-
+    contentAssistInfo.completionSuggestions.currentPartialDecl = memberDecl;
     List<LookupResultItem> candidateItems;
     for (auto facet : inheritanceInfo.facets)
     {
@@ -10467,6 +10467,11 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
     {
         getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
         return;
+    }
+
+    if (elementCount->isLinkTimeVal())
+    {
+        getSink()->diagnose(varDecl, Diagnostics::linkTimeConstantArraySize);
     }
 }
 

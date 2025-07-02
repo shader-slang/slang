@@ -72,56 +72,56 @@ struct EmptyArrayLoweringContext
             {
                 const auto base = gep->getBase();
                 return hasEmptyArrayPtrType(gep) || hasEmptyArrayPtrType(base) ||
-                               base->getOp() == kIROp_undefined
+                               base->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(gep->getDataType())
                            : nullptr;
             },
             [&](IRFieldAddress* gep)
             {
                 const auto base = gep->getBase();
-                return hasEmptyArrayPtrType(gep) || base->getOp() == kIROp_undefined
+                return hasEmptyArrayPtrType(gep) || base->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(gep->getDataType())
                            : nullptr;
             },
             [&](IRLoad* load)
             {
-                return load->getOperand(0)->getOp() == kIROp_undefined
+                return load->getOperand(0)->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(load->getDataType())
                            : nullptr;
             },
             [&](IRImageLoad* load)
             {
-                return load->getOperand(0)->getOp() == kIROp_undefined
+                return load->getOperand(0)->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(load->getDataType())
                            : nullptr;
             },
             [&](IRStore* store)
             {
-                if (store->getPtr()->getOp() == kIROp_undefined)
+                if (store->getPtr()->getOp() == kIROp_Undefined)
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRAtomicStore* store)
             {
-                if (store->getPtr()->getOp() == kIROp_undefined)
+                if (store->getPtr()->getOp() == kIROp_Undefined)
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRImageStore* store)
             {
-                if (store->getImage()->getOp() == kIROp_undefined)
+                if (store->getImage()->getOp() == kIROp_Undefined)
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRImageSubscript* subscript)
             {
-                return subscript->getImage()->getOp() == kIROp_undefined
+                return subscript->getImage()->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(subscript->getDataType())
                            : nullptr;
             },
             [&](IRAtomicOperation* atomic)
             {
-                return atomic->getOperand(0)->getOp() == kIROp_undefined
+                return atomic->getOperand(0)->getOp() == kIROp_Undefined
                            ? builder.emitUndefined(atomic->getDataType())
                            : nullptr;
             },

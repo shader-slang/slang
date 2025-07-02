@@ -983,13 +983,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            if (x->getParent()->getOp() == kIROp_Module)
+            if (x->getParent()->getOp() == kIROp_ModuleInst)
                 builder.setInsertBefore(inst);
             else
                 setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), AddressSpace::Function);
             builder.emitStore(y, x);
-            if (x->getParent()->getOp() != kIROp_Module)
+            if (x->getParent()->getOp() != kIROp_ModuleInst)
                 m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
@@ -1397,7 +1397,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         maybeHoistConstructInstToGlobalScope(inst);
 
-        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_Module &&
+        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_ModuleInst &&
             inst->getOperandCount() !=
                 (UInt)getIntVal(as<IRVectorType>(inst->getDataType())->getElementCount()))
         {
@@ -1772,10 +1772,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_NonUniformResourceIndex:
                 processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
-            case kIROp_loop:
+            case kIROp_Loop:
                 processLoop(as<IRLoop>(inst));
                 break;
-            case kIROp_ifElse:
+            case kIROp_IfElse:
                 processIfElse(as<IRIfElse>(inst));
                 break;
             case kIROp_Switch:
@@ -1809,7 +1809,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
-            case kIROp_unconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 processBranch(inst);
                 break;
             case kIROp_SPIRVAsm:
@@ -2407,7 +2407,7 @@ void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* mo
             if (auto inst = block->getTerminator())
             {
                 if (inst->getOp() == kIROp_Return ||
-                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_discard)
+                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_Discard)
                 {
                     builder.setInsertBefore(inst);
                     builder.emitEndFragmentShaderInterlock();

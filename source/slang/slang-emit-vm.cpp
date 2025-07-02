@@ -481,7 +481,7 @@ public:
     {
         switch (inst->getOp())
         {
-        case kIROp_undefined:
+        case kIROp_Undefined:
             {
                 ensureWorkingsetMemory(funcBuilder, inst);
             }
@@ -605,8 +605,8 @@ public:
                     ensureInst(inst->getOperand(0)));
             }
             break;
-        case kIROp_unconditionalBranch:
-        case kIROp_loop:
+        case kIROp_UnconditionalBranch:
+        case kIROp_Loop:
             {
                 // Write phi arguments into param registers.
                 auto branch = as<IRUnconditionalBranch>(inst);
@@ -646,7 +646,7 @@ public:
                 relocations.add(entry);
             }
             break;
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 VMOperand relocOperand = {};
                 writeInst(
@@ -868,7 +868,7 @@ public:
         case kIROp_FloatCast:
             emitCast(funcBuilder, VMOp::Cast, inst);
             break;
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             {
                 auto swizzleInst = as<IRSwizzle>(inst);
                 auto base = swizzleInst->getBase();

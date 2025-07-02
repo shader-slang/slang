@@ -737,6 +737,17 @@ typedef uint32_t SlangSizeT;
     };
 
     /*!
+    @brief Options to control floating-point denormal handling mode for a target.
+    */
+    typedef unsigned int SlangFpDenormalModeIntegral;
+    enum SlangFpDenormalMode : SlangFpDenormalModeIntegral
+    {
+        SLANG_FP_DENORM_MODE_ANY = 0,
+        SLANG_FP_DENORM_MODE_PRESERVE,
+        SLANG_FP_DENORM_MODE_FTZ,
+    };
+
+    /*!
     @brief Options to control emission of `#line` directives
     */
     typedef unsigned int SlangLineDirectiveModeIntegral;
@@ -1026,6 +1037,12 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EmitSeparateDebug, // bool
+
+        // Floating point denormal handling modes
+        DenormalModeFp16,
+        DenormalModeFp32,
+        DenormalModeFp64,
+
         CountOf,
     };
 
@@ -2274,9 +2291,9 @@ struct TypeReflection
     }
 
     // only useful if `getKind() == Kind::Array`
-    size_t getElementCount()
+    size_t getElementCount(SlangReflection* reflection = nullptr)
     {
-        return spReflectionType_GetElementCount((SlangReflectionType*)this);
+        return spReflectionType_GetSpecializedElementCount((SlangReflectionType*)this, reflection);
     }
 
     size_t getTotalArrayElementCount()
@@ -2437,6 +2454,8 @@ enum class BindingType : SlangBindingTypeIntegral
     ExtMask = SLANG_BINDING_TYPE_EXT_MASK,
 };
 
+struct ShaderReflection;
+
 struct TypeLayoutReflection
 {
     TypeReflection* getType()
@@ -2526,7 +2545,10 @@ struct TypeLayoutReflection
     }
 
     // only useful if `getKind() == Kind::Array`
-    size_t getElementCount() { return getType()->getElementCount(); }
+    size_t getElementCount(ShaderReflection* reflection = nullptr)
+    {
+        return getType()->getElementCount((SlangReflection*)reflection);
+    }
 
     size_t getTotalArrayElementCount() { return getType()->getTotalArrayElementCount(); }
 
