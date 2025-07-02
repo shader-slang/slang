@@ -144,8 +144,13 @@ struct AssociatedTypeLookupSpecializationContext
         // returns the sequential ID of the resulting witness table, effectively getting rid
         // of actual witness table objects in the target code (they all become IDs).
         auto witnessTableType = inst->getWitnessTable()->getDataType();
-        IRInterfaceType* interfaceType = cast<IRInterfaceType>(
-            cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType());
+        auto witnessTableTypeBase = cast<IRWitnessTableTypeBase>(witnessTableType);
+        if (!witnessTableTypeBase)
+            return;
+        auto conformanceType = witnessTableTypeBase->getConformanceType();
+        if (!conformanceType)
+            return;
+        IRInterfaceType* interfaceType = cast<IRInterfaceType>(conformanceType);
         if (!interfaceType)
             return;
         auto key = inst->getRequirementKey();
