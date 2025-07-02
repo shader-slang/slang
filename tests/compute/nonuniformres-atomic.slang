@@ -17,11 +17,11 @@ void main( uint2 dispatchThreadID : SV_DispatchThreadID, uint2 groupThreadID : S
     // CHECK2-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2-DAG: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2: %[[VAR1]] = OpCopyObject %{{.*}}
-    // CHECK2: %[[VAR2]] = OpInBoundsAccessChain %_ptr_UniformConstant_{{.*}} %{{.*}} %[[VAR1]]
+    // CHECK2: %[[VAR2]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %{{.*}} %[[VAR1]]
     // CHECK2: %[[VAR3]] = OpImageTexelPointer %_ptr_Image_uint %[[VAR2]] %{{.*}}
 
     // CHECK3-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3: %[[VAR1]] = OpInBoundsAccessChain %_ptr_UniformConstant_{{.*}} %texArray %{{.*}}
+    // CHECK3: %[[VAR1]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %texArray %{{.*}}
     // CHECK3: %{{.*}} = OpImageTexelPointer %_ptr_Image_uint %[[VAR1]] %{{.*}}
     InterlockedAdd(texArray[NonUniformResourceIndex(dispatchThreadID.x)][uint2(0)], 2);
 }
