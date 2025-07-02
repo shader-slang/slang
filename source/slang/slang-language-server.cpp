@@ -762,7 +762,9 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
         {
             if (expr->type)
             {
-                sb << "```\n" << expr->type->toString() << " this" << "\n```\n";
+                sb << "```\n"
+                   << expr->type->toString() << " this"
+                   << "\n```\n";
             }
             fillLoc(expr->loc);
         }

@@ -1282,6 +1282,14 @@ static void addExplicitParameterBindings_GLSL(
     {
         warnedMissingVulkanLayoutModifier =
             _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        // For behavioral compatibility, if we didn't warn due to a push constant or shader record,
+        // we still need to set the flag to true to maintain the same binding logic
+        if (!warnedMissingVulkanLayoutModifier &&
+            (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
+             varDecl.getDecl()->hasModifier<ShaderRecordAttribute>()))
+        {
+            warnedMissingVulkanLayoutModifier = true;
+        }
     }
 
     // We need an HLSL register semantic to to infer from

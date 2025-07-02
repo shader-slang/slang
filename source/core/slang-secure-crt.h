@@ -15,7 +15,7 @@ inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* s
     memcpy(dest, src, count);
 }
 
-#define _TRUNCATE ((size_t) - 1)
+#define _TRUNCATE ((size_t)-1)
 #define _stricmp strcasecmp
 
 inline void fopen_s(FILE** f, const char* fileName, const char* mode)
