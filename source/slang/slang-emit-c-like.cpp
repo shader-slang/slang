@@ -2707,7 +2707,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_NonUniformResourceIndex:
         emitOperand(
             inst->getOperand(0),
-            getInfo(EmitOp::General)); // Directly emit NonUniformResourceIndex Operand0;
+            outerPrec); // Directly emit NonUniformResourceIndex Operand0;
         break;
 
     case kIROp_GetNativeStr:
