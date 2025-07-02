@@ -2107,6 +2107,96 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void legalizeStructBlocks()
+    {
+        // SPIRV does not allow using a struct with a block declaration as a field
+        // of another struct. Only top-level usage (e.g., global parameter blocks) should
+        // have the block decoration. If a struct is used both as a field and as a block,
+        // we must move the top-level usage to a wrapper struct, and move the block
+        // decoration to the wrapper struct.
+
+        HashSet<IRStructType*> embeddedBlockStructs;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            if (auto outerStruct = as<IRStructType>(globalInst))
+            {
+                for (auto field : outerStruct->getFields())
+                {
+                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
+                    {
+                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                        {
+                            embeddedBlockStructs.add(innerStruct);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            if (auto globalParam = as<IRGlobalParam>(globalInst))
+            {
+                auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+                if (!ptrType) continue;
+                auto structType = as<IRStructType>(ptrType->getValueType());
+                if (!structType) continue;
+
+                if (embeddedBlockStructs.contains(structType))
+                {
+                    // Create a wrapper struct type
+                    IRBuilder builder(globalParam);
+                    builder.setInsertBefore(globalParam);
+
+                    auto wrapperStruct = builder.createStructType();
+                    auto key = builder.createStructKey();
+                    builder.createStructField(wrapperStruct, key, structType);
+
+                    // Copy the block decoration from the inner struct to the wrapper (do not remove yet)
+                    if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                    {
+                        builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
+                    }
+                    if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                    {
+                        builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBufferBlockDecoration);
+                    }
+
+                    // Update the global param's type to use the wrapper struct
+                    auto newPtrType = builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+                    globalParam->setFullType(newPtrType);
+
+                    // Traverse all uses of the global param and insert a FieldAddress to access the inner struct
+                    traverseUses(
+                        globalParam,
+                        [&](IRUse* use)
+                        {
+                            builder.setInsertBefore(use->getUser());
+                            auto addr = builder.emitFieldAddress(
+                                builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
+                                globalParam,
+                                key);
+                            use->set(addr);
+                        });
+                }
+            }
+        }
+
+        // Remove block/buffer block decorations from all embedded block structs
+        for (auto structType : embeddedBlockStructs)
+        {
+            if (auto blockDecor = structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                blockDecor->removeAndDeallocate();
+            }
+            if (auto bufferBlockDecor = structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                bufferBlockDecor->removeAndDeallocate();
+            }
+        }
+    }
+
     void processModule()
     {
         determineSpirvVersion();
@@ -2195,6 +2285,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_targetProgram,
             m_module,
             bufferElementTypeLoweringOptions);
+
+        // Look for structs that are both used as fields and marked with Block
+        // decorations, and move the Block decoration to a wrapper struct.
+        legalizeStructBlocks();
 
         // Inline all pack/unpack storage type functions generated during buffer element
         // lowering pass.
