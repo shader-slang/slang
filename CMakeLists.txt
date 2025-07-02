@@ -183,6 +183,12 @@ option(
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
 # Options for user defined paths for external modules.
+#
+# Note that these paths point to a directory containing an subdirectory of the
+# dependency name, rather than to the dependency directory itself, for example
+# SLANG_OVERRIDE_LZ4_PATH points to a directory containing a directory called
+# `lz4` containing the lz4 source.
+# 
 advanced_option(
     SLANG_OVERRIDE_LZ4_PATH
     "Build using user defined path for LZ4"
