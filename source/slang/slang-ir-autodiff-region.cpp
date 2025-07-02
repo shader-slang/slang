@@ -22,7 +22,7 @@ RefPtr<IndexedRegionMap> buildIndexedRegionMap(IRGlobalValueWithCode* func)
 
         switch (terminator->getOp())
         {
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 auto loopRegion = regionMap->newRegion(as<IRLoop>(terminator), currentRegion);
                 auto condBlock = as<IRLoop>(terminator)->getTargetBlock();

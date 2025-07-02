@@ -1796,7 +1796,7 @@ struct NativeString
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
     __implicit_conversion($(kConversionCost_None))
-    __intrinsic_op($(kIROp_getNativeStr))
+    __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
 
     __init() { this = NativeString(""); }
@@ -3358,7 +3358,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_undefined))
+__intrinsic_op($(kIROp_Undefined))
 T __declVal();
 
 __generic<T>

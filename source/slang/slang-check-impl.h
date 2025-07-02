@@ -3226,6 +3226,8 @@ bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
 
+bool isImmutableBufferType(Type* type);
+
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.
 bool isNullableType(Type* type);

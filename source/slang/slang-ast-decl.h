@@ -3,8 +3,10 @@
 #pragma once
 
 #include "slang-ast-base.h"
-#include "slang-ast-decl.h.fiddle"
 #include "slang-fossil.h"
+
+//
+#include "slang-ast-decl.h.fiddle"
 
 FIDDLE()
 namespace Slang
@@ -984,7 +986,8 @@ class SyntaxDecl : public Decl
 {
     FIDDLE(...)
     // What type of syntax node will be produced when parsing with this keyword?
-    FIDDLE() SyntaxClass<NodeBase> syntaxClass;
+    FIDDLE()
+    SyntaxClass<NodeBase> syntaxClass;
 
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback parseCallback = nullptr;

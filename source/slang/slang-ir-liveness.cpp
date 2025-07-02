@@ -670,7 +670,7 @@ LivenessContext::BlockResult LivenessContext::_completeBlock(
 static IRLoop* _getLoopTerminator(IRBlock* block)
 {
     auto terminator = block->getTerminator();
-    if (terminator->getOp() == kIROp_loop)
+    if (terminator->getOp() == kIROp_Loop)
     {
         return static_cast<IRLoop*>(terminator);
     }
@@ -888,7 +888,7 @@ void LivenessContext::_findAliasesAndAccesses(IRInst* root)
                     accessType = AccessType::Alias;
                     break;
                 }
-            case kIROp_GetAddr:
+            case kIROp_GetAddress:
                 {
                     IRGetAddress* getAddr = static_cast<IRGetAddress*>(cur);
                     base = getAddr->getOperand(0);

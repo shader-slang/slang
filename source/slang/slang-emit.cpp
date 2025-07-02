@@ -414,7 +414,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         result.generics = true;
         break;
     case kIROp_Specialize:
@@ -1227,11 +1227,6 @@ Result linkAndOptimizeIR(
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
-    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
-        isWGPUTarget(targetRequest))
-        deferBufferLoad(irModule);
-
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
     // will run a DCE pass to clean up after the specialization.
@@ -1385,6 +1380,11 @@ Result linkAndOptimizeIR(
     // We clean up the usages of resource values here.
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
+    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
+        isWGPUTarget(targetRequest))
+        deferBufferLoad(irModule);
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
