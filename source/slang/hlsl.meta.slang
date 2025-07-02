@@ -7740,7 +7740,7 @@ vector<T,N> __real_cast(vector<U,N> val);
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -7766,7 +7766,7 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 T copysign(T x, T y)
 {
     __target_switch
