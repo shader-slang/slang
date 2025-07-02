@@ -301,44 +301,6 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// To improve the performance of our backend, we will try to avoid running
-// passes related to features not used in the user code.
-// To do so, we will scan the IR module once, and determine which passes are needed
-// based on the instructions used in the IR module.
-// This will allow us to skip running passes that are not needed, without having to
-// run all the passes only to find out that no work is needed.
-// This is especially important for the performance of the backend, as some passes
-// have an initialization cost (such as building reference graphs or DOM trees) that
-// can be expensive.
-//
-struct RequiredLoweringPassSet
-{
-    bool debugInfo;
-    bool resultType;
-    bool optionalType;
-    bool enumType;
-    bool combinedTextureSamplers;
-    bool reinterpret;
-    bool generics;
-    bool bindExistential;
-    bool autodiff;
-    bool derivativePyBindWrapper;
-    bool bitcast;
-    bool existentialTypeLayout;
-    bool bindingQuery;
-    bool meshOutput;
-    bool higherOrderFunc;
-    bool globalVaryingVar;
-    bool glslSSBO;
-    bool byteAddressBuffer;
-    bool dynamicResource;
-    bool dynamicResourceHeap;
-    bool resolveVaryingInputRef;
-    bool specializeStageSwitch;
-    bool missingReturn;
-    bool nonVectorCompositeSelect;
-};
-
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
@@ -498,7 +460,10 @@ void calcRequiredLoweringPassSet(
     }
     for (auto child : inst->getDecorationsAndChildren())
     {
-        calcRequiredLoweringPassSet(result, codeGenContext, child);
+        calcRequiredLoweringPassSet(
+            codeGenContext->getRequiredLoweringPassSet(),
+            codeGenContext,
+            child);
     }
 }
 
@@ -770,7 +735,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet requiredLoweringPassSet = {};
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
@@ -1094,20 +1060,8 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         case CodeGenTarget::HLSL:
-            legalizeNonVectorCompositeSelect(targetRequest, irModule, sink);
+            legalizeNonVectorCompositeSelect(irModule);
             break;
-
-        case CodeGenTarget::SPIRV:
-        case CodeGenTarget::SPIRVAssembly:
-        {
-            // SPIRV older than 1.4 must legalize composites
-            // returned from a `select` instruction
-            if (codeGenContext->getTargetProgram()->getOptionSet().getProfileVersion() <= ProfileVersion::SPIRV_1_3)
-            {
-                legalizeNonVectorCompositeSelect(targetRequest, irModule, sink);
-            }
-            break;
-        }
         default:
             break;
         }
@@ -1127,7 +1081,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     switch (target)

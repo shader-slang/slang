@@ -10,49 +10,48 @@
 namespace Slang
 {
 void legalizeASingleNonVectorCompositeSelect(
-    TargetRequest* target,
     IRBuilder& builder,
-    IRSelect* selectInst,
-    DiagnosticSink* sink)
+    IRSelect* selectInst)
 {
-    SLANG_UNUSED(sink)
-    SLANG_UNUSED(target)
     SLANG_ASSERT(selectInst);
 
-    // Var holding result of OpSelect
-    builder.setInsertBefore(selectInst);
-    auto resultVar = builder.emitVar(selectInst->getFullType());
+    auto resultType = selectInst->getFullType();
+    auto trueResult = selectInst->getTrueResult();
+    auto falseResult = selectInst->getFalseResult();
 
-    auto trueBlock = builder.createBlock();
-    auto falseBlock = builder.createBlock();
-    auto afterBlock = builder.createBlock();
+    IRBlock* trueBlock;
+    IRBlock* falseBlock;
+    IRBlock* afterBlock;
     builder.emitIfElseWithBlocks(selectInst->getCondition(), trueBlock, falseBlock, afterBlock);
 
     // Generate if-select-true and else-select-false clause
     builder.setInsertInto(trueBlock);
-    builder.emitStore(
-        builder.emitGetAddress(resultVar->getFullType(), resultVar),
-        selectInst->getTrueResult());
+    builder.emitBranch(afterBlock, 1, &trueResult);
 
     builder.setInsertInto(falseBlock);
-    builder.emitStore(
-        builder.emitGetAddress(resultVar->getFullType(), resultVar),
-        selectInst->getFalseResult());
+    builder.emitBranch(afterBlock, 1, &falseResult);
 
     // Move everything after the OpSelect into the "after" block
-    builder.setInsertInto(afterBlock);
+    List<IRInst*> instsToMove;
+    instsToMove.reserve(15);
     IRInst* nextInst = selectInst;
     while (nextInst)
     {
-        afterBlock->insertAtEnd(nextInst);
+        instsToMove.add(nextInst);
         nextInst = nextInst->getNextInst();
     }
+    for (auto i : instsToMove)
+        afterBlock->insertAtEnd(i);
     
+    // Merge result of branches into param
+    builder.setInsertInto(afterBlock);
+    auto param = builder.emitParam(resultType);
+    selectInst->replaceUsesWith(param);
+
     // Clean up
-    selectInst->replaceUsesWith(resultVar);
     selectInst->removeAndDeallocate();
 }
-void legalizeNonVectorCompositeSelect(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+void legalizeNonVectorCompositeSelect(IRModule* module)
 {
     IRBuilder builder(module);
     for (auto globalInst : module->getModuleInst()->getChildren())
@@ -72,7 +71,7 @@ void legalizeNonVectorCompositeSelect(TargetRequest* target, IRModule* module, D
                 case kIROp_Select:
                     // Replace OpSelect with if/else branch (same process as glslang)
                     if (!isScalarOrVectorType(inst->getFullType()))
-                        legalizeASingleNonVectorCompositeSelect(target, builder, as<IRSelect>(inst), sink);
+                        legalizeASingleNonVectorCompositeSelect(builder, as<IRSelect>(inst));
                     continue;
                 }
             }

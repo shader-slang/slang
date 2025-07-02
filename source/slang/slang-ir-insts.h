@@ -2425,7 +2425,7 @@ struct IRImageStore : IRInst
 FIDDLE()
 struct IRSelect : IRInst
 {
-    IR_LEAF_ISA(Select);
+    FIDDLE(leafInst());
 
     IRInst* getCondition() { return getOperand(0); }
     IRInst* getTrueResult() { return getOperand(1); }
