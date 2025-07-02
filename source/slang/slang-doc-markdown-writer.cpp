@@ -2834,8 +2834,7 @@ void writeTOCChildren(
     if (page->children.getCount() == 0)
         return;
 
-    sb << R"(<ul class="toc_list">)"
-       << "\n";
+    sb << R"(<ul class="toc_list">)" << "\n";
 
     // Don't sort the root page.
     if (page->path != "index.md")

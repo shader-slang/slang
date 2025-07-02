@@ -1280,7 +1280,8 @@ static void addExplicitParameterBindings_GLSL(
     // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
-        warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        warnedMissingVulkanLayoutModifier =
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1307,7 +1308,8 @@ static void addExplicitParameterBindings_GLSL(
         {
             if (!warnedMissingVulkanLayoutModifier)
             {
-                warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+                warnedMissingVulkanLayoutModifier =
+                    _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
             }
             return;
         }
@@ -1328,7 +1330,8 @@ static void addExplicitParameterBindings_GLSL(
     {
         if (!warnedMissingVulkanLayoutModifier)
         {
-            warnedMissingVulkanLayoutModifier = _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+            warnedMissingVulkanLayoutModifier =
+                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
         }
     }
 

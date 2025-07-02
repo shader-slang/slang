@@ -1670,7 +1670,10 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                       \
     else
 
-#define TERMINATING_CASE(MATCH) {MATCH}
+#define TERMINATING_CASE(MATCH) \
+    {                           \
+        MATCH                   \
+    }
 
         // Handle the cases using the macros
         BINARY_OPERATOR_CASE(>=)
