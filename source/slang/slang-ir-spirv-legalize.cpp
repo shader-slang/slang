@@ -12,6 +12,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
@@ -38,6 +39,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVEmitSharedContext* m_sharedContext;
 
     IRModule* m_module;
+
+    CodeGenContext* m_codeGenContext;
 
     DiagnosticSink* m_sink;
 
@@ -202,8 +205,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVLegalizationContext(
         SPIRVEmitSharedContext* sharedContext,
         IRModule* module,
+        CodeGenContext* codeGenContext,
         DiagnosticSink* sink)
-        : m_sharedContext(sharedContext), m_module(module), m_sink(sink)
+        : m_sharedContext(sharedContext)
+        , m_module(module)
+        , m_codeGenContext(codeGenContext)
+        , m_sink(sink)
     {
     }
 
@@ -2208,6 +2215,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+
+        // If older than spirv 1.4, legalize OpSelect returning non-vector-composites
+        if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect &&
+            !m_sharedContext->isSpirv14OrLater())
+            legalizeNonVectorCompositeSelect(m_module);
     }
 
     void updateFunctionTypes()
@@ -2281,9 +2293,16 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
+void legalizeSPIRV(
+    SPIRVEmitSharedContext* sharedContext,
+    IRModule* module,
+    CodeGenContext* codeGenContext)
 {
-    SPIRVLegalizationContext context(sharedContext, module, sink);
+    SPIRVLegalizationContext context(
+        sharedContext,
+        module,
+        codeGenContext,
+        codeGenContext->getSink());
     context.processModule();
 }
 
@@ -2424,7 +2443,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module, codeGenContext->getSink());
+    legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);
