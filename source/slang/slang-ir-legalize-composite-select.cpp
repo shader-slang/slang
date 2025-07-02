@@ -19,16 +19,16 @@ void legalizeASingleNonVectorCompositeSelect(
     SLANG_UNUSED(target)
     SLANG_ASSERT(selectInst);
 
-    // result var
+    // Var holding result of OpSelect
     builder.setInsertBefore(selectInst);
     auto resultVar = builder.emitVar(selectInst->getFullType());
 
-    // emit {if(condition) result = selectTrueBlock; else result = selectFalseBlock;}
     auto trueBlock = builder.createBlock();
     auto falseBlock = builder.createBlock();
     auto afterBlock = builder.createBlock();
     builder.emitIfElseWithBlocks(selectInst->getCondition(), trueBlock, falseBlock, afterBlock);
 
+    // Generate if-select-true and else-select-false clause
     builder.setInsertInto(trueBlock);
     builder.emitStore(
         builder.emitGetAddress(resultVar->getFullType(), resultVar),
@@ -39,7 +39,7 @@ void legalizeASingleNonVectorCompositeSelect(
         builder.emitGetAddress(resultVar->getFullType(), resultVar),
         selectInst->getFalseResult());
 
-    // Move everything after the if/else into the "after" block
+    // Move everything after the OpSelect into the "after" block
     builder.setInsertInto(afterBlock);
     IRInst* nextInst = selectInst;
     while (nextInst)
@@ -48,7 +48,7 @@ void legalizeASingleNonVectorCompositeSelect(
         nextInst = nextInst->getNextInst();
     }
     
-    // clean up
+    // Clean up
     selectInst->replaceUsesWith(resultVar);
     selectInst->removeAndDeallocate();
 }
@@ -70,7 +70,7 @@ void legalizeNonVectorCompositeSelect(TargetRequest* target, IRModule* module, D
                 switch (inst->getOp())
                 {
                 case kIROp_Select:
-                    // We will legalize the same way glslang legalizes, replace the OpSelect with an OpBranch and OpStore.
+                    // Replace OpSelect with if/else branch (same process as glslang)
                     if (!isScalarOrVectorType(inst->getFullType()))
                         legalizeASingleNonVectorCompositeSelect(target, builder, as<IRSelect>(inst), sink);
                     continue;
