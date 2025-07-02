@@ -845,9 +845,18 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30301,
     Error,
-    isAsOperatorCannotUseInterfaceAsRHS,
-    "'is' and 'as' operators do not support interface types as the right-hand side. Use a concrete "
-    "type instead.")
+    isOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'is' operator with an interface type as the right-hand "
+    "side without a corresponding optional constraint. Use a concrete type "
+    "instead, or add an optional constraint for the interface type.")
+
+DIAGNOSTIC(
+    30302,
+    Error,
+    asOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'as' operator with an interface type as the right-hand "
+    "side. Use a concrete type instead. If you want to use an optional "
+    "constraint, use an 'if (T is IInterface)' block instead.")
 
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 
@@ -1578,6 +1587,14 @@ DIAGNOSTIC(
     switchDuplicateCases,
     "duplicate cases not allowed within a 'switch' statement")
 
+// 310xx: link time specializaion
+DIAGNOSTIC(
+    31000,
+    Warning,
+    linkTimeConstantArraySize,
+    "Link-time constant sized arrays are a work in progress feature, some aspects of the "
+    "reflection API may not work")
+
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(
@@ -1610,6 +1627,12 @@ DIAGNOSTIC(
     Error,
     invalidConstraintSubType,
     "type '$0' is not a valid left hand side of a type constraint.")
+DIAGNOSTIC(
+    30403,
+    Error,
+    requiredConstraintIsNotChecked,
+    "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
+    "usage.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")

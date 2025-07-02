@@ -25,7 +25,6 @@ struct IRSerialWriter
     Result write(
         IRModule* module,
         SerialSourceLocWriter* sourceLocWriter,
-        SerialOptionFlags flags,
         IRSerialData* serialData);
 
     /// Write to a container

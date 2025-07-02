@@ -393,7 +393,7 @@ OpModule
         {
             [OpPrimalInstDecoration]
             %a_primal = OpDifferentialPairGetPrimal %dpa : %dpfloat 
-            [OpPrimalInstDecorarion]
+            [OpPrimalInstDecoration]
             %b_primal = OpDifferentialPairGetPrimal %dpa : %dpfloat 
 
             [OpPrimalInstDecoration]
@@ -414,7 +414,7 @@ OpModule
         {
             [OpDifferentialInstDecoration]
             %a_diff = OpDifferentialPairGetDifferential %dpa : %dpfloat 
-            [OpDifferentialInstDecorarion]
+            [OpDifferentialInstDecoration]
             %b_diff = OpDifferentialPairGetDifferential %dpa : %dpfloat 
 
             [OpDifferentialInstDecoration]

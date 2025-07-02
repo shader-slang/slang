@@ -27,6 +27,7 @@ enum class FormatBehavior
 
 struct FormatOptions
 {
+    bool enableFormatOnType = true;
     String clangFormatLocation;
     String style = "file";
     String fallbackStyle = "{BasedOnStyle: Microsoft}";

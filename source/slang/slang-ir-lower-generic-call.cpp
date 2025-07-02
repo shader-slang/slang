@@ -269,7 +269,7 @@ struct GenericCallLoweringContext
             // modified in this pass.
             SLANG_UNEXPECTED("Nested generics specialization.");
         }
-        else if (loweredFunc->getOp() == kIROp_LookupWitness)
+        else if (loweredFunc->getOp() == kIROp_LookupWitnessMethod)
         {
             lowerCallToInterfaceMethod(
                 callInst,
@@ -295,9 +295,17 @@ struct GenericCallLoweringContext
             return;
         }
 
-        auto interfaceType = cast<IRInterfaceType>(
+        auto interfaceType = as<IRInterfaceType>(
             cast<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())
                 ->getConformanceType());
+
+        if (!interfaceType)
+        {
+            // NoneWitness -> remove call.
+            callInst->removeAndDeallocate();
+            return;
+        }
+
         if (isBuiltin(interfaceType))
             return;
 

@@ -123,7 +123,7 @@ struct RegisterAllocateContext
         IRUse* branchUse = nullptr;
         for (auto use = phiArg->firstUse; use; use = use->nextUse)
         {
-            if (use->getUser()->getOp() == kIROp_unconditionalBranch)
+            if (use->getUser()->getOp() == kIROp_UnconditionalBranch)
             {
                 if (!branchUse)
                     branchUse = use;
