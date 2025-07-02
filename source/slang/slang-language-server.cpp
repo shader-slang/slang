@@ -247,6 +247,14 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
+
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
+    {
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
@@ -2616,6 +2624,14 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
+
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
+    {
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
