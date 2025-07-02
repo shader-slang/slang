@@ -1740,6 +1740,69 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             SLANG_ASSERT(!"Unhandled floating point mode");
         }
 
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp16))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp16))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp16 denormal handling mode");
+            }
+        }
+
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp32))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp32))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp32 denormal handling mode");
+            }
+        }
+
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp64))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp64))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp64 denormal handling mode");
+            }
+        }
+
         {
             // We need to look at the stage of the entry point(s) we are
             // being asked to compile, since this will determine the
@@ -2375,8 +2438,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     // If debug information is enabled, enable writing out source locs
     if (_shouldWriteSourceLocs(linkage))
     {
-        options.optionFlags |= SerialOptionFlag::SourceLocation;
-        options.sourceManager = linkage->getSourceManager();
+        options.sourceManagerToUseWhenSerializingSourceLocs = linkage->getSourceManager();
     }
 
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
@@ -2919,7 +2981,6 @@ bool CodeGenContext::isSpecializationDisabled()
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     OwnedMemoryStream memoryStream(FileAccess::Write);
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
     *outSerializedBlob = RawBlob::create(
@@ -2932,7 +2993,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSeriali
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     FileStream fileStream;
     SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));
     return SerialContainerUtil::write(this, writeOptions, &fileStream);

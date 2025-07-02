@@ -27,6 +27,7 @@ slangc -help-style markdown -h
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
 * [fp-mode](#fp-mode)
+* [fp-denormal-mode](#fp-denormal-mode)
 * [help-style](#help-style)
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
@@ -396,6 +397,30 @@ Disables generics and specialization pass.
 Control floating point optimizations 
 
 
+<a id="denorm-mode-fp16"></a>
+### -denorm-mode-fp16
+
+**-denorm-mode-fp16 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp32"></a>
+### -denorm-mode-fp32
+
+**-denorm-mode-fp32 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp64"></a>
+### -denorm-mode-fp64
+
+**-denorm-mode-fp64 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
 <a id="g"></a>
 ### -g
 
@@ -627,7 +652,7 @@ Print the hierarchy of the processed source files.
 
 <a id="serial-ir"></a>
 ### -serial-ir
-Serialize the IR between front-end and back-end. 
+\[REMOVED\] Serialize the IR between front-end and back-end. 
 
 
 <a id="skip-codegen"></a>
@@ -961,6 +986,15 @@ Floating Point Mode
 * `precise` : Disable optimization that could change the output of floating-point computations, including around infinities, NaNs, denormalized values, and negative zero. Prefer the most precise versions of special functions supported by the target. 
 * `fast` : Allow optimizations that may change results of floating-point computations. Prefer the fastest version of special functions supported by the target. 
 * `default` : Default floating point mode 
+
+<a id="fp-denormal-mode"></a>
+## fp-denormal-mode
+
+Floating Point Denormal Handling Mode 
+
+* `any` : Use any denormal handling mode (default). The mode used is implementation defined. 
+* `preserve` : Preserve denormal values 
+* `ftz` : Flush denormals to zero 
 
 <a id="help-style"></a>
 ## help-style

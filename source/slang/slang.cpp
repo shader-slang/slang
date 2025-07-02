@@ -637,13 +637,11 @@ SlangResult Session::saveBuiltinModule(
     // We want builtin modules to be saved with their source location
     // information.
     //
-    options.optionFlags |= SerialOptionFlag::SourceLocation;
-    //
     // And in order to work with source locations, the serialization
     // process will also need access to the source manager that
     // can translate locations into their humane format.
     //
-    options.sourceManager = m_builtinLinkage->getSourceManager();
+    options.sourceManagerToUseWhenSerializingSourceLocs = m_builtinLinkage->getSourceManager();
 
     // At this point we can finally delegate down to the next level,
     // which handles the serialization of a Slang module into a
@@ -3619,8 +3617,7 @@ void FrontEndCompileRequest::generateIR()
         {
             SerialContainerUtil::WriteOptions options;
 
-            options.sourceManager = getSourceManager();
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManagerToUseWhenSerializingSourceLocs = getSourceManager();
 
             // Verify debug information
             if (SLANG_FAILED(
@@ -3630,33 +3627,6 @@ void FrontEndCompileRequest::generateIR()
                     irModule->getModuleInst()->sourceLoc,
                     Diagnostics::serialDebugVerificationFailed);
             }
-        }
-
-        if (useSerialIRBottleneck)
-        {
-            // Keep the obfuscated source map (if there is one)
-            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
-
-            IRSerialData serialData;
-            {
-                // Write IR out to serialData - copying over SourceLoc information directly
-                IRSerialWriter writer;
-                writer.write(irModule, nullptr, SerialOptionFlag::RawSourceLocation, &serialData);
-
-                // Destroy irModule such that memory can be used for newly constructed read
-                // irReadModule
-                irModule = nullptr;
-            }
-            RefPtr<IRModule> irReadModule;
-            {
-                // Read IR back from serialData
-                IRSerialReader reader;
-                reader.read(serialData, getSession(), nullptr, irReadModule);
-            }
-
-            // Set irModule to the read module
-            irModule = irReadModule;
-            irModule->setObfuscatedSourceMap(obfuscatedSourceMap);
         }
 
         // Set the module on the translation unit

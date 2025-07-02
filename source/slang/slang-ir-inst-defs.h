@@ -879,6 +879,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MaxVertexCountDecoration,          maxVertexCount,         1, 0)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
+    INST(FpDenormalPreserveDecoration,      fpDenormalPreserve,     1, 0)
+    INST(FpDenormalFlushToZeroDecoration,   fpDenormalFlushToZero,  1, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
 
     INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
@@ -1019,7 +1021,6 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(VkStructOffsetDecoration, vkStructOffset, 1, 0)
-    INST(PayloadDecoration, payload, 0, 0)
     INST(RayPayloadDecoration, raypayload, 0, 0)
 
     /* Mesh Shader outputs */

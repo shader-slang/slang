@@ -1622,6 +1622,14 @@ DIAGNOSTIC(
     switchDuplicateCases,
     "duplicate cases not allowed within a 'switch' statement")
 
+// 310xx: link time specializaion
+DIAGNOSTIC(
+    31000,
+    Warning,
+    linkTimeConstantArraySize,
+    "Link-time constant sized arrays are a work in progress feature, some aspects of the "
+    "reflection API may not work")
+
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(
