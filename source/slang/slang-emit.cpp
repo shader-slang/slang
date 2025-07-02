@@ -56,6 +56,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
@@ -335,6 +336,7 @@ struct RequiredLoweringPassSet
     bool resolveVaryingInputRef;
     bool specializeStageSwitch;
     bool missingReturn;
+    bool nonVectorCompositeSelect;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -470,6 +472,10 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_MissingReturn:
         result.missingReturn = true;
+        break;
+    case kIROp_Select:
+        if(!isScalarOrVectorType(inst->getFullType()))
+            result.nonVectorCompositeSelect = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -994,6 +1000,30 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.optionalType)
         lowerOptionalType(irModule, sink);
+
+    if (requiredLoweringPassSet.nonVectorCompositeSelect)
+    {
+        switch (target)
+        {
+        case CodeGenTarget::HLSL:
+            legalizeNonVectorCompositeSelect(targetRequest, irModule, sink);
+            break;
+
+        case CodeGenTarget::SPIRV:
+        case CodeGenTarget::SPIRVAssembly:
+        {
+            // SPIRV older than 1.4 must legalize composites
+            // returned from a `select` instruction
+            if (codeGenContext->getTargetProgram()->getOptionSet().getProfileVersion() <= ProfileVersion::SPIRV_1_3)
+            {
+                legalizeNonVectorCompositeSelect(targetRequest, irModule, sink);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
 
     switch (target)
     {

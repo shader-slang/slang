@@ -2699,6 +2699,16 @@ struct IRImageStore : IRInst
 };
 // Terminators
 
+struct IRSelect : IRInst
+{
+    IR_LEAF_ISA(Select);
+
+    IRInst* getCondition() { return getOperand(0); }
+    IRInst* getTrueResult() { return getOperand(1); }
+    IRInst* getFalseResult() { return getOperand(2); }
+};
+
+
 struct IRReturn : IRTerminatorInst
 {
     IR_LEAF_ISA(Return);
