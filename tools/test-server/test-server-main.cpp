@@ -508,13 +508,16 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     StdWriters stdWriters;
     StringBuilder stdOut;
     StringBuilder stdError;
+    StringBuilder debugLayer;
 
     // Make writer/s act as if they are the console.
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
     RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
+    RefPtr<StringWriter> debugLayerWriter(new StringWriter(&debugLayer, WriterFlag::IsConsole));
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
+    stdWriters.setWriter(SLANG_WRITER_CHANNEL_DEBUG_LAYER, debugLayerWriter);
 
     // HACK, to make behavior the same as previously
     if (args.toolName == "slangc")
@@ -529,6 +532,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.result = funcRes;
     result.stdError = stdError;
     result.stdOut = stdOut;
+    result.debugLayer = debugLayer;
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
     return m_connection->sendResult(&result, id);

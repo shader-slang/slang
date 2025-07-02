@@ -1214,8 +1214,13 @@ public:
         rhi::DebugMessageSource source,
         const char* message) override
     {
-        SLANG_UNUSED(source);
-        if (type == rhi::DebugMessageType::Error)
+        // Write debug layer messages (from driver) to the debug layer channel
+        if (source == rhi::DebugMessageSource::Driver)
+        {
+            writers->getWriter(SLANG_WRITER_CHANNEL_DEBUG_LAYER)->write(message, strlen(message));
+            writers->getWriter(SLANG_WRITER_CHANNEL_DEBUG_LAYER)->write("\n", 1);
+        }
+        else if (type == rhi::DebugMessageType::Error)
         {
             writers->getOut().print("%s\n", message);
         }
