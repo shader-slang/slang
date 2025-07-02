@@ -672,6 +672,21 @@ SpvInst* emitOpAccessChain(
     return emitInst(parent, inst, SpvOpAccessChain, idResultType, kResultID, base, indexes);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpInBoundsAccessChain
+template<typename T1, typename T2, typename Ts>
+SpvInst* emitOpInBoundsAccessChain(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T1& idResultType,
+    const T2& base,
+    const Ts& indexes)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    static_assert(isPlural<Ts>);
+    return emitInst(parent, inst, SpvOpInBoundsAccessChain, idResultType, kResultID, base, indexes);
+}
+
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpPtrAccessChain
 template<typename T1, typename T2, typename T3>

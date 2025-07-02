@@ -250,6 +250,7 @@ private:
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
     void updateFormattingOptions(
+        const JSONValue& enableFormatOnType,
         const JSONValue& clangFormatLoc,
         const JSONValue& clangFormatStyle,
         const JSONValue& clangFormatFallbackStyle,

@@ -2408,4 +2408,17 @@ bool isSignedType(IRType* type)
     }
 }
 
+bool isIROpaqueType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_TextureType:
+    case kIROp_SamplerStateType:
+    case kIROp_SamplerComparisonStateType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 } // namespace Slang

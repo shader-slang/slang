@@ -2060,7 +2060,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                if (shouldEmitArrayStride(irArrayType->getElementType()))
+                // Arrays of opaque types should not emit a stride
+                if (!isIROpaqueType(elementType) &&
+                    shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
                     // If the array type has no stride, it indicates that this array type is only
@@ -6824,7 +6826,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
-        return emitOpAccessChain(
+        return emitOpInBoundsAccessChain(
             parent,
             fieldAddress,
             fieldAddress->getFullType(),
@@ -6869,7 +6871,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We might replace resultType with a different storage class equivalent
         auto resultType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(resultType);
-
         if (const auto basePtrType = as<IRPtrTypeBase>(base->getDataType()))
         {
             // If the base pointer has a specific address space and the
