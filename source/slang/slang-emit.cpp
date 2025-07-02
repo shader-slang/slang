@@ -436,7 +436,7 @@ void calcRequiredLoweringPassSet(
         result.missingReturn = true;
         break;
     case kIROp_Select:
-        if(!isScalarOrVectorType(inst->getFullType()))
+        if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
     }
