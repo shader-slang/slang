@@ -9,9 +9,7 @@
 
 namespace Slang
 {
-void legalizeASingleNonVectorCompositeSelect(
-    IRBuilder& builder,
-    IRSelect* selectInst)
+void legalizeASingleNonVectorCompositeSelect(IRBuilder& builder, IRSelect* selectInst)
 {
     SLANG_ASSERT(selectInst);
 
@@ -42,7 +40,7 @@ void legalizeASingleNonVectorCompositeSelect(
     }
     for (auto i : instsToMove)
         afterBlock->insertAtEnd(i);
-    
+
     // Merge result of branches into param
     builder.setInsertInto(afterBlock);
     auto param = builder.emitParam(resultType);

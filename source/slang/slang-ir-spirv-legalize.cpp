@@ -2293,7 +2293,10 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, CodeGenContext* codeGenContext)
+void legalizeSPIRV(
+    SPIRVEmitSharedContext* sharedContext,
+    IRModule* module,
+    CodeGenContext* codeGenContext)
 {
     SPIRVLegalizationContext context(
         sharedContext,
