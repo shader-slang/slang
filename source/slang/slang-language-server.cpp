@@ -210,15 +210,15 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 12)
+                    if (arr.getCount() == 13)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8]);
-                        updateInlayHintOptions(arr[9], arr[10]);
-                        updateTraceOptions(arr[11]);
+                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8], arr[9]);
+                        updateInlayHintOptions(arr[10], arr[11]);
+                        updateTraceOptions(arr[12]);
                     }
                 }
                 break;
@@ -247,6 +247,14 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
+
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
+    {
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
@@ -1876,6 +1884,9 @@ SlangResult LanguageServer::rangeFormatting(
 LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore::rangeFormatting(
     const LanguageServerProtocol::DocumentRangeFormattingParams& args)
 {
+    if (!m_formatOptions.enableFormatOnType)
+        return std::nullopt;
+
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
@@ -1924,6 +1935,9 @@ SlangResult LanguageServer::onTypeFormatting(
 LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore::onTypeFormatting(
     const LanguageServerProtocol::DocumentOnTypeFormattingParams& args)
 {
+    if (!m_formatOptions.enableFormatOnType)
+        return std::nullopt;
+
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
@@ -2084,6 +2098,7 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
 }
 
 void LanguageServer::updateFormattingOptions(
+    const JSONValue& enableFormatOnType,
     const JSONValue& clangFormatLoc,
     const JSONValue& clangFormatStyle,
     const JSONValue& clangFormatFallbackStyle,
@@ -2092,6 +2107,8 @@ void LanguageServer::updateFormattingOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+    if (enableFormatOnType.isValid())
+        converter.convert(enableFormatOnType, &m_core.m_formatOptions.enableFormatOnType);
     if (clangFormatLoc.isValid())
         converter.convert(clangFormatLoc, &m_core.m_formatOptions.clangFormatLocation);
     if (clangFormatStyle.isValid())
@@ -2161,6 +2178,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.searchInAllWorkspaceDirectories";
     args.items.add(item);
     item.section = "slang.enableCommitCharactersInAutoCompletion";
+    args.items.add(item);
+    item.section = "slang.format.enableFormatOnType";
     args.items.add(item);
     item.section = "slang.format.clangFormatLocation";
     args.items.add(item);
@@ -2605,13 +2624,21 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
+
+    auto version = m_workspace->getCurrentVersion();
+    Module* parsedModule = version->getOrLoadModule(canonicalPath);
+    if (!parsedModule)
+    {
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
 SlangResult LanguageServer::didChangeConfiguration(
     const LanguageServerProtocol::DidChangeConfigurationParams& args)
 {
-    if (args.settings.isValid())
+    if (args.settings.isValid() && args.settings.type != JSONValue::Type::Null)
     {
         updateConfigFromJSON(args.settings);
     }
@@ -2657,25 +2684,65 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         {
             updateCommitCharacters(kv.value);
         }
+        else if (key == "slang.format.enableFormatOnType")
+        {
+            updateFormattingOptions(
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
+        }
         else if (key == "slang.format.clangFormatLocation")
         {
-            updateFormattingOptions(kv.value, JSONValue(), JSONValue(), JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.clangFormatStyle")
         {
-            updateFormattingOptions(JSONValue(), kv.value, JSONValue(), JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.clangFormatFallbackStyle")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), kv.value, JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.allowLineBreakChangesInOnTypeFormatting")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), kv.value, JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue());
         }
         else if (key == "slang.format.allowLineBreakChangesInRangeFormatting")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), JSONValue(), kv.value);
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value);
         }
         else if (key == "slang.inlayHints.deducedTypes")
         {

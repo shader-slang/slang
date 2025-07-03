@@ -259,7 +259,7 @@ InstPair BackwardDiffTranscriberBase::transcribeInstImpl(IRBuilder* builder, IRI
     case kIROp_Return:
         return transcribeReturn(builder, as<IRReturn>(origInst));
 
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
 
     case kIROp_Specialize:

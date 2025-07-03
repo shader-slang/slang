@@ -175,8 +175,17 @@ struct LValueCastLoweringContext
 
         IRBuilder builder(m_module);
 
-        IRType* toValueType = as<IRPtrType>(toType)->getValueType();
-        IRType* fromValueType = as<IRPtrType>(fromType)->getValueType();
+        auto toPtrType = as<IRPtrTypeBase>(toType);
+        auto fromPtrType = as<IRPtrTypeBase>(fromType);
+
+        if (!toPtrType || !fromPtrType)
+        {
+            // If either type is not a pointer type, we cannot process this L-value cast
+            return;
+        }
+
+        IRType* toValueType = toPtrType->getValueType();
+        IRType* fromValueType = fromPtrType->getValueType();
 
         for (auto useSite : useSites)
         {

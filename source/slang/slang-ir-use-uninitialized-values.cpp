@@ -35,7 +35,7 @@ static bool isUninitializedValue(IRInst* inst)
     // Also consider var since it does not
     // automatically mean it will be initialized
     // (at least not as the user may have intended)
-    return (inst->m_op == kIROp_undefined) || (inst->m_op == kIROp_Var);
+    return (inst->m_op == kIROp_Undefined) || (inst->m_op == kIROp_Var);
 }
 
 static bool isUnmodifying(IRFunc* func)
@@ -278,8 +278,8 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
 
     switch (user->getOp())
     {
-    case kIROp_loop:
-    case kIROp_unconditionalBranch:
+    case kIROp_Loop:
+    case kIROp_UnconditionalBranch:
         // TODO: Ignore branches for now
         return None;
 
@@ -520,7 +520,7 @@ static List<IRStructField*> checkFieldsFromExit(
 
 static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, DiagnosticSink* sink)
 {
-    auto constructor = func->findDecoration<IRConstructorDecorartion>();
+    auto constructor = func->findDecoration<IRConstructorDecoration>();
     if (!constructor)
         return;
 
@@ -598,7 +598,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     ReachabilityContext reachability(func);
 
     // Used for a further analysis and to skip usual return checks
-    auto constructor = func->findDecoration<IRConstructorDecorartion>();
+    auto constructor = func->findDecoration<IRConstructorDecoration>();
 
     // Special checks for stages e.g. raytracing shader
     Stage stage = Stage::Unknown;
