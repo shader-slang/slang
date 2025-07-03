@@ -1,17 +1,17 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include <slang-rhi/shader-cursor.h>
+#include <slang-rhi.h>
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 static Slang::Result loadProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    IDevice* device,
+    Slang::ComPtr<IShaderProgram>& outShaderProgram,
     const char* mainModuleName,
     const char* libModuleName,
     const char* entryPointName,
@@ -64,10 +64,10 @@ static Slang::Result loadProgram(
     slangReflection = composedProgram->getLayout();
 
     // Create shader program
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
 
-    auto shaderProgram = device->createProgram(programDesc);
+    auto shaderProgram = device->createShaderProgram(programDesc);
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;
@@ -80,20 +80,18 @@ static void validateArraySizeInStruct(
     int expectedSize)
 {
     // Check reflection is available
-    SLANG_CHECK(slangReflection != nullptr);
+    GFX_CHECK_CALL_ABORT(slangReflection != nullptr);
 
     // Get the global scope layout
     auto globalScope = slangReflection->getGlobalParamsVarLayout();
-    SLANG_CHECK_MSG(globalScope != nullptr, "Could not get global scope layout");
+    GFX_CHECK_CALL_ABORT(globalScope != nullptr);
 
     auto typeLayout = globalScope->getTypeLayout();
-    SLANG_CHECK_MSG(typeLayout != nullptr, "Global scope has no type layout");
+    GFX_CHECK_CALL_ABORT(typeLayout != nullptr);
 
     // Check if the global scope is a struct type
     auto kind = typeLayout->getKind();
-    SLANG_CHECK_MSG(
-        kind == slang::TypeReflection::Kind::Struct,
-        "Global scope is not a struct type");
+    GFX_CHECK_CALL_ABORT(kind == slang::TypeReflection::Kind::Struct);
 
     // Find the buffer resource 'b'
     bool foundBuffer = false;
@@ -110,23 +108,19 @@ static void validateArraySizeInStruct(
 
             // Get the type layout of the field
             auto fieldTypeLayout = fieldLayout->getTypeLayout();
-            SLANG_CHECK_MSG(fieldTypeLayout != nullptr, "Field has no type layout");
+            GFX_CHECK_CALL_ABORT(fieldTypeLayout != nullptr);
 
             // Get the element type of the structured buffer
             auto elementTypeLayout = fieldTypeLayout->getElementTypeLayout();
-            SLANG_CHECK_MSG(
-                elementTypeLayout != nullptr,
-                "Structured buffer has no element type layout");
+            GFX_CHECK_CALL_ABORT(elementTypeLayout != nullptr);
 
             // Check if it's a struct type
             auto elementKind = elementTypeLayout->getKind();
-            SLANG_CHECK_MSG(
-                elementKind == slang::TypeReflection::Kind::Struct,
-                "Buffer element is not a struct type");
+            GFX_CHECK_CALL_ABORT(elementKind == slang::TypeReflection::Kind::Struct);
 
             // Get the field count of the struct
             auto structFieldCount = elementTypeLayout->getFieldCount();
-            SLANG_CHECK_MSG(structFieldCount >= 1, "Struct has no fields");
+            GFX_CHECK_CALL_ABORT(structFieldCount >= 1);
 
             // Check for the 'xs' field
             bool foundXsField = false;
@@ -143,46 +137,33 @@ static void validateArraySizeInStruct(
                     auto structFieldTypeLayout = structField->getTypeLayout();
                     auto structFieldTypeKind = structFieldTypeLayout->getKind();
 
-                    SLANG_CHECK_MSG(
-                        structFieldTypeKind == slang::TypeReflection::Kind::Array,
-                        "Field 'xs' is not an array type");
+                    GFX_CHECK_CALL_ABORT(structFieldTypeKind == slang::TypeReflection::Kind::Array);
 
                     // Check the array size
                     auto arraySize = structFieldTypeLayout->getElementCount();
                     // 0 becuase we haven't resolved the constant
-                    SLANG_CHECK_MSG(
-                        arraySize == 0,
-                        "Field 'xs' array size does not match expected size");
+                    GFX_CHECK_CALL_ABORT(arraySize == 0);
 
                     // 4 because we're resolving it
                     const auto resolvedArraySize =
                         structFieldTypeLayout->getElementCount(slangReflection);
-                    SLANG_CHECK_MSG(
-                        resolvedArraySize == expectedSize,
-                        "Field 'xs' array size does not match expected size");
+                    GFX_CHECK_CALL_ABORT(resolvedArraySize == expectedSize);
 
                     break;
                 }
             }
 
-            SLANG_CHECK_MSG(foundXsField, "Could not find field 'xs' in struct S");
+            GFX_CHECK_CALL_ABORT(foundXsField);
             break;
         }
     }
 
-    SLANG_CHECK_MSG(foundBuffer, "Could not find buffer 'b' in global scope");
+    GFX_CHECK_CALL_ABORT(foundBuffer);
 }
 
 
 void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context)
 {
-    // Create transient heap
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     // Load and link program
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
@@ -200,70 +181,56 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     validateArraySizeInStruct(context, slangReflection, N);
 
     // Create compute pipeline
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
+    ComPtr<IComputePipeline> pipelineState;
     GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     // Create buffer for struct S with array of size N
     int32_t initialData[] = {1, 2, 3, 4};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = N * sizeof(int32_t);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = N * sizeof(int32_t);
+    bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(int32_t);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // Record and execute command buffer
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
-
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+        auto queue = device->getQueue(QueueType::Graphics);
+        auto commandEncoder = queue->createCommandEncoder();
+        auto encoder = commandEncoder->beginComputePass();
 
         auto rootObject = encoder->bindPipeline(pipelineState);
 
         ShaderCursor rootCursor(rootObject);
-        rootCursor.getPath("b").setResource(bufferView);
+        rootCursor.getPath("b").setBinding(Binding(numbersBuffer));
 
         encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        encoder->end();
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
     }
 
     // Expected results: each element is input * N
     // With N=4 and inputs [1,2,3,4], expected output is [4,8,12,16]
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<int>(4, 8, 12, 16));
+    compareComputeResult(device, numbersBuffer, std::array{4, 8, 12, 16});
 }
 
 SLANG_UNIT_TEST(linkTimeConstantArraySizeD3D12)
 {
-    runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(linkTimeConstantArraySizeVulkan)
 {
-    runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(linkTimeConstantArraySizeTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test
