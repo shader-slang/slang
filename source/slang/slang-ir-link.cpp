@@ -730,7 +730,38 @@ IRWitnessTable* cloneWitnessTableImpl(
     if (!clonedTable)
     {
         clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
-        auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
+        
+        // For witness table concrete types, we need to be careful to preserve
+        // specialization information and not simplify specialized types to their base types.
+        // This is crucial for maintaining correct generic parameter values.
+        auto originalConcreteType = (IRType*)(originalTable->getConcreteType());
+        IRType* clonedSubType;
+        
+        // If the concrete type is a specialization, we need to preserve that fact
+        // and not simplify it to the base type during cloning.
+        if (originalConcreteType->getOp() == kIROp_Specialize)
+        {
+            // For specializations, clone each operand separately to preserve the specialization structure
+            auto originalSpecialize = as<IRSpecialize>(originalConcreteType);
+            auto baseType = cloneValue(context, originalSpecialize->getBase());
+            List<IRInst*> clonedArgs;
+            for (UInt i = 0; i < originalSpecialize->getArgCount(); i++)
+            {
+                clonedArgs.add(cloneValue(context, originalSpecialize->getArg(i)));
+            }
+            
+            IRBuilder builder(context->getModule());
+            clonedSubType = (IRType*)builder.emitSpecializeInst(
+                cloneType(context, originalSpecialize->getFullType()),
+                baseType,
+                clonedArgs.getCount(),
+                clonedArgs.getBuffer());
+        }
+        else
+        {
+            clonedSubType = cloneType(context, originalConcreteType);
+        }
+        
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
         if (clonedTable->hasDecorationOrChild())
             return clonedTable;
