@@ -508,16 +508,13 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     StdWriters stdWriters;
     StringBuilder stdOut;
     StringBuilder stdError;
-    StringBuilder debugLayer;
 
     // Make writer/s act as if they are the console.
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
     RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
-    RefPtr<StringWriter> debugLayerWriter(new StringWriter(&debugLayer, WriterFlag::IsConsole));
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
-    stdWriters.setWriter(SLANG_WRITER_CHANNEL_DEBUG_LAYER, debugLayerWriter);
 
     // HACK, to make behavior the same as previously
     if (args.toolName == "slangc")
@@ -528,9 +525,31 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     const SlangResult funcRes =
         func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
 
+    // Parse stderr to extract debug layer messages
+    StringBuilder cleanStdError;
+    StringBuilder debugLayer;
+    List<UnownedStringSlice> stderrLines;
+    StringUtil::split(stdError.getUnownedSlice(), '\n', stderrLines);
+
+    for (const auto& line : stderrLines)
+    {
+        if (line.startsWith("[DEBUG_LAYER]"))
+        {
+            // Extract the message after the prefix (skip "[DEBUG_LAYER]")
+            UnownedStringSlice debugMessage = line.tail(line.getLength() - 13);
+            debugLayer.append(debugMessage);
+            debugLayer.append("\n");
+        }
+        else
+        {
+            cleanStdError.append(line);
+            cleanStdError.append("\n");
+        }
+    }
+
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;
-    result.stdError = stdError;
+    result.stdError = cleanStdError;
     result.stdOut = stdOut;
     result.debugLayer = debugLayer;
 
