@@ -2172,7 +2172,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             // Update the global param's type to use the wrapper struct
-            auto newPtrType = builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+            auto newPtrType =
+                builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
             globalParam->setFullType(newPtrType);
 
             // Traverse all uses of the global param and insert a FieldAddress to access the
