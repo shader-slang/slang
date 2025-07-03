@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
@@ -88,14 +88,21 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[15] = res.d;
     }
 
-    // Test 8: vector backward diff
+    // Test 8: copysign with x=0 - derivative should be 0
+    {
+        dpfloat dpx = dpfloat(0.0, 2.0);
+        dpfloat dpy = dpfloat(-1.0, 1.0);
+        dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
+        outputBuffer[16] = res.p;               
+        outputBuffer[17] = res.d;
+    }
+
+    // Test 9: vector backward diff
     {
         dpfloat2 dpx = dpfloat2(float2(2.0, -1.0), float2(0.0, 0.0));
         dpfloat2 dpy = dpfloat2(float2(-3.0, 4.0), float2(0.0, 0.0));
         __bwd_diff(diffCopysign)(dpx, dpy, float2(1.0, 3.0));
-        outputBuffer[16] = dpx.d[0];           
-        outputBuffer[17] = dpx.d[1];           
-        outputBuffer[18] = dpy.d[0];           
-        outputBuffer[19] = dpy.d[1];
+        outputBuffer[18] = dpx.d[0];           
+        outputBuffer[19] = dpx.d[1];           
     }
 }

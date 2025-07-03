@@ -2168,12 +2168,12 @@ __generic<T : __BuiltinFloatingPointType>
 DifferentialPair<T> __d_copysign(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
     // copysign(x, y) = sign(y) * abs(x)
-    // d/dx copysign(x, y) = sign(y) * sign(x) when y != 0, 0 when y == 0
+    // d/dx copysign(x, y) = sign(y) * sign(x) when x != 0 and y != 0, 0 when x == 0 or y == 0
     // d/dy copysign(x, y) = 0 (sign function is not differentiable w.r.t y)
     let sign_y = select(dpy.p >= T(0.0), T(1.0), T(-1.0));
     let sign_x = select(dpx.p >= T(0.0), T(1.0), T(-1.0));
-    // When y == 0, derivative w.r.t. x should be 0 due to sign ambiguity
-    let dx_coeff = select(dpy.p == T(0.0), T(0.0), sign_y * sign_x);
+    // When x == 0 or y == 0, derivative w.r.t. x should be 0
+    let dx_coeff = select((dpx.p == T(0.0)) || (dpy.p == T(0.0)), T(0.0), sign_y * sign_x);
     return DifferentialPair<T>(
         copysign(dpx.p, dpy.p),
         __mul_p_d(dx_coeff, dpx.d)
@@ -2188,8 +2188,8 @@ void __d_copysign(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, 
 {
     let sign_y = select(dpy.p >= T(0.0), T(1.0), T(-1.0));
     let sign_x = select(dpx.p >= T(0.0), T(1.0), T(-1.0));
-    // When y == 0, derivative w.r.t. x should be 0 due to sign ambiguity
-    let dx_coeff = select(dpy.p == T(0.0), T(0.0), sign_y * sign_x);
+    // When x == 0 or y == 0, derivative w.r.t. x should be 0
+    let dx_coeff = select((dpx.p == T(0.0)) || (dpy.p == T(0.0)), T(0.0), sign_y * sign_x);
     // Gradient flows only to x since d/dy copysign = 0
     dpx = diffPair(dpx.p, __mul_p_d(dx_coeff, dOut));
     dpy = diffPair(dpy.p, T.dzero());
