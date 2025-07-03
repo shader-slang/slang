@@ -382,9 +382,8 @@ inline const char* MemoryArena::allocateString(const char* chars, size_t numChar
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocate()
 {
-    void* mem = (SLANG_ALIGN_OF(T) <= kMinAlignment)
-                    ? allocate(sizeof(T))
-                    : allocateAligned(sizeof(T), SLANG_ALIGN_OF(T));
+    void* mem = (alignof(T) <= kMinAlignment) ? allocate(sizeof(T))
+                                              : allocateAligned(sizeof(T), alignof(T));
     return reinterpret_cast<T*>(mem);
 }
 
@@ -392,9 +391,8 @@ SLANG_FORCE_INLINE T* MemoryArena::allocate()
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 {
-    return (numElems > 0)
-               ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, SLANG_ALIGN_OF(T)))
-               : nullptr;
+    return (numElems > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)))
+                          : nullptr;
 }
 
 // --------------------------------------------------------------------------
@@ -405,7 +403,7 @@ SLANG_FORCE_INLINE T* MemoryArena::allocateAndCopyArray(const T* arr, size_t num
     if (numElems > 0)
     {
         const size_t totalSize = sizeof(T) * numElems;
-        void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
+        void* ptr = allocateAligned(totalSize, alignof(T));
         ::memcpy(ptr, arr, totalSize);
         return reinterpret_cast<T*>(ptr);
     }
@@ -419,7 +417,7 @@ SLANG_FORCE_INLINE T* MemoryArena::allocateAndZeroArray(size_t numElems)
     if (numElems > 0)
     {
         const size_t totalSize = sizeof(T) * numElems;
-        void* ptr = allocateAligned(totalSize, SLANG_ALIGN_OF(T));
+        void* ptr = allocateAligned(totalSize, alignof(T));
         ::memset(ptr, 0, totalSize);
         return reinterpret_cast<T*>(ptr);
     }
