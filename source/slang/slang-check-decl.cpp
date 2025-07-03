@@ -3243,11 +3243,13 @@ void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
         auto referencedDecl = declRefType->getDeclRef().getDecl();
         if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
         {
-            // Check if this type parameter belongs to the same generic and comes after the constraint
+            // Check if this type parameter belongs to the same generic and comes after the
+            // constraint
             if (typeParam->parentDecl == parentGeneric)
             {
                 // Find the type parameter's position
-                for (Index i = constraintIndex + 1; i < parentGeneric->getDirectMemberDeclCount(); ++i)
+                for (Index i = constraintIndex + 1; i < parentGeneric->getDirectMemberDeclCount();
+                     ++i)
                 {
                     if (parentGeneric->getDirectMemberDecl(i) == typeParam)
                     {
@@ -3300,14 +3302,19 @@ void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
             {
                 if (auto argType = as<Type>(arg))
                 {
-                    checkTypeForForwardReferences(argType, constraintDecl, parentGeneric, constraintIndex);
+                    checkTypeForForwardReferences(
+                        argType,
+                        constraintDecl,
+                        parentGeneric,
+                        constraintIndex);
                 }
             }
         }
     }
 }
 
-void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl)
+void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
+    GenericTypeConstraintDecl* decl)
 {
     // Check if this constraint references type parameters that appear later
     // in the same GenericDecl's parameter list and a report forward reference error
