@@ -2249,6 +2249,24 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     return trySolveConstraintSystem(&constraints, genericDeclRef, knownGenericArgs, outBaseCost);
 }
 
+LookupResult SemanticsVisitor::lookupConstructorsInType(Type* type, Scope* sourceScope)
+{
+    // Look up all the initializers on `type` by looking up
+    // its members named `$init`. All `__init` declarations are stored
+    // with the name `$init` internally to avoid potential conflicts
+    // if a user decided to name a field/method `__init`.
+    LookupOptions options =
+        LookupOptions(uint8_t(LookupOptions::IgnoreInheritance) | uint8_t(LookupOptions::NoDeref));
+    return lookUpMember(
+        m_astBuilder,
+        this,
+        getName("$init"),
+        type,
+        sourceScope,
+        LookupMask::Default,
+        options);
+}
+
 void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context)
 {
     // The code being checked is trying to apply `type` like a function.
@@ -2272,16 +2290,7 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    LookupOptions options =
-        LookupOptions(uint8_t(LookupOptions::IgnoreInheritance) | uint8_t(LookupOptions::NoDeref));
-    LookupResult initializers = lookUpMember(
-        m_astBuilder,
-        this,
-        getName("$init"),
-        type,
-        context.sourceScope,
-        LookupMask::Default,
-        options);
+    LookupResult initializers = lookupConstructorsInType(type, context.sourceScope);
     AddOverloadCandidates(initializers, context);
 }
 
@@ -2702,6 +2711,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0],
                                             &tempSink,
                                             &conversionCost);
+                if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
+                {
+                    resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
+                    resultInvokeExpr->argumentDelimeterLocs = expr->argumentDelimeterLocs;
+                    resultInvokeExpr->loc = expr->loc;
+                }
                 if (coerceResult)
                     return resultExpr;
                 typeOverloadChecked = true;

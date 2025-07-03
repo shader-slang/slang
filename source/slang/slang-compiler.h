@@ -3764,6 +3764,8 @@ public:
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
+    void getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName);
+
     RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
     SPIRVCoreGrammarInfo& getSPIRVCoreGrammarInfo()

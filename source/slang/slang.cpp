@@ -435,6 +435,21 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
 }
 
+void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
+{
+    switch (moduleName)
+    {
+    case slang::BuiltinModuleName::Core:
+        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
+           << (const char*)getHLSLLibraryCode()->getBufferPointer()
+           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::GLSL:
+        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    }
+}
+
 SlangResult Session::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
@@ -460,17 +475,7 @@ SlangResult Session::compileBuiltinModule(
     }
 
     StringBuilder moduleSrcBuilder;
-    switch (moduleName)
-    {
-    case slang::BuiltinModuleName::Core:
-        moduleSrcBuilder << (const char*)getCoreLibraryCode()->getBufferPointer()
-                         << (const char*)getHLSLLibraryCode()->getBufferPointer()
-                         << (const char*)getAutodiffLibraryCode()->getBufferPointer();
-        break;
-    case slang::BuiltinModuleName::GLSL:
-        moduleSrcBuilder << (const char*)getGLSLLibraryCode()->getBufferPointer();
-        break;
-    }
+    getBuiltinModuleSource(moduleSrcBuilder, moduleName);
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     auto moduleSrcBlob = StringBlob::moveCreate(moduleSrcBuilder.produceString());
