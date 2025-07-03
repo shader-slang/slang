@@ -48,10 +48,10 @@ protected:
 
     void mainLoop();
 
-    //Slang::ComPtr<rhi::IResourceView> createTextureFromFile(
-    //    Slang::String fileName,
-    //    int& textureWidth,
-    //    int& textureHeight);
+    Slang::ComPtr<rhi::ITextureView> createTextureFromFile(
+        Slang::String fileName,
+        int& textureWidth,
+        int& textureHeight);
 
     void createOfflineTextures();
 
