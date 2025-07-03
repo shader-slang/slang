@@ -159,6 +159,28 @@ if(SLANG_ENABLE_GFX)
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
     )
 
+    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+    add_custom_target(
+        copy-gfx-slang-modules
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
+            ${modules_dest_dir}/gfx.slang
+        COMMAND
+            ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+            ${modules_dest_dir}/slang.slang
+        WORKING_DIRECTORY ${slang_SOURCE_DIR}
+        VERBATIM
+    )
+    set_target_properties(
+        copy-gfx-slang-modules
+        PROPERTIES FOLDER generators
+    )
+    install(
+        FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
+        DESTINATION ${runtime_subdir}
+    )
 endif()
 if(SLANG_ENABLE_TESTS)
 
@@ -217,6 +239,9 @@ if(SLANG_ENABLE_TESTS)
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
+
+    add_dependencies(slang-test copy-gfx-slang-modules)
+
     include(CTest)
     add_test(
         NAME slang-test
