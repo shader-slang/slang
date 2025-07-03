@@ -1,5 +1,5 @@
 #if 0
-
+// Duplicated: This test is identical to slang-rhi\tests\test-mutable-shader-object.cpp
 // TODO: This test failed
 // The result buffer is still {0.0f, 1.0f, 2.0f, 3.0f}. Not incremented by the shader
 

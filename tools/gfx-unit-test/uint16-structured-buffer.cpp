@@ -1,8 +1,5 @@
-#if 0
+// Duplicated: This this test is identical to slang-rhi\tests\test-uint16-buffer.cpp
 
-// TODO: This test failed
-// FAILED test: 'gfx-unit-test-tool/uint16BufferTestD3D12.internal'
-// result buffer is not able to read
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include "slang-rhi/shader-cursor.h"
@@ -32,7 +29,7 @@ void uint16BufferTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.size = numberCount * sizeof(uint16_t);
     bufferDesc.format = rhi::Format::Undefined;
 
-    bufferDesc.elementSize = sizeof(uint16_t);
+    bufferDesc.elementSize = 0;  // Let RHI derive from reflection
     bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
@@ -59,7 +56,7 @@ void uint16BufferTestImpl(IDevice* device, UnitTestContext* context)
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, std::array{1, 2, 3, 4});
+    compareComputeResult(device, numbersBuffer, std::array<uint16_t, 4>{1, 2, 3, 4});
 }
 
 SLANG_UNIT_TEST(uint16BufferTestD3D12)
@@ -73,5 +70,3 @@ SLANG_UNIT_TEST(uint16BufferTestVulkan)
 }
 
 } // namespace gfx_test
-
-#endif

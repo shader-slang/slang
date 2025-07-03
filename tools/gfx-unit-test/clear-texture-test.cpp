@@ -1,6 +1,5 @@
 #if 0
-
-// This is tested in slang-rhi\tests\test-cmd-clear-texture.cpp
+// Duplicated: this is covered by slang-rhi\tests\test-cmd-clear-texture.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"

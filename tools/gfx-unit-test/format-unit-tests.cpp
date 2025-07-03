@@ -1,6 +1,5 @@
 #if 0
-// TODO: This test is identical to external\slang-rhi\tests\test-formats.cpp
-
+// Duplicated: This test is identical to slang-rhi\tests\test-formats.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
