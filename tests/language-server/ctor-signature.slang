@@ -6,4 +6,4 @@ void test()
     let v = float3(1.0, )
 }
 
-// CHECK: (selected) vector<T,3>.init(float x, float
+// CHECK: (selected) float3.init(float x, float

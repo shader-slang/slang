@@ -1233,7 +1233,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
         ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
-        Type* type = extensionDecl->targetType.type;
+        Type* type = getTargetType(m_astBuilder, extensionDeclRef);
         if (m_optionFlags & OptionFlag::NoSpecializedExtensionTypeName)
         {
             if (auto unspecializedDeclRef = isDeclRefTypeOf<Decl>(type))
