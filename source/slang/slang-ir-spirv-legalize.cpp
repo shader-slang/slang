@@ -2116,6 +2116,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // decoration to the wrapper struct.
 
         HashSet<IRStructType*> embeddedBlockStructs;
+        List<IRGlobalParam*> structGlobalParams;
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto outerStruct = as<IRStructType>(globalInst))
@@ -2132,66 +2133,69 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     }
                 }
             }
-        }
-
-        for (auto globalInst : m_module->getGlobalInsts())
-        {
-            if (auto globalParam = as<IRGlobalParam>(globalInst))
+            else if (auto globalParam = as<IRGlobalParam>(globalInst))
             {
-                auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
-                if (!ptrType)
-                    continue;
-                auto structType = as<IRStructType>(ptrType->getValueType());
-                if (!structType)
-                    continue;
-
-                if (embeddedBlockStructs.contains(structType))
+                if (auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType()))
                 {
-                    // Create a wrapper struct type
-                    IRBuilder builder(globalParam);
-                    builder.setInsertBefore(globalParam);
-
-                    auto wrapperStruct = builder.createStructType();
-                    auto key = builder.createStructKey();
-                    builder.createStructField(wrapperStruct, key, structType);
-
-                    // Copy the block decoration from the inner struct to the wrapper
-                    if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                    if (auto structType = as<IRStructType>(ptrType->getValueType()))
                     {
-                        builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
+                        structGlobalParams.add(globalParam);
                     }
-                    if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
-                    {
-                        builder.addDecorationIfNotExist(
-                            wrapperStruct,
-                            kIROp_SPIRVBufferBlockDecoration);
-                    }
-
-                    // Update the global param's type to use the wrapper struct
-                    auto newPtrType = builder.getPtrType(
-                        ptrType->getOp(),
-                        wrapperStruct,
-                        ptrType->getAddressSpace());
-                    globalParam->setFullType(newPtrType);
-
-                    // Traverse all uses of the global param and insert a FieldAddress to access the
-                    // inner struct
-                    traverseUses(
-                        globalParam,
-                        [&](IRUse* use)
-                        {
-                            builder.setInsertBefore(use->getUser());
-                            auto addr = builder.emitFieldAddress(
-                                builder.getPtrType(
-                                    kIROp_PtrType,
-                                    structType,
-                                    ptrType->getAddressSpace()),
-                                globalParam,
-                                key);
-                            use->set(addr);
-                        });
                 }
             }
+        }
+
+        for (auto globalParam : structGlobalParams)
+        {
+            auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+            auto structType = as<IRStructType>(ptrType->getValueType());
+
+            if (!embeddedBlockStructs.contains(structType))
+                continue;
+
+            // Create a wrapper struct type
+            IRBuilder builder(globalParam);
+            builder.setInsertBefore(globalParam);
+
+            auto wrapperStruct = builder.createStructType();
+            auto key = builder.createStructKey();
+            builder.createStructField(wrapperStruct, key, structType);
+
+            // Copy the block decoration from the inner struct to the wrapper
+            if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
+            }
+            if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(
+                    wrapperStruct,
+                    kIROp_SPIRVBufferBlockDecoration);
+            }
+
+            // Update the global param's type to use the wrapper struct
+            auto newPtrType = builder.getPtrType(
+                ptrType->getOp(),
+                wrapperStruct,
+                ptrType->getAddressSpace());
+            globalParam->setFullType(newPtrType);
+
+            // Traverse all uses of the global param and insert a FieldAddress to access the
+            // inner struct
+            traverseUses(
+                globalParam,
+                [&](IRUse* use)
+                {
+                    builder.setInsertBefore(use->getUser());
+                    auto addr = builder.emitFieldAddress(
+                        builder.getPtrType(
+                            kIROp_PtrType,
+                            structType,
+                            ptrType->getAddressSpace()),
+                        globalParam,
+                        key);
+                    use->set(addr);
+                });
         }
 
         // Remove block/buffer block decorations from all embedded block structs
