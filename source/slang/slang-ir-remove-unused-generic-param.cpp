@@ -72,16 +72,37 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                         child = next;
                     }
                     SLANG_ASSERT(returnVal);
-                    List<IRUse*> uses;
+
+                    // Collect all specialize uses that we might optimize
+                    List<IRUse*> specializeUses;
                     for (auto use = genInst->firstUse; use; use = use->nextUse)
-                        uses.add(use);
-                    for (auto use : uses)
                     {
                         if (use->getUser()->getOp() == kIROp_Specialize &&
                             use == use->getUser()->getOperands())
                         {
-                            use->getUser()->replaceUsesWith(returnVal);
+                            specializeUses.add(use);
                         }
+                    }
+
+                    // Check if any of these specialize uses are used by witness tables
+                    // If so, we cannot apply the optimization because witness tables are immutable
+                    for (auto use : specializeUses)
+                    {
+                        for (auto specializeUse = use->getUser()->firstUse; specializeUse;
+                             specializeUse = specializeUse->nextUse)
+                        {
+                            auto userOp = specializeUse->getUser()->getOp();
+                            if (userOp == kIROp_WitnessTable)
+                            {
+                                goto skipOptimization;
+                            }
+                        }
+                    }
+
+                    // Apply the optimization: replace all specialize uses with the return value
+                    for (auto use : specializeUses)
+                    {
+                        use->getUser()->replaceUsesWith(returnVal);
                     }
                     genInst->replaceUsesWith(returnVal);
                     genInst->removeAndDeallocate();
@@ -118,6 +139,7 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                     for (auto param : paramsToRemove)
                         param->removeAndDeallocate();
                 }
+            skipOptimization:;
             }
         }
         return changed;
