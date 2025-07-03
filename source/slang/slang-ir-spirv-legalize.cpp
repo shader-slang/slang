@@ -2137,7 +2137,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 if (auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType()))
                 {
-                    if (auto structType = as<IRStructType>(ptrType->getValueType()))
+                    if (as<IRStructType>(ptrType->getValueType()))
                     {
                         structGlobalParams.add(globalParam);
                     }
