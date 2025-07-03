@@ -128,9 +128,9 @@ inline void contract_violation(const char* msg)
 #endif
 
 #ifdef TCB_SPAN_HAVE_STD_BYTE
-using byte = std::byte;
+using slang_byte = std::byte;
 #else
-using byte = unsigned char;
+using slang_byte = unsigned char;
 #endif
 
 #if defined(TCB_SPAN_HAVE_CPP17)
@@ -563,19 +563,19 @@ constexpr span<const typename Container::value_type> make_span(const Container& 
 }
 
 template<typename ElementType, std::size_t Extent>
-span<const byte, ((Extent == dynamic_extent) ? dynamic_extent : sizeof(ElementType) * Extent)> as_bytes(
+span<const slang_byte, ((Extent == dynamic_extent) ? dynamic_extent : sizeof(ElementType) * Extent)> as_bytes(
     span<ElementType, Extent> s
 ) noexcept
 {
-    return {reinterpret_cast<const byte*>(s.data()), s.size_bytes()};
+    return {reinterpret_cast<const slang_byte*>(s.data()), s.size_bytes()};
 }
 
 template<class ElementType, size_t Extent, typename std::enable_if<!std::is_const<ElementType>::value, int>::type = 0>
-span<byte, ((Extent == dynamic_extent) ? dynamic_extent : sizeof(ElementType) * Extent)> as_writable_bytes(
+span<slang_byte, ((Extent == dynamic_extent) ? dynamic_extent : sizeof(ElementType) * Extent)> as_writable_bytes(
     span<ElementType, Extent> s
 ) noexcept
 {
-    return {reinterpret_cast<byte*>(s.data()), s.size_bytes()};
+    return {reinterpret_cast<slang_byte*>(s.data()), s.size_bytes()};
 }
 
 template<std::size_t N, typename E, std::size_t S>

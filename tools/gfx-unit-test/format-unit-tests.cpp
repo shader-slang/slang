@@ -1,3 +1,7 @@
+#if 0
+// TODO: This test is identical to external\slang-rhi\tests\test-formats.cpp
+
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include "gfx-util/shader-cursor.h"
@@ -1500,3 +1504,5 @@ SLANG_UNIT_TEST(FormatTestsVulkan)
 }
 
 } // namespace gfx_test
+
+#endif

@@ -1,3 +1,7 @@
+#if 0
+
+// This is tested in slang-rhi\tests\test-cmd-draw.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include "gfx-util/shader-cursor.h"
@@ -602,3 +606,5 @@ SLANG_UNIT_TEST(drawIndexedIndirectVulkan)
         Slang::RenderApiFlag::Vulkan);
 }
 } // namespace gfx_test
+
+#endif

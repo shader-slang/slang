@@ -1,3 +1,4 @@
+#if 0
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "gfx-util/shader-cursor.h"
@@ -824,3 +825,5 @@ struct AutoDiffTexture : public WindowedAppBase
 };
 
 EXAMPLE_MAIN(innerMain<AutoDiffTexture>);
+
+#endif

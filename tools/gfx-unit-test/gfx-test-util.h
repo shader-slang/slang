@@ -54,7 +54,8 @@ Slang::Result loadGraphicsProgram(
     const char* fragmentEntryPointName,
     slang::ProgramLayout*& slangReflection);
 
-inline void compareResultFuzzy(const float* result, const float* expectedResult, size_t count)
+template<typename T>
+void compareResultFuzzy(const T* result, const T* expectedResult, size_t count)
 {
     for (size_t i = 0; i < count; ++i)
     {
@@ -63,16 +64,25 @@ inline void compareResultFuzzy(const float* result, const float* expectedResult,
 }
 
 template<typename T>
+void compareResult(const T* result, const T* expectedResult, size_t count)
+{
+    for (size_t i = 0; i < count; i++)
+    {
+        SLANG_CHECK(result[i] == expectedResult[i]);
+    }
+}
+
+template<typename T>
 void compareComputeResult(rhi::IDevice* device, rhi::IBuffer* buffer, span<T> expectedResult)
 {
     size_t bufferSize = expectedResult.size() * sizeof(T);
-    // Read back the results.
+    // Read back the results.`
     ComPtr<ISlangBlob> bufferData;
     SLANG_CHECK(SLANG_SUCCEEDED(device->readBuffer(buffer, 0, bufferSize, bufferData.writeRef())));
     SLANG_CHECK(bufferData->getBufferSize() == bufferSize);
     const T* result = reinterpret_cast<const T*>(bufferData->getBufferPointer());
 
-    if constexpr (std::is_same<T, float>::value)
+    if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
         compareResultFuzzy(result, expectedResult.data(), expectedResult.size());
     else
         compareResult<T>(result, expectedResult.data(), expectedResult.size());
