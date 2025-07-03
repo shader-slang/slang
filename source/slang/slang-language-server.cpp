@@ -1504,6 +1504,68 @@ SlangResult LanguageServer::signatureHelp(
     return SLANG_OK;
 }
 
+// Heuristical cost for determining the best candidate to use as the active signature.
+// We will always use the candidate that has the most matched parameters to the current argument
+// list. If there are multiple candidates with the same number of matched parameters, we will
+// use the one with the least number of unmatched parameters. If there are still multiple
+// candidates with the same number of unmatched parameters, we will use the one with the least
+// maximum argument conversion cost.
+//
+struct CallCandidateMatchCost
+{
+    Index matchedArgCount = 0;
+    Index unmatchedParamCount = 0;
+    ConversionCost maxArgConversionCost = 0;
+
+    bool isBetterThan(const CallCandidateMatchCost& other) const
+    {
+        if (matchedArgCount > other.matchedArgCount)
+            return true;
+        else if (matchedArgCount == other.matchedArgCount)
+        {
+            if (unmatchedParamCount < other.unmatchedParamCount)
+                return true;
+            else if (unmatchedParamCount == other.unmatchedParamCount)
+                return maxArgConversionCost < other.maxArgConversionCost;
+        }
+        return false;
+    }
+};
+
+// Given a callable decl and an AppExprBase containing the arguments used to call it,
+// return the match cost for the candidate.
+static CallCandidateMatchCost getCallCandidateMatchCost(
+    DeclRef<CallableDecl> callableDeclRef,
+    AppExprBase* appExpr,
+    SemanticsVisitor& semanticsVisitor,
+    WorkspaceVersion* version)
+{
+    CallCandidateMatchCost result;
+    auto astBuilder = version->linkage->getASTBuilder();
+    auto paramList = getMembersOfType<ParamDecl>(astBuilder, callableDeclRef).toArray();
+
+    for (Index argId = 0; argId < appExpr->arguments.getCount(); argId++)
+    {
+        auto arg = appExpr->arguments[argId];
+        if (!arg)
+            continue;
+        if (!arg->type.type)
+            continue;
+        if (argId < paramList.getCount())
+        {
+            auto paramType = getType(version->linkage->getASTBuilder(), paramList[argId]);
+            ConversionCost argCost = 0;
+            if (paramType && semanticsVisitor.canCoerce(paramType, arg->type.type, arg, &argCost))
+            {
+                result.matchedArgCount++;
+                result.maxArgConversionCost = Math::Max(result.maxArgConversionCost, argCost);
+            }
+        }
+    }
+    result.unmatchedParamCount = paramList.getCount() - result.matchedArgCount;
+    return result;
+}
+
 LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::signatureHelp(
     const LanguageServerProtocol::SignatureHelpParams& args)
 {
@@ -1594,10 +1656,40 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
 
     SignatureHelp response;
+    response.activeSignature = 0;
+
+    CallCandidateMatchCost bestCandidateMatchCost;
+
+    // We will use an ad-hoc semantics visitor to check for argument-to-parameter conversions
+    // and to determine the best candidate signature.
+    // In the ideal design, this info should be gathered during the normal type checking
+    // process, but that require a lot of refactoring in the current code base, and may
+    // risk slowing down type checking for non-language-server use cases since we won't be
+    // able to do as many early returns.
+    // So instead we will do a separate ad-hoc checking here to do a best-effort guess
+    // on the best candidate.
+    //
+    DiagnosticSink sink;
+    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    SemanticsVisitor semanticsVisitor(&semanticsContext);
+
     auto addDeclRef = [&](DeclRef<Decl> declRef)
     {
         if (!declRef.getDecl())
             return;
+
+        // If we have a better match than the current best, we will update response.activeSignature
+        // to this signature.
+        if (auto callableDeclRef = declRef.as<CallableDecl>())
+        {
+            auto matchCost =
+                getCallCandidateMatchCost(callableDeclRef, appExpr, semanticsVisitor, version);
+            if (matchCost.isBetterThan(bestCandidateMatchCost))
+            {
+                bestCandidateMatchCost = matchCost;
+                response.activeSignature = (uint32_t)response.signatures.getCount();
+            }
+        }
 
         SignatureInformation sigInfo;
 
@@ -1711,7 +1803,6 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     {
         addFuncType(funcType);
     }
-    response.activeSignature = 0;
     response.activeParameter = 0;
     for (int i = 1; i < appExpr->argumentDelimeterLocs.getCount(); i++)
     {
