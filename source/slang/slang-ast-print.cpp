@@ -1129,6 +1129,7 @@ void ASTPrinter::addVal(Val* val)
 
 /* static */ void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
+    decl = maybeGetInner(decl);
     if (as<ConstructorDecl>(decl))
     {
         out << "init";

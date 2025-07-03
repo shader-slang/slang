@@ -1547,21 +1547,26 @@ SlangResult LanguageServer::signatureHelp(
 struct CallCandidateMatchCost
 {
     Index matchedArgCount = 0;
+    Index excessArgCount = 0;
     Index unmatchedParamCount = 0;
     ConversionCost maxArgConversionCost = 0;
 
     bool isBetterThan(const CallCandidateMatchCost& other) const
     {
+        if (excessArgCount < other.excessArgCount)
+            return true;
+        else if (excessArgCount > other.excessArgCount)
+            return false;
         if (matchedArgCount > other.matchedArgCount)
             return true;
-        else if (matchedArgCount == other.matchedArgCount)
-        {
-            if (unmatchedParamCount < other.unmatchedParamCount)
-                return true;
-            else if (unmatchedParamCount == other.unmatchedParamCount)
-                return maxArgConversionCost < other.maxArgConversionCost;
-        }
-        return false;
+        else if (matchedArgCount < other.matchedArgCount)
+            return false;
+
+        if (unmatchedParamCount < other.unmatchedParamCount)
+            return true;
+        else if (unmatchedParamCount > other.unmatchedParamCount)
+            return false;
+        return maxArgConversionCost < other.maxArgConversionCost;
     }
 };
 
@@ -1595,6 +1600,8 @@ static CallCandidateMatchCost getCallCandidateMatchCost(
             }
         }
     }
+    result.excessArgCount =
+        Math::Max((Index)0, (appExpr->argumentDelimeterLocs.getCount() - 1) - paramList.getCount());
     result.unmatchedParamCount = paramList.getCount() - result.matchedArgCount;
     return result;
 }
@@ -1800,13 +1807,14 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
 
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        if (auto aggDeclRef = as<AggTypeDecl>(declRefExpr->declRef))
+        if (auto typeType = as<TypeType>(declRefExpr->type.type))
         {
             // Look for initializers
-            for (auto member :
-                 getMembersOfType<ConstructorDecl>(version->linkage->getASTBuilder(), aggDeclRef))
+            auto ctors =
+                semanticsVisitor.lookupConstructorsInType(typeType->getType(), declRefExpr->scope);
+            for (auto ctor : ctors)
             {
-                addDeclRef(member);
+                addDeclRef(ctor.declRef);
             }
         }
         else
