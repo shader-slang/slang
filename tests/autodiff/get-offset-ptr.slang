@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 
-//CHECK: struct s_bwd_prop_function_Intermediates{{[_0-9]+}}
+//CHECK: struct s_bwdCallableCtx_function_{{[_0-9]+}}
 //CHECK: {
 //CHECK:     MyDiffPtr{{[_0-9]+}} {{[_A-Za-z0-9]+}};
 //CHECK:     MyDiffPtr{{[_0-9]+}} {{[_A-Za-z0-9]+}};

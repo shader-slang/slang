@@ -21,9 +21,9 @@ struct BwdCallableForZap : IBwdCallable<__func_as_type(zap)>
 extension __func_as_type(zap) : IBackwardDifferentiable<__func_as_type(zap)>
 {
     typealias BwdCallable = BwdCallableForZap;
-    static This.BwdCallable apply_bwd(float x)
+    This.BwdCallable apply_bwd(float x)
     {
-        return makeTuple(zap(x), BwdCallableForZap(x));
+        return BwdCallableForZap(x);
     }
 }
 

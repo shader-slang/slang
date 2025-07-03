@@ -132,6 +132,24 @@ struct WitnessChainLookupLoweringContext
         }
     }
 
+    // TODO: This check should really not be needed if hoistable
+    // insts are handled properly, but we'll check for it for now.
+    //
+    static bool areEquivalent(IRInst* inst1, IRInst* inst2)
+    {
+        if (inst1 == inst2)
+            return true;
+
+        if (as<IRFieldExtract>(inst1) && as<IRFieldExtract>(inst2) &&
+            inst1->getOperand(0) == inst2->getOperand(0) &&
+            inst1->getOperand(1) == inst2->getOperand(1))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     struct ExistentialBaseResult
     {
         IRInst* baseInst;
@@ -157,7 +175,7 @@ struct WitnessChainLookupLoweringContext
             }
             else if (flavor == One && other.flavor == One)
             {
-                if (baseInst != other.baseInst)
+                if (!areEquivalent(baseInst, other.baseInst))
                     flavor = Many;
             }
             else

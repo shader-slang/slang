@@ -2693,7 +2693,7 @@ static NodeBase* parseForwardDifferentiate(Parser* parser, void* /* unused */)
     return parseForwardDifferentiate(parser);
 }
 
-/// Parse an expression of the form __bwd_diff(fn) where fn is an
+/// Parse an expression of the form bwd_diff(fn) where fn is an
 /// identifier pointing to a function.
 static Expr* parseBackwardDifferentiate(Parser* parser)
 {
@@ -2758,23 +2758,50 @@ static Expr* parseBwdDiffFuncTypeExpr(Parser* parser)
 
 static Expr* parseApplyForBwdFuncTypeExpr(Parser* parser)
 {
-    // Parse an expr of the form `__apply_for_fwd_type(fn)`
+    // Parse an expr of the form `__apply_for_bwd_type(fn)`
     ApplyForBwdFuncTypeExpr* expr = parser->astBuilder->create<ApplyForBwdFuncTypeExpr>();
     parser->ReadToken(TokenType::LParent);
     expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::Comma);
+    expr->ctxType = parser->ParseTypeExp();
     parser->ReadToken(TokenType::RParent);
     return expr;
 }
+/*
+static Expr* parseApplyForFwdFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__apply_for_fwd_type(fn)`
+    ApplyForFwdFuncTypeExpr* expr = parser->astBuilder->create<ApplyForFwdFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::Comma);
+    expr->ctxType = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+    */
 
 static Expr* parseBwdCallableFuncTypeExpr(Parser* parser)
 {
-    // Parse an expr of the form `__fwd_callable_type(fn)`
+    // Parse an expr of the form `__bwd_callable_type(fn)`
     BwdCallableFuncTypeExpr* expr = parser->astBuilder->create<BwdCallableFuncTypeExpr>();
     parser->ReadToken(TokenType::LParent);
     expr->base = parser->ParseTypeExp();
     parser->ReadToken(TokenType::RParent);
     return expr;
 }
+
+/*
+static Expr* parseFwdCallableFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__fwd_callable_type(fn)`
+    FwdCallableFuncTypeExpr* expr = parser->astBuilder->create<FwdCallableFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+    */
 
 static Expr* parseResultTypeExpr(Parser* parser)
 {
@@ -3080,11 +3107,21 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseApplyForBwdFuncTypeExpr(parser);
         return typeSpec;
     }
+    /*else if (AdvanceIf(parser, "__apply_fwd_func_type"))
+    {
+        typeSpec.expr = parseApplyForFwdFuncTypeExpr(parser);
+        return typeSpec;
+    }*/
     else if (AdvanceIf(parser, "__bwd_callable_type"))
     {
         typeSpec.expr = parseBwdCallableFuncTypeExpr(parser);
         return typeSpec;
     }
+    /*else if (AdvanceIf(parser, "__fwd_callable_type"))
+    {
+        typeSpec.expr = parseFwdCallableFuncTypeExpr(parser);
+        return typeSpec;
+    }*/
     else if (AdvanceIf(parser, "__result_type"))
     {
         typeSpec.expr = parseResultTypeExpr(parser);

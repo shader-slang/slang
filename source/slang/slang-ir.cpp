@@ -8551,6 +8551,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
     case kIROp_DetachDerivative:
+    case kIROp_FuncTypeOf:
+        return false;
+
+    case kIROp_FunctionCopy:
         return false;
 
         /* TODO: Remove..

@@ -127,11 +127,8 @@ IRFuncType* ForwardDiffTranscriber::resolveFuncType(IRBuilder* builder, IRInst* 
     {
     case kIROp_ForwardDiffFuncType:
         {
-            if (auto func = as<IRFunc>(funcTypeInst->getOperand(0)))
-            {
-                auto baseFuncType = cast<IRFuncType>(func->getFullType());
-                return differentiateFunctionType(builder, nullptr, baseFuncType);
-            }
+            auto baseFuncType = cast<IRFuncType>(funcTypeInst->getOperand(0));
+            return differentiateFunctionType(builder, nullptr, baseFuncType);
         }
     }
     SLANG_UNEXPECTED("Unexpected function type kind for differentiation.");
@@ -214,6 +211,40 @@ InstPair ForwardDiffTranscriber::transcribeDifferentiableTypeAnnotation(
     builder->markInstAsPrimal(primalAnnotation);
 
     return InstPair(primalAnnotation, diffAnnotation);
+}
+
+
+InstPair ForwardDiffTranscriber::transcribeAssociatedInstAnnotation(
+    IRBuilder* builder,
+    IRInst* origInst)
+{
+    auto primalAnnotation =
+        as<IRAssociatedInstAnnotation>(maybeCloneForPrimalInst(builder, origInst));
+
+    IRAssociatedInstAnnotation* annotation = as<IRAssociatedInstAnnotation>(origInst);
+
+    /*auto diffType = differentiateType(builder, (IRType*)annotation->getBaseType());
+    if (!diffType)
+        return InstPair(primalAnnotation, nullptr);
+
+    auto diffTypeDiffWitness =
+        tryGetDifferentiableWitness(builder, diffType, DiffConformanceKind::Any);
+
+    IRInst* args[] = {diffType, diffTypeDiffWitness};
+
+    auto diffAnnotation = builder->emitIntrinsicInst(
+        builder->getVoidType(),
+        kIROp_DifferentiableTypeAnnotation,
+        2,
+        args);
+
+    builder->markInstAsPrimal(primalAnnotation);
+    builder->markInstAsPrimal(diffAnnotation);
+    */
+
+    builder->markInstAsPrimal(primalAnnotation);
+
+    return InstPair(primalAnnotation, nullptr);
 }
 
 InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
@@ -721,25 +752,48 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     auto primalCallee = findOrTranscribePrimalInst(builder, origCallee);
+    IRInst* diffCallee = nullptr;
 
-    auto fwdDiffWitness = this->differentiableTypeConformanceContext.tryGetWitnessOfKind(
-        primalCallee,
-        DifferentiableTypeConformanceContext::FunctionConformanceKind::ForwardDifferentiable);
+    if (auto assocFwdDiffCallee =
+            (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                primalCallee,
+                FunctionAssociationKind::ForwardDerivative)))
+    {
+        diffCallee = assocFwdDiffCallee;
+    }
+    else
+    {
+        // TODO: It may be better to lower this as a SynthesizedFuncDecl from the front-end
+        // if a function is backward-differentiable, but not forward-differentiable.
+        //
+        if (this->useTrivialFwdsForBwdDifferentiableFuncs)
+        {
+            // See if the callee is backward differentiable.
+            if (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                    primalCallee,
+                    FunctionAssociationKind::BackwardDerivativeApply))
+            {
+                // If yes, then we want to generate a trivial forward function.
+                IRInst* args[] = {primalCallee->getDataType()};
+                auto fwdDiffFuncTypeInst = builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_ForwardDiffFuncType,
+                    1,
+                    args);
+                auto resolvedFuncType = resolveFuncType(builder, fwdDiffFuncTypeInst);
+                // Generate a trivial forward differentiation function
+                auto trivialFwdCallee = builder->emitIntrinsicInst(
+                    resolvedFuncType,
+                    kIROp_ForwardDifferentiateTrivial,
+                    1,
+                    &primalCallee);
 
-    auto fwdDiffWitnessType = as<IRWitnessTableType>(fwdDiffWitness->getDataType());
-    auto fwdDiffWitnessInterface = as<IRInterfaceType>(fwdDiffWitnessType->getConformanceType());
-    IRInterfaceRequirementEntry* fwdDiffMethodEntry =
-        as<IRInterfaceRequirementEntry>(fwdDiffWitnessInterface->getOperand(0));
-
-    auto assocForwardDiffCallee = _lookupWitness(
-        builder,
-        fwdDiffWitness,
-        fwdDiffMethodEntry->getRequirementKey(),
-        cast<IRFuncType>(resolveFuncType(builder, fwdDiffMethodEntry->getRequirementVal())));
+                diffCallee = trivialFwdCallee;
+            }
+        }
+    }
 
     // auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
-
-    IRInst* diffCallee = assocForwardDiffCallee;
 
     /*if (diffCallee)
     {
@@ -2180,6 +2234,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_DifferentiableTypeAnnotation:
         return transcribeDifferentiableTypeAnnotation(builder, origInst);
+
+    case kIROp_AssociatedInstAnnotation:
+        return transcribeAssociatedInstAnnotation(builder, origInst);
 
         // Differentiable insts that should have been lowered in a previous pass.
     case kIROp_SwizzledStore:

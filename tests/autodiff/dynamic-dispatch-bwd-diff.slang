@@ -42,11 +42,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 0.5f); // A
     var p = diffPair(3.0);
 
-    __bwd_diff(run)(obj, p, 1.0f);
+    bwd_diff(run)(obj, p, 1.0f);
     outputBuffer[0] = p.d; // A.calc, expect 3
 
     obj = createDynamicObject<IInterface>(dispatchThreadID.x + 1, 1.5f); // B
     p = diffPair(3.0);
-    __bwd_diff(run)(obj, p, 1.0f);
+    bwd_diff(run)(obj, p, 1.0f);
     outputBuffer[1] = p.d; // B.calc, expect 40.5
 }

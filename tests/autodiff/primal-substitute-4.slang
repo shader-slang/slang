@@ -19,7 +19,7 @@ struct BufferWithGrad
     {
     }
 
-    [BackwardDerivativeOf(add)]
+    [BackwardDerivativeOf(add_subst)]
     void add_bwd(inout DifferentialPair<float> d)
     {
         d = diffPair(d.p, grad[0]);

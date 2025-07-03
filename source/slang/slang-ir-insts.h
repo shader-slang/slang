@@ -1430,7 +1430,6 @@ struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
     IR_LEAF_ISA(BackwardPropagateFromLegacyBwdDiffFunc)
 };
 
-
 struct IRIsDifferentialNull : IRInst
 {
     enum
@@ -1480,6 +1479,19 @@ struct IRWitnessTableAnnotation : IRInst
     }
 
     IR_LEAF_ISA(WitnessTableAnnotation)
+};
+
+struct IRAssociatedInstAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_AssociatedInstAnnotation
+    };
+    IRInst* getTarget() { return getOperand(0); }
+    IRIntegerValue getConformanceID() { return as<IRIntLit>(getOperand(1))->getValue(); }
+    IRInst* getInst() { return getOperand(2); }
+
+    IR_LEAF_ISA(AssociatedInstAnnotation)
 };
 
 struct IRDispatchKernel : IRInst

@@ -387,6 +387,8 @@ struct BackwardDiffTranslationFuncContext
             bwdContextGetValFunc,
             bwdContextType);
 
+        // IRAssociatedInstAnnotation
+
         return {bwdPrimalFunc, bwdPropagateFunc, bwdContextGetValFunc, (IRType*)bwdContextType};
     }
 };
@@ -460,7 +462,6 @@ struct BackwardDiffTranslator
         return extractRelevantGlobalVal(translationResult);
     }
 };
-
 
 // AD 2.0 -> 1.0 translator.
 struct LegacyBackwardDiffTranslationFuncContext
@@ -572,6 +573,7 @@ struct LegacyToNewBackwardDiffTranslationFuncContext
     {
         IRInst* applyBwdFunc = nullptr;
         IRInst* contextType = nullptr;
+        IRInst* getValFunc = nullptr;
         IRInst* bwdPropFunc = nullptr;
     };
 
@@ -585,18 +587,26 @@ struct LegacyToNewBackwardDiffTranslationFuncContext
     IRFunc* primalFunc;
     IRFunc* legacyBwdDiffFunc;
 
+    // The expected types of the apply and propagate functions.
+    IRFuncType* applyForBwdFuncType;
+    IRFuncType* bwdPropFuncType;
+
     // The diagnostic sink to report errors.
     DiagnosticSink* sink;
 
     LegacyToNewBackwardDiffTranslationFuncContext(
         IRFunc* primalFunc,
         IRFunc* legacyBwdDiffFunc,
+        IRFuncType* applyForBwdFuncType,
+        IRFuncType* bwdPropFuncType,
         AutoDiffSharedContext* shared,
         DiagnosticSink* sink)
         : sharedContext(shared)
         , diffTypeContext(shared)
         , primalFunc(primalFunc)
         , legacyBwdDiffFunc(legacyBwdDiffFunc)
+        , applyForBwdFuncType(applyForBwdFuncType)
+        , bwdPropFuncType(bwdPropFuncType)
         , sink(sink)
     {
     }
@@ -622,6 +632,7 @@ struct LegacyToNewBackwardDiffTranslator
         case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
         case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
         case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
             primalFunc = inst->getOperand(0);
             bwdDiffFunc = inst->getOperand(1);
             break;
@@ -658,25 +669,39 @@ struct LegacyToNewBackwardDiffTranslator
         }
     }
 
+    IRInst* getCacheKeyForTranslateInst(IRInst* translateInst)
+    {
+        switch (translateInst->getOp())
+        {
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+        case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+            return translateInst->getOperand(0);
+        default:
+            SLANG_UNEXPECTED("Unexpected backward differentiation operation.");
+            return nullptr;
+        }
+    }
+
     IRInst* processTranslationRequest(
         IRInst* translateInst,
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        IRInst* primalFunc;
-        IRInst* legacyBwdDiffFunc;
-        getOperandsForTranslateInst(translateInst, primalFunc, legacyBwdDiffFunc);
+        IRInst* key = getCacheKeyForTranslateInst(translateInst);
 
         auto extractRelevantGlobalVal =
-            [&](LegacyToNewBackwardDiffTranslationFuncContext::Result) -> IRInst*
+            [&](LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult) -> IRInst*
         {
-            auto translationResult = translationCache[primalFunc];
             switch (translateInst->getOp())
             {
             case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
                 return translationResult.applyBwdFunc;
             case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
                 return translationResult.bwdPropFunc;
+            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+                return translationResult.getValFunc;
             case kIROp_BackwardContextFromLegacyBwdDiffFunc:
                 return translationResult.contextType;
             default:
@@ -684,16 +709,29 @@ struct LegacyToNewBackwardDiffTranslator
             }
         };
 
-        if (translationCache.containsKey(primalFunc))
+        if (translationCache.containsKey(key))
         {
             // If we already have a translation for this function, return the requested value.
-            return extractRelevantGlobalVal(translationCache[primalFunc]);
+            return extractRelevantGlobalVal(translationCache[key]);
         }
+
+        IRInst* primalFunc;
+        IRInst* legacyBwdDiffFunc;
+        IRFuncType* applyForBwdFuncType;
+        IRFuncType* bwdPropFuncType;
+        getOperandsForTranslateInst(
+            translateInst,
+            primalFunc,
+            legacyBwdDiffFunc,
+            applyForBwdFuncType,
+            bwdPropFuncType);
 
         // Create a new context for the translation.
         LegacyToNewBackwardDiffTranslationFuncContext context(
             as<IRFunc>(primalFunc),
             as<IRFunc>(legacyBwdDiffFunc),
+            applyForBwdFuncType,
+            bwdPropFuncType,
             sharedContext,
             sink);
         IRBuilder builder(sharedContext->moduleInst);
@@ -701,7 +739,7 @@ struct LegacyToNewBackwardDiffTranslator
 
         LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult =
             context.translate(&builder);
-        translationCache.add(primalFunc, translationResult);
+        translationCache.add(key, translationResult);
 
         return extractRelevantGlobalVal(translationResult);
     }

@@ -24,5 +24,5 @@ void d_test(float dOut)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    __bwd_diff(test)(3.0f);
+    bwd_diff(test)(3.0f);
 }

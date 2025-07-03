@@ -11,6 +11,23 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Pending values to write back to inout params at the end of the current function.
     OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
 
+    // Signals the transcriber to use an IRForwardDifferentiateTrivial(func)
+    // instruction for functions that are non-forward-differentiable, but
+    // have a reverse-mode derivative defined.
+    //
+    // Normally, we just treat the call as non-differentiable, but this will
+    // cause the reverse-mode differentiation step to skip the function as well
+    //
+    bool useTrivialFwdsForBwdDifferentiableFuncs = true;
+
+    void enableReverseModeCompatibility()
+    {
+        useTrivialFwdsForBwdDifferentiableFuncs = true;
+
+        // TODO: Any other flags that we need to generate a reverse-mode compatible
+        // forward-mode derivative.
+    }
+
     ForwardDiffTranscriber(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
         : AutoDiffTranscriberBase(shared, inSink)
     {
@@ -96,6 +113,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeReinterpret(IRBuilder* builder, IRInst* origInst);
 
     InstPair transcribeDifferentiableTypeAnnotation(IRBuilder* builder, IRInst* origInst);
+
+    InstPair transcribeAssociatedInstAnnotation(IRBuilder* builder, IRInst* origInst);
 
     virtual IRFuncType* differentiateFunctionType(
         IRBuilder* builder,

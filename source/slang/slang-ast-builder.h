@@ -216,6 +216,9 @@ public:
     HashSet<Val*> m_valsRequiringResolution;
     Dictionary<Val*, Val*> m_resolvedVals;
 
+    // For [PrimalSubstitute] and [PrimalSubstituteOf] decorators
+    Dictionary<Decl*, ShortList<Decl*, 4>> m_substituteMap;
+
     /// Create AST types
     template<typename T>
     T* createImpl()
@@ -506,8 +509,9 @@ public:
 
     Type* getForwardDiffFuncInterfaceType(Type* baseType);
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
-    Type* getLegacyBackwardDiffFuncInterfaceType(Type* baseType);
+    // Type* getLegacyBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
+    Type* getFwdCallableBaseType(Type* baseType);
 
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.

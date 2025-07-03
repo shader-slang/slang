@@ -1,7 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
 float bar(float x)
@@ -33,13 +33,13 @@ extension __func_as_type(bar) : IForwardDifferentiable<__func_as_type(bar)>
 void computeMain(uint tig : SV_GroupIndex)
 {
     var bwdCallable = zap.apply_bwd(1.f);
-    outputBuffer[tig] = bwdCallable.val(); // zap(1.f);
+    outputBuffer[tig] = bwdCallable.val(); // CHK: 2.0
 
     var dx = 0.f;
 
-    bwdCallable(dx, 1.f); // (out float, float) -> void
-    outputBuffer[tig + 1] = dx; // Expect:
+    bwdCallable(dx, 1.f); 
+    outputBuffer[tig + 1] = dx; // CHK: 2.0
 
     bwdCallable(dx, 3.f);
-    outputBuffer[tig + 2] = dx; // Expect:
+    outputBuffer[tig + 2] = dx; // CHK: 6.0
 }

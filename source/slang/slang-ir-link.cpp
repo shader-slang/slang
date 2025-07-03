@@ -1943,6 +1943,7 @@ bool doesModuleUseAutodiff(IRInst* inst)
             case kIROp_BackwardDifferentiatePropagate:
             case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
             case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
                 return true;
             }
         }
@@ -2187,7 +2188,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
                 sharedContext->useAutodiff &&
                     (as<IRDifferentiableTypeAnnotation>(inst) ||
-                     as<IRWitnessTableAnnotation>(inst) ||
+                     as<IRWitnessTableAnnotation>(inst) || as<IRAssociatedInstAnnotation>(inst) ||
                      inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
             {
                 auto cloned = cloneValue(context, inst);

@@ -306,10 +306,10 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tfwddiff");
         emitType(context, fwdDiffFuncType->getBase());
     }
-    else if (auto fwdCallableFuncType = as<BwdCallableFuncType>(type))
+    else if (auto bwdCallableFuncType = as<BwdCallableFuncType>(type))
     {
-        emitRaw(context, "Tfwdcallable");
-        emitType(context, fwdCallableFuncType->getBase());
+        emitRaw(context, "Tbwdcallable");
+        emitType(context, bwdCallableFuncType->getBase());
     }
     else if (auto applyForFwdFuncType = as<ApplyForBwdFuncType>(type))
     {
@@ -789,7 +789,7 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
         emitQualifiedName(context, makeDeclRef(innerDecl), true);
         return;
     }
-    else if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(decl))
+    /*else if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(decl))
     {
         emitRaw(context, "FwdReq_");
         emitQualifiedName(context, fwdReq->originalRequirementDecl, true);
@@ -800,7 +800,7 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
         emitRaw(context, "BwdReq_");
         emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
         return;
-    }
+    }*/
     else
     {
         // TODO: handle other cases

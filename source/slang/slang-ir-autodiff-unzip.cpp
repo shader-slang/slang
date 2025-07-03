@@ -175,6 +175,7 @@ struct ExtractPrimalFuncContext
         auto structField =
             genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
 
+        /*
         if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(
                 &genTypeBuilder,
                 (IRType*)fieldType,
@@ -184,6 +185,7 @@ struct ExtractPrimalFuncContext
                 structField,
                 witness);
         }
+        */
         return structField;
     }
 

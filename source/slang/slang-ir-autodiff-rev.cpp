@@ -693,8 +693,12 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
         return diffPropagateFunc;
 
     // Forward transcribe the clone of the original func.
-    ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
-        autoDiffSharedContext->transcriberSet.forwardTranscriber);
+    /*ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
+        autoDiffSharedContext->transcriberSet.forwardTranscriber);*/
+
+    ForwardDiffTranscriber fwdTranscriber(autoDiffSharedContext, sink);
+    fwdTranscriber.enableReverseModeCompatibility();
+
     auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
     IRFunc* fwdDiffFunc =
         as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
@@ -1985,6 +1989,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     //
     auto applyFunc = builder->createFunc();
     auto bwdPropFunc = builder->createFunc();
+    auto getValFunc = builder->createFunc();
     auto contextType = builder->createStructType();
 
     auto legacyBwdDiffFuncType = as<IRFuncType>(this->legacyBwdDiffFunc->getDataType());
@@ -2004,12 +2009,6 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
             builder->emitIntrinsicInst(nullptr, kIROp_BwdCallableFuncType, 2, &primalFuncType)));
     */
 
-    //
-    // Workaround to avoid the above for now (later, it's better to simply lower the expected func
-    // types into the translation request).
-    //
-
-
     applyFunc->setFullType(applyForBwdFuncType);
     bwdPropFunc->setFullType(bwdPropFuncType);
 
@@ -2028,6 +2027,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     bwdPropFuncBuilder.emitBlock();
     auto contextInParam =
         bwdPropFuncBuilder.emitParam(contextType); // Context parameter for the bwd prop func.
+    bwdPropFuncBuilder.addNameHintDecoration(contextInParam, UnownedStringSlice("ctx"));
 
     IRBuilder bwdPropPostCallBuilder(builder->getModule());
     bwdPropPostCallBuilder.setInsertAfter(contextInParam);
@@ -2037,6 +2037,16 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
         0,
         nullptr);
 
+    bwdPropFuncBuilder.setInsertBefore(placeholderCall);
+
+    // Pull up a list of primal params, so we can use them for naming &
+    // location tagging.
+    //
+    ShortList<IRParam*, 8> primalFuncParams;
+    for (auto param : this->primalFunc->getParams())
+    {
+        primalFuncParams.add(param);
+    }
 
     // Jointly emit parameters for the apply and bwd prop functions, while
     // also building the context type.
@@ -2044,10 +2054,14 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     List<IRInst*> bwdDiffFuncArgs;
     for (UIndex idx = 0; idx < applyForBwdFuncType->getParamCount(); idx++)
     {
-        // TODO: figure out how to put the right names for the parameters.
         auto applyForBwdParam = applyFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
+        generateName(builder, primalFuncParams[idx], applyForBwdParam, "");
+        applyForBwdParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+
         auto bwdPropParam = bwdPropFuncBuilder.emitParam(
             bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
+        generateName(builder, primalFuncParams[idx], bwdPropParam, "d_");
+        bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
 
         if (!as<IROutType>(applyForBwdParam->getDataType()))
         {
@@ -2067,22 +2081,23 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 
             applyFuncBuilder.emitStore(
                 applyFuncBuilder
-                    .emitFieldAddress(builder->getPtrType(structFieldType), key, contextVar),
+                    .emitFieldAddress(builder->getPtrType(structFieldType), contextVar, key),
                 applyForBwdParam);
 
             if (as<IRVoidType>(bwdPropParam->getDataType()))
             {
                 // Add just the primal part (there's no differential part since its void).
                 bwdDiffFuncArgs.add(
-                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, key, contextInParam));
+                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, contextInParam, key));
             }
             else
             {
                 // If this is not a void type, we need to construct a differential pair
                 // var.
                 //
-                auto pairType = legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount() - 1);
-                IRInst* pairVar = bwdPropFuncBuilder.emitVar(pairType);
+                auto inOutPairType = cast<IRInOutType>(
+                    legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount()));
+                IRInst* pairVar = bwdPropFuncBuilder.emitVar(inOutPairType->getValueType());
 
                 // Load the primal value from the context param and store it in here.
                 bwdPropFuncBuilder.emitStore(
@@ -2091,13 +2106,15 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
                         kIROp_DifferentialPairGetPrimalUserCode,
                         1,
                         &pairVar),
-                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, key, contextInParam));
+                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, contextInParam, key));
 
                 auto diffPtr = bwdPropFuncBuilder.emitIntrinsicInst(
-                    as<IROutTypeBase>(bwdPropParam->getDataType())->getValueType(),
+                    bwdPropFuncBuilder.getPtrType(
+                        as<IROutTypeBase>(bwdPropParam->getDataType())->getValueType()),
                     kIROp_DifferentialPairGetDifferentialUserCode,
                     1,
                     &pairVar);
+
                 if (as<IRInOutType>(bwdPropParam->getDataType()))
                 {
                     bwdPropFuncBuilder.emitStore(
@@ -2129,19 +2146,81 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
             // Nothing to do.
         }
     }
+
+    //
+    // Build the getVal() function.
+    //
+
+    auto getValFuncType = builder->getFuncType({contextType}, primalFunc->getResultType());
+
+    // Emit a call to the primal-func & store the result in a new key,
+    // then load that key in the getValFunc and return it.
+    //
+    IRStructKey* resultKeyInst = contextTypeBuilder.createStructKey();
+    auto resultFieldType = primalFunc->getResultType();
+    contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
+
+    getValFunc->setFullType(getValFuncType);
+    IRBuilder getValFuncBuilder(builder->getModule());
+    getValFuncBuilder.setInsertInto(getValFunc);
+    getValFuncBuilder.emitBlock();
+    auto getValContextParam = getValFuncBuilder.emitParam(contextType);
+    getValFuncBuilder.addNameHintDecoration(getValContextParam, UnownedStringSlice("ctx"));
+
+    if (!as<IRVoidType>(resultFieldType))
+    {
+        // Load the result value from the context and return it
+        auto resultVal =
+            getValFuncBuilder.emitFieldExtract(resultFieldType, getValContextParam, resultKeyInst);
+        getValFuncBuilder.emitReturn(resultVal);
+    }
+    else
+    {
+        getValFuncBuilder.emitReturn();
+    }
+
+    // Now we need to emit the call to the primal function in the apply function
+    List<IRInst*> primalFuncArgs;
+    for (auto param : applyFunc->getParams())
+    {
+        primalFuncArgs.add(param);
+    }
+
+    // Call the primal function and store the result in the context
+    auto primalResult = applyFuncBuilder.emitCallInst(
+        primalFunc->getResultType(),
+        primalFunc,
+        primalFuncArgs.getCount(),
+        primalFuncArgs.getBuffer());
+
+    if (!as<IRVoidType>(resultFieldType))
+    {
+        applyFuncBuilder.emitStore(
+            applyFuncBuilder.emitFieldAddress(
+                applyFuncBuilder.getPtrType(resultFieldType),
+                contextVar,
+                resultKeyInst),
+            primalResult);
+    }
+
+    //
+    // Finish up applyFunc & bwdPropFunc.
+    //
+
     applyFuncBuilder.emitReturn(applyFuncBuilder.emitLoad(contextVar));
 
     if (legacyBwdDiffFuncType->getParamCount() > bwdDiffFuncArgs.getCount())
     {
         // We have a d_out parameter.
         auto dOutParamType = legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount());
-        SLANG_ASSERT(as<IRVoidType>(dOutParamType));
-        bwdDiffFuncArgs.add(bwdPropFuncBuilder.emitParam(dOutParamType));
+        auto dOutParam = bwdPropFuncBuilder.emitParam(dOutParamType);
+        builder->addNameHintDecoration(dOutParam, UnownedStringSlice("d_out"));
+        bwdDiffFuncArgs.add(dOutParam);
     }
 
     // Replace the placeholder call with the actual bwd diff func call.
-    bwdPropPostCallBuilder.setInsertBefore(placeholderCall);
-    bwdPropPostCallBuilder.emitCallInst(
+    bwdPropFuncBuilder.setInsertBefore(placeholderCall);
+    bwdPropFuncBuilder.emitCallInst(
         legacyBwdDiffFuncType->getResultType(),
         this->legacyBwdDiffFunc,
         bwdDiffFuncArgs.getCount(),
@@ -2151,7 +2230,12 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 
     bwdPropPostCallBuilder.emitReturn();
 
-    return {applyFunc, contextType, bwdPropFunc};
+    generateName(builder, primalFunc, applyFunc, "s_apply_");
+    generateName(builder, primalFunc, bwdPropFunc, "s_bwdProp_");
+    generateName(builder, primalFunc, getValFunc, "s_getVal_");
+    generateName(builder, primalFunc, contextType, "s_bwdCallableCtx_");
+
+    return {applyFunc, contextType, getValFunc, bwdPropFunc};
 }
 
 } // namespace Slang

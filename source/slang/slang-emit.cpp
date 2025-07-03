@@ -338,6 +338,9 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+        result.autodiff = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:

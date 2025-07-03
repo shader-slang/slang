@@ -12,7 +12,7 @@ struct LatentTexture
     static const uint32_t kLatentDimsCount = N_LATENT_DIMS;
     static const uint32_t kLatentTextureCount = N_LATENT_DIMS / 4;
 
-    [BackwardDifferentiable]
+    [Differentiable]
     void getCodeStochastic(float2 uv, out float code[kLatentDimsCount])
     {
         return getCode(uint2(1,2), code);
@@ -37,7 +37,7 @@ struct LatentTexture
 
 static LatentTexture gLatents;
 
-[BackwardDifferentiable]
+[Differentiable]
 void test(float arr[10], out float result[3])
 {
     float sum = 0;
@@ -49,7 +49,7 @@ void test(float arr[10], out float result[3])
     result[2] = sum;
 }
 
-[BackwardDifferentiable]
+[Differentiable]
 float evalDecoder()
 {
     // Latent code.
@@ -79,5 +79,5 @@ float evalDecoder()
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    __bwd_diff(evalDecoder)(1.0);
+    bwd_diff(evalDecoder)(1.0);
 }

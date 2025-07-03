@@ -1216,6 +1216,24 @@ IRInst* DifferentiableTypeConformanceContext::tryGetWitnessOfKind(
     return nullptr;
 }
 
+IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
+    IRInst* target,
+    FunctionAssociationKind kind)
+{
+    // TODO: Cache results.
+    for (auto use = target->firstUse; use; use = use->nextUse)
+    {
+        if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
+        {
+            if (annotation->getConformanceID() == (IRIntegerValue)kind &&
+                annotation->getTarget() == target)
+                return annotation->getInst();
+        }
+    }
+
+    return nullptr;
+}
+
 void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
@@ -1297,7 +1315,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
         }
     }
 
-    for (auto item : witnessTableAnnotations)
+    /*for (auto item : witnessTableAnnotations)
     {
         auto conformanceKind = getFunctionConformanceKind(item->getConformanceType());
         if (conformanceKind == FunctionConformanceKind::Unknown)
@@ -1305,7 +1323,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
         witnessTableCache.addIfNotExists(
             {item->getTarget(), conformanceKind},
             item->getWitnessTable());
-    }
+    }*/
 }
 
 IRWitnessTable* findGlobalWitness(IRInterfaceType* interface, IRInst* type)
@@ -1633,7 +1651,7 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
             addTypeToDictionary((IRType*)annotation->getBaseType(), annotation->getWitness());
         }
 
-        if (auto annotation = as<IRWitnessTableAnnotation>(globalInst))
+        /*if (auto annotation = as<IRWitnessTableAnnotation>(globalInst))
         {
             auto confKind = getFunctionConformanceKind(annotation->getConformanceType());
 
@@ -1641,7 +1659,7 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
                 witnessTableCache.addIfNotExists(
                     {annotation->getTarget(), confKind},
                     annotation->getWitnessTable());
-        }
+        }*/
     }
 }
 
@@ -1784,6 +1802,7 @@ IRInst* DifferentiableTypeConformanceContext::tryGetDifferentiableWitness(
         return witness;
 
     // If a witness is not already mapped, build one if possible.
+    // TODO (Sai): Remove all these...
     SLANG_RELEASE_ASSERT(primalType);
     if (auto primalPairType = as<IRDifferentialPairTypeBase>(primalType))
     {
@@ -3410,7 +3429,7 @@ struct AutoDiffPass : public InstPassBase
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
-            if (as<IRWitnessTableEntry>(user) || as<IRWitnessTable>(user))
+            if (as<IRWitnessTable>(user) || as<IRAssociatedInstAnnotation>(user))
                 continue;
 
             if (isTranslationOp(user))
@@ -3566,9 +3585,11 @@ struct AutoDiffPass : public InstPassBase
                             autodiffContext,
                             getSink());
                     }
+                    break;
                 case kIROp_BackwardContextFromLegacyBwdDiffFunc:
                 case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
                 case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+                case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
                     {
                         // These are legacy backward differentiation functions that we
                         // translate to the new style.
@@ -3857,6 +3878,10 @@ struct RemoveTypeAnnotationInstsPass : InstPassBase
         processInstsOfType<IRWitnessTableAnnotation>(
             kIROp_WitnessTableAnnotation,
             [&](IRWitnessTableAnnotation* annotation) { annotation->removeAndDeallocate(); });
+
+        processInstsOfType<IRAssociatedInstAnnotation>(
+            kIROp_AssociatedInstAnnotation,
+            [&](IRAssociatedInstAnnotation* annotation) { annotation->removeAndDeallocate(); });
     }
 };
 

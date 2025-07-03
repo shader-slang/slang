@@ -1216,12 +1216,34 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
 // that might be used by a pass (e.g. auto-diff)
 //
 template<typename TFunc>
-void forEachAssociatedFunction(IRInst* func, TFunc callback)
+void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
     // Resolve the function to get all its decorations
-    auto resolvedFunc = getResolvedInstForDecorations(func);
-    if (!resolvedFunc)
-        return;
+    // auto resolvedFunc = getResolvedInstForDecorations(func);
+    // if (!resolvedFunc)
+    //    return;
+
+    // TODO: Verify this logic for generic witness table entries.
+    for (auto use = callee->firstUse; use; use = use->nextUse)
+    {
+        if (auto annotation = as<IRWitnessTableAnnotation>(use->getUser()))
+        {
+            if (annotation->getTarget() == callee)
+            {
+                for (auto child : annotation->getWitnessTable()->getChildren())
+                {
+                    if (auto entry = as<IRWitnessTableEntry>(child))
+                    {
+                        // If the child is a witness table entry (and not a type), we can treat it
+                        // as an associated callee.
+                        //
+                        // if (entry->getSatisfyingVal()->getDataType()->getOp() != kIROp_TypeKind)
+                        callback(entry->getSatisfyingVal());
+                    }
+                }
+            }
+        }
+    }
 
     // We'll scan for appropriate decorations and return
     // the function references.
@@ -1230,7 +1252,7 @@ void forEachAssociatedFunction(IRInst* func, TFunc callback)
     // passes, we might want to create a parent class for such
     // decorations that associate functions with each other.
     //
-    for (auto decor : resolvedFunc->getDecorations())
+    /*for (auto decor : resolvedFunc->getDecorations())
     {
         switch (decor->getOp())
         {
@@ -1264,7 +1286,7 @@ void forEachAssociatedFunction(IRInst* func, TFunc callback)
         default:
             break;
         }
-    }
+    }*/
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
@@ -1291,9 +1313,13 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     // Typically, once the relevant pass has completed, the association is removed,
     // and at that point we can remove the function.
     //
+    // TODO: We can narrow this check down a bit.. this check is only really
+    // needed if the parent function that is performing the call is an operand
+    // of a translate inst (i.e. IRTranslateBase/IRTranslatedTypeBase)
+    //
     if (!sideEffect)
     {
-        forEachAssociatedFunction(
+        forEachAssociatedCallee(
             callee,
             [&](IRInst* associatedCallee)
             {

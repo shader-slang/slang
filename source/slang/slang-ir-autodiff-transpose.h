@@ -648,7 +648,17 @@ struct DiffTransposePass
             builder.setInsertInto(diffParamBlock);
             auto dReturnVal = builder.emitParam((IRType*)diffReturnType);
             builder.markInstAsDifferential(dReturnVal);
-            addRevGradientForFwdInst(returnInst, RevGradient(returnInst, dReturnVal, nullptr));
+
+            // We won't add a rev-gradient at this point, since they are consumed on
+            // a per-block basis.
+            //
+            // addRevGradientForFwdInst(returnInst, RevGradient(returnInst, dReturnVal, nullptr));
+            this->dOutParam = dReturnVal;
+        }
+        else
+        {
+            // If the return type is void, then we don't need to do anything special.
+            this->dOutParam = nullptr;
         }
         // End parameter transposition
 
@@ -1173,6 +1183,15 @@ struct DiffTransposePass
             break;
         }
 
+        // Add dOut as a gradient for the return inst, if any.
+        if (auto returnInst = as<IRReturn>(inst))
+        {
+            if (this->dOutParam)
+                addRevGradientForFwdInst(
+                    returnInst,
+                    RevGradient(RevGradient::Flavor::Simple, returnInst, this->dOutParam, nullptr));
+        }
+
         // Look for gradient entries for this inst.
         List<RevGradient> gradients;
         if (hasRevGradients(inst))
@@ -1271,7 +1290,7 @@ struct DiffTransposePass
         auto fwdPropCalleeFuncType = cast<IRFuncType>(fwdPropCallee->getDataType());
 
         auto baseFn = fwdPropCallee->getBaseFn();
-        auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
+        /*auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
             baseFn,
             DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardPropCallable);
         auto bwdCallableWitnessType = as<IRWitnessTableType>(bwdCallableWitness->getDataType());
@@ -1286,7 +1305,11 @@ struct DiffTransposePass
             bwdCallableWitness,
             bwdPropMethodEntry->getRequirementKey(),
             cast<IRFuncType>(
-                diffTypeContext.resolveType(builder, bwdPropMethodEntry->getRequirementVal())));
+                diffTypeContext.resolveType(builder, bwdPropMethodEntry->getRequirementVal())));*/
+
+        auto bwdPropFunc = diffTypeContext.tryGetAssociationOfKind(
+            baseFn,
+            FunctionAssociationKind::BackwardDerivativePropagate);
 
         List<IRInst*> bwdPropArgs;
         OrderedDictionary<IRInst*, IRVar*> writebacks;
@@ -3337,6 +3360,8 @@ struct DiffTransposePass
     Dictionary<IRStore*, IRBlock*> mapStoreToDefBlock;
 
     IRCloneEnv typeInstCloneEnv = {};
+
+    IRInst* dOutParam;
 };
 
 

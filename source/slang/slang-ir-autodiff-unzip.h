@@ -259,7 +259,7 @@ struct DiffUnzipPass
         SLANG_RELEASE_ASSERT(baseFn);
 
         // AD 2.0 logic..
-        auto bwdDiffWitness = diffTypeContext.tryGetWitnessOfKind(
+        /*auto bwdDiffWitness = diffTypeContext.tryGetWitnessOfKind(
             baseFn,
             DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardDifferentiable);
 
@@ -270,15 +270,23 @@ struct DiffUnzipPass
         IRInterfaceRequirementEntry* applyBwdMethodEntry =
             as<IRInterfaceRequirementEntry>(bwdDiffWitnessInterface->getOperand(2));
 
+        // TODO: Need to lower annotations for _functions_ and not witness tables.
+        // This will force the front-end to lower a proper func-type in the context of the function.
+        // Right now, we aare using the witness table's requirement type, which won't have
+        // info for the associated types.
+        //
         auto applyBwdFunc = _lookupWitness(
             primalBuilder,
             bwdDiffWitness,
             applyBwdMethodEntry->getRequirementKey(),
             cast<IRFuncType>(diffTypeContext.resolveType(
                 primalBuilder,
-                applyBwdMethodEntry->getRequirementVal())));
+                applyBwdMethodEntry->getRequirementVal())));*/
 
-        auto applyBwdFuncType = as<IRFuncType>(applyBwdFunc->getDataType());
+        auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
+            baseFn,
+            FunctionAssociationKind::BackwardDerivativeApply);
+        auto applyBwdFuncType = cast<IRFuncType>(applyBwdFunc->getDataType());
 
         List<IRInst*> applyFuncArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
@@ -290,13 +298,14 @@ struct DiffUnzipPass
                 applyFuncArgs.add(arg);
         }
 
+        SLANG_ASSERT(applyFuncArgs.getCount() == applyBwdFuncType->getParamCount());
         auto contextVal = primalBuilder->emitCallInst(
             applyBwdFuncType->getResultType(),
             applyBwdFunc,
             applyFuncArgs);
         primalBuilder->markInstAsPrimal(contextVal);
 
-        auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
+        /*auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
             baseFn,
             DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardPropCallable);
         auto bwdCallableWitnessType = as<IRWitnessTableType>(bwdCallableWitness->getDataType());
@@ -313,7 +322,11 @@ struct DiffUnzipPass
             cast<IRFuncType>(diffTypeContext.resolveType(
                 primalBuilder,
                 getValMethodEntry->getRequirementVal())));
-        primalBuilder->markInstAsPrimal(getValFunc);
+        primalBuilder->markInstAsPrimal(getValFunc);*/
+        auto getValFunc = diffTypeContext.tryGetAssociationOfKind(
+            baseFn,
+            FunctionAssociationKind::BackwardDerivativeContextGetVal);
+        SLANG_ASSERT(getValFunc);
 
         // Extract the primal return value from the context.
         // This will serve as the primal part of the mixed call.
@@ -383,13 +396,16 @@ struct DiffUnzipPass
         // ....
         auto fwdPropFuncInst =
             diffBuilder->emitForwardDifferentiatePropagateInst(fwdPropFuncType, baseFn);
-        diffBuilder->markInstAsDifferential(fwdPropFuncInst, fwdPropFuncType, primalReturnVal);
+        // diffBuilder->markInstAsDifferential(fwdPropFuncInst, fwdPropFuncType, primalReturnVal);
 
         auto fwdPropCall = diffBuilder->emitCallInst(
             fwdPropFuncType->getResultType(),
             fwdPropFuncInst,
             propFuncArgs);
-        diffBuilder->markInstAsDifferential(fwdPropCall, fwdPropFuncType, primalReturnVal);
+        diffBuilder->markInstAsDifferential(
+            fwdPropCall,
+            primalReturnVal->getDataType(),
+            primalReturnVal);
 
         return InstPair(primalReturnVal, fwdPropCall);
 

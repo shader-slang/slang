@@ -690,11 +690,12 @@ __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin("IForwardDifferentiable")]
 interface IForwardDifferentiable<FType>
 {
+
     // BuiltinRequirementKind::ForwardDerivativeFunc
     // inserts a synthesized-func-decl, which becomes a 
     // IRForwardDifferentiate()
     // 
-    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     //static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
     static __associatedfunc __fwd_diff_func_type(FType) fwd_diff; // -> fwd_diff
 };
@@ -719,7 +720,7 @@ interface IBackwardDifferentiable<FType>
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
-    __associatedfunc __apply_bwd_func_type(FType) apply_bwd; // -> primal_ctx
+    __associatedfunc __apply_bwd_func_type(FType, This.BwdCallable) apply_bwd; // -> apply_bwd
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
     __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx

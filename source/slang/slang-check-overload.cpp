@@ -629,9 +629,11 @@ static QualType getParamQualType(Type* paramType)
     if (auto paramDirType = as<ParamDirectionType>(paramType))
     {
         if (as<OutTypeBase>(paramDirType) || as<RefType>(paramDirType))
-            return QualType(paramDirType->getValueType(), true);
+            return QualType(unwrapModifiedType(paramDirType->getValueType()), true);
     }
-    return paramType;
+    // TODO: We really shouldn't be dropping modifiers like this, but at the moment
+    // we can't get a sub-type to coerce to a no_diff(superType)
+    return unwrapModifiedType(paramType);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -1321,6 +1323,45 @@ DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
     return parent;
 }
 
+// TODO: Probably a nicer way to do this..
+bool isEffectivelySynthesized(Decl* decl)
+{
+    if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
+    {
+        if (synFuncDecl->irOp == kIROp_FunctionCopy)
+            return isEffectivelySynthesized(DeclRef<Decl>(synFuncDecl->operands[0]).getDecl());
+
+        switch (synFuncDecl->irOp)
+        {
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+            return false;
+        default:
+            // All other synthesized functions are considered synthesized.
+            return true;
+        }
+    }
+
+    if (auto typealiasDecl = as<TypeDefDecl>(decl))
+        if (auto declRefType = as<DeclRefType>(typealiasDecl->type.type))
+            return isEffectivelySynthesized(declRefType->getDeclRef().getDecl());
+
+    if (auto synStructDecl = as<SynthesizedStructDecl>(decl))
+    {
+        switch (synStructDecl->irOp)
+        {
+        case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+            return false;
+        default:
+            // All other synthesized structs are considered synthesized.
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
 //
 int SemanticsVisitor::CompareLookupResultItems(
@@ -1466,6 +1507,17 @@ int SemanticsVisitor::CompareLookupResultItems(
         }
     }
 
+    // If both are synthesized func decls, prefer the one that is not
+    // synthesized.
+    //
+    bool isEffectivelySynthesizedLeft = isEffectivelySynthesized(left.declRef.getDecl());
+    bool isEffectivelySynthesizedRight = isEffectivelySynthesized(right.declRef.getDecl());
+
+    if (isEffectivelySynthesizedLeft != isEffectivelySynthesizedRight)
+    {
+        // If one is synthesized and the other is not, prefer the one that is not synthesized.
+        return int(isEffectivelySynthesizedLeft) - int(isEffectivelySynthesizedRight);
+    }
 
     // TODO: We should generalize above rules such that in a tie a declaration
     // A::m is better than B::m when all other factors are equal and

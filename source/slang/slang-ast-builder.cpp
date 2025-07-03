@@ -300,7 +300,7 @@ Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType)
             makeConstArrayViewSingle(as<Val>(baseType))));
 }
 
-
+/*
 Type* ASTBuilder::getLegacyBackwardDiffFuncInterfaceType(Type* baseType)
 {
     auto decl = getSharedASTBuilder()->findMagicDecl("LegacyBwdDiffFuncInterfaceType");
@@ -309,11 +309,21 @@ Type* ASTBuilder::getLegacyBackwardDiffFuncInterfaceType(Type* baseType)
         this->getGenericAppDeclRef(
             DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
             makeConstArrayViewSingle(as<Val>(baseType))));
-}
+}*/
 
 Type* ASTBuilder::getBwdCallableBaseType(Type* baseType)
 {
     auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+Type* ASTBuilder::getFwdCallableBaseType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("FwdCallableBaseType");
     return DeclRefType::create(
         this,
         this->getGenericAppDeclRef(

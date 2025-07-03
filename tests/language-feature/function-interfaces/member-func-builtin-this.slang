@@ -20,7 +20,7 @@ struct Zig : IDifferentiable
     }
 };
 
-extension __func_as_type(Zig::zap) : IDifferentiableFuncBase, IForwardDifferentiable<__func_as_type(Zig::zap)> { };
+extension __func_as_type(Zig::zap) : IForwardDifferentiable<__func_as_type(Zig::zap)> { };
 
 [numthreads(1, 1, 1)]
 void computeMain(uint tig : SV_GroupIndex)
@@ -28,5 +28,5 @@ void computeMain(uint tig : SV_GroupIndex)
     Zig zig = {3};
     DifferentialPair<Zig> dpzig = diffPair(zig, zig);
     DifferentialPair<float> dpx = diffPair(2.0, 5.0);
-    outputBuffer[tig] = zig.zap.fwd_diff(dpzig, dpx).d; // Expect: ?
+    outputBuffer[tig] = __func_as_type(Zig::zap).fwd_diff(dpzig, dpx).d; // Expect: ?
 }

@@ -2662,6 +2662,80 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
+
+// For AD 2.0, we represent derivatives as lookups
+// instead of operators.
+//
+static Expr* convertHigherOrderExprToLookup(
+    SemanticsVisitor* visitor,
+    HigherOrderInvokeExpr* resultExpr)
+{
+    Name* lookupName = nullptr;
+    if (as<ForwardDifferentiateExpr>(resultExpr))
+    {
+        lookupName = visitor->getName("fwd_diff");
+    }
+    else if (as<BackwardDifferentiateExpr>(resultExpr))
+    {
+        lookupName = visitor->getName("bwd_diff");
+    }
+    else
+    {
+        visitor->getSink()->diagnose(
+            resultExpr,
+            Diagnostics::internalCompilerError,
+            "Unsupported higher order invoke expression");
+        return resultExpr;
+    }
+
+    if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
+    {
+        auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), declRefExpr->declRef);
+
+        auto result = lookUpMember(
+            visitor->getASTBuilder(),
+            visitor,
+            lookupName,
+            funcAsType,
+            visitor->getOuterScope(),
+            LookupMask::Default,
+            LookupOptions::NoDeref);
+        result = visitor->resolveOverloadedLookup(result);
+
+        if (result.isValid() && !result.isOverloaded())
+        {
+            // Return the lookup result.
+            auto lookupResultExpr = visitor->createLookupResultExpr(
+                lookupName,
+                result,
+                resultExpr->baseFunction,
+                resultExpr->loc,
+                resultExpr);
+
+            // Slight hack for the fact that some function result types can be "unresolved".
+            lookupResultExpr->type = visitor->resolveType(lookupResultExpr->type);
+            return lookupResultExpr;
+        }
+        else
+        {
+            visitor->getSink()->diagnose(
+                resultExpr,
+                Diagnostics::internalCompilerError,
+                "Could not find derivative function for operand. Operand may not be "
+                "differentiable.");
+            return resultExpr;
+        }
+    }
+    else
+    {
+        visitor->getSink()->diagnose(
+            resultExpr,
+            Diagnostics::internalCompilerError,
+            "Higher order invoke operand did not resolve to a function");
+        return resultExpr;
+    }
+}
+
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
@@ -2879,6 +2953,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         }
                     }
                 }
+
+                invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
             }
         }
     }
@@ -3130,13 +3206,16 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                     //     checkGenericAppWithCheckedArgs(fwdDiffInterfaceGenericAppExpr));
 
                     // fn : IForwardDifferentiable
+                    /*
                     auto fwdDiffInterfaceType =
                         m_astBuilder->getForwardDiffFuncInterfaceType(funcAsType);
 
                     if (auto witness = tryGetSubtypeWitness(funcAsType, fwdDiffInterfaceType))
+                    {
                         m_parentDifferentiableAttr->addWitness(
                             fnExpr->declRef.declRefBase,
                             witness);
+                    }
 
                     // fn : IBackwardDifferentiable
                     auto bwdDiffInterfaceType =
@@ -3221,6 +3300,82 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                                 }
                             }
                         }
+                    }*/
+                }
+
+                // Revised AD 2.0 lowering.
+                {
+                    auto maybeRegisterVal = [&](Type* baseForLookup,
+                                                Val* baseForRegistry,
+                                                Name* name,
+                                                FunctionAssociationKind kind) -> Val*
+                    {
+                        auto lookupResult = lookUpMember(
+                            getCurrentASTBuilder(),
+                            this,
+                            name,
+                            baseForLookup,
+                            getOuterScope(),
+                            LookupMask::Default);
+                        lookupResult = resolveOverloadedLookup(lookupResult);
+
+                        if (!lookupResult.isOverloaded() && lookupResult.isValid())
+                        {
+                            // TODO: This is a hack to force the func type to be translated
+                            // and cached in the resolvedVals map.
+                            // We probably want something more robust..
+                            //
+                            if (lookupResult.item.declRef.as<CallableDecl>())
+                            {
+                                auto type =
+                                    GetTypeForDeclRef(lookupResult.item.declRef, fnExpr->loc);
+                                if (!as<FuncType>(type))
+                                {
+                                    getCurrentASTBuilder()->m_resolvedVals[type.type] =
+                                        resolveType(type);
+                                }
+                            }
+
+                            m_parentDifferentiableAttr->addAssocVal(
+                                baseForRegistry,
+                                (SlangInt)kind,
+                                lookupResult.item.declRef);
+                            return (Val*)lookupResult.item.declRef;
+                        }
+
+                        return nullptr;
+                    };
+
+                    maybeRegisterVal(
+                        funcAsType,
+                        fnExpr->declRef.declRefBase,
+                        this->getName("fwd_diff"),
+                        FunctionAssociationKind::ForwardDerivative);
+
+                    if (maybeRegisterVal(
+                            funcAsType,
+                            fnExpr->declRef.declRefBase,
+                            this->getName("apply_bwd"),
+                            FunctionAssociationKind::BackwardDerivativeApply))
+                    {
+                        auto bwdCallableType = as<DeclRefBase>(maybeRegisterVal(
+                            funcAsType,
+                            fnExpr->declRef.declRefBase,
+                            this->getName("BwdCallable"),
+                            FunctionAssociationKind::BackwardDerivativeContext));
+                        SLANG_ASSERT(bwdCallableType); // TODO: Diagnose if not found.
+
+                        maybeRegisterVal(
+                            DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
+                            fnExpr->declRef.declRefBase,
+                            this->getName("()"),
+                            FunctionAssociationKind::BackwardDerivativePropagate);
+
+                        maybeRegisterVal(
+                            DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
+                            fnExpr->declRef.declRefBase,
+                            this->getName("val"),
+                            FunctionAssociationKind::BackwardDerivativeContextGetVal);
                     }
                 }
             }
@@ -3370,7 +3525,14 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, Type* thi
     {
         // The first parameter is the primal function itself.
         if (auto diffThisType = _toDifferentialParamType(thisType))
+        {
             paramTypes.add(diffThisType);
+        }
+
+        /*if (auto diffThisType = tryGetDifferentialType(m_astBuilder, thisType))
+        {
+            paramTypes.add(diffThisType);
+        }*/
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
@@ -3427,9 +3589,23 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
                 {
                     // An `inout` non differentiable parameter becomes an `in` parameter
                     // (removing `out`).
-                    derivType = inoutType->getValueType();
+                    derivType = m_astBuilder->getModifiedType(
+                        inoutType->getValueType(),
+                        {m_astBuilder->getNoDiffModifierVal()});
                 }
             }
+            else
+            {
+                // If the type is not a pair, it must be a non-differentiable,
+                // we'll wrap it in a NoDiff, so that any changes to the type
+                // that may make it differentiable in the future don't affect
+                // the function signature
+                //
+                derivType = m_astBuilder->getModifiedType(
+                    derivType,
+                    {m_astBuilder->getNoDiffModifierVal()});
+            }
+
             paramTypes.add(derivType);
         }
     }
@@ -3449,6 +3625,7 @@ struct HigherOrderInvokeExprCheckingActions
         HigherOrderInvokeExpr* resultDiffExpr,
         SemanticsVisitor* semantics,
         Expr* funcExpr) = 0;
+
     FuncType* getBaseFunctionType(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         if (auto funcType = as<FuncType>(funcExpr->type.type))
@@ -3614,7 +3791,12 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
-    expr->baseFunction = semantics->CheckTerm(expr->baseFunction);
+    SemanticsVisitor subVisitor(semantics->getShared());
+    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
+    expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
+    expr->baseFunction =
+        subVisitor.maybeResolveOverloadedExpr(expr->baseFunction, LookupMask::Function, nullptr);
 
     auto astBuilder = semantics->getASTBuilder();
 
@@ -5021,16 +5203,38 @@ Expr* SemanticsExprVisitor::visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr
 {
     // Translate type node.
     expr->base = CheckProperType(expr->base);
+    expr->ctxType = CheckProperType(expr->ctxType);
 
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
+        !as<ErrorType>(expr->ctxType.type))
     {
-        auto fwdDiffFuncType = m_astBuilder->getOrCreate<ApplyForBwdFuncType>(expr->base.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
+        auto bwdApplyFuncType =
+            m_astBuilder->getOrCreate<ApplyForBwdFuncType>(expr->base.type, expr->ctxType.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(bwdApplyFuncType);
         return expr;
     }
 
     SLANG_UNEXPECTED("aaaaah");
 }
+/*
+Expr* SemanticsExprVisitor::visitApplyForFwdFuncTypeExpr(ApplyForFwdFuncTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+    expr->ctxType = CheckProperType(expr->ctxType);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
+        !as<ErrorType>(expr->ctxType.type))
+    {
+        auto fwdApplyFuncType =
+            m_astBuilder->getOrCreate<ApplyForFwdFuncType>(expr->base.type, expr->ctxType.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdApplyFuncType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
+}
+*/
 
 Expr* SemanticsExprVisitor::visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr)
 {
@@ -5039,13 +5243,29 @@ Expr* SemanticsExprVisitor::visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr
 
     if (expr->base.type && !as<ErrorType>(expr->base.type))
     {
-        auto fwdDiffFuncType = m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
+        auto bwdCallableFuncType = m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(bwdCallableFuncType);
         return expr;
     }
 
     SLANG_UNEXPECTED("aaaaah");
 }
+/*
+Expr* SemanticsExprVisitor::visitFwdCallableFuncTypeExpr(FwdCallableFuncTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    {
+        auto fwdCallableFuncType = m_astBuilder->getOrCreate<FwdCallableFuncType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdCallableFuncType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
+}
+*/
 
 Expr* SemanticsExprVisitor::visitFuncResultTypeExpr(FuncResultTypeExpr* expr)
 {

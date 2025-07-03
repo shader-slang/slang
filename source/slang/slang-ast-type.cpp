@@ -369,17 +369,21 @@ void ApplyForBwdFuncType::_toTextOverride(StringBuilder& out)
     out << toSlice("ApplyForBwdFuncType<") << getBase() << toSlice(">");
 }
 
-Type* ApplyForBwdFuncType::_createCanonicalTypeOverride()
+/*Type* ApplyForBwdFuncType::_createCanonicalTypeOverride()
 {
     auto canonicalType = getBase()->getCanonicalType();
-    if (canonicalType == this)
-        return this;
+    auto canonicalCtxType = getCtxType()->getCanonicalType();
+    if (canonicalType != getBase() || canonicalCtxType != getCtxType())
+        return getCurrentASTBuilder()->getOrCreate<ApplyForBwdFuncType>(
+            canonicalType,
+            canonicalCtxType);
 
     // Otherwise, create a new ApplyForBwdFuncType.
-    auto astBuilder = getCurrentASTBuilder();
-    auto newType = astBuilder->getOrCreate<ApplyForBwdFuncType>(canonicalType);
-    return newType;
-}
+   //auto astBuilder = getCurrentASTBuilder();
+    //auto newType = astBuilder->getOrCreate<ApplyForBwdFuncType>(canonicalType);
+    //return newType;
+    return this;
+}*/
 
 Val* ApplyForBwdFuncType::_substituteImplOverride(
     ASTBuilder* astBuilder,
@@ -387,7 +391,8 @@ Val* ApplyForBwdFuncType::_substituteImplOverride(
     int* ioDiff)
 {
     auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<ApplyForBwdFuncType>(substBase)->getCanonicalType();
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<ApplyForBwdFuncType>(substBase, substCtx)->getCanonicalType();
 }
 
 // --

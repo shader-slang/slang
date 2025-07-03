@@ -69,6 +69,20 @@ enum class DiffConformanceKind
     Value = 2 // Perform actions for IDifferentiable
 };
 
+enum class FunctionConformanceKind
+{
+    Unknown = 0,
+    // ForwardDifferentiable = 1,
+    // BackwardDifferentiable = 2,
+    // BackwardPropCallable = 3,
+
+    ForwardDerivative = 1,
+    BackwardApply = 2,
+    BackwardContext = 3,
+    BackwardContextGetVal = 4,
+    BackwardProp = 5,
+};
+
 struct AutoDiffSharedContext
 {
     TargetProgram* targetProgram = nullptr;
@@ -235,14 +249,6 @@ struct DifferentiableTypeConformanceContext
     IRGlobalValueWithCode* parentFunc = nullptr;
     OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
-    enum class FunctionConformanceKind
-    {
-        Unknown = 0,
-        ForwardDifferentiable = 1,
-        BackwardDifferentiable = 2,
-        BackwardPropCallable = 3
-    };
-
     struct WitnessTableCacheKey
     {
         IRInst* inst;
@@ -278,7 +284,7 @@ struct DifferentiableTypeConformanceContext
 
     IRType* lookupContextType(IRBuilder* builder, IRInst* fnInst)
     {
-        auto bwdDiffWitness =
+        /*auto bwdDiffWitness =
             tryGetWitnessOfKind(fnInst, FunctionConformanceKind::BackwardDifferentiable);
         SLANG_ASSERT(bwdDiffWitness);
         auto bwdDiffWitnessType = as<IRWitnessTableType>(bwdDiffWitness->getDataType());
@@ -290,9 +296,12 @@ struct DifferentiableTypeConformanceContext
         auto bwdContextType = builder->emitLookupInterfaceMethodInst(
             builder->getTypeKind(),
             bwdDiffWitness,
-            contextTypeEntry->getRequirementKey());
+            contextTypeEntry->getRequirementKey());*/
 
-        return (IRType*)bwdContextType;
+        return (IRType*)tryGetAssociationOfKind(
+            fnInst,
+            FunctionAssociationKind::BackwardDerivativeContext);
+        // return (IRType*)bwdContextType;
     }
 
     IRType* resolveType(IRBuilder* builder, IRInst* typeInst)
@@ -314,17 +323,17 @@ struct DifferentiableTypeConformanceContext
         {
         case kIROp_ForwardDiffFuncType:
             {
-                SLANG_UNEXPECTED("not supported yet..");
+                SLANG_UNEXPECTED("not supported here..");
             }
         case kIROp_ApplyForBwdFuncType:
             {
-                auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
 
                 // Copy the func's parameter types as-is and replace the result type with
                 // the bwd context type.
                 //
-                auto innerFnType =
-                    cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)->getDataType()));
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
 
                 List<IRType*> paramTypes;
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
@@ -338,8 +347,7 @@ struct DifferentiableTypeConformanceContext
         case kIROp_FuncResultType:
             {
                 auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
-                auto innerFnType =
-                    cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)->getDataType()));
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
 
                 return builder->getFuncType(
                     List<IRType*>(bwdContextType),
@@ -350,8 +358,7 @@ struct DifferentiableTypeConformanceContext
             {
                 auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
 
-                auto innerFnType =
-                    cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)->getDataType()));
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
                 List<IRType*> paramTypes;
 
                 paramTypes.add(bwdContextType);
@@ -386,7 +393,7 @@ struct DifferentiableTypeConformanceContext
         return (IRType*)typeInst;
     }
 
-    FunctionConformanceKind getFunctionConformanceKind(IRInst* conformanceType)
+    /*FunctionConformanceKind getFunctionConformanceKind(IRInst* conformanceType)
     {
         if (auto knownBuiltinDecoration =
                 conformanceType->findDecoration<IRKnownBuiltinDecoration>())
@@ -408,7 +415,7 @@ struct DifferentiableTypeConformanceContext
         }
 
         return FunctionConformanceKind::Unknown;
-    }
+    }*/
 
     void setFunc(IRGlobalValueWithCode* func);
 
@@ -419,6 +426,8 @@ struct DifferentiableTypeConformanceContext
     List<T*> getAnnotations(IRModuleInst* inst);
 
     IRInst* tryGetWitnessOfKind(IRInst* target, FunctionConformanceKind kind);
+
+    IRInst* tryGetAssociationOfKind(IRInst* target, FunctionAssociationKind kind);
 
     void buildGlobalWitnessDictionary();
 

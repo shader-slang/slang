@@ -114,6 +114,17 @@ enum class AddressSpace : uint64_t
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
 };
+
+enum class FunctionAssociationKind
+{
+    Unknown = 0,
+    ForwardDerivative = 1,
+    BackwardDerivativeApply = 2,
+    BackwardDerivativeContext = 3,
+    BackwardDerivativeContextGetVal = 4,
+    BackwardDerivativePropagate = 5
+};
+
 } // namespace Slang
 
 #endif

@@ -1999,10 +1999,11 @@ public:
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeBwdContextTypeRequirementWitness(
+    bool trySynthesizeDiffContextTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
 
     /// Attempt to synthesize function requirements for enum types to make them conform to
     /// `ILogical`.
@@ -2995,6 +2996,8 @@ public:
     Expr* visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr* expr);
     Expr* visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr);
     Expr* visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr);
+    // Expr* visitApplyForFwdFuncTypeExpr(ApplyForFwdFuncTypeExpr* expr);
+    // Expr* visitFwdCallableFuncTypeExpr(FwdCallableFuncTypeExpr* expr);
     Expr* visitFuncResultTypeExpr(FuncResultTypeExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);

@@ -732,7 +732,18 @@ class ApplyForBwdFuncTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
 };
+
+/*
+FIDDLE()
+class ApplyForFwdFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
+};
+*/
 
 FIDDLE()
 class BwdCallableFuncTypeExpr : public Expr
@@ -740,6 +751,16 @@ class BwdCallableFuncTypeExpr : public Expr
     FIDDLE(...)
     FIDDLE() TypeExp base;
 };
+
+/*
+FIDDLE()
+class FwdCallableFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+*/
+
 
 FIDDLE()
 class FuncResultTypeExpr : public Expr

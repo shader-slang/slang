@@ -70,11 +70,15 @@ INST(Nop, nop, 0, 0)
     INST(BackwardDiffFuncType, BwdDiffFuncType, 1, HOISTABLE)
     INST(ApplyForBwdFuncType, ApplyForBwdFuncType, 1, HOISTABLE)
     INST(BwdCallableFuncType, BwdCallableFuncType, 1, HOISTABLE)
+    //INST(ApplyForFwdFuncType, ApplyForFwdFuncType, 1, HOISTABLE)
+    //INST(FwdCallableFuncType, FwdCallableFuncType, 1, HOISTABLE)
     INST(FuncResultType, FuncResultType, 1, HOISTABLE)
 
-    INST(BackwardContextFromLegacyBwdDiffFunc, BackwardContextFromLegacyBwdDiffFunc, 2, HOISTABLE)
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
-    INST_RANGE(TranslatedTypeBase, BackwardContextFromLegacyBwdDiffFunc, BackwardDiffIntermediateContextType)
+    INST(BackwardContextFromLegacyBwdDiffFunc, BackwardContextFromLegacyBwdDiffFunc, 2, HOISTABLE)
+    //INST(ForwardDerivativeContextType, ForwardDerivativeContextType, 1, HOISTABLE)
+    //INST(ForwardContextFromLegacyFwdDiffFunc, ForwardContextFromLegacyFwdDiffFunc, 2, HOISTABLE)
+    INST_RANGE(TranslatedTypeBase, BackwardDiffIntermediateContextType, BackwardContextFromLegacyBwdDiffFunc)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
@@ -1250,7 +1254,9 @@ INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
 INST(AlignOf,                           alignOf,                    1, 0)
-INST(CountOf, countOf, 1, 0)
+INST(CountOf,                           countOf,                    1, 0)
+INST(FuncTypeOf,                        funcTypeOf,                 1, 0)
+INST(ContextTypeOf,                     contextTypeOf,              1, 0)
 
 INST(GetArrayLength,                    GetArrayLength,             1, 0)
 INST(IsType, IsType, 3, 0)
@@ -1264,7 +1270,24 @@ INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
 INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
-    INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, HOISTABLE)
+    // AD 2.0 Translation Insts. 
+    //
+    // These represent the core instructions that can be used to invoke the
+    // auto-diff passes.
+
+    // Produces the context struct from the primal arguments, that the
+    // derivatives are supplied to.
+    //
+    //INST(ForwardDifferentiateApply,               ForwardDifferentiateApply,      1, HOISTABLE)
+
+    // Computes both the primal and differential results through forward derivative propagation.
+    //INST(ForwardEvalAndPropagate,                 ForwardEvalAndPropagate,        1, HOISTABLE)
+
+    // Produces a function with the correct signature, but all 0 derivatives. Used for
+    // placeholders & trivial implementations for satisfying interface requirements.
+    // Like a differential "no-op".
+    //
+    INST(ForwardDifferentiateTrivial,            ForwardDifferentiateTrivial,     1, HOISTABLE)
 
     // Produces the primal computation of backward derivatives, will return an intermediate context for
     // backward derivative func.
@@ -1277,24 +1300,32 @@ INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
     // AD 2.0 inst to get the primal value from the backward context.
     INST(BackwardContextGetPrimalVal,            BackwardContextGetPrimalVal,     1, HOISTABLE)
 
-    // AD 2.0 inst for internal use. Represents a forward-propagation function that
-    // accepts the bwd-context. 
-    // 
-    INST(ForwardDifferentiatePropagate,        ForwardDifferentiatePropagate,   1, HOISTABLE)
-
     // AD 2.0 inst for "copying" a function as-is. Useful for representing the same function
     // under different contexts/names, while retaining a single definition.
     INST(FunctionCopy, FunctionCopy, 1, HOISTABLE)
 
-    // Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
-    // replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
-    INST(BackwardDifferentiate, BackwardDifferentiate, 3, HOISTABLE)
+    // The AD 2.0 -> AD 1.0 Translation Insts
+    // Represents the conceptual full forward and backward derivative invocation, including
+    // any primal necessary primal conputation.
+    // 
+    INST(BackwardDifferentiate,                     BackwardDifferentiate, 3, HOISTABLE)
+    INST(ForwardDifferentiate,                      ForwardDifferentiate,  3, HOISTABLE)
 
-    // Legacy to AD 2.0 Translation insts.
+    // AD 1.0 -> AD 2.0 Translation insts.
     INST(BackwardPrimalFromLegacyBwdDiffFunc, BackwardPrimalFromLegacyBwdDiffFunc, 2, HOISTABLE)
+    INST(BackwardContextGetValFromLegacyBwdDiffFunc, BackwardContextGetValFromLegacyBwdDiffFunc, 2, HOISTABLE)
     INST(BackwardPropagateFromLegacyBwdDiffFunc, BackwardPropagateFromLegacyBwdDiffFunc, 2, HOISTABLE)
 
-INST_RANGE(TranslateBase, ForwardDifferentiate, BackwardPropagateFromLegacyBwdDiffFunc)
+    //INST(ForwardEvalAndPropFromLegacyFwdDiffFunc, ForwardEvalAndPropFromLegacyFwdDiffFunc, 2, HOISTABLE)
+    //INST(ForwardApplyFromLegacyFwdDiffFunc,       ForwardApplyFromLegacyFwdDiffFunc, 2, HOISTABLE)
+
+    // AD 2.0 Internal Use Insts.
+    // Represents a forward-propagation function that
+    // accepts the bwd-context. 
+    // 
+    INST(ForwardDifferentiatePropagate,        ForwardDifferentiatePropagate,   1, HOISTABLE)
+
+INST_RANGE(TranslateBase, ForwardDifferentiateTrivial, ForwardDifferentiatePropagate)
 
 INST(PrimalSubstitute, PrimalSubstitute, 1, 0)
 
@@ -1370,6 +1401,7 @@ INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 /* Differentiable Type Annotation (for run-time types)*/
 INST(DifferentiableTypeAnnotation, DifferentiableTypeAnnotation, 2, HOISTABLE)
 INST(WitnessTableAnnotation, WitnessTableAnnotation, 2, HOISTABLE)
+INST(AssociatedInstAnnotation, AssociatedInstAnnotation, 3, HOISTABLE)
 
 INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
