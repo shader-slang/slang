@@ -1102,7 +1102,7 @@ Stage
 * `miss` 
 * `callable` 
 * `mesh` 
-* `amplification` 
+* `amplification`, `task` 
 * `dispatch` 
 
 <a id="vulkan-shift"></a>
@@ -1383,6 +1383,7 @@ A capability describes an optional feature that a target may or may not support.
 * `callable` 
 * `miss` 
 * `mesh` 
+* `task` 
 * `amplification` 
 * `any_stage` 
 * `amplification_mesh` 
@@ -1585,6 +1586,8 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `tesc` : glsl (hull) 
 * `tese` : glsl (domain) 
 * `comp` : glsl (compute) 
+* `mesh` : glsl (mesh) 
+* `task` : glsl (amplification) 
 * `slang` 
 * `spv` : SPIR-V 
 * `spv-asm` : SPIR-V assembly 
