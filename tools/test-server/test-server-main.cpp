@@ -531,8 +531,9 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     List<UnownedStringSlice> stderrLines;
     StringUtil::split(stdError.getUnownedSlice(), '\n', stderrLines);
 
-    for (const auto& line : stderrLines)
+    for (Index i = 0; i < stderrLines.getCount(); ++i)
     {
+        const auto& line = stderrLines[i];
         if (line.startsWith("[DEBUG_LAYER]"))
         {
             // Extract the message after the prefix (skip "[DEBUG_LAYER]")
@@ -543,7 +544,11 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
         else
         {
             cleanStdError.append(line);
-            cleanStdError.append("\n");
+            // Only add newline if this isn't the last line or if the original had a trailing newline
+            if (i < stderrLines.getCount() - 1 || stdError.getUnownedSlice().endsWith("\n"))
+            {
+                cleanStdError.append("\n");
+            }
         }
     }
 
