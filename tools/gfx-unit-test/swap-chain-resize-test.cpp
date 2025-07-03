@@ -1,3 +1,5 @@
+#if 0
+
 // Duplicated: This test is similar to slang-rhi\tests\test-surface.cpp
 
 #include <slang-rhi.h>
@@ -79,6 +81,7 @@ struct SwapchainResizeTest
         vertexBufferDesc.size = sizeof(Vertex) * kVertexCount;
         vertexBufferDesc.memoryType = MemoryType::DeviceLocal;
         vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
         vertexBuffer = device->createBuffer(vertexBufferDesc, kVertexData);
 
         // Input layout
@@ -89,23 +92,31 @@ struct SwapchainResizeTest
             {sizeof(Vertex), InputSlotClass::PerVertex, 0},
         };
         InputLayoutDesc inputLayoutDesc = {};
-        inputLayoutDesc.inputElementCount = 1;
+        inputLayoutDesc.inputElementCount = sizeof(inputElements) / sizeof(InputElementDesc);
         inputLayoutDesc.inputElements = inputElements;
-        inputLayoutDesc.vertexStreamCount = 1;
+        inputLayoutDesc.vertexStreamCount = sizeof(vertexStreams) / sizeof(VertexStreamDesc);;
         inputLayoutDesc.vertexStreams = vertexStreams;
-        inputLayout = device->createInputLayout(inputLayoutDesc);
 
-        // Load shaders (assume slang reflection and program creation is handled elsewhere)
-        // For demonstration, you would fill in shaderProgram with your compiled program.
-        // shaderProgram = ...;
-        // rootShaderObject = device->createRootShaderObject(shaderProgram);
+        GFX_CHECK_CALL_ABORT(device->createInputLayout(inputLayoutDesc, inputLayout.writeRef()));
+
+        ComPtr<IShaderProgram> shaderProgram;
+        slang::ProgramLayout* slangReflection = nullptr;
+        GFX_CHECK_CALL_ABORT(loadGraphicsProgram(
+            device,
+            shaderProgram,
+            "swapchain-shader",
+            "vertexMain",
+            "fragmentMain",
+            slangReflection
+        ));
+
 
         // Pipeline
         ColorTargetDesc colorTarget = {};
         colorTarget.format = desiredFormat;
         RenderPipelineDesc pipelineDesc = {};
-        pipelineDesc.program = shaderProgram;
-        pipelineDesc.inputLayout = inputLayout;
+        pipelineDesc.program = shaderProgram.get();
+        pipelineDesc.inputLayout = inputLayout.get();
         pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
         pipelineDesc.targets = &colorTarget;
         pipelineDesc.targetCount = 1;
@@ -210,3 +221,5 @@ SLANG_UNIT_TEST(swapchainResizeVulkan)
 }
 
 } // namespace gfx_test
+
+#endif
