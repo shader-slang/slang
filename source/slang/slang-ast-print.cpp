@@ -1523,6 +1523,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<HLSLLayoutSemantic>(modifier))
                     continue;
+                if (as<ImplicitConversionModifier>(modifier))
+                    continue;
             }
             // Don't print out attributes.
             if (as<AttributeBase>(modifier))
