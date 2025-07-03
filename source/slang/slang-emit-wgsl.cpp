@@ -66,16 +66,24 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     // "case 2, 3, 4: ...;" instead of the C-like syntax
     // "case 2: case 3: case 4: ...;".
 
-    m_writer->emit("case ");
-    for (auto caseVal : currentCase->values)
+    if (!isDefault)
     {
-        emitOperand(caseVal, getInfo(EmitOp::General));
-        m_writer->emit(", ");
+        m_writer->emit("case ");
+        auto& values = currentCase->values;
+        for (Index i = 0; i < values.getCount(); ++i)
+        {
+            emitOperand(values[i], getInfo(EmitOp::General));
+            if (i < values.getCount() - 1)
+            {
+                m_writer->emit(", ");
+            }
+        }
     }
-    if (isDefault)
+    else
     {
-        m_writer->emit("default, ");
+        m_writer->emit("default ");
     }
+
     m_writer->emit(":\n");
 }
 
@@ -726,15 +734,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    if (inst->getParent()->getOp() == kIROp_Module)
+    if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
     }
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_CastFloatToInt:

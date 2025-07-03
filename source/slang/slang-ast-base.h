@@ -2,10 +2,12 @@
 
 #pragma once
 
-#include "slang-ast-base.h.fiddle"
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-support-types.h"
 #include "slang-capability.h"
+
+//
+#include "slang-ast-base.h.fiddle"
 
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
@@ -767,7 +769,7 @@ public:
     /// method, which ensures that the `_prevInContainerWithSameName` fields
     /// have been properly set for all declarations in that container.
     ///
-    Decl* _prevInContainerWithSameName = nullptr;
+    FIDDLE() Decl* _prevInContainerWithSameName = nullptr;
 
     bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)

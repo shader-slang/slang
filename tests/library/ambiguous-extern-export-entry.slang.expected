@@ -1,0 +1,17 @@
+result code = 0
+standard error = {
+tests/library/ambiguous-extern-export-lib1.slang(4): warning 31000: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+public extern static const int[call_data_len] call_group_vector;
+                                              ^~~~~~~~~~~~~~~~~
+tests/library/ambiguous-extern-export-lib1.slang(5): warning 31000: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+public static int[call_data_len] call_id_1 = {};
+                                 ^~~~~~~~~
+tests/library/ambiguous-extern-export-lib2.slang(5): warning 31000: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+public extern static const int[call_data_len] call_group_vector;
+                                              ^~~~~~~~~~~~~~~~~
+tests/library/ambiguous-extern-export-lib2.slang(7): warning 31000: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+public static int[call_data_len] call_id_2 = {};
+                                 ^~~~~~~~~
+}
+standard output = {
+}

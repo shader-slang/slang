@@ -184,7 +184,7 @@ struct AssociatedTypeLookupSpecializationContext
             sharedContext,
             [this](IRInst* inst)
             {
-                if (inst->getOp() == kIROp_LookupWitness)
+                if (inst->getOp() == kIROp_LookupWitnessMethod)
                 {
                     processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
                 }

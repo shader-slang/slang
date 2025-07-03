@@ -106,6 +106,9 @@ Stages
 `mesh`
 > Mesh shader stage & mesh shader capabilities
 
+`task`
+> Task shader stage & mesh shader capabilities
+
 `amplification`
 > Amplification shader stage & mesh shader capabilities
 
@@ -403,6 +406,9 @@ Extensions
 `SPV_KHR_non_semantic_info`
 > Represents the SPIR-V extension for non-semantic information.
 
+`SPV_KHR_device_group`
+> Represents the SPIR-V extension for device-group information.
+
 `SPV_KHR_ray_tracing`
 > Represents the SPIR-V extension for ray tracing.
 
@@ -464,6 +470,9 @@ Extensions
 
 `SPV_NV_cooperative_matrix2`
 > Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
+
+`spvDeviceGroup`
+> Represents the SPIR-V capability for DeviceGroup.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
@@ -635,6 +644,9 @@ Extensions
 
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
+
+`GL_EXT_device_group`
+> Represents the GL_EXT_device_group extension.
 
 `GL_EXT_fragment_shader_barycentric`
 > Represents the GL_EXT_fragment_shader_barycentric extension.

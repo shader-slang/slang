@@ -3,6 +3,9 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-fossil.h"
+
+//
 #include "slang-ast-decl.h.fiddle"
 
 FIDDLE()
@@ -34,23 +37,54 @@ class UnresolvedDecl : public Decl
 struct ContainerDeclDirectMemberDecls
 {
 public:
-    List<Decl*> const& getDecls() const { return decls; }
+    List<Decl*> const& getDecls() const;
 
-    List<Decl*>& _refDecls() { return decls; }
+    Count getDeclCount() const;
+    Decl* getDecl(Index index) const;
+
+    Decl* findLastDeclOfName(Name* name) const;
+
+    Dictionary<Name*, Decl*> getMapFromNameToLastDeclOfThatName() const;
+
+    List<Decl*> const& getTransparentDecls() const;
+
+    bool isUsingOnDemandDeserialization() const;
+
+    void _initForOnDemandDeserialization(
+        RefObject* deserializationContext,
+        void const* deserializationData,
+        Count declCount);
 
 private:
     friend class ContainerDecl;
+    friend class ModuleDecl;
     friend struct ASTDumpContext;
 
-    List<Decl*> decls;
+    bool _areLookupAcceleratorsValid() const;
+    void _invalidateLookupAccelerators() const;
+    void _ensureLookupAcceleratorsAreValid() const;
 
-    struct
+    void _readSerializedTransparentDecls() const;
+    Decl* _readSerializedDeclAtIndex(Index index) const;
+    Decl* _readSerializedDeclsOfName(Name* name) const;
+
+    void _readAllSerializedDecls() const;
+
+    mutable List<Decl*> decls;
+
+    mutable struct
     {
         Count declCountWhenLastUpdated = 0;
 
         Dictionary<Name*, Decl*> mapNameToLastDeclOfThatName;
         List<Decl*> filteredListOfTransparentDecls;
     } accelerators;
+
+    mutable struct
+    {
+        RefPtr<RefObject> context;
+        void const* data = nullptr;
+    } onDemandDeserialization;
 };
 
 /// A conceptual list of declarations of the same name, in the same container.
@@ -198,6 +232,10 @@ class ContainerDecl : public Decl
     // already using this name.
     //
     void addMember(Decl* member) { addDirectMemberDecl(member); }
+
+    /// Is this declaration using on-demand deserialization for its direct members?
+    ///
+    bool isUsingOnDemandDeserializationForDirectMembers();
 
     //
     // NOTE: The operations after this point are *not* considered part of
@@ -737,6 +775,14 @@ class ModuleDecl : public NamespaceDeclBase
     /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
     ///
     FIDDLE() Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+
+    /// Is this module using on-demand deserialization for its exports?
+    ///
+    bool isUsingOnDemandDeserializationForExports();
+
+    /// Find a declaration exported from this module by its `mangledName`.
+    ///
+    Decl* _findSerializedDeclByMangledExportName(UnownedStringSlice const& mangledName);
 };
 
 // Represents a transparent scope of declarations that are defined in a single source file.
@@ -918,7 +964,8 @@ class SyntaxDecl : public Decl
 {
     FIDDLE(...)
     // What type of syntax node will be produced when parsing with this keyword?
-    FIDDLE() SyntaxClass<NodeBase> syntaxClass;
+    FIDDLE()
+    SyntaxClass<NodeBase> syntaxClass;
 
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback parseCallback = nullptr;

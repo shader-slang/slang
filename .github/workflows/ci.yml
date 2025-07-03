@@ -2,13 +2,13 @@ name: CI
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
+  merge_group:
+    types: [checks_requested]
   pull_request:
     branches: [master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   build:
     strategy:
@@ -68,8 +68,10 @@ jobs:
             compiler: cl
             platform: x86_64
             test-category: full
+            # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
@@ -79,7 +81,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, "GCP-T4"]
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
       fail-fast: false
@@ -186,6 +188,10 @@ jobs:
               cmake --workflow --preset "${{matrix.config}}"
             fi
           fi
+
+      - name: Check documented compiler versions
+        run: bash extras/verify-documented-compiler-version.sh
+
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
@@ -206,6 +212,8 @@ jobs:
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
             echo "Printing CUDA version: ..." && nvcc --version
+            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
+
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
@@ -230,27 +238,16 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
-          elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-github-runner.txt \
-              -skip-reference-image-generation \
-              -show-adapter-info  \
-              -enable-debug-layers false
+              -enable-debug-layers true
           else
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
-              -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-github-runner.txt \
+              -expected-failure-list tests/expected-failure-no-gpu.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers false
+              -enable-debug-layers true
           fi
       - name: Test Slang 2
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
@@ -3741,13 +3738,13 @@ jobs:
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
-            -expected-failure-list tests/expected-failure.txt \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
             -skip-reference-image-generation \
             -show-adapter-info
       - name: Run slang-rhi tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -tce=ray-tracing-*,cmd-query-resolve-host,fence-*
+          "$bin_dir/slang-rhi-tests" -check-devices
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
@@ -3785,4 +3782,6 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
-          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+          path: |
+            build/dist-${{matrix.config}}/**/ZIP/slang/*
+            build.em/Release

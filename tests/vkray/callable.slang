@@ -22,5 +22,5 @@ void main(in out MaterialPayload ioPayload)
 // CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
 // CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
 // CHECK-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
-// CHECK-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
-// CHECK-DAG: %{{.*}} = OpAccessChain %{{.*}} %{{.*}} %{{.*}}
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %{{.*}} %{{.*}} %{{.*}}
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %{{.*}} %{{.*}} %{{.*}}

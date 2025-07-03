@@ -1794,7 +1794,16 @@ public:
 
     /// Given a mangled name finds the exported NodeBase associated with this module.
     /// If not found returns nullptr.
-    NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
+    Decl* findExportedDeclByMangledName(const UnownedStringSlice& mangledName);
+
+    /// Ensure that the any accelerator(s) used for `findExportedDeclByMangledName`
+    /// have already been built.
+    ///
+    void ensureExportLookupAcceleratorBuilt();
+
+    Count getExportedDeclCount();
+    Decl* getExportedDecl(Index index);
+    UnownedStringSlice getExportedDeclMangledName(Index index);
 
     /// Get the ASTBuilder
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
@@ -1906,7 +1915,7 @@ private:
     // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
     // and m_mangledExportSymbols holds the NodeBase* values for each index.
     StringSlicePool m_mangledExportPool;
-    List<NodeBase*> m_mangledExportSymbols;
+    List<Decl*> m_mangledExportSymbols;
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
@@ -2026,6 +2035,13 @@ enum class FloatingPointMode : SlangFloatingPointModeIntegral
     Default = SLANG_FLOATING_POINT_MODE_DEFAULT,
     Fast = SLANG_FLOATING_POINT_MODE_FAST,
     Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
+};
+
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
+{
+    Any = SLANG_FP_DENORM_MODE_ANY,
+    Preserve = SLANG_FP_DENORM_MODE_PRESERVE,
+    FlushToZero = SLANG_FP_DENORM_MODE_FTZ,
 };
 
 enum class WriterChannel : SlangWriterChannelIntegral
@@ -2451,6 +2467,7 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
@@ -2458,6 +2475,7 @@ public:
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
@@ -2466,6 +2484,7 @@ public:
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
+        ISlangBlob* blobHoldingSerializedData,
         ModuleChunk const* moduleChunk,
         RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
@@ -2646,10 +2665,6 @@ public:
     {
         return translationUnits[index];
     }
-
-    // If true then generateIR will serialize out IR, and serialize back in again. Making
-    // serialization a bottleneck or firewall between the front end and the backend
-    bool useSerialIRBottleneck = false;
 
     // If true will serialize and de-serialize with debug information
     bool verifyDebugSerialization = false;
@@ -2932,6 +2947,34 @@ class ExtensionTracker : public RefObject
 public:
 };
 
+struct RequiredLoweringPassSet
+{
+    bool debugInfo;
+    bool resultType;
+    bool optionalType;
+    bool enumType;
+    bool combinedTextureSamplers;
+    bool reinterpret;
+    bool generics;
+    bool bindExistential;
+    bool autodiff;
+    bool derivativePyBindWrapper;
+    bool bitcast;
+    bool existentialTypeLayout;
+    bool bindingQuery;
+    bool meshOutput;
+    bool higherOrderFunc;
+    bool globalVaryingVar;
+    bool glslSSBO;
+    bool byteAddressBuffer;
+    bool dynamicResource;
+    bool dynamicResourceHeap;
+    bool resolveVaryingInputRef;
+    bool specializeStageSwitch;
+    bool missingReturn;
+    bool nonVectorCompositeSelect;
+};
+
 /// A context for code generation in the compiler back-end
 struct CodeGenContext
 {
@@ -3061,10 +3104,23 @@ public:
     // This is a no-op if modules are not precompiled.
     bool shouldSkipDownstreamLinking();
 
+    RequiredLoweringPassSet& getRequiredLoweringPassSet() { return m_requiredLoweringPassSet; }
+
 protected:
     CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
     Profile m_targetProfile;
     ExtensionTracker* m_extensionTracker = nullptr;
+
+    // To improve the performance of our backend, we will try to avoid running
+    // passes related to features not used in the user code.
+    // To do so, we will scan the IR module once, and determine which passes are needed
+    // based on the instructions used in the IR module.
+    // This will allow us to skip running passes that are not needed, without having to
+    // run all the passes only to find out that no work is needed.
+    // This is especially important for the performance of the backend, as some passes
+    // have an initialization cost (such as building reference graphs or DOM trees) that
+    // can be expensive.
+    RequiredLoweringPassSet m_requiredLoweringPassSet;
 
     /// Will output assembly as well as the artifact if appropriate for the artifact type for
     /// assembly output and conversion is possible

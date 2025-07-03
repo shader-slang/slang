@@ -48,7 +48,7 @@ Texture2DArray<float4> t2DArray_f32v4;
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name tCubeArray_f32v4
 TextureCubeArray<float4> tCubeArray_f32v4;
 
-//TEST_INPUT: Texture2D(size=4, content = one):name t2DMS_f32v4
+//TEST_INPUT: Texture2D(size=4, content = one, format=RGBA32Float, sampleCount=two):name t2DMS_f32v4
 Texture2DMS<float4> t2DMS_f32v4;
 
 //
@@ -106,9 +106,9 @@ typealias depthcube_array = _Texture<
     format
 >;
 
-//TEST_INPUT: Texture2D(size=4, content = zero):name d2D
+//TEST_INPUT: Texture2D(size=4, content = zero, format=D32Float):name d2D
 depth2d<float> d2D;
-//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name d2DArray
+//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2, format=D32Float):name d2DArray
 depth2d_array<float> d2DArray;
 
 uint getNotMapped()
@@ -235,6 +235,7 @@ bool TEST_load<T>(
     int3 iuvs = int3(iuv, sampleIndex);
 
     return true
+
         && (status = getNotMapped(), all(TN(T(1)) == t2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
             // SPIRV does not support sparse buffer loads.

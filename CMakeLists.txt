@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.22)
 
 # Our module dir, include that now so that we can get the version automatically
 # from git describe
@@ -66,6 +66,21 @@ auto_option(
     CUDAToolkit
     "Enable CUDA tests using CUDA found in CUDA_PATH"
 )
+# Check if SLANG_ENABLE_OPTIX was explicitly set by user before auto_option
+set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED FALSE)
+get_property(
+    _SLANG_ENABLE_OPTIX_CACHE_TYPE
+    CACHE SLANG_ENABLE_OPTIX
+    PROPERTY TYPE
+)
+if(
+    DEFINED SLANG_ENABLE_OPTIX
+    AND NOT SLANG_ENABLE_OPTIX STREQUAL "AUTO"
+    AND _SLANG_ENABLE_OPTIX_CACHE_TYPE STREQUAL "BOOL"
+)
+    set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED TRUE)
+endif()
+
 auto_option(
     SLANG_ENABLE_OPTIX
     OptiX
@@ -168,6 +183,12 @@ option(
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
 # Options for user defined paths for external modules.
+#
+# Note that these paths point to a directory containing an subdirectory of the
+# dependency name, rather than to the dependency directory itself, for example
+# SLANG_OVERRIDE_LZ4_PATH points to a directory containing a directory called
+# `lz4` containing the lz4 source.
+# 
 advanced_option(
     SLANG_OVERRIDE_LZ4_PATH
     "Build using user defined path for LZ4"
@@ -350,10 +371,18 @@ if(NOT SLANG_EMBED_CORE_MODULE AND NOT SLANG_EMBED_CORE_MODULE_SOURCE)
 endif()
 
 if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
-    message(
-        SEND_ERROR
-        "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
-    )
+    if(_SLANG_ENABLE_OPTIX_USER_SPECIFIED)
+        message(
+            SEND_ERROR
+            "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
+        )
+    else()
+        message(
+            STATUS
+            "OptiX is not supported without CUDA. Automatically disabling SLANG_ENABLE_OPTIX."
+        )
+        set(SLANG_ENABLE_OPTIX OFF)
+    endif()
 endif()
 
 if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")

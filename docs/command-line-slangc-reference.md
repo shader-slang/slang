@@ -27,6 +27,7 @@ slangc -help-style markdown -h
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
 * [fp-mode](#fp-mode)
+* [fp-denormal-mode](#fp-denormal-mode)
 * [help-style](#help-style)
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
@@ -396,6 +397,30 @@ Disables generics and specialization pass.
 Control floating point optimizations 
 
 
+<a id="denorm-mode-fp16"></a>
+### -denorm-mode-fp16
+
+**-denorm-mode-fp16 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp32"></a>
+### -denorm-mode-fp32
+
+**-denorm-mode-fp32 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp64"></a>
+### -denorm-mode-fp64
+
+**-denorm-mode-fp64 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
 <a id="g"></a>
 ### -g
 
@@ -529,6 +554,11 @@ Allow generating code from incomplete libraries with unresolved external functio
 Specify the space index for the system defined global bindless resource array. 
 
 
+<a id="separate-debug-info"></a>
+### -separate-debug-info
+Emit debug data to a separate file, and strip it from the main output file. 
+
+
 
 <a id="Downstream"></a>
 ## Downstream
@@ -622,7 +652,7 @@ Print the hierarchy of the processed source files.
 
 <a id="serial-ir"></a>
 ### -serial-ir
-Serialize the IR between front-end and back-end. 
+\[REMOVED\] Serialize the IR between front-end and back-end. 
 
 
 <a id="skip-codegen"></a>
@@ -648,11 +678,6 @@ Verify IR in the front-end.
 <a id="dump-module"></a>
 ### -dump-module
 Disassemble and print the module IR. 
-
-
-<a id="separate-debug-info"></a>
-### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. 
 
 
 
@@ -962,6 +987,15 @@ Floating Point Mode
 * `fast` : Allow optimizations that may change results of floating-point computations. Prefer the fastest version of special functions supported by the target. 
 * `default` : Default floating point mode 
 
+<a id="fp-denormal-mode"></a>
+## fp-denormal-mode
+
+Floating Point Denormal Handling Mode 
+
+* `any` : Use any denormal handling mode (default). The mode used is implementation defined. 
+* `preserve` : Preserve denormal values 
+* `ftz` : Flush denormals to zero 
+
 <a id="help-style"></a>
 ## help-style
 
@@ -1068,7 +1102,7 @@ Stage
 * `miss` 
 * `callable` 
 * `mesh` 
-* `amplification` 
+* `amplification`, `task` 
 * `dispatch` 
 
 <a id="vulkan-shift"></a>
@@ -1133,6 +1167,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
+* `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
@@ -1152,6 +1187,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
+* `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
 * `spvAtomicFloat64AddEXT` 
@@ -1254,6 +1290,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_demote_to_helper_invocation` : enables the GL_EXT_demote_to_helper_invocation extension 
 * `GL_EXT_maximal_reconvergence` : enables the GL_EXT_maximal_reconvergence extension 
 * `GL_EXT_shader_quad_control` : enables the GL_EXT_shader_quad_control extension 
+* `GL_EXT_device_group` : enables the GL_EXT_device_group extension 
 * `GL_EXT_fragment_shader_barycentric` : enables the GL_EXT_fragment_shader_barycentric extension 
 * `GL_EXT_mesh_shader` : enables the GL_EXT_mesh_shader extension 
 * `GL_EXT_nonuniform_qualifier` : enables the GL_EXT_nonuniform_qualifier extension 
@@ -1346,6 +1383,7 @@ A capability describes an optional feature that a target may or may not support.
 * `callable` 
 * `miss` 
 * `mesh` 
+* `task` 
 * `amplification` 
 * `any_stage` 
 * `amplification_mesh` 
@@ -1548,6 +1586,8 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `tesc` : glsl (hull) 
 * `tese` : glsl (domain) 
 * `comp` : glsl (compute) 
+* `mesh` : glsl (mesh) 
+* `task` : glsl (amplification) 
 * `slang` 
 * `spv` : SPIR-V 
 * `spv-asm` : SPIR-V assembly 

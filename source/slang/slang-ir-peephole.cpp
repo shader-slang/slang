@@ -256,7 +256,7 @@ struct PeepholeContext : InstPassBase
     {
         if (as<IRGlobalValueWithCode>(inst))
         {
-            if (auto fpModeDecor = inst->findDecoration<IRFloatingModeOverrideDecoration>())
+            if (auto fpModeDecor = inst->findDecoration<IRFloatingPointModeOverrideDecoration>())
                 floatingPointMode = fpModeDecor->getFloatingPointMode();
         }
 
@@ -281,7 +281,7 @@ struct PeepholeContext : InstPassBase
                         baseType,
                         &sizeAlignment)))
                     break;
-                if (sizeAlignment.size == 0)
+                if (sizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
                     break;
 
                 IRBuilder builder(module);
@@ -863,7 +863,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_WitnessTable)
                 {
@@ -1041,7 +1041,7 @@ struct PeepholeContext : InstPassBase
                         continue;
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
-                    if (arg->getOp() == kIROp_undefined)
+                    if (arg->getOp() == kIROp_Undefined)
                         continue;
                     if (argValue == nullptr)
                         argValue = arg;
@@ -1090,7 +1090,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             {
                 // If we see a swizzle(scalar), we replace it with makeVectorFromScalar.
                 if (as<IRBasicType>(inst->getOperand(0)->getDataType()))
@@ -1269,7 +1269,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_Load:
             {
                 // Load from undef is undef.
-                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_undefined)
+                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_Undefined)
                 {
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -1285,7 +1285,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_Store:
             {
                 // Store undef is no-op.
-                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_undefined)
+                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_Undefined)
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1295,7 +1295,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_DebugValue:
             {
                 // Update debug value with undef is no-op.
-                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_undefined)
+                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_Undefined)
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1309,7 +1309,7 @@ struct PeepholeContext : InstPassBase
 
     bool isConcreteType(IRType* type)
     {
-        return type->parent->getOp() == kIROp_Module && !as<IRGlobalGenericParam>(type);
+        return type->parent->getOp() == kIROp_ModuleInst && !as<IRGlobalGenericParam>(type);
     }
 
     bool processFunc(IRInst* func)

@@ -637,13 +637,11 @@ SlangResult Session::saveBuiltinModule(
     // We want builtin modules to be saved with their source location
     // information.
     //
-    options.optionFlags |= SerialOptionFlag::SourceLocation;
-    //
     // And in order to work with source locations, the serialization
     // process will also need access to the source manager that
     // can translate locations into their humane format.
     //
-    options.sourceManager = m_builtinLinkage->getSourceManager();
+    options.sourceManagerToUseWhenSerializingSourceLocs = m_builtinLinkage->getSourceManager();
 
     // At this point we can finally delegate down to the next level,
     // which handles the serialization of a Slang module into a
@@ -745,6 +743,7 @@ SlangResult Session::_readBuiltinModule(
         linkage,
         astBuilder,
         nullptr, // no sink
+        fileContents,
         astChunk,
         sourceLocReader,
         SourceLoc());
@@ -754,11 +753,6 @@ SlangResult Session::_readBuiltinModule(
     }
     moduleDecl->module = module;
     module->setModuleDecl(moduleDecl);
-
-    if (isFromCoreModule(moduleDecl))
-    {
-        registerBuiltinDecls(this, moduleDecl);
-    }
 
     // After the AST module has been read in, we next look
     // to deserialize the IR module.
@@ -3623,8 +3617,7 @@ void FrontEndCompileRequest::generateIR()
         {
             SerialContainerUtil::WriteOptions options;
 
-            options.sourceManager = getSourceManager();
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManagerToUseWhenSerializingSourceLocs = getSourceManager();
 
             // Verify debug information
             if (SLANG_FAILED(
@@ -3634,33 +3627,6 @@ void FrontEndCompileRequest::generateIR()
                     irModule->getModuleInst()->sourceLoc,
                     Diagnostics::serialDebugVerificationFailed);
             }
-        }
-
-        if (useSerialIRBottleneck)
-        {
-            // Keep the obfuscated source map (if there is one)
-            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
-
-            IRSerialData serialData;
-            {
-                // Write IR out to serialData - copying over SourceLoc information directly
-                IRSerialWriter writer;
-                writer.write(irModule, nullptr, SerialOptionFlag::RawSourceLocation, &serialData);
-
-                // Destroy irModule such that memory can be used for newly constructed read
-                // irReadModule
-                irModule = nullptr;
-            }
-            RefPtr<IRModule> irReadModule;
-            {
-                // Read IR back from serialData
-                IRSerialReader reader;
-                reader.read(serialData, getSession(), nullptr, irReadModule);
-            }
-
-            // Set irModule to the read module
-            irModule = irReadModule;
-            irModule->setObfuscatedSourceMap(obfuscatedSourceMap);
         }
 
         // Set the module on the translation unit
@@ -4165,8 +4131,18 @@ void Linkage::loadParsedModule(
     auto sink = translationUnit->compileRequest->getSink();
 
     int errorCountBefore = sink->getErrorCount();
-    compileRequest->checkAllTranslationUnits();
-    int errorCountAfter = sink->getErrorCount();
+    int errorCountAfter;
+    try
+    {
+        compileRequest->checkAllTranslationUnits();
+    }
+    catch (...)
+    {
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
+        throw;
+    }
+    errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
         // Don't generate IR as language server.
@@ -4198,6 +4174,7 @@ void Linkage::loadParsedModule(
 }
 
 RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* libraryChunk,
     DiagnosticSink* sink)
@@ -4244,6 +4221,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     return loadSerializedModule(
         moduleName,
         modulePathInfo,
+        blobHoldingSerializedData,
         moduleChunk,
         libraryChunk,
         SourceLoc(),
@@ -4253,6 +4231,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
 RefPtr<Module> Linkage::loadSerializedModule(
     Name* moduleName,
     const PathInfo& moduleFilePathInfo,
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* containerChunk,
     SourceLoc const& requestingLoc,
@@ -4286,6 +4265,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
         if (SLANG_FAILED(loadSerializedModuleContents(
                 module,
                 moduleFilePathInfo,
+                blobHoldingSerializedData,
                 moduleChunk,
                 containerChunk,
                 sink)))
@@ -4352,6 +4332,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     RefPtr<Module> module = loadSerializedModule(
         moduleName,
         moduleFilePathInfo,
+        moduleFileContents,
         moduleChunk,
         rootChunk,
         requestingLoc,
@@ -5269,7 +5250,27 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     }
 }
 
-NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
+Decl* Module::findExportedDeclByMangledName(const UnownedStringSlice& mangledName)
+{
+    // If this module is a serialized module that is being
+    // deserialized on-demand, then we want to use the
+    // mangled name mapping that was baked into the serialized
+    // data, rather than attempt to enumerate all of the declarations
+    // in the module (as would be done if we proceeded to call
+    // `ensureExportLookupAcceleratorBuilt()`).
+    //
+    if (this->m_moduleDecl->isUsingOnDemandDeserializationForExports())
+    {
+        return m_moduleDecl->_findSerializedDeclByMangledExportName(mangledName);
+    }
+
+    ensureExportLookupAcceleratorBuilt();
+
+    const Index index = m_mangledExportPool.findIndex(mangledName);
+    return (index >= 0) ? m_mangledExportSymbols[index] : nullptr;
+}
+
+void Module::ensureExportLookupAcceleratorBuilt()
 {
     // Will be non zero if has been previously attempted
     if (m_mangledExportSymbols.getCount() == 0)
@@ -5284,9 +5285,25 @@ NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
             m_mangledExportSymbols.add(nullptr);
         }
     }
+}
 
-    const Index index = m_mangledExportPool.findIndex(slice);
-    return (index >= 0) ? m_mangledExportSymbols[index] : nullptr;
+Count Module::getExportedDeclCount()
+{
+    ensureExportLookupAcceleratorBuilt();
+
+    return m_mangledExportPool.getSlicesCount();
+}
+
+Decl* Module::getExportedDecl(Index index)
+{
+    ensureExportLookupAcceleratorBuilt();
+    return m_mangledExportSymbols[index];
+}
+
+UnownedStringSlice Module::getExportedDeclMangledName(Index index)
+{
+    ensureExportLookupAcceleratorBuilt();
+    return m_mangledExportPool.getSlices()[index];
 }
 
 // ComponentType
@@ -6657,6 +6674,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
+    ISlangBlob* blobHoldingSerializedData,
     ModuleChunk const* moduleChunk,
     RIFF::ListChunk const* containerChunk,
     DiagnosticSink* sink)
@@ -6753,6 +6771,7 @@ SlangResult Linkage::loadSerializedModuleContents(
         this,
         astBuilder,
         sink,
+        blobHoldingSerializedData,
         astChunk,
         sourceLocReader,
         serializedModuleLoc);
@@ -7399,8 +7418,10 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
+    auto libBlob = RawBlob::create((const Byte*)libData, libDataSize);
+
     SLANG_RETURN_ON_FAIL(
-        loadModuleLibrary((const Byte*)libData, libDataSize, basePath, this, library));
+        loadModuleLibrary(libBlob, (const Byte*)libData, libDataSize, basePath, this, library));
 
     // Create an artifact without any name (as one is not provided)
     auto artifact =

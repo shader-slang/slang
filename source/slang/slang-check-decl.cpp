@@ -2914,9 +2914,9 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
             context->parentDecl->findLastDirectMemberDeclOfName(requirementDeclRef.getName()))
     {
         // Remove the `ToBeSynthesizedModifier`.
-        if (as<ToBeSynthesizedModifier>(existingDecl->modifiers.first))
+        if (auto mod = existingDecl->modifiers.findModifier<ToBeSynthesizedModifier>())
         {
-            existingDecl->modifiers.first = existingDecl->modifiers.first->next;
+            removeModifier(existingDecl, mod);
         }
         else
         {
@@ -3133,14 +3133,9 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
 
     addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
 
-    // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-    if (requirementDeclRef.getDecl()->findModifier<VisibilityModifier>())
-    {
-        auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
-        auto thisVisibility = getDeclVisibility(context->parentDecl);
-        auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(aggTypeDecl, visibility);
-    }
+    // The visibility of synthesized decl should be the same of the parent decl.
+    auto thisVisibility = getDeclVisibility(context->parentDecl);
+    addVisibilityModifier(aggTypeDecl, thisVisibility);
 
     // Synthesize the rest of IDifferential method conformances by recursively checking
     // conformance on the synthesized decl.
@@ -3494,14 +3489,8 @@ struct SemanticsDeclDifferentialConformanceVisitor
     }
 };
 
-/// Recursively register any builtin declarations that need to be attached to the `session`.
-///
-/// This function should only be needed for declarations in the core module.
-///
-static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
+void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
 {
-    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
-
     if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
     {
         sharedASTBuilder->registerBuiltinDecl(decl, builtinMod);
@@ -3514,6 +3503,25 @@ static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
+}
+
+
+void registerBuiltinDecl(ASTBuilder* astBuilder, Decl* decl)
+{
+    registerBuiltinDecl(astBuilder->getSharedASTBuilder(), decl);
+}
+
+
+/// Recursively register any builtin declarations that need to be attached to the `session`.
+///
+/// This function should only be needed for declarations in the core module.
+///
+static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
+{
+    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+
+    registerBuiltinDecl(sharedASTBuilder, decl);
+
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
         for (auto childDecl : containerDecl->getDirectMemberDecls())
@@ -3533,6 +3541,42 @@ static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
 void registerBuiltinDecls(Session* session, Decl* decl)
 {
     _registerBuiltinDeclsRec(session, decl);
+}
+
+void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecls)
+{
+    if (decl->findModifier<BuiltinTypeModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<MagicTypeModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<BuiltinRequirementModifier>())
+    {
+        ioDecls.add(decl);
+    }
+
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        for (auto childDecl : containerDecl->getDirectMemberDecls())
+        {
+            if (as<ScopeDecl>(childDecl))
+                continue;
+
+            _collectBuiltinDeclsThatNeedRegistrationRec(childDecl, ioDecls);
+        }
+    }
+    if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        _collectBuiltinDeclsThatNeedRegistrationRec(genericDecl->inner, ioDecls);
+    }
+}
+
+void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
+{
+    _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
 }
 
 Type* unwrapArrayType(Type* type)
@@ -4100,8 +4144,12 @@ bool SemanticsVisitor::doesVarMatchRequirement(
             return false;
     }
 
-    auto satisfyingVal =
-        tryConstantFoldDeclRef(satisfyingMemberDeclRef, ConstantFoldingKind::LinkTime, nullptr);
+    IntVal* satisfyingVal = nullptr;
+    if (isValidCompileTimeConstantType(satisfyingType))
+    {
+        satisfyingVal =
+            tryConstantFoldDeclRef(satisfyingMemberDeclRef, ConstantFoldingKind::LinkTime, nullptr);
+    }
     if (satisfyingVal)
     {
         witnessTable->add(requiredMemberDeclRef.getDecl(), RequirementWitness(satisfyingVal));
@@ -5076,9 +5124,9 @@ void SemanticsVisitor::markOverridingDecl(
         return;
     }
 
+    memberDecl = maybeGetInner(memberDecl);
     if (hasDefaultImpl(requiredMemberDeclRef))
     {
-        memberDecl = maybeGetInner(memberDecl);
         // If the required member has a default implementation,
         // we need to make sure the member we found is marked as 'override'.
         if (!memberDecl->hasModifier<OverrideModifier>())
@@ -7850,7 +7898,7 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     contentAssistInfo.completionSuggestions.formatMode =
         varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
                     : CompletionSuggestions::FormatMode::FullSignature;
-
+    contentAssistInfo.completionSuggestions.currentPartialDecl = memberDecl;
     List<LookupResultItem> candidateItems;
     for (auto facet : inheritanceInfo.facets)
     {
@@ -10419,6 +10467,11 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
     {
         getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
         return;
+    }
+
+    if (elementCount->isLinkTimeVal())
+    {
+        getSink()->diagnose(varDecl, Diagnostics::linkTimeConstantArraySize);
     }
 }
 
@@ -14241,6 +14294,9 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     }
     else
     {
+        auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
+        declaredCapModifier->declaredCapabilityRequirements = declaredCaps;
+        addModifier(funcDecl, declaredCapModifier);
         if (vis == DeclVisibility::Public)
         {
             // For public decls, we need to enforce that the function
@@ -14413,6 +14469,15 @@ VarDeclBase* getTrailingUnsizedArrayElement(
         }
     }
     return nullptr;
+}
+
+bool isImmutableBufferType(Type* type)
+{
+    if (as<UniformParameterGroupType>(type))
+        return true;
+    if (auto resourceType = as<ResourceType>(type))
+        return resourceType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+    return false;
 }
 
 bool isOpaqueHandleType(Type* type)

@@ -171,7 +171,9 @@ struct GenerateWitnessTableWrapperContext
 
     void lowerWitnessTable(IRWitnessTable* witnessTable)
     {
-        auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
+        auto interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
+        if (!interfaceType)
+            return;
         if (isBuiltin(interfaceType))
             return;
         if (isComInterfaceType(interfaceType))

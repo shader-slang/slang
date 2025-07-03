@@ -511,6 +511,10 @@ def SPV_KHR_fragment_shader_barycentric : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_non_semantic_info : _spirv_1_0;
 
+/// Represents the SPIR-V extension for device-group information.
+/// [EXT]
+def SPV_KHR_device_group : _spirv_1_0;
+
 /// Represents the SPIR-V extension for ray tracing.
 /// [EXT]
 def SPV_KHR_ray_tracing : _spirv_1_4;
@@ -595,6 +599,10 @@ def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_
 
 
 // SPIRV Capabilities.
+
+/// Represents the SPIR-V capability for DeviceGroup.
+/// [EXT]
+def spvDeviceGroup : SPV_KHR_device_group;
 
 /// Represents the SPIR-V capability for atomic float 32 add operations.
 /// [EXT]
@@ -840,6 +848,7 @@ def _GL_EXT_texture_query_lod : glsl;
 def _GL_EXT_texture_shadow_lod : _GLSL_130;
 def _GL_EXT_maximal_reconvergence : _GLSL_140;
 def _GL_EXT_shader_quad_control : _GLSL_140;
+def _GL_EXT_device_group : _GLSL_140;
 
 def _GL_ARB_derivative_control : _GLSL_400;
 def _GL_ARB_fragment_shader_interlock : _GLSL_450;
@@ -904,6 +913,10 @@ alias GL_EXT_maximal_reconvergence = _GL_EXT_maximal_reconvergence | spvMaximalR
 /// Represents the GL_EXT_shader_quad_control extension.
 /// [EXT]
 alias GL_EXT_shader_quad_control = _GL_EXT_shader_quad_control | spvQuadControlKHR;
+
+/// Represents the GL_EXT_device_group extension.
+/// [EXT]
+alias GL_EXT_device_group = _GL_EXT_device_group | spvDeviceGroup;
 
 /// Represents the GL_EXT_fragment_shader_barycentric extension.
 /// [EXT]
@@ -1256,6 +1269,10 @@ alias miss = _miss + raytracing;
 /// Mesh shader stage & mesh shader capabilities
 /// [Stage]
 alias mesh = _mesh + _meshshading;
+
+/// Task shader stage & mesh shader capabilities
+/// [Stage]
+alias task = _amplification + _meshshading;
 
 /// Amplification shader stage & mesh shader capabilities
 /// [Stage]

@@ -108,7 +108,6 @@ Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
 Result IRSerialWriter::write(
     IRModule* module,
     SerialSourceLocWriter* sourceLocWriter,
-    SerialOptionFlags options,
     IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
@@ -306,23 +305,7 @@ Result IRSerialWriter::write(
         SerialStringTableUtil::encodeStringTable(m_stringSlicePool, serialData->m_stringTable);
     }
 
-    // If the option to use RawSourceLocations is enabled, serialize out as is
-    if (options & SerialOptionFlag::RawSourceLocation)
-    {
-        const Index numInsts = m_insts.getCount();
-        serialData->m_rawSourceLocs.setCount(numInsts);
-
-        Ser::RawSourceLoc* dstLocs = serialData->m_rawSourceLocs.begin();
-        // 0 is null, just mark as no location
-        dstLocs[0] = Ser::RawSourceLoc(0);
-        for (Index i = 1; i < numInsts; ++i)
-        {
-            IRInst* srcInst = m_insts[i];
-            dstLocs[i] = Ser::RawSourceLoc(srcInst->sourceLoc.getRaw());
-        }
-    }
-
-    if ((options & SerialOptionFlag::SourceLocation) && sourceLocWriter)
+    if (sourceLocWriter)
     {
         _calcDebugInfo(sourceLocWriter);
     }
@@ -547,7 +530,7 @@ Result IRSerialReader::read(
     {
         // Check that insts[1] is the module inst
         const Ser::Inst& srcInst = data.m_insts[1];
-        SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_Module);
+        SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_ModuleInst);
         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
 
         // The root IR instruction for the module will already have

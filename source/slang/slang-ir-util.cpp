@@ -871,8 +871,8 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
         }
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         {
             auto branch = as<IRUnconditionalBranch>(inst);
             // If any pointer typed argument of the branch inst may overlap addr, return true.
@@ -922,7 +922,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -2348,6 +2348,45 @@ bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
            isSpecConstOpHoistable(op, type, fixedArgs);
 }
 
+IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
+{
+    SLANG_RELEASE_ASSERT(isSignedType(type));
+
+    auto elementType = getVectorOrCoopMatrixElementType(type);
+
+    IROp op = type->getOp();
+    switch (op)
+    {
+    case kIROp_MatrixType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto matType = as<IRMatrixType>(type);
+            SLANG_RELEASE_ASSERT(matType);
+            return builder->getMatrixType(
+                builder->getType(unsignedTypeOp),
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+        }
+    case kIROp_VectorType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto vecType = as<IRVectorType>(type);
+            SLANG_RELEASE_ASSERT(vecType);
+            return builder->getVectorType(
+                builder->getType(unsignedTypeOp),
+                vecType->getElementCount());
+        }
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return builder->getType(getOppositeSignIntTypeOp(elementType->getOp()));
+    default:
+        return type;
+    }
+}
+
 bool isSignedType(IRType* type)
 {
     switch (type->getOp())
@@ -2364,6 +2403,19 @@ bool isSignedType(IRType* type)
         return isSignedType(as<IRVectorType>(type)->getElementType());
     case kIROp_MatrixType:
         return isSignedType(as<IRMatrixType>(type)->getElementType());
+    default:
+        return false;
+    }
+}
+
+bool isIROpaqueType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_TextureType:
+    case kIROp_SamplerStateType:
+    case kIROp_SamplerComparisonStateType:
+        return true;
     default:
         return false;
     }

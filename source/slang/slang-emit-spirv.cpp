@@ -2060,17 +2060,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                if (shouldEmitArrayStride(irArrayType->getElementType()))
+                // Arrays of opaque types should not emit a stride
+                if (!isIROpaqueType(elementType) &&
+                    shouldEmitArrayStride(irArrayType->getElementType()))
                 {
                     auto stride = 0;
+                    // If the array type has no stride, it indicates that this array type is only
+                    // used in Private or Function storage class (aka. thread-local or function
+                    // scope variable), in that case SPIRV doesn't allow to decorate the array
+                    // stride.
+                    //
+                    // The only exception is if the array type is unsized, because unsized array
+                    // also has no stride operand, however unsized array can not be used in Private
+                    // or Function, so we are safe to just decorate the stride for unsized array by
+                    // calculating the natural stride.
                     if (auto strideInst = irArrayType->getArrayStride())
                     {
                         stride = (int)getIntVal(strideInst);
                     }
-                    else
+                    else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
-                        // Stride may not have been calculated for basic element types. Calculate it
-                        // here.
                         IRSizeAndAlignment sizeAndAlignment;
                         getNaturalSizeAndAlignment(
                             m_targetProgram->getOptionSet(),
@@ -2079,11 +2088,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
-                    emitOpDecorateArrayStride(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        arrayType,
-                        SpvLiteralInteger::from32(stride));
+                    if (stride != 0)
+                    {
+                        emitOpDecorateArrayStride(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            arrayType,
+                            SpvLiteralInteger::from32(stride));
+                    }
                 }
                 return arrayType;
             }
@@ -3468,7 +3480,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     spvBlock,
                     spvFunc,
                     irDebugFunc,
-                    irFunc->getDataType());
+                    irFunc->getDataType(),
+                    irFunc);
             }
             if (funcDebugScope)
             {
@@ -3483,7 +3496,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // all loops gets a header block.
             for (auto irInst : irBlock->getChildren())
             {
-                if (irInst->getOp() == kIROp_loop)
+                if (irInst->getOp() == kIROp_Loop)
                 {
                     emitOpLabel(spvFunc, irInst);
                 }
@@ -3545,9 +3558,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (as<IRVar>(irInst))
                     continue;
                 emitLocalInst(spvBlock, irInst);
-                if (irInst->getOp() == kIROp_loop)
+                if (irInst->getOp() == kIROp_Loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
-                if (irInst->getOp() == kIROp_discard && !shouldEmitDiscardAsDemote())
+                if (irInst->getOp() == kIROp_Discard && !shouldEmitDiscardAsDemote())
                 {
                     // If we emitted OpKill for discard, we should stop emitting anything
                     // after this inst in the block, because OpKill is a terminator inst.
@@ -3589,7 +3602,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto use = block->firstUse; use; use = use->nextUse)
         {
-            if (use->getUser()->getOp() == kIROp_loop &&
+            if (use->getUser()->getOp() == kIROp_Loop &&
                 as<IRLoop>(use->getUser())->getTargetBlock() == block)
             {
                 loopInst = use->getUser();
@@ -3981,7 +3994,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SwizzledStore:
             result = emitSwizzledStore(parent, as<IRSwizzledStore>(inst));
             break;
-        case kIROp_swizzleSet:
+        case kIROp_SwizzleSet:
             result = emitSwizzleSet(parent, as<IRSwizzleSet>(inst));
             break;
         case kIROp_RWStructuredBufferGetElementPtr:
@@ -3994,7 +4007,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetUntypedBufferPtr:
             result = emitGetBufferPtr(parent, inst);
             break;
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             result = emitSwizzle(parent, as<IRSwizzle>(inst));
             break;
         case kIROp_IntCast:
@@ -4158,7 +4171,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             else
                 result = emitOpReturnValue(parent, inst, as<IRReturn>(inst)->getVal());
             break;
-        case kIROp_discard:
+        case kIROp_Discard:
             if (shouldEmitDiscardAsDemote())
             {
                 ensureExtensionDeclarationBeforeSpv16(
@@ -4183,7 +4196,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_EndFragmentShaderInterlock:
             result = emitOpEndInvocationInterlockEXT(parent, inst);
             break;
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
             {
                 // If we are jumping to the main block of a loop,
                 // emit a branch to the loop header instead.
@@ -4196,7 +4209,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = emitOpBranch(parent, inst, getIRInstSpvID(targetBlock));
                 break;
             }
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 // Return loop header block in its own block.
                 auto blockId = getIRInstSpvID(inst);
@@ -4213,7 +4226,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = block;
                 break;
             }
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
@@ -4257,7 +4270,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Unreachable:
             result = emitOpUnreachable(parent, inst);
             break;
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             SLANG_UNEXPECTED("Unstructured branching is not supported by SPIRV.");
             break;
         case kIROp_MakeVector:
@@ -4309,7 +4322,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetStringHash:
             result = emitGetStringHash(inst);
             break;
-        case kIROp_undefined:
+        case kIROp_Undefined:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
         case kIROp_SPIRVAsm:
@@ -4670,7 +4683,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             kResultID,
             subscript->getImage(),
             subscript->getCoord(),
-            builder.getIntValue(builder.getIntType(), 0));
+            subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                        : builder.getIntValue(builder.getIntType(), 0));
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
@@ -4850,7 +4864,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (mode == SpvExecutionModeMax)
             return;
 
-        requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
+        // Vulkan spec requires DepthReplacing exec mode when storing to FragDepth,
+        // in addition to DepthLess/DepthGreater modes.
+        requireSPIRVExecutionMode(
+            nullptr,
+            getIRInstSpvID(entryPoint),
+            SpvExecutionModeDepthReplacing);
+
+        if (mode != SpvExecutionModeDepthReplacing)
+            requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
     }
 
     // Make user type name conform to `SPV_GOOGLE_user_type` spec.
@@ -5099,6 +5121,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(int32_t(numThreads->getY()->getValue())),
                         SpvLiteralInteger::from32(int32_t(numThreads->getZ()->getValue())));
                 }
+            }
+            break;
+        case kIROp_FpDenormalPreserveDecoration:
+            {
+                auto fpDenormalDecor = cast<IRFpDenormalPreserveDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormPreserve);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormPreserve,
+                    SpvLiteralInteger::from32(width));
+            }
+            break;
+        case kIROp_FpDenormalFlushToZeroDecoration:
+            {
+                auto fpDenormalDecor = cast<IRFpDenormalFlushToZeroDecoration>(decoration);
+                auto width = int32_t(getIntVal(fpDenormalDecor->getWidth()));
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_float_controls"));
+                requireSPIRVCapability(SpvCapabilityDenormFlushToZero);
+                // emitInst is used instead of requireSPIRVExecutionMode because
+                // we need to be able to emit the same execution mode with different
+                // operands for different widths
+                emitInst(
+                    getSection(SpvLogicalSectionID::ExecutionModes),
+                    decoration,
+                    SpvOpExecutionMode,
+                    dstID,
+                    SpvExecutionModeDenormFlushToZero,
+                    SpvLiteralInteger::from32(width));
             }
             break;
         case kIROp_MaxVertexCountDecoration:
@@ -6004,6 +6062,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDrawIndex, inst);
                 }
+                else if (semanticName == "sv_deviceindex")
+                {
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_device_group"));
+                    requireSPIRVCapability(SpvCapabilityDeviceGroup);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInDeviceIndex, inst);
+                }
                 else if (semanticName == "sv_primitiveid")
                 {
                     auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);
@@ -6408,10 +6472,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UInt argStartIndex = 0;
                     switch (branchInst->getOp())
                     {
-                    case kIROp_unconditionalBranch:
+                    case kIROp_UnconditionalBranch:
                         argStartIndex = 1;
                         break;
-                    case kIROp_loop:
+                    case kIROp_Loop:
                         argStartIndex = 3;
                         break;
                     default:
@@ -6762,7 +6826,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
-        return emitOpAccessChain(
+        return emitOpInBoundsAccessChain(
             parent,
             fieldAddress,
             fieldAddress->getFullType(),
@@ -6807,7 +6871,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We might replace resultType with a different storage class equivalent
         auto resultType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(resultType);
-
         if (const auto basePtrType = as<IRPtrTypeBase>(base->getDataType()))
         {
             // If the base pointer has a specific address space and the
@@ -7300,11 +7363,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Perform unsigned conversion first to an unsigned integer of the same width as the
             // result then perform bit cast to the signed result type. This is done because SPIRV's
             // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
-            auto unsignedV = emitOpUConvert(
-                parent,
-                nullptr,
-                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
-                inst->getOperand(0));
+            auto builderType = getUnsignedTypeFromSignedType(&builder, toTypeV);
+
+            auto unsignedV = emitOpUConvert(parent, nullptr, builderType, inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
         else if (fromInfo.isSigned)
@@ -7956,7 +8017,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* firstBlock,
         SpvInst* spvFunc,
         IRDebugFunction* debugFunc,
-        IRFuncType* debugType)
+        IRFuncType* debugType,
+        IRFunc* irFunc = nullptr)
     {
         SpvInst* debugFuncInfo = nullptr;
         if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
@@ -7993,6 +8055,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugFunc->getName(),
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
+
+        if (irFunc)
+        {
+            registerDebugInst(irFunc, debugFuncInfo);
+        }
 
         if (firstBlock && spvFunc)
         {
