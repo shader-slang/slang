@@ -2168,16 +2168,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
             {
-                builder.addDecorationIfNotExist(
-                    wrapperStruct,
-                    kIROp_SPIRVBufferBlockDecoration);
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBufferBlockDecoration);
             }
 
             // Update the global param's type to use the wrapper struct
-            auto newPtrType = builder.getPtrType(
-                ptrType->getOp(),
-                wrapperStruct,
-                ptrType->getAddressSpace());
+            auto newPtrType = builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
             globalParam->setFullType(newPtrType);
 
             // Traverse all uses of the global param and insert a FieldAddress to access the
@@ -2188,10 +2183,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     builder.setInsertBefore(use->getUser());
                     auto addr = builder.emitFieldAddress(
-                        builder.getPtrType(
-                            kIROp_PtrType,
-                            structType,
-                            ptrType->getAddressSpace()),
+                        builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
                         globalParam,
                         key);
                     use->set(addr);
