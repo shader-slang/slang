@@ -167,7 +167,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     // Load and link program
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
-    SLANG_CHECK_ABORT(loadProgram(
+    GFX_CHECK_CALL_ABORT(loadProgram(
         device,
         shaderProgram,
         "link-time-constant-array-size-main",
@@ -184,7 +184,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    SLANG_CHECK_ABORT(
+    GFX_CHECK_CALL_ABORT(
         device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     // Create buffer for struct S with array of size N
@@ -198,7 +198,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> numbersBuffer;
-    SLANG_CHECK_ABORT(
+    GFX_CHECK_CALL_ABORT(
         device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // Record and execute command buffer
