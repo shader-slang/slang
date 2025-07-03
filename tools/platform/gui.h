@@ -4,7 +4,7 @@
 #include "core/slang-basic.h"
 #include "imgui/imgui.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
+#include <slang-rhi.h>
 #include "vector-math.h"
 #include "window.h"
 
@@ -14,20 +14,20 @@ namespace platform
 struct GUI : Slang::RefObject
 {
     GUI(Window* window,
-        gfx::IDevice* device,
-        gfx::ICommandQueue* queue,
-        gfx::IFramebufferLayout* framebufferLayout);
+        rhi::IDevice* device,
+        rhi::ICommandQueue* queue);
     ~GUI();
 
     void beginFrame();
-    void endFrame(gfx::ITransientResourceHeap* transientHeap, gfx::IFramebuffer* framebuffer);
+    void endFrame(rhi::ITexture* renderTarget);
 
 private:
-    Slang::ComPtr<gfx::IDevice> device;
-    Slang::ComPtr<gfx::ICommandQueue> queue;
-    Slang::ComPtr<gfx::IRenderPassLayout> renderPass;
-    Slang::ComPtr<gfx::IPipelineState> pipelineState;
-    Slang::ComPtr<gfx::ISamplerState> samplerState;
+    Slang::ComPtr<rhi::IDevice> device;
+    Slang::ComPtr<rhi::ICommandQueue> queue;
+    Slang::ComPtr<rhi::IRenderPipeline> pipelineState;
+    Slang::ComPtr<rhi::ISampler> samplerState;
+    Slang::ComPtr<rhi::IShaderProgram> shaderProgram;
+    Slang::ComPtr<rhi::IInputLayout> inputLayout;
 };
 
 } // namespace platform

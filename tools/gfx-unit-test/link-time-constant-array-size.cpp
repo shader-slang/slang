@@ -80,18 +80,18 @@ static void validateArraySizeInStruct(
     int expectedSize)
 {
     // Check reflection is available
-    GFX_CHECK_CALL_ABORT(slangReflection != nullptr);
+    SLANG_CHECK_ABORT(slangReflection != nullptr);
 
     // Get the global scope layout
     auto globalScope = slangReflection->getGlobalParamsVarLayout();
-    GFX_CHECK_CALL_ABORT(globalScope != nullptr);
+    SLANG_CHECK_ABORT(globalScope != nullptr);
 
     auto typeLayout = globalScope->getTypeLayout();
-    GFX_CHECK_CALL_ABORT(typeLayout != nullptr);
+    SLANG_CHECK_ABORT(typeLayout != nullptr);
 
     // Check if the global scope is a struct type
     auto kind = typeLayout->getKind();
-    GFX_CHECK_CALL_ABORT(kind == slang::TypeReflection::Kind::Struct);
+    SLANG_CHECK_ABORT(kind == slang::TypeReflection::Kind::Struct);
 
     // Find the buffer resource 'b'
     bool foundBuffer = false;
@@ -108,19 +108,19 @@ static void validateArraySizeInStruct(
 
             // Get the type layout of the field
             auto fieldTypeLayout = fieldLayout->getTypeLayout();
-            GFX_CHECK_CALL_ABORT(fieldTypeLayout != nullptr);
+            SLANG_CHECK_ABORT(fieldTypeLayout != nullptr);
 
             // Get the element type of the structured buffer
             auto elementTypeLayout = fieldTypeLayout->getElementTypeLayout();
-            GFX_CHECK_CALL_ABORT(elementTypeLayout != nullptr);
+            SLANG_CHECK_ABORT(elementTypeLayout != nullptr);
 
             // Check if it's a struct type
             auto elementKind = elementTypeLayout->getKind();
-            GFX_CHECK_CALL_ABORT(elementKind == slang::TypeReflection::Kind::Struct);
+            SLANG_CHECK_ABORT(elementKind == slang::TypeReflection::Kind::Struct);
 
             // Get the field count of the struct
             auto structFieldCount = elementTypeLayout->getFieldCount();
-            GFX_CHECK_CALL_ABORT(structFieldCount >= 1);
+            SLANG_CHECK_ABORT(structFieldCount >= 1);
 
             // Check for the 'xs' field
             bool foundXsField = false;
@@ -137,28 +137,28 @@ static void validateArraySizeInStruct(
                     auto structFieldTypeLayout = structField->getTypeLayout();
                     auto structFieldTypeKind = structFieldTypeLayout->getKind();
 
-                    GFX_CHECK_CALL_ABORT(structFieldTypeKind == slang::TypeReflection::Kind::Array);
+                    SLANG_CHECK_ABORT(structFieldTypeKind == slang::TypeReflection::Kind::Array);
 
                     // Check the array size
                     auto arraySize = structFieldTypeLayout->getElementCount();
                     // 0 becuase we haven't resolved the constant
-                    GFX_CHECK_CALL_ABORT(arraySize == 0);
+                    SLANG_CHECK_ABORT(arraySize == 0);
 
                     // 4 because we're resolving it
                     const auto resolvedArraySize =
                         structFieldTypeLayout->getElementCount(slangReflection);
-                    GFX_CHECK_CALL_ABORT(resolvedArraySize == expectedSize);
+                    SLANG_CHECK_ABORT(resolvedArraySize == expectedSize);
 
                     break;
                 }
             }
 
-            GFX_CHECK_CALL_ABORT(foundXsField);
+            SLANG_CHECK_ABORT(foundXsField);
             break;
         }
     }
 
-    GFX_CHECK_CALL_ABORT(foundBuffer);
+    SLANG_CHECK_ABORT(foundBuffer);
 }
 
 
@@ -167,7 +167,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     // Load and link program
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
-    GFX_CHECK_CALL_ABORT(loadProgram(
+    SLANG_CHECK_ABORT(loadProgram(
         device,
         shaderProgram,
         "link-time-constant-array-size-main",
@@ -184,7 +184,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
+    SLANG_CHECK_ABORT(
         device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     // Create buffer for struct S with array of size N
@@ -198,7 +198,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> numbersBuffer;
-    GFX_CHECK_CALL_ABORT(
+    SLANG_CHECK_ABORT(
         device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // Record and execute command buffer

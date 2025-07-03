@@ -365,7 +365,7 @@ struct AutoDiffTexture : public WindowedAppBase
         bufferDesc.size = mipMapOffset.getLast() * sizeof(uint32_t);
         bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
         
-        printf("Creating accumulate buffer: size=%zu bytes\n", bufferDesc.size);
+        printf("Creating accumulate buffer: size=%llu bytes\n", bufferDesc.size);
         gAccumulateBuffer = gDevice->createBuffer(bufferDesc);
         if (!gAccumulateBuffer)
         {
@@ -373,7 +373,7 @@ struct AutoDiffTexture : public WindowedAppBase
             return SLANG_FAIL;
         }
         
-        printf("Creating reconstruct buffer: size=%zu bytes\n", bufferDesc.size);
+        printf("Creating reconstruct buffer: size=%llu bytes\n", bufferDesc.size);
         gReconstructBuffer = gDevice->createBuffer(bufferDesc);
         if (!gReconstructBuffer)
         {

@@ -7,7 +7,7 @@
 #include "core/slang-blob.h"
 #include "span.h"
 
-
+// GFX_CHECK_CALL and GFX_CHECK_CALL_ABORT are used to check SlangResult
 #define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
 #define GFX_CHECK_CALL_ABORT(x) SLANG_CHECK_ABORT(!SLANG_FAILED(x))
 

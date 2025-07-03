@@ -147,21 +147,21 @@ struct BaseRayTracingTest
 
     void createRequiredResources()
     {
-        GFX_CHECK_CALL_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
+        SLANG_CHECK_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
 
         BufferDesc vertexBufferDesc;
         vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
         vertexBufferDesc.defaultState = ResourceState::ShaderResource;
         vertexBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
         vertexBuffer = device->createBuffer(vertexBufferDesc, &kVertexData[0]);
-        GFX_CHECK_CALL_ABORT(vertexBuffer != nullptr);
+        SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
         BufferDesc indexBufferDesc;
         indexBufferDesc.size = kIndexCount * sizeof(int32_t);
         indexBufferDesc.defaultState = ResourceState::ShaderResource;
         indexBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
         indexBuffer = device->createBuffer(indexBufferDesc, &kIndexData[0]);
-        GFX_CHECK_CALL_ABORT(indexBuffer != nullptr);
+        SLANG_CHECK_ABORT(indexBuffer != nullptr);
 
         BufferDesc transformBufferDesc;
         transformBufferDesc.size = sizeof(float) * 12;
@@ -170,7 +170,7 @@ struct BaseRayTracingTest
         float transformData[12] =
             {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
         transformBuffer = device->createBuffer(transformBufferDesc, &transformData);
-        GFX_CHECK_CALL_ABORT(transformBuffer != nullptr);
+        SLANG_CHECK_ABORT(transformBuffer != nullptr);
 
         createResultTexture();
 
@@ -196,7 +196,7 @@ struct BaseRayTracingTest
 
             // Query buffer size for acceleration structure build.
             AccelerationStructureSizes sizes;
-            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
+            SLANG_CHECK_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
             
             // Allocate buffers for acceleration structure.
             BufferDesc asDraftBufferDesc;
@@ -216,13 +216,13 @@ struct BaseRayTracingTest
             QueryPoolDesc queryPoolDesc;
             queryPoolDesc.count = 1;
             queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-            GFX_CHECK_CALL_ABORT(
+            SLANG_CHECK_ABORT(
                 device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef()));
 
             ComPtr<IAccelerationStructure> draftAS;
             AccelerationStructureDesc draftCreateDesc;
             draftCreateDesc.size = sizes.accelerationStructureSize;
-            GFX_CHECK_CALL_ABORT(
+            SLANG_CHECK_ABORT(
                 device->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
 
             compactedSizeQuery->reset();
@@ -277,7 +277,7 @@ struct BaseRayTracingTest
             instanceBufferDesc.defaultState = ResourceState::ShaderResource;
             instanceBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
             instanceBuffer = device->createBuffer(instanceBufferDesc, instanceDescs.getBuffer());
-            GFX_CHECK_CALL_ABORT(instanceBuffer != nullptr);
+            SLANG_CHECK_ABORT(instanceBuffer != nullptr);
 
             AccelerationStructureBuildInput instanceInput = {};
             instanceInput.type = AccelerationStructureBuildInputType::Instances;
@@ -291,7 +291,7 @@ struct BaseRayTracingTest
 
             // Query buffer size for acceleration structure build.
             AccelerationStructureSizes sizes;
-            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
+            SLANG_CHECK_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
 
             BufferDesc asBufferDesc;
             asBufferDesc.defaultState = ResourceState::AccelerationStructure;
@@ -307,7 +307,7 @@ struct BaseRayTracingTest
 
             AccelerationStructureDesc createDesc;
             createDesc.size = sizes.accelerationStructureSize;
-            GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
+            SLANG_CHECK_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
 
             auto commandEncoder = queue->createCommandEncoder();
             commandEncoder->buildAccelerationStructure(buildInputs, TLAS, nullptr, BufferOffsetPair(scratchBuffer, 0), 0, nullptr);
@@ -319,7 +319,7 @@ struct BaseRayTracingTest
         const char* hitgroupNames[] = {"hitgroupA", "hitgroupB"};
 
         ComPtr<IShaderProgram> rayTracingProgram;
-        GFX_CHECK_CALL_ABORT(loadShaderProgram(device, rayTracingProgram.writeRef()));
+        SLANG_CHECK_ABORT(loadShaderProgram(device, rayTracingProgram.writeRef()));
         RayTracingPipelineDesc rtpDesc = {};
         rtpDesc.program = rayTracingProgram;
         rtpDesc.hitGroupCount = 2;
@@ -331,9 +331,9 @@ struct BaseRayTracingTest
         rtpDesc.hitGroups = hitGroups;
         rtpDesc.maxRayPayloadSize = 64;
         rtpDesc.maxRecursion = 2;
-        GFX_CHECK_CALL_ABORT(
+        SLANG_CHECK_ABORT(
             device->createRayTracingPipeline(rtpDesc, renderPipelineState.writeRef()));
-        GFX_CHECK_CALL_ABORT(renderPipelineState != nullptr);
+        SLANG_CHECK_ABORT(renderPipelineState != nullptr);
 
         const char* raygenNames[] = {"rayGenShaderA", "rayGenShaderB"};
         const char* missNames[] = {"missShaderA", "missShaderB"};
@@ -346,7 +346,7 @@ struct BaseRayTracingTest
         shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
         shaderTableDesc.missShaderCount = 2;
         shaderTableDesc.missShaderEntryPointNames = missNames;
-        GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+        SLANG_CHECK_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
     }
 
     void checkTestResults(float* expectedResult, uint32_t count)
@@ -358,7 +358,7 @@ struct BaseRayTracingTest
         queue->waitOnHost();
 
         SubresourceLayout layout;
-        GFX_CHECK_CALL_ABORT(device->readTexture(
+        SLANG_CHECK_ABORT(device->readTexture(
             resultTexture,
             0, 0,
             resultBlob.writeRef(),
@@ -371,7 +371,7 @@ struct BaseRayTracingTest
 #endif
         auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
         auto actualData = (float*)buffer.data();
-        GFX_CHECK_CALL_ABORT(memcmp(actualData, expectedResult, count * sizeof(float)) == 0)
+        SLANG_CHECK_ABORT(memcmp(actualData, expectedResult, count * sizeof(float)) == 0)
     }
 };
 

@@ -2,7 +2,6 @@
 
 #include "core/slang-basic.h"
 #include "slang-rhi.h"
-#include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
