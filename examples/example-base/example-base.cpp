@@ -125,7 +125,7 @@ ComPtr<ITextureView> WindowedAppBase::createTextureFromFile(
 
     int lastMipWidth = textureWidth;
     int lastMipHeight = textureHeight;
-    for (int m = 1; m < textureDesc.mipCount; m++)
+    for (uint32_t m = 1; m < textureDesc.mipCount; m++)
     {
         auto lastMipmapData = mipMapData[m - 1].getBuffer();
         int w = lastMipWidth / 2;
