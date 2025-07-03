@@ -565,6 +565,37 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
     return location;
 }
 
+// When user code has `Foo(123)` where `Foo` is a `struct`, goto-definition on
+// `Foo` should redirect to the constructor of `Foo` instead of the type declaration of `Foo`.
+// This function will check if the `declRefExpr` is a reference to a type declaration,
+// but the declRefExpr is referenced from an `InvokeExpr::originalFunctionExpr` that is now
+// resolved to a constructor. If so we will return the declRef of the constructor.
+//
+DeclRef<Decl> maybeRedirectToConstructor(DeclRefExpr* declRefExpr, const List<SyntaxNode*>& path)
+{
+    if (path.getCount() < 2)
+        return declRefExpr->declRef;
+    if (!as<AggTypeDecl>(declRefExpr->declRef))
+        return declRefExpr->declRef;
+    auto invokeExpr = as<InvokeExpr>(path[path.getCount() - 2]);
+    if (!invokeExpr)
+        return declRefExpr->declRef;
+    if (!invokeExpr->originalFunctionExpr)
+        return declRefExpr->declRef;
+    auto originalFuncExpr = invokeExpr->originalFunctionExpr;
+    if (originalFuncExpr != declRefExpr)
+        return declRefExpr->declRef;
+    // If the invoke expression is the same as the decl ref expression,
+    // it means we are looking at a constructor call.
+    auto resolvedFuncExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!resolvedFuncExpr)
+        return declRefExpr->declRef;
+    auto ctorDecl = as<ConstructorDecl>(resolvedFuncExpr->declRef);
+    if (ctorDecl)
+        return ctorDecl;
+    return declRefExpr->declRef;
+}
+
 SlangResult LanguageServer::hover(
     const LanguageServerProtocol::HoverParams& args,
     const JSONValue& responseId)
@@ -828,7 +859,8 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
     {
-        fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
+        auto resolvedDeclRef = maybeRedirectToConstructor(declRefExpr, findResult[0].path);
+        fillDeclRefHoverInfo(resolvedDeclRef, declRefExpr->name);
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
     {
@@ -1004,11 +1036,12 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
     {
         if (declRefExpr->declRef.getDecl())
         {
+            auto declRef = declRefExpr->declRef;
+            declRef = maybeRedirectToConstructor(declRefExpr, findResult[0].path);
             auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
-                                                            : declRefExpr->declRef.getLoc(),
+                declRef.getNameLoc().isValid() ? declRef.getNameLoc() : declRef.getLoc(),
                 SourceLocType::Actual);
-            auto name = declRefExpr->declRef.getName();
+            auto name = declRef.getName();
             locations.add(LocationResult{
                 location,
                 name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});

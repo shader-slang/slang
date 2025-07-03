@@ -2702,6 +2702,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0],
                                             &tempSink,
                                             &conversionCost);
+                if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
+                {
+                    resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
+                    resultInvokeExpr->argumentDelimeterLocs =
+                        expr->argumentDelimeterLocs;
+                    resultInvokeExpr->loc = expr->loc;
+                }
                 if (coerceResult)
                     return resultExpr;
                 typeOverloadChecked = true;
