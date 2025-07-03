@@ -2705,8 +2705,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
-                    resultInvokeExpr->argumentDelimeterLocs =
-                        expr->argumentDelimeterLocs;
+                    resultInvokeExpr->argumentDelimeterLocs = expr->argumentDelimeterLocs;
                     resultInvokeExpr->loc = expr->loc;
                 }
                 if (coerceResult)
