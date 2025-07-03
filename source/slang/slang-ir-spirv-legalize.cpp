@@ -2139,9 +2139,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (auto globalParam = as<IRGlobalParam>(globalInst))
             {
                 auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
-                if (!ptrType) continue;
+                if (!ptrType)
+                    continue;
                 auto structType = as<IRStructType>(ptrType->getValueType());
-                if (!structType) continue;
+                if (!structType)
+                    continue;
 
                 if (embeddedBlockStructs.contains(structType))
                 {
@@ -2153,28 +2155,37 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     auto key = builder.createStructKey();
                     builder.createStructField(wrapperStruct, key, structType);
 
-                    // Copy the block decoration from the inner struct to the wrapper (do not remove yet)
+                    // Copy the block decoration from the inner struct to the wrapper
                     if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
                     {
                         builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
                     }
                     if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
                     {
-                        builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBufferBlockDecoration);
+                        builder.addDecorationIfNotExist(
+                            wrapperStruct,
+                            kIROp_SPIRVBufferBlockDecoration);
                     }
 
                     // Update the global param's type to use the wrapper struct
-                    auto newPtrType = builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+                    auto newPtrType = builder.getPtrType(
+                        ptrType->getOp(),
+                        wrapperStruct,
+                        ptrType->getAddressSpace());
                     globalParam->setFullType(newPtrType);
 
-                    // Traverse all uses of the global param and insert a FieldAddress to access the inner struct
+                    // Traverse all uses of the global param and insert a FieldAddress to access the
+                    // inner struct
                     traverseUses(
                         globalParam,
                         [&](IRUse* use)
                         {
                             builder.setInsertBefore(use->getUser());
                             auto addr = builder.emitFieldAddress(
-                                builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
+                                builder.getPtrType(
+                                    kIROp_PtrType,
+                                    structType,
+                                    ptrType->getAddressSpace()),
                                 globalParam,
                                 key);
                             use->set(addr);
@@ -2190,7 +2201,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 blockDecor->removeAndDeallocate();
             }
-            if (auto bufferBlockDecor = structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            if (auto bufferBlockDecor =
+                    structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
             {
                 bufferBlockDecor->removeAndDeallocate();
             }
