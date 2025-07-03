@@ -161,28 +161,6 @@ if(SLANG_ENABLE_GFX)
 
 endif()
 if(SLANG_ENABLE_TESTS)
-    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
-    add_custom_target(
-        copy-gfx-slang-modules
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
-        COMMAND
-            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
-            ${modules_dest_dir}/gfx.slang
-        COMMAND
-            ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
-            ${modules_dest_dir}/slang.slang
-        WORKING_DIRECTORY ${slang_SOURCE_DIR}
-        VERBATIM
-    )
-    set_target_properties(
-        copy-gfx-slang-modules
-        PROPERTIES FOLDER generators
-    )
-    install(
-        FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
-        DESTINATION ${runtime_subdir}
-    )
 
 # The test executables and runtime-loaded modules
     slang_add_target(
