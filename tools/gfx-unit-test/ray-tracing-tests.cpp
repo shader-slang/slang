@@ -1,3 +1,6 @@
+#if 0
+// Duplcated: This is ported to slang-rhi\tests\test-ray-tracing.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
@@ -147,7 +150,7 @@ struct BaseRayTracingTest
 
     void createRequiredResources()
     {
-        SLANG_CHECK_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
+        GFX_CHECK_CALL_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
 
         BufferDesc vertexBufferDesc;
         vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
@@ -196,7 +199,7 @@ struct BaseRayTracingTest
 
             // Query buffer size for acceleration structure build.
             AccelerationStructureSizes sizes;
-            SLANG_CHECK_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
+            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
             
             // Allocate buffers for acceleration structure.
             BufferDesc asDraftBufferDesc;
@@ -216,13 +219,13 @@ struct BaseRayTracingTest
             QueryPoolDesc queryPoolDesc;
             queryPoolDesc.count = 1;
             queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-            SLANG_CHECK_ABORT(
+            GFX_CHECK_CALL_ABORT(
                 device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef()));
 
             ComPtr<IAccelerationStructure> draftAS;
             AccelerationStructureDesc draftCreateDesc;
             draftCreateDesc.size = sizes.accelerationStructureSize;
-            SLANG_CHECK_ABORT(
+            GFX_CHECK_CALL_ABORT(
                 device->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
 
             compactedSizeQuery->reset();
@@ -291,7 +294,7 @@ struct BaseRayTracingTest
 
             // Query buffer size for acceleration structure build.
             AccelerationStructureSizes sizes;
-            SLANG_CHECK_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
+            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
 
             BufferDesc asBufferDesc;
             asBufferDesc.defaultState = ResourceState::AccelerationStructure;
@@ -307,7 +310,7 @@ struct BaseRayTracingTest
 
             AccelerationStructureDesc createDesc;
             createDesc.size = sizes.accelerationStructureSize;
-            SLANG_CHECK_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
+            GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
 
             auto commandEncoder = queue->createCommandEncoder();
             commandEncoder->buildAccelerationStructure(buildInputs, TLAS, nullptr, BufferOffsetPair(scratchBuffer, 0), 0, nullptr);
@@ -331,7 +334,7 @@ struct BaseRayTracingTest
         rtpDesc.hitGroups = hitGroups;
         rtpDesc.maxRayPayloadSize = 64;
         rtpDesc.maxRecursion = 2;
-        SLANG_CHECK_ABORT(
+        GFX_CHECK_CALL_ABORT(
             device->createRayTracingPipeline(rtpDesc, renderPipelineState.writeRef()));
         SLANG_CHECK_ABORT(renderPipelineState != nullptr);
 
@@ -346,7 +349,7 @@ struct BaseRayTracingTest
         shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
         shaderTableDesc.missShaderCount = 2;
         shaderTableDesc.missShaderEntryPointNames = missNames;
-        SLANG_CHECK_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+        GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
     }
 
     void checkTestResults(float* expectedResult, uint32_t count)
@@ -358,7 +361,7 @@ struct BaseRayTracingTest
         queue->waitOnHost();
 
         SubresourceLayout layout;
-        SLANG_CHECK_ABORT(device->readTexture(
+        GFX_CHECK_CALL_ABORT(device->readTexture(
             resultTexture,
             0, 0,
             resultBlob.writeRef(),
@@ -457,3 +460,4 @@ SLANG_UNIT_TEST(RayTracingTestBVulkan)
     runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test
+#endif
