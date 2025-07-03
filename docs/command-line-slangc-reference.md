@@ -27,6 +27,7 @@ slangc -help-style markdown -h
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
 * [fp-mode](#fp-mode)
+* [fp-denormal-mode](#fp-denormal-mode)
 * [help-style](#help-style)
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
@@ -394,6 +395,30 @@ Disables generics and specialization pass.
 **-fp-mode &lt;[fp-mode](#fp-mode)&gt;, -floating-point-mode &lt;[fp-mode](#fp-mode)&gt;**
 
 Control floating point optimizations 
+
+
+<a id="denorm-mode-fp16"></a>
+### -denorm-mode-fp16
+
+**-denorm-mode-fp16 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp32"></a>
+### -denorm-mode-fp32
+
+**-denorm-mode-fp32 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp64"></a>
+### -denorm-mode-fp64
+
+**-denorm-mode-fp64 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
 
 
 <a id="g"></a>
@@ -962,6 +987,15 @@ Floating Point Mode
 * `fast` : Allow optimizations that may change results of floating-point computations. Prefer the fastest version of special functions supported by the target. 
 * `default` : Default floating point mode 
 
+<a id="fp-denormal-mode"></a>
+## fp-denormal-mode
+
+Floating Point Denormal Handling Mode 
+
+* `any` : Use any denormal handling mode (default). The mode used is implementation defined. 
+* `preserve` : Preserve denormal values 
+* `ftz` : Flush denormals to zero 
+
 <a id="help-style"></a>
 ## help-style
 
@@ -1068,7 +1102,7 @@ Stage
 * `miss` 
 * `callable` 
 * `mesh` 
-* `amplification` 
+* `amplification`, `task` 
 * `dispatch` 
 
 <a id="vulkan-shift"></a>
@@ -1349,6 +1383,7 @@ A capability describes an optional feature that a target may or may not support.
 * `callable` 
 * `miss` 
 * `mesh` 
+* `task` 
 * `amplification` 
 * `any_stage` 
 * `amplification_mesh` 
@@ -1551,6 +1586,8 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `tesc` : glsl (hull) 
 * `tese` : glsl (domain) 
 * `comp` : glsl (compute) 
+* `mesh` : glsl (mesh) 
+* `task` : glsl (amplification) 
 * `slang` 
 * `spv` : SPIR-V 
 * `spv-asm` : SPIR-V assembly 

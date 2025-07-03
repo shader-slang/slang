@@ -141,7 +141,7 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
 
     switch (clonedValue->getOp())
     {
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
 
         // If `originalVal` represents a witness table entry key, add the key
         // to witnessTableEntryWorkList.

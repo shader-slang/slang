@@ -53,6 +53,7 @@ enum class ValueCategory
     Target,
     Language,
     FloatingPointMode,
+    FloatingPointDenormalMode,
     ArchiveType,
     Stage,
     LineDirectiveMode,
@@ -85,6 +86,7 @@ SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
 SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
 SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
 SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
+SLANG_GET_VALUE_CATEGORY(FloatingPointDenormalMode, FloatingPointDenormalMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
@@ -183,6 +185,13 @@ void initCommandOptions(CommandOptions& options)
             "Floating Point Mode",
             UserValue(ValueCategory::FloatingPointMode));
         options.addValues(TypeTextUtil::getFloatingPointModeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "fp-denormal-mode",
+            "Floating Point Denormal Handling Mode",
+            UserValue(ValueCategory::FloatingPointDenormalMode));
+        options.addValues(TypeTextUtil::getFpDenormalModeInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -316,6 +325,8 @@ void initCommandOptions(CommandOptions& options)
             {"tesc", "glsl (hull)"},
             {"tese", "glsl (domain)"},
             {"comp", "glsl (compute)"},
+            {"mesh", "glsl (mesh)"},
+            {"task", "glsl (amplification)"},
             {"slang", nullptr},
             {"spv", "SPIR-V"},
             {"spv-asm", "SPIR-V assembly"},
@@ -580,6 +591,21 @@ void initCommandOptions(CommandOptions& options)
          "-fp-mode,-floating-point-mode",
          "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>",
          "Control floating point optimizations"},
+        {OptionKind::DenormalModeFp16,
+         "-denorm-mode-fp16",
+         "-denorm-mode-fp16 <fp-denormal-mode>",
+         "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
+        {OptionKind::DenormalModeFp32,
+         "-denorm-mode-fp32",
+         "-denorm-mode-fp32 <fp-denormal-mode>",
+         "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, "
+         "preserve, ftz)"},
+        {OptionKind::DenormalModeFp64,
+         "-denorm-mode-fp64",
+         "-denorm-mode-fp64 <fp-denormal-mode>",
+         "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",
@@ -1281,11 +1307,14 @@ void OptionsParser::addInputForeignShaderPath(
     };
 
     static const Entry entries[] = {
+        {".vert", Profile::GLSL_Vertex},
         {".frag", Profile::GLSL_Fragment},
         {".geom", Profile::GLSL_Geometry},
         {".tesc", Profile::GLSL_TessControl},
         {".tese", Profile::GLSL_TessEval},
-        {".comp", Profile::GLSL_Compute}};
+        {".comp", Profile::GLSL_Compute},
+        {".mesh", Profile::GLSL_Mesh},
+        {".task", Profile::GLSL_Task}};
 
     for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
     {
@@ -2800,6 +2829,27 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 FloatingPointMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 setFloatingPointMode(getCurrentTarget(), value);
+                break;
+            }
+        case OptionKind::DenormalModeFp16:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
+                break;
+            }
+        case OptionKind::DenormalModeFp32:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
+                break;
+            }
+        case OptionKind::DenormalModeFp64:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
             }
         case OptionKind::Optimization:

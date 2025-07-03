@@ -131,9 +131,12 @@ DeclRefBase* LookupDeclRef::_substituteImplOverride(
 
 void LookupDeclRef::_toTextOverride(StringBuilder& out)
 {
-    getLookupSource()->toText(out);
-    if (out.getLength() && !out.endsWith("."))
-        out << ".";
+    if (!as<ThisType>(getLookupSource()))
+    {
+        getLookupSource()->toText(out);
+        if (out.getLength() && !out.endsWith("."))
+            out << ".";
+    }
     if (getDecl()->getName() && getDecl()->getName()->text.getLength() != 0)
     {
         out << getDecl()->getName()->text;

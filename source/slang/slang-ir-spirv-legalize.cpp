@@ -12,6 +12,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
@@ -38,6 +39,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVEmitSharedContext* m_sharedContext;
 
     IRModule* m_module;
+
+    CodeGenContext* m_codeGenContext;
 
     DiagnosticSink* m_sink;
 
@@ -202,8 +205,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVLegalizationContext(
         SPIRVEmitSharedContext* sharedContext,
         IRModule* module,
+        CodeGenContext* codeGenContext,
         DiagnosticSink* sink)
-        : m_sharedContext(sharedContext), m_module(module), m_sink(sink)
+        : m_sharedContext(sharedContext)
+        , m_module(module)
+        , m_codeGenContext(codeGenContext)
+        , m_sink(sink)
     {
     }
 
@@ -983,13 +990,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            if (x->getParent()->getOp() == kIROp_Module)
+            if (x->getParent()->getOp() == kIROp_ModuleInst)
                 builder.setInsertBefore(inst);
             else
                 setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), AddressSpace::Function);
             builder.emitStore(y, x);
-            if (x->getParent()->getOp() != kIROp_Module)
+            if (x->getParent()->getOp() != kIROp_ModuleInst)
                 m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
@@ -1397,7 +1404,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         maybeHoistConstructInstToGlobalScope(inst);
 
-        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_Module &&
+        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_ModuleInst &&
             inst->getOperandCount() !=
                 (UInt)getIntVal(as<IRVectorType>(inst->getDataType())->getElementCount()))
         {
@@ -1772,10 +1779,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_NonUniformResourceIndex:
                 processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
-            case kIROp_loop:
+            case kIROp_Loop:
                 processLoop(as<IRLoop>(inst));
                 break;
-            case kIROp_ifElse:
+            case kIROp_IfElse:
                 processIfElse(as<IRIfElse>(inst));
                 break;
             case kIROp_Switch:
@@ -1809,7 +1816,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
-            case kIROp_unconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 processBranch(inst);
                 break;
             case kIROp_SPIRVAsm:
@@ -2208,6 +2215,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+
+        // If older than spirv 1.4, legalize OpSelect returning non-vector-composites
+        if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect &&
+            !m_sharedContext->isSpirv14OrLater())
+            legalizeNonVectorCompositeSelect(m_module);
     }
 
     void updateFunctionTypes()
@@ -2281,9 +2293,16 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
+void legalizeSPIRV(
+    SPIRVEmitSharedContext* sharedContext,
+    IRModule* module,
+    CodeGenContext* codeGenContext)
 {
-    SPIRVLegalizationContext context(sharedContext, module, sink);
+    SPIRVLegalizationContext context(
+        sharedContext,
+        module,
+        codeGenContext,
+        codeGenContext->getSink());
     context.processModule();
 }
 
@@ -2407,7 +2426,7 @@ void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* mo
             if (auto inst = block->getTerminator())
             {
                 if (inst->getOp() == kIROp_Return ||
-                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_discard)
+                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_Discard)
                 {
                     builder.setInsertBefore(inst);
                     builder.emitEndFragmentShaderInterlock();
@@ -2424,7 +2443,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module, codeGenContext->getSink());
+    legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);
