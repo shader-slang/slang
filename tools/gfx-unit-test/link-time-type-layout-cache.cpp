@@ -1,9 +1,9 @@
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -95,7 +95,7 @@ static void validateStructSLayout(
     }
 }
 
-void linkTimeTypeLayoutCacheImpl(gfx::IDevice* device, UnitTestContext* context)
+void linkTimeTypeLayoutCacheImpl(rhi::IDevice* device, UnitTestContext* context)
 {
     // main.slang: declares the interface and extern struct S
     const char* mainSrc = R"(
@@ -198,7 +198,7 @@ void linkTimeTypeLayoutCacheImpl(gfx::IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(linkTimeTypeLayoutCache)
 {
-    runTestImpl(linkTimeTypeLayoutCacheImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(linkTimeTypeLayoutCacheImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test

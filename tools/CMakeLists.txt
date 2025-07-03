@@ -151,7 +151,11 @@ if(SLANG_ENABLE_GFX)
             $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         INCLUDE_DIRECTORIES_PUBLIC .
             platform
-            ${slang_SOURCE_DIR}/external 
+        if (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external
+        else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH}
+        endif ()
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
     )
 
@@ -271,9 +275,17 @@ if(SLANG_ENABLE_TESTS)
                 slang
                 unit-test
                 stb
+                platform
                 $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
             INCLUDE_FROM_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+                INCLUDE_DIRECTORIES_PUBLIC .
+                platform
+            if (not ${SLANG_OVERRIDE_GLM_PATH})
+            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external
+            else ()
+            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH}
+            endif ()
             OUTPUT_NAME gfx-unit-test-tool
             REQUIRED_BY slang-test
             FOLDER test/tools

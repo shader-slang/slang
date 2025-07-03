@@ -1,3 +1,7 @@
+#if 0
+
+// This is tested in slang-rhi\tests\test-cmd-clear-texture.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include "gfx-util/shader-cursor.h"
@@ -90,3 +94,5 @@ SLANG_UNIT_TEST(clearTextureTestVulkan)
     runTestImpl(clearTextureTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 } // namespace gfx_test
+
+#endif 
