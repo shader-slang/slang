@@ -1109,6 +1109,14 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             {
                 result.uri =
                     URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+            }
+            else if (loc.loc.pathInfo.getName() == "core" || loc.loc.pathInfo.getName() == "glsl")
+            {
+                result.uri = StringBuilder() << "slang-synth://" << loc.loc.pathInfo.getName()
+                                             << "/" << loc.loc.pathInfo.getName() << ".builtin";
+            }
+            if (result.uri.getLength() != 0)
+            {
                 doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
                     loc.loc.line,
                     loc.loc.column,
@@ -2957,6 +2965,25 @@ SLANG_API SlangResult runLanguageServer(Slang::LanguageServerStartupOptions opti
 {
     Slang::LanguageServer server(options);
     SLANG_RETURN_ON_FAIL(server.execute());
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult
+getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef());
+    Slang::Session* session = static_cast<Slang::Session*>(globalSession.get());
+    StringBuilder sb;
+    if (moduleName.startsWith("core"))
+    {
+        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::Core);
+    }
+    else if (moduleName.startsWith("glsl"))
+    {
+        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::GLSL);
+    }
+    *blob = StringBlob::moveCreate(sb.produceString()).detach();
     return SLANG_OK;
 }
 

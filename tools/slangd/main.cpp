@@ -16,6 +16,14 @@ int main(int argc, const char* const* argv)
         {
             isDebug = true;
         }
+        else if (Slang::UnownedStringSlice(argv[i]) == "--print-builtin-module" && i < argc - 1)
+        {
+            Slang::UnownedStringSlice moduleName = Slang::UnownedStringSlice(argv[++i]);
+            Slang::ComPtr<slang::IBlob> code;
+            Slang::getBuiltinModuleSource(moduleName, code.writeRef());
+            printf("%s\n", (const char*)code->getBufferPointer());
+            return 0;
+        }
     }
     if (isDebug)
     {
