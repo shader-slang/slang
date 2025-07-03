@@ -1,4 +1,6 @@
 #if 0
+// Duplicated: This test is identical to slang-rhi\tests\test-cmd-copy-texture.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
@@ -923,5 +925,4 @@ SLANG_UNIT_TEST(copySectionWithSetExtent)
         Slang::RenderApiFlag::Vulkan);
 }
 } // namespace gfx_test
-
 #endif

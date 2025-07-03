@@ -1,11 +1,13 @@
 /*
- * This test has been temporarily disabled because the slang-rhi API 
+ * This test has been disabled because the slang-rhi API 
  * does not provide equivalent functionality for querying format-supported
- * resource states. The old gfx API's getFormatSupportedResourceStates() 
- * and related barrier functions don't have direct equivalents in slang-rhi.
+ * resource states. The old gfx API's getFormatSupportedResourceStates() is
+ * replaced by with IDevice::getFormatSupport.
  */
 
 #if 0
+// Disabled: no equivalent API in slang-rhi
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include <slang-rhi.h>

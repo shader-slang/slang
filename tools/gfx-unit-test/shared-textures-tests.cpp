@@ -1,5 +1,5 @@
 #if 0
-// This is identical to slang-rhi\tests\test-texture-shared.cpp
+// Duplicated: This is identical to slang-rhi\tests\test-texture-shared.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"

@@ -1,6 +1,5 @@
 #if 0
-
-// This is tested in slang-rhi\tests\test-cmd-draw.cpp
+// Duplicated: This is tested in slang-rhi\tests\test-cmd-draw.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"

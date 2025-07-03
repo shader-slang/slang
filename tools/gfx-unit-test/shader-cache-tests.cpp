@@ -1,7 +1,7 @@
 #if 0
-// TODO: This file uses gfx-specific shader cache functionality (IShaderCache) 
+// Duplicated: this is identical to slang-rhi\tests\test-shader-cache.cpp
+// This file uses gfx-specific shader cache functionality (IShaderCache) 
 // that has been replaced with a different caching system (IPersistentCache) in slang-rhi.
-// This needs to be rewritten to use the new slang-rhi caching API.
 
 #include "core/slang-basic.h"
 #include "core/slang-file-system.h"

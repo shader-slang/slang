@@ -1,6 +1,4 @@
-#if 0
-// TODO: This test failed 
-// FAILED test: 'gfx-unit-test-tool/rootShaderParameterD3D12.internal'
+// Duplicated: This test is identical slang-rhi\tests\test-root-shader-parameter.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
@@ -19,6 +17,8 @@ static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
     bufferDesc.size = sizeof(uint32_t);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | 
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
@@ -30,6 +30,10 @@ static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
 }
 void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
 {
+    if (!device->hasFeature(Feature::ParameterBlock)) {
+        SLANG_CHECK("no support for parameter blocks");
+    }
+
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -123,5 +127,3 @@ SLANG_UNIT_TEST(rootShaderParameterVulkan)
     runTestImpl(rootShaderParameterTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test
-
-#endif

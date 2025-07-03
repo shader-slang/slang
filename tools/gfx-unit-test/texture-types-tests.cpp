@@ -1,5 +1,5 @@
-#if 0 // Disabled: This test uses many old gfx API concepts that don't have direct equivalents in slang-rhi
-// The file would need to be completely rewritten to work with the new API
+#if 0
+// Duplicated: This test is identical to slang-rhi\tests\test-texture-types.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"

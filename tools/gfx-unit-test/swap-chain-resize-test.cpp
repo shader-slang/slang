@@ -1,5 +1,4 @@
-#if 0
-// TODO: This test segfaults
+// Duplicated: This test is similar to slang-rhi\tests\test-surface.cpp
 
 #include <slang-rhi.h>
 #include <slang-rhi/shader-cursor.h>
@@ -63,7 +62,7 @@ struct SwapchainResizeTest
         window = platform::Application::createWindow(windowDesc);
 
         // Create surface
-        WindowHandle windowHandle = WindowHandle::fromHwnd(window->getNativeHandle().handleValues);
+        WindowHandle windowHandle = WindowHandle::fromHwnd((void*)window->getNativeHandle().handleValues[0]);
         surface = device->createSurface(windowHandle);
 
         // Configure surface (swapchain)
@@ -211,5 +210,3 @@ SLANG_UNIT_TEST(swapchainResizeVulkan)
 }
 
 } // namespace gfx_test
-
-#endif

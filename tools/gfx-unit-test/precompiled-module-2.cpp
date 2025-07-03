@@ -1,5 +1,6 @@
 #if 0
-// There is no downstreamLinkMode in the RHI API
+// Duplicated: This test is identical to slang-rhi\tests\test-precompiled-module-cache.cpp
+// TODO_TESTING port
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -74,7 +75,7 @@ static Slang::Result precompileProgram(
         }
     }
 
-    // Write loaded modules to memory file system.
+    // Write loaded modules to file system.
     for (SlangInt i = 0; i < slangSession->getLoadedModuleCount(); i++)
     {
         auto module = slangSession->getLoadedModule(i);

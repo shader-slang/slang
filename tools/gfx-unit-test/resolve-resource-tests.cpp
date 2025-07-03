@@ -1,6 +1,5 @@
 #if 0
-
-// TODO: slang-rhi doesn't have resolveResource API.
+// Disabled: slang-rhi doesn't have resolveResource API.
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"

@@ -1,6 +1,4 @@
-#if 0
-// TODO: This test failed
-// FAILED test: 'gfx-unit-test-tool/samplerArrayVulkan.internal'
+// Duplicated: This test is identical to slang-rhi\tests\test-sampler-array.cpp
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
@@ -19,10 +17,11 @@ static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
     bufferDesc.size = sizeof(uint32_t);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination |
+                       BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
         device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
 
@@ -37,9 +36,9 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
 
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<IComputePipeline> pipelineState;
+    ComPtr<IComputePipeline> pipeline;
     GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+        device->createComputePipeline(pipelineDesc, pipeline.writeRef()));
 
     Slang::List<ComPtr<ISampler>> samplers;
     ComPtr<ITexture> texture;
@@ -54,6 +53,7 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
         textureDesc.size.depth = 1;
         textureDesc.mipCount = 2;
         textureDesc.memoryType = MemoryType::DeviceLocal;
+        textureDesc.usage = TextureUsage::ShaderResource | TextureUsage::CopyDestination;
         textureDesc.defaultState = ResourceState::ShaderResource;
         uint32_t data[] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
         SubresourceData subResourceData[2] = {{data, 8, 16}, {data, 8, 16}};
@@ -93,6 +93,7 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
         }
         cursor["data"].setData(1.0f);
     }
+        s1->finalize();
 
     {
         auto cursor = ShaderCursor(g);
@@ -105,19 +106,20 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
         cursor["g"].setObject(g);
         cursor["buffer"].setBinding(Binding(buffer));
     }
+    g->finalize();
 
     {
         auto queue = device->getQueue(QueueType::Graphics);
         auto commandEncoder = queue->createCommandEncoder();
-        {
-            auto encoder = commandEncoder->beginComputePass();
-            encoder->bindPipeline(pipelineState, rootObject);
-            encoder->dispatchCompute(1, 1, 1);
-            encoder->end();
-        }
+        auto passEncoder = commandEncoder->beginComputePass();
+        auto rootObject = passEncoder->bindPipeline(pipeline);
+        auto cursor = ShaderCursor(rootObject);
+        cursor["g"].setObject(g);
+        cursor["buffer"].setBinding(buffer);
+        passEncoder->dispatchCompute(1, 1, 1);
+        passEncoder->end();
 
-        auto commandBuffer = commandEncoder->finish();
-        queue->submit(commandBuffer);
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
     }
 
@@ -129,5 +131,3 @@ SLANG_UNIT_TEST(samplerArrayVulkan)
     runTestImpl(samplerArrayTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test
-
-#endif
