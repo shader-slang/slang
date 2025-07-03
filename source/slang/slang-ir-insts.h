@@ -976,12 +976,6 @@ struct IRTreatAsDifferentiableDecoration : IRDecoration
     FIDDLE(leafInst())
 };
 
-// Mark type as `some`
-struct IRSomeTypeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
 // Mark a call as explicitly calling a differentiable function.
 FIDDLE()
 struct IRDifferentiableCallDecoration : IRDecoration

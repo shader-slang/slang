@@ -138,30 +138,6 @@ Val* DeclRefType::_substituteImplOverride(
     if (!subst)
         return this;
 
-    // Any type that has a decl-hiding a inner type that needs specialization requires
-    // a bit of unwrapping (using the same subsitution set) and then repacking to
-    // substitute correctly
-    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(this))
-    {
-        auto someType = someTypeDeclRef.getDecl();
-        auto substitutedInnerType = subst.applyToType(astBuilder, someType->interfaceType);
-        if (substitutedInnerType)
-        {
-            (*ioDiff)++;
-            SomeTypeDecl* decl;
-            if (as<UnboundSomeTypeDecl>(isDeclRefTypeOf<SomeTypeDecl>(this)))
-                decl = astBuilder->create<UnboundSomeTypeDecl>();
-            else
-                decl = astBuilder->create<SomeTypeDecl>();
-            decl->loc = someType->loc;
-            decl->interfaceType.exp = someType->interfaceType.exp;
-            decl->interfaceType.type = substitutedInnerType;
-            decl->parentDecl = decl->parentDecl;
-            return DeclRefType::create(astBuilder, decl);
-        }
-        return this;
-    }
-
     int diff = 0;
     DeclRef<Decl> substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
 
@@ -912,6 +888,7 @@ Type* InterfaceWithContext::getOriginalInterfaceType()
     }
     else if (as<SomeTypeWithContextType>(this))
     {
+        // We do not subsitute the interfaceType here on purpose.
         return isDeclRefTypeOf<SomeTypeDecl>(as<Type>(getOperand(1))).getDecl()->interfaceType;
     }
     else

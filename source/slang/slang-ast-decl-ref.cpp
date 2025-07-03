@@ -374,13 +374,14 @@ void DeclRefBase::toText(StringBuilder& out)
         {
             if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
             {
-                out << "Unbound_Some<" << unboundSomeTypeDecl->interfaceType << ">";
+                out << "Unbound_Some<" << getInterfaceType(getCurrentASTBuilder(), unboundSomeTypeDecl) << ">";
             }
             else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
             {
                 // output `some` type as `parentDecl.Some<type>` instead of `parentDecl.some type`
                 // for clarity reasons.
-                out << "Some<" << someTypeDecl->interfaceType << ">";
+                out << "Some<"
+                    << getInterfaceType(getCurrentASTBuilder(), someTypeDecl) << ">";
             }
             out << ".";
         }

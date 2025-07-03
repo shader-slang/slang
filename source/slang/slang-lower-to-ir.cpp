@@ -8355,9 +8355,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
     {
-        auto declRefType = as<DeclRefType>(decl->interfaceType.type);
-        SLANG_ASSERT(declRefType);
-        auto loweredType = lowerType(this->context, declRefType);
+        auto interfaceType = getInterfaceType(context->astBuilder, decl);
+        SLANG_ASSERT(interfaceType);
+        auto loweredType = lowerType(this->context, interfaceType);
         if (!loweredType->findDecoration<IRSomeTypeDecoration>())
             context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
         return loweredType;

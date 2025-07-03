@@ -1928,7 +1928,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
         // implicit unwrap
         return _coerce(
             site,
-            someTypeDecl.getDecl()->interfaceType.type,
+            getInterfaceType(m_astBuilder, someTypeDecl),
             outToExpr,
             fromType,
             fromExpr,
@@ -1944,7 +1944,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
                 site,
                 toType,
                 outToExpr,
-                someTypeDeclRef.getDecl()->interfaceType.type,
+                getInterfaceType(m_astBuilder, someTypeDeclRef),
                 fromExpr,
                 sink,
                 outCost);
