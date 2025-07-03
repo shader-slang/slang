@@ -862,6 +862,12 @@ struct SCCPContext
         case kIROp_BoolLit:
             return LatticeVal::getConstant(inst);
 
+        case kIROp_Specialize:
+            // Specialization instructions should not be constant-folded, especially
+            // when they are used as operands to witness tables, because this can
+            // cause incorrect simplification of generic parameters.
+            return LatticeVal::getAny();
+
         // We might also want to special-case certain
         // instructions where we shouldn't bother trying to
         // constant-fold them and should just default to the
