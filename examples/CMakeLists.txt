@@ -98,6 +98,7 @@ if(SLANG_ENABLE_EXAMPLES)
         COMMENT "meta target which depends on all examples"
     )
     set_target_properties(all-examples PROPERTIES FOLDER examples)
+    example(autodiff-texture WIN32_EXECUTABLE)
     example(cpu-com-example)
     example(cpu-hello-world)
     example(gpu-printing)
