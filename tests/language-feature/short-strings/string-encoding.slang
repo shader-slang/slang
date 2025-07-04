@@ -59,12 +59,12 @@ extension ShortString<N>
 {
 	struct Reader : IMutatingFunc<uint>
 	{
-		Array<uint, N> str;
+		ShortString<N> str;
 		uint it = 0;
 
 		__init(const in ShortString<N> str, uint it = 0)
 		{
-			this.str = str.getArray();
+			this.str = str;
 			this.it = it;
 		}
 

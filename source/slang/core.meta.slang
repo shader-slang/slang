@@ -1734,7 +1734,7 @@ __magic_type(ShortStringType)
 __intrinsic_type($(kIROp_ShortStringType))
 struct ShortString : IArray<uint>
 {
-    __intrinsic_op($(kIROp_GetShortStringLength))
+    __intrinsic_op($(kIROp_GetArrayLength))
     [__unsafeForceInlineEarly]
     int getCount();
 
@@ -1747,29 +1747,9 @@ struct ShortString : IArray<uint>
     [__unsafeForceInlineEarly]
     Array<uint, N> getArray();
 
-    [__unsafeForceInlineEarly]
-    internal uint _getElementFromArray(uint i)
-    {
-        return getArray()[i];
-    }
-
-    __intrinsic_op($(kIROp_GetElement))
-    [__unsafeForceInlineEarly]
-    [require(cpp_cuda)]
-    internal uint _getElementFromNative(uint i);
-
     __subscript(uint i) -> uint
     {
-        [__unsafeForceInlineEarly] get {
-            uint res;
-            __target_switch
-            {
-                case cpp: res = _getElementFromNative(i);
-                case cuda: res = _getElementFromNative(i);
-                default: res = _getElementFromArray(i);
-            }
-            return res;
-         }
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetElement)) get;
     }
 };
 

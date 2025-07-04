@@ -5190,7 +5190,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            //expr->type
             StringBuilder sb;
             sb << "Unexpected type of StringLiteralExpr: ";
             expr->type.type->toText(sb);

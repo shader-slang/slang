@@ -2336,8 +2336,7 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice, IROp d
     keyInst.m_op = kIROp_StringLit;
     if (desiredType == kIROp_ShortStringType)
     {
-        keyInst.typeUse.usedValue =
-            getShortStringType(static_cast<IRIntLit*>(getIntValue(length)));
+        keyInst.typeUse.usedValue = getShortStringType(static_cast<IRIntLit*>(getIntValue(length)));
     }
     else if (desiredType == kIROp_StringType)
     {
@@ -8688,7 +8687,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
-    case kIROp_GetShortStringLength:
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:

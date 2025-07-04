@@ -306,9 +306,7 @@ struct PeepholeContext : InstPassBase
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
-            break;
-        case kIROp_GetShortStringLength:
-            if (auto strLitType = as<IRShortStringType>(inst->getOperand(0)->getDataType()))
+            else if (auto strLitType = as<IRShortStringType>(inst->getOperand(0)->getDataType()))
             {
                 inst->replaceUsesWith(strLitType->getLength());
                 maybeRemoveOldInst(inst);
