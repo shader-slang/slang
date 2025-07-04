@@ -40,7 +40,7 @@ local insts = {
 			{
 				StringTypeBase = {
 					hoistable = true,
-					{ ShortString = { struct_name = "ShortString", min_operands = 1 } },
+					{ ShortString = { struct_name = "ShortStringType", min_operands = 1 } },
 					{ String = { struct_name = "StringType" } },
 					{ NativeString = { struct_name = "NativeStringType" } },
 				},

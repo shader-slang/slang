@@ -328,7 +328,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_MakeString:
-        case kIROp_getNativeStr:
+        case kIROp_GetNativeStr:
             if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
             {
                 IRBuilder builder(module);

@@ -986,6 +986,7 @@ struct IRStringTypeBase : IRType
     FIDDLE(baseInst())
 };
 
+FIDDLE()
 struct IRShortStringType : IRStringTypeBase
 {
     FIDDLE(leafInst())

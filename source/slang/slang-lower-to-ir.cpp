@@ -5175,7 +5175,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        IROp type = kIROp_undefined;
+        IROp type = kIROp_Undefined;
         if (as<ShortStringType>(expr->type))
         {
             type = kIROp_ShortStringType;
