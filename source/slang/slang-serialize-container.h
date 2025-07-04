@@ -68,7 +68,9 @@ public:
     String getValue() const;
 };
 
-struct IRModuleChunk;
+struct IRModuleChunk : RIFF::ListChunk
+{
+};
 
 struct ASTModuleChunk : RIFF::ListChunk
 {
