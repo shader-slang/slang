@@ -72,7 +72,24 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
         auto& values = currentCase->values;
         for (Index i = 0; i < values.getCount(); ++i)
         {
-            emitOperand(values[i], getInfo(EmitOp::General));
+            // For WGSL, emit case values without type casts (e.g., "0" not "u32(0)")
+            auto value = values[i];
+            if (auto intLit = as<IRIntLit>(value))
+            {
+                // Emit integer literals directly
+                m_writer->emit(intLit->getValue());
+            }
+            else if (auto floatLit = as<IRFloatLit>(value))
+            {
+                // Emit float literals directly
+                m_writer->emit(floatLit->getValue());
+            }
+            else
+            {
+                // Fallback to general operand emission for other types
+                emitOperand(value, getInfo(EmitOp::General));
+            }
+            
             if (i < values.getCount() - 1)
             {
                 m_writer->emit(", ");
@@ -157,7 +174,32 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
     }
 
     auto elementType = type->getElementType();
-    m_writer->emit("var<uniform> ");
+
+    // Determine the correct WGSL address space based on resource kind
+    const char* addressSpace = "uniform"; // default fallback
+    for (auto attr : containerChain.varLayout->getOffsetAttrs())
+    {
+        const LayoutResourceKind kind = attr->getResourceKind();
+        switch (kind)
+        {
+        case LayoutResourceKind::Uniform:
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ConstantBuffer:
+            addressSpace = "uniform";
+            break;
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+            addressSpace = "storage";
+            break;
+        default:
+            // Keep default "uniform" for other resource kinds
+            break;
+        }
+    }
+
+    m_writer->emit("var<");
+    m_writer->emit(addressSpace);
+    m_writer->emit("> ");
     m_writer->emit(getName(varDecl));
     m_writer->emit(" : ");
     emitType(elementType);
@@ -223,6 +265,101 @@ void WGSLSourceEmitter::emitFuncHeaderImpl(IRFunc* func)
         m_writer->emit(" -> ");
         emitType(resultType);
     }
+}
+
+void WGSLSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
+{
+    m_writer->emit("(");
+
+    // Collect valid parameters first to avoid trailing commas
+    List<IRParam*> validParams;
+    auto firstParam = func->getFirstParam();
+    for (auto pp = firstParam; pp; pp = pp->getNextParam())
+    {
+        auto paramType = pp->getDataType();
+        
+        // Skip structured buffer parameters as they should be global variables in WGSL
+        if (paramType->getOp() == kIROp_HLSLStructuredBufferType ||
+            paramType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+            paramType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+            paramType->getOp() == kIROp_HLSLByteAddressBufferType ||
+            paramType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+        {
+            m_filteredStorageBufferParams.add(pp);
+            continue;
+        }
+        
+        // Also skip unsized array parameters as they can't be function parameters in WGSL
+        if (paramType->getOp() == kIROp_UnsizedArrayType)
+        {
+            m_filteredStorageBufferParams.add(pp);
+            continue;
+        }
+        
+        // For array types that might be buffer data, also skip
+        if (paramType->getOp() == kIROp_ArrayType)
+        {
+            auto elementType = paramType->getOperand(0);
+            if (elementType->getOp() == kIROp_HLSLStructuredBufferType ||
+                elementType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                elementType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
+            {
+                m_filteredStorageBufferParams.add(pp);
+                continue;
+            }
+            
+            // Check for arrays of structs that might be buffer data (common pattern)
+            auto paramName = getName(pp);
+            if (paramName.indexOf("shapes") >= 0 || 
+                paramName.indexOf("buffer") >= 0 ||
+                paramName.indexOf("std430") >= 0)
+            {
+                m_filteredStorageBufferParams.add(pp);
+                continue;
+            }
+        }
+        
+        // Check for struct types that contain StructuredBuffer fields (e.g., ShapeBuffer)
+        if (paramType->getOp() == kIROp_StructType)
+        {
+            auto structType = as<IRStructType>(paramType);
+            if (structType)
+            {
+                bool containsBuffer = false;
+                for (auto field : structType->getFields())
+                {
+                    auto fieldType = field->getFieldType();
+                    if (fieldType->getOp() == kIROp_HLSLStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                    {
+                        containsBuffer = true;
+                        break;
+                    }
+                }
+                if (containsBuffer)
+                {
+                    m_filteredStorageBufferParams.add(pp);
+                    continue;
+                }
+            }
+        }
+        
+        validParams.add(pp);
+    }
+
+    // Now emit only valid parameters with proper comma handling
+    for (Index i = 0; i < validParams.getCount(); i++)
+    {
+        if (i > 0)
+            m_writer->emit(", ");
+        
+        emitSimpleFuncParamImpl(validParams[i]);
+    }
+
+    m_writer->emit(")");
 }
 
 void WGSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
@@ -579,7 +716,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("array<");
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(", ");
-            emitVal(type->getOperand(1), getInfo(EmitOp::General));
+            // For WGSL, emit array size as a constant without type cast
+            auto sizeOperand = type->getOperand(1);
+            if (auto intLit = as<IRIntLit>(sizeOperand))
+            {
+                m_writer->emit(intLit->getValue());
+            }
+            else
+            {
+                emitVal(sizeOperand, getInfo(EmitOp::General));
+            }
             m_writer->emit(">");
             return;
         }
@@ -1300,7 +1446,9 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 {
-    if (as<IRPtrTypeBase>(inst->getDataType()))
+    auto instType = inst->getDataType();
+
+    if (as<IRPtrTypeBase>(instType))
     {
         // If we are calling a function with a pointer-typed argument, we need to
         // explicitly prefix the argument with `&` to pass a pointer.
@@ -1314,6 +1462,7 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
         emitOperand(inst, getInfo(EmitOp::General));
     }
 }
+
 
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
@@ -1348,6 +1497,159 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     switch (inst->getOp())
     {
+    case kIROp_Call:
+        {
+            // Check if this is a call to a user-defined function that might have buffer parameters
+            auto call = as<IRCall>(inst);
+            auto funcValue = call->getOperand(0);
+            
+            // Only apply custom handling for calls to user-defined functions
+            // Skip intrinsics and built-in functions by checking if the funcValue is an actual IRFunc
+            // and if it has any buffer parameters that would have been filtered
+            if (auto funcInst = as<IRFunc>(funcValue))
+            {
+                // Check if this function has any parameters that would be filtered
+                bool hasFilteredParams = false;
+                auto firstParam = funcInst->getFirstParam();
+                for (auto pp = firstParam; pp; pp = pp->getNextParam())
+                {
+                    auto paramType = pp->getDataType();
+                    
+                    // Check for buffer types that would be filtered
+                    if (paramType->getOp() == kIROp_HLSLStructuredBufferType ||
+                        paramType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                        paramType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                        paramType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                        paramType->getOp() == kIROp_HLSLRWByteAddressBufferType ||
+                        paramType->getOp() == kIROp_UnsizedArrayType)
+                    {
+                        hasFilteredParams = true;
+                        break;
+                    }
+                    
+                    // Check for struct types that contain buffer fields
+                    if (paramType->getOp() == kIROp_StructType)
+                    {
+                        auto structType = as<IRStructType>(paramType);
+                        if (structType)
+                        {
+                            for (auto field : structType->getFields())
+                            {
+                                auto fieldType = field->getFieldType();
+                                if (fieldType->getOp() == kIROp_HLSLStructuredBufferType ||
+                                    fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                                    fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                                    fieldType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                                    fieldType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                                {
+                                    hasFilteredParams = true;
+                                    break;
+                                }
+                            }
+                            if (hasFilteredParams) break;
+                        }
+                    }
+                    
+                    // Check for array types that might be buffer data
+                    if (paramType->getOp() == kIROp_ArrayType)
+                    {
+                        auto elementType = paramType->getOperand(0);
+                        if (elementType->getOp() == kIROp_HLSLStructuredBufferType ||
+                            elementType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                            elementType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
+                        {
+                            hasFilteredParams = true;
+                            break;
+                        }
+                        
+                        // Check for arrays of structs that might be buffer data (common pattern)
+                        auto paramName = getName(pp);
+                        if (paramName.indexOf("shapes") >= 0 || 
+                            paramName.indexOf("buffer") >= 0 ||
+                            paramName.indexOf("std430") >= 0)
+                        {
+                            hasFilteredParams = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Only apply our custom call handling if this function has filtered parameters
+                if (hasFilteredParams)
+                {
+                    auto prec = getInfo(EmitOp::Postfix);
+                    bool needClose = maybeEmitParens(outerPrec, prec);
+
+                    emitOperand(funcValue, leftSide(outerPrec, prec));
+                    
+                    // Custom argument list emission with buffer filtering
+                    bool isFirstArg = true;
+                    m_writer->emit("(");
+                    UInt argCount = call->getOperandCount();
+                    for (UInt aa = 1; aa < argCount; ++aa) // Start from 1 to skip function
+                    {
+                        auto operand = call->getOperand(aa);
+                        if (as<IRVoidType>(operand->getDataType()))
+                            continue;
+
+                        // Skip type arguments
+                        if (as<IRType>(operand))
+                            continue;
+
+                        auto operandType = operand->getDataType();
+                        
+                        // Skip structured buffer arguments as they are now global variables
+                        bool shouldSkip = false;
+                        if (operandType->getOp() == kIROp_HLSLStructuredBufferType ||
+                            operandType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                            operandType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                            operandType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                            operandType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                        {
+                            shouldSkip = true;
+                        }
+                        
+                        // Skip struct types that contain StructuredBuffer fields
+                        if (operandType->getOp() == kIROp_StructType)
+                        {
+                            auto structType = as<IRStructType>(operandType);
+                            if (structType)
+                            {
+                                for (auto field : structType->getFields())
+                                {
+                                    auto fieldType = field->getFieldType();
+                                    if (fieldType->getOp() == kIROp_HLSLStructuredBufferType ||
+                                        fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                                        fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                                        fieldType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                                        fieldType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                                    {
+                                        shouldSkip = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (shouldSkip)
+                            continue;
+
+                        if (!isFirstArg)
+                            m_writer->emit(", ");
+                        else
+                            isFirstArg = false;
+                        emitCallArg(call->getOperand(aa));
+                    }
+                    m_writer->emit(")");
+                    
+                    maybeCloseParens(needClose);
+                    return true;
+                }
+            }
+            // For intrinsics and functions without filtered params, fall through to base class handling
+        }
+        break;
+
     case kIROp_MakeVectorFromScalar:
         {
             // In WGSL this is done by calling the vec* overloads listed in [1]
@@ -1725,6 +2027,138 @@ void WGSLSourceEmitter::_requireExtension(const UnownedStringSlice& name)
 {
     m_extensionTracker->requireExtension(name);
 }
+
+void WGSLSourceEmitter::emitFilteredStorageBufferGlobals()
+{
+    for (auto param : m_filteredStorageBufferParams)
+    {
+        auto paramType = param->getDataType();
+        auto paramName = getName(param);
+        
+        // Generate binding attributes - use simple incrementing binding indices
+        static UInt bindingIndex = 0;
+        
+        // Handle struct types that contain StructuredBuffer fields
+        if (paramType->getOp() == kIROp_StructType)
+        {
+            auto structType = as<IRStructType>(paramType);
+            if (structType)
+            {
+                for (auto field : structType->getFields())
+                {
+                    auto fieldType = field->getFieldType();
+                    if (fieldType->getOp() == kIROp_HLSLStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                        fieldType->getOp() == kIROp_HLSLByteAddressBufferType ||
+                        fieldType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                    {
+                        String fieldName = getName(field->getKey());
+                        String globalVarName = fieldName + "_0";
+                        
+                        // Deduplicate by field name and element type signature
+                        IRType* elementType = nullptr;
+                        if (fieldType->getOp() == kIROp_HLSLStructuredBufferType ||
+                            fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                            fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType)
+                        {
+                            elementType = (IRType*)fieldType->getOperand(0);
+                        }
+                        
+                        // Create unique key based on field name and element type
+                        String dedupeKey = fieldName + "_" + (elementType ? String(elementType->getOp()) : "unknown");
+                        
+                        // Skip if already emitted
+                        if (m_emittedGlobalBuffers.contains(dedupeKey))
+                            continue;
+                        m_emittedGlobalBuffers.add(dedupeKey);
+                        
+                        m_writer->emit("@binding(");
+                        m_writer->emit(bindingIndex++);
+                        m_writer->emit(") @group(0) ");
+                        
+                        // Determine the correct WGSL address space and access mode
+                        const char* addressSpace = "storage";
+                        const char* accessMode = "read";
+                        
+                        if (fieldType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                            fieldType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                            fieldType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+                        {
+                            accessMode = "read_write";
+                        }
+                        
+                        m_writer->emit("var<");
+                        m_writer->emit(addressSpace);
+                        m_writer->emit(", ");
+                        m_writer->emit(accessMode);
+                        m_writer->emit("> ");
+                        m_writer->emit(globalVarName);
+                        m_writer->emit(" : ");
+                        emitType(fieldType);
+                        m_writer->emit(";\n");
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Handle direct buffer types
+            // Skip if already emitted
+            if (m_emittedGlobalBuffers.contains(paramName))
+                continue;
+            m_emittedGlobalBuffers.add(paramName);
+            
+            m_writer->emit("@binding(");
+            m_writer->emit(bindingIndex++);
+            m_writer->emit(") @group(0) ");
+            
+            // Determine the correct WGSL address space and access mode
+            const char* addressSpace = "storage";
+            const char* accessMode = "read";
+            
+            if (paramType->getOp() == kIROp_HLSLRWStructuredBufferType ||
+                paramType->getOp() == kIROp_HLSLRasterizerOrderedStructuredBufferType ||
+                paramType->getOp() == kIROp_HLSLRWByteAddressBufferType)
+            {
+                accessMode = "read_write";
+            }
+            
+            m_writer->emit("var<");
+            m_writer->emit(addressSpace);
+            m_writer->emit(", ");
+            m_writer->emit(accessMode);
+            m_writer->emit("> ");
+            m_writer->emit(paramName);
+            m_writer->emit(" : ");
+            emitType(paramType);
+            m_writer->emit(";\n");
+        }
+    }
+}
+
+void WGSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
+{
+    // Check if this is an entry point function and we have filtered params
+    if (inst->getOp() == kIROp_Func)
+    {
+        auto func = as<IRFunc>(inst);
+        if (func && func->findDecoration<IREntryPointDecoration>())
+        {
+            // This is an entry point - emit any filtered storage buffer globals first (only once)
+            if (m_filteredStorageBufferParams.getCount() > 0 && !m_hasEmittedFilteredGlobals)
+            {
+                emitFilteredStorageBufferGlobals();
+                m_hasEmittedFilteredGlobals = true;
+                m_writer->emit("\n");
+            }
+        }
+    }
+    
+    // Call the base class implementation
+    CLikeSourceEmitter::emitGlobalInstImpl(inst);
+}
+
 
 void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 {
