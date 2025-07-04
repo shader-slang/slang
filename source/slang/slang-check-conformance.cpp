@@ -148,6 +148,29 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         if (!facetType->equals(superType))
             continue;
 
+        // Do not propagate conformance of struct to interface through an intermediate struct
+        // Other transitive witnesses are valid
+        if (auto transitiveWitness = as<TransitiveSubtypeWitness>(facet->subtypeWitness))
+        {
+            auto midType = transitiveWitness->getMidToSup()->getSub();
+            auto subDeclRefType = as<DeclRefType>(subType);
+            auto midDeclRefType = as<DeclRefType>(midType);
+            auto superDeclRefType = as<DeclRefType>(superType);
+
+            if (subDeclRefType && midDeclRefType && superDeclRefType)
+            {
+                auto subDecl = as<StructDecl>(subDeclRefType->getDeclRef().getDecl());
+                auto superDecl = as<InterfaceDecl>(superDeclRefType->getDeclRef().getDecl());
+                auto midDecl = as<StructDecl>(midDeclRefType->getDeclRef().getDecl());
+
+                if (subDecl && superDecl && midDecl)
+                {
+                    // This witness is not a conformance we will support
+                    continue;
+                }
+            }
+        }
+
         // If the `superType` appears in the flattened inheritance list
         // for the `subType`, then we know that the subtype relationship
         // holds.
