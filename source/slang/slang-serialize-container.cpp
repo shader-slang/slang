@@ -12,6 +12,7 @@
 #include "slang-serialize-ast.h"
 #include "slang-serialize-ir.h"
 #include "slang-serialize-source-loc.h"
+#include "slang-serialize-types.h"
 
 namespace Slang
 {
@@ -137,11 +138,10 @@ public:
         IRModule* irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
 
         // Okay, we need to serialize this target program and its IR too...
-        IRSerialData serialData;
-        IRSerialWriter writer;
-
-        SLANG_RETURN_ON_FAIL(writer.write(irModule, _sourceLocWriter, &serialData));
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
+        {
+            // SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
+        }
 
         return SLANG_OK;
     }
@@ -216,10 +216,8 @@ public:
         //
         if (auto irModule = module->getIRModule())
         {
-            IRSerialData serialData;
-            IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.write(irModule, _sourceLocWriter, &serialData));
-            SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
+            // SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
         }
 
         // If we have AST information available, then we serialize it here.
@@ -582,30 +580,40 @@ SlangResult decodeModuleIR(
     Session* session,
     SerialSourceLocReader* sourceLocReader)
 {
-    // IR serialization still uses the older approach, where
-    // data gets deserialized from the RIFF into an intermediate
-    // data structure (`IRSerialData`), and then the actual
-    // in-memory structures are created based on the intermediate.
-    //
-    // Thus we start by running the `IRSerialReader::readContainer`
-    // logic to get the `IRSerialData` representation.
-    //
-    // TODO(tfoley): This should all get streamlined so that we
-    // are deserializing IR nodes directly from the format written
-    // into the RIFF.
-    //
-    IRSerialData serialData;
-    SLANG_RETURN_ON_FAIL(IRSerialReader::readFrom(chunk, &serialData));
-
-    // Next we read the actual IR representation out from the
-    // `serialData`. This is the step that may pull source-location
-    // information from the provided `sourceLocReader`.
-    //
-    IRSerialReader reader;
-    SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceLocReader, outIRModule));
-
-    return SLANG_OK;
+    return readSerializedModuleIR(chunk, session, sourceLocReader, outIRModule);
 }
+
+static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
+{
+    // We reserve 0 for null
+    instsOut.setCount(1);
+    instsOut[0] = nullptr;
+
+    // Stack for parentInst
+    List<IRInst*> parentInstStack;
+
+    IRModuleInst* moduleInst = module->getModuleInst();
+    parentInstStack.add(moduleInst);
+
+    // Add to list
+    instsOut.add(moduleInst);
+
+    // Traverse all of the instructions
+    while (parentInstStack.getCount())
+    {
+        // If it's in the stack it is assumed it is already in the inst map
+        IRInst* parentInst = parentInstStack.getLast();
+        parentInstStack.removeLast();
+
+        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
+        for (IRInst* child : childrenList)
+        {
+            instsOut.add(child);
+            parentInstStack.add(child);
+        }
+    }
+}
+
 
 /* static */ SlangResult SerialContainerUtil::verifyIRSerialize(
     IRModule* module,
@@ -615,9 +623,8 @@ SlangResult decodeModuleIR(
     // Verify if we can stream out with raw source locs
 
     List<IRInst*> originalInsts;
-    IRSerialWriter::calcInstructionList(module, originalInsts);
-
-    IRSerialData irData;
+    SLANG_ASSERT(false);
+    calcModuleInstructionList(module, originalInsts);
 
     OwnedMemoryStream memoryStream(FileAccess::ReadWrite);
 
@@ -627,7 +634,6 @@ SlangResult decodeModuleIR(
 
         // Need to put all of this in a module chunk
         SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, SerialBinary::kModuleFourCC);
-
         RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
         if (options.sourceManagerToUseWhenSerializingSourceLocs)
@@ -636,12 +642,7 @@ SlangResult decodeModuleIR(
                 new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
-        {
-            // Write IR out to `irData`
-            IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.write(module, sourceLocWriter, &irData));
-        }
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(irData, cursor));
+        writeSerializedModuleIR(cursor, module, sourceLocWriter);
 
         // Write the debug info Riff container
         if (sourceLocWriter)
@@ -703,25 +704,13 @@ SlangResult decodeModuleIR(
                 return SLANG_FAIL;
             }
 
-            {
-                IRSerialData irReadData;
-                IRSerialReader reader;
-                SLANG_RETURN_ON_FAIL(reader.readFrom(irChunk, &irReadData));
-
-                // Check the stream read data is the same
-                if (irData != irReadData)
-                {
-                    SLANG_ASSERT(!"Streamed in data doesn't match");
-                    return SLANG_FAIL;
-                }
-
-                SLANG_RETURN_ON_FAIL(reader.read(irData, session, sourceLocReader, irReadModule));
-            }
+            SLANG_RETURN_ON_FAIL(
+                readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule));
         }
     }
 
     List<IRInst*> readInsts;
-    IRSerialWriter::calcInstructionList(irReadModule, readInsts);
+    calcModuleInstructionList(irReadModule, readInsts);
 
     if (readInsts.getCount() != originalInsts.getCount())
     {

@@ -9,6 +9,102 @@
 namespace Slang
 {
 
+struct IRSerialWriter
+{
+    typedef IRSerialData Ser;
+    typedef IRSerialBinary Bin;
+
+    Result write(
+        IRModule* module,
+        SerialSourceLocWriter* sourceLocWriter,
+        IRSerialData* serialData);
+
+    /// Write to a container
+    static Result writeTo(const IRSerialData& data, RIFF::BuildCursor& cursor);
+
+    /// Get an instruction index from an instruction
+    Ser::InstIndex getInstIndex(IRInst* inst) const
+    {
+        return inst ? Ser::InstIndex(m_instMap.getValue(inst)) : Ser::InstIndex(0);
+    }
+
+    /// Get a slice from an index
+    UnownedStringSlice getStringSlice(Ser::StringIndex index) const
+    {
+        return m_stringSlicePool.getSlice(StringSlicePool::Handle(index));
+    }
+    /// Get index from string representations
+    Ser::StringIndex getStringIndex(StringRepresentation* string)
+    {
+        return Ser::StringIndex(m_stringSlicePool.add(string));
+    }
+    Ser::StringIndex getStringIndex(const UnownedStringSlice& slice)
+    {
+        return Ser::StringIndex(m_stringSlicePool.add(slice));
+    }
+    Ser::StringIndex getStringIndex(Name* name)
+    {
+        return name ? getStringIndex(name->text) : SerialStringData::kNullStringIndex;
+    }
+    Ser::StringIndex getStringIndex(const char* chars)
+    {
+        return Ser::StringIndex(m_stringSlicePool.add(chars));
+    }
+    Ser::StringIndex getStringIndex(const String& string)
+    {
+        return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice()));
+    }
+
+    StringSlicePool& getStringPool() { return m_stringSlicePool; }
+
+    IRSerialWriter()
+        : m_serialData(nullptr), m_stringSlicePool(StringSlicePool::Style::Default)
+    {
+    }
+
+protected:
+    void _addInstruction(IRInst* inst);
+    Result _calcDebugInfo(SerialSourceLocWriter* sourceLocWriter);
+
+    List<IRInst*> m_insts; ///< Instructions in same order as stored in the
+
+    List<IRDecoration*>
+        m_decorations; ///< Holds all decorations in order of the instructions as found
+    List<IRInst*> m_instWithFirstDecoration; ///< All decorations are held in this order after all
+                                             ///< the regular instructions
+
+    Dictionary<IRInst*, Ser::InstIndex> m_instMap; ///< Map an instruction to an instruction index
+
+    StringSlicePool m_stringSlicePool;
+    IRSerialData* m_serialData; ///< Where the data is stored
+};
+
+struct IRSerialReader
+{
+    typedef IRSerialData Ser;
+
+    /// Read a stream to fill in dataOut IRSerialData
+    static Result readFrom(RIFF::ListChunk const* irModuleChunk, IRSerialData* outData);
+
+    /// Read a module from serial data
+    Result read(
+        const IRSerialData& data,
+        Session* session,
+        SerialSourceLocReader* sourceLocReader,
+        RefPtr<IRModule>& outModule);
+
+    IRSerialReader()
+        : m_serialData(nullptr), m_module(nullptr), m_stringTable(StringSlicePool::Style::Default)
+    {
+    }
+
+protected:
+    StringSlicePool m_stringTable;
+
+    const IRSerialData* m_serialData;
+    IRModule* m_module;
+};
+
 static bool _isConstant(IROp opIn)
 {
     const int op = (kIROpMask_OpMask & opIn);
@@ -359,37 +455,6 @@ Result _writeInstArrayChunk(
     return SLANG_OK;
 }
 
-/* static */ void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
-{
-    // We reserve 0 for null
-    instsOut.setCount(1);
-    instsOut[0] = nullptr;
-
-    // Stack for parentInst
-    List<IRInst*> parentInstStack;
-
-    IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.add(moduleInst);
-
-    // Add to list
-    instsOut.add(moduleInst);
-
-    // Traverse all of the instructions
-    while (parentInstStack.getCount())
-    {
-        // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.getLast();
-        parentInstStack.removeLast();
-
-        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
-        for (IRInst* child : childrenList)
-        {
-            instsOut.add(child);
-            parentInstStack.add(child);
-        }
-    }
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 static Result _readInstArrayChunk(RIFF::DataChunk const* chunk, List<IRSerialData::Inst>& arrayOut)
@@ -399,7 +464,7 @@ static Result _readInstArrayChunk(RIFF::DataChunk const* chunk, List<IRSerialDat
 }
 
 /* static */ Result IRSerialReader::readFrom(
-    IRModuleChunk const* irModuleChunk,
+    RIFF::ListChunk const* irModuleChunk,
     IRSerialData* outData)
 {
     typedef IRSerialBinary Bin;
@@ -754,6 +819,55 @@ Result IRSerialReader::read(
     }
 
     outModule->buildMangledNameToGlobalInstMap();
+
+    return SLANG_OK;
+}
+
+void writeSerializedModuleIR(
+    RIFF::BuildCursor& cursor,
+    IRModule* irModule,
+    SerialSourceLocWriter* sourceLocWriter)
+{
+    IRSerialData serialData;
+    IRSerialWriter writer;
+
+    writer.write(irModule, sourceLocWriter, &serialData);
+    IRSerialWriter::writeTo(serialData, cursor);
+}
+
+SlangResult readSerializedModuleIR(
+    RIFF::Chunk const* chunk,
+    // [[maybe_unused]] ISlangBlob* blobHoldingSerializedData,
+    Session* session,
+    // [[maybe_unused]] DiagnosticSink* sink,
+    SerialSourceLocReader* sourceLocReader,
+    RefPtr<IRModule>& outIRModule)
+{
+    // IR serialization still uses the older approach, where
+    // data gets deserialized from the RIFF into an intermediate
+    // data structure (`IRSerialData`), and then the actual
+    // in-memory structures are created based on the intermediate.
+    //
+    // Thus we start by running the `IRSerialReader::readContainer`
+    // logic to get the `IRSerialData` representation.
+    //
+    // TODO(tfoley): This should all get streamlined so that we
+    // are deserializing IR nodes directly from the format written
+    // into the RIFF.
+    const auto moduleChunk = as<RIFF::ListChunk>(chunk);
+    if (!moduleChunk)
+    {
+        SLANG_UNEXPECTED("invalid format for serialized module IR");
+    }
+    IRSerialData serialData;
+    SLANG_RETURN_ON_FAIL(IRSerialReader::readFrom(moduleChunk, &serialData));
+
+    // Next we read the actual IR representation out from the
+    // `serialData`. This is the step that may pull source-location
+    // information from the provided `sourceLocReader`.
+    //
+    IRSerialReader reader;
+    SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceLocReader, outIRModule));
 
     return SLANG_OK;
 }
