@@ -318,7 +318,7 @@ struct ValidateUniformityContext
                             }
                             break;
                         }
-                    case kIROp_ifElse:
+                    case kIROp_IfElse:
                         {
                             auto ifElse = as<IRIfElse>(user);
                             visitControlDependentBlock(ifElse->getTrueBlock());

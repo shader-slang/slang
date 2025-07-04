@@ -15,12 +15,12 @@ uint3 f() { return WorkgroupSize(); }
 void compute1()
 {
     // CHECK_EXPERIMENTAL-DAG: %[[VAR:[A-Za-z0-9_]+]] = OpTypePointer Function %v3int
-    // CHECK_EXPERIMENTAL: OpAccessChain %[[VAR]]
+    // CHECK_EXPERIMENTAL: Op{{.*}}AccessChain %[[VAR]]
     //
     // CHECK_EXPERIMENTAL-DAG: %[[CALL_RS:[A-Za-z0-9_]+]] = OpFunctionCall %v3uint %f
     // CHECK_EXPERIMENTAL: OpCompositeExtract %uint %[[CALL_RS]] 0
     //
-    // CHECK_EXPERIMENTAL-DAG: %[[PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %int_1
+    // CHECK_EXPERIMENTAL-DAG: %[[PTR:[A-Za-z0-9_]+]] = Op{{.*}}AccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %int_1
     // CHECK_EXPERIMENTAL: OpStore %[[PTR]] %int_2
 
     // CHECK-DAG: %[[VAR:[A-Za-z0-9_]+]] = OpVariable %_ptr_Private_v3int Private
@@ -29,7 +29,7 @@ void compute1()
     // CHECK-DAG: %[[CALL_RS:[A-Za-z0-9_]+]] = OpFunctionCall %v3uint %f
     // CHECK: OpCompositeExtract %uint %[[CALL_RS]] 0
     //
-    // CHECK-DAG: %[[PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %int_1
+    // CHECK-DAG: %[[PTR:[A-Za-z0-9_]+]] = Op{{.*}}AccessChain %_ptr_StorageBuffer_int %outputBuffer %int_0 %int_1
     // CHECK: OpStore %[[PTR]] %int_2
 
     const int x = f().x;

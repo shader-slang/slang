@@ -2141,8 +2141,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 actualOutputSB << "activeParameter: " << sigInfo.activeParameter << "\n";
                 actualOutputSB << "activeSignature: " << sigInfo.activeSignature << "\n";
-                for (auto item : sigInfo.signatures)
+                for (Index i = 0; i < sigInfo.signatures.getCount(); ++i)
                 {
+                    auto& item = sigInfo.signatures[i];
+                    if (i == sigInfo.activeSignature)
+                    {
+                        actualOutputSB << "(selected) ";
+                    }
                     actualOutputSB << item.label << ":";
                     for (auto param : item.parameters)
                     {

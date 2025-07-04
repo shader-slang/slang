@@ -265,14 +265,14 @@ struct CFGNormalizationPass
             auto terminator = currentBlock->getTerminator();
             switch (terminator->getOp())
             {
-            case kIROp_unconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 {
                     auto targetBlock = as<IRUnconditionalBranch>(terminator)->getTargetBlock();
                     currentBlock = targetBlock;
                     break;
                 }
 
-            case kIROp_ifElse:
+            case kIROp_IfElse:
                 {
                     auto ifElse = as<IRIfElse>(terminator);
 
@@ -441,7 +441,7 @@ struct CFGNormalizationPass
                     break;
                 }
 
-            case kIROp_loop:
+            case kIROp_Loop:
             case kIROp_Switch:
                 {
                     auto breakBlock = normalizeBreakableRegion(terminator);
@@ -509,7 +509,7 @@ struct CFGNormalizationPass
 
         switch (branchInst->getOp())
         {
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 BreakableRegionInfo info;
                 info.breakBlock = as<IRLoop>(branchInst)->getBreakBlock();
