@@ -1,4 +1,7 @@
-//TEST:SIMPLE(filecheck=SPV): -allow-glsl -target spirv-asm -entry computeMain -stage compute
+//DISABLE_TEST:SIMPLE(filecheck=SPV): -allow-glsl -target spirv-asm -entry computeMain -stage compute
+// TODO: with https://github.com/shader-slang/slang/pull/7269, this test will fail because
+// textureGatherOffset() in the slang stdlib requires a compile-time constant offset.
+
 
 // Test if we are correctly using `Offset` option instead of `ConstOffset`
 // when the offset value is not a compile-time constant.
