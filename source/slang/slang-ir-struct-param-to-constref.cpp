@@ -1,6 +1,5 @@
 #include "slang-ir-struct-param-to-constref.h"
 
-#include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -234,9 +233,44 @@ struct StructParamToConstRefContext
         }
     }
 
+    // Check if function should be excluded from transformation
+    bool shouldSkipFunction(IRFunc* func)
+    {
+        // Skip built-in utility functions like __sizeOf, __offsetOf
+        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+        {
+            String name = nameHint->getName();
+            if (name.startsWith("__sizeOf") || name.startsWith("__offsetOf") ||
+                name.startsWith("__alignOf"))
+                return true;
+        }
+
+        // Skip functions with readNone decoration (pure utility functions)
+        if (func->findDecoration<IRReadNoneDecoration>())
+            return true;
+
+        // Skip functions with target intrinsic decorations (backend-specific functions)
+        if (func->findDecoration<IRTargetIntrinsicDecoration>())
+            return true;
+
+        // Skip functions without definitions (external/intrinsic functions)
+        if (!func->isDefinition())
+            return true;
+
+        // Skip entry point functions (interface with runtime)
+        if (func->findDecoration<IREntryPointDecoration>())
+            return true;
+
+        return false;
+    }
+
     // Process a single function
     void processFunc(IRFunc* func)
     {
+        // Skip built-in utility functions
+        if (shouldSkipFunction(func))
+            return;
+
         Dictionary<IRParam*, IRParam*> paramMap;
         bool hasTransformedParams = false;
 
