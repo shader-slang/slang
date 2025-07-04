@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
-// CHECK: 'closestHit' uses features that are not available in 'closesthit' stage.
+// CHECK: error 36117:{{.*}}'closestHit'{{.*}}'closesthit'
 // CHECK: see using of 'discard'
 
 struct PrimaryRayPayload{}
@@ -13,7 +13,7 @@ void closestHit(
     discard;
 }
 
-// CHECK: 'closestHit1' uses features that are not available in 'closesthit' stage
+// CHECK: error 36107:{{.*}}'closestHit1'{{.*}}'closesthit'{{.* }}'spirv' 
 // CHECK: see using of 'discard'
 [shader("closesthit")]
 void closestHit1(
