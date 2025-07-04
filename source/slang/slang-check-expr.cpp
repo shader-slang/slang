@@ -194,15 +194,74 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         });
 }
 
-/// If `expr` has existential type, then open it.
-///
-/// Returns an expression that opens `expr` if it had existential type.
-/// Otherwise returns `expr` itself.
+// Create a SomeType with context required for resolving the base concrete type
+Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef)
+{
+    /*
+    Why we are temporarily using existential logic for a non existential object:
+    * Until we add backend support for legalizing `some`, we will need to use
+      `ExistentialType` with `some` for the backend to specialize our interfaces.
+      This gives us 3 options:
+    * hack in support for `ExistentialType` at lower-to-ir.
+        * This will be non-trivial since we need to fetch a look-up to our function-calls, and
+    call's may need specialization, this causing other transitive issues once lowering to ir. *To
+    generate these look-ups we also need a type use-site for a witness-table (to specialize the
+          function-calls in IR). To do this logic without bugs we need to create
+    `ExtractExistentialType` around the same time as `OpenExistential` so that we have the correct
+    `expr` to generate with. This means this approach is redundant.
+        * If we modify, add, or change the Existentials system in any significant way, we will
+          break the `some` logic added since it will be significantly hacked together.
+    * generate a `ExtractExistentialType` with `OpenExistential` logic
+        * By far the easiest solution to get something that will flawlessly work is to just
+    duplicate `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be
+    removed by replacing a single return value.
+        * Problem is that we then explicitly need to unwrap `some` type before creating an
+    existential which should never be enforced. We should only sparingly treat the `some` as an
+    existential since `some` should be its own legal type. The end goal is to decouple `some` from
+    the existential system fully, this means we need to minimize areas where we treat `some` as its
+    underlying interface.
+    * Create new AST nodes mimicing `ExistentialType`s is the middle ground of these options.
+      We are implementing this approach.
+        * New AST nodes will mimic how Existential's are currently handled, but will provide thin
+         "overloads" so that we are more selective about where our hacks are used.
+        * This change is in-hopes that we do not need to hack the actual Existential type system
+    when changing `some` before we fully decouple `some` from the existential system.
+        * The added benifit is that by sharing logic with ExtractExistentialType we won't break
+    `some` every time we add a new existential type system feature.
+        */
+    return maybeMoveTemp(
+        expr,
+        [&](DeclRef<VarDeclBase> varDeclRef)
+        {
+            SomeTypeWithContextType* openedType =
+                m_astBuilder->getOrCreate<SomeTypeWithContextType>(
+                    varDeclRef,
+                    expr->type.type,
+                    declRef);
+
+            ExtractExistentialValueExpr* openedValue =
+                m_astBuilder->create<ExtractExistentialValueExpr>();
+            openedValue->declRef = varDeclRef;
+            openedValue->type = QualType(openedType);
+            openedValue->originalExpr = expr;
+            openedValue->checked = true;
+            if (expr->type.isLeftValue)
+            {
+                openedValue->type.isLeftValue = true;
+            }
+
+            return openedValue;
+        });
+}
+
+/// Returns an expression that opens `expr` if it has an existential type;
+/// else creates an expression to indirectly point to a concrete (`some`) type;
+/// otherwise return `expr` itself.
 ///
 /// See `openExistential` for a discussion of what "opening" an
 /// existential-type value means.
 ///
-Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
+Expr* SemanticsVisitor::maybeCreateIndirectValToInterface(Expr* expr)
 {
     auto exprType = expr->type.type;
 
@@ -211,6 +270,10 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
         if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
         {
             return openExistential(expr, interfaceDeclRef);
+        }
+        else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
+        {
+            return createSomeTypeWithContext(expr, someTypeDeclRef);
         }
     }
 
@@ -2476,8 +2539,13 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
+
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsUnbound |
+        (UInt)SemanticsContextState::SomeTypeIsAllowed));
+
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
+    auto baseExpr = subVisitor.checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
         CheckBaseContext::Subscript,
         needDeref);
@@ -2487,9 +2555,9 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // the subscript
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
-    auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(disableShortCircuitLogicalExpr())
-                          : *this;
+    subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
+                     ? SemanticsVisitor(subVisitor.disableShortCircuitLogicalExpr())
+                     : subVisitor;
 
     for (auto& arg : subscriptExpr->indexExprs)
     {
@@ -2513,7 +2581,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         IntVal* elementCount = nullptr;
         if (subscriptExpr->indexExprs.getCount() == 1)
         {
-            elementCount = CheckIntegerConstantExpression(
+            elementCount = subVisitor.CheckIntegerConstantExpression(
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
@@ -2536,7 +2604,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
         }
 
-        auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
+        auto elementType =
+            subVisitor.CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
         auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
@@ -4202,7 +4271,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Otherwise, if the target type is a subtype of value->type, we need to grab the
     // subtype witness for runtime checks.
 
-    expr->value = maybeOpenExistential(originalVal);
+    expr->value = maybeCreateIndirectValToInterface(originalVal);
     expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
     if (expr->witnessArg)
     {
@@ -4257,7 +4326,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         {
             getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
         }
-        expr->value = maybeOpenExistential(expr->value);
+        expr->value = maybeCreateIndirectValToInterface(expr->value);
         return expr;
     }
 
@@ -5165,7 +5234,7 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     // can expose its structure.
     //
 
-    expr->baseExpression = maybeOpenExistential(expr->baseExpression);
+    expr->baseExpression = maybeCreateIndirectValToInterface(expr->baseExpression);
     // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
 }
@@ -5202,7 +5271,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     // and we should "open" the existential here so that we
     // can expose its structure.
     //
-    baseExpr = maybeOpenExistential(baseExpr);
+    baseExpr = maybeCreateIndirectValToInterface(baseExpr);
 
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.
@@ -5616,6 +5685,92 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
         expr->type = expr->base.type;
     auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
     expr->type = m_astBuilder->getTypeType(ptrType);
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
+{
+    // For now we need to tell the children to generate a `some T`, otherwise
+    // we have the problem that we can't actually know if a `some T` was already
+    // implicitly generated or if an invalid expression was passes (`some some T`, etc.)
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsAllowed |
+        (UInt)SemanticsContextState::DynTypeIsAllowed));
+
+    // We do not check for a proper type here since that would run validation
+    // and implicitly assign `some` to our expr->base.type. This is an issue
+    // since we would have no way of telling if a `some` was implicitly added
+    // without major hacks that we do not want in the final `some` type support.
+    expr->base = subVisitor.TranslateTypeNode(expr->base);
+
+    auto& type = expr->base.type;
+    auto& result = expr->type;
+    auto& typeExp = expr->base;
+
+    if (as<ErrorType>(type))
+        result = type;
+    else
+    {
+        if (!isDeclRefTypeOf<InterfaceDecl>(type))
+        {
+            getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, type);
+            result = m_astBuilder->getErrorType();
+        }
+        else
+        {
+            SomeTypeDecl* decl;
+            if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
+                decl = m_astBuilder->create<UnboundSomeTypeDecl>();
+            else
+                decl = m_astBuilder->create<SomeTypeDecl>();
+            decl->loc = expr->loc;
+            decl->interfaceType = typeExp;
+            decl->parentDecl = getOuterScope()->containerDecl;
+            result = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, decl));
+        }
+    }
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitDynTypeExpr(DynTypeExpr* expr)
+{
+    // For now we need to tell the children to generate a `dyn T` to keep logic
+    // close to how `some` works
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsAllowed |
+        (UInt)SemanticsContextState::DynTypeIsAllowed));
+
+    // We do not check for a proper type here since that would run validation.
+    expr->base = subVisitor.TranslateTypeNode(expr->base);
+
+    auto& type = expr->base.type;
+    auto& result = expr->type;
+
+    if (as<ErrorType>(type))
+        result = type;
+    else
+    {
+        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(type);
+        if (!interfaceDeclRef)
+        {
+            getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceDynType, type);
+            result = m_astBuilder->getErrorType();
+        }
+        else
+        {
+            result = m_astBuilder->getTypeType(type);
+
+            // Validation has no reason to check for a `dyn` type without
+            // a parent decl since in these cases, `dyn` is treated exactly
+            // as if it is a regular type. Therefore, if we lack
+            // a propagation target, we can just ignore adding `dyn`.
+            auto targetToAddDynTo = getModifierPropagationTarget();
+            if (targetToAddDynTo)
+            {
+                addModifier(targetToAddDynTo, this->getASTBuilder()->create<DynModifier>());
+            }
+        }
+    }
     return expr;
 }
 

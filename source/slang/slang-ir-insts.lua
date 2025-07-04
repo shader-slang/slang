@@ -1717,6 +1717,11 @@ local insts = {
 					-- Treat a function as differentiable function
 				},
 			},
+			{ 
+				SomeTypeDecoration = {
+					-- Marks the variable as `some T`
+				},
+			},
 			{
 				treatCallAsDifferentiableDecoration = {
 					-- Treat a call to arbitrary function as a differentiable call.
