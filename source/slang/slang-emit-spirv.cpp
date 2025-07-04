@@ -2308,8 +2308,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     debugBuildIdentifier->getBuildIdentifier(),
                     debugBuildIdentifier->getFlags());
             }
-        case kIROp_GetStringHash:
-            return emitGetStringHash(inst);
         case kIROp_AttributedType:
             return ensureInst(as<IRAttributedType>(inst)->getBaseType());
         case kIROp_AllocateOpaqueHandle:
@@ -4319,9 +4317,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugValue:
             result = emitDebugValue(parent, as<IRDebugValue>(inst));
             break;
-        case kIROp_GetStringHash:
-            result = emitGetStringHash(inst);
-            break;
         case kIROp_Undefined:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
@@ -4685,27 +4680,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             subscript->getCoord(),
             subscript->hasSampleCoord() ? subscript->getSampleCoord()
                                         : builder.getIntValue(builder.getIntType(), 0));
-    }
-
-    SpvInst* emitGetStringHash(IRInst* inst)
-    {
-        auto getStringHashInst = as<IRGetStringHash>(inst);
-        auto stringLit = getStringHashInst->getStringLit();
-
-        if (stringLit)
-        {
-            auto slice = stringLit->getStringSlice();
-            return emitIntConstant(
-                getStableHashCode32(slice.begin(), slice.getLength()).hash,
-                inst->getDataType());
-        }
-        else
-        {
-            // Couldn't handle
-            String e = "Unhandled local inst in spirv-emit:\n" +
-                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
-            SLANG_UNIMPLEMENTED_X(e.getBuffer());
-        }
     }
 
     SpvInst* emitLit(IRInst* inst)

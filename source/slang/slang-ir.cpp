@@ -2320,7 +2320,7 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     return _findOrEmitConstant(keyInst);
 }
 
-IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
+IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice, IROp desiredType)
 {
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
@@ -2331,12 +2331,25 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
     stackDecoration.m_op = kIROp_TransitoryDecoration;
     stackDecoration.insertAtEnd(&keyInst);
 
+    auto length = inSlice.getLength();
+
     keyInst.m_op = kIROp_StringLit;
-    keyInst.typeUse.usedValue = getStringType();
+    if (desiredType == kIROp_ShortStringType)
+    {
+        keyInst.typeUse.usedValue = getShortStringType(static_cast<IRIntLit*>(getIntValue(length)));
+    }
+    else if (desiredType == kIROp_StringType)
+    {
+        keyInst.typeUse.usedValue = getStringType();
+    }
+    else if (desiredType == kIROp_NativeStringType)
+    {
+        keyInst.typeUse.usedValue = getNativeStringType();
+    }
 
     IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
     dstSlice.chars = const_cast<char*>(inSlice.begin());
-    dstSlice.numChars = uint32_t(inSlice.getLength());
+    dstSlice.numChars = uint32_t(length);
 
     return static_cast<IRStringLit*>(_findOrEmitConstant(keyInst));
 }
@@ -2738,6 +2751,11 @@ IRBasicType* IRBuilder::getFloatType()
 IRBasicType* IRBuilder::getCharType()
 {
     return (IRBasicType*)getType(kIROp_CharType);
+}
+
+IRShortStringType* IRBuilder::getShortStringType(IRIntLit* length)
+{
+    return (IRShortStringType*)getType(kIROp_ShortStringType, length);
 }
 
 IRStringType* IRBuilder::getStringType()
