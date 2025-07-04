@@ -596,6 +596,7 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     case CodeGenTarget::CSource:
     case CodeGenTarget::Metal:
     case CodeGenTarget::WGSL:
+    case CodeGenTarget::HostVM:
         {
             return PassThroughMode::None;
         }
