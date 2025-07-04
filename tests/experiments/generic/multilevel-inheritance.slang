@@ -1,15 +1,19 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
-//TEST:SIMPLE(filecheck=CHECK_DEBUG_INFO): -target spirv -gminimal
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gminimal -std 2026
+//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gnone -std 2025
+//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std 2025
+//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gnone -std legacy
+//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std legacy
 
-// CHECK: support for inheritance is unstable
+// CHECK: error 30811
 // CHECK: struct Child : Parent {};
-// CHECK-NOT: Unhandled global inst in spirv-emit
-// CHECK-NOT: let  %1 : %2    = lookupWitness(%base, %3)
+// CHECK: error 38029
+// CHECK: getObject<Child>();
 
-// CHECK_DEBUG_INFO: support for inheritance is unstable
-// CHECK_DEBUG_INFO: struct Child : Parent {};
-// CHECK_DEBUG_INFO: Unhandled global inst in spirv-emit
-// CHECK_DEBUG_INFO: let  %1 : %2    = lookupWitness(%base, %3)
+// CHECK_LEGACY: warning 30816
+// CHECK_LEGACY: struct Child : Parent {};
+// CHECK_LEGACY: error 38029
+// CHECK_LEGACY: getObject<Child>();
 
 interface IFoo {};
 struct Parent : IFoo {};
