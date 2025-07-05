@@ -1,7 +1,10 @@
+#if 0
+// Duplicated: This test is identical to slang-rhi\tests\test-formats.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
@@ -1500,3 +1503,5 @@ SLANG_UNIT_TEST(FormatTestsVulkan)
 }
 
 } // namespace gfx_test
+
+#endif

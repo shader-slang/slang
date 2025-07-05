@@ -1,20 +1,24 @@
+#if 0
+// Duplicated: This test is identical to slang-rhi\tests\test-precompiled-module-cache.cpp
+// TODO_TESTING port
+
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 // Test that mixing precompiled and non-precompiled modules is working.
 
 static Slang::Result precompileProgram(
-    gfx::IDevice* device,
+    rhi::IDevice* device,
     ISlangMutableFileSystem* fileSys,
     const char* shaderModuleName,
     PrecompilationMode precompilationMode)
@@ -41,12 +45,12 @@ static Slang::Result precompileProgram(
         precompilationMode == PrecompilationMode::ExternalLink)
     {
         SlangCompileTarget target;
-        switch (device->getDeviceInfo().deviceType)
+        switch (device->getInfo().deviceType)
         {
-        case gfx::DeviceType::DirectX12:
+        case rhi::DeviceType::D3D12:
             target = SLANG_DXIL;
             break;
-        case gfx::DeviceType::Vulkan:
+        case rhi::DeviceType::Vulkan:
             target = SLANG_SPIRV;
             break;
         default:
@@ -71,7 +75,7 @@ static Slang::Result precompileProgram(
         }
     }
 
-    // Write loaded modules to memory file system.
+    // Write loaded modules to file system.
     for (SlangInt i = 0; i < slangSession->getLoadedModuleCount(); i++)
     {
         auto module = slangSession->getLoadedModule(i);
@@ -92,12 +96,6 @@ void precompiledModule2TestImplCommon(
     UnitTestContext* context,
     PrecompilationMode precompilationMode)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     // First, load and compile the slang source.
     ComPtr<ISlangMutableFileSystem> memoryFileSystem =
         ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
@@ -116,13 +114,13 @@ void precompiledModule2TestImplCommon(
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     slang::TargetDesc targetDesc = {};
-    switch (device->getDeviceInfo().deviceType)
+    switch (device->getInfo().deviceType)
     {
-    case gfx::DeviceType::DirectX12:
+    case rhi::DeviceType::D3D12:
         targetDesc.format = SLANG_DXIL;
         targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("sm_6_6");
         break;
-    case gfx::DeviceType::Vulkan:
+    case rhi::DeviceType::Vulkan:
         targetDesc.format = SLANG_SPIRV;
         targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("GLSL_460");
         break;
@@ -169,61 +167,44 @@ void precompiledModule2TestImplCommon(
         slangReflection,
         precompilationMode));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
-
+    ComPtr<rhi::IComputePipeline> pipeline = device->createComputePipeline(pipelineDesc);
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+        auto commandBuffer = queue->createCommandEncoder();
+        auto encoder = commandBuffer->beginComputePass();
 
-        auto rootObject = encoder->bindPipeline(pipelineState);
+        auto rootObject = encoder->bindPipeline(pipeline);
 
         ShaderCursor entryPointCursor(
             rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
         // Bind buffer view to the entry point.
-        entryPointCursor.getPath("buffer").setResource(bufferView);
+        entryPointCursor.getPath("buffer").setBinding(numbersBuffer);
 
         encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        encoder->end();
+        queue->submit(commandBuffer->finish());
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
+    compareComputeResult(device, numbersBuffer, std::array{3.0f, 3.0f, 3.0f, 3.0f});
 }
 
 void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
@@ -243,7 +224,7 @@ void precompiledTargetModule2ExternalLinkTestImpl(IDevice* device, UnitTestConte
 
 SLANG_UNIT_TEST(precompiledModule2D3D12)
 {
-    runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(precompiledModule2TestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
@@ -251,7 +232,7 @@ SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
     runTestImpl(
         precompiledTargetModule2InternalLinkTestImpl,
         unitTestContext,
-        Slang::RenderApiFlag::D3D12);
+        DeviceType::D3D12);
 }
 
 /*
@@ -259,13 +240,13 @@ SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
 SLANG_UNIT_TEST(precompiledTargetModuleExternalLink2D3D12)
 {
     runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext,
-Slang::RenderApiFlag::D3D12);
+DeviceType::D3D12);
 }
 */
 
 SLANG_UNIT_TEST(precompiledModule2Vulkan)
 {
-    runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(precompiledModule2TestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
@@ -273,7 +254,7 @@ SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
     runTestImpl(
         precompiledTargetModule2InternalLinkTestImpl,
         unitTestContext,
-        Slang::RenderApiFlag::Vulkan);
+        DeviceType::Vulkan);
 }
 
 SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan)
@@ -281,7 +262,9 @@ SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan)
     runTestImpl(
         precompiledTargetModule2ExternalLinkTestImpl,
         unitTestContext,
-        Slang::RenderApiFlag::Vulkan);
+        DeviceType::Vulkan);
 }
 
 } // namespace gfx_test
+
+#endif

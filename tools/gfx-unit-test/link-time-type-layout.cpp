@@ -1,9 +1,9 @@
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -17,8 +17,8 @@ static void diagnoseIfNeeded(Slang::ComPtr<slang::IBlob>& diagnosticsBlob)
 }
 
 static Slang::Result loadSpirvProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     slang::ProgramLayout*& slangReflection)
 {
     // main.slang: declares the interface and extern struct S, and the vertex shader.
@@ -88,9 +88,9 @@ static Slang::Result loadSpirvProgram(
     slangReflection = composedProgram->getLayout();
 
     // Create a shader program that will generate SPIRV code.
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
-    auto shaderProgram = device->createProgram(programDesc);
+    auto shaderProgram = device->createShaderProgram(programDesc);
     outShaderProgram = shaderProgram;
 
     // Force SPIRV generation by explicitly requesting it
@@ -201,9 +201,9 @@ static void validateStructSLayout(UnitTestContext* context, slang::ProgramLayout
     SLANG_CHECK_MSG(foundFooField, "Could not find field 'foo' in struct S");
 }
 
-void linkTimeTypeLayoutImpl(gfx::IDevice* device, UnitTestContext* context)
+void linkTimeTypeLayoutImpl(rhi::IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<gfx::IShaderProgram> shaderProgram;
+    Slang::ComPtr<rhi::IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection = nullptr;
 
     auto result = loadSpirvProgram(device, shaderProgram, slangReflection);
@@ -213,15 +213,14 @@ void linkTimeTypeLayoutImpl(gfx::IDevice* device, UnitTestContext* context)
     validateStructSLayout(context, slangReflection);
 
     // Create a graphics pipeline to verify SPIRV code generation works
-    GraphicsPipelineStateDesc pipelineDesc = {};
+    RenderPipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
 
     // We need to set up a minimal pipeline state for a vertex shader
-    pipelineDesc.primitiveType = PrimitiveType::Triangle;
+    pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
 
-    ComPtr<gfx::IPipelineState> pipelineState;
-    auto pipelineResult =
-        device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef());
+    ComPtr<IRenderPipeline> pipelineState;
+    auto pipelineResult = device->createRenderPipeline(pipelineDesc, pipelineState.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(pipelineResult));
 }
 
@@ -239,7 +238,7 @@ void linkTimeTypeLayoutImpl(gfx::IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(linkTimeTypeLayout)
 {
-    runTestImpl(linkTimeTypeLayoutImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(linkTimeTypeLayoutImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test

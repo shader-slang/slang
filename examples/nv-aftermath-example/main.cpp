@@ -5,13 +5,14 @@
 #include "GFSDK_Aftermath_GpuCrashDump.h"
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
 #include "slang.h"
 
-using namespace gfx;
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
+
+using namespace rhi;
 using namespace Slang;
 
 static const ExampleResources resourceBase("nv-aftermath-example");
@@ -46,11 +47,9 @@ struct AftermathCrashExample : public WindowedAppBase
 {
     void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
-    gfx::Result loadShaderProgram(gfx::IDevice* device, gfx::IShaderProgram** outProgram);
+    Result loadShaderProgram(IDevice* device, IShaderProgram** outProgram);
 
-    Slang::Result initialize();
-
-    virtual void renderFrame(int frameBufferIndex) override;
+    virtual void renderFrame(ITexture* texture) override;
 
     void onAftermathCrash(const void* data, const uint32_t dataSizeInBytes);
 
@@ -60,23 +59,85 @@ struct AftermathCrashExample : public WindowedAppBase
 
     void onAftermathMarker(const void* pMarker, void** resolvedMarkerData, uint32_t* markerSize);
 
-    // Create accessors so we don't have to use g prefixed variables.
-    gfx::IDevice* getDevice() { return gDevice; }
-    gfx::ICommandQueue* getQueue() { return gQueue; }
-    gfx::IFramebufferLayout* getFrameBufferLayout() { return gFramebufferLayout; }
-    gfx::ISwapchain* getSwapChain() { return gSwapchain; }
-    gfx::IRenderPassLayout* getRenderPassLayout() { return gRenderPass; }
-    Slang::List<Slang::ComPtr<gfx::IFramebuffer>>& getFrameBuffers() { return gFramebuffers; }
-    Slang::List<Slang::ComPtr<gfx::ITransientResourceHeap>>& getTransientHeaps()
-    {
-        return gTransientHeaps;
-    }
-
-    ComPtr<gfx::IPipelineState> m_pipelineState;
-    ComPtr<gfx::IBufferResource> m_vertexBuffer;
+    ComPtr<IRenderPipeline> m_renderPipeline;
+    ComPtr<IBuffer> m_vertexBuffer;
 
     /// A counter such that we can make aftermath dump file names unique
     std::atomic<int> m_uniqueId = 0;
+
+    Slang::Result initialize()
+    {
+        // Defer shader debug information callbacks until an actual GPU crash dump
+        // is generated. Increases memory footprint.
+        const uint32_t aftermathFeatureFlags =
+            GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks;
+
+        // As per docs must be called before any device is created
+        GFSDK_Aftermath_EnableGpuCrashDumps(
+            GFSDK_Aftermath_Version_API,
+            GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX |
+                GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
+            aftermathFeatureFlags,
+            _crashCallback,
+            _debugInfoCallback,
+            _crashDescriptionCallback,
+            _markerCallback,
+            this);
+
+        SLANG_RETURN_ON_FAIL(initializeBase("autodiff-texture", 1024, 768, DeviceType::Default));
+
+
+        // We will create objects needed to configure the "input assembler"
+        // (IA) stage of the pipeline.
+        //
+        // First, we create an input layout:
+        //
+        InputElementDesc inputElements[] = {
+            {"POSITION", 0, Format::RGB32Float, offsetof(Vertex, position)},
+            {"COLOR", 0, Format::RGB32Float, offsetof(Vertex, color)},
+        };
+        auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
+        if (!inputLayout)
+            return SLANG_FAIL;
+
+        // Next we allocate a vertex buffer for our pre-initialized
+        // vertex data.
+        //
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+        m_vertexBuffer = gDevice->createBuffer(vertexBufferDesc, &kVertexData[0]);
+        if (!m_vertexBuffer)
+            return SLANG_FAIL;
+
+        // Now we will use our `loadShaderProgram` function to load
+        // the code from `shaders.slang` into the graphics API.
+        //
+        ComPtr<IShaderProgram> shaderProgram;
+        SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram.writeRef()));
+
+        // Following the D3D12/Vulkan style of API, we need a pipeline state object
+        // (PSO) to encapsulate the configuration of the overall graphics pipeline.
+        //
+        ColorTargetDesc colorTarget;
+        colorTarget.format = Format::RGBA8Unorm;
+        RenderPipelineDesc desc;
+        desc.inputLayout = inputLayout;
+        desc.program = shaderProgram;
+        desc.targetCount = 1;
+        desc.targets = &colorTarget;
+        desc.depthStencil.depthTestEnable = false;
+        desc.depthStencil.depthWriteEnable = false;
+        desc.primitiveTopology = PrimitiveTopology::TriangleList;
+        auto pipelineState = gDevice->createRenderPipeline(desc);
+        if (!pipelineState)
+            return SLANG_FAIL;
+
+        m_renderPipeline = pipelineState;
+
+        return SLANG_OK;
+    }
 };
 
 void AftermathCrashExample::diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
@@ -264,12 +325,10 @@ static SlangResult _addCompileProducts(
     return SLANG_OK;
 }
 
-gfx::Result AftermathCrashExample::loadShaderProgram(
-    gfx::IDevice* device,
-    gfx::IShaderProgram** outProgram)
+Result AftermathCrashExample::loadShaderProgram(IDevice* device, IShaderProgram** outProgram)
 {
     ComPtr<slang::ISession> slangSession;
-    slangSession = device->getSlangSession();
+    slangSession = gDevice->getSlangSession();
 
     // This is a little bit of a work around.
     //
@@ -423,9 +482,9 @@ gfx::Result AftermathCrashExample::loadShaderProgram(
     // to extract compiled kernel code and load it into the API-specific
     // program representation.
     //
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = linkedProgram;
-    SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+    SLANG_RETURN_ON_FAIL(gDevice->createShaderProgram(programDesc, outProgram));
 
     return SLANG_OK;
 }
@@ -465,129 +524,60 @@ static void GFSDK_AFTERMATH_CALL _markerCallback(
         markerSize);
 }
 
-Slang::Result AftermathCrashExample::initialize()
+void AftermathCrashExample::renderFrame(ITexture* texture)
 {
-    // Defer shader debug information callbacks until an actual GPU crash dump
-    // is generated. Increases memory footprint.
-    const uint32_t aftermathFeatureFlags =
-        GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks;
+    auto commandEncoder = gQueue->createCommandEncoder();
 
-    // As per docs must be called before any device is created
-    GFSDK_Aftermath_EnableGpuCrashDumps(
-        GFSDK_Aftermath_Version_API,
-        GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_DX |
-            GFSDK_Aftermath_GpuCrashDumpWatchedApiFlags_Vulkan,
-        aftermathFeatureFlags,
-        _crashCallback,
-        _debugInfoCallback,
-        _crashDescriptionCallback,
-        _markerCallback,
-        this);
+    ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+    RenderPassColorAttachment colorAttachment = {};
+    colorAttachment.view = textureView;
+    colorAttachment.loadOp = LoadOp::Clear;
 
-    // Set to a specific render API as needed. Valid values are...
-    //
-    // * gfx::DeviceType::Default
-    // * gfx::DeviceType::Vulkan
-    // * gfx::DeviceType::DirectX12
-    // * gfx::DeviceType::DirectX11
+    RenderPassDesc renderPass = {};
+    renderPass.colorAttachments = &colorAttachment;
+    renderPass.colorAttachmentCount = 1;
 
-    const gfx::DeviceType deviceType = gfx::DeviceType::Default;
+    auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
 
-    initializeBase("aftermath-crash-example", 1024, 768, deviceType);
+    RenderState renderState = {};
+    renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+    renderState.viewportCount = 1;
+    renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+    renderState.scissorRectCount = 1;
 
-    auto device = getDevice();
-
-    // We will create objects needed to configur the "input assembler"
-    // (IA) stage of the D3D pipeline.
-    //
-    // First, we create an input layout:
-    //
-    InputElementDesc inputElements[] = {
-        {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
-        {"COLOR", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
-    };
-    auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
-    if (!inputLayout)
-        return SLANG_FAIL;
-
-    // Next we allocate a vertex buffer for our pre-initialized
-    // vertex data.
-    //
-    IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.type = IResource::Type::Buffer;
-    vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-    m_vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
-    if (!m_vertexBuffer)
-        return SLANG_FAIL;
-
-    // Now we will use our `loadShaderProgram` function to load
-    // the code from `shaders.slang` into the graphics API.
-    //
-    ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram.writeRef()));
-
-    // Following the D3D12/Vulkan style of API, we need a pipeline state object
-    // (PSO) to encapsulate the configuration of the overall graphics pipeline.
-    //
-    GraphicsPipelineStateDesc desc;
-    desc.inputLayout = inputLayout;
-    desc.program = shaderProgram;
-    desc.framebufferLayout = getFrameBufferLayout();
-    auto pipelineState = device->createGraphicsPipelineState(desc);
-    if (!pipelineState)
-        return SLANG_FAIL;
-
-    m_pipelineState = pipelineState;
-
-    return SLANG_OK;
-}
-
-void AftermathCrashExample::renderFrame(int frameBufferIndex)
-{
-    ComPtr<ICommandBuffer> commandBuffer =
-        getTransientHeaps()[frameBufferIndex]->createCommandBuffer();
-    auto renderEncoder =
-        commandBuffer->encodeRenderCommands(gRenderPass, getFrameBuffers()[frameBufferIndex]);
-
-    gfx::Viewport viewport = {};
-    viewport.maxZ = 1.0f;
-    viewport.extentX = (float)windowWidth;
-    viewport.extentY = (float)windowHeight;
-    renderEncoder->setViewportAndScissor(viewport);
-
-    auto rootObject = renderEncoder->bindPipeline(m_pipelineState);
-
-    auto deviceInfo = getDevice()->getDeviceInfo();
-
+    auto rootObject = renderEncoder->bindPipeline(m_renderPipeline);
     ShaderCursor rootCursor(rootObject);
 
-    rootCursor["Uniforms"]["modelViewProjection"].setData(
-        deviceInfo.identityProjectionMatrix,
-        sizeof(float) * 16);
+    rootCursor["Uniforms"]["modelViewProjection"].setData(kIdentity, sizeof(float) * 16);
 
     // We are going to extra efforts to create a shader that we know will time
     // out because we *want* a GPU "crash", such we can capture via nsight aftermath.
-    // The failCount is just a number that is large enought to make things take too long.
+    // The failCount is just a number that is large enough to make things take too long.
     int32_t failCount = 0x3fffffff;
     rootCursor["Uniforms"]["failCount"].setData(&failCount, sizeof(failCount));
 
     // We also need to set up a few pieces of fixed-function pipeline
     // state that are not bound by the pipeline state above.
     //
-    renderEncoder->setVertexBuffer(0, m_vertexBuffer);
-    renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+    renderState.vertexBuffers[0] = m_vertexBuffer;
+    renderState.vertexBufferCount = 1;
+    renderEncoder->setRenderState(renderState);
 
     // Finally, we are ready to issue a draw call for a single triangle.
     //
-    renderEncoder->draw(3);
-    renderEncoder->endEncoding();
-    commandBuffer->close();
-    getQueue()->executeCommandBuffer(commandBuffer);
+    DrawArguments drawArgs = {};
+    drawArgs.vertexCount = 3;
+    renderEncoder->draw(drawArgs);
 
-    // With that, we are done drawing for one frame, and ready for the next.
-    //
-    getSwapChain()->present();
+    renderEncoder->end();
+    gQueue->submit(commandEncoder->finish());
+
+    if (!isTestMode())
+    {
+        // With that, we are done drawing for one frame, and ready for the next.
+        //
+        gSurface()->present();
+    }
 
     // If the id changes means we have a capture and so can quit.
     // On D3D11, the first present *doesn't* appear to crash.

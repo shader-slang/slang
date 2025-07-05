@@ -25,17 +25,17 @@
 // and parameter binding.
 //
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/gui.h"
 #include "platform/model.h"
 #include "platform/vector-math.h"
 #include "platform/window.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 
 #include <map>
+#include <slang-rhi/shader-cursor.h>
 #include <sstream>
 
-using namespace gfx;
+using namespace rhi;
 using Slang::RefObject;
 using Slang::RefPtr;
 
@@ -121,12 +121,12 @@ struct RendererContext
 
         // At this point, `composedProgram` represents the shader program
         // we want to run, and the compute shader there have been checked.
-        // We can create a `gfx::IShaderProgram` object from `composedProgram`
+        // We can create a `IShaderProgram` object from `composedProgram`
         // so it may be used by the graphics layer.
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = composedProgram.get();
 
-        shaderProgram = device->createProgram(programDesc);
+        shaderProgram = device->createShaderProgram(programDesc);
 
         // Get other shader types that we will use for creating shader objects.
         perViewShaderType = slangReflection->findTypeByName("PerView");
@@ -175,7 +175,7 @@ struct SimpleMaterial : Material
         auto program = context->slangReflection;
         auto shaderType = program->findTypeByName("SimpleMaterial");
         shaderObject = context->device->createShaderObject(shaderType);
-        gfx::ShaderCursor cursor(shaderObject);
+        ShaderCursor cursor(shaderObject);
         cursor["diffuseColor"].setData(&diffuseColor, sizeof(diffuseColor));
         cursor["specularColor"].setData(&specularColor, sizeof(specularColor));
         cursor["specularity"].setData(&specularity, sizeof(specularity));
@@ -201,8 +201,8 @@ struct Model : RefObject
 {
     typedef platform::ModelLoader::Vertex Vertex;
 
-    ComPtr<IBufferResource> vertexBuffer;
-    ComPtr<IBufferResource> indexBuffer;
+    ComPtr<IBuffer> vertexBuffer;
+    ComPtr<IBuffer> indexBuffer;
     PrimitiveTopology primitiveTopology;
     int vertexCount;
     int indexCount;
@@ -383,16 +383,19 @@ struct LightEnvLayout : public RefObject
     //
     struct LightArrayLayout : RefObject
     {
-        Int maximumCount = 0;
+        SlangInt maximumCount = 0;
         std::string typeName;
     };
     std::vector<LightArrayLayout> lightArrayLayouts;
-    std::map<slang::TypeReflection*, Int> mapLightTypeToArrayIndex;
+    std::map<slang::TypeReflection*, SlangInt> mapLightTypeToArrayIndex;
     slang::TypeReflection* shaderType = nullptr;
 
-    void addLightType(RendererContext* context, slang::TypeReflection* lightType, Int maximumCount)
+    void addLightType(
+        RendererContext* context,
+        slang::TypeReflection* lightType,
+        SlangInt maximumCount)
     {
-        Int arrayIndex = (Int)lightArrayLayouts.size();
+        SlangInt arrayIndex = (SlangInt)lightArrayLayouts.size();
         LightArrayLayout layout;
         layout.maximumCount = maximumCount;
 
@@ -419,12 +422,12 @@ struct LightEnvLayout : public RefObject
     }
 
     template<typename T>
-    void addLightType(RendererContext* context, Int maximumCount)
+    void addLightType(RendererContext* context, SlangInt maximumCount)
     {
         addLightType(context, getShaderType<T>(context), maximumCount);
     }
 
-    Int getArrayIndexForType(slang::TypeReflection* lightType)
+    SlangInt getArrayIndexForType(slang::TypeReflection* lightType)
     {
         auto iter = mapLightTypeToArrayIndex.find(lightType);
         if (iter != mapLightTypeToArrayIndex.end())
@@ -647,7 +650,7 @@ struct ModelViewer : WindowedAppBase
     RefPtr<LightEnv> lightEnv;
 
     // The pipeline state object we will use to draw models.
-    ComPtr<IPipelineState> gPipelineState;
+    ComPtr<IPipeline> gPipelineState;
 
     // During startup the application will load one or more models and
     // add them to the `gModels` list.
@@ -762,23 +765,27 @@ struct ModelViewer : WindowedAppBase
 
 
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, position)},
-            {"NORMAL", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, normal)},
-            {"UV", 0, Format::R32G32_FLOAT, offsetof(Model::Vertex, uv)},
+            {"POSITION", 0, Format::RGB32Float, offsetof(Model::Vertex, position)},
+            {"NORMAL", 0, Format::RGB32Float, offsetof(Model::Vertex, normal)},
+            {"UV", 0, Format::RG32Float, offsetof(Model::Vertex, uv)},
         };
         auto inputLayout = gDevice->createInputLayout(sizeof(Model::Vertex), &inputElements[0], 3);
         if (!inputLayout)
             return SLANG_FAIL;
 
         // Create the pipeline state object for drawing models.
-        GraphicsPipelineStateDesc pipelineStateDesc = {};
+        RenderPipelineDesc pipelineStateDesc = {};
         pipelineStateDesc.program = context.shaderProgram;
-        pipelineStateDesc.framebufferLayout = gFramebufferLayout;
         pipelineStateDesc.inputLayout = inputLayout;
-        pipelineStateDesc.primitiveType = PrimitiveType::Triangle;
+        pipelineStateDesc.primitiveTopology = PrimitiveTopology::TriangleList;
         pipelineStateDesc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
         pipelineStateDesc.depthStencil.depthTestEnable = true;
-        gPipelineState = gDevice->createGraphicsPipelineState(pipelineStateDesc);
+        // Set up color target
+        ColorTargetDesc colorTarget = {};
+        colorTarget.format = Format::RGBA8Unorm;
+        pipelineStateDesc.targetCount = 1;
+        pipelineStateDesc.targets = &colorTarget;
+        gPipelineState = gDevice->createRenderPipeline(pipelineStateDesc);
 
         // We will create a lighting environment layout that can hold a few point
         // and directional lights, and then initialize a lighting environment
@@ -813,7 +820,7 @@ struct ModelViewer : WindowedAppBase
     // logic to see how the application will drive the `RenderContext`
     // type to perform both shader parameter binding and code specialization.
     //
-    void renderFrame(int frameIndex) override
+    void renderFrame(ITexture* texture) override
     {
         // In order to see that things are rendering properly we need some
         // kind of animation, so we will compute a crude delta-time value here.
@@ -871,22 +878,35 @@ struct ModelViewer : WindowedAppBase
         view = glm::translate(view, -cameraPosition);
 
         glm::mat4x4 viewProjection = projection * view;
-        auto deviceInfo = gDevice->getDeviceInfo();
+        auto deviceInfo = gDevice->getInfo();
+        // Use identity matrix for correction
+        static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         glm::mat4x4 correctionMatrix;
-        memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float) * 16);
+        memcpy(&correctionMatrix, kIdentity, sizeof(float) * 16);
         viewProjection = correctionMatrix * viewProjection;
         // glm uses column-major layout, we need to translate it to row-major.
         viewProjection = glm::transpose(viewProjection);
 
-        auto drawCommandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
-        auto drawCommandEncoder =
-            drawCommandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)clientRect.width;
-        viewport.extentY = (float)clientRect.height;
-        drawCommandEncoder->setViewportAndScissor(viewport);
-        drawCommandEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+        auto drawCommandEncoder = gQueue->createCommandEncoder();
+
+        ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = textureView;
+        colorAttachment.loadOp = LoadOp::Clear;
+
+        RenderPassDesc renderPass = {};
+        renderPass.colorAttachments = &colorAttachment;
+        renderPass.colorAttachmentCount = 1;
+
+        auto renderEncoder = drawCommandEncoder->beginRenderPass(renderPass);
+
+        RenderState renderState = {};
+        renderState.viewports[0] =
+            Viewport::fromSize((float)clientRect.width, (float)clientRect.height);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] =
+            ScissorRect::fromSize((float)clientRect.width, (float)clientRect.height);
+        renderState.scissorRectCount = 1;
 
         // We are only rendering one view, so we can fill in a per-view
         // shader object once and use it across all draw calls.
@@ -903,8 +923,10 @@ struct ModelViewer : WindowedAppBase
         //
         for (auto& model : gModels)
         {
-            drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer);
-            drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R32_UINT);
+            renderState.vertexBuffers[0] = model->vertexBuffer;
+            renderState.vertexBufferCount = 1;
+            renderState.indexBuffer = model->indexBuffer;
+            renderState.indexFormat = IndexFormat::Uint32;
             // For each model we provide a parameter
             // block that holds the per-model transformation
             // parameters, corresponding to the `PerModel` type
@@ -932,7 +954,12 @@ struct ModelViewer : WindowedAppBase
             for (auto& mesh : model->meshes)
             {
                 // Set the pipeline and binding state for drawing each mesh.
-                auto rootObject = drawCommandEncoder->bindPipeline(gPipelineState);
+                auto rootObject = renderEncoder->bindPipeline(
+                    static_cast<IRenderPipeline*>(gPipelineState.get()));
+
+                // Apply render state
+                renderEncoder->setRenderState(renderState);
+
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["gViewParams"].setObject(viewShaderObject);
                 rootCursor["gModelParams"].setObject(modelShaderObject);
@@ -953,16 +980,20 @@ struct ModelViewer : WindowedAppBase
 
                 // All the shader parameters and pipeline states have been set up,
                 // we can now issue a draw call for the mesh.
-                drawCommandEncoder->drawIndexed(mesh->indexCount, mesh->firstIndex);
+                DrawArguments drawArgs = {};
+                // `drawArgs.vertexCount` is actually `indexCount` for the `DrawIndexed` Graphics
+                // API
+                drawArgs.vertexCount = mesh->indexCount;
+                drawArgs.startIndexLocation = mesh->firstIndex;
+                renderEncoder->drawIndexed(drawArgs);
             }
         }
-        drawCommandEncoder->endEncoding();
-        drawCommandBuffer->close();
-        gQueue->executeCommandBuffer(drawCommandBuffer);
+        renderEncoder->end();
+        gQueue->submit(drawCommandEncoder->finish());
 
         if (!isTestMode())
         {
-            gSwapchain->present();
+            gSurface->present();
         }
     }
 };

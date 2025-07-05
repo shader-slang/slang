@@ -8,7 +8,7 @@ IMGUI_IMPL_API LRESULT
 ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
-using namespace gfx;
+using namespace rhi;
 
 namespace platform
 {
@@ -41,11 +41,7 @@ LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 #endif
 
 
-GUI::GUI(
-    Window* window,
-    IDevice* inDevice,
-    ICommandQueue* inQueue,
-    IFramebufferLayout* framebufferLayout)
+GUI::GUI(Window* window, IDevice* inDevice, ICommandQueue* inQueue)
     : device(inDevice), queue(inQueue)
 {
     ImGui::CreateContext();
@@ -96,45 +92,46 @@ GUI::GUI(
     auto slangSession = inDevice->getSlangSession();
 
     // TODO: create slang program.
-    IShaderProgram* program = nullptr;
+    // For now, we'll proceed without a proper shader program
+    // This is a limitation that would need to be addressed for full functionality
 #if 0
-    gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Graphics;
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = slangGlobalScope;
-    program = device->createProgram(programDesc);
+    shaderProgram = device->createShaderProgram(programDesc);
 #endif
+
     InputElementDesc inputElements[] = {
-        {"U", 0, Format::R32G32_FLOAT, offsetof(ImDrawVert, pos)},
-        {"U", 1, Format::R32G32_FLOAT, offsetof(ImDrawVert, uv)},
-        {"U", 2, Format::R8G8B8A8_UNORM, offsetof(ImDrawVert, col)},
+        {"U", 0, Format::RG32Float, offsetof(ImDrawVert, pos)},
+        {"U", 1, Format::RG32Float, offsetof(ImDrawVert, uv)},
+        {"U", 2, Format::RGBA8Unorm, offsetof(ImDrawVert, col)},
     };
-    auto inputLayout = device->createInputLayout(
+    inputLayout = device->createInputLayout(
         sizeof(ImDrawVert),
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
 
-    //
+    // For now, skip pipeline creation since we don't have a shader program
+    // This would need to be completed for full functionality
+#if 0
+    ColorTargetDesc colorTarget;
+    colorTarget.format = Format::RGBA8Unorm;
+    colorTarget.enableBlend = true;
+    colorTarget.color.srcFactor = BlendFactor::SrcAlpha;
+    colorTarget.color.dstFactor = BlendFactor::InvSrcAlpha;
+    colorTarget.alpha.srcFactor = BlendFactor::InvSrcAlpha;
+    colorTarget.alpha.dstFactor = BlendFactor::Zero;
 
-    TargetBlendDesc targetBlendDesc;
-    targetBlendDesc.color.srcFactor = BlendFactor::SrcAlpha;
-    targetBlendDesc.color.dstFactor = BlendFactor::InvSrcAlpha;
-    targetBlendDesc.alpha.srcFactor = BlendFactor::InvSrcAlpha;
-    targetBlendDesc.alpha.dstFactor = BlendFactor::Zero;
-
-    GraphicsPipelineStateDesc pipelineDesc;
-    pipelineDesc.framebufferLayout = framebufferLayout;
-    pipelineDesc.program = program;
+    RenderPipelineDesc pipelineDesc;
+    pipelineDesc.program = shaderProgram;
     pipelineDesc.inputLayout = inputLayout;
-    pipelineDesc.blend.targets[0] = targetBlendDesc;
-    pipelineDesc.blend.targetCount = 1;
+    pipelineDesc.targetCount = 1;
+    pipelineDesc.targets = &colorTarget;
     pipelineDesc.rasterizer.cullMode = CullMode::None;
-
-    // Set up the pieces of fixed-function state that we care about
     pipelineDesc.depthStencil.depthTestEnable = false;
+    pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
 
-    // TODO: need to set up blending state...
-
-    pipelineState = device->createGraphicsPipelineState(pipelineDesc);
+    pipelineState = device->createRenderPipeline(pipelineDesc);
+#endif
 
     // Initialize the texture atlas
     unsigned char* pixels;
@@ -142,49 +139,35 @@ GUI::GUI(
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     {
-        gfx::ITextureResource::Desc desc = {};
-        desc.type = IResource::Type::Texture2D;
-        desc.format = Format::R8G8B8A8_UNORM;
-        desc.arraySize = 0;
+        TextureDesc desc = {};
+        desc.type = TextureType::Texture2D;
+        desc.format = Format::RGBA8Unorm;
+        desc.arrayLength = 1;
         desc.size.width = width;
         desc.size.height = height;
         desc.size.depth = 1;
-        desc.numMipLevels = 1;
+        desc.mipCount = 1;
+        desc.usage = TextureUsage::ShaderResource;
         desc.defaultState = ResourceState::ShaderResource;
-        desc.allowedStates =
-            ResourceStateSet(ResourceState::ShaderResource, ResourceState::CopyDestination);
 
-        ITextureResource::SubresourceData initData = {};
+        SubresourceData initData = {};
         initData.data = pixels;
-        initData.strideY = width * 4 * sizeof(unsigned char);
+        initData.rowPitch = width * 4 * sizeof(unsigned char);
+        initData.slicePitch = initData.rowPitch * height;
 
-        auto texture = device->createTextureResource(desc, &initData);
+        auto texture = device->createTexture(desc, &initData);
 
-        gfx::IResourceView::Desc viewDesc;
+        TextureViewDesc viewDesc;
         viewDesc.format = desc.format;
-        viewDesc.type = IResourceView::Type::ShaderResource;
+        viewDesc.aspect = TextureAspect::All;
         auto textureView = device->createTextureView(texture, viewDesc);
 
         io.Fonts->TexID = (void*)textureView.detach();
     }
 
     {
-        ISamplerState::Desc desc;
-        samplerState = device->createSamplerState(desc);
-    }
-
-    {
-        IRenderPassLayout::Desc desc;
-        desc.framebufferLayout = framebufferLayout;
-        IRenderPassLayout::TargetAccessDesc colorAccess;
-        desc.depthStencilAccess = nullptr;
-        colorAccess.initialState = ResourceState::Present;
-        colorAccess.finalState = ResourceState::Present;
-        colorAccess.loadOp = IRenderPassLayout::TargetLoadOp::Load;
-        colorAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-        desc.renderTargetAccess = &colorAccess;
-        desc.renderTargetCount = 1;
-        renderPass = device->createRenderPassLayout(desc);
+        SamplerDesc desc;
+        samplerState = device->createSampler(desc);
     }
 }
 
@@ -197,7 +180,7 @@ void GUI::beginFrame()
     ImGui::NewFrame();
 }
 
-void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuffer)
+void GUI::endFrame(ITexture* renderTarget)
 {
     ImGui::Render();
 
@@ -213,53 +196,58 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     if (!commandListCount)
         return;
 
-    // Allocate transient vertex/index buffers to hold the data for this frame.
-
-    gfx::IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.type = IResource::Type::Buffer;
+        // For now, skip rendering since we don't have a complete pipeline
+        // This would need shader program creation to work properly
+#if 0
+    // Create vertex and index buffers for this frame
+    BufferDesc vertexBufferDesc;
+    vertexBufferDesc.size = vertexCount * sizeof(ImDrawVert);
+    vertexBufferDesc.usage = BufferUsage::VertexBuffer | BufferUsage::CopyDestination;
     vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-    vertexBufferDesc.allowedStates =
-        ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
-    vertexBufferDesc.sizeInBytes = vertexCount * sizeof(ImDrawVert);
     vertexBufferDesc.memoryType = MemoryType::Upload;
-    auto vertexBuffer = device->createBufferResource(vertexBufferDesc);
+    auto vertexBuffer = device->createBuffer(vertexBufferDesc);
 
-    gfx::IBufferResource::Desc indexBufferDesc;
-    indexBufferDesc.type = IResource::Type::Buffer;
-    indexBufferDesc.sizeInBytes = indexCount * sizeof(ImDrawIdx);
-    indexBufferDesc.allowedStates =
-        ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
+    BufferDesc indexBufferDesc;
+    indexBufferDesc.size = indexCount * sizeof(ImDrawIdx);
+    indexBufferDesc.usage = BufferUsage::IndexBuffer | BufferUsage::CopyDestination;
     indexBufferDesc.defaultState = ResourceState::IndexBuffer;
     indexBufferDesc.memoryType = MemoryType::Upload;
-    auto indexBuffer = device->createBufferResource(indexBufferDesc);
-    auto cmdBuf = transientHeap->createCommandBuffer();
-    auto encoder = cmdBuf->encodeResourceCommands();
+    auto indexBuffer = device->createBuffer(indexBufferDesc);
+
+    // Upload vertex and index data
     {
+        void* vertexData;
+        device->mapBuffer(vertexBuffer, CpuAccessMode::Write, &vertexData);
+        size_t vertexOffset = 0;
         for (int ii = 0; ii < commandListCount; ++ii)
         {
             const ImDrawList* commandList = draw_data->CmdLists[ii];
-            encoder->uploadBufferData(
-                vertexBuffer,
-                commandList->VtxBuffer.Size * ii * sizeof(ImDrawVert),
-                commandList->VtxBuffer.Size * sizeof(ImDrawVert),
-                commandList->VtxBuffer.Data);
-            encoder->uploadBufferData(
-                indexBuffer,
-                commandList->IdxBuffer.Size * ii * sizeof(ImDrawIdx),
-                commandList->IdxBuffer.Size * sizeof(ImDrawIdx),
-                commandList->IdxBuffer.Data);
+            size_t dataSize = commandList->VtxBuffer.Size * sizeof(ImDrawVert);
+            memcpy((char*)vertexData + vertexOffset, commandList->VtxBuffer.Data, dataSize);
+            vertexOffset += dataSize;
         }
+        device->unmapBuffer(vertexBuffer);
+
+        void* indexData;
+        device->mapBuffer(indexBuffer, CpuAccessMode::Write, &indexData);
+        size_t indexOffset = 0;
+        for (int ii = 0; ii < commandListCount; ++ii)
+        {
+            const ImDrawList* commandList = draw_data->CmdLists[ii];
+            size_t dataSize = commandList->IdxBuffer.Size * sizeof(ImDrawIdx);
+            memcpy((char*)indexData + indexOffset, commandList->IdxBuffer.Data, dataSize);
+            indexOffset += dataSize;
+        }
+        device->unmapBuffer(indexBuffer);
     }
 
-    // Allocate a transient constant buffer for projection matrix
-    gfx::IBufferResource::Desc constantBufferDesc;
-    constantBufferDesc.type = IResource::Type::Buffer;
-    constantBufferDesc.allowedStates =
-        ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+    // Create constant buffer for projection matrix
+    BufferDesc constantBufferDesc;
+    constantBufferDesc.size = sizeof(glm::mat4x4);
+    constantBufferDesc.usage = BufferUsage::ConstantBuffer | BufferUsage::CopyDestination;
     constantBufferDesc.defaultState = ResourceState::ConstantBuffer;
-    constantBufferDesc.sizeInBytes = sizeof(glm::mat4x4);
     constantBufferDesc.memoryType = MemoryType::Upload;
-    auto constantBuffer = device->createBufferResource(constantBufferDesc);
+    auto constantBuffer = device->createBuffer(constantBufferDesc);
 
     {
         float L = draw_data->DisplayPos.x;
@@ -272,30 +260,38 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
             {0.0f, 0.0f, 0.5f, 0.0f},
             {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
         };
-        encoder->uploadBufferData(constantBuffer, 0, sizeof(mvp), mvp);
+
+        void* constantData;
+        device->mapBuffer(constantBuffer, CpuAccessMode::Write, &constantData);
+        memcpy(constantData, mvp, sizeof(mvp));
+        device->unmapBuffer(constantBuffer);
     }
 
-    encoder->endEncoding();
+    // Record rendering commands
+    auto commandEncoder = queue->createCommandEncoder();
+    
+    ComPtr<ITextureView> renderTargetView = device->createTextureView(renderTarget, {});
+    RenderPassColorAttachment colorAttachment = {};
+    colorAttachment.view = renderTargetView;
+    colorAttachment.loadOp = LoadOp::Load;
+    colorAttachment.storeOp = StoreOp::Store;
 
-    gfx::Viewport viewport;
-    viewport.originX = 0;
-    viewport.originY = 0;
-    viewport.extentY = draw_data->DisplaySize.y;
-    viewport.extentX = draw_data->DisplaySize.x;
-    viewport.extentY = draw_data->DisplaySize.y;
-    viewport.minZ = 0;
-    viewport.maxZ = 1;
+    RenderPassDesc renderPass = {};
+    renderPass.colorAttachments = &colorAttachment;
+    renderPass.colorAttachmentCount = 1;
 
-    auto renderEncoder = cmdBuf->encodeRenderCommands(renderPass, framebuffer);
-    renderEncoder->setViewportAndScissor(viewport);
+    auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
 
-    renderEncoder->bindPipeline(pipelineState);
+    RenderState renderState = {};
+    renderState.viewports[0] = Viewport::fromSize(draw_data->DisplaySize.x, draw_data->DisplaySize.y);
+    renderState.viewportCount = 1;
+    renderState.vertexBuffers[0] = vertexBuffer;
+    renderState.vertexBufferCount = 1;
+    renderState.indexBuffer = indexBuffer;
+    renderState.indexFormat = sizeof(ImDrawIdx) == 2 ? IndexFormat::Uint16 : IndexFormat::Uint32;
 
-    renderEncoder->setVertexBuffer(0, vertexBuffer);
-    renderEncoder->setIndexBuffer(
-        indexBuffer,
-        sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
-    renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+    auto rootObject = renderEncoder->bindPipeline(pipelineState);
+    renderEncoder->setRenderState(renderState);
 
     uint32_t vertexOffset = 0;
     uint32_t indexOffset = 0;
@@ -314,26 +310,30 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
             else
             {
                 ScissorRect rect = {
-                    (int32_t)(command->ClipRect.x - pos.x),
-                    (int32_t)(command->ClipRect.y - pos.y),
-                    (int32_t)(command->ClipRect.z - pos.x),
-                    (int32_t)(command->ClipRect.w - pos.y)};
-                renderEncoder->setScissorRects(1, &rect);
+                    (uint32_t)(command->ClipRect.x - pos.x),
+                    (uint32_t)(command->ClipRect.y - pos.y),
+                    (uint32_t)(command->ClipRect.z - pos.x),
+                    (uint32_t)(command->ClipRect.w - pos.y)};
+                
+                RenderState scissorState = renderState;
+                scissorState.scissorRects[0] = rect;
+                scissorState.scissorRectCount = 1;
+                renderEncoder->setRenderState(scissorState);
 
-                // TODO: set parameter into root shader object.
-
-                renderEncoder->drawIndexed(
-                    command->ElemCount,
-                    (uint32_t)indexOffset,
-                    (uint32_t)vertexOffset);
+                DrawArguments drawArgs = {};
+                drawArgs.vertexCount = command->ElemCount;
+                drawArgs.startIndexLocation = indexOffset;
+                drawArgs.startVertexLocation = vertexOffset;
+                renderEncoder->drawIndexed(drawArgs);
             }
             indexOffset += command->ElemCount;
         }
         vertexOffset += commandList->VtxBuffer.Size;
     }
-    renderEncoder->endEncoding();
-    cmdBuf->close();
-    queue->executeCommandBuffer(cmdBuf);
+    
+    renderEncoder->end();
+    queue->submit(commandEncoder->finish());
+#endif
 }
 
 GUI::~GUI()
@@ -341,8 +341,8 @@ GUI::~GUI()
     auto& io = ImGui::GetIO();
 
     {
-        ComPtr<IResourceView> textureView;
-        textureView.attach((IResourceView*)io.Fonts->TexID);
+        Slang::ComPtr<ITextureView> textureView;
+        textureView.attach((ITextureView*)io.Fonts->TexID);
         textureView = nullptr;
     }
 

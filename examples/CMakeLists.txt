@@ -55,12 +55,12 @@ function(example dir)
         LINK_WITH_PRIVATE
             core
             example-base
+            slang-rhi
             slang
-            gfx
-            gfx-util
             platform
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             ${main_wrapper_libraries}
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_EXAMPLE_NAME=${dir}
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
@@ -81,8 +81,8 @@ if(SLANG_ENABLE_EXAMPLES)
         STATIC
         LINK_WITH_PRIVATE
             core
+            slang-rhi
             slang
-            gfx
             platform
             stb
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>

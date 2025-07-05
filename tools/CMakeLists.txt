@@ -139,119 +139,47 @@ if(SLANG_ENABLE_GFX)
             imgui
             stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
             "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
             "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
             ${CMAKE_DL_LIBS}
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE gfx
-        INCLUDE_DIRECTORIES_PUBLIC . platform
-        EXPORT_MACRO_PREFIX SLANG_PLATFORM
-    )
-
-    #
-    # GFX
-    #
-    slang_add_target(
-        gfx
-        ${SLANG_LIB_TYPE}
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            slang
-            Vulkan-Headers
-            metal-cpp
-            stb
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:${NVAPI_LIBRARIES}>
-        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
-            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
-            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:GFX_NVAPI>
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
-        # This is a shared library, so we need to set a preprocessor macro to mark
-        # exported symbols
-        EXPORT_MACRO_PREFIX SLANG_GFX
-        # slang-gfx is in this directory, anything which depends on gfx should include
-        # this
+        INCLUDE_FROM_PRIVATE
+            imgui
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}
-            ${slang_SOURCE_DIR}/include
-            if
-            (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
-            endif
-            ()
+            .
+            platform
             if
             (not ${SLANG_OVERRIDE_GLM_PATH})
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${SLANG_OVERRIDE_GLM_PATH}
-            endif
-            ()
-            if
-            (not ${SLANG_OVERRIDE_IMGUI_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${SLANG_OVERRIDE_IMGUI_PATH}
-            endif
-            ()
-            if
-            (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
-        INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
-        INSTALL
-        EXPORT_SET_NAME SlangTargets
-        FOLDER gfx
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        EXPORT_MACRO_PREFIX SLANG_PLATFORM
     )
-    if(SLANG_ENABLE_TESTS)
-        set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
-        add_custom_target(
-            copy-gfx-slang-modules
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
-            COMMAND
-                ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
-                ${modules_dest_dir}/gfx.slang
-            COMMAND
-                ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
-                ${modules_dest_dir}/slang.slang
-            WORKING_DIRECTORY ${slang_SOURCE_DIR}
-            VERBATIM
-        )
-        set_target_properties(
-            copy-gfx-slang-modules
-            PROPERTIES FOLDER generators
-        )
-        install(
-            FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
-            DESTINATION ${runtime_subdir}
-        )
-        add_dependencies(gfx copy-gfx-slang-modules)
-    endif()
 
-    slang_add_target(
-        gfx-util
-        STATIC
-        LINK_WITH_PRIVATE core
-        INCLUDE_FROM_PRIVATE gfx
-        # The headers are included with 'include "gfx-util/blah.h"' which is found
-        # in the tools directory
-        INCLUDE_DIRECTORIES_PUBLIC .
-        FOLDER gfx
+    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+    add_custom_target(
+        copy-gfx-slang-modules
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
+            ${modules_dest_dir}/gfx.slang
+        COMMAND
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+            ${modules_dest_dir}/slang.slang
+        WORKING_DIRECTORY ${slang_SOURCE_DIR}
+        VERBATIM
+    )
+    set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+    install(
+        FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
+        DESTINATION ${runtime_subdir}
     )
 endif()
-
-#
-# The test executables and runtime-loaded modules
-#
 if(SLANG_ENABLE_TESTS)
+    # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
         EXECUTABLE
@@ -292,7 +220,6 @@ if(SLANG_ENABLE_TESTS)
             test-server
             test-process
         OPTIONAL_REQUIRES
-            gfx
             slang-rt
             slang-glslang
             slang-llvm
@@ -307,6 +234,9 @@ if(SLANG_ENABLE_TESTS)
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
+
+    add_dependencies(slang-test copy-gfx-slang-modules)
+
     include(CTest)
     add_test(
         NAME slang-test
@@ -338,7 +268,21 @@ if(SLANG_ENABLE_TESTS)
             EXCLUDE_FROM_ALL
             EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
             USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform stb
+            LINK_WITH_PRIVATE
+                core
+                slang
+                unit-test
+                stb
+                platform
+                $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            INCLUDE_DIRECTORIES_PUBLIC
+                .
+                platform
+                if
+                (not ${SLANG_OVERRIDE_GLM_PATH})
+            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
             OUTPUT_NAME gfx-unit-test-tool
             REQUIRED_BY slang-test
             FOLDER test/tools
