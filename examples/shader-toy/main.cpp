@@ -88,8 +88,8 @@ struct ShaderToyApp : public WindowedAppBase
         // We need to obatin a compilation session (`slang::ISession`) that will provide
         // a scope to all the compilation and loading of code we do.
         //
-        // Our example application uses the `slang-rhi` graphics API abstraction layer, which already
-        // creates a Slang compilation session for us, so we just grab and use it here.
+        // Our example application uses the `slang-rhi` graphics API abstraction layer, which
+        // already creates a Slang compilation session for us, so we just grab and use it here.
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
 
@@ -311,8 +311,7 @@ struct ShaderToyApp : public WindowedAppBase
             FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex);
         vertexBufferDesc.elementSize = sizeof(FullScreenTriangle::Vertex);
         vertexBufferDesc.usage = BufferUsage::VertexBuffer;
-        gVertexBuffer =
-            gDevice->createBuffer(vertexBufferDesc, &FullScreenTriangle::kVertices[0]);
+        gVertexBuffer = gDevice->createBuffer(vertexBufferDesc, &FullScreenTriangle::kVertices[0]);
         if (!gVertexBuffer)
             return SLANG_FAIL;
 

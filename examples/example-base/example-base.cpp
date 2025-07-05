@@ -24,7 +24,8 @@ Slang::Result WindowedAppBase::initializeBase(
     deviceDesc.enableValidation = true;
 #endif
     gDevice = getRHI()->createDevice(deviceDesc);
-    if (!gDevice) {
+    if (!gDevice)
+    {
         return SLANG_FAIL;
     }
 
@@ -163,7 +164,8 @@ ComPtr<ITextureView> WindowedAppBase::createTextureFromFile(
 
 void WindowedAppBase::createOfflineTextures()
 {
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++) {
+    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    {
         TextureDesc textureDesc = {};
         textureDesc.size.width = this->windowWidth;
         textureDesc.size.height = this->windowHeight;

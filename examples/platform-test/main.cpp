@@ -4,6 +4,7 @@
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
 #include "slang.h"
+
 #include <cstdio>
 
 using namespace rhi;
@@ -12,11 +13,23 @@ using namespace Slang;
 struct PlatformTest : public WindowedAppBase
 {
 
-    void onSizeChanged() { printf("onSizeChanged\n"); fflush(stdout); }
+    void onSizeChanged()
+    {
+        printf("onSizeChanged\n");
+        fflush(stdout);
+    }
 
-    void onFocus() { printf("onFocus\n"); fflush(stdout); }
+    void onFocus()
+    {
+        printf("onFocus\n");
+        fflush(stdout);
+    }
 
-    void onLostFocus() { printf("onLostFocus\n"); fflush(stdout); }
+    void onLostFocus()
+    {
+        printf("onLostFocus\n");
+        fflush(stdout);
+    }
 
     void onKeyDown(platform::KeyEventArgs args)
     {
@@ -96,7 +109,7 @@ struct PlatformTest : public WindowedAppBase
         {
             printf("Setting up event handlers...\n");
             fflush(stdout);
-            
+
             gWindow->events.sizeChanged = [this]() { onSizeChanged(); };
             gWindow->events.focus = [this]() { onFocus(); };
             gWindow->events.lostFocus = [this]() { onLostFocus(); };

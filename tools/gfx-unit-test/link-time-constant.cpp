@@ -1,8 +1,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -90,8 +90,7 @@ void linkTimeConstantTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -99,7 +98,8 @@ void linkTimeConstantTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.size = numberCount * sizeof(float);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 

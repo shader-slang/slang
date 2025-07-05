@@ -1,5 +1,5 @@
 /*
- * This test has been disabled because the slang-rhi API 
+ * This test has been disabled because the slang-rhi API
  * does not provide equivalent functionality for querying format-supported
  * resource states. The old gfx API's getFormatSupportedResourceStates() is
  * replaced by with IDevice::getFormatSupport.
@@ -10,9 +10,10 @@
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
+#include "unit-test/slang-unit-test.h"
+
 #include <slang-rhi.h>
 #include <slang-rhi/shader-cursor.h>
-#include "unit-test/slang-unit-test.h"
 
 #if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>

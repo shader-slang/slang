@@ -1,11 +1,11 @@
 #pragma once
 
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 #include "core/slang-render-api-util.h"
 #include "slang-rhi.h"
-#include "unit-test/slang-unit-test.h"
-#include "core/slang-blob.h"
 #include "span.h"
+#include "unit-test/slang-unit-test.h"
 
 // GFX_CHECK_CALL and GFX_CHECK_CALL_ABORT are used to check SlangResult
 #define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
@@ -89,19 +89,28 @@ void compareComputeResult(rhi::IDevice* device, rhi::IBuffer* buffer, span<T> ex
 }
 
 template<typename T, size_t Count>
-void compareComputeResult(rhi::IDevice* device, rhi::IBuffer* buffer, std::array<T, Count> expectedResult)
+void compareComputeResult(
+    rhi::IDevice* device,
+    rhi::IBuffer* buffer,
+    std::array<T, Count> expectedResult)
 {
     compareComputeResult(device, buffer, span<T>(expectedResult.data(), Count));
 }
 
 template<typename T>
-void compareComputeResult(rhi::IDevice* device, rhi::ITexture* texture, uint32_t layer, uint32_t mip, span<T> expectedResult)
+void compareComputeResult(
+    rhi::IDevice* device,
+    rhi::ITexture* texture,
+    uint32_t layer,
+    uint32_t mip,
+    span<T> expectedResult)
 {
     size_t bufferSize = expectedResult.size() * sizeof(T);
     // Read back the results.
     ComPtr<ISlangBlob> textureData;
     rhi::SubresourceLayout layout;
-    SLANG_CHECK(SLANG_SUCCEEDED(device->readTexture(texture, layer, mip, textureData.writeRef(), &layout)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(device->readTexture(texture, layer, mip, textureData.writeRef(), &layout)));
     SLANG_CHECK(textureData->getBufferSize() >= bufferSize);
 
     uint8_t* buffer = (uint8_t*)textureData->getBufferPointer();
@@ -112,11 +121,10 @@ void compareComputeResult(rhi::IDevice* device, rhi::ITexture* texture, uint32_t
             for (uint32_t x = 0; x < layout.size.width; x++)
             {
                 const uint8_t* src = reinterpret_cast<const uint8_t*>(
-                    buffer + z * layout.slicePitch + y * layout.rowPitch + x * layout.colPitch
-                );
+                    buffer + z * layout.slicePitch + y * layout.rowPitch + x * layout.colPitch);
                 uint8_t* dst = reinterpret_cast<uint8_t*>(
-                    buffer + (((z * layout.size.depth + y) * layout.size.width) + x) * layout.colPitch
-                );
+                    buffer +
+                    (((z * layout.size.depth + y) * layout.size.width) + x) * layout.colPitch);
                 ::memcpy(dst, src, layout.colPitch);
             }
         }
@@ -136,8 +144,7 @@ void compareComputeResult(
     rhi::ITexture* texture,
     uint32_t layer,
     uint32_t mip,
-    std::array<T, Count> expectedResult
-)
+    std::array<T, Count> expectedResult)
 {
     compareComputeResult(device, texture, layer, mip, span<T>(expectedResult.data(), Count));
 }
@@ -166,10 +173,10 @@ void runTestImpl(
     rhi::DeviceType deviceType,
     Slang::List<const char*> searchPaths = {})
 {
-    //if ((api & context->enabledApis) == 0)
+    // if ((api & context->enabledApis) == 0)
     //{
-    //    SLANG_IGNORE_TEST
-    //}
+    //     SLANG_IGNORE_TEST
+    // }
     auto device = createTestingDevice(context, deviceType, searchPaths);
     if (!device)
     {

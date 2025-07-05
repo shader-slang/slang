@@ -2,8 +2,8 @@
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -20,8 +20,7 @@ void uint16BufferTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     const int numberCount = 4;
     uint16_t initialData[] = {0, 1, 2, 3};
@@ -29,8 +28,9 @@ void uint16BufferTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.size = numberCount * sizeof(uint16_t);
     bufferDesc.format = rhi::Format::Undefined;
 
-    bufferDesc.elementSize = 0;  // Let RHI derive from reflection
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.elementSize = 0; // Let RHI derive from reflection
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 

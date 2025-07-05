@@ -1,8 +1,9 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include <slang-rhi/shader-cursor.h>
 #include "slang-rhi.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 
@@ -34,7 +35,8 @@ ComPtr<IBuffer> createFloatBuffer(
     desc.elementSize = sizeof(float);
     desc.format = Format::Undefined;
     desc.memoryType = MemoryType::DeviceLocal;
-    desc.usage = BufferUsage::ShaderResource | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    desc.usage =
+        BufferUsage::ShaderResource | BufferUsage::CopyDestination | BufferUsage::CopySource;
     if (unorderedAccess)
         desc.usage |= BufferUsage::UnorderedAccess;
 
@@ -61,13 +63,11 @@ void barrierTestImpl(IDevice* device, UnitTestContext* context)
         programB.reflection));
     programA.pipelineDesc.program = programA.program.get();
     programB.pipelineDesc.program = programB.program.get();
-    GFX_CHECK_CALL_ABORT(device->createComputePipeline(
-        programA.pipelineDesc,
-        programA.pipeline.writeRef()));
+    GFX_CHECK_CALL_ABORT(
+        device->createComputePipeline(programA.pipelineDesc, programA.pipeline.writeRef()));
 
-    GFX_CHECK_CALL_ABORT(device->createComputePipeline(
-        programB.pipelineDesc,
-        programB.pipeline.writeRef()));
+    GFX_CHECK_CALL_ABORT(
+        device->createComputePipeline(programB.pipelineDesc, programB.pipeline.writeRef()));
 
     float initialData[] = {1.0f, 2.0f, 3.0f, 4.0f};
     ComPtr<IBuffer> inputBuffer = createFloatBuffer(device, false, 4, initialData);
@@ -80,43 +80,39 @@ void barrierTestImpl(IDevice* device, UnitTestContext* context)
         auto queue = device->getQueue(QueueType::Graphics);
         auto commandEncoder = queue->createCommandEncoder();
 
-    // Write inputBuffer data to intermediateBuffer
-     {
-        auto passEncoder = commandEncoder->beginComputePass();
-        auto rootObject = passEncoder->bindPipeline(programA.pipeline);
+        // Write inputBuffer data to intermediateBuffer
+        {
+            auto passEncoder = commandEncoder->beginComputePass();
+            auto rootObject = passEncoder->bindPipeline(programA.pipeline);
 
-        ShaderCursor cursor(rootObject->getEntryPoint(0));
-        cursor["inBuffer"].setBinding(inputBuffer);
-        cursor["outBuffer"].setBinding(intermediateBuffer);
-        passEncoder->dispatchCompute(1, 1, 1);
-        passEncoder->end();
-     }
+            ShaderCursor cursor(rootObject->getEntryPoint(0));
+            cursor["inBuffer"].setBinding(inputBuffer);
+            cursor["outBuffer"].setBinding(intermediateBuffer);
+            passEncoder->dispatchCompute(1, 1, 1);
+            passEncoder->end();
+        }
 
-    // Resource transition is automatically handled.
+        // Resource transition is automatically handled.
 
-    // Write intermediateBuffer data to outputBuffer
+        // Write intermediateBuffer data to outputBuffer
 
-    {
-        auto passEncoder = commandEncoder->beginComputePass();
-        auto rootObject = passEncoder->bindPipeline(programB.pipeline);
-        ShaderCursor cursor(rootObject->getEntryPoint(0));
-        cursor["inBuffer"].setBinding(intermediateBuffer);
-        cursor["outBuffer"].setBinding(outputBuffer);
-        passEncoder->dispatchCompute(1, 1, 1);
-        passEncoder->end();
+        {
+            auto passEncoder = commandEncoder->beginComputePass();
+            auto rootObject = passEncoder->bindPipeline(programB.pipeline);
+            ShaderCursor cursor(rootObject->getEntryPoint(0));
+            cursor["inBuffer"].setBinding(intermediateBuffer);
+            cursor["outBuffer"].setBinding(outputBuffer);
+            passEncoder->dispatchCompute(1, 1, 1);
+            passEncoder->end();
+        }
+
+
+        queue->submit(commandEncoder->finish());
+        queue->waitOnHost();
     }
 
 
-    queue->submit(commandEncoder->finish());
-    queue->waitOnHost();
-
-     }  
-
-
-    compareComputeResult(
-        device,
-        outputBuffer,
-        makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
+    compareComputeResult(device, outputBuffer, makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
 }
 
 void barrierTestAPI(UnitTestContext* context, DeviceType deviceType)

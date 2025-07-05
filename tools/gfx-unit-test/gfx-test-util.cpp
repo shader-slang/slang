@@ -30,8 +30,7 @@ Result loadComputeProgram(
     ComPtr<IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
-    slang::ProgramLayout*& slangReflection
-)
+    slang::ProgramLayout*& slangReflection)
 {
     ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
@@ -42,7 +41,8 @@ Result loadComputeProgram(
         return SLANG_FAIL;
 
     ComPtr<slang::IEntryPoint> computeEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
 
     std::vector<slang::IComponentType*> componentTypes;
     componentTypes.push_back(module);
@@ -53,8 +53,7 @@ Result loadComputeProgram(
         componentTypes.data(),
         componentTypes.size(),
         composedProgram.writeRef(),
-        diagnosticsBlob.writeRef()
-    );
+        diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
@@ -75,8 +74,7 @@ Result loadComputeProgram(
     ComPtr<IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
-    slang::ProgramLayout*& slangReflection
-)
+    slang::ProgramLayout*& slangReflection)
 {
     ComPtr<slang::IBlob> diagnosticsBlob;
     slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
@@ -85,7 +83,8 @@ Result loadComputeProgram(
         return SLANG_FAIL;
 
     ComPtr<slang::IEntryPoint> computeEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
 
     std::vector<slang::IComponentType*> componentTypes;
     componentTypes.push_back(module);
@@ -96,8 +95,7 @@ Result loadComputeProgram(
         componentTypes.data(),
         componentTypes.size(),
         composedProgram.writeRef(),
-        diagnosticsBlob.writeRef()
-    );
+        diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
@@ -112,64 +110,66 @@ Result loadComputeProgram(
     return outShaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
-//Slang::Result loadComputeProgram(
-//    rhi::IDevice* device,
-//    slang::ISession* slangSession,
-//    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
-//    const char* shaderModuleName,
-//    const char* entryPointName,
-//    slang::ProgramLayout*& slangReflection,
-//    PrecompilationMode precompilationMode)
+// Slang::Result loadComputeProgram(
+//     rhi::IDevice* device,
+//     slang::ISession* slangSession,
+//     Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
+//     const char* shaderModuleName,
+//     const char* entryPointName,
+//     slang::ProgramLayout*& slangReflection,
+//     PrecompilationMode precompilationMode)
 //{
-//    Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-//    slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
-//    diagnoseIfNeeded(diagnosticsBlob);
-//    if (!module)
-//        return SLANG_FAIL;
+//     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+//     slang::IModule* module = slangSession->loadModule(shaderModuleName,
+//     diagnosticsBlob.writeRef()); diagnoseIfNeeded(diagnosticsBlob); if (!module)
+//         return SLANG_FAIL;
 //
-//    ComPtr<slang::IEntryPoint> computeEntryPoint;
-//    SLANG_RETURN_ON_FAIL(
-//        module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
+//     ComPtr<slang::IEntryPoint> computeEntryPoint;
+//     SLANG_RETURN_ON_FAIL(
+//         module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
 //
-//    Slang::List<slang::IComponentType*> componentTypes;
-//    componentTypes.add(module);
-//    componentTypes.add(computeEntryPoint);
+//     Slang::List<slang::IComponentType*> componentTypes;
+//     componentTypes.add(module);
+//     componentTypes.add(computeEntryPoint);
 //
-//    Slang::ComPtr<slang::IComponentType> composedProgram;
-//    SlangResult result = slangSession->createCompositeComponentType(
-//        componentTypes.getBuffer(),
-//        componentTypes.getCount(),
-//        composedProgram.writeRef(),
-//        diagnosticsBlob.writeRef());
-//    diagnoseIfNeeded(diagnosticsBlob);
-//    SLANG_RETURN_ON_FAIL(result);
+//     Slang::ComPtr<slang::IComponentType> composedProgram;
+//     SlangResult result = slangSession->createCompositeComponentType(
+//         componentTypes.getBuffer(),
+//         componentTypes.getCount(),
+//         composedProgram.writeRef(),
+//         diagnosticsBlob.writeRef());
+//     diagnoseIfNeeded(diagnosticsBlob);
+//     SLANG_RETURN_ON_FAIL(result);
 //
-//    ComPtr<slang::IComponentType> linkedProgram;
-//    result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
-//    diagnoseIfNeeded(diagnosticsBlob);
-//    SLANG_RETURN_ON_FAIL(result);
+//     ComPtr<slang::IComponentType> linkedProgram;
+//     result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+//     diagnoseIfNeeded(diagnosticsBlob);
+//     SLANG_RETURN_ON_FAIL(result);
 //
-//    composedProgram = linkedProgram;
-//    slangReflection = composedProgram->getLayout();
+//     composedProgram = linkedProgram;
+//     slangReflection = composedProgram->getLayout();
 //
-//    rhi::ShaderProgramDesc programDesc = {};
-//    programDesc.slangGlobalScope = composedProgram.get();
-//    if (precompilationMode == PrecompilationMode::ExternalLink)
-//    {
-//        programDesc.downstreamLinkMode = rhi::IShaderProgram::DownstreamLinkMode::Deferred;
-//    }
-//    else
-//    {
-//        programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::None;
-//    }
+//     rhi::ShaderProgramDesc programDesc = {};
+//     programDesc.slangGlobalScope = composedProgram.get();
+//     if (precompilationMode == PrecompilationMode::ExternalLink)
+//     {
+//         programDesc.downstreamLinkMode = rhi::IShaderProgram::DownstreamLinkMode::Deferred;
+//     }
+//     else
+//     {
+//         programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::None;
+//     }
 //
-//    auto shaderProgram = device->createProgram(programDesc);
+//     auto shaderProgram = device->createProgram(programDesc);
 //
-//    outShaderProgram = shaderProgram;
-//    return SLANG_OK;
-//}
+//     outShaderProgram = shaderProgram;
+//     return SLANG_OK;
+// }
 
-Result loadComputeProgramFromSource(IDevice* device, ComPtr<IShaderProgram>& outShaderProgram, std::string_view source)
+Result loadComputeProgramFromSource(
+    IDevice* device,
+    ComPtr<IShaderProgram>& outShaderProgram,
+    std::string_view source)
 {
     auto slangSession = device->getSlangSession();
     slang::IModule* module = nullptr;
@@ -177,8 +177,11 @@ Result loadComputeProgramFromSource(IDevice* device, ComPtr<IShaderProgram>& out
     size_t hash = std::hash<std::string_view>()(source);
     std::string moduleName = "source_module_" + std::to_string(hash);
     auto srcBlob = Slang::UnownedRawBlob::create(source.data(), source.size());
-    module =
-        slangSession->loadModuleFromSource(moduleName.data(), moduleName.data(), srcBlob, diagnosticsBlob.writeRef());
+    module = slangSession->loadModuleFromSource(
+        moduleName.data(),
+        moduleName.data(),
+        srcBlob,
+        diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if (!module)
         return SLANG_FAIL;
@@ -202,8 +205,7 @@ Result loadComputeProgramFromSource(IDevice* device, ComPtr<IShaderProgram>& out
         rawComponentTypes.data(),
         rawComponentTypes.size(),
         linkedProgram.writeRef(),
-        diagnosticsBlob.writeRef()
-    );
+        diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
@@ -218,8 +220,7 @@ Result loadGraphicsProgram(
     const char* shaderModuleName,
     const char* vertexEntryPointName,
     const char* fragmentEntryPointName,
-    slang::ProgramLayout*& slangReflection
-)
+    slang::ProgramLayout*& slangReflection)
 {
     ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
@@ -230,10 +231,12 @@ Result loadGraphicsProgram(
         return SLANG_FAIL;
 
     ComPtr<slang::IEntryPoint> vertexEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        module->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
 
     ComPtr<slang::IEntryPoint> fragmentEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        module->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
 
     std::vector<slang::IComponentType*> componentTypes;
     componentTypes.push_back(module);
@@ -245,8 +248,7 @@ Result loadGraphicsProgram(
         componentTypes.data(),
         componentTypes.size(),
         composedProgram.writeRef(),
-        diagnosticsBlob.writeRef()
-    );
+        diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 

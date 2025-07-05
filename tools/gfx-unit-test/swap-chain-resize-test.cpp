@@ -2,11 +2,12 @@
 
 // Duplicated: This test is similar to slang-rhi\tests\test-surface.cpp
 
-#include <slang-rhi.h>
-#include <slang-rhi/shader-cursor.h>
+#include "gfx-test-util.h"
 #include "platform/window.h"
 #include "unit-test/slang-unit-test.h"
-#include "gfx-test-util.h"
+
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 

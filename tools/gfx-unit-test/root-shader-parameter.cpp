@@ -2,8 +2,8 @@
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -17,20 +17,20 @@ static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
     bufferDesc.size = sizeof(uint32_t);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | 
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
                        BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> numbersBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
 
     return buffer;
 }
 void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
 {
-    if (!device->hasFeature(Feature::ParameterBlock)) {
+    if (!device->hasFeature(Feature::ParameterBlock))
+    {
         SLANG_CHECK("no support for parameter blocks");
     }
 
@@ -111,10 +111,7 @@ void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
         queue->waitOnHost();
     }
 
-    compareComputeResult(
-        device,
-        buffers[8],
-        std::array{10 - 1 + 2 - 3 + 4 + 5 - 6 + 7});
+    compareComputeResult(device, buffers[8], std::array{10 - 1 + 2 - 3 + 4 + 5 - 6 + 7});
 }
 
 SLANG_UNIT_TEST(rootShaderParameterD3D12)

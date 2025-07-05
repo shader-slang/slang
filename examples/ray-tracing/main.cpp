@@ -5,13 +5,12 @@
 
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "slang-rhi/shader-cursor.h"
-#include "slang-rhi/acceleration-structure-utils.h"
-
 #include "platform/vector-math.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
+#include "slang-rhi/acceleration-structure-utils.h"
+#include "slang-rhi/shader-cursor.h"
 #include "slang.h"
 
 using namespace rhi;
@@ -150,10 +149,7 @@ struct RayTracing : public WindowedAppBase
     }
 
     // Load and compile shader code from souce.
-    Result loadShaderProgram(
-        IDevice* device,
-        bool isComputePipeline,
-        IShaderProgram** outProgram)
+    Result loadShaderProgram(IDevice* device, bool isComputePipeline, IShaderProgram** outProgram)
     {
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
@@ -387,8 +383,13 @@ struct RayTracing : public WindowedAppBase
             AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
             compactedSizeQueryDesc.queryPool = compactedSizeQuery;
             compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-            commandEncoder
-                ->buildAccelerationStructure(buildDesc, draftAS, nullptr, scratchBuffer, 1, &compactedSizeQueryDesc);
+            commandEncoder->buildAccelerationStructure(
+                buildDesc,
+                draftAS,
+                nullptr,
+                scratchBuffer,
+                1,
+                &compactedSizeQueryDesc);
             gQueue->submit(commandEncoder->finish());
             gQueue->waitOnHost();
 
@@ -399,7 +400,10 @@ struct RayTracing : public WindowedAppBase
             gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
 
             commandEncoder = gQueue->createCommandEncoder();
-            commandEncoder->copyAccelerationStructure(gBLAS, draftAS, AccelerationStructureCopyMode::Compact);
+            commandEncoder->copyAccelerationStructure(
+                gBLAS,
+                draftAS,
+                AccelerationStructureCopyMode::Compact);
             gQueue->submit(commandEncoder->finish());
             gQueue->waitOnHost();
         }
@@ -408,7 +412,8 @@ struct RayTracing : public WindowedAppBase
         {
             AccelerationStructureInstanceDescType nativeInstanceDescType =
                 getAccelerationStructureInstanceDescType(gDevice);
-            Size nativeInstanceDescSize = getAccelerationStructureInstanceDescSize(nativeInstanceDescType);
+            Size nativeInstanceDescSize =
+                getAccelerationStructureInstanceDescSize(nativeInstanceDescType);
 
             std::vector<AccelerationStructureInstanceDescGeneric> instanceDescs;
             instanceDescs.resize(1);
@@ -419,8 +424,7 @@ struct RayTracing : public WindowedAppBase
             instanceDescs[0].instanceID = 0;
             instanceDescs[0].instanceMask = 0xFF;
             instanceDescs[0].instanceContributionToHitGroupIndex = 0;
-            instanceDescs[0].flags =
-                AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
+            instanceDescs[0].flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
             instanceDescs[0].accelerationStructure = gBLAS->getHandle();
 
             std::vector<uint8_t> nativeInstanceDescs(instanceDescs.size() * nativeInstanceDescSize);
@@ -430,16 +434,14 @@ struct RayTracing : public WindowedAppBase
                 nativeInstanceDescs.data(),
                 nativeInstanceDescSize,
                 instanceDescs.data(),
-                sizeof(AccelerationStructureInstanceDescGeneric)
-            );
+                sizeof(AccelerationStructureInstanceDescGeneric));
 
             BufferDesc instanceBufferDesc;
             instanceBufferDesc.size =
                 instanceDescs.size() * sizeof(AccelerationStructureInstanceDescGeneric);
             instanceBufferDesc.usage = BufferUsage::ShaderResource;
             instanceBufferDesc.defaultState = ResourceState::ShaderResource;
-            gInstanceBuffer =
-                gDevice->createBuffer(instanceBufferDesc, nativeInstanceDescs.data());
+            gInstanceBuffer = gDevice->createBuffer(instanceBufferDesc, nativeInstanceDescs.data());
             if (!gInstanceBuffer)
                 return SLANG_FAIL;
 
@@ -465,10 +467,12 @@ struct RayTracing : public WindowedAppBase
 
             AccelerationStructureDesc createDesc;
             createDesc.size = sizes.accelerationStructureSize;
-            SLANG_RETURN_ON_FAIL(gDevice->createAccelerationStructure(createDesc, gTLAS.writeRef()));
+            SLANG_RETURN_ON_FAIL(
+                gDevice->createAccelerationStructure(createDesc, gTLAS.writeRef()));
 
             auto commandEncoder = gQueue->createCommandEncoder();
-            commandEncoder->buildAccelerationStructure(buildDesc, gTLAS, nullptr, scratchBuffer, 0, nullptr);
+            commandEncoder
+                ->buildAccelerationStructure(buildDesc, gTLAS, nullptr, scratchBuffer, 0, nullptr);
             gQueue->submit(commandEncoder->finish());
             gQueue->waitOnHost();
         }
@@ -478,9 +482,8 @@ struct RayTracing : public WindowedAppBase
             FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex);
         fullScreenVertexBufferDesc.usage = BufferUsage::VertexBuffer;
         fullScreenVertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        gFullScreenVertexBuffer = gDevice->createBuffer(
-            fullScreenVertexBufferDesc,
-            &FullScreenTriangle::kVertices[0]);
+        gFullScreenVertexBuffer =
+            gDevice->createBuffer(fullScreenVertexBufferDesc, &FullScreenTriangle::kVertices[0]);
         if (!gFullScreenVertexBuffer)
             return SLANG_FAIL;
 
@@ -599,7 +602,10 @@ struct RayTracing : public WindowedAppBase
             cursor["uniforms"].setData(&gUniforms, sizeof(Uniforms));
             cursor["sceneBVH"].setBinding(gTLAS);
             cursor["primitiveBuffer"].setBinding(gPrimitiveBuffer);
-            computePassEncoder->dispatchCompute((windowWidth + 15) / 16, (windowHeight + 15) / 16, 1);
+            computePassEncoder->dispatchCompute(
+                (windowWidth + 15) / 16,
+                (windowHeight + 15) / 16,
+                1);
             computePassEncoder->end();
             gQueue->submit(commandEncoder->finish());
         }
@@ -617,7 +623,7 @@ struct RayTracing : public WindowedAppBase
             renderPassDesc.colorAttachmentCount = 1;
 
             auto renderPassEncoder = commandEncoder->beginRenderPass(renderPassDesc);
-            
+
             RenderState renderState = {};
             renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
             renderState.viewportCount = 1;
@@ -626,11 +632,11 @@ struct RayTracing : public WindowedAppBase
             renderState.vertexBuffers[0] = gFullScreenVertexBuffer;
             renderState.vertexBufferCount = 1;
             renderPassEncoder->setRenderState(renderState);
-            
+
             auto rootObject = renderPassEncoder->bindPipeline(gPresentPipeline);
             auto cursor = ShaderCursor(rootObject);
             cursor["t"].setBinding(gResultTexture);
-            
+
             DrawArguments drawArgs = {};
             drawArgs.vertexCount = 3;
             renderPassEncoder->draw(drawArgs);

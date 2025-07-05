@@ -10,8 +10,8 @@
 #include "core/slang-string-util.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-gfx.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
