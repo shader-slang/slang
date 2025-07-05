@@ -58,8 +58,9 @@ protected:
     virtual void windowSizeChanged();
 
 protected:
- //   virtual void renderFrame(int framebufferIndex) = 0;
+    //   virtual void renderFrame(int framebufferIndex) = 0;
     virtual void renderFrame(rhi::ITexture* texture) = 0;
+
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->waitOnHost(); }

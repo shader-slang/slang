@@ -7,9 +7,10 @@
 #include "examples/example-base/example-base.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
+
 #include <slang-rhi.h>
 #include <slang-rhi/shader-cursor.h>
-#include "slang.h"
 
 using namespace rhi;
 using namespace Slang;
@@ -70,7 +71,7 @@ struct AftermathCrashExample : public WindowedAppBase
         // is generated. Increases memory footprint.
         const uint32_t aftermathFeatureFlags =
             GFSDK_Aftermath_GpuCrashDumpFeatureFlags_DeferDebugInfoCallbacks;
-    
+
         // As per docs must be called before any device is created
         GFSDK_Aftermath_EnableGpuCrashDumps(
             GFSDK_Aftermath_Version_API,
@@ -82,10 +83,10 @@ struct AftermathCrashExample : public WindowedAppBase
             _crashDescriptionCallback,
             _markerCallback,
             this);
-    
+
         SLANG_RETURN_ON_FAIL(initializeBase("autodiff-texture", 1024, 768, DeviceType::Default));
-    
-    
+
+
         // We will create objects needed to configure the "input assembler"
         // (IA) stage of the pipeline.
         //
@@ -98,7 +99,7 @@ struct AftermathCrashExample : public WindowedAppBase
         auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
         if (!inputLayout)
             return SLANG_FAIL;
-        
+
         // Next we allocate a vertex buffer for our pre-initialized
         // vertex data.
         //
@@ -109,13 +110,13 @@ struct AftermathCrashExample : public WindowedAppBase
         m_vertexBuffer = gDevice->createBuffer(vertexBufferDesc, &kVertexData[0]);
         if (!m_vertexBuffer)
             return SLANG_FAIL;
-        
+
         // Now we will use our `loadShaderProgram` function to load
         // the code from `shaders.slang` into the graphics API.
         //
         ComPtr<IShaderProgram> shaderProgram;
         SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram.writeRef()));
-    
+
         // Following the D3D12/Vulkan style of API, we need a pipeline state object
         // (PSO) to encapsulate the configuration of the overall graphics pipeline.
         //
@@ -132,9 +133,9 @@ struct AftermathCrashExample : public WindowedAppBase
         auto pipelineState = gDevice->createRenderPipeline(desc);
         if (!pipelineState)
             return SLANG_FAIL;
-        
+
         m_renderPipeline = pipelineState;
-    
+
         return SLANG_OK;
     }
 };
@@ -324,9 +325,7 @@ static SlangResult _addCompileProducts(
     return SLANG_OK;
 }
 
-Result AftermathCrashExample::loadShaderProgram(
-    IDevice* device,
-    IShaderProgram** outProgram)
+Result AftermathCrashExample::loadShaderProgram(IDevice* device, IShaderProgram** outProgram)
 {
     ComPtr<slang::ISession> slangSession;
     slangSession = gDevice->getSlangSession();
@@ -548,10 +547,8 @@ void AftermathCrashExample::renderFrame(ITexture* texture)
 
     auto rootObject = renderEncoder->bindPipeline(m_renderPipeline);
     ShaderCursor rootCursor(rootObject);
-    
-    rootCursor["Uniforms"]["modelViewProjection"].setData(
-        kIdentity,
-        sizeof(float) * 16);
+
+    rootCursor["Uniforms"]["modelViewProjection"].setData(kIdentity, sizeof(float) * 16);
 
     // We are going to extra efforts to create a shader that we know will time
     // out because we *want* a GPU "crash", such we can capture via nsight aftermath.

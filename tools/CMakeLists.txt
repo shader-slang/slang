@@ -149,13 +149,13 @@ if(SLANG_ENABLE_GFX)
         INCLUDE_FROM_PRIVATE
             imgui
             $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-        INCLUDE_DIRECTORIES_PUBLIC .
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
             platform
-        if (not ${SLANG_OVERRIDE_GLM_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external
-        else ()
-        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH}
-        endif ()
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
         EXPORT_MACRO_PREFIX SLANG_PLATFORM
     )
 
@@ -167,24 +167,19 @@ if(SLANG_ENABLE_GFX)
             ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
             ${modules_dest_dir}/gfx.slang
         COMMAND
-            ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
             ${modules_dest_dir}/slang.slang
         WORKING_DIRECTORY ${slang_SOURCE_DIR}
         VERBATIM
     )
-    set_target_properties(
-        copy-gfx-slang-modules
-        PROPERTIES FOLDER generators
-    )
+    set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
     install(
         FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
         DESTINATION ${runtime_subdir}
     )
 endif()
 if(SLANG_ENABLE_TESTS)
-
-# The test executables and runtime-loaded modules
+    # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
         EXECUTABLE
@@ -280,15 +275,14 @@ if(SLANG_ENABLE_TESTS)
                 stb
                 platform
                 $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-            INCLUDE_FROM_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-                INCLUDE_DIRECTORIES_PUBLIC .
+            INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            INCLUDE_DIRECTORIES_PUBLIC
+                .
                 platform
-            if (not ${SLANG_OVERRIDE_GLM_PATH})
-            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external
-            else ()
-            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH}
-            endif ()
+                if
+                (not ${SLANG_OVERRIDE_GLM_PATH})
+            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
             OUTPUT_NAME gfx-unit-test-tool
             REQUIRED_BY slang-test
             FOLDER test/tools

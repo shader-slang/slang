@@ -4,12 +4,12 @@
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
-#include <slang-rhi/shader-cursor.h>
 #include "platform/vector-math.h"
-#include <slang-rhi.h>
 #include "unit-test/slang-unit-test.h"
 
 #include <chrono>
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 using namespace Slang;

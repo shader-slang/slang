@@ -2,8 +2,8 @@
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -17,13 +17,12 @@ static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
     bufferDesc.size = sizeof(uint32_t);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination |
-                       BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
 
     return buffer;
 }
@@ -37,8 +36,7 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipeline;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipeline.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipeline.writeRef()));
 
     Slang::List<ComPtr<ISampler>> samplers;
     ComPtr<ITexture> texture;
@@ -93,7 +91,7 @@ void samplerArrayTestImpl(IDevice* device, UnitTestContext* context)
         }
         cursor["data"].setData(1.0f);
     }
-        s1->finalize();
+    s1->finalize();
 
     {
         auto cursor = ShaderCursor(g);

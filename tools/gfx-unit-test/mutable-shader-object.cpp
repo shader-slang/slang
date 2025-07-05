@@ -1,8 +1,9 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include <slang-rhi/shader-cursor.h>
-#include <slang-rhi.h>
 #include "unit-test/slang-unit-test.h"
+
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 
@@ -22,8 +23,7 @@ void mutableShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     float initialData[] = {0.0f, 1.0f, 2.0f, 3.0f};
     const int numberCount = SLANG_COUNT_OF(initialData);
@@ -31,7 +31,8 @@ void mutableShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.size = sizeof(initialData);
     bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
@@ -48,7 +49,7 @@ void mutableShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
             addTransformerType,
             ShaderObjectContainerType::None,
             transformer.writeRef()));
-        
+
         // Set the `c` field of the `AddTransformer`.
         float c = 1.0f;
         ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));

@@ -1,8 +1,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -122,8 +122,7 @@ void linkTimeDefaultTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     // Create pipeline with a specialization override module linked in, so we should
     // see the result of using `Bar` for `extern Foo`.
@@ -133,8 +132,7 @@ void linkTimeDefaultTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc1 = {};
     pipelineDesc1.program = shaderProgram1.get();
     ComPtr<IComputePipeline> pipelineState1;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc1, pipelineState1.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc1, pipelineState1.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -142,7 +140,8 @@ void linkTimeDefaultTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.size = numberCount * sizeof(float);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 

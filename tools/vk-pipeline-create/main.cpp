@@ -7,10 +7,10 @@
 #include "../../source/core/slang-string-util.h"
 #include "examples/hello-world/vulkan-api.h"
 #include "slang-com-ptr.h"
-#include <slang-rhi.h>
 #include "slang.h"
 
 #include <chrono>
+#include <slang-rhi.h>
 
 #if SLANG_WINDOWS_FAMILY
 #include <windows.h>

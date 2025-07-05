@@ -25,7 +25,6 @@
 // and parameter binding.
 //
 #include "examples/example-base/example-base.h"
-#include <slang-rhi/shader-cursor.h>
 #include "platform/gui.h"
 #include "platform/model.h"
 #include "platform/vector-math.h"
@@ -33,6 +32,7 @@
 #include "slang-rhi.h"
 
 #include <map>
+#include <slang-rhi/shader-cursor.h>
 #include <sstream>
 
 using namespace rhi;
@@ -390,7 +390,10 @@ struct LightEnvLayout : public RefObject
     std::map<slang::TypeReflection*, SlangInt> mapLightTypeToArrayIndex;
     slang::TypeReflection* shaderType = nullptr;
 
-    void addLightType(RendererContext* context, slang::TypeReflection* lightType, SlangInt maximumCount)
+    void addLightType(
+        RendererContext* context,
+        slang::TypeReflection* lightType,
+        SlangInt maximumCount)
     {
         SlangInt arrayIndex = (SlangInt)lightArrayLayouts.size();
         LightArrayLayout layout;
@@ -898,9 +901,11 @@ struct ModelViewer : WindowedAppBase
         auto renderEncoder = drawCommandEncoder->beginRenderPass(renderPass);
 
         RenderState renderState = {};
-        renderState.viewports[0] = Viewport::fromSize((float)clientRect.width, (float)clientRect.height);
+        renderState.viewports[0] =
+            Viewport::fromSize((float)clientRect.width, (float)clientRect.height);
         renderState.viewportCount = 1;
-        renderState.scissorRects[0] = ScissorRect::fromSize((float)clientRect.width, (float)clientRect.height);
+        renderState.scissorRects[0] =
+            ScissorRect::fromSize((float)clientRect.width, (float)clientRect.height);
         renderState.scissorRectCount = 1;
 
         // We are only rendering one view, so we can fill in a per-view
@@ -949,11 +954,12 @@ struct ModelViewer : WindowedAppBase
             for (auto& mesh : model->meshes)
             {
                 // Set the pipeline and binding state for drawing each mesh.
-                auto rootObject = renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gPipelineState.get()));
-                
+                auto rootObject = renderEncoder->bindPipeline(
+                    static_cast<IRenderPipeline*>(gPipelineState.get()));
+
                 // Apply render state
                 renderEncoder->setRenderState(renderState);
-                
+
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["gViewParams"].setObject(viewShaderObject);
                 rootCursor["gModelParams"].setObject(modelShaderObject);
@@ -975,7 +981,8 @@ struct ModelViewer : WindowedAppBase
                 // All the shader parameters and pipeline states have been set up,
                 // we can now issue a draw call for the mesh.
                 DrawArguments drawArgs = {};
-                // `drawArgs.vertexCount` is actually `indexCount` for the `DrawIndexed` Graphics API
+                // `drawArgs.vertexCount` is actually `indexCount` for the `DrawIndexed` Graphics
+                // API
                 drawArgs.vertexCount = mesh->indexCount;
                 drawArgs.startIndexLocation = mesh->firstIndex;
                 renderEncoder->drawIndexed(drawArgs);

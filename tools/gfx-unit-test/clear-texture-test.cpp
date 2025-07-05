@@ -3,8 +3,8 @@
 
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-gfx.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -94,4 +94,4 @@ SLANG_UNIT_TEST(clearTextureTestVulkan)
 }
 } // namespace gfx_test
 
-#endif 
+#endif

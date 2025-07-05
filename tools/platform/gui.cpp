@@ -41,10 +41,7 @@ LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 #endif
 
 
-GUI::GUI(
-    Window* window,
-    IDevice* inDevice,
-    ICommandQueue* inQueue)
+GUI::GUI(Window* window, IDevice* inDevice, ICommandQueue* inQueue)
     : device(inDevice), queue(inQueue)
 {
     ImGui::CreateContext();
@@ -199,8 +196,8 @@ void GUI::endFrame(ITexture* renderTarget)
     if (!commandListCount)
         return;
 
-    // For now, skip rendering since we don't have a complete pipeline
-    // This would need shader program creation to work properly
+        // For now, skip rendering since we don't have a complete pipeline
+        // This would need shader program creation to work properly
 #if 0
     // Create vertex and index buffers for this frame
     BufferDesc vertexBufferDesc;

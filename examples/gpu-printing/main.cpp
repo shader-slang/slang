@@ -10,6 +10,7 @@ using Slang::ComPtr;
 #include "gpu-printing.h"
 #include "platform/window.h"
 #include "slang-rhi.h"
+
 #include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
@@ -109,7 +110,8 @@ struct ExampleProgram : public TestBase
         BufferDesc printBufferDesc = {};
         printBufferDesc.size = printBufferSize;
         printBufferDesc.elementSize = sizeof(uint32_t);
-        printBufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource | BufferUsage::CopyDestination;
+        printBufferDesc.usage =
+            BufferUsage::UnorderedAccess | BufferUsage::CopySource | BufferUsage::CopyDestination;
         printBufferDesc.memoryType = MemoryType::DeviceLocal;
         auto printBuffer = gDevice->createBuffer(printBufferDesc);
 
@@ -119,9 +121,9 @@ struct ExampleProgram : public TestBase
         auto rootShaderObject = computeEncoder->bindPipeline(gPipelineState);
         auto cursor = ShaderCursor(rootShaderObject);
         cursor["gPrintBuffer"].setBinding(printBuffer);
-        
+
         computeEncoder->dispatchCompute(1, 1, 1);
-        
+
         computeEncoder->end();
         queue->submit(commandEncoder->finish());
 

@@ -21,12 +21,11 @@
 // with a certain amount of boilerplate that isn't especially
 // interesting to discuss.
 
-#include "slang.h"
-
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
+#include "slang.h"
 
 typedef SlangResult Result;
 using Slang::ComPtr;
@@ -586,7 +585,7 @@ struct ReflectionParameterBlocksExampleApp : public TestBase
         deviceDesc.deviceType = DeviceType::Vulkan;
 
         ComPtr<IDevice> rhiDevice = getRHI()->createDevice(deviceDesc);
-       if (!rhiDevice)
+        if (!rhiDevice)
             return SLANG_FAIL;
 
         // The `slang-rhi` library also creates a Slang session as

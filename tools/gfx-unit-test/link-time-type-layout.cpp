@@ -220,8 +220,7 @@ void linkTimeTypeLayoutImpl(rhi::IDevice* device, UnitTestContext* context)
     pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
 
     ComPtr<IRenderPipeline> pipelineState;
-    auto pipelineResult =
-        device->createRenderPipeline(pipelineDesc, pipelineState.writeRef());
+    auto pipelineResult = device->createRenderPipeline(pipelineDesc, pipelineState.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(pipelineResult));
 }
 

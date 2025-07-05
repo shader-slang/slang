@@ -34,10 +34,11 @@
 //
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include <slang-rhi/shader-cursor.h>
 #include "platform/window.h"
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
+
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 using namespace Slang;
@@ -334,7 +335,8 @@ struct HelloWorld : public WindowedAppBase
         // This method will return a transient root shader object for us to write our
         // shader parameters into.
         //
-        auto rootObject = renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gPipeline.get()));
+        auto rootObject =
+            renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gPipeline.get()));
 
         // We will update the model-view-projection matrix that is passed
         // into the shader code via the `Uniforms` buffer on a per-frame
@@ -376,9 +378,7 @@ struct HelloWorld : public WindowedAppBase
         // Once we have formed a cursor that "points" at the
         // model-view projection matrix, we can set its data directly.
         //
-        rootCursor["Uniforms"]["modelViewProjection"].setData(
-            kIdentity,
-            sizeof(float) * 16);
+        rootCursor["Uniforms"]["modelViewProjection"].setData(kIdentity, sizeof(float) * 16);
         //
         // Some readers might be concerned about the performance of
         // the above operations because of the use of strings. For

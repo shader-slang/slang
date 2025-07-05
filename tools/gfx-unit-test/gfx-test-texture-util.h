@@ -21,7 +21,13 @@ struct ValidationTextureFormatBase : RefObject
 {
     virtual void validateBlocksEqual(const void* actual, const void* expected) = 0;
 
-    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) = 0;
+    virtual void initializeTexel(
+        void* texel,
+        uint32_t x,
+        uint32_t y,
+        uint32_t z,
+        uint32_t mip,
+        uint32_t layer) = 0;
 };
 
 template<typename T>
@@ -30,7 +36,7 @@ struct ValidationTextureFormat : ValidationTextureFormatBase
     uint32_t componentCount;
 
     ValidationTextureFormat(uint32_t componentCount)
-        : componentCount(componentCount) {};
+        : componentCount(componentCount){};
 
     virtual void validateBlocksEqual(const void* actual, const void* expected) override
     {
@@ -43,7 +49,13 @@ struct ValidationTextureFormat : ValidationTextureFormatBase
         }
     }
 
-    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) override
+    virtual void initializeTexel(
+        void* texel,
+        uint32_t x,
+        uint32_t y,
+        uint32_t z,
+        uint32_t mip,
+        uint32_t layer) override
     {
         auto temp = (T*)texel;
 
@@ -83,10 +95,7 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
     int aBits;
 
     PackedValidationTextureFormat(int rBits, int gBits, int bBits, int aBits)
-        : rBits(rBits)
-        , gBits(gBits)
-        , bBits(bBits)
-        , aBits(aBits) {};
+        : rBits(rBits), gBits(gBits), bBits(bBits), aBits(aBits){};
 
     virtual void validateBlocksEqual(const void* actual, const void* expected) override
     {
@@ -101,7 +110,13 @@ struct PackedValidationTextureFormat : ValidationTextureFormatBase
         }
     }
 
-    virtual void initializeTexel(void* texel, uint32_t x, uint32_t y, uint32_t z, uint32_t mip, uint32_t layer) override
+    virtual void initializeTexel(
+        void* texel,
+        uint32_t x,
+        uint32_t y,
+        uint32_t z,
+        uint32_t mip,
+        uint32_t layer) override
     {
         T temp = 0;
 
@@ -199,9 +214,16 @@ inline TextureType toArrayType(TextureType type)
 
 Size getTexelSize(Format format);
 RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
-void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat);
+void generateTextureData(
+    RefPtr<TextureInfo> texture,
+    ValidationTextureFormatBase* validationFormat);
 
-std::vector<uint8_t> removePadding(ISlangBlob* pixels, uint32_t width, uint32_t height, Size rowPitch, Size pixelSize);
+std::vector<uint8_t> removePadding(
+    ISlangBlob* pixels,
+    uint32_t width,
+    uint32_t height,
+    Size rowPitch,
+    Size pixelSize);
 Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height);
 Result writeImage(
     const char* filename,
@@ -209,7 +231,6 @@ Result writeImage(
     uint32_t width,
     uint32_t height,
     uint32_t rowPitch,
-    uint32_t pixelSize
-);
+    uint32_t pixelSize);
 
-} // namespace rhi::testing
+} // namespace gfx_test

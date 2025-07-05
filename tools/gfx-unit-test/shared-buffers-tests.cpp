@@ -1,7 +1,7 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace rhi;
@@ -18,7 +18,8 @@ void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContex
     bufferDesc.size = numberCount * sizeof(float);
     bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopySource | BufferUsage::CopyDestination | BufferUsage::Shared;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopySource | BufferUsage::CopyDestination | BufferUsage::Shared;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
@@ -56,8 +57,7 @@ void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContex
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        dstDevice->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(dstDevice->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     auto queue = dstDevice->getQueue(QueueType::Graphics);
     auto commandEncoder = queue->createCommandEncoder();
@@ -78,10 +78,7 @@ void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContex
     compareComputeResult(dstDevice, dstBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
-void sharedBufferTestAPI(
-    UnitTestContext* context,
-    DeviceType srcApi,
-    DeviceType dstApi)
+void sharedBufferTestAPI(UnitTestContext* context, DeviceType srcApi, DeviceType dstApi)
 {
     auto srcDevice = createTestingDevice(context, srcApi);
     auto dstDevice = createTestingDevice(context, dstApi);
