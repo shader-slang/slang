@@ -4,18 +4,17 @@
 #include "core/slang-basic.h"
 #include "imgui/imgui.h"
 #include "slang-com-ptr.h"
-#include <slang-rhi.h>
 #include "vector-math.h"
 #include "window.h"
+
+#include <slang-rhi.h>
 
 namespace platform
 {
 
 struct GUI : Slang::RefObject
 {
-    GUI(Window* window,
-        rhi::IDevice* device,
-        rhi::ICommandQueue* queue);
+    GUI(Window* window, rhi::IDevice* device, rhi::ICommandQueue* queue);
     ~GUI();
 
     void beginFrame();

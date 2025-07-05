@@ -3,8 +3,8 @@
 #include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <mutex>
@@ -161,14 +161,14 @@ void precompiledModuleCacheTestImpl(IDevice* device, UnitTestContext* context)
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> computePipeline;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, computePipeline.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, computePipeline.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
     BufferDesc bufferDesc = {};
     bufferDesc.size = numberCount * sizeof(float);
-    bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::ShaderResource | BufferUsage::CopySource | BufferUsage::CopyDestination;
+    bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::ShaderResource |
+                       BufferUsage::CopySource | BufferUsage::CopyDestination;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> numbersBuffer;

@@ -14,8 +14,9 @@ using Slang::ComPtr;
 
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include <slang-rhi/shader-cursor.h>
 #include "slang-rhi.h"
+
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 
@@ -165,7 +166,8 @@ int exampleMain(int argc, char** argv)
     bufferDesc.size = numberCount * sizeof(float);
     bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
@@ -198,7 +200,8 @@ int exampleMain(int argc, char** argv)
 
         // Now we can use this type to create a shader object that can be bound to the root object.
         ComPtr<IShaderObject> transformer;
-        transformer = device->createShaderObject(addTransformerType, ShaderObjectContainerType::None);
+        transformer =
+            device->createShaderObject(addTransformerType, ShaderObjectContainerType::None);
         if (!transformer)
             return SLANG_FAIL;
 
@@ -226,11 +229,8 @@ int exampleMain(int argc, char** argv)
     }
     // Read back the results.
     ComPtr<ISlangBlob> resultBlob;
-    SLANG_RETURN_ON_FAIL(device->readBuffer(
-        numbersBuffer,
-        0,
-        numberCount * sizeof(float),
-        resultBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        device->readBuffer(numbersBuffer, 0, numberCount * sizeof(float), resultBlob.writeRef()));
     auto result = reinterpret_cast<const float*>(resultBlob->getBufferPointer());
     for (int i = 0; i < numberCount; i++)
         printf("%f\n", result[i]);

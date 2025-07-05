@@ -1,16 +1,13 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "slang-rhi/shader-cursor.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 using namespace rhi;
 
 namespace gfx_test
 {
-Slang::ComPtr<IBuffer> createBuffer(
-    IDevice* device,
-    uint32_t data,
-    ResourceState defaultState)
+Slang::ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t data, ResourceState defaultState)
 {
     uint32_t initialData[] = {data, data, data, data};
     const int numberCount = SLANG_COUNT_OF(initialData);
@@ -20,7 +17,7 @@ Slang::ComPtr<IBuffer> createBuffer(
     bufferDesc.elementSize = sizeof(uint32_t) * 4;
     bufferDesc.defaultState = defaultState;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
-    
+
     // Set appropriate usage flags based on the default state
     if (defaultState == ResourceState::ShaderResource)
     {
@@ -59,8 +56,8 @@ void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
     pipeline = device->createComputePipeline(pipelineDesc);
 
     ComPtr<IShaderObject> shaderObject;
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        device->createRootShaderObject(shaderProgram, shaderObject.writeRef())));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(device->createRootShaderObject(shaderProgram, shaderObject.writeRef())));
 
     Slang::List<Slang::ComPtr<IBuffer>> srvBuffers;
 
@@ -122,10 +119,7 @@ void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
         queue->waitOnHost();
     }
 
-    compareComputeResult(
-        device,
-        resultBuffer,
-        std::array{1123u, 1123u, 1123u, 1123u});
+    compareComputeResult(device, resultBuffer, std::array{1123u, 1123u, 1123u, 1123u});
 }
 
 SLANG_UNIT_TEST(nestedParameterBlockTestD3D12)

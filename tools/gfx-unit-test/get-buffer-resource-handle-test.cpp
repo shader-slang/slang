@@ -1,8 +1,9 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
 #include "slang-rhi/shader-cursor.h"
-#include <slang-rhi.h>
 #include "unit-test/slang-unit-test.h"
+
+#include <slang-rhi.h>
 
 #if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>
@@ -21,7 +22,8 @@ void getBufferResourceHandleTestImpl(IDevice* device, UnitTestContext* context)
     bufferDesc.elementSize = sizeof(float);
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
-    bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::ShaderResource | BufferUsage::CopySource | BufferUsage::CopyDestination;
+    bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::ShaderResource |
+                       BufferUsage::CopySource | BufferUsage::CopyDestination;
 
     ComPtr<IBuffer> buffer;
     GFX_CHECK_CALL_ABORT(device->createBuffer(bufferDesc, nullptr, buffer.writeRef()));

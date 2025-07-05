@@ -1,9 +1,10 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include <slang-rhi/shader-cursor.h>
-#include <slang-rhi.h>
 #include "unit-test/slang-unit-test.h"
+
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
 using namespace rhi;
 
@@ -184,8 +185,7 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<IComputePipeline> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     // Create buffer for struct S with array of size N
     int32_t initialData[] = {1, 2, 3, 4};
@@ -193,7 +193,8 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     bufferDesc.size = N * sizeof(int32_t);
     bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(int32_t);
-    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopyDestination | BufferUsage::CopySource;
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 

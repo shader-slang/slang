@@ -1,10 +1,10 @@
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "slang-rhi/shader-cursor.h"
 #include "platform/vector-math.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
 #include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "slang.h"
 
 using namespace rhi;
@@ -96,10 +96,7 @@ struct AutoDiffTexture : public WindowedAppBase
         return SLANG_OK;
     }
 
-    Result loadComputeProgram(
-        IDevice* device,
-        const char* fileName,
-        IShaderProgram** outProgram)
+    Result loadComputeProgram(IDevice* device, const char* fileName, IShaderProgram** outProgram)
     {
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
@@ -178,11 +175,7 @@ struct AutoDiffTexture : public WindowedAppBase
 
     bool resetLearntTexture = false;
 
-    ComPtr<ITexture> createRenderTargetTexture(
-        Format format,
-        int w,
-        int h,
-        int levels)
+    ComPtr<ITexture> createRenderTargetTexture(Format format, int w, int h, int levels)
     {
         TextureDesc textureDesc = {};
         textureDesc.format = format;
@@ -190,7 +183,8 @@ struct AutoDiffTexture : public WindowedAppBase
         textureDesc.size.height = h;
         textureDesc.size.depth = 1;
         textureDesc.mipCount = levels;
-        textureDesc.usage = TextureUsage::ShaderResource | TextureUsage::UnorderedAccess | TextureUsage::RenderTarget;
+        textureDesc.usage = TextureUsage::ShaderResource | TextureUsage::UnorderedAccess |
+                            TextureUsage::RenderTarget;
         textureDesc.defaultState = ResourceState::RenderTarget;
         return gDevice->createTexture(textureDesc);
     }
@@ -225,9 +219,7 @@ struct AutoDiffTexture : public WindowedAppBase
         TextureViewDesc srvDesc = {};
         return gDevice->createTextureView(tex, srvDesc);
     }
-    ComPtr<IRenderPipeline> createRenderPipeline(
-        IInputLayout* inputLayout,
-        IShaderProgram* program)
+    ComPtr<IRenderPipeline> createRenderPipeline(IInputLayout* inputLayout, IShaderProgram* program)
     {
         ColorTargetDesc colorTarget;
         colorTarget.format = Format::RGBA8Unorm;
@@ -254,8 +246,8 @@ struct AutoDiffTexture : public WindowedAppBase
         TextureViewDesc desc = {};
         SubresourceRange textureViewRange = {};
         textureViewRange.mipCount = 1;
-        textureViewRange.mip = level;  // Fixed: should be level, not 0
-        textureViewRange.layerCount = 1;  // Fixed: should be 1, not level
+        textureViewRange.mip = level;    // Fixed: should be level, not 0
+        textureViewRange.layerCount = 1; // Fixed: should be 1, not level
         textureViewRange.layer = 0;
         desc.subresourceRange = textureViewRange;
         return gDevice->createTextureView(texture, desc);
@@ -357,21 +349,21 @@ struct AutoDiffTexture : public WindowedAppBase
         // Load texture from file - this would need to be adapted to use slang-rhi texture loading
         Slang::String imagePath = resourceBase.resolveResource("checkerboard.jpg");
         gTexView = createTextureFromFile(imagePath.getBuffer(), textureWidth, textureHeight);
-        textureWidth = 512;  // Placeholder values
+        textureWidth = 512; // Placeholder values
         textureHeight = 512;
         initMipOffsets(textureWidth, textureHeight);
 
         BufferDesc bufferDesc = {};
         bufferDesc.size = mipMapOffset.getLast() * sizeof(uint32_t);
         bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
-        
+
         gAccumulateBuffer = gDevice->createBuffer(bufferDesc);
         if (!gAccumulateBuffer)
         {
             printf("ERROR: Failed to create accumulate buffer!\n");
             return SLANG_FAIL;
         }
-        
+
         gReconstructBuffer = gDevice->createBuffer(bufferDesc);
         if (!gReconstructBuffer)
         {
@@ -381,21 +373,14 @@ struct AutoDiffTexture : public WindowedAppBase
 
         int mipCount = 1 + Math::Log2Ceil(Math::Max(textureWidth, textureHeight));
         SubresourceData initialData = {};
-        initialData.data = 
-        gLearningTexture = createRenderTargetTexture(
-            Format::RGBA32Float,
-            textureWidth,
-            textureHeight,
-            mipCount);
+        initialData.data = gLearningTexture =
+            createRenderTargetTexture(Format::RGBA32Float, textureWidth, textureHeight, mipCount);
         gLearningTextureSRV = createSRV(gLearningTexture);
         for (int i = 0; i < mipCount; i++)
             gLearningTextureUAVs.add(createUAV(gLearningTexture, i));
 
-        gDiffTexture = createRenderTargetTexture(
-            Format::RGBA32Float,
-            textureWidth,
-            textureHeight,
-            mipCount);
+        gDiffTexture =
+            createRenderTargetTexture(Format::RGBA32Float, textureWidth, textureHeight, mipCount);
         gDiffTextureSRV = createSRV(gDiffTexture);
         for (int i = 0; i < mipCount; i++)
             gDiffTextureUAVs.add(createUAV(gDiffTexture, i));
@@ -409,8 +394,7 @@ struct AutoDiffTexture : public WindowedAppBase
         gRefImage = createRenderTargetTexture(Format::RGBA8Unorm, windowWidth, windowHeight, 1);
         gRefImageSRV = createSRV(gRefImage);
 
-        gIterImage =
-            createRenderTargetTexture(Format::RGBA8Unorm, windowWidth, windowHeight, 1);
+        gIterImage = createRenderTargetTexture(Format::RGBA8Unorm, windowWidth, windowHeight, 1);
         gIterImageSRV = createSRV(gIterImage);
 
         // Initialize textures
@@ -419,7 +403,7 @@ struct AutoDiffTexture : public WindowedAppBase
             // Clear learning and diff textures
             commandEncoder->clearTextureFloat(gLearningTexture, kEntireTexture, clearValue);
             commandEncoder->clearTextureFloat(gDiffTexture, kEntireTexture, clearValue);
-            
+
             gQueue->submit(commandEncoder->finish());
         }
 
@@ -464,9 +448,7 @@ struct AutoDiffTexture : public WindowedAppBase
     }
 
     template<typename SetupPipelineFunc>
-    void renderImage(
-        ITexture* renderTarget,
-        const SetupPipelineFunc& setupPipeline)
+    void renderImage(ITexture* renderTarget, const SetupPipelineFunc& setupPipeline)
     {
         auto commandEncoder = gQueue->createCommandEncoder();
 
@@ -517,7 +499,8 @@ struct AutoDiffTexture : public WindowedAppBase
             gRefImage,
             [&](IRenderPassEncoder* encoder)
             {
-                auto rootObject = encoder->bindPipeline(static_cast<IRenderPipeline*>(gRefPipeline.get()));
+                auto rootObject =
+                    encoder->bindPipeline(static_cast<IRenderPipeline*>(gRefPipeline.get()));
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["Uniforms"]["modelViewProjection"].setData(
                     &transformMatrix,
@@ -528,7 +511,8 @@ struct AutoDiffTexture : public WindowedAppBase
                     mipMapOffset.getBuffer(),
                     sizeof(uint32_t) * mipMapOffset.getCount());
                 rootCursor["Uniforms"]["texRef"].setBinding(gTexView);
-                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(gAccumulateBuffer);
+                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(
+                    gAccumulateBuffer);
             });
     }
 
@@ -544,7 +528,7 @@ struct AutoDiffTexture : public WindowedAppBase
             auto commandEncoder = gQueue->createCommandEncoder();
             commandEncoder->clearBuffer(gAccumulateBuffer, 0, gAccumulateBuffer->getDesc().size);
             commandEncoder->clearBuffer(gReconstructBuffer, 0, gReconstructBuffer->getDesc().size);
-            
+
             if (resetLearntTexture)
             {
                 commandEncoder->clearTextureFloat(gLearningTexture, kEntireTexture, clearValue);
@@ -570,7 +554,8 @@ struct AutoDiffTexture : public WindowedAppBase
                     mipMapOffset.getBuffer(),
                     sizeof(uint32_t) * mipMapOffset.getCount());
                 rootCursor["Uniforms"]["texRef"].setBinding(gRefImageSRV);
-                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(gAccumulateBuffer);
+                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(
+                    gAccumulateBuffer);
                 rootCursor["Uniforms"]["bwdTexture"]["minLOD"].setData(5.0);
             });
 
@@ -671,7 +656,7 @@ struct AutoDiffTexture : public WindowedAppBase
             renderPass.colorAttachmentCount = 1;
 
             auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
-            
+
             drawTexturedQuad(renderEncoder, 0, 0, textureWidth, textureHeight, gLearningTextureSRV);
 
             int refImageWidth = windowWidth - textureWidth - 10;
@@ -718,7 +703,8 @@ struct AutoDiffTexture : public WindowedAppBase
         renderState.vertexBufferCount = 1;
         renderEncoder->setRenderState(renderState);
 
-        auto root = renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gDrawQuadPipeline.get()));
+        auto root =
+            renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gDrawQuadPipeline.get()));
         ShaderCursor rootCursor(root);
         rootCursor["Uniforms"]["x"].setData(x);
         rootCursor["Uniforms"]["y"].setData(y);
@@ -728,7 +714,7 @@ struct AutoDiffTexture : public WindowedAppBase
         rootCursor["Uniforms"]["viewHeight"].setData(windowHeight);
         rootCursor["Uniforms"]["texture"].setBinding(srv);
         rootCursor["Uniforms"]["sampler"].setBinding(gSampler);
-        
+
         DrawArguments drawArgs = {};
         drawArgs.vertexCount = 4;
         renderEncoder->draw(drawArgs);

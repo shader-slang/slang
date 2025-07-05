@@ -1,7 +1,6 @@
 #include "gfx-test-texture-util.h"
 
 #include <slang-com-ptr.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,7 +14,8 @@
 #pragma warning(pop)
 #endif
 
-namespace gfx_test {
+namespace gfx_test
+{
 
 TextureInfo::~TextureInfo()
 {
@@ -233,7 +233,12 @@ void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBas
     }
 }
 
-std::vector<uint8_t> removePadding(ISlangBlob* pixels, uint32_t width, uint32_t height, Size rowPitch, Size pixelSize)
+std::vector<uint8_t> removePadding(
+    ISlangBlob* pixels,
+    uint32_t width,
+    uint32_t height,
+    Size rowPitch,
+    Size pixelSize)
 {
     std::vector<uint8_t> buffer;
     buffer.resize(height * rowPitch);
@@ -241,7 +246,10 @@ std::vector<uint8_t> removePadding(ISlangBlob* pixels, uint32_t width, uint32_t 
     {
         Offset srcOffset = i * rowPitch;
         Offset dstOffset = i * width * pixelSize;
-        memcpy(buffer.data() + dstOffset, (char*)pixels->getBufferPointer() + srcOffset, width * pixelSize);
+        memcpy(
+            buffer.data() + dstOffset,
+            (char*)pixels->getBufferPointer() + srcOffset,
+            width * pixelSize);
     }
 
     return buffer;
@@ -260,8 +268,7 @@ Result writeImage(
     uint32_t width,
     uint32_t height,
     uint32_t rowPitch,
-    uint32_t pixelSize
-)
+    uint32_t pixelSize)
 {
     if (rowPitch == width * pixelSize)
         return writeImage(filename, pixels, width, height);
@@ -273,4 +280,4 @@ Result writeImage(
     return stbResult ? SLANG_OK : SLANG_FAIL;
 }
 
-} // namespace rhi::testing
+} // namespace gfx_test
