@@ -55,8 +55,8 @@ function(example dir)
         LINK_WITH_PRIVATE
             core
             example-base
-            slang
             slang-rhi
+            slang
             platform
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
             ${main_wrapper_libraries}
@@ -82,8 +82,8 @@ if(SLANG_ENABLE_EXAMPLES)
         STATIC
         LINK_WITH_PRIVATE
             core
-            slang
             slang-rhi
+            slang
             platform
             stb
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
