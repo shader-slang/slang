@@ -4,8 +4,14 @@
 #include "../core/slang-byte-encode-util.h"
 #include "../core/slang-math.h"
 #include "../core/slang-text-io.h"
+#include "core/slang-blob-builder.h"
 #include "slang-ir-insts.h"
 
+//
+#include "slang-serialize-fossil.h"
+#include "slang-serialize-ir.cpp.fiddle"
+
+FIDDLE()
 namespace Slang
 {
 
@@ -425,7 +431,8 @@ Result _writeInstArrayChunk(
 
 /* static */ Result IRSerialWriter::writeTo(const IRSerialData& data, RIFF::BuildCursor& cursor)
 {
-    SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, Bin::kIRModuleFourCc);
+    SLANG_ASSERT(false);
+    // SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, Bin::kIRModuleFourCc);
 
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(Bin::kInstFourCc, data.m_insts, cursor));
     SLANG_RETURN_ON_FAIL(
@@ -823,17 +830,315 @@ Result IRSerialReader::read(
     return SLANG_OK;
 }
 
+FIDDLE()
+struct IRModuleInfo
+{
+    FIDDLE(...)
+    // FIDDLE() int64_t a;
+    // FIDDLE() String name;
+    FIDDLE() RefPtr<IRModule> module;
+};
+
+struct IRSerialContext;
+using IRSerializer = Serializer_<ISerializerImpl, IRSerialContext>;
+
+struct IRSerialContext
+{
+public:
+    virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) = 0;
+    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) = 0;
+    // virtual void handleIRNode(ASTSerializer const& serializer, NodeBase*& value) = 0;
+    // virtual void handleIRNodeContents(ASTSerializer const& serializer, NodeBase* value) = 0;
+    virtual void handleName(IRSerializer const& serializer, Name*& value) = 0;
+    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) = 0;
+    // virtual void handleToken(IRSerializer const& serializer, Token& value) = 0;
+    // virtual void handleContainerDeclDirectMemberDecls(
+    //     IRSerializer const& serializer,
+    //     ContainerDeclDirectMemberDecls& value) = 0;
+};
+
+struct IRSerialWriteContext : IRSerialContext
+{
+    IRSerialWriteContext(SerialSourceLocWriter* sourceLocWriter)
+        : _sourceLocWriter(sourceLocWriter)
+    {
+    }
+
+    virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
+    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
+    virtual void handleName(IRSerializer const& serializer, Name*& value) override;
+    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
+
+    SerialSourceLocWriter* _sourceLocWriter;
+};
+
+struct IRSerialReadContext : IRSerialContext, RefObject
+{
+    IRSerialReadContext(
+        // IRBuilder* irBuilder,
+        Session* session,
+        SerialSourceLocReader* sourceLocReader)
+        : _session(session), _sourceLocReader(sourceLocReader)
+    // , _irBuilder(irBuilder)
+    {
+    }
+    virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
+    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
+    virtual void handleName(IRSerializer const& serializer, Name*& value) override;
+    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
+
+    Session* _session;
+    SerialSourceLocReader* _sourceLocReader;
+    // IRBuilder* _irBuilder;
+    RefPtr<IRModule> _module;
+};
+
+#if 0 // FIDDLE TEMPLATE:
+%
+%local enumTypeNames = {
+%   "IROp",
+%}
+%
+%for _,T in ipairs(enumTypeNames) do
+
+/// Serialize a `value` of type `$T`.
+void serialize(Serializer const& serializer, $T& value)
+{
+    serializeEnum(serializer, value);
+}
+
+% -- The `serializeEnum()` function encodes enum values as `FossilUInt`s
+% -- so we declare the fossilized representation of these types to match.
+%
+// Declare fossilized representation of `$T`
+SLANG_DECLARE_FOSSILIZED_AS($T, FossilUInt);
+
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-serialize-ir.cpp.fiddle"
+#endif // FIDDLE END
+
+#if 0 // FIDDLE TEMPLATE:
+%irStructTypes = {
+%   Slang.IRModuleInfo,
+%}
+%
+%for _,T in ipairs(irStructTypes) do
+
+/// Fossilized representation of a `$T`
+struct Fossilized_$T;
+
+SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
+
+/// Serialize a `$T`
+void serialize(IRSerializer const& serializer, $T& value);
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 1
+#include "slang-serialize-ir.cpp.fiddle"
+#endif // FIDDLE END
+
+#if 0 // FIDDLE TEMPLATE:
+%for _,T in ipairs(irStructTypes) do
+% TRACE(T)
+/// Fossilized representation of a value of type `$T`
+struct Fossilized_$T
+    : public FossilizedRecordVal
+{
+%   for _,f in ipairs(T.directFields) do
+    Fossilized<decltype($T::$f)> $f;
+%   end
+};
+
+/// Serialize a `value` of type `$T`
+void serialize(IRSerializer const& serializer, $T& value)
+{
+    SLANG_UNUSED(value);
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+%   if T.directSuperClass then
+    serialize(serializer, static_cast<$(T.directSuperClass)&>(value));
+%   end
+%   for _,f in ipairs(T.directFields) do
+    serialize(serializer, value.$f);
+%   end
+}
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 2
+#include "slang-serialize-ir.cpp.fiddle"
+#endif // FIDDLE END
+
+void serialize(IRSerializer const& serializer, SourceLoc& value)
+{
+    serializer.getContext()->handleSourceLoc(serializer, value);
+}
+
+void IRSerialWriteContext::handleSourceLoc(IRSerializer const& serializer, SourceLoc& value)
+{
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (_sourceLocWriter != nullptr)
+    {
+        SerialSourceLocData::SourceLoc rawValue = _sourceLocWriter->addSourceLoc(value);
+        serialize(serializer, rawValue);
+    }
+}
+
+void IRSerialReadContext::handleSourceLoc(IRSerializer const& serializer, SourceLoc& value)
+{
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (hasElements(serializer))
+    {
+        SerialSourceLocData::SourceLoc rawValue;
+        serialize(serializer, rawValue);
+        if (auto sourceLocReader = _sourceLocReader)
+        {
+            value = sourceLocReader->getSourceLoc(rawValue);
+        }
+    }
+}
+
+SLANG_DECLARE_FOSSILIZED_AS(SourceLoc, std::optional<SerialSourceLocData::SourceLoc>);
+
+SLANG_DECLARE_FOSSILIZED_AS(IRInstListBase, List<IRInst*>);
+
+void serialize(IRSerializer const& serializer, IRInstListBase& value)
+{
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+
+    if (isWriting(serializer))
+    {
+        for (auto inst : value)
+        {
+            serialize(serializer, inst);
+        }
+    }
+    else
+    {
+        IRInst** link = &value.first;
+
+        while (hasElements(serializer))
+        {
+            IRInst* inst = nullptr;
+            serialize(serializer, inst);
+
+            *link = inst;
+            link = &inst->next;
+        }
+    }
+}
+
+template<typename T>
+void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
+{
+    SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
+    serializer.getContext()->handleIRInst(serializer, reinterpret_cast<IRInst*&>(value));
+}
+
+void IRSerialWriteContext::handleIRInst(IRSerializer const& serializer, IRInst*& value)
+{
+    serialize(serializer, value->m_op);
+    serialize(serializer, value->operandCount);
+    serialize(serializer, value->sourceLoc);
+    for (Index i = 0; i < value->operandCount; ++i)
+    {
+        auto operand = value->getOperand(i);
+        serialize(serializer, operand);
+    }
+    serialize(serializer, value->m_decorationsAndChildren);
+}
+
+void IRSerialReadContext::handleIRInst(IRSerializer const& serializer, IRInst*& value)
+{
+    IROp op;
+    serialize(serializer, op);
+    uint32_t operandCount;
+    serialize(serializer, operandCount);
+    value = _module->_allocateInst(op, operandCount);
+    serialize(serializer, value->sourceLoc);
+    for (Index i = 0; i < operandCount; ++i)
+    {
+        IRInst* arg = nullptr;
+        serialize(serializer, arg);
+        auto operand = value->getOperands();
+        operand->init(value, arg);
+    }
+    serialize(serializer, value->m_decorationsAndChildren);
+}
+
+void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*)
+{
+    serializer.getContext()->handleIRModule(serializer, value);
+}
+
+void IRSerialWriteContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    fprintf(stderr, "Write: Module Name: %s\n", value->getName()->text.getBuffer());
+    serialize(serializer, value->getName()->text);
+    serialize(serializer, value->m_moduleInst);
+}
+
+void IRSerialReadContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    value = new IRModule{_session};
+    SLANG_ASSERT(!_module);
+    _module = value;
+    serialize(serializer, value->m_name);
+    serialize(serializer, value->m_moduleInst);
+    fprintf(stderr, "Read: Module Name: %s\n", value->m_name->text.getBuffer());
+}
+
+void serializeObject(IRSerializer const& serializer, Name*& value, Name*)
+{
+    serializer.getContext()->handleName(serializer, value);
+}
+
+void IRSerialWriteContext::handleName(IRSerializer const& serializer, Name*& value)
+{
+    serialize(serializer, value->text);
+}
+
+void IRSerialReadContext::handleName(IRSerializer const& serializer, Name*& value)
+{
+    String text;
+    serialize(serializer, text);
+    value = _session->getNamePool()->getName(text);
+}
+
+//
+//
+//
+
 void writeSerializedModuleIR(
     RIFF::BuildCursor& cursor,
     IRModule* irModule,
     SerialSourceLocWriter* sourceLocWriter)
 {
-    IRSerialData serialData;
-    IRSerialWriter writer;
+    // The flow here is very similar to writeSerializedModuleAST which is very
+    // well documented.
 
-    writer.write(irModule, sourceLocWriter, &serialData);
-    IRSerialWriter::writeTo(serialData, cursor);
+    IRModuleInfo moduleInfo{.module = irModule};
+
+    BlobBuilder blobBuilder;
+    {
+        Fossil::SerialWriter writer(blobBuilder);
+        IRSerialWriteContext context{sourceLocWriter};
+        IRSerializer serializer(&writer, &context);
+        serialize(serializer, moduleInfo);
+    }
+
+    ComPtr<ISlangBlob> blob;
+    blobBuilder.writeToBlob(blob.writeRef());
+
+    void const* data = blob->getBufferPointer();
+    size_t size = blob->getBufferSize();
+    cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
 }
+
+// static_assert(sizeof(Fossilized<IRModuleInfo>) == 8);
+// static_assert(offsetof(Fossilized<IRModuleInfo>, a) == 0);
 
 SlangResult readSerializedModuleIR(
     RIFF::Chunk const* chunk,
@@ -843,31 +1148,37 @@ SlangResult readSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
-    // IR serialization still uses the older approach, where
-    // data gets deserialized from the RIFF into an intermediate
-    // data structure (`IRSerialData`), and then the actual
-    // in-memory structures are created based on the intermediate.
-    //
-    // Thus we start by running the `IRSerialReader::readContainer`
-    // logic to get the `IRSerialData` representation.
-    //
-    // TODO(tfoley): This should all get streamlined so that we
-    // are deserializing IR nodes directly from the format written
-    // into the RIFF.
-    const auto moduleChunk = as<RIFF::ListChunk>(chunk);
-    if (!moduleChunk)
+    auto dataChunk = as<RIFF::DataChunk>(chunk);
+    if (!dataChunk)
     {
         SLANG_UNEXPECTED("invalid format for serialized module IR");
     }
-    IRSerialData serialData;
-    SLANG_RETURN_ON_FAIL(IRSerialReader::readFrom(moduleChunk, &serialData));
 
-    // Next we read the actual IR representation out from the
-    // `serialData`. This is the step that may pull source-location
-    // information from the provided `sourceLocReader`.
-    //
-    IRSerialReader reader;
-    SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceLocReader, outIRModule));
+    Fossil::AnyValPtr rootValPtr =
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    if (!rootValPtr)
+    {
+        SLANG_UNEXPECTED("invalid format for serialized module IR");
+    }
+
+    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+
+    IRModuleInfo info;
+    {
+        auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
+        Fossil::ReadContext readContext;
+        Fossil::SerialReader reader(
+            readContext,
+            rootValPtr,
+            Fossil::SerialReader::InitialStateType::Root);
+
+        IRSerializer serializer(&reader, sharedDecodingContext);
+        serialize(serializer, info);
+    }
+    // fprintf(stderr, "AAAAAAAA: %ld\n", info.a);
+    // fprintf(stderr, "AAAAAAAA: %s\n", info->name.getBuffer());
+    SLANG_ASSERT(info.module);
+    outIRModule = info.module;
 
     return SLANG_OK;
 }

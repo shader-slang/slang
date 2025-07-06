@@ -139,7 +139,7 @@ public:
 
         // Okay, we need to serialize this target program and its IR too...
         {
-            // SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
             writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
         }
 
@@ -216,7 +216,7 @@ public:
         //
         if (auto irModule = module->getIRModule())
         {
-            // SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
             writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
         }
 
@@ -455,11 +455,11 @@ String ModuleChunk::getName() const
 
 IRModuleChunk const* ModuleChunk::findIR() const
 {
-    auto foundChunk = findListChunk(IRSerialBinary::kIRModuleFourCc);
-    if (!foundChunk)
+    auto foundProperty = findListChunk(PropertyKeys<IRModule>::IRModule);
+    if (!foundProperty)
         return nullptr;
 
-    return static_cast<IRModuleChunk const*>(foundChunk);
+    return static_cast<IRModuleChunk const*>(foundProperty->getFirstChild().get());
 }
 
 ASTModuleChunk const* ModuleChunk::findAST() const
