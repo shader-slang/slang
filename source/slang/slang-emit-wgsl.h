@@ -83,22 +83,22 @@ private:
     const char* getWgslImageFormat(IRTextureTypeBase* type);
 
     void _requireExtension(const UnownedStringSlice& name);
-    
+
     void emitFilteredStorageBufferGlobals();
 
     bool m_f16ExtensionEnabled = false;
 
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
-    
+
     // Track filtered storage buffer parameters that need global variables
     List<IRParam*> m_filteredStorageBufferParams;
-    
+
     // Track already emitted global variable names to avoid duplicates
     HashSet<String> m_emittedGlobalBuffers;
-    
+
     // Map field types to their canonical global variable names for deduplication
     Dictionary<IRType*, String> m_bufferTypeToGlobalName;
-    
+
     // Track whether we've already emitted the filtered globals
     bool m_hasEmittedFilteredGlobals = false;
 };
