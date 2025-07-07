@@ -1,13 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DFAIL
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
 
-interface ITwoParamGeneric<A, B>
-{
-    int getVal();
-}
-
-struct Foo<A, B> : ITwoParamGeneric<A, B>
+struct Foo<each A>
 {
     int val = 0;
     int getVal()
@@ -16,12 +11,13 @@ struct Foo<A, B> : ITwoParamGeneric<A, B>
     }
 }
 
-extension<A, B> Foo<A,B> where A == B
+extension<each A> Foo<A>
+    where A == int
 {
     [mutating]
-    void setVal(int dataIn)
+    void setVal1(int dataIn)
     {
-        val = dataIn;
+        val += dataIn;
     }
 }
 
@@ -30,15 +26,16 @@ RWStructuredBuffer<float4> outBuffer;
 
 void computeMain()
 {
-//CHECK_FAIL: error 30027:{{.*}}'setVal'{{.*}}'Foo<int, float>'.
+//CHECK_FAIL: error 30027: 'setVal1' is not a member of 'Foo<float, int>'.
 //CHECK_PASS: OpEntryPoint
-//BUF: 3
+//CHECK: 3
 #ifdef FAIL
-    Foo<int, float> x = Foo<int, float>();
-
+    // fails since while expanding A and applying `where`,
+    // we will find a `float`, not a `int`
+    Foo<float> x = Foo<float>();
 #else
-    Foo<int, int> x = Foo<int, int>();
+    Foo<int> x = Foo<int>();
 #endif
-    x.setVal(3);
+    x.setVal1(3);
     outBuffer[0] = x.getVal();
 }

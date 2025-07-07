@@ -3295,7 +3295,8 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(valParam, DeclCheckState::ReadyForReference);
             valParam->parameterIndex = parameterIndex++;
         }
-        else if (as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m))
+        else if (as<GenericTypeConstraintDecl>(m)
+            || as<TypeCoercionConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }

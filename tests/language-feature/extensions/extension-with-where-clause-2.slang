@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DFAIL
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
 
 interface ITwoParamGeneric<A, B>
 {
@@ -43,7 +43,7 @@ void computeMain()
 {
 //CHECK_FAIL: error 30027:{{.*}}'setVal'{{.*}}'Foo<float, int>'.
 //CHECK_PASS: OpEntryPoint
-//BUF: 3
+//CHECK: 3
     Foo<float, int> x = Foo<float, int>();
     x.setVal(3);
     outBuffer[0] = x.getVal();

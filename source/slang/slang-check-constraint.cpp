@@ -360,20 +360,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
-
-        // We validate equality constraints seperately in a seperate pass. If we unify
-        // these now we may have to `join` 2 generic types (which is always false) due
-        // to Sub and Sup type being a GenericTypeParam.
-        //
-        // This is also semantically fine since 'joining' 2 equality constraints
-        // does not mean anything beyond type equality which our solver will check
-        // anyways after we solve-types
-        if (constraintDeclRef.getDecl()->isEqualityConstraint)
-            continue;
-
         ValUnificationContext unificationContext;
         unificationContext.optionalConstraint =
             constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        unificationContext.equalityConstraint = constraintDeclRef.getDecl()->isEqualityConstraint;
         if (!TryUnifyTypes(
                 *system,
                 unificationContext,
@@ -502,6 +492,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 if (!joinType)
                 {
                     if (c.isOptional)
+                        joinType = type;
+                    else if (c.isEquality)
                         joinType = type;
                     else
                         // failure!
@@ -981,6 +973,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
     constraint.isOptional = unificationContext.optionalConstraint;
+    constraint.isEquality = unificationContext.equalityConstraint;
     constraints.constraints.add(constraint);
 
     return true;
