@@ -345,12 +345,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
 
-    // Helper to recursively check a type for forward references to type parameters
-    void checkTypeForForwardReferences(
-        Type* type,
-        GenericTypeConstraintDecl* constraintDecl,
-        GenericDecl* parentGeneric,
-        Index constraintIndex);
+    // General utility function to collect all referenced declarations from a type
+    void collectReferencedDecls(Type* type, List<Decl*>& outDecls);
 
     void visitGenericDecl(GenericDecl* genericDecl);
 
@@ -3229,11 +3225,7 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     }
 }
 
-void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
-    Type* type,
-    GenericTypeConstraintDecl* constraintDecl,
-    GenericDecl* parentGeneric,
-    Index constraintIndex)
+void SemanticsDeclHeaderVisitor::collectReferencedDecls(Type* type, List<Decl*>& outDecls)
 {
     if (!type)
         return;
@@ -3241,58 +3233,14 @@ void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto referencedDecl = declRefType->getDeclRef().getDecl();
-        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        if (referencedDecl)
         {
-            // Check if this type parameter belongs to the same generic and comes after the constraint
-            if (typeParam->parentDecl == parentGeneric)
-            {
-                // Find the type parameter's position
-                for (Index i = constraintIndex + 1; i < parentGeneric->getDirectMemberDeclCount(); ++i)
-                {
-                    if (parentGeneric->getDirectMemberDecl(i) == typeParam)
-                    {
-                        // Found a forward reference, throw an error.
-
-                        // Try to get names of the forward reference and
-                        // the later declaration for better error info.
-                        Name* forwardParamName = typeParam->getName();
-
-                        Name* constraintParamName = nullptr;
-                        if (auto subDeclRefType = as<DeclRefType>(constraintDecl->sub.type))
-                        {
-                            if (auto subDecl = subDeclRefType->getDeclRef().getDecl())
-                            {
-                                constraintParamName = subDecl->getName();
-                            }
-                        }
-
-                        // Report the error using available names
-                        if (constraintParamName && forwardParamName)
-                        {
-                            getSink()->diagnose(
-                                constraintDecl->sup.exp,
-                                Diagnostics::forwardReferenceInGenericConstraint,
-                                constraintParamName,
-                                forwardParamName);
-                        }
-                        else
-                        {
-                            // Fallback for cases where we don't have names
-                            getSink()->diagnose(
-                                constraintDecl->sup.exp,
-                                Diagnostics::forwardReferenceInGenericConstraint,
-                                getName("(unknown)"),
-                                forwardParamName ? forwardParamName : getName("(unnamed)"));
-                        }
-                        return;
-                    }
-                }
-            }
+            // Add the referenced declaration to our collection
+            outDecls.add(referencedDecl);
         }
 
-        // Also check type arguments in generic applications
-        // This is for cases like:
-        // void example<T : IContainer<U>, U>() { ... }
+        // Also collect declarations from type arguments in generic applications
+        // This handles cases like: void example<T : IContainer<U>, U>() { ... }
         if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRefType->getDeclRef().declRefBase))
         {
             auto args = genericAppDeclRef->getArgs();
@@ -3300,7 +3248,7 @@ void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
             {
                 if (auto argType = as<Type>(arg))
                 {
-                    checkTypeForForwardReferences(argType, constraintDecl, parentGeneric, constraintIndex);
+                    collectReferencedDecls(argType, outDecls);
                 }
             }
         }
@@ -3310,7 +3258,7 @@ void SemanticsDeclHeaderVisitor::checkTypeForForwardReferences(
 void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl)
 {
     // Check if this constraint references type parameters that appear later
-    // in the same GenericDecl's parameter list and a report forward reference error
+    // in the same GenericDecl's parameter list and report a forward reference error
     // if it does.
 
     // Only applies to constraints within GenericDecl contexts where declaration order matters.
@@ -3320,7 +3268,7 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(Gener
         return;
 
     // Find the constraint's position among the generic parameters and constraints.
-    // If the contraint's superior type is declared at a later index, then we
+    // If the constraint's superior type is declared at a later index, then we
     // need to throw an error.
     Index constraintIndex = -1;
     for (Index i = 0; i < parentGeneric->getDirectMemberDeclCount(); ++i)
@@ -3337,9 +3285,62 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(Gener
     if (constraintIndex == -1)
         return;
 
-    // Check the superior type of the constraint for forward references. If it is declared
-    // after this reference (as the superior type in the constraint), then throw an error.
-    checkTypeForForwardReferences(decl->sup.type, decl, parentGeneric, constraintIndex);
+    // Collect all referenced declarations from the constraint's superior type
+    List<Decl*> referencedDecls;
+    collectReferencedDecls(decl->sup.type, referencedDecls);
+
+    // Check if any of the referenced declarations are forward references
+    for (auto referencedDecl : referencedDecls)
+    {
+        if (auto typeParam = as<GenericTypeParamDeclBase>(referencedDecl))
+        {
+            // Check if this type parameter belongs to the same generic and comes after the constraint
+            if (typeParam->parentDecl == parentGeneric)
+            {
+                // Find the type parameter's position
+                for (Index i = constraintIndex + 1; i < parentGeneric->getDirectMemberDeclCount(); ++i)
+                {
+                    if (parentGeneric->getDirectMemberDecl(i) == typeParam)
+                    {
+                        // Found a forward reference, report an error.
+
+                        // Try to get names of the forward reference and
+                        // the constraint parameter for better error info.
+                        Name* forwardParamName = typeParam->getName();
+
+                        Name* constraintParamName = nullptr;
+                        if (auto subDeclRefType = as<DeclRefType>(decl->sub.type))
+                        {
+                            if (auto subDecl = subDeclRefType->getDeclRef().getDecl())
+                            {
+                                constraintParamName = subDecl->getName();
+                            }
+                        }
+
+                        // Report the error using available names
+                        if (constraintParamName && forwardParamName)
+                        {
+                            getSink()->diagnose(
+                                decl->sup.exp,
+                                Diagnostics::forwardReferenceInGenericConstraint,
+                                constraintParamName,
+                                forwardParamName);
+                        }
+                        // Fallback for cases where we don't have names
+                        else
+                        {
+                            getSink()->diagnose(
+                                decl->sup.exp,
+                                Diagnostics::forwardReferenceInGenericConstraint,
+                                getName("(unknown)"),
+                                forwardParamName ? forwardParamName : getName("(unnamed)"));
+                        }
+                        break; // Break out of the inner loop, but continue checking other referenced decls
+                    }
+                }
+            }
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
