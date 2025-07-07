@@ -113,9 +113,7 @@ struct PropertyKeys<Module>
 template<>
 struct PropertyKeys<IRModule>
 {
-    static const FourCC::RawValue Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
     static const FourCC::RawValue IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
-    static const FourCC::RawValue FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
 };
 
 // For types/FourCC that work for serializing in general (not just IR).
