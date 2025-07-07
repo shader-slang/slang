@@ -1491,13 +1491,29 @@ static void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    try
+    {
+        sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Internal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 static void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    try
+    {
+        sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Fatal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
