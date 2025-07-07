@@ -101,8 +101,8 @@ bool GlobalInstInliningContextGeneric::isInlinableGlobalInst(IRInst* inst)
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MakeVectorFromScalar:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_MatrixReshape:
     case kIROp_MakeString:
     case kIROp_MakeResultError:
@@ -218,7 +218,7 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
         case kIROp_Func:
         case kIROp_Specialize:
         case kIROp_Generic:
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             return inst;
         }
         if (as<IRType>(inst))

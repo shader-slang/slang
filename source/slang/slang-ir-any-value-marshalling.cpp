@@ -1001,7 +1001,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
                 interfaceType->sourceLoc);
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         {
             auto witnessTableVal = type->getOperand(0);
             auto key = type->getOperand(1);

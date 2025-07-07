@@ -2947,6 +2947,34 @@ class ExtensionTracker : public RefObject
 public:
 };
 
+struct RequiredLoweringPassSet
+{
+    bool debugInfo;
+    bool resultType;
+    bool optionalType;
+    bool enumType;
+    bool combinedTextureSamplers;
+    bool reinterpret;
+    bool generics;
+    bool bindExistential;
+    bool autodiff;
+    bool derivativePyBindWrapper;
+    bool bitcast;
+    bool existentialTypeLayout;
+    bool bindingQuery;
+    bool meshOutput;
+    bool higherOrderFunc;
+    bool globalVaryingVar;
+    bool glslSSBO;
+    bool byteAddressBuffer;
+    bool dynamicResource;
+    bool dynamicResourceHeap;
+    bool resolveVaryingInputRef;
+    bool specializeStageSwitch;
+    bool missingReturn;
+    bool nonVectorCompositeSelect;
+};
+
 /// A context for code generation in the compiler back-end
 struct CodeGenContext
 {
@@ -3076,10 +3104,23 @@ public:
     // This is a no-op if modules are not precompiled.
     bool shouldSkipDownstreamLinking();
 
+    RequiredLoweringPassSet& getRequiredLoweringPassSet() { return m_requiredLoweringPassSet; }
+
 protected:
     CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
     Profile m_targetProfile;
     ExtensionTracker* m_extensionTracker = nullptr;
+
+    // To improve the performance of our backend, we will try to avoid running
+    // passes related to features not used in the user code.
+    // To do so, we will scan the IR module once, and determine which passes are needed
+    // based on the instructions used in the IR module.
+    // This will allow us to skip running passes that are not needed, without having to
+    // run all the passes only to find out that no work is needed.
+    // This is especially important for the performance of the backend, as some passes
+    // have an initialization cost (such as building reference graphs or DOM trees) that
+    // can be expensive.
+    RequiredLoweringPassSet m_requiredLoweringPassSet;
 
     /// Will output assembly as well as the artifact if appropriate for the artifact type for
     /// assembly output and conversion is possible
@@ -3722,6 +3763,8 @@ public:
     ComPtr<ISlangBlob> getHLSLLibraryCode();
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
+
+    void getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName);
 
     RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 

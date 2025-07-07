@@ -138,9 +138,9 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     {
     case SLANG_RESOURCE_ACCESS_READ:
         {
-            // Metal does not support access::sample for texture buffers, so we need to emit
-            // access::read instead.
-            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            // Metal does not support access::sample for texture buffers and multisampled textures,
+            // so we need to emit access::read instead.
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER || texType->isMultisample())
                 m_writer->emit("access::read");
             else
                 m_writer->emit("access::sample");
@@ -409,7 +409,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     switch (inst->getOp())
     {
-    case kIROp_discard:
+    case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
         return true;
     case kIROp_MetalAtomicCast:

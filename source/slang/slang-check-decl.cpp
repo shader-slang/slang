@@ -7898,7 +7898,7 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     contentAssistInfo.completionSuggestions.formatMode =
         varDeclBase ? CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType
                     : CompletionSuggestions::FormatMode::FullSignature;
-
+    contentAssistInfo.completionSuggestions.currentPartialDecl = memberDecl;
     List<LookupResultItem> candidateItems;
     for (auto facet : inheritanceInfo.facets)
     {
@@ -14469,6 +14469,15 @@ VarDeclBase* getTrailingUnsizedArrayElement(
         }
     }
     return nullptr;
+}
+
+bool isImmutableBufferType(Type* type)
+{
+    if (as<UniformParameterGroupType>(type))
+        return true;
+    if (auto resourceType = as<ResourceType>(type))
+        return resourceType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+    return false;
 }
 
 bool isOpaqueHandleType(Type* type)

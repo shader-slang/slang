@@ -20,4 +20,10 @@ String evaluateScriptCode(
     String originalFileName,
     String scriptSource,
     DiagnosticSink* sink);
+
+String evaluateLuaExpression(
+    SourceLoc loc,
+    String originalFileName,
+    String scriptSource,
+    DiagnosticSink* sink);
 } // namespace fiddle
