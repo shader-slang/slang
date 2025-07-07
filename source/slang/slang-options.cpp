@@ -359,7 +359,6 @@ void initCommandOptions(CommandOptions& options)
         }
     }
 
-    
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

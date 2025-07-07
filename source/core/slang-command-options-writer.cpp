@@ -504,11 +504,12 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     {
         _appendDescriptionForCategory(categoryIndex);
     }
-    
+
     // Add instructions for getting help for specific categories
     m_builder << "Getting Help for Specific Categories\n";
     m_builder << "=====================================\n\n";
-    m_builder << "To get help for a specific category of options or values, use: slangc -h <help-category>\n";
+    m_builder << "To get help for a specific category of options or values, use: slangc -h "
+                 "<help-category>\n";
     m_builder << "See the <help-category> section above for the list of categories.\n\n";
 }
 
