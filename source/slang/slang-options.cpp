@@ -348,7 +348,7 @@ void initCommandOptions(CommandOptions& options)
         options.addCategory(
             CategoryKind::Value,
             "help-category",
-            "Available help categories for -h option");
+            "Available help categories for the -h option");
 
         // Add all existing categories as valid help category values
         const auto& categories = options.getCategories();
