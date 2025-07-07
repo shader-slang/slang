@@ -2107,6 +2107,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
                     for (auto ch : item.commitCharacters)
                         actualOutputSB << ch;
+                    if (item.sortText.hasValue)
+                        actualOutputSB << " sort(" << item.sortText.value << ")";
                     actualOutputSB << "\n";
                 }
             }
