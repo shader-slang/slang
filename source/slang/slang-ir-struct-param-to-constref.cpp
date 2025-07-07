@@ -236,15 +236,6 @@ struct StructParamToConstRefContext
     // Check if function should be excluded from transformation
     bool shouldSkipFunction(IRFunc* func)
     {
-        // Skip built-in utility functions like __sizeOf, __offsetOf
-        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-        {
-            String name = nameHint->getName();
-            if (name.startsWith("__sizeOf") || name.startsWith("__offsetOf") ||
-                name.startsWith("__alignOf"))
-                return true;
-        }
-
         // Skip functions with readNone decoration (pure utility functions)
         if (func->findDecoration<IRReadNoneDecoration>())
             return true;
@@ -259,6 +250,10 @@ struct StructParamToConstRefContext
 
         // Skip entry point functions (interface with runtime)
         if (func->findDecoration<IREntryPointDecoration>())
+            return true;
+
+        // Skip CUDA kernel functions (marked with [CudaKernel])
+        if (func->findDecoration<IRCudaKernelDecoration>())
             return true;
 
         return false;
