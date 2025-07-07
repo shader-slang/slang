@@ -757,8 +757,13 @@ Index CompletionContext::determineCompletionItemSortOrder(
         auto etDeclRefType = as<DeclRefType>(et);
         if (!etDeclRefType)
             continue;
-        if (item == etDeclRefType->getDeclRef().getDecl() && !as<InterfaceDecl>(item))
-            currentSortOrder = 0;
+        if (item == etDeclRefType->getDeclRef().getDecl())
+        {
+            if (as<EnumDecl>(item))
+                currentSortOrder = 0;
+            else if (!as<InterfaceDecl>(item))
+                currentSortOrder = 1;
+        }
         else if (auto varItem = as<VarDeclBase>(item))
         {
             currentSortOrder = matchType(varItem->type.type, etDeclRefType);
@@ -776,7 +781,7 @@ Index CompletionContext::determineCompletionItemSortOrder(
         }
     }
     // Always list decls within the same module first.
-    // Note if result == 0, it means the item is representing the expected type itself,
+    // Note if result == 0, it means the item is representing the expected enum type itself,
     // so we always want to list it first by not increasing `result`.
     if (result > 0 && getModule(item) != parsedModule)
         result++;
