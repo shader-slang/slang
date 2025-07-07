@@ -46,9 +46,9 @@ enum class SpawnType
 
 enum class VerbosityLevel
 {
-    Failure,    ///< Only show failures and errors
-    Info,       ///< Show test discovery and results (default)
-    Verbose,    ///< Show detailed output including command lines
+    Failure, ///< Only show failures and errors
+    Info,    ///< Show test discovery and results (default)
+    Verbose, ///< Show detailed output including command lines
 };
 
 struct Options
