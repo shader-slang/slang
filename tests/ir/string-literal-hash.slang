@@ -2,11 +2,10 @@
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-wgpu
 
-// Note: disabled on CPU target until we can fill
-// in a more correct/complete `String` and `getStringHash`
-// for that target.
-//
-//TEST_DISABLED(compute):COMPARE_COMPUTE: -cpu
+// Note: getStringHash works in C++ here because 
+// it is used directly on the literal
+// and can be resolved at compile time without the type inlining pass
+//TEST(compute):COMPARE_COMPUTE: -cpu
 
 
 import string_literal_module;

@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+// Note: getStringHash cannot be used in C++ in this context.
+//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj

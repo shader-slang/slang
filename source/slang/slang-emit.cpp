@@ -1126,7 +1126,7 @@ Result linkAndOptimizeIR(
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
     // boil down into getStringHash(stringLiteral)
-    // if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
