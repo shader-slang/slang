@@ -234,7 +234,8 @@ public:
     Dictionary<SourceFile*, RefPtr<Source>> m_sourceFileMap;
 };
 
-// A class to inherit from t
+// A class a custom serialization context can inherit from to enable
+// serializing SourceLoc
 struct SourceLocSerialContext
 {
     virtual SerialSourceLocReader* getSourceLocReader() { return nullptr; }

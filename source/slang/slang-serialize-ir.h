@@ -1,20 +1,14 @@
-// slang-serialize-ir.h
-#ifndef SLANG_SERIALIZE_IR_H_INCLUDED
-#define SLANG_SERIALIZE_IR_H_INCLUDED
+#pragma once
 
-#include "../core/slang-riff.h"
-#include "slang-ir.h"
-#include "slang-serialize-ir-types.h"
-#include "slang-serialize-source-loc.h"
-
-// For TranslationUnitRequest
-// and FrontEndCompileRequest::ExtraEntryPointInfo
-#include "slang-compiler.h"
+#include "core/slang-riff.h"
 
 namespace Slang
 {
 
 struct IRModule;
+class Session;
+class SerialSourceLocReader;
+class SerialSourceLocWriter;
 
 void writeSerializedModuleIR(
     RIFF::BuildCursor& cursor,
@@ -23,11 +17,8 @@ void writeSerializedModuleIR(
 
 void readSerializedModuleIR(
     RIFF::Chunk const* chunk,
-    // ISlangBlob* blobHoldingSerializedData,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
 
 } // namespace Slang
-
-#endif

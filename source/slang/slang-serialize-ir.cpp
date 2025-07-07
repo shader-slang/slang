@@ -14,6 +14,7 @@ namespace Slang
 //
 // We wrap everything up in an IRModuleInfo, to prepare for the case in which
 // we want to serialize some sidecar information to help with on-demand loading
+// or backwards compat
 //
 struct IRModuleInfo
 {
@@ -379,7 +380,6 @@ void writeSerializedModuleIR(
 //
 void readSerializedModuleIR(
     RIFF::Chunk const* chunk,
-    // [[maybe_unused]] ISlangBlob* blobHoldingSerializedData,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)

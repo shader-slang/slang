@@ -2231,7 +2231,6 @@ struct IRModuleInst : IRInst
     // Pointer back to the non-instruction object that represents
     // the module, so that we can get back to it in algorithms
     // that need it.
-    FIDDLE()
     IRModule* module;
 
     IRInstListBase getGlobalInsts() { return getChildren(); }
@@ -2358,10 +2357,8 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
-FIDDLE()
 struct IRModule : RefObject
 {
-    FIDDLE(...)
 public:
     enum
     {
@@ -2466,11 +2463,9 @@ private:
     /// instructions from an arbitrary IR instruction we expect to find the
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
-    FIDDLE()
     IRModuleInst* m_moduleInst = nullptr;
 
     // The name of the module.
-    FIDDLE()
     Name* m_name = nullptr;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
@@ -2485,12 +2480,10 @@ private:
     mutable IRDeduplicationContext m_deduplicationContext;
 
     /// Holds the obfuscated source map for this module if applicable
-    FIDDLE()
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 
-    FIDDLE()
     Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
 };
 
