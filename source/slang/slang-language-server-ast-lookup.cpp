@@ -7,6 +7,7 @@ namespace Slang
 {
 struct ASTLookupContext
 {
+    Linkage* linkage;
     DocumentVersion* doc;
     SourceManager* sourceManager;
     List<SyntaxNode*> nodePath;
@@ -167,6 +168,7 @@ public:
 
     bool visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
+        PushNode pushNodeRAII(context, genericAppExpr);
         if (dispatchIfNotNull(genericAppExpr->functionExpr))
             return true;
         for (auto arg : genericAppExpr->arguments)
@@ -231,7 +233,15 @@ public:
                 return true;
             }
         }
-
+        if (this->context->findType == ASTLookupType::CompletionRequest &&
+            expr->name == context->linkage->getSessionImpl()->getCompletionRequestTokenName())
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
         return dispatchIfNotNull(expr->originalExpr);
     }
 
@@ -861,6 +871,7 @@ List<ASTLookupResult> findASTNodesAt(
     context.findType = findType;
     context.sourceFileName = fileName;
     context.doc = doc;
+    context.linkage = getModule(moduleDecl)->getLinkage();
     _findAstNodeImpl(context, moduleDecl);
     return context.results;
 }
