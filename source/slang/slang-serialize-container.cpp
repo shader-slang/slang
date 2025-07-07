@@ -623,7 +623,6 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
     // Verify if we can stream out with raw source locs
 
     List<IRInst*> originalInsts;
-    SLANG_ASSERT(false);
     calcModuleInstructionList(module, originalInsts);
 
     OwnedMemoryStream memoryStream(FileAccess::ReadWrite);
@@ -642,7 +641,10 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
                 new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
-        writeSerializedModuleIR(cursor, module, sourceLocWriter);
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(cursor, module, sourceLocWriter);
+        }
 
         // Write the debug info Riff container
         if (sourceLocWriter)

@@ -8,10 +8,10 @@
 #include "slang-ir-insts.h"
 
 //
+#include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
-#include "slang-serialize-ir.cpp.fiddle"
+#include "slang-serialize.h"
 
-FIDDLE()
 namespace Slang
 {
 
@@ -830,13 +830,9 @@ Result IRSerialReader::read(
     return SLANG_OK;
 }
 
-FIDDLE()
 struct IRModuleInfo
 {
-    FIDDLE(...)
-    // FIDDLE() int64_t a;
-    // FIDDLE() String name;
-    FIDDLE() RefPtr<IRModule> module;
+    RefPtr<IRModule> module;
 };
 
 struct IRSerialContext;
@@ -894,81 +890,36 @@ struct IRSerialReadContext : IRSerialContext, RefObject
     IRInst* _parent = nullptr;
 };
 
-#if 0 // FIDDLE TEMPLATE:
-%
-%local enumTypeNames = {
-%   "IROp",
-%}
-%
-%for _,T in ipairs(enumTypeNames) do
-
-/// Serialize a `value` of type `$T`.
-void serialize(Serializer const& serializer, $T& value)
+/// Serialize a `value` of type `IROp`.
+void serialize(Serializer const& serializer, IROp& value)
 {
     serializeEnum(serializer, value);
 }
 
-% -- The `serializeEnum()` function encodes enum values as `FossilUInt`s
-% -- so we declare the fossilized representation of these types to match.
-%
-// Declare fossilized representation of `$T`
-SLANG_DECLARE_FOSSILIZED_AS($T, FossilUInt);
+// Declare fossilized representation of `IROp`
+SLANG_DECLARE_FOSSILIZED_AS(IROp, FossilUInt);
 
-%end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 0
-#include "slang-serialize-ir.cpp.fiddle"
-#endif // FIDDLE END
+/// Fossilized representation of a `IRModuleInfo`
+struct Fossilized_IRModuleInfo;
 
-#if 0 // FIDDLE TEMPLATE:
-%irStructTypes = {
-%   Slang.IRModuleInfo,
-%}
-%
-%for _,T in ipairs(irStructTypes) do
+SLANG_DECLARE_FOSSILIZED_TYPE(IRModuleInfo, Fossilized_IRModuleInfo);
 
-/// Fossilized representation of a `$T`
-struct Fossilized_$T;
+/// Serialize a `IRModuleInfo`
+void serialize(IRSerializer const& serializer, IRModuleInfo& value);
 
-SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
-
-/// Serialize a `$T`
-void serialize(IRSerializer const& serializer, $T& value);
-%end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 1
-#include "slang-serialize-ir.cpp.fiddle"
-#endif // FIDDLE END
-
-#if 0 // FIDDLE TEMPLATE:
-%for _,T in ipairs(irStructTypes) do
-% TRACE(T)
-/// Fossilized representation of a value of type `$T`
-struct Fossilized_$T
-    : public FossilizedRecordVal
+/// Fossilized representation of a value of type `IRModuleInfo`
+struct Fossilized_IRModuleInfo : public FossilizedRecordVal
 {
-%   for _,f in ipairs(T.directFields) do
-    Fossilized<decltype($T::$f)> $f;
-%   end
+    Fossilized<decltype(IRModuleInfo::module)> module;
 };
 
-/// Serialize a `value` of type `$T`
-void serialize(IRSerializer const& serializer, $T& value)
+/// Serialize a `value` of type `IRModuleInfo`
+void serialize(IRSerializer const& serializer, IRModuleInfo& value)
 {
     SLANG_UNUSED(value);
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-%   if T.directSuperClass then
-    serialize(serializer, static_cast<$(T.directSuperClass)&>(value));
-%   end
-%   for _,f in ipairs(T.directFields) do
-    serialize(serializer, value.$f);
-%   end
+    serialize(serializer, value.module);
 }
-%end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 2
-#include "slang-serialize-ir.cpp.fiddle"
-#endif // FIDDLE END
 
 void serialize(IRSerializer const& serializer, SourceLoc& value)
 {
@@ -1052,40 +1003,14 @@ void serializeUse(IRSerializer const& serializer, IRInst* user, IRUse& use)
     }
 }
 
-struct RAIIIRParentContext
-{
-    RAIIIRParentContext(IRSerializer const& serializer, IRInst* newParent)
-    {
-        if (isReading(serializer))
-        {
-            const auto readContext = static_cast<IRSerialReadContext*>(serializer.getContext());
-            _oldParent = readContext->_parent;
-            readContext->_parent = newParent;
-        }
-    }
-    ~RAIIIRParentContext()
-    {
-        if (_context)
-        {
-            _context->_parent = _oldParent;
-        }
-    }
-    IRSerialReadContext* _context = nullptr;
-    IRInst* _oldParent = nullptr;
-};
-
 template<typename T>
 void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
 {
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
 
-    IROp op;
-    uint32_t operandCount;
-    if (isWriting(serializer))
-    {
-        op = value->m_op;
-        operandCount = value->operandCount;
-    }
+    //
+    IROp op = isWriting(serializer) ? value->m_op : kIROp_Invalid;
+    uint32_t operandCount = isWriting(serializer) ? value->operandCount : ~0;
     serialize(serializer, op);
     serialize(serializer, operandCount);
 
@@ -1129,17 +1054,23 @@ void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
         {
             const auto c = cast<IRConstant>(value);
             char* dstChars = c->value.stringVal.chars;
-            c->value.stringVal.numChars = stringLitString.getLength();
+            c->value.stringVal.numChars = uint32_t(stringLitString.getLength());
             memcpy(dstChars, stringLitString.getBuffer(), stringLitString.getLength());
         }
 
-        value->parent = readContext->_parent;
+        // value->parent = readContext->_parent;
     }
 
-    RAIIIRParentContext parentContext(serializer, value);
+    // We've allocated the object, we can leave the rest for later
+    deferSerializeObjectContents(serializer, value);
+}
+
+template<typename T>
+void serializeObjectContents(IRSerializer const& serializer, T*& value, IRInst*)
+{
     serialize(serializer, value->sourceLoc);
     serializeUse(serializer, value, value->typeUse);
-    for (Index i = 0; i < operandCount; ++i)
+    for (Index i = 0; i < value->operandCount; ++i)
     {
         serializeUse(serializer, value, value->getOperands()[i]);
     }
@@ -1150,7 +1081,7 @@ void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
     //
     if (const auto constant = as<IRConstant>(value))
     {
-        switch (op)
+        switch (value->m_op)
         {
         case kIROp_BoolLit:
         case kIROp_IntLit:
@@ -1257,14 +1188,10 @@ void writeSerializedModuleIR(
     cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
 }
 
-// static_assert(sizeof(Fossilized<IRModuleInfo>) == 8);
-// static_assert(offsetof(Fossilized<IRModuleInfo>, a) == 0);
-
 SlangResult readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     // [[maybe_unused]] ISlangBlob* blobHoldingSerializedData,
     Session* session,
-    // [[maybe_unused]] DiagnosticSink* sink,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
@@ -1281,8 +1208,6 @@ SlangResult readSerializedModuleIR(
         SLANG_UNEXPECTED("invalid format for serialized module IR");
     }
 
-    // Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
-
     IRModuleInfo info;
     {
         auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
@@ -1296,6 +1221,25 @@ SlangResult readSerializedModuleIR(
         serialize(serializer, info);
     }
     SLANG_ASSERT(info.module);
+
+    //
+    // Now that everything is loaded, we can traverse the module and fix up the
+    // parents which we didn't do before because due to deferred
+    // deserialization we didn't necessarily have this information handy at the
+    // time.
+    //
+    auto go = [](auto&& go, IRInst* parent, IRInst* inst) -> void
+    {
+        inst->parent = parent;
+        for (const auto child : inst->getDecorationsAndChildren())
+            go(go, inst, child);
+    };
+    go(go, nullptr, info.module->getModuleInst());
+
+    //
+    // Module is finally valid (or at least as much as it was going it) and
+    // ready to be used
+    //
     info.module->buildMangledNameToGlobalInstMap();
     outIRModule = info.module;
 

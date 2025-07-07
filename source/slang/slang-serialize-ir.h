@@ -26,7 +26,6 @@ SlangResult readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     // ISlangBlob* blobHoldingSerializedData,
     Session* session,
-    // DiagnosticSink* sink,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
 

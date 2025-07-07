@@ -287,8 +287,6 @@ struct ASTModuleInfo
     // mangled names.
     //
     FIDDLE() OrderedDictionary<String, Decl*> mapMangledNameToDecl;
-
-    FIDDLE() int64_t a = 100;
 };
 
 //
@@ -1984,7 +1982,6 @@ void writeSerializedModuleAST(
 
     ASTModuleInfo moduleInfo;
     _collectASTModuleInfo(moduleDecl, moduleInfo);
-    moduleInfo.a = 100;
 
     // At the most basic, we are building a single "blob" of data
     // (in the sense of the `ISlangBlob` interface).
@@ -2060,7 +2057,7 @@ void writeSerializedModuleAST(
 // about the key properties we expect of the fossilized `ASTModuleInfo`.
 //
 
-static_assert(sizeof(Fossilized<ASTModuleInfo>) == 24);
+static_assert(sizeof(Fossilized<ASTModuleInfo>) == 12);
 static_assert(offsetof(Fossilized<ASTModuleInfo>, moduleDecl) == 0);
 static_assert(offsetof(Fossilized<ASTModuleInfo>, declsToRegister) == 4);
 static_assert(offsetof(Fossilized<ASTModuleInfo>, mapMangledNameToDecl) == 8);
