@@ -274,9 +274,8 @@ void serializeObjectContents(IRSerializer const& serializer, T*& value, IRInst*)
             break;
         case kIROp_PtrLit:
             {
-                // Clang gets upset using intptr_t here, converting from long
-                // to long long
-                static_assert(sizeof(intptr_t) == sizeof(Int64));
+                // Clang gets upset using intptr_t here, due to long and long
+                // long being distinct types
                 auto i = reinterpret_cast<UInt64>(constant->value.ptrVal);
                 serialize(serializer, i);
                 constant->value.ptrVal = reinterpret_cast<void*>(i);
