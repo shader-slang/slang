@@ -85,22 +85,7 @@ Available APIs:
 
 Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`
 
-Available test types:
-- `SIMPLE`: Runs the slangc compiler with specified options after the command
-- `REFLECTION`: Runs slang-reflection-test with the options specified after the command
-- `COMPARE_COMPUTE`: Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content
-- `COMPARE_COMPUTE_EX`: Same as COMPARE_COMPUTE, but supports additional parameter specifications
-- `COMPARE_RENDER_COMPUTE`: Runs render-test with "-slang -gcompute" options and compares text file outputs
-- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs
-
-Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(_EX) or COMPARE_RENDER_COMPUTE instead):
-- `COMPARE_HLSL`: Runs the slangc compiler with forced DXBC output and compares with a file having the '.expected' extension
-- `COMPARE_HLSL_RENDER`: Runs render-test to generate two images - one using HLSL (expected) and one using Slang, saving both as .png files. The test passes if the images match
-- `COMPARE_HLSL_CROSS_COMPILE_RENDER`: Runs render-test to generate two images - one using Slang and one using -glsl-cross. The test passes if the images match
-- `COMPARE_HLSL_GLSL_RENDER`: Runs render-test to generate two images - one using -hlsl-rewrite and one using -glsl-rewrite. The test passes if the images match
-- `COMPARE_GLSL`: Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output
-- `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
-- `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
+Run `slang-test --help` to list the available and deprecated test types.
 
 ## Unit Tests
 In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples.

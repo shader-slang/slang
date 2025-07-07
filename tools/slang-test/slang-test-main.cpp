@@ -4044,38 +4044,44 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
 // based on command name, dispatch to an appropriate callback
 struct TestCommandInfo
 {
+    TestCommandStatus status;
     char const* name;
     TestCallback callback;
     RenderApiFlags requiredRenderApiFlags; ///< An RenderApi types that are needed to run the tests
+    char const* help;
 };
 
+// Turning off clang-format here to avoid splitting each of these across multiple lines.
+// clang-format off
 static const TestCommandInfo s_testCommandInfos[] = {
-    {"SIMPLE", &runSimpleTest, 0},
-    {"SIMPLE_EX", &runSimpleTest, 0},
-    {"SIMPLE_LINE", &runSimpleLineTest, 0},
-    {"INTERPRET", &runInterpreterTest, 0},
-    {"REFLECTION", &runReflectionTest, 0},
-    {"CPU_REFLECTION", &runReflectionTest, 0},
-    {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
-    {"COMPARE_HLSL", &runDXBCComparisonTest, 0},
-    {"COMPARE_DXIL", &runDXILComparisonTest, 0},
-    {"COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest, 0},
-    {"COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest, 0},
-    {"COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest, 0},
-    {"COMPARE_COMPUTE", &runSlangComputeComparisonTest, 0},
-    {"COMPARE_COMPUTE_EX", &runSlangComputeComparisonTestEx, 0},
-    {"HLSL_COMPUTE", &runHLSLComputeTest, 0},
-    {"COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest, 0},
-    {"COMPARE_GLSL", &runGLSLComparisonTest, 0},
-    {"CROSS_COMPILE", &runCrossCompilerTest, 0},
-    {"CPP_COMPILER_EXECUTE", &runCPPCompilerExecute, RenderApiFlag::CPU},
-    {"CPP_COMPILER_SHARED_LIBRARY", &runCPPCompilerSharedLibrary, RenderApiFlag::CPU},
-    {"CPP_COMPILER_COMPILE", &runCPPCompilerCompile, RenderApiFlag::CPU},
-    {"PERFORMANCE_PROFILE", &runPerformanceProfile, 0},
-    {"COMPILE", &runCompile, 0},
-    {"DOC", &runDocTest, 0},
-    {"LANG_SERVER", &runLanguageServerTest, 0},
-    {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
+    {Available, "SIMPLE", &runSimpleTest, 0, "Runs the slangc compiler with specified options after the command"},
+    {Undocumented, "SIMPLE_EX", &runSimpleTest, 0},
+    {Undocumented, "SIMPLE_LINE", &runSimpleLineTest, 0},
+    {Undocumented, "INTERPRET", &runInterpreterTest, 0},
+    {Available, "REFLECTION", &runReflectionTest, 0, "Runs slang-reflection-test with the options specified after the command"},
+    {Undocumented, "CPU_REFLECTION", &runReflectionTest, 0},
+    {Undocumented, "COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
+    {Deprecated, "COMPARE_HLSL", &runDXBCComparisonTest, 0, "Runs the slangc compiler with forced DXBC output and compares with a file having the '.expected' extension"},
+    {Undocumented, "COMPARE_DXIL", &runDXILComparisonTest, 0},
+    {Deprecated, "COMPARE_HLSL_RENDER", &runHLSLRenderComparisonTest, 0, "Runs render-test to generate two images - one using HLSL (expected) and one using Slang, saving both as .png files. The test passes if the images match"},
+    {Deprecated, "COMPARE_HLSL_CROSS_COMPILE_RENDER", &runHLSLCrossCompileRenderComparisonTest, 0, "Runs render-test to generate two images - one using Slang and one using -glsl-cross. The test passes if the images match"},
+    {Deprecated, "COMPARE_HLSL_GLSL_RENDER", &runHLSLAndGLSLRenderComparisonTest, 0, "Runs render-test to generate two images - one using -hlsl-rewrite and one using -glsl-rewrite. The test passes if the images match"},
+    {Available, "COMPARE_COMPUTE", &runSlangComputeComparisonTest, 0, "Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content"},
+    {Available, "COMPARE_COMPUTE_EX", &runSlangComputeComparisonTestEx, 0, "Same as COMPARE_COMPUTE, but supports additional parameter specifications"},
+    {Deprecated, "HLSL_COMPUTE", &runHLSLComputeTest, 0, "Runs render-test with \"-hlsl-rewrite -compute\" options and compares text file outputs"},
+    {Available, "COMPARE_RENDER_COMPUTE", &runSlangRenderComputeComparisonTest, 0, "Runs render-test with \"-slang -gcompute\" options and compares text file outputs"},
+    {Deprecated, "COMPARE_GLSL", &runGLSLComparisonTest, 0, "Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output"},
+    {Deprecated, "CROSS_COMPILE", &runCrossCompilerTest, 0, "Compiles using GLSL pass-through and through Slang, then compares the outputs"},
+    {Undocumented, "CPP_COMPILER_EXECUTE", &runCPPCompilerExecute, RenderApiFlag::CPU},
+    {Undocumented, "CPP_COMPILER_SHARED_LIBRARY", &runCPPCompilerSharedLibrary, RenderApiFlag::CPU},
+    {Undocumented, "CPP_COMPILER_COMPILE", &runCPPCompilerCompile, RenderApiFlag::CPU},
+    {Undocumented, "PERFORMANCE_PROFILE", &runPerformanceProfile, 0},
+    {Undocumented, "COMPILE", &runCompile, 0},
+    {Undocumented, "DOC", &runDocTest, 0},
+    {Available, "LANG_SERVER", &runLanguageServerTest, 0, "Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs"},
+    {Undocumented, "EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU},
+};
+// clang-format on
 
 const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)
 {
@@ -4992,8 +4998,17 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangi", &SlangITool::innerMain);
     }
 
-    SLANG_RETURN_ON_FAIL(
-        Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
+    std::vector<TestCommandDoc> commands;
+    for (auto& command : s_testCommandInfos)
+        commands.push_back({.status = command.status, .name = command.name, .help = command.help});
+
+    SLANG_RETURN_ON_FAIL(Options::parse(
+        argc,
+        argv,
+        &categorySet,
+        commands,
+        StdWriters::getError(),
+        &context.options));
 
     Options& options = context.options;
 
