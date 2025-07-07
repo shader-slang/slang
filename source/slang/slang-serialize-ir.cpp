@@ -846,7 +846,7 @@ struct IRSerialContext
 {
 public:
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) = 0;
-    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) = 0;
+    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) = 0;
     // virtual void handleIRNode(ASTSerializer const& serializer, NodeBase*& value) = 0;
     // virtual void handleIRNodeContents(ASTSerializer const& serializer, NodeBase* value) = 0;
     virtual void handleName(IRSerializer const& serializer, Name*& value) = 0;
@@ -865,7 +865,7 @@ struct IRSerialWriteContext : IRSerialContext
     }
 
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
-    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
+    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
     virtual void handleName(IRSerializer const& serializer, Name*& value) override;
     virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
 
@@ -883,7 +883,7 @@ struct IRSerialReadContext : IRSerialContext, RefObject
     {
     }
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
-    virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
+    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
     virtual void handleName(IRSerializer const& serializer, Name*& value) override;
     virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
 
@@ -891,6 +891,7 @@ struct IRSerialReadContext : IRSerialContext, RefObject
     SerialSourceLocReader* _sourceLocReader;
     // IRBuilder* _irBuilder;
     RefPtr<IRModule> _module;
+    IRInst* _parent = nullptr;
 };
 
 #if 0 // FIDDLE TEMPLATE:
@@ -1015,56 +1016,176 @@ void serialize(IRSerializer const& serializer, IRInstListBase& value)
     }
     else
     {
-        IRInst** link = &value.first;
+        IRInst* first = nullptr;
+        IRInst* prev = nullptr;
 
         while (hasElements(serializer))
         {
             IRInst* inst = nullptr;
             serialize(serializer, inst);
+            first = first ? first : inst;
 
-            *link = inst;
-            link = &inst->next;
+            if (prev)
+            {
+                prev->next = inst;
+            }
+
+            inst->prev = prev;
+            prev = inst;
         }
+        if (prev)
+        {
+            prev->next = nullptr;
+        }
+        value = IRInstListBase(first, prev);
     }
 }
+
+void serializeUse(IRSerializer const& serializer, IRInst* user, IRUse& use)
+{
+    SLANG_ASSERT(user);
+    IRInst* used = isWriting(serializer) ? use.get() : nullptr;
+    serialize(serializer, used);
+    if (isReading(serializer))
+    {
+        use.init(user, used);
+    }
+}
+
+struct RAIIIRParentContext
+{
+    RAIIIRParentContext(IRSerializer const& serializer, IRInst* newParent)
+    {
+        if (isReading(serializer))
+        {
+            const auto readContext = static_cast<IRSerialReadContext*>(serializer.getContext());
+            _oldParent = readContext->_parent;
+            readContext->_parent = newParent;
+        }
+    }
+    ~RAIIIRParentContext()
+    {
+        if (_context)
+        {
+            _context->_parent = _oldParent;
+        }
+    }
+    IRSerialReadContext* _context = nullptr;
+    IRInst* _oldParent = nullptr;
+};
 
 template<typename T>
 void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
 {
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
-    serializer.getContext()->handleIRInst(serializer, reinterpret_cast<IRInst*&>(value));
-}
 
-void IRSerialWriteContext::handleIRInst(IRSerializer const& serializer, IRInst*& value)
-{
-    serialize(serializer, value->m_op);
-    serialize(serializer, value->operandCount);
-    serialize(serializer, value->sourceLoc);
-    for (Index i = 0; i < value->operandCount; ++i)
-    {
-        auto operand = value->getOperand(i);
-        serialize(serializer, operand);
-    }
-    serialize(serializer, value->m_decorationsAndChildren);
-}
-
-void IRSerialReadContext::handleIRInst(IRSerializer const& serializer, IRInst*& value)
-{
     IROp op;
-    serialize(serializer, op);
     uint32_t operandCount;
+    if (isWriting(serializer))
+    {
+        op = value->m_op;
+        operandCount = value->operandCount;
+    }
+    serialize(serializer, op);
     serialize(serializer, operandCount);
-    value = _module->_allocateInst(op, operandCount);
+
+    String stringLitString;
+    if (op == kIROp_StringLit || op == kIROp_BlobLit)
+    {
+        if (isWriting(serializer))
+        {
+            stringLitString = cast<IRConstant>(value)->getStringSlice();
+        }
+        serialize(serializer, stringLitString);
+    }
+    if (isReading(serializer))
+    {
+        const auto readContext = static_cast<IRSerialReadContext*>(serializer.getContext());
+
+        // We need to handle the special case instructions which aren't just defined by operands and
+        // children, IRModuleInst and IRConstants
+        size_t minSizeInBytes = 0;
+        switch (op)
+        {
+        case kIROp_ModuleInst:
+            minSizeInBytes = offsetof(IRModuleInst, module) +
+                             sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
+            break;
+        case kIROp_BoolLit:
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_PtrLit:
+        case kIROp_VoidLit:
+            minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
+            break;
+        case kIROp_StringLit:
+        case kIROp_BlobLit:
+            minSizeInBytes = offsetof(IRConstant, value) +
+                             offsetof(IRConstant::StringValue, chars) + stringLitString.getLength();
+            break;
+        }
+        value = cast<T>(readContext->_module->_allocateInst(op, operandCount, minSizeInBytes));
+        if (op == kIROp_StringLit || op == kIROp_BlobLit)
+        {
+            const auto c = cast<IRConstant>(value);
+            char* dstChars = c->value.stringVal.chars;
+            c->value.stringVal.numChars = stringLitString.getLength();
+            memcpy(dstChars, stringLitString.getBuffer(), stringLitString.getLength());
+        }
+
+        value->parent = readContext->_parent;
+    }
+
+    RAIIIRParentContext parentContext(serializer, value);
     serialize(serializer, value->sourceLoc);
+    serializeUse(serializer, value, value->typeUse);
     for (Index i = 0; i < operandCount; ++i)
     {
-        IRInst* arg = nullptr;
-        serialize(serializer, arg);
-        auto operand = value->getOperands();
-        operand->init(value, arg);
+        serializeUse(serializer, value, value->getOperands()[i]);
     }
     serialize(serializer, value->m_decorationsAndChildren);
+
+    //
+    //
+    //
+    if (const auto constant = as<IRConstant>(value))
+    {
+        switch (op)
+        {
+        case kIROp_BoolLit:
+        case kIROp_IntLit:
+            {
+                serialize(serializer, constant->value.intVal);
+            }
+            break;
+        case kIROp_FloatLit:
+            {
+                serialize(serializer, constant->value.intVal);
+            }
+            break;
+        case kIROp_PtrLit:
+            {
+                auto i = reinterpret_cast<intptr_t>(constant->value.ptrVal);
+                serialize(serializer, i);
+                constant->value.ptrVal = reinterpret_cast<void*>(i);
+            }
+            break;
+        case kIROp_StringLit:
+        case kIROp_BlobLit:
+            {
+            }
+            break;
+        case kIROp_VoidLit:
+            break;
+        default:
+            SLANG_UNREACHABLE("unhandled constant");
+        }
+    }
 }
+
+// void IRSerialWriteContext::handleIRInst(IRSerializer const& serializer, IRInst*& value) {}
+//
+// void IRSerialReadContext::handleIRInst(IRSerializer const& serializer, IRInst*& value) {}
 
 void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*)
 {
@@ -1074,7 +1195,6 @@ void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*
 void IRSerialWriteContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
 {
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    fprintf(stderr, "Write: Module Name: %s\n", value->getName()->text.getBuffer());
     serialize(serializer, value->getName()->text);
     serialize(serializer, value->m_moduleInst);
 }
@@ -1087,7 +1207,7 @@ void IRSerialReadContext::handleIRModule(IRSerializer const& serializer, IRModul
     _module = value;
     serialize(serializer, value->m_name);
     serialize(serializer, value->m_moduleInst);
-    fprintf(stderr, "Read: Module Name: %s\n", value->m_name->text.getBuffer());
+    value->m_moduleInst->module = value;
 }
 
 void serializeObject(IRSerializer const& serializer, Name*& value, Name*)
@@ -1161,7 +1281,7 @@ SlangResult readSerializedModuleIR(
         SLANG_UNEXPECTED("invalid format for serialized module IR");
     }
 
-    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    // Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
 
     IRModuleInfo info;
     {
@@ -1175,9 +1295,8 @@ SlangResult readSerializedModuleIR(
         IRSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
     }
-    // fprintf(stderr, "AAAAAAAA: %ld\n", info.a);
-    // fprintf(stderr, "AAAAAAAA: %s\n", info->name.getBuffer());
     SLANG_ASSERT(info.module);
+    info.module->buildMangledNameToGlobalInstMap();
     outIRModule = info.module;
 
     return SLANG_OK;
