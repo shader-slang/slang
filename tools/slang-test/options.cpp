@@ -69,7 +69,8 @@ static bool _isSubCommand(const char* arg)
         "  -bindir <path>                 Set directory for binaries (default: the path to the "
         "slang-test executable)\n"
         "  -test-dir <path>               Set directory for test files (default: tests/)\n"
-        "  -v                             Enable verbose output\n"
+        "  -v [level]                     Set verbosity level (verbose, info, failure)\n"
+        "                                 Default: verbose when -v used, info otherwise\n"
         "  -hide-ignored                  Hide results from ignored tests\n"
         "  -api-only                      Only run tests that use specified APIs\n"
         "  -verbose-paths                 Use verbose paths in output\n"
@@ -215,7 +216,35 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-v") == 0)
         {
-            optionsOut->shouldBeVerbose = true;
+            if (argCursor == argEnd)
+            {
+                // Default to verbose if no argument provided (backward compatibility)
+                optionsOut->verbosity = VerbosityLevel::Verbose;
+            }
+            else
+            {
+                const char* verbosityArg = *argCursor;
+                if (strcmp(verbosityArg, "verbose") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Verbose;
+                    argCursor++;
+                }
+                else if (strcmp(verbosityArg, "info") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Info;
+                    argCursor++;
+                }
+                else if (strcmp(verbosityArg, "failure") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Failure;
+                    argCursor++;
+                }
+                else
+                {
+                    // Not a verbosity level, treat as old-style -v
+                    optionsOut->verbosity = VerbosityLevel::Verbose;
+                }
+            }
         }
         else if (strcmp(arg, "-hide-ignored") == 0)
         {
