@@ -1,15 +1,11 @@
 // slang-serialize-ir.cpp
 #include "slang-serialize-ir.h"
 
-#include "../core/slang-byte-encode-util.h"
-#include "../core/slang-math.h"
-#include "../core/slang-text-io.h"
 #include "core/slang-blob-builder.h"
 #include "slang-ir-insts.h"
-
-//
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
+#include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 
 namespace Slang
@@ -838,19 +834,11 @@ struct IRModuleInfo
 struct IRSerialContext;
 using IRSerializer = Serializer_<ISerializerImpl, IRSerialContext>;
 
-struct IRSerialContext
+struct IRSerialContext : SourceLocSerialContext
 {
 public:
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) = 0;
-    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) = 0;
-    // virtual void handleIRNode(ASTSerializer const& serializer, NodeBase*& value) = 0;
-    // virtual void handleIRNodeContents(ASTSerializer const& serializer, NodeBase* value) = 0;
     virtual void handleName(IRSerializer const& serializer, Name*& value) = 0;
-    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) = 0;
-    // virtual void handleToken(IRSerializer const& serializer, Token& value) = 0;
-    // virtual void handleContainerDeclDirectMemberDecls(
-    //     IRSerializer const& serializer,
-    //     ContainerDeclDirectMemberDecls& value) = 0;
 };
 
 struct IRSerialWriteContext : IRSerialContext
@@ -861,31 +849,24 @@ struct IRSerialWriteContext : IRSerialContext
     }
 
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
-    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
     virtual void handleName(IRSerializer const& serializer, Name*& value) override;
-    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
+    virtual SerialSourceLocWriter* getSourceLocWriter() override { return _sourceLocWriter; }
 
     SerialSourceLocWriter* _sourceLocWriter;
 };
 
 struct IRSerialReadContext : IRSerialContext, RefObject
 {
-    IRSerialReadContext(
-        // IRBuilder* irBuilder,
-        Session* session,
-        SerialSourceLocReader* sourceLocReader)
+    IRSerialReadContext(Session* session, SerialSourceLocReader* sourceLocReader)
         : _session(session), _sourceLocReader(sourceLocReader)
-    // , _irBuilder(irBuilder)
     {
     }
     virtual void handleIRModule(IRSerializer const& serializer, IRModule*& value) override;
-    // virtual void handleIRInst(IRSerializer const& serializer, IRInst*& value) override;
     virtual void handleName(IRSerializer const& serializer, Name*& value) override;
-    virtual void handleSourceLoc(IRSerializer const& serializer, SourceLoc& value) override;
+    virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
 
     Session* _session;
     SerialSourceLocReader* _sourceLocReader;
-    // IRBuilder* _irBuilder;
     RefPtr<IRModule> _module;
     IRInst* _parent = nullptr;
 };
@@ -920,37 +901,6 @@ void serialize(IRSerializer const& serializer, IRModuleInfo& value)
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
     serialize(serializer, value.module);
 }
-
-void serialize(IRSerializer const& serializer, SourceLoc& value)
-{
-    serializer.getContext()->handleSourceLoc(serializer, value);
-}
-
-void IRSerialWriteContext::handleSourceLoc(IRSerializer const& serializer, SourceLoc& value)
-{
-    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-    if (_sourceLocWriter != nullptr)
-    {
-        SerialSourceLocData::SourceLoc rawValue = _sourceLocWriter->addSourceLoc(value);
-        serialize(serializer, rawValue);
-    }
-}
-
-void IRSerialReadContext::handleSourceLoc(IRSerializer const& serializer, SourceLoc& value)
-{
-    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-    if (hasElements(serializer))
-    {
-        SerialSourceLocData::SourceLoc rawValue;
-        serialize(serializer, rawValue);
-        if (auto sourceLocReader = _sourceLocReader)
-        {
-            value = sourceLocReader->getSourceLoc(rawValue);
-        }
-    }
-}
-
-SLANG_DECLARE_FOSSILIZED_AS(SourceLoc, std::optional<SerialSourceLocData::SourceLoc>);
 
 SLANG_DECLARE_FOSSILIZED_AS(IRInstListBase, List<IRInst*>);
 
@@ -1057,8 +1007,6 @@ void serializeObject(IRSerializer const& serializer, T*& value, IRInst*)
             c->value.stringVal.numChars = uint32_t(stringLitString.getLength());
             memcpy(dstChars, stringLitString.getBuffer(), stringLitString.getLength());
         }
-
-        // value->parent = readContext->_parent;
     }
 
     // We've allocated the object, we can leave the rest for later
@@ -1113,10 +1061,6 @@ void serializeObjectContents(IRSerializer const& serializer, T*& value, IRInst*)
         }
     }
 }
-
-// void IRSerialWriteContext::handleIRInst(IRSerializer const& serializer, IRInst*& value) {}
-//
-// void IRSerialReadContext::handleIRInst(IRSerializer const& serializer, IRInst*& value) {}
 
 void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*)
 {
