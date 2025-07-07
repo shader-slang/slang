@@ -309,7 +309,7 @@ void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*
 void IRSerialWriteContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
 {
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value->getName()->text);
+    serialize(serializer, value->m_name);
     serialize(serializer, value->m_moduleInst);
 }
 
