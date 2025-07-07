@@ -348,7 +348,10 @@ struct PeepholeContext : InstPassBase
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto asArray = getShortStringAsArray(builder, strLit);
+                auto asArray = getShortStringAsArray(
+                    builder,
+                    strLit,
+                    as<IRBasicType>(as<IRArrayType>(inst->getDataType())->getElementType()));
                 inst->replaceUsesWith(asArray);
                 maybeRemoveOldInst(inst);
                 changed = true;
@@ -561,7 +564,7 @@ struct PeepholeContext : InstPassBase
                     c = sv[index->getValue()];
                 }
                 // else diagnose an out of bound error
-                inst->replaceUsesWith(builder.getIntValue(builder.getUIntType(), c));
+                inst->replaceUsesWith(builder.getIntValue(inst->getDataType(), c));
                 maybeRemoveOldInst(inst);
                 changed = true;
             }

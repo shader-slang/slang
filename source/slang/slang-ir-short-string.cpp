@@ -5,24 +5,34 @@
 namespace Slang
 {
 
-IRArrayType* getShortStringArrayType(IRBuilder& builder, IRShortStringType* strLitType)
+IRArrayType* getShortStringArrayType(
+    IRBuilder& builder,
+    IRShortStringType* strLitType,
+    IRBasicType* charType)
 {
-    return builder.getArrayType(builder.getUIntType(), strLitType->getLength());
+    if (!charType)
+    {
+        charType = builder.getUIntType();
+    }
+    return builder.getArrayType(charType, strLitType->getLength());
 }
 
-IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* strLit)
+IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* strLit, IRBasicType* charType)
 {
     auto sv = strLit->getStringSlice();
     List<IRInst*> chars;
     chars.reserve(sv.getLength());
+    if (!charType)
+    {
+        charType = builder.getUIntType();
+    }
     for (uint32_t i = 0; i < sv.getLength(); ++i)
     {
         // TODO check encoding
         uint32_t c = uint8_t(sv[i]);
-        chars.add(builder.getIntValue(builder.getUIntType(), c));
+        chars.add(builder.getIntValue(charType, c));
     }
-    auto arrayType =
-        builder.getArrayType(builder.getUIntType(), builder.getIntValue(chars.getCount()));
+    auto arrayType = builder.getArrayType(charType, builder.getIntValue(chars.getCount()));
     auto asArray = builder.emitMakeArray(arrayType, chars.getCount(), chars.getBuffer());
     return asArray;
 }

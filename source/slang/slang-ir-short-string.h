@@ -8,9 +8,17 @@ namespace Slang
 struct IRModule;
 class TargetProgram;
 
-IRArrayType* getShortStringArrayType(IRBuilder& builder, IRShortStringType* strLitType);
+// if charType is null, then uint is used by default
+IRArrayType* getShortStringArrayType(
+    IRBuilder& builder,
+    IRShortStringType* strLitType,
+    IRBasicType* charType = nullptr);
 
-IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* strLit);
+// if charType is null, then uint is used by default
+IRInst* getShortStringAsArray(
+    IRBuilder& builder,
+    IRStringLit* strLit,
+    IRBasicType* charType = nullptr);
 
 struct ShortStringsOptions
 {
