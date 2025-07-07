@@ -358,10 +358,10 @@ struct TupleLoweringContext
         case kIROp_GetElementPtr:
             processGetElementPtr((IRGetElementPtr*)inst);
             break;
-        case kIROp_swizzle:
+        case kIROp_Swizzle:
             processSwizzle((IRSwizzle*)inst);
             break;
-        case kIROp_swizzleSet:
+        case kIROp_SwizzleSet:
             processSwizzleSet((IRSwizzleSet*)inst);
             break;
         case kIROp_SwizzledStore:

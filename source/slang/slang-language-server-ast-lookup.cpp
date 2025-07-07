@@ -235,16 +235,6 @@ public:
         return dispatchIfNotNull(expr->originalExpr);
     }
 
-    bool visitTypeCastExpr(TypeCastExpr* expr)
-    {
-        if (dispatchIfNotNull(expr->functionExpr))
-            return true;
-        for (auto arg : expr->arguments)
-            if (dispatchIfNotNull(arg))
-                return true;
-        return false;
-    }
-
     bool visitDerefExpr(DerefExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {

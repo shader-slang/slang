@@ -487,7 +487,10 @@ void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
     Index rsLine = inLine - 1;
     auto bounds = getUTF16Boundaries(inLine);
     outLine = rsLine;
-    outCol = std::lower_bound(bounds.begin(), bounds.end(), inCol - 1) - bounds.begin();
+    if (bounds.getCount() != 0)
+        outCol = std::lower_bound(bounds.begin(), bounds.end(), inCol - 1) - bounds.begin();
+    else
+        outCol = inCol - 1;
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(

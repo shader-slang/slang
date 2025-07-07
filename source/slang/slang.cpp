@@ -435,6 +435,21 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
 }
 
+void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
+{
+    switch (moduleName)
+    {
+    case slang::BuiltinModuleName::Core:
+        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
+           << (const char*)getHLSLLibraryCode()->getBufferPointer()
+           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::GLSL:
+        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    }
+}
+
 SlangResult Session::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
@@ -460,17 +475,7 @@ SlangResult Session::compileBuiltinModule(
     }
 
     StringBuilder moduleSrcBuilder;
-    switch (moduleName)
-    {
-    case slang::BuiltinModuleName::Core:
-        moduleSrcBuilder << (const char*)getCoreLibraryCode()->getBufferPointer()
-                         << (const char*)getHLSLLibraryCode()->getBufferPointer()
-                         << (const char*)getAutodiffLibraryCode()->getBufferPointer();
-        break;
-    case slang::BuiltinModuleName::GLSL:
-        moduleSrcBuilder << (const char*)getGLSLLibraryCode()->getBufferPointer();
-        break;
-    }
+    getBuiltinModuleSource(moduleSrcBuilder, moduleName);
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     auto moduleSrcBlob = StringBlob::moveCreate(moduleSrcBuilder.produceString());
@@ -835,7 +840,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
-    if (srcSize == dstSize && (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    if (srcSize == dstSize && (size_t(src) & (alignof(T) - 1)) == 0)
     {
         return *(const T*)src;
     }
@@ -4147,8 +4152,18 @@ void Linkage::loadParsedModule(
     auto sink = translationUnit->compileRequest->getSink();
 
     int errorCountBefore = sink->getErrorCount();
-    compileRequest->checkAllTranslationUnits();
-    int errorCountAfter = sink->getErrorCount();
+    int errorCountAfter;
+    try
+    {
+        compileRequest->checkAllTranslationUnits();
+    }
+    catch (...)
+    {
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
+        throw;
+    }
+    errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
         // Don't generate IR as language server.

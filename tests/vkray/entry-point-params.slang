@@ -20,4 +20,4 @@ void main(
 // CHECK-DAG: OpDecorate %[[LaunchID:[A-Za-z0-9_]+]] BuiltIn LaunchId{{NV|KHR}}
 // CHECK-DAG: %[[LaunchID]] = OpVariable %_ptr_Input_v3uint Input
 // CHECK-DAG: %{{.*}} = OpLoad %v3uint %[[LaunchID]]
-// CHECK-DAG: %{{.*}} = OpAccessChain %_ptr_ShaderRecordBuffer{{NV|KHR}}_float %{{.*}} %int_0
+// CHECK-DAG: %{{.*}} = Op{{.*}}AccessChain %_ptr_ShaderRecordBuffer{{NV|KHR}}_float %{{.*}} %int_0
