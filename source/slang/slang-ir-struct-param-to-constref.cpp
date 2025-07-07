@@ -19,6 +19,16 @@ struct StructParamToConstRefContext
     {
     }
 
+    // Check if a function is differentiable (has autodiff decorations)
+    bool isDifferentiableFunc(IRFunc* func)
+    {
+        return func->findDecoration<IRForwardDifferentiableDecoration>() ||
+               func->findDecoration<IRBackwardDifferentiableDecoration>() ||
+               func->findDecoration<IRForwardDerivativeDecoration>() ||
+               func->findDecoration<IRBackwardDerivativeDecoration>() ||
+               func->findDecoration<IRUserDefinedBackwardDerivativeDecoration>();
+    }
+
     // Check if a type should be transformed (struct, array, or other composite types)
     bool shouldTransformParamType(IRType* type)
     {
@@ -233,6 +243,14 @@ struct StructParamToConstRefContext
         }
     }
 
+    bool shouldProcessFunction(IRFunc* func)
+    {
+        if (func->findDecoration<IRMethodDecoration>())
+        {
+            return true;
+        }
+        return false;
+    }
     // Check if function should be excluded from transformation
     bool shouldSkipFunction(IRFunc* func)
     {
@@ -256,14 +274,25 @@ struct StructParamToConstRefContext
         if (func->findDecoration<IRCudaKernelDecoration>())
             return true;
 
+        // Skip differentiable functions (they have special ConstRef semantics)
+        if (isDifferentiableFunc(func))
+            return true;
+
+        // Skip constructor functions (they have special semantics)
+        if (func->findDecoration<IRConstructorDecoration>())
+            return true;
+
         return false;
     }
 
     // Process a single function
     void processFunc(IRFunc* func)
     {
-        // Skip built-in utility functions
-        if (shouldSkipFunction(func))
+        //// Skip built-in utility functions
+        // if (shouldSkipFunction(func))
+        //     return;
+
+        if (!shouldProcessFunction(func))
             return;
 
         Dictionary<IRParam*, IRParam*> paramMap;
