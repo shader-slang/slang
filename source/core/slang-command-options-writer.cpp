@@ -508,47 +508,8 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     // Add instructions for getting help for specific categories
     m_builder << "Getting Help for Specific Categories\n";
     m_builder << "=====================================\n\n";
-    m_builder << "To get help for a specific category of options or values, use: slangc -h <category>\n\n";
-    
-    // Collect option categories
-    StringBuilder optionCategoriesText;
-    bool firstOption = true;
-    for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
-    {
-        const auto& category = categories[categoryIndex];
-        if (category.kind == CommandOptions::CategoryKind::Option)
-        {
-            if (!firstOption) optionCategoriesText << ", ";
-            optionCategoriesText << category.name;
-            firstOption = false;
-        }
-    }
-    
-    m_builder << "Available option categories:\n";
-    if (optionCategoriesText.getLength() > 0)
-    {
-        _appendText(1, optionCategoriesText.getUnownedSlice());
-    }
-    
-    // Collect value categories
-    StringBuilder valueCategoriesText;
-    bool firstValue = true;
-    for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
-    {
-        const auto& category = categories[categoryIndex];
-        if (category.kind == CommandOptions::CategoryKind::Value)
-        {
-            if (!firstValue) valueCategoriesText << ", ";
-            valueCategoriesText << category.name;
-            firstValue = false;
-        }
-    }
-    
-    m_builder << "Available value categories:\n";
-    if (valueCategoriesText.getLength() > 0)
-    {
-        _appendText(1, valueCategoriesText.getUnownedSlice());
-    }
+    m_builder << "To get help for a specific category of options or values, use: slangc -h <help-category>\n";
+    m_builder << "See the <help-category> section above for the list of categories.\n\n";
 }
 
 void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex)
