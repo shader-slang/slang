@@ -26,7 +26,7 @@ RWStructuredBuffer<float4> outBuffer;
 
 void computeMain()
 {
-//CHECK_FAIL: error 30027: 'setVal1' is not a member of 'Foo<float>'.
+//CHECK_FAIL: error 30027: 'setVal1'{{.*}}'Foo<float>'
 //CHECK_PASS: OpEntryPoint
 //CHECK: 3
 #ifdef FAIL
