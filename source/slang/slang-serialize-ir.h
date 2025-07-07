@@ -21,8 +21,7 @@ void writeSerializedModuleIR(
     IRModule* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
-[[nodiscard]]
-SlangResult readSerializedModuleIR(
+void readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     // ISlangBlob* blobHoldingSerializedData,
     Session* session,

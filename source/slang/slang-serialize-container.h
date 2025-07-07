@@ -131,12 +131,6 @@ SlangResult readSourceLocationsFromDebugChunk(
     SourceManager* sourceManager,
     RefPtr<SerialSourceLocReader>& outReader);
 
-SlangResult decodeModuleIR(
-    RefPtr<IRModule>& outIRModule,
-    IRModuleChunk const* chunk,
-    Session* session,
-    SerialSourceLocReader* sourceLocReader);
-
 } // namespace Slang
 
 #endif

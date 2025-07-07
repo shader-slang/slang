@@ -574,15 +574,6 @@ SlangResult readSourceLocationsFromDebugChunk(
     return SLANG_OK;
 }
 
-SlangResult decodeModuleIR(
-    RefPtr<IRModule>& outIRModule,
-    IRModuleChunk const* chunk,
-    Session* session,
-    SerialSourceLocReader* sourceLocReader)
-{
-    return readSerializedModuleIR(chunk, session, sourceLocReader, outIRModule);
-}
-
 static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
 {
     // We reserve 0 for null
@@ -706,8 +697,7 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
                 return SLANG_FAIL;
             }
 
-            SLANG_RETURN_ON_FAIL(
-                readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule));
+            readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule);
         }
     }
 

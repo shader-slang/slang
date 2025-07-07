@@ -763,7 +763,7 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, this, sourceLocReader));
+    readSerializedModuleIR(irChunk, this, sourceLocReader, irModule);
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);
@@ -6785,7 +6785,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, session, sourceLocReader));
+    readSerializedModuleIR(irChunk, session, sourceLocReader, irModule);
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of
