@@ -43,9 +43,6 @@ cmake.exe --build --preset release
 
 #### Linux
 ```bash
-# Install dependencies
-sudo apt-get install cmake ninja-build
-
 # Configure and build
 cmake --preset default
 cmake --build --preset release
@@ -53,9 +50,6 @@ cmake --build --preset release
 
 #### macOS
 ```bash
-# Install dependencies (using Homebrew)
-brew install ninja cmake
-
 # Configure and build
 cmake --preset default
 cmake --build --preset release
@@ -240,7 +234,7 @@ Generate a personal access token at: https://github.com/settings/tokens
 
 ### Slang internal steps, as an example
 1. Update lexer for new tokens (slang-lexer.cpp)
-2. Extend parser for new syntax (slang-check-*.cpp)
+2. Extend parser for new syntax (slang-parser.cpp)
 3. Add semantic analysis (slang-check-*.cpp)
 4. Implement IR generation (slang-ir-*.cpp)
 5. Add code generation for each target backend
@@ -346,9 +340,6 @@ slangc -dump-ir -target spirv shader.slang
 
 # Enable IR validation
 slangc -validate-ir shader.slang
-
-# Generate reproduction data during compilation
-slangc -dump-repro repro.slang-repro shader.slang
 ```
 
 #### AVOID These Debugging Options
@@ -358,22 +349,9 @@ slangc -dump-repro repro.slang-repro shader.slang
 - `-dump-intermediates` - Not actively maintained
 - `-dump-ir-ids` - ID dumping is not reliable
 - `-serial-ir` - Serial IR output is not maintained
+- `-dump-repro` - not maintained
 
 **Always use `-dump-ir` as the primary debugging tool** - it's actively maintained and reliable.
-
-#### Repro System for Bug Reproduction
-**Note** The options, `-dump-repro`, `-load-repro`, and `-extract-repro`, are not actively maintained.
-
-```bash
-# Generate reproduction data during compilation
-slangc -dump-repro repro.slang-repro shader.slang
-
-# Load and replay compilation from repro data
-slangc -load-repro repro.slang-repro
-
-# Extract files from repro archive
-slangc -extract-repro repro.slang-repro extracted/
-```
 
 ### Systematic IR Investigation Methodology
 
