@@ -355,7 +355,7 @@ Include additional type conformance during linking for dynamic dispatch.
 <a id="reflection-json"></a>
 ### -reflection-json
 
-**reflection-json &lt;path&gt;**
+**-reflection-json &lt;path&gt;**
 
 Emit reflection data in JSON format to a file. 
 
