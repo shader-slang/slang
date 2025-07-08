@@ -26,6 +26,7 @@ struct StructParamToConstRefContext
                func->findDecoration<IRBackwardDifferentiableDecoration>() ||
                func->findDecoration<IRForwardDerivativeDecoration>() ||
                func->findDecoration<IRBackwardDerivativeDecoration>() ||
+               func->findDecoration<IRBackwardDerivativePrimalDecoration>() ||
                func->findDecoration<IRUserDefinedBackwardDerivativeDecoration>();
     }
 
@@ -108,6 +109,24 @@ struct StructParamToConstRefContext
         // Collect all instructions to transform first (to avoid iterator invalidation)
         List<IRFieldExtract*> fieldExtractsToTransform;
         List<IRGetElement*> getElementsToTransform;
+        List<IRUse*> directUsesToTransform;
+
+        // Collect all direct uses of transformed parameters
+        for (auto pair : paramMap)
+        {
+            auto param = pair.first;
+            for (auto use = param->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+
+                // Skip uses that are handled by field extract and get element cases
+                if (as<IRFieldExtract>(user) || as<IRGetElement>(user))
+                    continue;
+
+                // Add all other direct uses for transformation
+                directUsesToTransform.add(use);
+            }
+        }
 
         for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
         {
@@ -160,6 +179,24 @@ struct StructParamToConstRefContext
 
             getElement->replaceUsesWith(loadInst);
             getElement->removeAndDeallocate();
+            changed = true;
+        }
+
+        // Transform all direct uses of transformed parameters
+        for (auto use : directUsesToTransform)
+        {
+            auto user = use->getUser();
+            auto param = as<IRParam>(use->get());
+
+            // Skip if this use was already handled above
+            if (!param || !transformedParams.contains(param))
+                continue;
+
+            builder.setInsertBefore(user);
+            auto loadInst = builder.emitLoad(param);
+
+            // Replace this specific use with the load
+            use->set(loadInst);
             changed = true;
         }
     }
@@ -267,11 +304,19 @@ struct StructParamToConstRefContext
 
     bool shouldProcessFunction(IRFunc* func)
     {
-        if (func->findDecoration<IRMethodDecoration>())
-        {
-            return true;
-        }
-        return false;
+        // Only process functions that have method decorations
+        if (!func->findDecoration<IRMethodDecoration>())
+            return false;
+
+        // Skip constructor functions (they have special initialization semantics)
+        if (func->findDecoration<IRConstructorDecoration>())
+            return false;
+
+        // Skip functions that are already handled by shouldSkipFunction
+        if (shouldSkipFunction(func))
+            return false;
+
+        return true;
     }
     // Check if function should be excluded from transformation
     bool shouldSkipFunction(IRFunc* func)
@@ -298,6 +343,10 @@ struct StructParamToConstRefContext
 
         // Skip differentiable functions (they have special ConstRef semantics)
         if (isDifferentiableFunc(func))
+            return true;
+
+        // Skip backward derivative propagate functions (special autodiff-generated functions)
+        if (func->findDecoration<IRBackwardDerivativePropagateDecoration>())
             return true;
 
         // Skip constructor functions (they have special semantics)
