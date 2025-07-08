@@ -15,6 +15,29 @@ using Slang::ComPtr;
 
 namespace gfx_test
 {
+class DebugPrinter : public rhi::IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
+        rhi::DebugMessageType type,
+        rhi::DebugMessageSource source,
+        const char* message) override
+    {
+        static const char* kTypeStrings[] = {"INFO", "WARN", "ERROR"};
+        static const char* kSourceStrings[] = {"Layer", "Driver", "Slang"};
+        if (type == rhi::DebugMessageType::Error)
+        {
+            printf("[%s] (%s) %s\n", kTypeStrings[int(type)], kSourceStrings[int(source)], message);
+            fflush(stdout);
+        }
+    }
+    static DebugPrinter* getInstance()
+    {
+        static DebugPrinter instance;
+        return &instance;
+    }
+};
+
 void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 {
     if (diagnosticsBlob != nullptr)
@@ -109,62 +132,6 @@ Result loadComputeProgram(
     diagnoseIfNeeded(diagnosticsBlob);
     return outShaderProgram ? SLANG_OK : SLANG_FAIL;
 }
-
-// Slang::Result loadComputeProgram(
-//     rhi::IDevice* device,
-//     slang::ISession* slangSession,
-//     Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
-//     const char* shaderModuleName,
-//     const char* entryPointName,
-//     slang::ProgramLayout*& slangReflection,
-//     PrecompilationMode precompilationMode)
-//{
-//     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-//     slang::IModule* module = slangSession->loadModule(shaderModuleName,
-//     diagnosticsBlob.writeRef()); diagnoseIfNeeded(diagnosticsBlob); if (!module)
-//         return SLANG_FAIL;
-//
-//     ComPtr<slang::IEntryPoint> computeEntryPoint;
-//     SLANG_RETURN_ON_FAIL(
-//         module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
-//
-//     Slang::List<slang::IComponentType*> componentTypes;
-//     componentTypes.add(module);
-//     componentTypes.add(computeEntryPoint);
-//
-//     Slang::ComPtr<slang::IComponentType> composedProgram;
-//     SlangResult result = slangSession->createCompositeComponentType(
-//         componentTypes.getBuffer(),
-//         componentTypes.getCount(),
-//         composedProgram.writeRef(),
-//         diagnosticsBlob.writeRef());
-//     diagnoseIfNeeded(diagnosticsBlob);
-//     SLANG_RETURN_ON_FAIL(result);
-//
-//     ComPtr<slang::IComponentType> linkedProgram;
-//     result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
-//     diagnoseIfNeeded(diagnosticsBlob);
-//     SLANG_RETURN_ON_FAIL(result);
-//
-//     composedProgram = linkedProgram;
-//     slangReflection = composedProgram->getLayout();
-//
-//     rhi::ShaderProgramDesc programDesc = {};
-//     programDesc.slangGlobalScope = composedProgram.get();
-//     if (precompilationMode == PrecompilationMode::ExternalLink)
-//     {
-//         programDesc.downstreamLinkMode = rhi::IShaderProgram::DownstreamLinkMode::Deferred;
-//     }
-//     else
-//     {
-//         programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::None;
-//     }
-//
-//     auto shaderProgram = device->createProgram(programDesc);
-//
-//     outShaderProgram = shaderProgram;
-//     return SLANG_OK;
-// }
 
 Result loadComputeProgramFromSource(
     IDevice* device,
@@ -303,6 +270,10 @@ Slang::ComPtr<IDevice> createTestingDevice(
     deviceDesc.slang.compilerOptionEntries = compilerOptions.data();
     deviceDesc.slang.compilerOptionEntryCount = compilerOptions.size();
 
+    if (context->enableDebugLayers) {
+        deviceDesc.enableValidation = context->enableDebugLayers;
+        deviceDesc.debugCallback = DebugPrinter::getInstance();
+    }
 
     D3D12DeviceExtendedDesc extDesc = {};
     if (deviceType == DeviceType::D3D12)

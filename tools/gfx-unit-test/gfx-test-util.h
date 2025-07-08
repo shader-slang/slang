@@ -2,6 +2,7 @@
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-render-api-util.h"
 #include "slang-rhi.h"
 #include "span.h"
@@ -166,6 +167,31 @@ auto makeArray(Args... args)
     return std::array<T, sizeof...(Args)>{static_cast<T>(args)...};
 }
 
+inline bool deviceTypeInEnabledApis(rhi::DeviceType deviceType, Slang::RenderApiFlags enabledApis)
+{
+    switch (deviceType)
+    {
+        case rhi::DeviceType::Default:
+            return true;
+        case rhi::DeviceType::CPU:
+            return enabledApis & Slang::RenderApiFlag::CPU;
+        case rhi::DeviceType::CUDA:
+            return enabledApis & Slang::RenderApiFlag::CUDA;
+        case rhi::DeviceType::Metal:
+            return enabledApis & Slang::RenderApiFlag::Metal;
+        case rhi::DeviceType::WGPU:
+            return enabledApis & Slang::RenderApiFlag::WebGPU;
+        case rhi::DeviceType::Vulkan:
+            return enabledApis & Slang::RenderApiFlag::Vulkan;
+        case rhi::DeviceType::D3D11:
+            return enabledApis & Slang::RenderApiFlag::D3D11;
+        case rhi::DeviceType::D3D12:
+            return enabledApis & Slang::RenderApiFlag::D3D12;
+    }
+    return true;
+}
+
+
 template<typename ImplFunc>
 void runTestImpl(
     const ImplFunc& f,
@@ -173,10 +199,11 @@ void runTestImpl(
     rhi::DeviceType deviceType,
     Slang::List<const char*> searchPaths = {})
 {
-    // if ((api & context->enabledApis) == 0)
-    //{
-    //     SLANG_IGNORE_TEST
-    // }
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
+    {
+        SLANG_IGNORE_TEST
+    }
+
     auto device = createTestingDevice(context, deviceType, searchPaths);
     if (!device)
     {
