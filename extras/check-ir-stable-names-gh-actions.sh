@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+make -C external/lua
+external/lua/lua -v
+
+# Run the check
+if ! ./external/lua/lua extras/check-ir-stable-names.lua check; then
+  echo "Check failed. Running update..."
+  ./external/lua/lua extras/check-ir-stable-names.lua update
+
+  echo -e "\n=== Diff of changes made ==="
+  git diff --no-index --color=always source/slang/slang-ir-insts-stable-names.lua || true
+
+  # Also create a summary for GitHub Actions
+  if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+    {
+      echo "## IR Stable Names Table Update Required"
+      echo "The following changes need to be made to \`source/slang/slang-ir-insts-stable-names.lua\`:"
+      echo '```diff'
+      git diff --no-index source/slang/slang-ir-insts-stable-names.lua
+      echo '```'
+    } >>"$GITHUB_STEP_SUMMARY"
+  fi
+
+  # Fail the job since the check failed
+  exit 1
+fi
