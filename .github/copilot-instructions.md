@@ -64,6 +64,9 @@ cmake --build --preset release
 ### Testing
 - `slang-test` must run from repository root.
 - The test file must be placed under "tests/" directory.
+- When `slang-test` run without any command-line argument describing which test to run, it will run a full test, which can take for a few minutes if not an hour.
+- When running a full test with `slang-test`, LLM must use `-v failure` to reduce the verbosity.
+- When the given issue is resolved, a full regression test with `slang-test` must pass all tests; otherwise, the fix will cause a regression.
 
 #### Windows
 ```bash
@@ -245,11 +248,11 @@ Generate a personal access token at: https://github.com/settings/tokens
 
 ### Debugging
 - Use `SLANG_ENABLE_IR_BREAK_ALLOC=TRUE` for IR debugging
-- Enable `SLANG_ENABLE_FULL_IR_VALIDATION` for thorough validation (slow)
-- Visual Studio presets include `-dev` variants with debugging aids
+- `slangc` has a debugging feature to dump the IR information for multiple steps; `-dump-ir`.
+- Use `printf` as a debugging tool extensively.
 - When debugging, especially after a build, the first compilation of a shader will also trigger the compilation of Slang's core modules. This can produce a large amount of debug output that is not relevant to the specific shader being tested.
 - To isolate the debug output for a particular shader, it is recommended to compile it twice. The first compilation will handle the core modules, and the second run will show only the debug information for the shader under investigation.
-- slangc has a debugging feature to dump the IR information for multiple steps; `-dump-ir`.
+- Confirm the working theory about the given issue before start applying any code fixes.
 
 ### Working with Tests
 - Most tests are `.slang` files with embedded test directives
