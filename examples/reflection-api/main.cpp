@@ -587,18 +587,18 @@ struct ReflectingPrinting
                 auto containerVarLayout = typeLayout->getContainerVarLayout();
                 auto elementVarLayout = typeLayout->getElementVarLayout();
 
-                key("container");
-                {
-                    SCOPED_OBJECT();
-                    printOffsets(containerVarLayout, accessPath);
-                }
-
                 AccessPath innerOffsets = accessPath;
                 innerOffsets.deepestConstantBufer = innerOffsets.leaf;
                 if (containerVarLayout->getTypeLayout()->getSize(
                         slang::ParameterCategory::SubElementRegisterSpace) != 0)
                 {
                     innerOffsets.deepestParameterBlock = innerOffsets.leaf;
+                }
+
+                key("container");
+                {
+                    SCOPED_OBJECT();
+                    printOffsets(containerVarLayout, innerOffsets);
                 }
 
                 key("content");
