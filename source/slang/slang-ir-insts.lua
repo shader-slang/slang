@@ -2303,7 +2303,6 @@ local function process(insts)
 					max_stable_name = stable_id
 				end
 			end
-			-- stable_name_to_id[stable_id] = value
 
 			-- Recursively process children
 			add_stable_names(value)
