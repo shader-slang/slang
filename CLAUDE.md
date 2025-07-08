@@ -195,85 +195,9 @@ It is rare for a PR to be a breaking change.
 - CPU-only tests use `-cpu` flag for environments without GPU
 - Interpreter tests use `//TEST:INTERPRET` for bytecode execution
 
-#### Advanced Testing Options
-```bash
-# Test categories
-slang-test -category smoke          # Quick smoke tests
-slang-test -category render         # Rendering tests
-slang-test -category compute        # Compute shader tests
-slang-test -category vulkan         # Vulkan-specific tests
-
-# API filtering (+ includes, - excludes)
-slang-test -api vk+dx12            # Only Vulkan and D3D12
-slang-test -api all-cpu            # All APIs except CPU
-slang-test -api gl+dx11            # Only OpenGL and D3D11
-
-# Parallel execution
-slang-test -use-test-server -server-count 8
-
-# Unit tests
-# Due to the backward compatibility the use of a forward-slash is required
-slang-test slang-unit-test-tool/    # Core unit tests
-slang-test gfx-unit-test-tool/      # Graphics unit tests
-```
-
 ## Advanced Development Features
 
-### CMake Configuration Options
-
-Key options for development:
-- `SLANG_ENABLE_TESTS=ON` - Enable test targets
-- `SLANG_ENABLE_GFX=ON` - Enable graphics abstraction layer  
-- `SLANG_ENABLE_SLANGD=ON` - Enable language server
-- `SLANG_ENABLE_SLANGC=ON` - Enable standalone compiler
-- `SLANG_ENABLE_SLANGI=ON` - Enable Slang interpreter
-- `SLANG_SLANG_LLVM_FLAVOR` - Configure LLVM backend support:
-  - `FETCH_BINARY_IF_POSSIBLE` (default) - Download prebuilt binary, fallback to disable
-  - `FETCH_BINARY` - Download prebuilt binary, fail if unavailable  
-  - `USE_SYSTEM_LLVM` - Use system LLVM installation
-  - `DISABLE` - Build without LLVM support
-- `SLANG_LIB_TYPE` - SHARED or STATIC library build
-- `SLANG_ENABLE_FULL_IR_VALIDATION=ON` - Enable thorough IR validation (slow)
-- `SLANG_ENABLE_IR_BREAK_ALLOC=ON` - Enable IR debugging features
-
-### WebAssembly Build
-```bash
-# 1. Install and activate Emscripten SDK
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk && ./emsdk install latest && ./emsdk activate latest
-
-# 2. Build generators for build platform first
-cmake --workflow --preset generators --fresh
-mkdir generators && cmake --install build --prefix generators --component generators
-
-# 3. Configure with emcmake for target platform  
-source ../emsdk/emsdk_env  # or emsdk_env.bat on Windows
-emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
-
-# 4. Build WebAssembly target
-cmake --build --preset emscripten --target slang-wasm
-```
-
-### Cross-Compilation Workflow
-```bash
-# 1. Build generators for build platform
-cmake --workflow --preset generators --fresh
-mkdir build-platform-generators
-cmake --install build --prefix build-platform-generators --component generators
-
-# 2. Configure for target platform
-cmake --preset default --fresh \
-  -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
-  -DCMAKE_C_COMPILER=target-gcc \
-  -DCMAKE_CXX_COMPILER=target-g++
-
-# 3. Build for target
-cmake --workflow --preset release
-```
-
-### Debugging and Reproduction System
-
-#### Reliable Debugging Options
+### Reliable Debugging Options
 ```bash
 # Dump IR at various stages
 # `-target` is often required to move into the rest steps of compilation
@@ -283,7 +207,7 @@ slangc -dump-ir -target spirv shader.slang
 slangc -validate-ir shader.slang
 ```
 
-#### AVOID These Debugging Options
+### AVOID These Debugging Options
 **DO NOT USE** these options as they are unmaintained and unreliable:
 - `-dump-ast` - AST dumping is not maintained
 - `-dump-intermediate-prefix` - Intermediate dumping is unreliable  
