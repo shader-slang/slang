@@ -140,8 +140,9 @@ jobs:
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
 
+      # Don't need to check this on every config
       - name: Check Stable Names Table
-        if: ${{matrix.os == 'linux'}}
+        if: ${{ matrix.os == 'linux' && matrix.config == 'debug' }}
         run: ./extras/check-ir-stable-names-gh-actions.sh
 
       - name: Build Slang
