@@ -3204,8 +3204,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     sizeof(infoBuffer),
                     "Minimum supported version: %lu\n"
                     "Maximum supported version: %lu\n",
-                    IRModule::k_minSupportedModuleVersion,
-                    IRModule::k_maxSupportedModuleVersion);
+                    (unsigned long)IRModule::k_minSupportedModuleVersion,
+                    (unsigned long)IRModule::k_maxSupportedModuleVersion);
 
                 m_sink->diagnoseRaw(Severity::Note, infoBuffer);
 
