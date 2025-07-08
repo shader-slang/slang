@@ -1394,6 +1394,13 @@ DIAGNOSTIC(
     primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
     "primal substitute function for differentiable method must also be differentiable. Use "
     "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
+DIAGNOSTIC(
+    31159,
+    Warning,
+    noDerivativeOnNonDifferentiableThisType,
+    "There is no derivative calculated for member '$0' because the parent struct is not differentiable. "
+    "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this warning."
+    )
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")

@@ -2041,6 +2041,8 @@ public:
     // Check and register a type if it is differentiable.
     void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
+    void maybeCheckMissingNoDiffThis(Expr* expr);
+
     // Find the default implementation of an interface requirement,
     // and insert it to the witness table, if it exists.
     bool findDefaultInterfaceImpl(
