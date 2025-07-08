@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-make -C external/lua
+# The github action runners don't have libreadline and we don't need it
+make -C external/lua MYCFLAGS="-DLUA_USE_POSIX" MYLIBS=""
 external/lua/lua -v
 
 # Run the check
