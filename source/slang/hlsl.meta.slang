@@ -645,7 +645,7 @@ extension vector<int64_t,2>:ITexelElement
 /// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
 /// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
 /// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
-/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit normalized unsigned integer texture |
 /// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
 /// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
 /// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
