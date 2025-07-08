@@ -171,65 +171,6 @@ It is rare for a PR to be a breaking change.
 
 ## Development Guidelines
 
-### Contribution Workflow
-
-#### Git repo setup
-If you are a github copilot, you don't need to setup git repo, because it is handled by .github/workflows/copilot-setup-steps.yml .
-
-```bash
-# 1. Fork the repository on GitHub and clone your fork
-git clone --recursive --tags https://github.com/YOUR-USERNAME/slang.git
-cd slang
-
-# 2. Add upstream remote and fetch tags (required for build process)
-git remote add upstream https://github.com/shader-slang/slang.git
-git fetch --tags upstream
-git push --tags origin
-
-# 3. Create a feature branch
-git checkout -b feature/your-feature-name
-```
-
-#### Making Changes
-```bash
-# Make your changes, then commit with descriptive message
-git commit -m "Add feature description
-
-Fixes #issue-number
-
-Detailed explanation of what this change does and why."
-
-# Push to your fork
-git push origin feature/your-feature-name
-```
-
-#### Syncing with Upstream
-```bash
-# Keep your branch in sync during review process
-git fetch upstream master
-git merge upstream/master  # resolve conflicts if needed
-git submodule update --recursive
-```
-
-### PR Requirements
-- Code must be formatted with `./extras/formatting.sh` or use `/format` bot command
-- Include regression tests for bug fixes in `tests/` directory as `.slang` files
-- Follow descriptive commit message guidelines
-- Enable Actions in your forked repository for CI to work
-
-### Cross-Platform Considerations
-- Primary development platforms: Windows, Linux, macOS
-- Build system supports both Ninja and Visual Studio generators
-- WebAssembly builds require Emscripten SDK
-
-### GitHub API Rate Limits
-If you encounter GitHub API rate limit warnings during `cmake --preset`:
-```bash
-# Use personal access token to increase rate limit
-cmake --preset default -DSLANG_GITHUB_TOKEN=your_token_here
-```
-Generate a personal access token at: https://github.com/settings/tokens
-
 ## Common Development Tasks
 
 ### Slang internal steps, as an example
