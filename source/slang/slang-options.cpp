@@ -850,7 +850,15 @@ void initCommandOptions(CommandOptions& options)
          "-verify-debug-serial-ir",
          nullptr,
          "Verify IR in the front-end."},
-        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
+        {OptionKind::GetModuleInfo,
+         "-get-module-info",
+         nullptr,
+         "Print the name and version of a serialized IR Module"},
+        {OptionKind::GetSupportedModuleVersions,
+         "-get-supported-module-versions",
+         nullptr,
+         "Print the minimum and maximum module versions this compiler supports"}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -3127,6 +3135,79 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
 
+
+                break;
+            }
+        case OptionKind::GetModuleInfo:
+            {
+                CommandLineArg fileName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
+                auto desc = slang::SessionDesc();
+                ComPtr<slang::ISession> session;
+                m_session->createSession(desc, session.writeRef());
+                ComPtr<slang::IBlob> diagnostics;
+
+                FileStream file;
+                if (SLANG_FAILED(file.init(
+                        fileName.value,
+                        FileMode::Open,
+                        FileAccess::Read,
+                        FileShare::None)))
+                {
+                    m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
+                    return SLANG_FAIL;
+                }
+
+                List<uint8_t> buffer;
+                file.seek(SeekOrigin::End, 0);
+                const Int64 size = file.getPosition();
+                buffer.setCount(size + 1);
+                file.seek(SeekOrigin::Start, 0);
+                SLANG_RETURN_ON_FAIL(file.readExactly(buffer.getBuffer(), (size_t)size));
+                buffer[size] = 0;
+                file.close();
+
+                ComPtr<slang::IModule> module;
+                // Load buffer as an IR blob
+                ComPtr<slang::IBlob> blob;
+                blob = RawBlob::create(buffer.getBuffer(), size);
+
+                const char* moduleName = nullptr;
+                const char* moduleCompilerVersion = nullptr;
+                SlangInt moduleVersion = ~0;
+                SLANG_RETURN_ON_FAIL(session->loadModuleInfoFromIRBlob(
+                    blob,
+                    moduleVersion,
+                    moduleCompilerVersion,
+                    moduleName));
+
+                char infoBuffer[512];
+                snprintf(
+                    infoBuffer,
+                    sizeof(infoBuffer),
+                    "Module Name: %s\n"
+                    "Module Version: %lld\n"
+                    "Compiler Version: %s\n",
+                    moduleName ? moduleName : "null",
+                    static_cast<long long>(moduleVersion),
+                    moduleCompilerVersion ? moduleCompilerVersion : "null");
+
+                m_sink->diagnoseRaw(Severity::Note, infoBuffer);
+
+                break;
+            }
+        case OptionKind::GetSupportedModuleVersions:
+            {
+                char infoBuffer[512];
+                snprintf(
+                    infoBuffer,
+                    sizeof(infoBuffer),
+                    "Minimum supported version: %lu\n"
+                    "Maximum supported version: %lu\n",
+                    IRModule::k_minSupportedModuleVersion,
+                    IRModule::k_maxSupportedModuleVersion);
+
+                m_sink->diagnoseRaw(Severity::Note, infoBuffer);
 
                 break;
             }

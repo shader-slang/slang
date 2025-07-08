@@ -2,12 +2,19 @@
 #include "slang-serialize-ir.h"
 
 #include "core/slang-blob-builder.h"
+#include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
+#include "slang-tag-version.h"
+#include "slang.h"
 
+//
+#include "slang-serialize-ir.cpp.fiddle"
+
+FIDDLE()
 namespace Slang
 {
 
@@ -16,9 +23,20 @@ namespace Slang
 // we want to serialize some sidecar information to help with on-demand loading
 // or backwards compat
 //
+FIDDLE()
 struct IRModuleInfo
 {
-    RefPtr<IRModule> module;
+    FIDDLE(...)
+    // Include the specific compiler version in serialized output, in case we
+    // ever need to do any version specific workarounds.
+    FIDDLE() String fullVersion = SLANG_TAG_VERSION;
+    // Include this here so that if we need to change the way we serialize
+    // things and maintain backwards compat we can increment this value, for
+    // example if we introduce more instructions with weird payloads like
+    // IRModuleInst or IRConstants.
+    const static UInt kSupportedSerializationVersion = 0;
+    FIDDLE() UInt serializationVersion = kSupportedSerializationVersion;
+    FIDDLE() RefPtr<IRModule> module;
 };
 
 //
@@ -68,19 +86,87 @@ struct IRSerialReadContext : IRSerialContext, RefObject
     RefPtr<IRModule> _module;
 };
 
-// IROps are serialized as integers
+SLANG_DECLARE_FOSSILIZED_AS(Name, String);
+
+/// Fossilized representation of a `IRModule`
+struct Fossilized_IRModule;
+
+SLANG_DECLARE_FOSSILIZED_TYPE(IRModule, Fossilized_IRModule);
+
+struct Fossilized_IRModule : public FossilizedRecordVal
+{
+    Fossilized<decltype(IRModule::m_moduleInst)> m_moduleInst;
+    Fossilized<String> m_name;
+    Fossilized<decltype(IRModule::m_version)> m_version;
+};
+
+//
+// This splice handles any aggregate types, a similar splice is well documented
+// in slang-serialize-ast.cpp
+//
+#if 0 // FIDDLE TEMPLATE:
+% irStructTypes = {
+%   Slang.IRModuleInfo,
+% }
+%
+% for _,T in ipairs(irStructTypes) do
+
+/// Fossilized representation of a `$T`
+struct Fossilized_$T;
+
+SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
+
+/// Serialize a `$T`
+void serialize(IRSerializer const& serializer, $T& value);
+%end
+%for _,T in ipairs(irStructTypes) do
+/// Fossilized representation of a value of type `$T`
+struct Fossilized_$T
+%   if T.directSuperClass then
+    : public Fossilized<$(T.directSuperClass)>
+%   else
+    : public FossilizedRecordVal
+%   end
+{
+%   for _,f in ipairs(T.directFields) do
+    Fossilized<decltype($T::$f)> $f;
+%   end
+};
+
+/// Serialize a `value` of type `$T`
+void serialize(IRSerializer const& serializer, $T& value)
+{
+    SLANG_UNUSED(value);
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+%   if T.directSuperClass then
+    serialize(serializer, static_cast<$(T.directSuperClass)&>(value));
+%   end
+%   for _,f in ipairs(T.directFields) do
+    serialize(serializer, value.$f);
+%   end
+}
+% end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-serialize-ir.cpp.fiddle"
+#endif // FIDDLE END
+
+
+// IROps are serialized as integers, and given a stable name
 SLANG_DECLARE_FOSSILIZED_AS(IROp, FossilUInt);
 void serialize(Serializer const& serializer, IROp& value)
 {
-    serializeEnum(serializer, value);
-}
-
-/// Serialize a `value` of type `IRModuleInfo`, currently no extra information
-/// besides the IRModule
-SLANG_DECLARE_FOSSILIZED_AS_MEMBER(IRModuleInfo, module);
-void serialize(IRSerializer const& serializer, IRModuleInfo& value)
-{
-    serialize(serializer, value.module);
+    auto stableName = isWriting(serializer) ? getOpcodeStableName(value) : kInvalidStableName;
+    serializeEnum(serializer, stableName);
+    if (isReading(serializer))
+    {
+        value = getStableNameOpcode(stableName);
+        // It's possible we're reading a module serialized by a future version of
+        // Slang with as-yet unknown instructions.
+        // if this is the case, return IRUnrecognized and we can handle it later
+        if (value == kIROp_Invalid)
+            value = kIROp_Unrecognized;
+    }
 }
 
 //
@@ -309,8 +395,9 @@ void serializeObject(IRSerializer const& serializer, IRModule*& value, IRModule*
 void IRSerialWriteContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
 {
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value->m_name);
     serialize(serializer, value->m_moduleInst);
+    serialize(serializer, value->m_name);
+    serialize(serializer, value->m_version);
 }
 
 void IRSerialReadContext::handleIRModule(IRSerializer const& serializer, IRModule*& value)
@@ -319,8 +406,9 @@ void IRSerialReadContext::handleIRModule(IRSerializer const& serializer, IRModul
     value = new IRModule{_session};
     SLANG_ASSERT(!_module);
     _module = value;
-    serialize(serializer, value->m_name);
     serialize(serializer, value->m_moduleInst);
+    serialize(serializer, value->m_name);
+    serialize(serializer, value->m_version);
     value->m_moduleInst->module = value;
 }
 
@@ -357,7 +445,9 @@ void writeSerializedModuleIR(
     // The flow here is very similar to writeSerializedModuleAST which is very
     // well documented.
 
-    IRModuleInfo moduleInfo{.module = irModule};
+    IRModuleInfo moduleInfo;
+    moduleInfo.fullVersion = SLANG_TAG_VERSION;
+    moduleInfo.module = irModule;
 
     BlobBuilder blobBuilder;
     {
@@ -375,10 +465,37 @@ void writeSerializedModuleIR(
     cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
 }
 
+Result readSerializedModuleInfo(
+    RIFF::Chunk const* chunk,
+    String& compilerVersion,
+    UInt& version,
+    String& name)
+{
+    auto dataChunk = as<RIFF::DataChunk>(chunk);
+    if (!dataChunk)
+    {
+        SLANG_UNEXPECTED("invalid format for serialized module IR");
+    }
+
+    Fossil::AnyValPtr rootValPtr =
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    if (!rootValPtr)
+    {
+        SLANG_UNEXPECTED("invalid format for serialized module IR");
+    }
+
+    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
+    version = fossilizedModule->m_version;
+    compilerVersion = fossilizedModuleInfo->fullVersion.get();
+    name = fossilizedModuleInfo->module->m_name.get();
+    return SLANG_OK;
+}
+
 //
 // Read a module, this currently does not do any on-demand loading
 //
-void readSerializedModuleIR(
+Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
@@ -396,6 +513,13 @@ void readSerializedModuleIR(
     {
         SLANG_UNEXPECTED("invalid format for serialized module IR");
     }
+
+    Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+
+    // Only one version supported so far, if we had multiple versions to
+    // support this is where we might branch
+    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_FAIL;
 
     IRModuleInfo info;
     {
@@ -417,13 +541,20 @@ void readSerializedModuleIR(
     // deserialization we didn't necessarily have this information handy at the
     // time.
     //
-    auto go = [](auto&& go, IRInst* parent, IRInst* inst) -> void
+    bool hasUnrecognizedInsts = false;
+    auto go = [&](auto&& go, IRInst* parent, IRInst* inst) -> void
     {
+        if (inst->getOp() == kIROp_Unrecognized)
+            hasUnrecognizedInsts = true;
+
         inst->parent = parent;
         for (const auto child : inst->getDecorationsAndChildren())
             go(go, inst, child);
     };
     go(go, nullptr, info.module->getModuleInst());
+
+    if (hasUnrecognizedInsts)
+        return SLANG_FAIL;
 
     //
     // Module is finally valid (or at least as much as it was going it) and
@@ -431,6 +562,7 @@ void readSerializedModuleIR(
     //
     info.module->buildMangledNameToGlobalInstMap();
     outIRModule = info.module;
+    return SLANG_OK;
 }
 
 } // namespace Slang

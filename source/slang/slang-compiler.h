@@ -2251,6 +2251,11 @@ public:
         const char* path,
         slang::IBlob* source,
         slang::IBlob** outDiagnostics = nullptr) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) override;
     SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
         const char* path,
@@ -2343,6 +2348,9 @@ public:
     SourceManager m_defaultSourceManager;
     SourceManager* m_sourceManager = nullptr;
     RefPtr<CommandLineContext> m_cmdLineContext;
+
+    // Used to store strings returned by the api as const char*
+    StringSlicePool m_stringSlicePool;
 
     // Name pool for looking up names
     NamePool namePool;
