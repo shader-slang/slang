@@ -680,6 +680,16 @@ Verify IR in the front-end.
 Disassemble and print the module IR. 
 
 
+<a id="get-module-info"></a>
+### -get-module-info
+Print the name and version of a serialized IR Module 
+
+
+<a id="get-supported-module-versions"></a>
+### -get-supported-module-versions
+Print the minimum and maximum module versions this compiler supports 
+
+
 
 <a id="Repro"></a>
 ## Repro
