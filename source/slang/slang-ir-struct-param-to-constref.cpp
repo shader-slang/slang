@@ -98,47 +98,69 @@ struct StructParamToConstRefContext
         if (paramMap.getCount() == 0)
             return;
 
+        // Build a set of all transformed parameters for faster lookup
+        HashSet<IRInst*> transformedParams;
+        for (auto pair : paramMap)
+        {
+            transformedParams.add(pair.first);
+        }
+
+        // Collect all instructions to transform first (to avoid iterator invalidation)
+        List<IRFieldExtract*> fieldExtractsToTransform;
+        List<IRGetElement*> getElementsToTransform;
+
         for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
         {
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                builder.setInsertBefore(inst);
-
-                // Transform fieldExtract(param, field) -> load(fieldAddress(param, field))
+                // Collect fieldExtract instructions that need transformation
                 if (auto fieldExtract = as<IRFieldExtract>(inst))
                 {
                     auto baseParam = fieldExtract->getBase();
-                    if (paramMap.containsKey(as<IRParam>(baseParam)))
+                    if (transformedParams.contains(baseParam))
                     {
-                        auto newParam = paramMap[as<IRParam>(baseParam)];
-                        auto fieldAddr =
-                            builder.emitFieldAddress(newParam, fieldExtract->getField());
-                        auto loadInst = builder.emitLoad(fieldAddr);
-
-                        fieldExtract->replaceUsesWith(loadInst);
-                        fieldExtract->removeAndDeallocate();
-                        changed = true;
-                        continue;
+                        fieldExtractsToTransform.add(fieldExtract);
                     }
                 }
 
-                // Transform getElement(param, index) -> load(getElementPtr(param, index))
+                // Collect getElement instructions that need transformation
                 if (auto getElement = as<IRGetElement>(inst))
                 {
                     auto baseParam = getElement->getBase();
-                    if (paramMap.containsKey(as<IRParam>(baseParam)))
+                    if (transformedParams.contains(baseParam))
                     {
-                        auto newParam = paramMap[as<IRParam>(baseParam)];
-                        auto elemPtr = builder.emitElementAddress(newParam, getElement->getIndex());
-                        auto loadInst = builder.emitLoad(elemPtr);
-
-                        getElement->replaceUsesWith(loadInst);
-                        getElement->removeAndDeallocate();
-                        changed = true;
-                        continue;
+                        getElementsToTransform.add(getElement);
                     }
                 }
             }
+        }
+
+        // Now transform all collected field extracts
+        for (auto fieldExtract : fieldExtractsToTransform)
+        {
+            builder.setInsertBefore(fieldExtract);
+            auto baseParam = fieldExtract->getBase();
+            auto transformedParam = as<IRParam>(baseParam);
+            auto fieldAddr = builder.emitFieldAddress(transformedParam, fieldExtract->getField());
+            auto loadInst = builder.emitLoad(fieldAddr);
+
+            fieldExtract->replaceUsesWith(loadInst);
+            fieldExtract->removeAndDeallocate();
+            changed = true;
+        }
+
+        // Transform all collected get elements
+        for (auto getElement : getElementsToTransform)
+        {
+            builder.setInsertBefore(getElement);
+            auto baseParam = getElement->getBase();
+            auto transformedParam = as<IRParam>(baseParam);
+            auto elemPtr = builder.emitElementAddress(transformedParam, getElement->getIndex());
+            auto loadInst = builder.emitLoad(elemPtr);
+
+            getElement->replaceUsesWith(loadInst);
+            getElement->removeAndDeallocate();
+            changed = true;
         }
     }
 
