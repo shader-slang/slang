@@ -2,8 +2,8 @@
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
-#include "core/slang-test-tool-util.h"
 #include "core/slang-render-api-util.h"
+#include "core/slang-test-tool-util.h"
 #include "slang-rhi.h"
 #include "span.h"
 #include "unit-test/slang-unit-test.h"
@@ -171,22 +171,22 @@ inline bool deviceTypeInEnabledApis(rhi::DeviceType deviceType, Slang::RenderApi
 {
     switch (deviceType)
     {
-        case rhi::DeviceType::Default:
-            return true;
-        case rhi::DeviceType::CPU:
-            return enabledApis & Slang::RenderApiFlag::CPU;
-        case rhi::DeviceType::CUDA:
-            return enabledApis & Slang::RenderApiFlag::CUDA;
-        case rhi::DeviceType::Metal:
-            return enabledApis & Slang::RenderApiFlag::Metal;
-        case rhi::DeviceType::WGPU:
-            return enabledApis & Slang::RenderApiFlag::WebGPU;
-        case rhi::DeviceType::Vulkan:
-            return enabledApis & Slang::RenderApiFlag::Vulkan;
-        case rhi::DeviceType::D3D11:
-            return enabledApis & Slang::RenderApiFlag::D3D11;
-        case rhi::DeviceType::D3D12:
-            return enabledApis & Slang::RenderApiFlag::D3D12;
+    case rhi::DeviceType::Default:
+        return true;
+    case rhi::DeviceType::CPU:
+        return enabledApis & Slang::RenderApiFlag::CPU;
+    case rhi::DeviceType::CUDA:
+        return enabledApis & Slang::RenderApiFlag::CUDA;
+    case rhi::DeviceType::Metal:
+        return enabledApis & Slang::RenderApiFlag::Metal;
+    case rhi::DeviceType::WGPU:
+        return enabledApis & Slang::RenderApiFlag::WebGPU;
+    case rhi::DeviceType::Vulkan:
+        return enabledApis & Slang::RenderApiFlag::Vulkan;
+    case rhi::DeviceType::D3D11:
+        return enabledApis & Slang::RenderApiFlag::D3D11;
+    case rhi::DeviceType::D3D12:
+        return enabledApis & Slang::RenderApiFlag::D3D12;
     }
     return true;
 }
