@@ -270,7 +270,8 @@ Slang::ComPtr<IDevice> createTestingDevice(
     deviceDesc.slang.compilerOptionEntries = compilerOptions.data();
     deviceDesc.slang.compilerOptionEntryCount = compilerOptions.size();
 
-    if (context->enableDebugLayers) {
+    if (context->enableDebugLayers)
+    {
         deviceDesc.enableValidation = context->enableDebugLayers;
         deviceDesc.debugCallback = DebugPrinter::getInstance();
     }
