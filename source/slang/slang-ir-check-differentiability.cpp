@@ -82,12 +82,14 @@ public:
             callInst->findDecoration<IRDifferentiableCallDecoration>());
     }
 
-    // If a function call takes all literals as arguments, it will implies that this function will not be expected
-    // to any gradients, in this case, this call should be treated as no_diff even there is no 'no_diff' decorated
-    // on it explicitly.
-    // In the actual check, we only need to check the argument corresponding to the differentiable parameters,
-    // because non-differentiable parameter are not expected to produce any gradients anyway.
-    bool shouldCallImpliesNoDiff(DifferentiableTypeConformanceContext& diffTypeContext, IRCall* callInst)
+    // If a function call takes all literals as arguments, it will implies that this function will
+    // not be expected to any gradients, in this case, this call should be treated as no_diff even
+    // there is no 'no_diff' decorated on it explicitly. In the actual check, we only need to check
+    // the argument corresponding to the differentiable parameters, because non-differentiable
+    // parameter are not expected to produce any gradients anyway.
+    bool shouldCallImpliesNoDiff(
+        DifferentiableTypeConformanceContext& diffTypeContext,
+        IRCall* callInst)
     {
         if (shouldTreatCallAsDifferentiable(callInst))
         {
@@ -102,7 +104,7 @@ public:
 
         bool doesImplyNoDiff = true;
         UInt paramIndex = 0;
-        for (auto paramType: calleeFuncType->getParamTypes())
+        for (auto paramType : calleeFuncType->getParamTypes())
         {
             if (isDifferentiableType(diffTypeContext, paramType))
             {
@@ -118,8 +120,7 @@ public:
         if (doesImplyNoDiff)
         {
             IRBuilder irBuilder(callInst->getModule());
-            irBuilder.addDecoration(
-                callInst, kIROp_TreatCallAsDifferentiableDecoration);
+            irBuilder.addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
         }
         return doesImplyNoDiff;
     }
