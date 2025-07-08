@@ -109,19 +109,22 @@ static void validateArraySizeInStruct(
 
             // Get the type layout of the field
             auto fieldTypeLayout = fieldLayout->getTypeLayout();
-            SLANG_CHECK_ABORT(fieldTypeLayout != nullptr);
+            SLANG_CHECK_MSG(fieldTypeLayout != nullptr, "Field has no type layout");
 
             // Get the element type of the structured buffer
             auto elementTypeLayout = fieldTypeLayout->getElementTypeLayout();
-            SLANG_CHECK_ABORT(elementTypeLayout != nullptr);
-
+            SLANG_CHECK_MSG(
+                elementTypeLayout != nullptr,
+                "Structured buffer has no element type layout");
             // Check if it's a struct type
             auto elementKind = elementTypeLayout->getKind();
-            SLANG_CHECK_ABORT(elementKind == slang::TypeReflection::Kind::Struct);
+            SLANG_CHECK_MSG(
+                elementKind == slang::TypeReflection::Kind::Struct,
+                "Buffer element is not a struct type");
 
             // Get the field count of the struct
             auto structFieldCount = elementTypeLayout->getFieldCount();
-            SLANG_CHECK_ABORT(structFieldCount >= 1);
+            SLANG_CHECK_MSG(structFieldCount >= 1, "Struct has no fields");
 
             // Check for the 'xs' field
             bool foundXsField = false;
@@ -138,28 +141,34 @@ static void validateArraySizeInStruct(
                     auto structFieldTypeLayout = structField->getTypeLayout();
                     auto structFieldTypeKind = structFieldTypeLayout->getKind();
 
-                    SLANG_CHECK_ABORT(structFieldTypeKind == slang::TypeReflection::Kind::Array);
+                    SLANG_CHECK_MSG(
+                        structFieldTypeKind == slang::TypeReflection::Kind::Array,
+                        "Field 'xs' is not an array type");
 
                     // Check the array size
                     auto arraySize = structFieldTypeLayout->getElementCount();
                     // 0 becuase we haven't resolved the constant
-                    SLANG_CHECK_ABORT(arraySize == 0);
+                    SLANG_CHECK_MSG(
+                        arraySize == 0,
+                        "Field 'xs' array size does not match expected size");
 
                     // 4 because we're resolving it
                     const auto resolvedArraySize =
                         structFieldTypeLayout->getElementCount(slangReflection);
-                    SLANG_CHECK_ABORT(resolvedArraySize == expectedSize);
+                    SLANG_CHECK_MSG(
+                        resolvedArraySize == expectedSize,
+                        "Field 'xs' array size does not match expected size");
 
                     break;
                 }
             }
 
-            SLANG_CHECK_ABORT(foundXsField);
+            SLANG_CHECK_MSG(foundXsField, "Could not find field 'xs' in struct S");
             break;
         }
     }
 
-    SLANG_CHECK_ABORT(foundBuffer);
+    SLANG_CHECK_MSG(foundBuffer, "Could not find buffer 'b' in global scope");
 }
 
 

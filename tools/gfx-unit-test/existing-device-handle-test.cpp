@@ -66,11 +66,10 @@ void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
 
 void existingDeviceHandleTestAPI(UnitTestContext* context, DeviceType deviceType)
 {
-    // if ((api & context->enabledApis) == 0)
-    //{
-    //     SLANG_IGNORE_TEST;
-    // }
-    //
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
+    {
+        SLANG_IGNORE_TEST
+    }
     Slang::ComPtr<IDevice> device;
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
