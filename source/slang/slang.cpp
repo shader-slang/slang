@@ -435,6 +435,21 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
 }
 
+void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
+{
+    switch (moduleName)
+    {
+    case slang::BuiltinModuleName::Core:
+        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
+           << (const char*)getHLSLLibraryCode()->getBufferPointer()
+           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::GLSL:
+        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    }
+}
+
 SlangResult Session::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
@@ -460,17 +475,7 @@ SlangResult Session::compileBuiltinModule(
     }
 
     StringBuilder moduleSrcBuilder;
-    switch (moduleName)
-    {
-    case slang::BuiltinModuleName::Core:
-        moduleSrcBuilder << (const char*)getCoreLibraryCode()->getBufferPointer()
-                         << (const char*)getHLSLLibraryCode()->getBufferPointer()
-                         << (const char*)getAutodiffLibraryCode()->getBufferPointer();
-        break;
-    case slang::BuiltinModuleName::GLSL:
-        moduleSrcBuilder << (const char*)getGLSLLibraryCode()->getBufferPointer();
-        break;
-    }
+    getBuiltinModuleSource(moduleSrcBuilder, moduleName);
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     auto moduleSrcBlob = StringBlob::moveCreate(moduleSrcBuilder.produceString());
@@ -758,7 +763,7 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, this, sourceLocReader));
+    readSerializedModuleIR(irChunk, this, sourceLocReader, irModule);
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);
@@ -835,7 +840,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
-    if (srcSize == dstSize && (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    if (srcSize == dstSize && (size_t(src) & (alignof(T) - 1)) == 0)
     {
         return *(const T*)src;
     }
@@ -1491,13 +1496,29 @@ static void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    try
+    {
+        sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Internal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 static void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    try
+    {
+        sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Fatal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
@@ -6780,7 +6801,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, session, sourceLocReader));
+    readSerializedModuleIR(irChunk, session, sourceLocReader, irModule);
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of

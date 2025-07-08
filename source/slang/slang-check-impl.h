@@ -1252,8 +1252,8 @@ public:
     TypeExp TranslateTypeNode(TypeExp const& typeExp);
     Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
     Type* getConstantBufferType(Type* elementType, Type* layoutType);
-
     DeclRefType* getExprDeclRefType(Expr* expr);
+    LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);

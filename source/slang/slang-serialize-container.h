@@ -68,7 +68,9 @@ public:
     String getValue() const;
 };
 
-struct IRModuleChunk;
+struct IRModuleChunk : RIFF::ListChunk
+{
+};
 
 struct ASTModuleChunk : RIFF::ListChunk
 {
@@ -128,12 +130,6 @@ SlangResult readSourceLocationsFromDebugChunk(
     DebugChunk const* debugChunk,
     SourceManager* sourceManager,
     RefPtr<SerialSourceLocReader>& outReader);
-
-SlangResult decodeModuleIR(
-    RefPtr<IRModule>& outIRModule,
-    IRModuleChunk const* chunk,
-    Session* session,
-    SerialSourceLocReader* sourceLocReader);
 
 } // namespace Slang
 

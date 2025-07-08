@@ -275,4 +275,7 @@ inline bool _isIdentifierChar(char ch)
 }
 
 SLANG_API SlangResult runLanguageServer(LanguageServerStartupOptions options);
+SLANG_API SlangResult
+getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob);
+
 } // namespace Slang

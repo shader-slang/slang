@@ -2442,6 +2442,9 @@ public:
     ContainerPool& getContainerPool() { return m_containerPool; }
 
 private:
+    friend struct IRSerialReadContext;
+    friend struct IRSerialWriteContext;
+
     IRModule() = delete;
 
     /// Ctor

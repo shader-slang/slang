@@ -13,6 +13,7 @@ enum class ASTLookupType
 {
     Decl,
     Invoke,
+    CompletionRequest,
 };
 
 struct Loc
