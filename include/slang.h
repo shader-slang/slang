@@ -4123,16 +4123,6 @@ struct ISession : public ISlangUnknown
         slang::IBlob* source,
         slang::IBlob** outDiagnostics = nullptr) = 0;
 
-    /** Read module info (name and version) from a module blob
-     *
-     * The returned pointers are valid for as long as the session.
-     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
-        slang::IBlob* source,
-        SlangInt& outModuleVersion,
-        const char*& outModuleCompilerVersion,
-        const char*& outModuleName) = 0;
-
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() = 0;
     virtual SLANG_NO_THROW IModule* SLANG_MCALL getLoadedModule(SlangInt index) = 0;
 
@@ -4180,6 +4170,16 @@ struct ISession : public ISlangUnknown
         slang::TypeReflection* interfaceType,
         uint32_t* outRTTIDataBuffer,
         uint32_t bufferSizeInBytes) = 0;
+
+    /** Read module info (name and version) from a module blob
+     *
+     * The returned pointers are valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
