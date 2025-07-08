@@ -216,7 +216,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instruction's word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
@@ -360,7 +360,7 @@ struct SpvLiteralBits
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string’s nul-termination character (0), and
+        // > The final word contains the string's nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
 
         // First work out the amount of words we'll need
@@ -2621,7 +2621,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
-        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+        // Vulkan spec 16.1: "The "Depth" operand of OpTypeImage is ignored."
         SpvWord depth =
             ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
@@ -6901,8 +6901,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         // Note: SPIRV only supports the case where `index` is constant.
+        printf("get element, inst:\n");
+        inst->dump();
+        printf("first opd:\n");
+        inst->getOperand(0)->dump();
         auto base = inst->getBase();
         const auto baseTy = base->getDataType();
+        printf("base type:\n");
+        baseTy->dump();
         SLANG_ASSERT(
             as<IRPointerLikeType>(baseTy) || as<IRArrayType>(baseTy) || as<IRVectorType>(baseTy) ||
             as<IRCoopVectorType>(baseTy) || as<IRMatrixType>(baseTy) ||
@@ -7851,8 +7857,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         UInt operandCount,
         ArrayView<IRInst*> operands)
     {
-        IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
+        printf("emitVectorOrScalarArithmetic:\n");
+        operands[0]->dump();
+
+        IRType* elementType = getAlgebraicElementType(operands[0]->getDataType());
+        //IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
+        SLANG_ASSERT(elementType);
+        printf("elementType: %p\n", elementType);
+        elementType->dump();
+
         IRBasicType* basicType = as<IRBasicType>(elementType);
+        SLANG_ASSERT(basicType);
+        printf("basicType\n");
+        basicType->dump();
 
         SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
         if (opCode == SpvOpUndef)
