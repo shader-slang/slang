@@ -345,9 +345,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
 
-    // General utility function to collect all referenced declarations from a value
-    void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls);
-
     void visitGenericDecl(GenericDecl* genericDecl);
 
     void visitTypeDefDecl(TypeDefDecl* decl);
@@ -3225,7 +3222,8 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     }
 }
 
-void SemanticsDeclHeaderVisitor::collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls)
+// General utility function to collect all referenced declarations from a value
+void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls)
 {
     if (!val)
         return;
