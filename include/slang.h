@@ -4124,6 +4124,8 @@ struct ISession : public ISlangUnknown
         slang::IBlob** outDiagnostics = nullptr) = 0;
 
     /** Read module info (name and version) from a module blob
+     *
+     * The returned pointers are valid for as long as the session.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
         slang::IBlob* source,
