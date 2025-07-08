@@ -8,6 +8,22 @@
 #include "../../source/core/slang-smart-pointer.h"
 #include "test-reporter.h"
 
+#include <span>
+
+enum TestCommandStatus
+{
+    Available,
+    Deprecated,
+    Undocumented,
+};
+
+struct TestCommandDoc
+{
+    TestCommandStatus status;
+    char const* name;
+    char const* help;
+};
+
 // A category that a test can be tagged with
 struct TestCategory : public Slang::RefObject
 {
@@ -134,11 +150,9 @@ struct Options
         int argc,
         char** argv,
         TestCategorySet* categorySet,
+        std::span<TestCommandDoc> commands,
         Slang::WriterHelper stdError,
         Options* optionsOut);
-
-    /// Display help message
-    static void showHelp(Slang::WriterHelper stdOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

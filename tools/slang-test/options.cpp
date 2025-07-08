@@ -4,6 +4,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-util.h"
 
+#include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -59,57 +60,144 @@ static bool _isSubCommand(const char* arg)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ void Options::showHelp(WriterHelper stdOut)
+
+struct Help
 {
-    stdOut.print(
-        "Usage: slang-test [options] [test-prefix...]\n"
-        "\n"
-        "Options:\n"
-        "  -h, --help                     Show this help message\n"
-        "  -bindir <path>                 Set directory for binaries (default: the path to the "
-        "slang-test executable)\n"
-        "  -test-dir <path>               Set directory for test files (default: tests/)\n"
-        "  -v                             Enable verbose output\n"
-        "  -hide-ignored                  Hide results from ignored tests\n"
-        "  -api-only                      Only run tests that use specified APIs\n"
-        "  -verbose-paths                 Use verbose paths in output\n"
-        "  -category <name>               Only run tests in specified category\n"
-        "  -exclude <name>                Exclude tests in specified category\n"
-        "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
-        "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
-        "  -skip-api-detection            Skip API availability detection\n"
-        "  -server-count <n>              Set number of test servers (default: 1)\n"
-        "  -show-adapter-info             Show detailed adapter information\n"
-        "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
-        "  -skip-reference-image-generation Skip generating reference images for render tests\n"
-        "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
-        "  -expected-failure-list <file>  Specify file containing expected failures\n"
-        "  -use-shared-library            Run tests in-process using shared library\n"
-        "  -use-test-server               Run tests using test server\n"
-        "  -use-fully-isolated-test-server  Run each test in isolated server\n"
-        "  -capability <name>             Compile with the given capability\n"
-        "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
-        "                                 and Debug Device for DX\n"
+    WriterHelper stdOut;
+    std::span<TestCommandDoc> commands;
+
+    void printWrapped(char const* text, int indentation, int start)
+    {
+        int width = 80;
+
+        List<UnownedStringSlice> words;
+        StringUtil::split(UnownedStringSlice(text), ' ', words);
+        bool first = true;
+        int column = start;
+        for (auto& word : words)
+        {
+            Count length = word.getLength();
+            if (first)
+            {
+                stdOut.put(word);
+                first = false;
+                column += length;
+            }
+            else if (column + 1 + length <= width)
+            {
+                stdOut.print(" ");
+                stdOut.put(word);
+                column += 1 + length;
+            }
+            else
+            {
+                stdOut.print("\n");
+                for (int i = 0; i < indentation; ++i)
+                    stdOut.print(" ");
+                stdOut.put(word);
+                column = indentation + length;
+            }
+        }
+        stdOut.print("\n");
+    }
+
+    void println(char const* text) { printWrapped(text, 0, 0); }
+
+    void printItem(char const* name, char const* help)
+    {
+        int indentation = 33;
+
+        stdOut.print("  %s", name);
+        int column = 2 + strlen(name);
+
+        // We indented by two spaces, printed the name, and need two more spaces of gap afterward.
+        int spaces = indentation - column - 2;
+        for (int i = 0; i < spaces; ++i)
+        {
+            stdOut.print(" ");
+            ++column;
+        }
+        stdOut.print("  ");
+        column += 2;
+
+        printWrapped(help, indentation, column);
+    }
+
+    void printCommands(TestCommandStatus status)
+    {
+        for (auto& command : commands)
+        {
+            if (command.status == status)
+                printItem(command.name, command.help);
+        }
+    }
+
+    void show();
+};
+
+void Help::show()
+{
+    println("Usage: slang-test [options] [test-prefix...]");
+    println("");
+    println("Options:");
+    printItem("-h, --help", "Show this help message");
+    printItem(
+        "-bindir <path>",
+        "Set directory for binaries (default: the path to the slang-test executable)");
+    printItem("-test-dir <path>", "Set directory for test files (default: tests/)");
+    printItem("-v", "Enable verbose output");
+    printItem("-hide-ignored", "Hide results from ignored tests");
+    printItem("-api-only", "Only run tests that use specified APIs");
+    printItem("-verbose-paths", "Use verbose paths in output");
+    printItem("-category <name>", "Only run tests in specified category");
+    printItem("-exclude <name>", "Exclude tests in specified category");
+    printItem("-api <expr>", "Enable specific APIs (e.g., 'vk+dx12' or '+dx11')");
+    printItem("-synthesizedTestApi <expr>", "Set APIs for synthesized tests");
+    printItem("-skip-api-detection", "Skip API availability detection");
+    printItem("-server-count <n>", "Set number of test servers (default: 1)");
+    printItem("-show-adapter-info", "Show detailed adapter information");
+    printItem("-generate-hlsl-baselines", "Generate HLSL test baselines");
+    printItem(
+        "-skip-reference-image-generation",
+        "Skip generating reference images for render tests");
+    printItem("-emit-spirv-via-glsl", "Emit SPIR-V through GLSL instead of directly");
+    printItem("-expected-failure-list <file>", "Specify file containing expected failures");
+    printItem("-use-shared-library", "Run tests in-process using shared library");
+    printItem("-use-test-server", "Run tests using test server");
+    printItem("-use-fully-isolated-test-server", "Run each test in isolated server");
+    printItem("-capability <name>", "Compile with the given capability");
+    printItem(
+        "-enable-debug-layers [true|false]",
+        "Enable or disable Validation Layer for Vulkan and Debug Device for DX");
 #if _DEBUG
-        "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
-        "build)\n"
+    printItem("-disable-debug-layers", "Disable the debug layers (default enabled in debug build)");
 #endif
-        "\n"
-        "Output modes:\n"
-        "  -appveyor                      Use AppVeyor output format\n"
-        "  -travis                        Use Travis CI output format\n"
-        "  -teamcity                      Use TeamCity output format\n"
-        "  -xunit                         Use xUnit output format\n"
-        "  -xunit2                        Use xUnit 2 output format\n"
-        "\n"
-        "Test prefixes are used to filter which tests to run. If no prefix is specified,\n"
-        "all tests will be run.\n");
+    println("");
+    println("Output modes:");
+    printItem("-appveyor", "Use AppVeyor output format");
+    printItem("-travis", "Use Travis CI output format");
+    printItem("-teamcity", "Use TeamCity output format");
+    printItem("-xunit", "Use xUnit output format");
+    printItem("-xunit2", "Use xUnit 2 output format");
+    println("");
+    println("Test prefixes are used to filter which tests to run. If no prefix is specified, all "
+            "tests will be run.");
+    println("");
+    println("Available test types, identified by a special comment at the start of the test file: "
+            "//TEST:<type>:");
+    printCommands(Available);
+    println("");
+    println("Deprecated test types (do not create new tests of these kinds, and we need to slowly "
+            "migrate existing tests to use SIMPLE, COMPARE_COMPUTE(_EX) or COMPARE_RENDER_COMPUTE "
+            "instead):");
+    printCommands(Deprecated);
 }
 
 /* static */ Result Options::parse(
     int argc,
     char** argv,
     TestCategorySet* categorySet,
+    std::span<TestCommandDoc> commands,
     Slang::WriterHelper stdError,
     Options* optionsOut)
 {
@@ -142,11 +230,12 @@ static bool _isSubCommand(const char* arg)
     }
 
     // Check for help flags first
+    Help help{.stdOut = stdError, .commands = commands};
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
-            showHelp(stdError);
+            help.show();
             return SLANG_FAIL;
         }
     }
@@ -196,7 +285,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             optionsOut->binDir = *argCursor++;
@@ -246,7 +335,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             argCursor++;
@@ -257,7 +346,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             argCursor++;
@@ -268,7 +357,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             optionsOut->serverCount = stringToInt(*argCursor++);
@@ -304,7 +393,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -318,7 +407,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -334,7 +423,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -356,7 +445,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -384,7 +473,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             optionsOut->capabilities.add(*argCursor++);
@@ -394,7 +483,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             auto fileName = *argCursor++;
@@ -412,7 +501,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
             optionsOut->testDir = *argCursor++;
@@ -432,7 +521,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
-                showHelp(stdError);
+                help.show();
                 return SLANG_FAIL;
             }
 
@@ -456,7 +545,7 @@ static bool _isSubCommand(const char* arg)
         else
         {
             stdError.print("unknown option '%s'\n", arg);
-            showHelp(stdError);
+            help.show();
             return SLANG_FAIL;
         }
     }
