@@ -18947,7 +18947,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
             };
         }
     }
