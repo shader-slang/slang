@@ -1034,7 +1034,7 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
-        GetModuleInfo, // Print serialized module version and name
+        GetModuleInfo,              // Print serialized module version and name
         GetSupportedModuleVersions, // Print the min and max module versions this compiler supports
 
         EmitSeparateDebug, // bool
