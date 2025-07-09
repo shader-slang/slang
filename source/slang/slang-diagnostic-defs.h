@@ -2604,6 +2604,12 @@ DIAGNOSTIC(
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
 
+DIAGNOSTIC(
+    41404,
+    Error,
+    cannotWriteToReadOnlyPointer,
+    "cannot write to a read-only pointer")
+
 //
 // 5xxxx - Target code generation.
 //
