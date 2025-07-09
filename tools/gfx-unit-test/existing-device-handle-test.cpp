@@ -1,21 +1,15 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -25,127 +19,102 @@ void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> pipelineState;
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 1.0f, 2.0f, 3.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
+        auto commandEncoder = queue->createCommandEncoder();
+        {
+            auto encoder = commandEncoder->beginComputePass();
+            auto rootObject = encoder->bindPipeline(pipelineState);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+            ShaderCursor rootCursor(rootObject);
+            // Bind buffer directly to the root.
+            rootCursor.getPath("buffer").setBinding(Binding(numbersBuffer));
 
-        auto rootObject = encoder->bindPipeline(pipelineState);
+            encoder->dispatchCompute(1, 1, 1);
+            encoder->end();
+        }
 
-        ShaderCursor rootCursor(rootObject);
-        // Bind buffer view to the root.
-        rootCursor.getPath("buffer").setResource(bufferView);
-
-        encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        auto commandBuffer = commandEncoder->finish();
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(1.0f, 2.0f, 3.0f, 4.0f));
+    compareComputeResult(device, numbersBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
-void existingDeviceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+void existingDeviceHandleTestAPI(UnitTestContext* context, DeviceType deviceType)
 {
-    gfxEnableDebugLayer(context->enableDebugLayers);
-    if ((api & context->enabledApis) == 0)
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
     {
-        SLANG_IGNORE_TEST;
+        SLANG_IGNORE_TEST
     }
     Slang::ComPtr<IDevice> device;
-    IDevice::Desc deviceDesc = {};
-    switch (api)
-    {
-    case Slang::RenderApiFlag::D3D12:
-        deviceDesc.deviceType = gfx::DeviceType::DirectX12;
-        break;
-    case Slang::RenderApiFlag::Vulkan:
-        deviceDesc.deviceType = gfx::DeviceType::Vulkan;
-        break;
-    case Slang::RenderApiFlag::CUDA:
-        deviceDesc.deviceType = gfx::DeviceType::CUDA;
-        break;
-    default:
-        SLANG_IGNORE_TEST;
-    }
+    DeviceDesc deviceDesc = {};
+    deviceDesc.deviceType = deviceType;
     deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
     const char* searchPaths[] = {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"};
     deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
     deviceDesc.slang.searchPaths = searchPaths;
-    auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
+    auto createDeviceResult = getRHI()->createDevice(deviceDesc, device.writeRef());
     if (SLANG_FAILED(createDeviceResult) || !device)
     {
         SLANG_IGNORE_TEST;
     }
 
-    IDevice::InteropHandles handles;
+    DeviceNativeHandles handles;
     GFX_CHECK_CALL_ABORT(device->getNativeDeviceHandles(&handles));
     Slang::ComPtr<IDevice> testDevice;
-    IDevice::Desc testDeviceDesc = deviceDesc;
+    DeviceDesc testDeviceDesc = deviceDesc;
     testDeviceDesc.existingDeviceHandles.handles[0] = handles.handles[0];
-    if (api == Slang::RenderApiFlag::Vulkan)
+    if (deviceType == DeviceType::Vulkan)
     {
         testDeviceDesc.existingDeviceHandles.handles[1] = handles.handles[1];
         testDeviceDesc.existingDeviceHandles.handles[2] = handles.handles[2];
     }
-    auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
-    if (SLANG_FAILED(createTestDeviceResult) || !device)
+    auto createTestDeviceResult = getRHI()->createDevice(testDeviceDesc, testDevice.writeRef());
+    if (SLANG_FAILED(createTestDeviceResult) || !testDevice)
     {
         SLANG_IGNORE_TEST;
     }
 
-    existingDeviceHandleTestImpl(device, context);
+    existingDeviceHandleTestImpl(testDevice, context);
 }
 
 SLANG_UNIT_TEST(existingDeviceHandleD3D12)
 {
-    return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
+    return existingDeviceHandleTestAPI(unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(existingDeviceHandleVulkan)
 {
-    return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
+    return existingDeviceHandleTestAPI(unitTestContext, DeviceType::Vulkan);
 }
 #if SLANG_WIN64
 SLANG_UNIT_TEST(existingDeviceHandleCUDA)
 {
-    return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::CUDA);
+    return existingDeviceHandleTestAPI(unitTestContext, DeviceType::CUDA);
 }
 #endif
 } // namespace gfx_test

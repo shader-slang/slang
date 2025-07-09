@@ -1,11 +1,11 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -17,8 +17,8 @@ namespace gfx_test
 // option to define the value of DOWNSTREAM_VALUE when running dxc.
 //
 static Slang::Result loadProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
     slang::ProgramLayout*& slangReflection)
@@ -62,10 +62,10 @@ static Slang::Result loadProgram(
     composedProgram = linkedProgram;
     slangReflection = composedProgram->getLayout();
 
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
 
-    auto shaderProgram = device->createProgram(programDesc);
+    auto shaderProgram = device->createShaderProgram(programDesc);
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;
@@ -73,76 +73,57 @@ static Slang::Result loadProgram(
 
 void linkTimeOptionTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(
         loadProgram(device, shaderProgram, "link-time-options", "computeMain", slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> pipelineState;
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
+        auto commandEncoder = queue->createCommandEncoder();
+        auto computePassEncoder = commandEncoder->beginComputePass();
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
-
-        auto rootObject = encoder->bindPipeline(pipelineState);
+        auto rootObject = computePassEncoder->bindPipeline(pipelineState);
 
         ShaderCursor entryPointCursor(
             rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
-        // Bind buffer view to the entry point.
-        entryPointCursor.getPath("buffer").setResource(bufferView);
+        // Bind buffer to the entry point.
+        entryPointCursor.getPath("buffer").setBinding(Binding(numbersBuffer));
 
-        encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        computePassEncoder->dispatchCompute(1, 1, 1);
+        computePassEncoder->end();
+        auto commandBuffer = commandEncoder->finish();
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(4.0));
+    compareComputeResult(device, numbersBuffer, std::array{4.0f});
 }
 
 SLANG_UNIT_TEST(linkTimeOptionD3D12)
 {
-    runTestImpl(linkTimeOptionTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(linkTimeOptionTestImpl, unitTestContext, DeviceType::D3D12);
 }
 } // namespace gfx_test
