@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK1):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK4):-target cuda -entry main -stage compute
 
 Texture2D<float> textures[2];
 RWTexture2D<float2> outputTexture;
@@ -32,6 +33,8 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK3: %[[VAR3:[a-zA-Z0-9_]+]] = OpAccessChain{{.*}}NonUniform
     // CHECK3: %[[VAR4:[a-zA-Z0-9_]+]] = OpLoad %{{.*}}[[VAR3]]{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpImageFetch %v4float %[[VAR4]] %{{.*}}
+
+    // CHECK4: tex2D
     float2 tmp0 = textures[NonUniformResourceIndex(pixelIndex.x)].Load(int3(0, 0, 0));
     outputTexture[0] = tmp0;
 

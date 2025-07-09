@@ -1,4 +1,8 @@
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target glsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

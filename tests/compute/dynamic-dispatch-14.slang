@@ -4,6 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -profile glsl_440
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda
 
 
 

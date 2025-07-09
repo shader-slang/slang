@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 struct Param
 {

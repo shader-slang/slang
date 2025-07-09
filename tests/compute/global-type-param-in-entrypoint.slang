@@ -1,9 +1,9 @@
 // tests/compute/*type-param* tests are broken #5627
-//DISABLED_TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
 
-//TEST_INPUT: cbuffer(data=[1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0]):name Uniforms
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
-//TEST_INPUT: global_type VertImpl
+//TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0], stride=4):name=Uniforms
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:global_type VertImpl
 
 interface IVertInterpolant
 {

@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK1):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK4):-target cuda -entry main -stage compute
 
 RWTexture2D<uint> texArray[2];
 
@@ -23,5 +24,7 @@ void main( uint2 dispatchThreadID : SV_DispatchThreadID, uint2 groupThreadID : S
     // CHECK3-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
     // CHECK3: %[[VAR1]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %texArray %{{.*}}
     // CHECK3: %{{.*}} = OpImageTexelPointer %_ptr_Image_uint %[[VAR1]] %{{.*}}
+
+    // CHECK4: atomicAdd
     InterlockedAdd(texArray[NonUniformResourceIndex(dispatchThreadID.x)][uint2(0)], 2);
 }

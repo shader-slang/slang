@@ -1,6 +1,7 @@
-// static-const-array.slang
+// static-const-vector-array.slang
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj -cuda
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -output-using-type -shaderobj
 

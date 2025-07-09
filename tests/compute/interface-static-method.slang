@@ -1,6 +1,7 @@
 // interface-static-method.slang
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, cuda):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_5_0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj

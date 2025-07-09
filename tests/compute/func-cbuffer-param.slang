@@ -9,6 +9,7 @@
 //TEST(compute, vulkan, compatibility-issue):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 
 struct Data
