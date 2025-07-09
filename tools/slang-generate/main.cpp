@@ -212,7 +212,7 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
         get(reader);
         openCount++;
 
-        // This case allows parsing `myFunc($((int)val))` correctly, else we parse 
+        // This case allows parsing `myFunc($((int)val))` correctly, else we parse
         // body as `int)val`, causing non obvious segfault.
         if constexpr (onlyReadFirstOpenChar)
             break;
