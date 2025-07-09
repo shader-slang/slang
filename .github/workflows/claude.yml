@@ -167,6 +167,14 @@ jobs:
           custom_instructions: |
             You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
             Use it at your disposal if you need to think about the problem at hand.
+            
+            Build system information:
+            - OS: Ubuntu Linux (ubuntu-latest runner)
+            - Build commands: 
+              * Configure: cmake --preset default
+              * Build: cmake --build --preset release
+              * Test: ./build/Release/bin/slang-test
+            - Project is pre-built and ready for development tasks
           mcp_config: |
             {
               "mcpServers": {
