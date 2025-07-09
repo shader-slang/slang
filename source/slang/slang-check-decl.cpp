@@ -10713,6 +10713,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         for (auto constraint :
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
+            ensureDecl(constraint, DeclCheckState::ReadyForReference);
             collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
         }
 
