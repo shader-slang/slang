@@ -150,19 +150,9 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
-          direct_prompt: |
-                Please review this pull request and provide comprehensive feedback.
-                Summarize the changes. Use that summary to ask deepwiki ask_question mcp server with GITHUB_REPOSITORY env
-                Feature Summary: <Fill with deepwiki mcp server>
-                Focus on:
-                - Code quality and best practices
-                - Potential bugs or issues
-                - Performance considerations
-                - Security implications
-                - Test coverage
-                - Documentation updates if needed
-                Provide constructive feedback with specific suggestions for improvement.
-                Use inline comments to highlight specific areas of concern.
+          custom_instructions	: |
+                You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
+                Use it at your disposal if you need to think about the problem at hand.
           mcp_config: |
             {
               "mcpServers": {
@@ -174,6 +164,7 @@ jobs:
             }
           allowed_tools: "Bash(git diff --name-only HEAD~1),Bash(git diff HEAD~1),Bash(git:*),View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
           trigger_phrase: "@claude"
+          assignee_trigger: "claude"
           timeout_minutes: "25"
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
