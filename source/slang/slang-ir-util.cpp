@@ -45,19 +45,6 @@ IRType* getMatrixElementType(IRType* type)
     return type;
 }
 
-IRType* getAlgebraicElementType(IRType* type)
-{
-    if (auto vecType = as<IRVectorType>(type))
-        return vecType->getElementType();
-    if (auto matrixType = as<IRMatrixType>(type))
-        return matrixType->getElementType();
-    if (auto coopVecType = as<IRCoopVectorType>(type))
-        return coopVecType->getElementType();
-    if (auto coopMatType = as<IRCoopMatrixType>(type))
-        return coopMatType->getElementType();
-    return type;
-}
-
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;

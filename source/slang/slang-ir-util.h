@@ -84,10 +84,6 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
-/// Get the element type of a vector, matrix, or cooperative matrix/vector type.
-/// If `type` is not one of the algebraic types, returns `type` itself.
-IRType* getAlgebraicElementType(IRType* type);
-
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);

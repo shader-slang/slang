@@ -2245,9 +2245,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 printf("matrix type may need to be legalized:\n");
                 matrixType->dump();
                 auto elementType = matrixType->getElementType();
-                if (as<IRBoolType>(elementType) || as<IRIntType>(elementType))
+                if (as<IRBoolType>(elementType) ||
+                    as<IRUIntType>(elementType) ||
+                    as<IRIntType>(elementType))
                 {
-                    printf("\tbool/int matrix... needs to be legalized\n");
+                    printf("\tbool/int/uint matrix... needs to be legalized\n");
                     matricesToLower.add(matrixType);
                 }
             }

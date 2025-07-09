@@ -2044,9 +2044,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // SPIR-V only supports floating-point matrices
                 // bool/int matrices should be lowered to
                 // arrays of vectors before reaching here
-                if (as<IRBoolType>(elementType) || as<IRIntType>(elementType))
+                if (as<IRBoolType>(elementType) ||
+                    as<IRUIntType>(elementType) ||
+                    as<IRIntType>(elementType))
                 {
-                    SLANG_UNEXPECTED("bool/int matrices should be lowered to structs before SPIR-V emission");
+                    SLANG_UNEXPECTED("bool/int/uint matrices should be lowered to structs before SPIR-V emission");
                 }
                 
                 auto vectorSpvType = ensureVectorType(
@@ -6908,14 +6910,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         // Note: SPIRV only supports the case where `index` is constant.
-        printf("get element, inst:\n");
-        inst->dump();
-        printf("first opd:\n");
-        inst->getOperand(0)->dump();
         auto base = inst->getBase();
         const auto baseTy = base->getDataType();
-        printf("base type:\n");
-        baseTy->dump();
         SLANG_ASSERT(
             as<IRPointerLikeType>(baseTy) || as<IRArrayType>(baseTy) || as<IRVectorType>(baseTy) ||
             as<IRCoopVectorType>(baseTy) || as<IRMatrixType>(baseTy) ||
@@ -7736,19 +7732,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
         
-        printf("make matrix:\n");
-        inst->dump();
-        printf("data type:\n");
-        inst->getDataType()->dump();
-
-        auto dataType = inst->getDataType();
-
         IRIntegerValue rowCount;
         IRIntegerValue colCount;
         IRType* elementType;
 
         // Data type can be either matrix or vector depending on the
         // legalization requirements
+        auto dataType = inst->getDataType();
+
         if (auto matrixType = as<IRMatrixType>(dataType))
         {
             elementType = matrixType->getElementType();
@@ -7757,7 +7748,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (auto arrayType = as<IRArrayType>(dataType))
         {
-            printf("array type!\n");
             auto vectorType = as<IRVectorType>(arrayType->getElementType());
             SLANG_ASSERT(vectorType);
 
@@ -7898,19 +7888,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         UInt operandCount,
         ArrayView<IRInst*> operands)
     {
-        printf("emitVectorOrScalarArithmetic:\n");
-        operands[0]->dump();
-
-        IRType* elementType = getAlgebraicElementType(operands[0]->getDataType());
-        //IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
+        IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
         SLANG_ASSERT(elementType);
-        printf("elementType: %p\n", elementType);
-        elementType->dump();
 
         IRBasicType* basicType = as<IRBasicType>(elementType);
         SLANG_ASSERT(basicType);
-        printf("basicType\n");
-        basicType->dump();
 
         SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
         if (opCode == SpvOpUndef)
@@ -7980,6 +7962,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto colCount = getIntVal(matrixType->getColumnCount());
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
+            // TODO: template matrix vs. array
             auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
             List<SpvInst*> rows;
             for (IRIntegerValue i = 0; i < rowCount; i++)
@@ -8003,6 +7986,57 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     parent,
                     nullptr,
                     rowVectorType,
+                    inst->getOp(),
+                    inst->getOperandCount(),
+                    operands.getArrayView()));
+            }
+            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
+        }
+        else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
+        {
+            printf("legalizing array type arithmetic:\n");
+            inst->dump();
+            printf("\tnumber of operands: %d\n", inst->getOperandCount());
+            // Only for legalization
+            auto arrayElementType = arrayType->getElementType();
+            SLANG_ASSERT(as<IRVectorType>(arrayElementType));
+
+            auto vectorType = as<IRVectorType>(arrayElementType);
+            auto elementType = vectorType->getElementType();
+            SLANG_ASSERT(
+                as<IRBoolType>(elementType) ||
+                as<IRUIntType>(elementType) ||
+                as<IRIntType>(elementType));
+
+            auto rowCount = getIntVal(arrayType->getElementCount());
+            auto colCount = getIntVal(vectorType->getElementCount());
+
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto rowVectorType = builder.getVectorType(elementType, colCount);
+            List<SpvInst*> rows;
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                List<IRInst*> operands;
+                for (IRIntegerValue j = 0; j < inst->getOperandCount(); j++)
+                {
+                    auto originalOperand = inst->getOperand(j);
+                    if (as<IRArrayType>(originalOperand->getDataType()))
+                    {
+                        auto operand = builder.emitElementExtract(originalOperand, i);
+                        emitLocalInst(parent, operand);
+                        operands.add(operand);
+                    }
+                    else
+                    {
+                        operands.add(originalOperand);
+                    }
+                }
+                printf("\trow %d: collected %d opds\n", i, operands.getCount());
+                rows.add(emitVectorOrScalarArithmetic(
+                    parent,
+                    nullptr,
+                    rowVectorType, 
                     inst->getOp(),
                     inst->getOperandCount(),
                     operands.getArrayView()));
