@@ -183,7 +183,6 @@ jobs:
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
             ANTHROPIC_SMALL_FAST_MODEL: ${{ vars.ANTHROPIC_SMALL_FAST_MODEL }}
-            ANTHROPIC_CUSTOM_HEADERS: ${{ vars.ANTHROPIC_CUSTOM_HEADERS }}
             AWS_REGION: ${{ vars.AWS_REGION }}
             GITHUB_REPOSITORY: ${{ github.repository }}
             GITHUB_EVENT_NAME: ${{ github.event_name }}
