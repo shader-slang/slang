@@ -1790,6 +1790,11 @@ DIAGNOSTIC(
     Error,
     overrideModifierNotOverridingBaseDecl,
     "'$0' marked as 'override' is not overriding any base declarations.")
+DIAGNOSTIC(
+    30855,
+    Error,
+    unreferencedGenericParamInExtension,
+    "generic parameter '$0' is not referenced by extension target type '$1'.")
 
 // 309xx: subscripts
 DIAGNOSTIC(
