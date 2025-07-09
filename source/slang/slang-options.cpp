@@ -565,7 +565,7 @@ void initCommandOptions(CommandOptions& options)
          "Include additional type conformance during linking for dynamic dispatch."},
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
-         "reflection-json <path>",
+         "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
