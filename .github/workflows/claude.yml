@@ -41,6 +41,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          submodules: "recursive"
           fetch-depth: 2 # fetch minimal history for git context
 
       # Step 1: Setup environment and prebuild project (following copilot pattern)
