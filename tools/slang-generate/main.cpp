@@ -323,7 +323,7 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                     //
                     addTextSpan(link, spanBegin, spanEnd);
 
-                    Node* body = readBody<false>(reader, 0, '(', 0, ')');
+                    Node* body = readBody<true>(reader, 0, '(', 0, ')');
 
                     addSpliceSpan(link, body);
 
