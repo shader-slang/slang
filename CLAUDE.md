@@ -413,12 +413,7 @@ Multiple files covering language features, compilation, reflection API, and plat
 - `legacy/006-artifact-container-format.md` - Artifact container format (legacy)
 - `implementation/ast-ir-serialization.md` - AST/IR serialization implementation
 
-#### Project Documentation (`external/spec/`)
-- `README.md` - Project overview and goals
-- `CONTRIBUTING.md` - Contribution guidelines
-- `CODE_OF_CONDUCT.md` - Community standards
-
-### Coding Standards (Key Points)
+### Coding Standards
 
 #### C++ Subset Restrictions
 - **No STL containers** - Use Slang's own List<>, Dictionary<>, etc.
