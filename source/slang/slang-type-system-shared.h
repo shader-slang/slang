@@ -130,13 +130,13 @@ enum class MemoryScope : uint64_t
 enum class CoherentScope : uint64_t
 {
     NotCoherent = 0xFF,
-    CrossDevice = MemoryScope::CrossDevice,
-    Device = MemoryScope::Device,
-    Workgroup = MemoryScope::Workgroup,
-    Subgroup = MemoryScope::Subgroup,
-    Invocation = MemoryScope::Invocation,
-    QueueFamily = MemoryScope::QueueFamily,
-    ShaderCall = MemoryScope::ShaderCall,
+    CrossDevice = (uint64_t)MemoryScope::CrossDevice,
+    Device = (uint64_t)MemoryScope::Device,
+    Workgroup = (uint64_t)MemoryScope::Workgroup,
+    Subgroup = (uint64_t)MemoryScope::Subgroup,
+    Invocation = (uint64_t)MemoryScope::Invocation,
+    QueueFamily = (uint64_t)MemoryScope::QueueFamily,
+    ShaderCall = (uint64_t)MemoryScope::ShaderCall,
 };
 
 enum class PtrAccess : uint64_t
