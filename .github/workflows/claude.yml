@@ -45,7 +45,6 @@ jobs:
         with:
           fetch-depth: 0 # will fetch full repo history for git history as context
 
-
       # Step 1: Validate environment and dependencies
       - name: Validate Environment
         run: |
@@ -176,7 +175,7 @@ jobs:
             GITHUB_ACTOR: ${{ github.actor }}
             ANTHROPIC_AUTH_TOKEN: ${{ env.ANTHROPIC_AUTH_TOKEN }}
             DISABLE_TELEMETRY: 1
-            
+
         # The ANTHROPIC_API_KEY environment variable is automatically picked up
         continue-on-error: true
 
