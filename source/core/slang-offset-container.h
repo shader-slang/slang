@@ -445,7 +445,7 @@ public:
     template<typename T>
     Offset32Ptr<T> newObject()
     {
-        void* data = allocate(sizeof(T), SLANG_ALIGN_OF(T));
+        void* data = allocate(sizeof(T), alignof(T));
         new (data) T();
         return Offset32Ptr<T>(getOffset(data));
     }
@@ -457,7 +457,7 @@ public:
         {
             return Offset32Array<T>();
         }
-        T* data = (T*)allocate(sizeof(T) * size, SLANG_ALIGN_OF(T));
+        T* data = (T*)allocate(sizeof(T) * size, alignof(T));
         for (size_t i = 0; i < size; ++i)
         {
             new (data + i) T();

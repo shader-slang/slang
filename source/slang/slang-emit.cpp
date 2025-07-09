@@ -56,6 +56,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
@@ -300,43 +301,6 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// To improve the performance of our backend, we will try to avoid running
-// passes related to features not used in the user code.
-// To do so, we will scan the IR module once, and determine which passes are needed
-// based on the instructions used in the IR module.
-// This will allow us to skip running passes that are not needed, without having to
-// run all the passes only to find out that no work is needed.
-// This is especially important for the performance of the backend, as some passes
-// have an initialization cost (such as building reference graphs or DOM trees) that
-// can be expensive.
-//
-struct RequiredLoweringPassSet
-{
-    bool debugInfo;
-    bool resultType;
-    bool optionalType;
-    bool enumType;
-    bool combinedTextureSamplers;
-    bool reinterpret;
-    bool generics;
-    bool bindExistential;
-    bool autodiff;
-    bool derivativePyBindWrapper;
-    bool bitcast;
-    bool existentialTypeLayout;
-    bool bindingQuery;
-    bool meshOutput;
-    bool higherOrderFunc;
-    bool globalVaryingVar;
-    bool glslSSBO;
-    bool byteAddressBuffer;
-    bool dynamicResource;
-    bool dynamicResourceHeap;
-    bool resolveVaryingInputRef;
-    bool specializeStageSwitch;
-    bool missingReturn;
-};
-
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
@@ -414,7 +378,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         result.generics = true;
         break;
     case kIROp_Specialize:
@@ -471,6 +435,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_MissingReturn:
         result.missingReturn = true;
         break;
+    case kIROp_Select:
+        if (!isScalarOrVectorType(inst->getFullType()))
+            result.nonVectorCompositeSelect = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -492,7 +460,10 @@ void calcRequiredLoweringPassSet(
     }
     for (auto child : inst->getDecorationsAndChildren())
     {
-        calcRequiredLoweringPassSet(result, codeGenContext, child);
+        calcRequiredLoweringPassSet(
+            codeGenContext->getRequiredLoweringPassSet(),
+            codeGenContext,
+            child);
     }
 }
 
@@ -764,7 +735,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     // Scan the IR module and determine which lowering/legalization passes are needed.
-    RequiredLoweringPassSet requiredLoweringPassSet = {};
+    RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
@@ -1083,6 +1055,18 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.optionalType)
         lowerOptionalType(irModule, sink);
 
+    if (requiredLoweringPassSet.nonVectorCompositeSelect)
+    {
+        switch (target)
+        {
+        case CodeGenTarget::HLSL:
+            legalizeNonVectorCompositeSelect(irModule);
+            break;
+        default:
+            break;
+        }
+    }
+
     switch (target)
     {
     case CodeGenTarget::CPPSource:
@@ -1097,7 +1081,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
     switch (target)
@@ -1226,11 +1209,6 @@ Result linkAndOptimizeIR(
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
-
-    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
-        isWGPUTarget(targetRequest))
-        deferBufferLoad(irModule);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -1385,6 +1363,11 @@ Result linkAndOptimizeIR(
     // We clean up the usages of resource values here.
     specializeResourceUsage(codeGenContext, irModule);
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
+    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
+        isWGPUTarget(targetRequest))
+        deferBufferLoad(irModule);
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.

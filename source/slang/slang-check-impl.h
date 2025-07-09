@@ -1252,8 +1252,8 @@ public:
     TypeExp TranslateTypeNode(TypeExp const& typeExp);
     Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
     Type* getConstantBufferType(Type* elementType, Type* layoutType);
-
     DeclRefType* getExprDeclRefType(Expr* expr);
+    LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
@@ -2305,6 +2305,11 @@ public:
         // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
         // not optional.
         bool isOptional = false;
+
+        // Is this constraint an equality? This tells us that "joining" types is meaningless, we
+        // know the result will be the sub type. If it is not, we will error once we start
+        // substituting types.
+        bool isEquality = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
@@ -2658,6 +2663,7 @@ public:
     {
         Index indexInTypePack = 0;
         bool optionalConstraint = false;
+        bool equalityConstraint = false;
     };
 
     // Try to find a unification for two values
@@ -3144,6 +3150,8 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+bool isImmutableBufferType(Type* type);
 
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.

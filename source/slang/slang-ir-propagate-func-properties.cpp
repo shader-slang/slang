@@ -35,11 +35,11 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
 {
     switch (op)
     {
-    case kIROp_ifElse:
-    case kIROp_unconditionalBranch:
+    case kIROp_IfElse:
+    case kIROp_UnconditionalBranch:
     case kIROp_Switch:
     case kIROp_Return:
-    case kIROp_loop:
+    case kIROp_Loop:
     case kIROp_Call:
     case kIROp_Param:
     case kIROp_Unreachable:

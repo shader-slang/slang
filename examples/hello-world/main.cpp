@@ -69,7 +69,6 @@ struct HelloWorldExample : public TestBase
 
 int exampleMain(int argc, char** argv)
 {
-    initDebugCallback();
     HelloWorldExample example;
     example.parseOption(argc, argv);
     return example.run();
