@@ -710,9 +710,10 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30049,
     Note,
-    thisIsImmutableByDefault,
-    "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` "
-    "attribute to the function declaration to opt in to a mutable `this`")
+    attemptingToAssignToConstVariable,
+    "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on "
+    "the containing method to allow modification")
+
 DIAGNOSTIC(
     30050,
     Error,
