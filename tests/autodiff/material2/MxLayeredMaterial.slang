@@ -52,6 +52,7 @@ public struct MxLayeredMaterial : IMaterial
     }
 
     [Differentiable]
+    [NoDiffThis]
     public UsedMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);
