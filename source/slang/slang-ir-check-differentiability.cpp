@@ -82,6 +82,49 @@ public:
             callInst->findDecoration<IRDifferentiableCallDecoration>());
     }
 
+    // If a function call takes all literals as arguments, it will implies that this function will
+    // not be expected to any gradients, in this case, this call should be treated as no_diff even
+    // there is no 'no_diff' decorated on it explicitly. In the actual check, we only need to check
+    // the argument corresponding to the differentiable parameters, because non-differentiable
+    // parameter are not expected to produce any gradients anyway.
+    bool shouldCallImpliesNoDiff(
+        DifferentiableTypeConformanceContext& diffTypeContext,
+        IRCall* callInst)
+    {
+        if (shouldTreatCallAsDifferentiable(callInst))
+        {
+            return true;
+        }
+
+        auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
+        if (!calleeFuncType)
+            return false;
+
+        SLANG_RELEASE_ASSERT(calleeFuncType->getParamCount() == callInst->getArgCount());
+
+        bool doesImplyNoDiff = true;
+        UInt paramIndex = 0;
+        for (auto paramType : calleeFuncType->getParamTypes())
+        {
+            if (isDifferentiableType(diffTypeContext, paramType))
+            {
+                auto arg = callInst->getArg(paramIndex);
+                if (!as<IRConstant>(arg))
+                {
+                    doesImplyNoDiff = false;
+                }
+            }
+            paramIndex++;
+        }
+
+        if (doesImplyNoDiff)
+        {
+            IRBuilder irBuilder(callInst->getModule());
+            irBuilder.addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
+        }
+        return doesImplyNoDiff;
+    }
+
     bool isDifferentiableFunc(IRInst* func, DifferentiableLevel level)
     {
         switch (func->getOp())
@@ -497,7 +540,8 @@ public:
                         // No need to fail here if the function is no_diff in
                         // both inputs and all outputs, this is equivalent of
                         // inserting no_diff on this inst.
-                        if (!isNeverDiffFuncType(cast<IRFuncType>(callee->getDataType())))
+                        if (!isNeverDiffFuncType(cast<IRFuncType>(callee->getDataType())) &&
+                            !shouldCallImpliesNoDiff(diffTypeContext, call))
                         {
                             sink->diagnose(
                                 inst,
