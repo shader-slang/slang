@@ -44,6 +44,13 @@ enum class SpawnType
     UseFullyIsolatedTestServer, ///< Uses a test server for each test (slow!)
 };
 
+enum class VerbosityLevel
+{
+    Failure, ///< Only show failures and errors
+    Info,    ///< Show test discovery and results (default)
+    Verbose, ///< Show detailed output including command lines
+};
+
 struct Options
 {
     char const* appName = "slang-test";
@@ -57,8 +64,8 @@ struct Options
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 
-    // generate extra output (notably: command lines we run)
-    bool shouldBeVerbose = false;
+    // verbosity level for output
+    VerbosityLevel verbosity = VerbosityLevel::Info;
 
     // When true results from ignored tests are not shown
     bool hideIgnored = false;

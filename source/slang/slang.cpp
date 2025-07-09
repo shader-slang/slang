@@ -435,6 +435,21 @@ SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlag
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
 }
 
+void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
+{
+    switch (moduleName)
+    {
+    case slang::BuiltinModuleName::Core:
+        sb << (const char*)getCoreLibraryCode()->getBufferPointer()
+           << (const char*)getHLSLLibraryCode()->getBufferPointer()
+           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::GLSL:
+        sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    }
+}
+
 SlangResult Session::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
@@ -460,17 +475,7 @@ SlangResult Session::compileBuiltinModule(
     }
 
     StringBuilder moduleSrcBuilder;
-    switch (moduleName)
-    {
-    case slang::BuiltinModuleName::Core:
-        moduleSrcBuilder << (const char*)getCoreLibraryCode()->getBufferPointer()
-                         << (const char*)getHLSLLibraryCode()->getBufferPointer()
-                         << (const char*)getAutodiffLibraryCode()->getBufferPointer();
-        break;
-    case slang::BuiltinModuleName::GLSL:
-        moduleSrcBuilder << (const char*)getGLSLLibraryCode()->getBufferPointer();
-        break;
-    }
+    getBuiltinModuleSource(moduleSrcBuilder, moduleName);
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     auto moduleSrcBlob = StringBlob::moveCreate(moduleSrcBuilder.produceString());
@@ -637,13 +642,11 @@ SlangResult Session::saveBuiltinModule(
     // We want builtin modules to be saved with their source location
     // information.
     //
-    options.optionFlags |= SerialOptionFlag::SourceLocation;
-    //
     // And in order to work with source locations, the serialization
     // process will also need access to the source manager that
     // can translate locations into their humane format.
     //
-    options.sourceManager = m_builtinLinkage->getSourceManager();
+    options.sourceManagerToUseWhenSerializingSourceLocs = m_builtinLinkage->getSourceManager();
 
     // At this point we can finally delegate down to the next level,
     // which handles the serialization of a Slang module into a
@@ -760,7 +763,7 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, this, sourceLocReader));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, this, sourceLocReader, irModule));
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);
@@ -837,7 +840,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
     const size_t dstSize = sizeof(T);
 
     // If they are the same size, and appropriate alignment we can just cast and return
-    if (srcSize == dstSize && (size_t(src) & (SLANG_ALIGN_OF(T) - 1)) == 0)
+    if (srcSize == dstSize && (size_t(src) & (alignof(T) - 1)) == 0)
     {
         return *(const T*)src;
     }
@@ -1365,6 +1368,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_sourceManager(&m_defaultSourceManager)
     , m_astBuilder(astBuilder)
     , m_cmdLineContext(new CommandLineContext())
+    , m_stringSlicePool(StringSlicePool::Style::Default)
 {
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
@@ -1493,13 +1497,29 @@ static void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    try
+    {
+        sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Internal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 static void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    try
+    {
+        sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Fatal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
@@ -1642,6 +1662,47 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
     slang::IBlob** outDiagnostics)
 {
     return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::IR, outDiagnostics);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::loadModuleInfoFromIRBlob(
+    slang::IBlob* source,
+    SlangInt& outModuleVersion,
+    const char*& outModuleCompilerVersion,
+    const char*& outModuleName)
+{
+    // We start by reading the content of the file as
+    // an in-memory RIFF container.
+    //
+    auto rootChunk = RIFF::RootChunk::getFromBlob(source);
+    if (!rootChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto moduleChunk = ModuleChunk::find(rootChunk);
+    if (!moduleChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto irChunk = moduleChunk->findIR();
+    if (!irChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    RefPtr<IRModule> irModule;
+    String compilerVersion;
+    UInt version;
+    String name;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, compilerVersion, version, name));
+    const auto compilerVersionSlice = m_stringSlicePool.addAndGetSlice(compilerVersion);
+    const auto nameSlice = m_stringSlicePool.addAndGetSlice(name);
+    outModuleCompilerVersion = compilerVersionSlice.begin();
+    outModuleName = nameSlice.begin();
+    outModuleVersion = SlangInt(version);
+
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
@@ -3619,8 +3680,7 @@ void FrontEndCompileRequest::generateIR()
         {
             SerialContainerUtil::WriteOptions options;
 
-            options.sourceManager = getSourceManager();
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManagerToUseWhenSerializingSourceLocs = getSourceManager();
 
             // Verify debug information
             if (SLANG_FAILED(
@@ -3630,33 +3690,6 @@ void FrontEndCompileRequest::generateIR()
                     irModule->getModuleInst()->sourceLoc,
                     Diagnostics::serialDebugVerificationFailed);
             }
-        }
-
-        if (useSerialIRBottleneck)
-        {
-            // Keep the obfuscated source map (if there is one)
-            ComPtr<IBoxValue<SourceMap>> obfuscatedSourceMap(irModule->getObfuscatedSourceMap());
-
-            IRSerialData serialData;
-            {
-                // Write IR out to serialData - copying over SourceLoc information directly
-                IRSerialWriter writer;
-                writer.write(irModule, nullptr, SerialOptionFlag::RawSourceLocation, &serialData);
-
-                // Destroy irModule such that memory can be used for newly constructed read
-                // irReadModule
-                irModule = nullptr;
-            }
-            RefPtr<IRModule> irReadModule;
-            {
-                // Read IR back from serialData
-                IRSerialReader reader;
-                reader.read(serialData, getSession(), nullptr, irReadModule);
-            }
-
-            // Set irModule to the read module
-            irModule = irReadModule;
-            irModule->setObfuscatedSourceMap(obfuscatedSourceMap);
         }
 
         // Set the module on the translation unit
@@ -4161,8 +4194,18 @@ void Linkage::loadParsedModule(
     auto sink = translationUnit->compileRequest->getSink();
 
     int errorCountBefore = sink->getErrorCount();
-    compileRequest->checkAllTranslationUnits();
-    int errorCountAfter = sink->getErrorCount();
+    int errorCountAfter;
+    try
+    {
+        compileRequest->checkAllTranslationUnits();
+    }
+    catch (...)
+    {
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
+        throw;
+    }
+    errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
         // Don't generate IR as language server.
@@ -6800,7 +6843,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, session, sourceLocReader));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of

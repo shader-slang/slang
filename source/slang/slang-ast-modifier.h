@@ -3,6 +3,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-modifier.h.fiddle"
+#include "slang-ir-insts-enum.h"
 
 FIDDLE()
 namespace Slang
@@ -185,6 +186,13 @@ FIDDLE()
 class SynthesizedStaticLambdaFuncModifier : public Modifier
 {
     FIDDLE(...)
+};
+
+FIDDLE()
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySet declaredCapabilityRequirements;
 };
 
 // Marks a synthesized variable as local temporary variable.
@@ -1909,16 +1917,6 @@ class RequireFullQuadsAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[payload]` attribute indicates that a `struct` type will be used as
-/// a ray payload for `TraceRay()` calls, and thus also as input/output
-/// for shaders in the ray tracing pipeline that might be invoked for
-/// such a ray.
-///
-FIDDLE()
-class PayloadAttribute : public Attribute
-{
-    FIDDLE(...)
-};
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output

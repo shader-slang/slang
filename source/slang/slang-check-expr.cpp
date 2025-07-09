@@ -410,7 +410,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
             baseTypeExpr->base.type = baseExprType;
             baseTypeExpr->type.type = m_astBuilder->getTypeType(baseExprType);
-
+            baseTypeExpr->base.exp = baseExpr;
             auto expr = m_astBuilder->create<StaticMemberExpr>();
             expr->loc = loc;
             expr->type = type;
@@ -537,6 +537,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     if (as<PtrType>(base->type) || as<RefType>(base->type))
     {
         derefExpr->type.isLeftValue = true;
+    }
+    else if (isImmutableBufferType(base->type))
+    {
+        derefExpr->type.isLeftValue = false;
+        derefExpr->type.isWriteOnly = false;
     }
     else
     {
@@ -682,6 +687,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = getName("Differential");
                 typeDef->parentDecl = structDecl;
+                addVisibilityModifier(structDecl, getDeclVisibility(parent));
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
 
                 auto synthDeclRef =
                     createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(structDecl));
@@ -714,6 +721,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 typeDef->type.type =
                     calcThisType(subType->getDeclRef().getDecl()->getDefaultDeclRef());
 
+                addVisibilityModifier(typeDef, getDeclVisibility(parent));
                 synthesizedDecl = parent;
 
                 parent->addDirectMemberDecl(typeDef);
@@ -1624,6 +1632,31 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 }
 
+// This checks that if a differentiable function access a non-diff type "This", in such case we
+// want to provide a non-error diagnostic to the user to notify that there could be an unexpected
+// behavior because every member access will not have derivative computed for it. User can use
+// [NoDiffThis] to clarify that this is intended.
+void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
+{
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
+        if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
+        {
+            if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
+                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+            {
+                return;
+            }
+
+            getSink()->diagnose(
+                memberExpr->loc,
+                Diagnostics::noDerivativeOnNonDifferentiableThisType,
+                memberExpr->declRef.getDecl(),
+                this->m_parentFunc);
+        }
+    }
+}
 
 Expr* SemanticsVisitor::CheckTerm(Expr* term)
 {
@@ -1641,7 +1674,13 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
         maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+
+        if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            maybeCheckMissingNoDiffThis(checkedTerm);
+        }
     }
+
     return checkedTerm;
 }
 
@@ -2085,7 +2124,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             // to not allow such cases.
             //
             // Note that float-to-inst casts for non-`IntVal`s are allowed.
-            if (!isScalarIntegerType(decl->getType()))
+            if (!isValidCompileTimeConstantType(decl->getType()))
             {
                 getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
                 return nullptr;

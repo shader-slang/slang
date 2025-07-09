@@ -1561,7 +1561,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("])");
             return true;
         }
-    case kIROp_swizzle:
+    case kIROp_Swizzle:
         {
             // For C++ we don't need to emit a swizzle function
             // For C we need a construction function
@@ -1677,7 +1677,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // try doing automatically
             return false;
         }
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         {
             emitInstExpr(inst->getOperand(0), inOuterPrec);
             m_writer->emit("->");
@@ -1697,7 +1697,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(")");
             return true;
         }
-    case kIROp_GetAddr:
+    case kIROp_GetAddress:
         {
             // Once we clean up the pointer emitting logic, we can
             // just use GetElementAddress instruction in place of

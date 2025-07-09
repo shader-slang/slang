@@ -363,6 +363,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         ValUnificationContext unificationContext;
         unificationContext.optionalConstraint =
             constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        unificationContext.equalityConstraint = constraintDeclRef.getDecl()->isEqualityConstraint;
         if (!TryUnifyTypes(
                 *system,
                 unificationContext,
@@ -491,6 +492,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 if (!joinType)
                 {
                     if (c.isOptional)
+                        joinType = type;
+                    else if (c.isEquality)
                         joinType = type;
                     else
                         // failure!
@@ -970,6 +973,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
     constraint.isOptional = unificationContext.optionalConstraint;
+    constraint.isEquality = unificationContext.equalityConstraint;
     constraints.constraints.add(constraint);
 
     return true;

@@ -17,6 +17,7 @@ struct A : IInterface
 {
     float a;
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(float x) { return a*x*x; }
 };
 
@@ -24,6 +25,7 @@ struct B : IInterface
 {
     float a;
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(float x) { return a*x*x*x; }
 };
 

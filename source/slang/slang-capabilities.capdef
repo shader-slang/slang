@@ -1270,6 +1270,10 @@ alias miss = _miss + raytracing;
 /// [Stage]
 alias mesh = _mesh + _meshshading;
 
+/// Task shader stage & mesh shader capabilities
+/// [Stage]
+alias task = _amplification + _meshshading;
+
 /// Amplification shader stage & mesh shader capabilities
 /// [Stage]
 alias amplification = _amplification + _meshshading;

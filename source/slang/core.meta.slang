@@ -1796,7 +1796,7 @@ struct NativeString
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
     __implicit_conversion($(kConversionCost_None))
-    __intrinsic_op($(kIROp_getNativeStr))
+    __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
 
     __init() { this = NativeString(""); }
@@ -1809,12 +1809,12 @@ extension Ptr<void>
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
     __generic<T, let addrSpace : uint64_t>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(NativeRef<T> ptr);
 }
@@ -3066,7 +3066,7 @@ int __alignOf()
     {
     case cuda :
     case cpp :
-        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+        __intrinsic_asm "alignof($[0])", T;
     }
 }
 
@@ -3077,8 +3077,8 @@ int __alignOf(T v)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
-    case cuda: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    case cpp: __intrinsic_asm "alignof($T0)";
+    case cuda: __intrinsic_asm "alignof($T0)";
     }
 }
 
@@ -3358,7 +3358,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_undefined))
+__intrinsic_op($(kIROp_Undefined))
 T __declVal();
 
 __generic<T>
@@ -4204,8 +4204,6 @@ attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttri
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
 
-__attributeTarget(StructDecl)
-attribute_syntax [payload] : PayloadAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
