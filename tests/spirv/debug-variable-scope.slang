@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -g2 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
 
 Texture2D    testTex      :   register(t0);
 SamplerState testSampler  :   register(s0);
@@ -16,6 +16,9 @@ float4 main(PSIn input) : SV_TARGET
     float4 colVal = testTex.SampleBias(testSampler, tc, bias);
     return float4(colVal.xyz, 1.0);
 }
+
+// CHECK: %[[COMPILATION_UNIT_ID:[0-9]+]] = OpExtInst %void {{.*}} DebugCompilationUnit
+// CHECK: DebugGlobalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[COMPILATION_UNIT_ID]]
 
 // CHECK: %[[FUNC_ID:[0-9]+]] = OpExtInst %void {{.*}} DebugFunction %{{[0-9]+}}
 // CHECK: DebugLocalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[FUNC_ID]]
