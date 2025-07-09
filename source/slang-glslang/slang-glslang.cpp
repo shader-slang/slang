@@ -189,7 +189,7 @@ extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
         bool glslang_disassembleSPIRVWithResult(
             const uint32_t* contents,
@@ -237,7 +237,7 @@ extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
 #else
-__attribute__((__visibility__("default")))
+    __attribute__((__visibility__("default")))
 #endif
         bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {

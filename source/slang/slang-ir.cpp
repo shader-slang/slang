@@ -94,63 +94,6 @@ IRInst* cloneGlobalValueWithLinkage(
     IRInst* originalVal,
     IRLinkageDecoration* originalLinkage);
 
-struct IROpMapEntry
-{
-    IROp op;
-    IROpInfo info;
-};
-
-// TODO: We should ideally be speeding up the name->inst
-// mapping by using a dictionary, or even by pre-computing
-// a hash table to be stored as a `static const` array.
-//
-// NOTE! That this array is now constructed in such a way that looking up
-// an entry from an op is fast, by keeping blocks of main, and pseudo ops in same order
-// as the ops themselves. Care must be taken to keep this constraint.
-static const IROpMapEntry kIROps[] = {
-
-// Main ops in order
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) \
-    {kIROp_##ID,                             \
-     {                                       \
-         #MNEMONIC,                          \
-         ARG_COUNT,                          \
-         FLAGS,                              \
-     }},
-#include "slang-ir-inst-defs.h"
-
-    // Invalid op sentinel value comes after all the valid ones
-    {kIROp_Invalid, {"invalid", 0, 0}},
-};
-
-IROpInfo getIROpInfo(IROp opIn)
-{
-    const int op = opIn & kIROpMask_OpMask;
-    if (op < kIROpCount)
-    {
-        // It's a main op
-        const auto& entry = kIROps[op];
-        SLANG_ASSERT(entry.op == op);
-        return entry.info;
-    }
-
-    // Don't know what this is
-    SLANG_ASSERT(!"Invalid op");
-    SLANG_ASSERT(kIROps[kIROpCount].op == kIROp_Invalid);
-    return kIROps[kIROpCount].info;
-}
-
-IROp findIROp(const UnownedStringSlice& name)
-{
-    for (auto ee : kIROps)
-    {
-        if (name == ee.info.name)
-            return ee.op;
-    }
-
-    return IROp(kIROp_Invalid);
-}
-
 
 //
 
@@ -584,15 +527,15 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
     case kIROp_GenericAsm:
         break;
 
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         // unconditonalBranch <block>
         begin = operands + 0;
         end = begin + 1;
         break;
 
-    case kIROp_conditionalBranch:
-    case kIROp_ifElse:
+    case kIROp_ConditionalBranch:
+    case kIROp_IfElse:
         // conditionalBranch <condition> <trueBlock> <falseBlock>
         begin = operands + 1;
         end = begin + 2;
@@ -759,10 +702,10 @@ UInt IRUnconditionalBranch::getArgCount()
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch:
+    case kIROp_UnconditionalBranch:
         return getOperandCount() - 1;
 
-    case kIROp_loop:
+    case kIROp_Loop:
         return getOperandCount() - 3;
 
     default:
@@ -775,10 +718,10 @@ IRUse* IRUnconditionalBranch::getArgs()
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch:
+    case kIROp_UnconditionalBranch:
         return getOperands() + 1;
 
-    case kIROp_loop:
+    case kIROp_Loop:
         return getOperands() + 3;
 
     default:
@@ -791,10 +734,10 @@ void IRUnconditionalBranch::removeArgument(UInt index)
 {
     switch (getOp())
     {
-    case kIROp_unconditionalBranch:
+    case kIROp_UnconditionalBranch:
         removeOperand(1 + index);
         break;
-    case kIROp_loop:
+    case kIROp_Loop:
         removeOperand(3 + index);
         break;
     default:
@@ -892,10 +835,10 @@ bool isTerminatorInst(IROp op)
         return false;
 
     case kIROp_Return:
-    case kIROp_unconditionalBranch:
-    case kIROp_conditionalBranch:
-    case kIROp_loop:
-    case kIROp_ifElse:
+    case kIROp_UnconditionalBranch:
+    case kIROp_ConditionalBranch:
+    case kIROp_Loop:
+    case kIROp_IfElse:
     case kIROp_Switch:
     case kIROp_Unreachable:
     case kIROp_MissingReturn:
@@ -2899,7 +2842,7 @@ IRTypePack* IRBuilder::getTypePack(UInt count, IRType* const* types)
     return (IRTypePack*)getType(kIROp_TypePack, count, (IRInst* const*)types);
 }
 
-IRExpandType* IRBuilder::getExpandTypeOrVal(
+IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
     IRType* type,
     IRInst* pattern,
     ArrayView<IRInst*> capture)
@@ -2907,7 +2850,7 @@ IRExpandType* IRBuilder::getExpandTypeOrVal(
     ShortList<IRInst*> args;
     args.add(pattern);
     args.addRange(capture);
-    return (IRExpandType*)emitIntrinsicInst(
+    return (IRExpandTypeOrVal*)emitIntrinsicInst(
         type,
         kIROp_ExpandTypeOrVal,
         args.getCount(),
@@ -3350,7 +3293,7 @@ IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInt
 
 IRUndefined* IRBuilder::emitUndefined(IRType* type)
 {
-    auto inst = createInst<IRUndefined>(this, kIROp_undefined, type);
+    auto inst = createInst<IRUndefined>(this, kIROp_Undefined, type);
 
     addInst(inst);
 
@@ -3836,7 +3779,7 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
 
     IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
-    return createIntrinsicInst(type, kIROp_LookupWitness, 2, args);
+    return createIntrinsicInst(type, kIROp_LookupWitnessMethod, 2, args);
 }
 
 IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
@@ -4443,7 +4386,7 @@ IRInst* IRBuilder::emitMakeString(IRInst* nativeStr)
 
 IRInst* IRBuilder::emitGetNativeString(IRInst* str)
 {
-    return emitIntrinsicInst(getNativeStringType(), kIROp_getNativeStr, 1, &str);
+    return emitIntrinsicInst(getNativeStringType(), kIROp_GetNativeStr, 1, &str);
 }
 
 IRInst* IRBuilder::emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element)
@@ -4754,7 +4697,7 @@ RefPtr<IRModule> IRModule::create(Session* session)
 {
     RefPtr<IRModule> module = new IRModule(session);
 
-    auto moduleInst = module->_allocateInst<IRModuleInst>(kIROp_Module, 0);
+    auto moduleInst = module->_allocateInst<IRModuleInst>(kIROp_ModuleInst, 0);
 
     module->m_moduleInst = moduleInst;
     moduleInst->module = module;
@@ -5162,6 +5105,20 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
 
     addInst(inst);
     return inst;
+}
+
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align)
+{
+    if (align)
+    {
+        auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, align);
+        addInst(inst);
+        return inst;
+    }
+    else
+    {
+        return emitLoad(type, ptr);
+    }
 }
 
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
@@ -5594,7 +5551,7 @@ IRInst* IRBuilder::emitGetOffsetPtr(IRInst* base, IRInst* offset)
 
 IRInst* IRBuilder::emitGetAddress(IRType* type, IRInst* value)
 {
-    auto inst = createInst<IRGetAddress>(this, kIROp_GetAddr, type, value);
+    auto inst = createInst<IRGetAddress>(this, kIROp_GetAddress, type, value);
 
     addInst(inst);
     return inst;
@@ -5608,7 +5565,7 @@ IRInst* IRBuilder::emitSwizzle(
 {
     auto inst = createInstWithTrailingArgs<IRSwizzle>(
         this,
-        kIROp_swizzle,
+        kIROp_Swizzle,
         type,
         base,
         elementCount,
@@ -5631,6 +5588,20 @@ IRInst* IRBuilder::addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, I
     IRInst* operands[3] = {x, y, z};
 
     return addDecoration(inst, kIROp_NumThreadsDecoration, operands, 3);
+}
+
+IRInst* IRBuilder::addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width)
+{
+    IRInst* operands[1] = {width};
+
+    return addDecoration(inst, kIROp_FpDenormalPreserveDecoration, operands, 1);
+}
+
+IRInst* IRBuilder::addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width)
+{
+    IRInst* operands[1] = {width};
+
+    return addDecoration(inst, kIROp_FpDenormalFlushToZeroDecoration, operands, 1);
 }
 
 IRInst* IRBuilder::addWaveSizeDecoration(IRInst* inst, IRInst* numLanes)
@@ -5714,7 +5685,7 @@ IRInst* IRBuilder::emitSwizzleSet(
 
     auto inst = createInstWithTrailingArgs<IRSwizzleSet>(
         this,
-        kIROp_swizzleSet,
+        kIROp_SwizzleSet,
         type,
         fixedArgCount,
         fixedArgs,
@@ -5870,7 +5841,7 @@ IRInst* IRBuilder::emitMissingReturn()
 
 IRInst* IRBuilder::emitDiscard()
 {
-    auto inst = createInst<IRDiscard>(this, kIROp_discard, nullptr);
+    auto inst = createInst<IRDiscard>(this, kIROp_Discard, nullptr);
     addInst(inst);
     return inst;
 }
@@ -5892,7 +5863,7 @@ IRInst* IRBuilder::emitLoopExitValue(IRInst* value)
 
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
-    auto inst = createInst<IRUnconditionalBranch>(this, kIROp_unconditionalBranch, nullptr, pBlock);
+    auto inst = createInst<IRUnconditionalBranch>(this, kIROp_UnconditionalBranch, nullptr, pBlock);
     addInst(inst);
     return inst;
 }
@@ -5905,7 +5876,7 @@ IRInst* IRBuilder::emitBranch(IRBlock* block, Int argCount, IRInst* const* args)
         argList.add(args[i]);
     auto inst = createInst<IRUnconditionalBranch>(
         this,
-        kIROp_unconditionalBranch,
+        kIROp_UnconditionalBranch,
         nullptr,
         argList.getCount(),
         argList.getBuffer());
@@ -5928,7 +5899,7 @@ IRInst* IRBuilder::emitLoop(IRBlock* target, IRBlock* breakBlock, IRBlock* conti
     IRInst* args[] = {target, breakBlock, continueBlock};
     UInt argCount = sizeof(args) / sizeof(args[0]);
 
-    auto inst = createInst<IRLoop>(this, kIROp_loop, nullptr, argCount, args);
+    auto inst = createInst<IRLoop>(this, kIROp_Loop, nullptr, argCount, args);
     addInst(inst);
     return inst;
 }
@@ -5950,7 +5921,7 @@ IRInst* IRBuilder::emitLoop(
         argList.add(args[ii]);
 
     auto inst =
-        createInst<IRLoop>(this, kIROp_loop, nullptr, argList.getCount(), argList.getBuffer());
+        createInst<IRLoop>(this, kIROp_Loop, nullptr, argList.getCount(), argList.getBuffer());
     addInst(inst);
     return inst;
 }
@@ -5961,7 +5932,7 @@ IRInst* IRBuilder::emitBranch(IRInst* val, IRBlock* trueBlock, IRBlock* falseBlo
     UInt argCount = sizeof(args) / sizeof(args[0]);
 
     auto inst =
-        createInst<IRConditionalBranch>(this, kIROp_conditionalBranch, nullptr, argCount, args);
+        createInst<IRConditionalBranch>(this, kIROp_ConditionalBranch, nullptr, argCount, args);
     addInst(inst);
     return inst;
 }
@@ -5975,7 +5946,7 @@ IRIfElse* IRBuilder::emitIfElse(
     IRInst* args[] = {val, trueBlock, falseBlock, afterBlock};
     UInt argCount = sizeof(args) / sizeof(args[0]);
 
-    auto inst = createInst<IRIfElse>(this, kIROp_ifElse, nullptr, argCount, args);
+    auto inst = createInst<IRIfElse>(this, kIROp_IfElse, nullptr, argCount, args);
     addInst(inst);
     return inst;
 }
@@ -7640,7 +7611,7 @@ void dumpIR(
     context.options = options;
     context.sourceManager = sourceManager;
 
-    if (globalVal->getOp() == kIROp_Module)
+    if (globalVal->getOp() == kIROp_ModuleInst)
         dumpIRModule(&context, globalVal->getModule());
     else
         dumpInst(&context, globalVal);
@@ -7801,7 +7772,7 @@ static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
         return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
                isTypeEqual(a->getFullType(), b->getFullType());
     }
-    if (IRSpecialize::isaImpl(opA) || opA == kIROp_LookupWitness)
+    if (IRSpecialize::isaImpl(opA) || opA == kIROp_LookupWitnessMethod)
     {
         return _areTypeOperandsEqual(a, b);
     }
@@ -8117,7 +8088,7 @@ static void _maybeHoistOperand(IRUse* use)
                 continue;
 
             // We allow out-of-order uses in global scope.
-            if (operand->getParent() && operand->getParent()->getOp() == kIROp_Module)
+            if (operand->getParent() && operand->getParent()->getOp() == kIROp_ModuleInst)
                 continue;
 
             // If the operand is defined after user, move it to before user.
@@ -8502,7 +8473,7 @@ void IRInst::transferDecorationsTo(IRInst* target)
 bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
 {
     // TODO: We should drive this based on flags specified
-    // in `ir-inst-defs.h` isntead of hard-coding things here,
+    // in `ir-inst-defs.yaml` isntead of hard-coding things here,
     // but this is good enough for now if we are conservative:
 
     if (as<IRType>(this))
@@ -8582,12 +8553,12 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_LiveRangeEnd:
 
     case kIROp_Nop:
-    case kIROp_undefined:
+    case kIROp_Undefined:
     case kIROp_DefaultConstruct:
     case kIROp_Specialize:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_GetSequentialID:
-    case kIROp_GetAddr:
+    case kIROp_GetAddress:
     case kIROp_GetValueFromBoundInterface:
     case kIROp_MakeUInt64:
     case kIROp_MakeCoopVector:
@@ -8601,7 +8572,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeStruct:
     case kIROp_MakeString:
-    case kIROp_getNativeStr:
+    case kIROp_GetNativeStr:
     case kIROp_MakeResultError:
     case kIROp_MakeResultValue:
     case kIROp_GetResultError:
@@ -8636,8 +8607,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
     case kIROp_MakeVectorFromScalar:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet: // Doesn't actually "set" anything - just returns the resulting
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting
                            // vector
     case kIROp_Add:
     case kIROp_Sub:
@@ -9101,7 +9072,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_OptionalHasValue:
     case kIROp_GetOptionalValue:
     case kIROp_MakeOptionalValue:
@@ -9114,8 +9085,8 @@ bool isMovableInst(IRInst* inst)
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MakeVectorFromScalar:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_MatrixReshape:
     case kIROp_MakeString:
     case kIROp_MakeResultError:

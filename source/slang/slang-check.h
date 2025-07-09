@@ -37,4 +37,7 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
 OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
     ASTBuilder* builder,
     DeclRef<ContainerDecl> genericDecl);
+
+// General utility function to collect all referenced declarations from a value
+void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls);
 } // namespace Slang

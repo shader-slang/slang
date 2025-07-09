@@ -3,8 +3,8 @@
 // This file provides the application code for the `shader-object` example.
 //
 
-// This example uses the Slang gfx layer to target different APIs.
-// The goal is to demonstrate how the Shader Object model implemented in `gfx` layer
+// This example uses the Slang slang-rhi layer to target different APIs.
+// The goal is to demonstrate how the Shader Object model implemented in `slang-rhi` layer
 // simplifies shader specialization and parameter binding when using `interface` typed
 // shader parameters.
 //
@@ -14,29 +14,30 @@ using Slang::ComPtr;
 
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 
-using namespace gfx;
+#include <slang-rhi/shader-cursor.h>
+
+using namespace rhi;
 
 static const ExampleResources resourceBase("shader-object");
 
 static TestBase testBase;
 
-// Loads the shader code defined in `shader-object.slang` for use by the `gfx` layer.
+// Loads the shader code defined in `shader-object.slang` for use by the `slang-rhi` layer.
 //
 Result loadShaderProgram(
-    gfx::IDevice* device,
-    ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    IDevice* device,
+    ComPtr<IShaderProgram>& outShaderProgram,
     slang::ProgramLayout*& slangReflection)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
     //
-    // Our example application uses the `gfx` graphics API abstraction layer, which already
+    // Our example application uses the `slang-rhi` graphics API abstraction layer, which already
     // creates a Slang compilation session for us, so we just grab and use it here.
     ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+    slangSession = device->getSlangSession();
 
     // Once the session has been obtained, we can start loading code into it.
     //
@@ -119,12 +120,12 @@ Result loadShaderProgram(
 
     // At this point, `composedProgram` represents the shader program
     // we want to run, and the compute shader there have been checked.
-    // We can create a `gfx::IShaderProgram` object from `composedProgram`
+    // We can create a `IShaderProgram` object from `composedProgram`
     // so it may be used by the graphics layer.
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
 
-    auto shaderProgram = device->createProgram(programDesc);
+    auto shaderProgram = device->createShaderProgram(programDesc);
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;
@@ -135,68 +136,53 @@ int exampleMain(int argc, char** argv)
 {
     testBase.parseOption(argc, argv);
 
-    // Creates a `gfx` renderer, which provides the main interface for
+    // Creates a `slang-rhi` renderer, which provides the main interface for
     // interacting with the graphics API.
-    Slang::ComPtr<gfx::IDevice> device;
-    IDevice::Desc deviceDesc = {};
-    SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, device.writeRef()));
-
-    Slang::ComPtr<gfx::ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    SLANG_RETURN_ON_FAIL(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+    Slang::ComPtr<IDevice> device;
+    DeviceDesc deviceDesc = {};
+    device = getRHI()->createDevice(deviceDesc);
+    if (!device)
+        return SLANG_FAIL;
 
     // Now we can load the shader code.
-    // A `gfx::IShaderProgram` object for use in the `gfx` layer.
-    ComPtr<gfx::IShaderProgram> shaderProgram;
+    // A `IShaderProgram` object for use in the `slang-rhi` layer.
+    ComPtr<IShaderProgram> shaderProgram;
     // A composed `IComponentType` that gives us reflection info on the shader code.
     slang::ProgramLayout* slangReflection;
     SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram, slangReflection));
 
     // Create a pipeline state with the loaded shader.
-    gfx::ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    SLANG_RETURN_ON_FAIL(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> pipelineState;
+    pipelineState = device->createComputePipeline(pipelineDesc);
+    if (!pipelineState)
+        return SLANG_FAIL;
 
     // Create and initiate our input/output buffer.
     const int numberCount = 4;
     float initialData[] = {0.0f, 1.0f, 2.0f, 3.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<gfx::IBufferResource> numbersBuffer;
-    SLANG_RETURN_ON_FAIL(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    // Create a resource view for the buffer.
-    ComPtr<gfx::IResourceView> bufferView;
-    gfx::IResourceView::Desc viewDesc = {};
-    viewDesc.type = gfx::IResourceView::Type::UnorderedAccess;
-    viewDesc.format = gfx::Format::Unknown;
-    SLANG_RETURN_ON_FAIL(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+    ComPtr<IBuffer> numbersBuffer;
+    numbersBuffer = device->createBuffer(bufferDesc, (void*)initialData);
+    if (!numbersBuffer)
+        return SLANG_FAIL;
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
-
+        auto commandEncoder = queue->createCommandEncoder();
+        auto encoder = commandEncoder->beginComputePass();
 
         // Now comes the interesting part: binding the shader parameter for the
         // compute kernel that we about to launch. We would like to construct
@@ -213,41 +199,38 @@ int exampleMain(int argc, char** argv)
             slangReflection->findTypeByName("AddTransformer");
 
         // Now we can use this type to create a shader object that can be bound to the root object.
-        ComPtr<gfx::IShaderObject> transformer;
-        SLANG_RETURN_ON_FAIL(device->createShaderObject(
-            addTransformerType,
-            ShaderObjectContainerType::None,
-            transformer.writeRef()));
+        ComPtr<IShaderObject> transformer;
+        transformer =
+            device->createShaderObject(addTransformerType, ShaderObjectContainerType::None);
+        if (!transformer)
+            return SLANG_FAIL;
+
         // Set the `c` field of the `AddTransformer`.
         float c = 1.0f;
-        gfx::ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
+        ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
 
         // We can set parameters directly with `rootObject`, but that requires us to use
         // the Slang reflection API to obtain the proper offsets into the root object for each
         // parameter. We implemented these logic in the `ShaderCursor` helper class, which
         // simplifies the user code to find shader parameters. Here we demonstrate how to set
         // parameters with `ShaderCursor`.
-        gfx::ShaderCursor entryPointCursor(
+        ShaderCursor entryPointCursor(
             rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
-        // Bind buffer view to the entry point.
-        entryPointCursor.getPath("buffer").setResource(bufferView);
+        // Bind buffer to the entry point.
+        entryPointCursor.getPath("buffer").setBinding(numbersBuffer);
 
         // Bind the previously created transformer object to root object.
         entryPointCursor.getPath("transformer").setObject(transformer);
 
         encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        encoder->end();
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
     }
     // Read back the results.
     ComPtr<ISlangBlob> resultBlob;
-    SLANG_RETURN_ON_FAIL(device->readBufferResource(
-        numbersBuffer,
-        0,
-        numberCount * sizeof(float),
-        resultBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        device->readBuffer(numbersBuffer, 0, numberCount * sizeof(float), resultBlob.writeRef()));
     auto result = reinterpret_cast<const float*>(resultBlob->getBufferPointer());
     for (int i = 0; i < numberCount; i++)
         printf("%f\n", result[i]);

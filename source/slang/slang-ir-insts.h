@@ -1,6 +1,5 @@
 // slang-ir-insts.h
-#ifndef SLANG_IR_INSTS_H_INCLUDED
-#define SLANG_IR_INSTS_H_INCLUDED
+#pragma once
 
 // This file extends the core definitions in `ir.h`
 // with a wider variety of concrete instructions,
@@ -14,21 +13,27 @@
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 
+//
+#include "slang-ir-insts.h.fiddle"
+
+FIDDLE()
 namespace Slang
 {
 
 class Decl;
 
+FIDDLE()
 struct IRCapabilitySet : IRInst
 {
-    IR_PARENT_ISA(CapabilitySet);
+    FIDDLE(baseInst())
 
     CapabilitySet getCaps();
 };
 
+FIDDLE()
 struct IRDecoration : IRInst
 {
-    IR_PARENT_ISA(Decoration)
+    FIDDLE(baseInst())
 
     IRDecoration* getNextDecoration() { return as<IRDecoration>(getNextInst()); }
 };
@@ -36,13 +41,10 @@ struct IRDecoration : IRInst
 // Associates an IR-level decoration with a source declaration
 // in the high-level AST, that can be used to extract
 // additional information that informs code emission.
+FIDDLE()
 struct IRHighLevelDeclDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_HighLevelDeclDecoration
-    };
-    IR_LEAF_ISA(HighLevelDeclDecoration)
+    FIDDLE(leafInst())
 
     IRPtrLit* getDeclOperand() { return cast<IRPtrLit>(getOperand(0)); }
     Decl* getDecl() { return (Decl*)getDeclOperand()->getValue(); }
@@ -54,34 +56,29 @@ enum IRLoopControl
     kIRLoopControl_Loop,
 };
 
+FIDDLE()
 struct IRLoopControlDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LoopControlDecoration
-    };
-    IR_LEAF_ISA(LoopControlDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
 
     IRLoopControl getMode() { return IRLoopControl(getModeOperand()->value.intVal); }
 };
 
+FIDDLE()
 struct IRLoopMaxItersDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LoopMaxItersDecoration
-    };
-    IR_LEAF_ISA(LoopMaxItersDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getMaxItersInst() { return cast<IRConstant>(getOperand(0)); }
     IRIntegerValue getMaxIters() { return as<IRIntLit>(getOperand(0))->getValue(); }
 };
 
+FIDDLE()
 struct IRTargetSpecificDecoration : IRDecoration
 {
-    IR_PARENT_ISA(TargetSpecificDecoration)
+    FIDDLE(baseInst())
 
     IRCapabilitySet* getTargetCapsOperand() { return cast<IRCapabilitySet>(getOperand(0)); }
 
@@ -108,79 +105,67 @@ struct IRTargetSpecificDecoration : IRDecoration
     }
 };
 
+FIDDLE()
 struct IRTargetSpecificDefinitionDecoration : IRTargetSpecificDecoration
 {
-    IR_PARENT_ISA(TargetSpecificDefinitionDecoration)
+    FIDDLE(baseInst())
 };
 
+FIDDLE()
 struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
 {
-    enum
-    {
-        kOp = kIROp_TargetDecoration
-    };
-    IR_LEAF_ISA(TargetDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTargetSystemValueDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_TargetSystemValueDecoration
-    };
-    IR_LEAF_ISA(TargetSystemValueDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getSemanticOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getSemantic() { return getSemanticOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
-    enum
-    {
-        kOp = kIROp_TargetIntrinsicDecoration
-    };
-    IR_LEAF_ISA(TargetIntrinsicDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getDefinitionOperand() { return cast<IRStringLit>(getOperand(1)); }
 
     UnownedStringSlice getDefinition() { return getDefinitionOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRRequirePreludeDecoration : IRTargetSpecificDecoration
 {
-    IR_LEAF_ISA(RequirePreludeDecoration)
+    FIDDLE(leafInst())
 
     UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(1))->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRIntrinsicOpDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_IntrinsicOpDecoration
-    };
-    IR_LEAF_ISA(IntrinsicOpDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getIntrinsicOpOperand() { return cast<IRIntLit>(getOperand(0)); }
 
     IROp getIntrinsicOp() { return (IROp)getIntrinsicOpOperand()->getValue(); }
 };
 
+FIDDLE()
 struct IRAlignedAddressDecoration : IRDecoration
 {
-    IR_LEAF_ISA(AlignedAddressDecoration)
+    FIDDLE(leafInst())
     IRInst* getAlignment() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_GLSLOuterArrayDecoration
-    };
-    IR_LEAF_ISA(GLSLOuterArrayDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getOuterArrayNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
@@ -210,13 +195,10 @@ enum class IRTargetBuiltinVarName
     SpvBaseVertex,
 };
 
+FIDDLE()
 struct IRInterpolationModeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_InterpolationModeDecoration
-    };
-    IR_LEAF_ISA(InterpolationModeDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
 
@@ -227,13 +209,10 @@ struct IRInterpolationModeDecoration : IRDecoration
 /// in conjunction with the given instruction. Back-end
 /// code generation may use this to help derive symbol
 /// names, emit debug information, etc.
+FIDDLE()
 struct IRNameHintDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_NameHintDecoration
-    };
-    IR_LEAF_ISA(NameHintDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
@@ -241,13 +220,10 @@ struct IRNameHintDecoration : IRDecoration
 };
 
 /// A decoration on a RTTIObject providing type size information.
+FIDDLE()
 struct IRRTTITypeSizeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RTTITypeSizeDecoration
-    };
-    IR_LEAF_ISA(RTTITypeSizeDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getTypeSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getTypeSize() { return getTypeSizeOperand()->getValue(); }
@@ -255,54 +231,39 @@ struct IRRTTITypeSizeDecoration : IRDecoration
 
 /// A decoration on `IRInterfaceType` that marks the size of `AnyValue` that should
 /// be used to represent a polymorphic value of the interface.
+FIDDLE()
 struct IRAnyValueSizeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_AnyValueSizeDecoration
-    };
-    IR_LEAF_ISA(AnyValueSizeDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
 };
 
+FIDDLE()
 struct IRDispatchFuncDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DispatchFuncDecoration
-    };
-    IR_LEAF_ISA(DispatchFuncDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRSpecializeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_SpecializeDecoration
-    };
-    IR_LEAF_ISA(SpecializeDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRComInterfaceDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ComInterfaceDecoration
-    };
-    IR_LEAF_ISA(ComInterfaceDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCOMWitnessDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_COMWitnessDecoration
-    };
-    IR_LEAF_ISA(COMWitnessDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getWitnessTable() { return getOperand(0); }
 };
@@ -310,78 +271,30 @@ struct IRCOMWitnessDecoration : IRDecoration
 /// A decoration on `IRParam`s that represent generic parameters,
 /// marking the interface type that the generic parameter conforms to.
 /// A generic parameter can have more than one `IRTypeConstraintDecoration`s
+FIDDLE()
 struct IRTypeConstraintDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_TypeConstraintDecoration
-    };
-    IR_LEAF_ISA(TypeConstraintDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getConstraintType() { return getOperand(0); }
 };
 
-#define IR_SIMPLE_DECORATION(NAME) \
-    struct IR##NAME : IRDecoration \
-    {                              \
-        enum                       \
-        {                          \
-            kOp = kIROp_##NAME     \
-        };                         \
-        IR_LEAF_ISA(NAME)          \
-    };                             \
-    /**/
-
 bool isSimpleDecoration(IROp op);
 
-/// A decoration that indicates that a variable represents
-/// a vulkan ray payload, and should have a location assigned
-/// to it.
-IR_SIMPLE_DECORATION(VulkanRayPayloadDecoration)
-IR_SIMPLE_DECORATION(VulkanRayPayloadInDecoration)
-
-/// A decoration that indicates that a variable represents
-/// a vulkan callable shader payload, and should have a location assigned
-/// to it.
-IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
-IR_SIMPLE_DECORATION(VulkanCallablePayloadInDecoration)
-
-/// A decoration that indicates that a variable represents
-/// vulkan hit attributes, and should have a location assigned
-/// to it.
-IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
-
-/// A decoration that indicates that a variable represents
-/// vulkan hit object attributes, and should have a location assigned
-/// to it.
-IR_SIMPLE_DECORATION(VulkanHitObjectAttributesDecoration)
-
-IR_SIMPLE_DECORATION(PerVertexDecoration)
-
-IR_SIMPLE_DECORATION(SPIRVBlockDecoration)
-
-IR_SIMPLE_DECORATION(DefaultValueDecoration)
-
+FIDDLE()
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RequireGLSLVersionDecoration
-    };
-    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getLanguageVersionOperand() { return cast<IRConstant>(getOperand(0)); }
 
     Int getLanguageVersion() { return Int(getLanguageVersionOperand()->value.intVal); }
 };
 
+FIDDLE()
 struct IRSPIRVNonUniformResourceDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_SPIRVNonUniformResourceDecoration
-    };
-    IR_LEAF_ISA(SPIRVNonUniformResourceDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
     IntegerLiteralValue getSPIRVNonUniformResource()
@@ -390,13 +303,10 @@ struct IRSPIRVNonUniformResourceDecoration : IRDecoration
     }
 };
 
+FIDDLE()
 struct IRRequireSPIRVVersionDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RequireSPIRVVersionDecoration
-    };
-    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
     SemanticVersion getSPIRVVersion()
@@ -405,25 +315,19 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     }
 };
 
+FIDDLE()
 struct IRRequireCapabilityAtomDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RequireCapabilityAtomDecoration
-    };
-    IR_LEAF_ISA(RequireCapabilityAtomDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
     CapabilityName getAtom() { return (CapabilityName)getCapabilityAtomOperand()->value.intVal; }
 };
 
+FIDDLE()
 struct IRRequireCUDASMVersionDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RequireCUDASMVersionDecoration
-    };
-    IR_LEAF_ISA(RequireCUDASMVersionDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
     SemanticVersion getCUDASMVersion()
@@ -432,111 +336,78 @@ struct IRRequireCUDASMVersionDecoration : IRDecoration
     }
 };
 
+FIDDLE()
 struct IRRequireGLSLExtensionDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_RequireGLSLExtensionDecoration
-    };
-    IR_LEAF_ISA(RequireGLSLExtensionDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRRequireWGSLExtensionDecoration : IRDecoration
 {
-    IR_LEAF_ISA(RequireWGSLExtensionDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRMemoryQualifierSetDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_MemoryQualifierSetDecoration
-    };
-    IR_LEAF_ISA(MemoryQualifierSetDecoration)
+    FIDDLE(leafInst())
     IRIntegerValue getMemoryQualifierBit() { return cast<IRIntLit>(getOperand(0))->getValue(); }
 };
 
-IR_SIMPLE_DECORATION(HasExplicitHLSLBindingDecoration)
-IR_SIMPLE_DECORATION(ReadNoneDecoration)
-IR_SIMPLE_DECORATION(NoSideEffectDecoration)
-IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
-IR_SIMPLE_DECORATION(PreciseDecoration)
-IR_SIMPLE_DECORATION(PublicDecoration)
-IR_SIMPLE_DECORATION(HLSLExportDecoration)
-IR_SIMPLE_DECORATION(KeepAliveDecoration)
-IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
-IR_SIMPLE_DECORATION(NoInlineDecoration)
-IR_SIMPLE_DECORATION(NoRefInlineDecoration)
-IR_SIMPLE_DECORATION(DerivativeGroupQuadDecoration)
-IR_SIMPLE_DECORATION(DerivativeGroupLinearDecoration)
-IR_SIMPLE_DECORATION(AlwaysFoldIntoUseSiteDecoration)
-IR_SIMPLE_DECORATION(StaticRequirementDecoration)
-IR_SIMPLE_DECORATION(NonCopyableTypeDecoration)
-IR_SIMPLE_DECORATION(HLSLMeshPayloadDecoration)
-IR_SIMPLE_DECORATION(GlobalInputDecoration)
-IR_SIMPLE_DECORATION(GlobalOutputDecoration)
-IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
-IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
-IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
-IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
-IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
-IR_SIMPLE_DECORATION(TempCallArgVarDecoration)
-
+FIDDLE()
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
-    IR_LEAF_ISA(AvailableInDownstreamIRDecoration)
+    FIDDLE(leafInst())
     CodeGenTarget getTarget()
     {
         return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue());
     }
 };
 
+FIDDLE()
 struct IRGLSLLocationDecoration : IRDecoration
 {
-    IR_LEAF_ISA(GLSLLocationDecoration)
+    FIDDLE(leafInst())
     IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 
+FIDDLE()
 struct IRGLSLOffsetDecoration : IRDecoration
 {
-    IR_LEAF_ISA(GLSLOffsetDecoration)
+    FIDDLE(leafInst())
     IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRVkStructOffsetDecoration : IRDecoration
 {
-    IR_LEAF_ISA(VkStructOffsetDecoration)
+    FIDDLE(leafInst())
     IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRNVAPIMagicDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_NVAPIMagicDecoration
-    };
-    IR_LEAF_ISA(NVAPIMagicDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRNVAPISlotDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_NVAPISlotDecoration
-    };
-    IR_LEAF_ISA(NVAPISlotDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getRegisterNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getRegisterName() { return getRegisterNameOperand()->getStringSlice(); }
@@ -545,94 +416,70 @@ struct IRNVAPISlotDecoration : IRDecoration
     UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRMaxTessFactorDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_MaxTessFactorDecoration
-    };
-    IR_LEAF_ISA(MaxTessFactorDecoration)
+    FIDDLE(leafInst())
 
     IRFloatLit* getMaxTessFactor() { return cast<IRFloatLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IROutputControlPointsDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_OutputControlPointsDecoration
-    };
-    IR_LEAF_ISA(OutputControlPointsDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 // This is used for mesh shaders too
+FIDDLE()
 struct IROutputTopologyDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_OutputTopologyDecoration
-    };
-    IR_LEAF_ISA(OutputTopologyDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
 
     IRIntegerValue getTopologyType() { return cast<IRIntLit>(getOperand(1))->getValue(); }
 };
 
+FIDDLE()
 struct IRPartitioningDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PartitioningDecoration
-    };
-    IR_LEAF_ISA(PartitioningDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getPartitioning() { return cast<IRStringLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRDomainDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DomainDecoration
-    };
-    IR_LEAF_ISA(DomainDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getDomain() { return cast<IRStringLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRMaxVertexCountDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_MaxVertexCountDecoration
-    };
-    IR_LEAF_ISA(MaxVertexCountDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRInstanceDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_InstanceDecoration
-    };
-    IR_LEAF_ISA(InstanceDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
 struct IRGlobalParam;
+FIDDLE()
 struct IRNumThreadsDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_NumThreadsDecoration
-    };
-    IR_LEAF_ISA(NumThreadsDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getX() { return as<IRIntLit>(getOperand(0)); }
     IRIntLit* getY() { return as<IRIntLit>(getOperand(1)); }
@@ -643,24 +490,33 @@ struct IRNumThreadsDecoration : IRDecoration
     IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
 };
 
+FIDDLE()
+struct IRFpDenormalPreserveDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRFpDenormalFlushToZeroDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+
+    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
+};
+
+FIDDLE()
 struct IRWaveSizeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_WaveSizeDecoration
-    };
-    IR_LEAF_ISA(WaveSizeDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getNumLanes() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IREntryPointDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_EntryPointDecoration
-    };
-    IR_LEAF_ISA(EntryPointDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getProfileInst() { return cast<IRIntLit>(getOperand(0)); }
     Profile getProfile() { return Profile(Profile::RawVal(getIntVal(getProfileInst()))); }
@@ -670,41 +526,27 @@ struct IREntryPointDecoration : IRDecoration
     void setName(IRStringLit* name) { setOperand(1, name); }
 };
 
-IR_SIMPLE_DECORATION(CudaHostDecoration)
-IR_SIMPLE_DECORATION(CudaKernelDecoration)
-
+FIDDLE()
 struct IRCudaKernelForwardDerivativeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_CudaKernelForwardDerivativeDecoration
-    };
-    IR_LEAF_ISA(CudaKernelForwardDerivativeDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRCudaKernelBackwardDerivativeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_CudaKernelBackwardDerivativeDecoration
-    };
-    IR_LEAF_ISA(CudaKernelBackwardDerivativeDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGeometryInputPrimitiveTypeDecoration : IRDecoration
 {
-    IR_PARENT_ISA(GeometryInputPrimitiveTypeDecoration)
+    FIDDLE(baseInst())
 };
-
-IR_SIMPLE_DECORATION(PointInputPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(LineInputPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(TriangleInputPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(LineAdjInputPrimitiveTypeDecoration)
-IR_SIMPLE_DECORATION(TriangleAdjInputPrimitiveTypeDecoration)
 
 /// This is a bit of a hack. The problem is that when GLSL legalization takes place
 /// the parameters from the entry point are globalized *and* potentially split
@@ -712,13 +554,10 @@ IR_SIMPLE_DECORATION(TriangleAdjInputPrimitiveTypeDecoration)
 /// it would potentially output multiple times without extra logic.
 /// Using this decoration we can copy the StreamOut type to the entry point, and then
 /// emit as part of entry point attribute emitting.
+FIDDLE()
 struct IRStreamOutputTypeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_StreamOutputTypeDecoration
-    };
-    IR_LEAF_ISA(StreamOutputTypeDecoration)
+    FIDDLE(leafInst())
 
     IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
 };
@@ -728,9 +567,10 @@ struct IRStreamOutputTypeDecoration : IRDecoration
 /// or will have a definition imported from another module.
 /// In either case, it requires a mangled name to use when
 /// matching imports and exports.
+FIDDLE()
 struct IRLinkageDecoration : IRDecoration
 {
-    IR_PARENT_ISA(LinkageDecoration)
+    FIDDLE(baseInst())
 
     IRStringLit* getMangledNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
@@ -738,9 +578,10 @@ struct IRLinkageDecoration : IRDecoration
 };
 
 // Mark a global variable as a target buitlin variable.
+FIDDLE()
 struct IRTargetBuiltinVarDecoration : IRDecoration
 {
-    IR_LEAF_ISA(TargetBuiltinVarDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getBuiltinVarOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRTargetBuiltinVarName getBuiltinVarName()
@@ -749,62 +590,44 @@ struct IRTargetBuiltinVarDecoration : IRDecoration
     }
 };
 
+FIDDLE()
 struct IRUserExternDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_UserExternDecoration
-    };
-    IR_LEAF_ISA(UserExternDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRImportDecoration : IRLinkageDecoration
 {
-    enum
-    {
-        kOp = kIROp_ImportDecoration
-    };
-    IR_LEAF_ISA(ImportDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRExportDecoration : IRLinkageDecoration
 {
-    enum
-    {
-        kOp = kIROp_ExportDecoration
-    };
-    IR_LEAF_ISA(ExportDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRExternCppDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ExternCppDecoration
-    };
-    IR_LEAF_ISA(ExternCppDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRExternCDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ExternCDecoration
-    };
-    IR_LEAF_ISA(ExternCDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDllImportDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DllImportDecoration
-    };
-    IR_LEAF_ISA(DllImportDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getLibraryNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getLibraryName() { return getLibraryNameOperand()->getStringSlice(); }
@@ -813,101 +636,75 @@ struct IRDllImportDecoration : IRDecoration
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRDllExportDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DllExportDecoration
-    };
-    IR_LEAF_ISA(DllExportDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRTorchEntryPointDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_TorchEntryPointDecoration
-    };
-    IR_LEAF_ISA(TorchEntryPointDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRAutoPyBindCudaDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_AutoPyBindCudaDecoration
-    };
-    IR_LEAF_ISA(AutoPyBindCudaDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
-IR_SIMPLE_DECORATION(AutoPyBindExportInfoDecoration)
-
+FIDDLE()
 struct IRPyExportDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PyExportDecoration
-    };
-    IR_LEAF_ISA(PyExportDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getExportNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getExportName() { return getExportNameOperand()->getStringSlice(); }
 };
 
 
+FIDDLE()
 struct IRKnownBuiltinDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_KnownBuiltinDecoration
-    };
-    IR_LEAF_ISA(KnownBuiltinDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+FIDDLE()
 struct IREntryPointParamDecoration : IRDecoration
 {
-    IR_LEAF_ISA(EntryPointParamDecoration)
+    FIDDLE(leafInst())
 
     /// Get the entry point that this parameter orignates from.
     IRFunc* getEntryPoint() { return cast<IRFunc>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRFormatDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_FormatDecoration
-    };
-    IR_LEAF_ISA(FormatDecoration)
+    FIDDLE(leafInst())
 
     IRConstant* getFormatOperand() { return cast<IRConstant>(getOperand(0)); }
 
     ImageFormat getFormat() { return ImageFormat(getFormatOperand()->value.intVal); }
 };
 
-IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
-
-IR_SIMPLE_DECORATION(ForceInlineDecoration)
-
-IR_SIMPLE_DECORATION(ForceUnrollDecoration)
-
-IR_SIMPLE_DECORATION(PhysicalTypeDecoration)
-
+FIDDLE()
 struct IRSizeAndAlignmentDecoration : IRDecoration
 {
-    IR_LEAF_ISA(SizeAndAlignmentDecoration)
+    FIDDLE(leafInst())
 
     IRTypeLayoutRuleName getLayoutName()
     {
@@ -920,9 +717,10 @@ struct IRSizeAndAlignmentDecoration : IRDecoration
     IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
 };
 
+FIDDLE()
 struct IROffsetDecoration : IRDecoration
 {
-    IR_LEAF_ISA(OffsetDecoration)
+    FIDDLE(leafInst())
 
     IRTypeLayoutRuleName getLayoutName()
     {
@@ -933,215 +731,158 @@ struct IROffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
-IR_SIMPLE_DECORATION(DynamicUniformDecoration)
-
+FIDDLE()
 struct IRBuiltinDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BuiltinDecoration
-    };
-    IR_LEAF_ISA(BuiltinDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRSequentialIDDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_SequentialIDDecoration
-    };
-    IR_LEAF_ISA(SequentialIDDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getSequentialIDOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
 };
 
+FIDDLE()
 struct IRResultWitnessDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ResultWitnessDecoration
-    };
-    IR_LEAF_ISA(ResultWitnessDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getWitness() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRDynamicDispatchWitnessDecoration : IRDecoration
 {
-    IR_LEAF_ISA(DynamicDispatchWitnessDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_AutoDiffOriginalValueDecoration
-    };
-    IR_LEAF_ISA(AutoDiffOriginalValueDecoration)
+    FIDDLE(leafInst())
     IRInst* getOriginalValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRForwardDifferentiableDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ForwardDifferentiableDecoration
-    };
-    IR_LEAF_ISA(ForwardDifferentiableDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRForwardDerivativeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_ForwardDerivativeDecoration
-    };
-    IR_LEAF_ISA(ForwardDerivativeDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRPrimalSubstituteDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PrimalSubstituteDecoration
-    };
-    IR_LEAF_ISA(PrimalSubstituteDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getPrimalSubstituteFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativeIntermediateTypeDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativeIntermediateTypeDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativeIntermediateType() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDerivativePrimalDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativePrimalDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativePrimalDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativePrimalFunc() { return getOperand(0); }
 };
 
 // Used to associate the restore context var to use in a call to splitted backward propgate
 // function.
+FIDDLE()
 struct IRBackwardDerivativePrimalContextDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativePrimalContextDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativePrimalContextDecoration)
+    FIDDLE(leafInst())
 
     IRUse primalContextVar;
     IRInst* getBackwardDerivativePrimalContextVar() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDerivativePrimalReturnDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativePrimalReturnDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativePrimalReturnDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativePrimalReturnValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDerivativePropagateDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativePropagateDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativePropagateDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativePropagateFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDerivativeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDerivativeDecoration
-    };
-    IR_LEAF_ISA(BackwardDerivativeDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRCheckpointHintDecoration : public IRDecoration
 {
-    IR_PARENT_ISA(CheckpointHintDecoration)
+    FIDDLE(baseInst())
 };
 
+FIDDLE()
 struct IRPreferRecomputeDecoration : IRCheckpointHintDecoration
 {
-    enum
-    {
-        kOp = kIROp_PreferRecomputeDecoration
-    };
-    IR_LEAF_ISA(PreferRecomputeDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
 {
-    enum
-    {
-        kOp = kIROp_PreferCheckpointDecoration
-    };
-    IR_LEAF_ISA(PreferCheckpointDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
 {
-    enum
-    {
-        kOp = kIROp_CheckpointIntermediateDecoration
-    };
-    IR_LEAF_ISA(CheckpointIntermediateDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getSourceFunction() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRLoopCounterDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LoopCounterDecoration
-    };
-    IR_LEAF_ISA(LoopCounterDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRLoopCounterUpdateDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LoopCounterUpdateDecoration
-    };
-    IR_LEAF_ISA(LoopCounterUpdateDecoration)
+    FIDDLE(leafInst())
 };
 
 
+FIDDLE()
 struct IRLoopExitPrimalValueDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LoopExitPrimalValueDecoration
-    };
-    IR_LEAF_ISA(LoopExitPrimalValueDecoration)
+    FIDDLE(leafInst())
 
     IRUse target;
     IRUse exitVal;
@@ -1149,193 +890,143 @@ struct IRLoopExitPrimalValueDecoration : IRDecoration
     IRInst* getLoopExitValInst() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRAutodiffInstDecoration : IRDecoration
 {
-    IR_PARENT_ISA(AutodiffInstDecoration)
+    FIDDLE(baseInst())
 };
 
+FIDDLE()
 struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
 {
-    enum
-    {
-        kOp = kIROp_DifferentialInstDecoration
-    };
+    FIDDLE(leafInst())
 
     IRUse primalType;
-    IR_LEAF_ISA(DifferentialInstDecoration)
 
     IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
     IRInst* getPrimalInst() { return getOperand(1); }
     IRInst* getWitness() { return getOperand(2); }
 };
 
+FIDDLE()
 struct IRPrimalInstDecoration : IRAutodiffInstDecoration
 {
-    enum
-    {
-        kOp = kIROp_PrimalInstDecoration
-    };
-
-    IR_LEAF_ISA(PrimalInstDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
 {
-    enum
-    {
-        kOp = kIROp_MixedDifferentialInstDecoration
-    };
+    FIDDLE(leafInst())
 
     IRUse pairType;
-    IR_LEAF_ISA(MixedDifferentialInstDecoration)
 
     IRType* getPairType() { return (IRType*)(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRRecomputeBlockDecoration : IRAutodiffInstDecoration
 {
-    enum
-    {
-        kOp = kIROp_RecomputeBlockDecoration
-    };
-
-    IR_LEAF_ISA(RecomputeBlockDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPrimalValueStructKeyDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PrimalValueStructKeyDecoration
-    };
+    FIDDLE(leafInst())
 
-    IR_LEAF_ISA(PrimalValueStructKeyDecoration)
 
     IRStructKey* getStructKey() { return as<IRStructKey>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRPrimalElementTypeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PrimalElementTypeDecoration
-    };
+    FIDDLE(leafInst())
 
-    IR_LEAF_ISA(PrimalElementTypeDecoration)
 
     IRInst* getPrimalElementType() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_IntermediateContextFieldDifferentialTypeDecoration
-    };
+    FIDDLE(leafInst())
 
-    IR_LEAF_ISA(IntermediateContextFieldDifferentialTypeDecoration)
 
     IRInst* getDifferentialWitness() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBackwardDifferentiableDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_BackwardDifferentiableDecoration
-    };
-    IR_LEAF_ISA(BackwardDifferentiableDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_UserDefinedBackwardDerivativeDecoration
-    };
-    IR_LEAF_ISA(UserDefinedBackwardDerivativeDecoration)
+    FIDDLE(leafInst())
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRTreatAsDifferentiableDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_TreatAsDifferentiableDecoration
-    };
-    IR_LEAF_ISA(TreatAsDifferentiableDecoration)
+    FIDDLE(leafInst())
 };
 
 // Mark a call as explicitly calling a differentiable function.
+FIDDLE()
 struct IRDifferentiableCallDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DifferentiableCallDecoration
-    };
-    IR_LEAF_ISA(DifferentiableCallDecoration)
+    FIDDLE(leafInst())
 };
 
 // Mark a type as being eligible for trimming if necessary. If
 // any fields don't have any effective loads from them, they can be
 // removed.
 //
+FIDDLE()
 struct IROptimizableTypeDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_OptimizableTypeDecoration
-    };
-    IR_LEAF_ISA(OptimizableTypeDecoration)
+    FIDDLE(leafInst())
 };
 
 // Informs the DCE pass to ignore side-effects on this call for
 // the purposes of dead code elimination, even if the call does have
 // side-effects.
 //
+FIDDLE()
 struct IRIgnoreSideEffectsDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_IgnoreSideEffectsDecoration
-    };
-    IR_LEAF_ISA(IgnoreSideEffectsDecoration)
+    FIDDLE(leafInst())
 };
 
 // Treat a call to a non-differentiable function as a differentiable call.
+FIDDLE()
 struct IRTreatCallAsDifferentiableDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_TreatCallAsDifferentiableDecoration
-    };
-    IR_LEAF_ISA(TreatCallAsDifferentiableDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDerivativeMemberDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_DerivativeMemberDecoration
-    };
-    IR_LEAF_ISA(DerivativeMemberDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol
 // with it's derivative function.
+FIDDLE()
 struct IRForwardDifferentiate : IRInst
 {
-    enum
-    {
-        kOp = kIROp_ForwardDifferentiate
-    };
+    FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
-
-    IR_LEAF_ISA(ForwardDifferentiate)
 };
 
 // An instruction that replaces the function symbol
@@ -1344,94 +1035,68 @@ struct IRForwardDifferentiate : IRInst
 // of backward derivative computation. It performs the primal
 // computations and returns the intermediates that will be used
 // by the actual backward derivative function.
+FIDDLE()
 struct IRBackwardDifferentiatePrimal : IRInst
 {
-    enum
-    {
-        kOp = kIROp_BackwardDifferentiatePrimal
-    };
+    FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
-
-    IR_LEAF_ISA(BackwardDifferentiatePrimal)
 };
 
 // An instruction that replaces the function symbol with its backward derivative propagate function.
 // A backward derivative propagate function is the second pass of backward derivative computation.
 // It uses the intermediates computed in the bacward derivative primal function to perform the
 // actual backward derivative propagation.
+FIDDLE()
 struct IRBackwardDifferentiatePropagate : IRInst
 {
-    enum
-    {
-        kOp = kIROp_BackwardDifferentiatePropagate
-    };
+    FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
-
-    IR_LEAF_ISA(BackwardDifferentiatePropagate)
 };
 
 // An instruction that replaces the function symbol with its backward derivative function.
 // A backward derivative function is a concept that combines both passes of backward derivative
 // computation. This inst should only be produced by lower-to-ir, and will be replaced with calls to
 // the primal function followed by the propagate function in the auto-diff pass.
+FIDDLE()
 struct IRBackwardDifferentiate : IRInst
 {
-    enum
-    {
-        kOp = kIROp_BackwardDifferentiate
-    };
+    FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
-
-    IR_LEAF_ISA(BackwardDifferentiate)
 };
 
+FIDDLE()
 struct IRIsDifferentialNull : IRInst
 {
-    enum
-    {
-        kOp = kIROp_IsDifferentialNull
-    };
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
-
-    IR_LEAF_ISA(IsDifferentialNull)
 };
 
 // Retrieves the primal substitution function for the given function.
+FIDDLE()
 struct IRPrimalSubstitute : IRInst
 {
-    enum
-    {
-        kOp = kIROp_PrimalSubstitute
-    };
+    FIDDLE(leafInst())
     IRInst* getBaseFn() { return getOperand(0); }
-
-    IR_LEAF_ISA(PrimalSubstitute)
 };
 
+FIDDLE()
 struct IRDifferentiableTypeAnnotation : IRInst
 {
-    enum
-    {
-        kOp = kIROp_DifferentiableTypeAnnotation
-    };
+    FIDDLE(leafInst())
     IRInst* getBaseType() { return getOperand(0); }
     IRInst* getWitness() { return getOperand(1); }
-
-    IR_LEAF_ISA(DifferentiableTypeAnnotation)
 };
 
+FIDDLE()
 struct IRDispatchKernel : IRInst
 {
-    enum
-    {
-        kOp = kIROp_DispatchKernel
-    };
+    FIDDLE(leafInst())
     IRInst* getBaseFn() { return getOperand(0); }
     IRInst* getThreadGroupSize() { return getOperand(1); }
     IRInst* getDispatchSize() { return getOperand(2); }
@@ -1441,38 +1106,36 @@ struct IRDispatchKernel : IRInst
     {
         return IROperandList<IRInst>(getOperands() + 3, getOperands() + getOperandCount());
     }
-
-    IR_LEAF_ISA(DispatchKernel)
 };
 
+FIDDLE()
 struct IRTorchTensorGetView : IRInst
 {
-    enum
-    {
-        kOp = kIROp_TorchTensorGetView
-    };
-    IR_LEAF_ISA(TorchTensorGetView)
+    FIDDLE(leafInst())
 };
 
 // Dictionary item mapping a type with a corresponding
 // IDifferentiable witness table
 //
+FIDDLE()
 struct IRDifferentiableTypeDictionaryItem : IRInst
 {
-    IR_LEAF_ISA(DifferentiableTypeDictionaryItem)
+    FIDDLE(leafInst())
 
     IRInst* getConcreteType() { return getOperand(0); }
     IRInst* getWitness() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
 {
-    IR_LEAF_ISA(DifferentiableTypeDictionaryDecoration)
+    FIDDLE(leafInst())
 };
 
-struct IRFloatingModeOverrideDecoration : IRDecoration
+FIDDLE()
+struct IRFloatingPointModeOverrideDecoration : IRDecoration
 {
-    IR_LEAF_ISA(FloatingPointModeOverrideDecoration)
+    FIDDLE(leafInst())
 
     FloatingPointMode getFloatingPointMode()
     {
@@ -1483,8 +1146,10 @@ struct IRFloatingModeOverrideDecoration : IRDecoration
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments
 // (instructions representing types, witness tables, etc.)
+FIDDLE()
 struct IRSpecialize : IRInst
 {
+    FIDDLE(leafInst())
     // The "base" for the call is the generic to be specialized
     IRUse base;
     IRInst* getBase() { return getOperand(0); }
@@ -1493,38 +1158,38 @@ struct IRSpecialize : IRInst
     UInt getArgCount() { return getOperandCount() - 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
     IRUse* getArgOperand(Index i) { return getOperands() + 1 + i; }
-
-    IR_LEAF_ISA(Specialize)
 };
 
 // An instruction that looks up the implementation
 // of an interface operation identified by `requirementDeclRef`
 // in the witness table `witnessTable` which should
 // hold the conformance information for a specific type.
+FIDDLE()
 struct IRLookupWitnessMethod : IRInst
 {
+    FIDDLE(leafInst())
     IRUse witnessTable;
     IRUse requirementKey;
 
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
-
-    IR_LEAF_ISA(LookupWitness)
 };
 
 // Returns the sequential ID of an RTTI object.
+FIDDLE()
 struct IRGetSequentialID : IRInst
 {
-    IR_LEAF_ISA(GetSequentialID)
+    FIDDLE(leafInst())
 
     IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
 /// Allocates space from local stack.
 ///
+FIDDLE()
 struct IRAlloca : IRInst
 {
-    IR_LEAF_ISA(Alloca)
+    FIDDLE(leafInst())
 
     IRInst* getAllocSize() { return getOperand(0); }
 };
@@ -1533,32 +1198,36 @@ struct IRAlloca : IRInst
 /// on `value` can be emitted as local insts instead of global insts, as required by targets (e.g.
 /// spirv) that doesn't allow the dependent computation in the global scope.
 ///
+FIDDLE()
 struct IRGlobalValueRef : IRInst
 {
-    IR_LEAF_ISA(GlobalValueRef)
+    FIDDLE(leafInst())
 
     IRInst* getValue() { return getOperand(0); }
 };
 
 /// Packs a value into an `AnyValue`.
 /// Return type is `IRAnyValueType`.
+FIDDLE()
 struct IRPackAnyValue : IRInst
 {
-    IR_LEAF_ISA(PackAnyValue)
+    FIDDLE(leafInst())
     IRInst* getValue() { return getOperand(0); }
 };
 
 /// Unpacks a `AnyValue` value into a concrete type.
 /// Operand must have `IRAnyValueType`.
+FIDDLE()
 struct IRUnpackAnyValue : IRInst
 {
-    IR_LEAF_ISA(UnpackAnyValue)
+    FIDDLE(leafInst())
     IRInst* getValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRBitFieldAccessorDecoration : IRDecoration
 {
-    IR_LEAF_ISA(BitFieldAccessorDecoration);
+    FIDDLE(leafInst())
     IRStructKey* getBackingMemberKey() { return cast<IRStructKey>(getOperand(0)); }
     IRIntegerValue getFieldWidth() { return as<IRIntLit>(getOperand(1))->getValue(); }
     IRIntegerValue getFieldOffset() { return as<IRIntLit>(getOperand(2))->getValue(); }
@@ -1575,9 +1244,10 @@ struct IRBitFieldAccessorDecoration : IRDecoration
 /// case where some amount of "layout" information can't just come
 /// in via the `TypeLayout` part of things.
 ///
+FIDDLE()
 struct IRSemanticDecoration : public IRDecoration
 {
-    IR_LEAF_ISA(SemanticDecoration)
+    FIDDLE(leafInst())
 
     IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
@@ -1586,143 +1256,147 @@ struct IRSemanticDecoration : public IRDecoration
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
-struct IRConstructorDecorartion : IRDecoration
+FIDDLE()
+struct IRConstructorDecoration : IRDecoration
 {
-    IR_LEAF_ISA(ConstructorDecoration)
+    FIDDLE(leafInst())
 
     bool getSynthesizedStatus() { return cast<IRBoolLit>(getOperand(0))->getValue(); }
 };
 
-IR_SIMPLE_DECORATION(MethodDecoration)
-
+FIDDLE()
 struct IRPackOffsetDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PackOffsetDecoration
-    };
-    IR_LEAF_ISA(PackOffsetDecoration)
+    FIDDLE(leafInst())
 
     IRIntLit* getRegisterOffset() { return cast<IRIntLit>(getOperand(0)); }
     IRIntLit* getComponentOffset() { return cast<IRIntLit>(getOperand(1)); }
 };
 
+FIDDLE()
 struct IRUserTypeNameDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_UserTypeNameDecoration
-    };
-    IR_LEAF_ISA(UserTypeNameDecoration)
+    FIDDLE(leafInst())
     IRStringLit* getUserTypeName() { return cast<IRStringLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRCounterBufferDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_CounterBufferDecoration
-    };
-    IR_LEAF_ISA(CounterBufferDecoration)
+    FIDDLE(leafInst())
     IRInst* getCounterBuffer() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRStageAccessDecoration : public IRDecoration
 {
-    IR_PARENT_ISA(StageAccessDecoration)
-
+    FIDDLE(baseInst())
     Int getStageCount() { return (Int)getOperandCount(); }
     IRStringLit* getStageOperand(Int index) { return cast<IRStringLit>(getOperand(index)); }
     UnownedStringSlice getStageName(Int index) { return getStageOperand(index)->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRStageReadAccessDecoration : public IRStageAccessDecoration
 {
-    IR_LEAF_ISA(StageReadAccessDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
 {
-    IR_LEAF_ISA(StageWriteAccessDecoration)
+    FIDDLE(leafInst())
 };
 
-
+FIDDLE()
 struct IRRayPayloadDecoration : public IRDecoration
 {
-    IR_LEAF_ISA(RayPayloadDecoration)
+    FIDDLE(leafInst())
 };
 
 // Mesh shader decorations
 
+FIDDLE()
 struct IRMeshOutputDecoration : public IRDecoration
 {
-    IR_PARENT_ISA(MeshOutputDecoration)
+    FIDDLE(baseInst())
     IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+FIDDLE()
 struct IRVerticesDecoration : public IRMeshOutputDecoration
 {
-    IR_LEAF_ISA(VerticesDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRIndicesDecoration : public IRMeshOutputDecoration
 {
-    IR_LEAF_ISA(IndicesDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPrimitivesDecoration : public IRMeshOutputDecoration
 {
-    IR_LEAF_ISA(PrimitivesDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGLSLPrimitivesRateDecoration : public IRDecoration
 {
-    IR_LEAF_ISA(GLSLPrimitivesRateDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGLPositionOutputDecoration : public IRDecoration
 {
-    IR_LEAF_ISA(GLPositionOutputDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGLPositionInputDecoration : public IRDecoration
 {
-    IR_LEAF_ISA(GLPositionInputDecoration)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMeshOutputRef : public IRInst
 {
-    IR_LEAF_ISA(MeshOutputRef)
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
 };
 
+FIDDLE()
 struct IRMeshOutputSet : public IRInst
 {
-    IR_LEAF_ISA(MeshOutputSet)
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getElementValue() { return getOperand(2); }
 };
 
+FIDDLE()
 struct IRMetalSetVertex : public IRInst
 {
-    IR_LEAF_ISA(MetalSetVertex)
+    FIDDLE(leafInst())
     IRInst* getIndex() { return getOperand(0); }
     IRInst* getElementValue() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRMetalSetPrimitive : public IRInst
 {
-    IR_LEAF_ISA(MetalSetPrimitive)
+    FIDDLE(leafInst())
     IRInst* getIndex() { return getOperand(0); }
     IRInst* getElementValue() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRMetalSetIndices : public IRInst
 {
-    IR_LEAF_ISA(MetalSetIndices)
+    FIDDLE(leafInst())
     IRInst* getIndex() { return getOperand(0); }
     IRInst* getElementValue() { return getOperand(1); }
 };
@@ -1743,15 +1417,17 @@ struct IRMetalSetIndices : public IRInst
 /// they can affect the conceptual value/identity of an instruction
 /// in cases where we deduplicate/hash instructions by value.
 ///
+FIDDLE()
 struct IRAttr : public IRInst
 {
-    IR_PARENT_ISA(Attr);
+    FIDDLE(baseInst())
 };
 
 /// An attribute that specifies layout information for a single resource kind.
+FIDDLE()
 struct IRLayoutResourceInfoAttr : public IRAttr
 {
-    IR_PARENT_ISA(LayoutResourceInfoAttr);
+    FIDDLE(baseInst())
 
     IRIntLit* getResourceKindInst() { return cast<IRIntLit>(getOperand(0)); }
     LayoutResourceKind getResourceKind()
@@ -1766,9 +1442,10 @@ struct IRLayoutResourceInfoAttr : public IRAttr
 /// `varOffset(kind, offset, space)`. The latter form is only
 /// used when `space` is non-zero.
 ///
+FIDDLE()
 struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
 {
-    IR_LEAF_ISA(VarOffsetAttr);
+    FIDDLE(leafInst())
 
     IRIntLit* getOffsetInst() { return cast<IRIntLit>(getOperand(1)); }
     UInt getOffset() { return UInt(getIntVal(getOffsetInst())); }
@@ -1789,22 +1466,25 @@ struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
 };
 
 /// An attribute that specifies the error type a function is throwing
+FIDDLE()
 struct IRFuncThrowTypeAttr : IRAttr
 {
-    IR_LEAF_ISA(FuncThrowTypeAttr)
+    FIDDLE(leafInst())
 
     IRType* getErrorType() { return (IRType*)getOperand(0); }
 };
 
+FIDDLE()
 struct IRNoDiffAttr : IRAttr
 {
-    IR_LEAF_ISA(NoDiffAttr)
+    FIDDLE(leafInst())
 };
 
 /// An attribute that specifies size information for a single resource kind.
+FIDDLE()
 struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
 {
-    IR_LEAF_ISA(TypeSizeAttr);
+    FIDDLE(leafInst())
 
     IRIntLit* getSizeInst() { return cast<IRIntLit>(getOperand(1)); }
     LayoutSize getSize()
@@ -1820,9 +1500,10 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
 ///
 /// Layout instructions are effectively just meta-data constants.
 ///
+FIDDLE()
 struct IRLayout : IRInst
 {
-    IR_PARENT_ISA(Layout)
+    FIDDLE(baseInst())
 };
 
 struct IRVarLayout;
@@ -1834,9 +1515,10 @@ struct IRVarLayout;
 /// type slots were filled in. The layout of pending data may not
 /// be contiguous with the layout of the original type/variable.
 ///
+FIDDLE()
 struct IRPendingLayoutAttr : IRAttr
 {
-    IR_LEAF_ISA(PendingLayoutAttr);
+    FIDDLE(leafInst())
 
     IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
 };
@@ -1851,9 +1533,10 @@ struct IRPendingLayoutAttr : IRAttr
 /// operands or attributes. For example, a type layout for a
 /// `struct` type will include offset information for its fields.
 ///
+FIDDLE()
 struct IRTypeLayout : IRLayout
 {
-    IR_PARENT_ISA(TypeLayout);
+    FIDDLE(baseInst())
 
     /// Find the attribute that stores offset information for `kind`.
     ///
@@ -1931,14 +1614,14 @@ struct IRTypeLayout : IRLayout
 };
 
 /// Type layout for parameter groups (constant buffers and parameter blocks)
+FIDDLE()
 struct IRParameterGroupTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
 private:
     typedef IRTypeLayout Super;
 
 public:
-    IR_LEAF_ISA(ParameterGroupTypeLayout)
-
     IRVarLayout* getContainerVarLayout() { return cast<IRVarLayout>(getOperand(0)); }
 
     IRVarLayout* getElementVarLayout() { return cast<IRVarLayout>(getOperand(1)); }
@@ -1980,11 +1663,12 @@ public:
 };
 
 /// Specialized layout information for array types
+FIDDLE()
 struct IRArrayTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(ArrayTypeLayout)
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 
@@ -2006,11 +1690,12 @@ struct IRArrayTypeLayout : IRTypeLayout
 };
 
 /// Specialized layout information for structured buffer types
+FIDDLE()
 struct IRStructuredBufferTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(StructuredBufferTypeLayout)
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 
@@ -2058,11 +1743,12 @@ infinite recursion in lookup.
 The work around for now is to observe that layout of a Ptr doesn't depend on what is being pointed
 to and as such we don't store the this in the pointer.
 */
+FIDDLE()
 struct IRPointerTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(PointerTypeLayout)
 
     struct Builder : Super::Builder
     {
@@ -2080,11 +1766,12 @@ struct IRPointerTypeLayout : IRTypeLayout
 };
 
 /// Specialized layout information for stream-output types
+FIDDLE()
 struct IRStreamOutputTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(StreamOutputTypeLayout)
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 
@@ -2106,11 +1793,12 @@ struct IRStreamOutputTypeLayout : IRTypeLayout
 };
 
 /// Specialized layout information for matrix types
+FIDDLE()
 struct IRMatrixTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(MatrixTypeLayout)
 
     MatrixLayoutMode getMode()
     {
@@ -2132,9 +1820,10 @@ struct IRMatrixTypeLayout : IRTypeLayout
 };
 
 /// Attribute that specifies the layout for one field of a structure type.
+FIDDLE()
 struct IRStructFieldLayoutAttr : IRAttr
 {
-    IR_LEAF_ISA(StructFieldLayoutAttr)
+    FIDDLE(leafInst())
 
     IRInst* getFieldKey() { return getOperand(0); }
 
@@ -2142,9 +1831,10 @@ struct IRStructFieldLayoutAttr : IRAttr
 };
 
 /// Specialized layout information for structure types.
+FIDDLE()
 struct IRStructTypeLayout : IRTypeLayout
 {
-    IR_LEAF_ISA(StructTypeLayout)
+    FIDDLE(leafInst())
 
     typedef IRTypeLayout Super;
 
@@ -2193,17 +1883,19 @@ struct IRStructTypeLayout : IRTypeLayout
 };
 
 /// Attribute that specifies the layout for one field of a structure type.
+FIDDLE()
 struct IRTupleFieldLayoutAttr : IRAttr
 {
-    IR_LEAF_ISA(TupleFieldLayoutAttr)
+    FIDDLE(leafInst())
 
     IRTypeLayout* getLayout() { return cast<IRTypeLayout>(getOperand(1)); }
 };
 
 /// Specialized layout information for tuple types.
+FIDDLE()
 struct IRTupleTypeLayout : IRTypeLayout
 {
-    IR_LEAF_ISA(TupleTypeLayout)
+    FIDDLE(leafInst())
 
     typedef IRTypeLayout Super;
 
@@ -2250,19 +1942,21 @@ struct IRTupleTypeLayout : IRTypeLayout
 };
 
 /// Attribute that represents the layout for one case of a union type
+FIDDLE()
 struct IRCaseTypeLayoutAttr : IRAttr
 {
-    IR_LEAF_ISA(CaseTypeLayoutAttr);
+    FIDDLE(leafInst())
 
     IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 };
 
 /// Type layout for an existential/interface type.
+FIDDLE()
 struct IRExistentialTypeLayout : IRTypeLayout
 {
+    FIDDLE(leafInst())
     typedef IRTypeLayout Super;
 
-    IR_LEAF_ISA(ExistentialTypeLayout)
 
     struct Builder : Super::Builder
     {
@@ -2283,9 +1977,10 @@ struct IRExistentialTypeLayout : IRTypeLayout
 
 
 /// Layout information for an entry point
+FIDDLE()
 struct IREntryPointLayout : IRLayout
 {
-    IR_LEAF_ISA(EntryPointLayout)
+    FIDDLE(leafInst())
 
     /// Get the layout information for the entry point parameters.
     ///
@@ -2310,18 +2005,20 @@ struct IREntryPointLayout : IRLayout
 IRStructTypeLayout* getScopeStructLayout(IREntryPointLayout* scopeLayout);
 
 /// Attribute that associates a variable layout with a known stage.
+FIDDLE()
 struct IRStageAttr : IRAttr
 {
-    IR_LEAF_ISA(StageAttr);
+    FIDDLE(leafInst())
 
     IRIntLit* getStageOperand() { return cast<IRIntLit>(getOperand(0)); }
     Stage getStage() { return Stage(getIntVal(getStageOperand())); }
 };
 
 /// Base type for attributes that associate a variable layout with a semantic name and index.
+FIDDLE()
 struct IRSemanticAttr : IRAttr
 {
-    IR_PARENT_ISA(SemanticAttr);
+    FIDDLE(baseInst())
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
@@ -2331,21 +2028,24 @@ struct IRSemanticAttr : IRAttr
 };
 
 /// Attribute that associates a variable with a system-value semantic name and index
+FIDDLE()
 struct IRSystemValueSemanticAttr : IRSemanticAttr
 {
-    IR_LEAF_ISA(SystemValueSemanticAttr);
+    FIDDLE(leafInst())
 };
 
 /// Attribute that associates a variable with a user-defined semantic name and index
+FIDDLE()
 struct IRUserSemanticAttr : IRSemanticAttr
 {
-    IR_LEAF_ISA(UserSemanticAttr);
+    FIDDLE(leafInst())
 };
 
 /// Layout infromation for a single parameter/field
+FIDDLE()
 struct IRVarLayout : IRLayout
 {
-    IR_LEAF_ISA(VarLayout)
+    FIDDLE(leafInst())
 
     /// Get the type layout information for this variable
     IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
@@ -2448,27 +2148,27 @@ bool isVaryingParameter(IRVarLayout* varLayout);
 /// * To attach an `IREntryPointLayout` to an `IRFunc` representing an entry point
 /// * To attach an `IRTaggedUnionTypeLayout` to an `IRTaggedUnionType`
 ///
+FIDDLE()
 struct IRLayoutDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_LayoutDecoration
-    };
-    IR_LEAF_ISA(LayoutDecoration)
+    FIDDLE(leafInst())
 
     /// Get the layout that is being attached to the parent instruction
     IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
 };
 
 //
+FIDDLE()
 struct IRAlignOf : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getBaseOp() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRCall : IRInst
 {
-    IR_LEAF_ISA(Call)
+    FIDDLE(leafInst())
 
     IRInst* getCallee() { return getOperand(0); }
     IRUse* getCalleeUse() { return getOperands(); }
@@ -2482,40 +2182,45 @@ struct IRCall : IRInst
     void setArg(UInt index, IRInst* arg) { setOperand(index + 1, arg); }
 };
 
+FIDDLE()
 struct IRAlignedAttr : IRAttr
 {
-    IR_LEAF_ISA(AlignedAttr)
+    FIDDLE(leafInst())
     IRInst* getAlignment() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRLoad : IRInst
 {
+    FIDDLE(leafInst())
     IRUse ptr;
-    IR_LEAF_ISA(Load)
 
     IRInst* getPtr() { return ptr.get(); }
 };
 
+FIDDLE()
 struct IRAtomicOperation : IRInst
 {
-    IR_PARENT_ISA(AtomicOperation);
+    FIDDLE(baseInst())
 
     IRInst* getPtr() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRAtomicLoad : IRAtomicOperation
 {
+    FIDDLE(leafInst())
     IRUse ptr;
-    IR_LEAF_ISA(AtomicLoad)
 
     IRInst* getPtr() { return ptr.get(); }
 };
 
+FIDDLE()
 struct IRStore : IRInst
 {
+    FIDDLE(leafInst())
     IRUse ptr;
     IRUse val;
-    IR_LEAF_ISA(Store)
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
@@ -2524,150 +2229,171 @@ struct IRStore : IRInst
     IRUse* getValUse() { return &val; }
 };
 
+FIDDLE()
 struct IRAtomicStore : IRAtomicOperation
 {
+    FIDDLE(leafInst())
     IRUse ptr;
     IRUse val;
-    IR_LEAF_ISA(AtomicStore)
 
     IRInst* getPtr() { return ptr.get(); }
     IRInst* getVal() { return val.get(); }
 };
 
+FIDDLE()
 struct IRRWStructuredBufferStore : IRInst
 {
-    IR_LEAF_ISA(RWStructuredBufferStore)
+    FIDDLE(leafInst())
     IRInst* getStructuredBuffer() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
     IRInst* getVal() { return getOperand(2); }
 };
 
+FIDDLE()
 struct IRFieldExtract : IRInst
 {
+    FIDDLE(leafInst())
     IRUse base;
     IRUse field;
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
-    IR_LEAF_ISA(FieldExtract)
 };
 
+FIDDLE()
 struct IRFieldAddress : IRInst
 {
+    FIDDLE(leafInst())
     IRUse base;
     IRUse field;
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
-    IR_LEAF_ISA(FieldAddress)
 };
 
+FIDDLE()
 struct IRGetElement : IRInst
 {
-    IR_LEAF_ISA(GetElement);
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRGetElementPtr : IRInst
 {
-    IR_LEAF_ISA(GetElementPtr);
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRGetOffsetPtr : IRInst
 {
-    IR_LEAF_ISA(GetOffsetPtr);
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getOffset() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRRWStructuredBufferGetElementPtr : IRInst
 {
-    IR_LEAF_ISA(RWStructuredBufferGetElementPtr);
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRStructuredBufferAppend : IRInst
 {
-    IR_LEAF_ISA(StructuredBufferAppend);
+    FIDDLE(leafInst())
     IRInst* getBuffer() { return getOperand(0); }
     IRInst* getElement() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRStructuredBufferConsume : IRInst
 {
-    IR_LEAF_ISA(StructuredBufferConsume);
+    FIDDLE(leafInst())
     IRInst* getBuffer() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRStructuredBufferGetDimensions : IRInst
 {
-    IR_LEAF_ISA(StructuredBufferGetDimensions);
+    FIDDLE(leafInst())
     IRInst* getBuffer() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRNonUniformResourceIndex : IRInst
 {
-    IR_LEAF_ISA(NonUniformResourceIndex);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRLoadReverseGradient : IRInst
 {
-    IR_LEAF_ISA(LoadReverseGradient)
+    FIDDLE(leafInst())
     IRInst* getValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRReverseGradientDiffPairRef : IRInst
 {
-    IR_LEAF_ISA(ReverseGradientDiffPairRef)
+    FIDDLE(leafInst())
     IRInst* getPrimal() { return getOperand(0); }
     IRInst* getDiff() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRPrimalParamRef : IRInst
 {
-    IR_LEAF_ISA(PrimalParamRef)
+    FIDDLE(leafInst())
     IRInst* getReferencedParam() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRDiffParamRef : IRInst
 {
-    IR_LEAF_ISA(DiffParamRef)
+    FIDDLE(leafInst())
     IRInst* getReferencedParam() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGetNativePtr : IRInst
 {
-    IR_LEAF_ISA(GetNativePtr);
+    FIDDLE(leafInst())
     IRInst* getElementType() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGetManagedPtrWriteRef : IRInst
 {
-    IR_LEAF_ISA(GetManagedPtrWriteRef);
+    FIDDLE(leafInst())
     IRInst* getPtrToManagedPtr() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGetAddress : IRInst
 {
-    IR_LEAF_ISA(GetAddr);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRImageSubscript : IRInst
 {
-    IR_LEAF_ISA(ImageSubscript);
+    FIDDLE(leafInst())
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
     bool hasSampleCoord() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
     IRInst* getSampleCoord() { return getOperand(2); }
 };
 
+FIDDLE()
 struct IRImageLoad : IRInst
 {
-    IR_LEAF_ISA(ImageLoad);
+    FIDDLE(leafInst())
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
 
@@ -2681,9 +2407,10 @@ struct IRImageLoad : IRInst
     IRInst* getAuxCoord2() { return getOperand(3); }
 };
 
+FIDDLE()
 struct IRImageStore : IRInst
 {
-    IR_LEAF_ISA(ImageStore);
+    FIDDLE(leafInst())
     IRInst* getImage() { return getOperand(0); }
     IRInst* getCoord() { return getOperand(1); }
     IRInst* getValue() { return getOperand(2); }
@@ -2695,22 +2422,37 @@ struct IRImageStore : IRInst
 };
 // Terminators
 
+FIDDLE()
+struct IRSelect : IRInst
+{
+    FIDDLE(leafInst());
+
+    IRInst* getCondition() { return getOperand(0); }
+    IRInst* getTrueResult() { return getOperand(1); }
+    IRInst* getFalseResult() { return getOperand(2); }
+};
+
+
+FIDDLE()
 struct IRReturn : IRTerminatorInst
 {
-    IR_LEAF_ISA(Return);
+    FIDDLE(leafInst())
 
     IRInst* getVal() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRYield : IRTerminatorInst
 {
-    IR_LEAF_ISA(Yield);
+    FIDDLE(leafInst())
 
     IRInst* getVal() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRDiscard : IRTerminatorInst
 {
+    FIDDLE(leafInst())
 };
 
 // Used for representing a distinct copy of an object.
@@ -2722,16 +2464,18 @@ struct IRDiscard : IRTerminatorInst
 // we need to make distinct copies of the inst for its uses
 // within the loop body and outside of it.
 //
+FIDDLE()
 struct IRCheckpointObject : IRInst
 {
-    IR_LEAF_ISA(CheckpointObject);
+    FIDDLE(leafInst())
 
     IRInst* getVal() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRLoopExitValue : IRInst
 {
-    IR_LEAF_ISA(LoopExitValue);
+    FIDDLE(leafInst())
 
     IRInst* getVal() { return getOperand(0); }
 };
@@ -2740,20 +2484,24 @@ struct IRLoopExitValue : IRInst
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
 // executed.
+FIDDLE()
 struct IRUnreachable : IRTerminatorInst
 {
-    IR_PARENT_ISA(Unreachable);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMissingReturn : IRUnreachable
 {
-    IR_LEAF_ISA(MissingReturn);
+    FIDDLE(leafInst())
 };
 
 struct IRBlock;
 
+FIDDLE()
 struct IRUnconditionalBranch : IRTerminatorInst
 {
+    FIDDLE(baseInst())
     IRUse block;
 
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
@@ -2762,25 +2510,15 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRUse* getArgs();
     IRInst* getArg(UInt index);
     void removeArgument(UInt index);
-    IR_PARENT_ISA(UnconditionalBranch);
-};
-
-// Special cases of unconditional branch, to handle
-// structured control flow:
-struct IRBreak : IRUnconditionalBranch
-{
-};
-struct IRContinue : IRUnconditionalBranch
-{
 };
 
 // The start of a loop is a special control-flow
 // instruction, that records relevant information
 // about the loop structure:
+FIDDLE()
 struct IRLoop : IRUnconditionalBranch
 {
-    IR_LEAF_ISA(loop);
-
+    FIDDLE(leafInst())
     // The next block after the loop, which
     // is where we expect control flow to
     // re-converge, and also where a
@@ -2795,9 +2533,10 @@ struct IRLoop : IRUnconditionalBranch
     IRBlock* getContinueBlock() { return (IRBlock*)continueBlock.get(); }
 };
 
+FIDDLE()
 struct IRConditionalBranch : IRTerminatorInst
 {
-    IR_PARENT_ISA(ConditionalBranch)
+    FIDDLE(baseInst())
 
     IRUse condition;
     IRUse trueBlock;
@@ -2814,17 +2553,20 @@ struct IRConditionalBranch : IRTerminatorInst
 //     else              { <falseBlock> }
 //     <afterBlock>
 //
+FIDDLE()
 struct IRIfElse : IRConditionalBranch
 {
+    FIDDLE(leafInst())
     IRUse afterBlock;
 
     IRBlock* getAfterBlock() { return (IRBlock*)afterBlock.get(); }
 };
 
 // A multi-way branch that represents a source-level `switch`
+FIDDLE()
 struct IRSwitch : IRTerminatorInst
 {
-    IR_LEAF_ISA(Switch);
+    FIDDLE(leafInst())
 
     IRUse condition;
     IRUse breakLabel;
@@ -2843,25 +2585,28 @@ struct IRSwitch : IRTerminatorInst
 };
 
 // A compile-time switch based on the current code generation target.
+FIDDLE()
 struct IRTargetSwitch : IRTerminatorInst
 {
-    IR_LEAF_ISA(TargetSwitch)
+    FIDDLE(leafInst())
     IRInst* getBreakBlock() { return getOperand(0); }
     UInt getCaseCount() { return (getOperandCount() - 1) / 2; }
     IRBlock* getCaseBlock(UInt index) { return (IRBlock*)getOperand(index * 2 + 2); }
     IRInst* getCaseValue(UInt index) { return getOperand(index * 2 + 1); }
 };
 
+FIDDLE()
 struct IRThrow : IRTerminatorInst
 {
-    IR_LEAF_ISA(Throw);
+    FIDDLE(leafInst())
 
     IRInst* getValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRTryCall : IRTerminatorInst
 {
-    IR_LEAF_ISA(TryCall);
+    FIDDLE(leafInst())
 
     IRBlock* getSuccessBlock() { return cast<IRBlock>(getOperand(0)); }
     IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
@@ -2871,19 +2616,20 @@ struct IRTryCall : IRTerminatorInst
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
+FIDDLE()
 struct IRDefer : IRTerminatorInst
 {
-    IR_LEAF_ISA(Defer);
+    FIDDLE(leafInst())
 
     IRBlock* getDeferBlock() { return cast<IRBlock>(getOperand(0)); }
     IRBlock* getMergeBlock() { return cast<IRBlock>(getOperand(1)); }
     IRBlock* getScopeBlock() { return cast<IRBlock>(getOperand(2)); }
 };
 
+FIDDLE()
 struct IRSwizzle : IRInst
 {
-    IR_LEAF_ISA(swizzle);
-
+    FIDDLE(leafInst())
     IRUse base;
 
     IRInst* getBase() { return base.get(); }
@@ -2891,10 +2637,10 @@ struct IRSwizzle : IRInst
     IRInst* getElementIndex(UInt index) { return getOperand(index + 1); }
 };
 
+FIDDLE()
 struct IRSwizzleSet : IRInst
 {
-    IR_LEAF_ISA(swizzleSet);
-
+    FIDDLE(leafInst())
     IRUse base;
     IRUse source;
 
@@ -2904,35 +2650,32 @@ struct IRSwizzleSet : IRInst
     IRInst* getElementIndex(UInt index) { return getOperand(index + 2); }
 };
 
+FIDDLE()
 struct IRSwizzledStore : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getDest() { return getOperand(0); }
     IRInst* getSource() { return getOperand(1); }
     UInt getElementCount() { return getOperandCount() - 2; }
     IRInst* getElementIndex(UInt index) { return getOperand(index + 2); }
-
-    IR_LEAF_ISA(SwizzledStore)
 };
 
 
+FIDDLE()
 struct IRPatchConstantFuncDecoration : IRDecoration
 {
-    enum
-    {
-        kOp = kIROp_PatchConstantFuncDecoration
-    };
-    IR_LEAF_ISA(PatchConstantFuncDecoration)
+    FIDDLE(leafInst())
 
     IRInst* getFunc() { return getOperand(0); }
 };
 
 // An IR `var` instruction conceptually represents
 // a stack allocation of some memory.
+FIDDLE()
 struct IRVar : IRInst
 {
+    FIDDLE(leafInst())
     IRPtrType* getDataType() { return cast<IRPtrType>(IRInst::getDataType()); }
-
-    static bool isaImpl(IROp op) { return op == kIROp_Var; }
 };
 
 /// @brief A global variable.
@@ -2941,9 +2684,10 @@ struct IRVar : IRInst
 /// If the variable has an initializer, then
 /// it is represented by the code in the basic
 /// blocks nested inside this value.
+FIDDLE()
 struct IRGlobalVar : IRGlobalValueWithCode
 {
-    IR_LEAF_ISA(GlobalVar)
+    FIDDLE(leafInst())
 
     IRPtrType* getDataType() { return cast<IRPtrType>(IRInst::getDataType()); }
 };
@@ -2960,9 +2704,10 @@ struct IRGlobalVar : IRGlobalValueWithCode
 /// immutable, and subject to various SSA simplifications that
 /// do not work for global variables.
 ///
+FIDDLE()
 struct IRGlobalParam : IRInst
 {
-    IR_LEAF_ISA(GlobalParam)
+    FIDDLE(leafInst())
 };
 
 /// @brief A global constnat.
@@ -2973,17 +2718,20 @@ struct IRGlobalParam : IRInst
 /// represents an "extern" constant that will be defined in another
 /// module, and which is thus expected to have linkage.
 ///
+FIDDLE()
 struct IRGlobalConstant : IRInst
 {
-    IR_LEAF_ISA(GlobalConstant);
+    FIDDLE(leafInst())
 
     /// Get the value of this global constant, or null if the value is not known.
     IRInst* getValue() { return getOperandCount() != 0 ? getOperand(0) : nullptr; }
 };
 
 // An entry in a witness table (see below)
+FIDDLE()
 struct IRWitnessTableEntry : IRInst
 {
+    FIDDLE(leafInst())
     // The AST-level requirement
     IRUse requirementKey;
 
@@ -2992,8 +2740,6 @@ struct IRWitnessTableEntry : IRInst
 
     IRInst* getRequirementKey() { return getOperand(0); }
     IRInst* getSatisfyingVal() { return getOperand(1); }
-
-    IR_LEAF_ISA(WitnessTableEntry)
 };
 
 // A witness table is a global value that stores
@@ -3001,8 +2747,10 @@ struct IRWitnessTableEntry : IRInst
 // interface. It basically takes the form of a
 // map from the required members of the interface
 // to the IR values that satisfy those requirements.
+FIDDLE()
 struct IRWitnessTable : IRInst
 {
+    FIDDLE(leafInst())
     IRInstList<IRWitnessTableEntry> getEntries()
     {
         return IRInstList<IRWitnessTableEntry>(getChildren());
@@ -3014,8 +2762,6 @@ struct IRWitnessTable : IRInst
     }
 
     IRType* getConcreteType() { return (IRType*)getOperand(0); }
-
-    IR_LEAF_ISA(WitnessTable)
 };
 
 /// Represents an RTTI object.
@@ -3023,9 +2769,10 @@ struct IRWitnessTable : IRInst
 /// this RTTI object provides info for.
 /// All type info are encapsualted as `IRRTTI*Decoration`s attached
 /// to the object.
+FIDDLE()
 struct IRRTTIObject : IRInst
 {
-    IR_LEAF_ISA(RTTIObject)
+    FIDDLE(leafInst())
 };
 
 // An instruction that yields an undefined value.
@@ -3033,114 +2780,132 @@ struct IRRTTIObject : IRInst
 // Note that we make this an instruction rather than a value,
 // so that we will be able to identify a variable that is
 // used when undefined.
+FIDDLE()
 struct IRUndefined : IRInst
 {
+    FIDDLE(leafInst())
 };
 
 // Special inst for targets that support default initialization,
 // like the braces '= {}' in C/HLSL
+FIDDLE()
 struct IRDefaultConstruct : IRInst
 {
-    IR_LEAF_ISA(DefaultConstruct)
+    FIDDLE(leafInst())
 };
 
 // A global-scope generic parameter (a type parameter, a
 // constraint parameter, etc.)
+FIDDLE()
 struct IRGlobalGenericParam : IRInst
 {
-    IR_LEAF_ISA(GlobalGenericParam)
+    FIDDLE(leafInst())
 };
 
 // An instruction that binds a global generic parameter
 // to a particular value.
+FIDDLE()
 struct IRBindGlobalGenericParam : IRInst
 {
+    FIDDLE(leafInst())
     IRGlobalGenericParam* getParam() { return cast<IRGlobalGenericParam>(getOperand(0)); }
     IRInst* getVal() { return getOperand(1); }
-
-    IR_LEAF_ISA(BindGlobalGenericParam)
 };
 
+FIDDLE()
 struct IRExpand : IRInst
 {
-    IR_LEAF_ISA(Expand)
+    FIDDLE(leafInst())
     UInt getCaptureCount() { return getOperandCount(); }
     IRInst* getCapture(UInt index) { return getOperand(index); }
     IRInstList<IRBlock> getBlocks() { return IRInstList<IRBlock>(getChildren()); }
 };
 
 
+FIDDLE()
 struct IREach : IRInst
 {
-    IR_LEAF_ISA(Each)
+    FIDDLE(leafInst())
 
     IRInst* getElement() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRMakeArray : IRInst
 {
-    IR_LEAF_ISA(MakeArray)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeArrayFromElement : IRInst
 {
-    IR_LEAF_ISA(MakeArrayFromElement)
+    FIDDLE(leafInst())
 };
 
 
 // An Instruction that creates a tuple value.
+FIDDLE()
 struct IRMakeTuple : IRInst
 {
-    IR_LEAF_ISA(MakeTuple)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeValuePack : IRInst
 {
-    IR_LEAF_ISA(MakeValuePack)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeStruct : IRInst
 {
-    IR_LEAF_ISA(MakeStruct)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeWitnessPack : IRInst
 {
-    IR_LEAF_ISA(MakeWitnessPack)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGetTupleElement : IRInst
 {
-    IR_LEAF_ISA(GetTupleElement)
+    FIDDLE(leafInst())
     IRInst* getTuple() { return getOperand(0); }
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRGetTargetTupleElement : IRInst
 {
-    IR_LEAF_ISA(GetTargetTupleElement)
+    FIDDLE(leafInst())
     IRInst* getTuple() { return getOperand(0); }
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRMakeVector : IRInst
 {
-    IR_LEAF_ISA(MakeVector)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeVectorFromScalar : IRInst
 {
-    IR_LEAF_ISA(MakeVectorFromScalar)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMakeCoopVector : IRInst
 {
-    IR_LEAF_ISA(MakeCoopVector)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCoopMatMapElementIFunc : IRInst
 {
-    IR_LEAF_ISA(CoopMatMapElementIFunc)
+    FIDDLE(leafInst())
     IRInst* getCoopMat() { return getOperand(0); }
     IRInst* getTuple() { return getOperand(0); }
     IRFunc* getIFuncCall() { return as<IRFunc>(getOperand(1)); }
@@ -3153,70 +2918,84 @@ struct IRCoopMatMapElementIFunc : IRInst
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
+FIDDLE()
 struct IRMakeDifferentialPairBase : IRInst
 {
-    IR_PARENT_ISA(MakeDifferentialPairBase)
+    FIDDLE(baseInst())
     IRInst* getPrimalValue() { return getOperand(0); }
     IRInst* getDifferentialValue() { return getOperand(1); }
 };
+FIDDLE()
 struct IRMakeDifferentialPair : IRMakeDifferentialPairBase
 {
-    IR_LEAF_ISA(MakeDifferentialPair)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
 {
-    IR_LEAF_ISA(MakeDifferentialPairUserCode)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRMakeDifferentialPtrPair : IRMakeDifferentialPairBase
 {
-    IR_LEAF_ISA(MakeDifferentialPtrPair)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDifferentialPairGetDifferentialBase : IRInst
 {
-    IR_PARENT_ISA(DifferentialPairGetDifferentialBase)
+    FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
+FIDDLE()
 struct IRDifferentialPairGetDifferential : IRDifferentialPairGetDifferentialBase
 {
-    IR_LEAF_ISA(DifferentialPairGetDifferential)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferentialBase
 {
-    IR_LEAF_ISA(DifferentialPairGetDifferentialUserCode)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRDifferentialPtrPairGetDifferential : IRDifferentialPairGetDifferentialBase
 {
-    IR_LEAF_ISA(DifferentialPtrPairGetDifferential)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDifferentialPairGetPrimalBase : IRInst
 {
-    IR_PARENT_ISA(DifferentialPairGetPrimalBase)
+    FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
+FIDDLE()
 struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
-    IR_LEAF_ISA(DifferentialPairGetPrimal)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
 {
-    IR_LEAF_ISA(DifferentialPairGetPrimalUserCode)
+    FIDDLE(leafInst())
 };
+FIDDLE()
 struct IRDifferentialPtrPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
-    IR_LEAF_ISA(DifferentialPtrPairGetPrimal)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDetachDerivative : IRInst
 {
-    IR_LEAF_ISA(DetachDerivative)
+    FIDDLE(leafInst())
     IRInst* getBase() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRUpdateElement : IRInst
 {
-    IR_LEAF_ISA(UpdateElement)
+    FIDDLE(leafInst())
 
     IRInst* getOldValue() { return getOperand(0); }
     IRInst* getElementValue() { return getOperand(1); }
@@ -3232,141 +3011,155 @@ struct IRUpdateElement : IRInst
 };
 
 // Constructs an `Result<T,E>` value from an error code.
+FIDDLE()
 struct IRMakeResultError : IRInst
 {
-    IR_LEAF_ISA(MakeResultError)
+    FIDDLE(leafInst())
 
     IRInst* getErrorValue() { return getOperand(0); }
 };
 
 // Constructs an `Result<T,E>` value from an valid value.
+FIDDLE()
 struct IRMakeResultValue : IRInst
 {
-    IR_LEAF_ISA(MakeResultValue)
+    FIDDLE(leafInst())
 
     IRInst* getValue() { return getOperand(0); }
 };
 
 // Determines if a `Result` value represents an error.
+FIDDLE()
 struct IRIsResultError : IRInst
 {
-    IR_LEAF_ISA(IsResultError)
+    FIDDLE(leafInst())
 
     IRInst* getResultOperand() { return getOperand(0); }
 };
 
 // Extract the value from a `Result`.
+FIDDLE()
 struct IRGetResultValue : IRInst
 {
-    IR_LEAF_ISA(GetResultValue)
+    FIDDLE(leafInst())
 
     IRInst* getResultOperand() { return getOperand(0); }
 };
 
 // Extract the error code from a `Result`.
+FIDDLE()
 struct IRGetResultError : IRInst
 {
-    IR_LEAF_ISA(GetResultError)
+    FIDDLE(leafInst())
 
     IRInst* getResultOperand() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IROptionalHasValue : IRInst
 {
-    IR_LEAF_ISA(OptionalHasValue)
+    FIDDLE(leafInst())
 
     IRInst* getOptionalOperand() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGetOptionalValue : IRInst
 {
-    IR_LEAF_ISA(GetOptionalValue)
+    FIDDLE(leafInst())
 
     IRInst* getOptionalOperand() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRMakeOptionalValue : IRInst
 {
-    IR_LEAF_ISA(MakeOptionalValue)
+    FIDDLE(leafInst())
 
     IRInst* getValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRMakeOptionalNone : IRInst
 {
-    IR_LEAF_ISA(MakeOptionalNone)
+    FIDDLE(leafInst())
     IRInst* getDefaultValue() { return getOperand(0); }
 };
 
 /// An instruction that packs a concrete value into an existential-type "box"
+FIDDLE()
 struct IRMakeExistential : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getWrappedValue() { return getOperand(0); }
     IRInst* getWitnessTable() { return getOperand(1); }
-
-    IR_LEAF_ISA(MakeExistential)
 };
 
+FIDDLE()
 struct IRMakeExistentialWithRTTI : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getWrappedValue() { return getOperand(0); }
     IRInst* getWitnessTable() { return getOperand(1); }
     IRInst* getRTTI() { return getOperand(2); }
-
-
-    IR_LEAF_ISA(MakeExistentialWithRTTI)
 };
 
+FIDDLE()
 struct IRCreateExistentialObject : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getTypeID() { return getOperand(0); }
     IRInst* getValue() { return getOperand(1); }
-
-    IR_LEAF_ISA(CreateExistentialObject)
 };
 
 /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
+FIDDLE()
 struct IRWrapExistential : IRInst
 {
+    FIDDLE(leafInst())
     IRInst* getWrappedValue() { return getOperand(0); }
 
     UInt getSlotOperandCount() { return getOperandCount() - 1; }
     IRInst* getSlotOperand(UInt index) { return getOperand(index + 1); }
     IRUse* getSlotOperands() { return getOperands() + 1; }
-
-    IR_LEAF_ISA(WrapExistential)
 };
 
+FIDDLE()
 struct IRGetValueFromBoundInterface : IRInst
 {
-    IR_LEAF_ISA(GetValueFromBoundInterface);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRExtractExistentialValue : IRInst
 {
-    IR_LEAF_ISA(ExtractExistentialValue);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRExtractExistentialType : IRInst
 {
-    IR_LEAF_ISA(ExtractExistentialType);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRExtractExistentialWitnessTable : IRInst
 {
-    IR_LEAF_ISA(ExtractExistentialWitnessTable);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRIsNullExistential : IRInst
 {
-    IR_LEAF_ISA(IsNullExistential);
+    FIDDLE(leafInst())
 };
 
 
 /* Base class for instructions that track liveness */
+FIDDLE()
 struct IRLiveRangeMarker : IRInst
 {
-    IR_PARENT_ISA(LiveRangeMarker)
+    FIDDLE(baseInst())
 
     // TODO(JS): It might be useful to track how many bytes are live in the item referenced.
     // It's not entirely clear how that will work across different targets, or even what such a
@@ -3383,14 +3176,16 @@ struct IRLiveRangeMarker : IRInst
 };
 
 /// Identifies then the item references starts being live.
+FIDDLE()
 struct IRLiveRangeStart : IRLiveRangeMarker
 {
-    IR_LEAF_ISA(LiveRangeStart);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRIsType : IRInst
 {
-    IR_LEAF_ISA(IsType);
+    FIDDLE(leafInst())
 
     IRInst* getValue() { return getOperand(0); }
     IRInst* getValueWitness() { return getOperand(1); }
@@ -3407,67 +3202,78 @@ struct IRIsType : IRInst
 /// the store will never be seen (by a load) and so can be ignored.
 ///
 /// In general there can be one or more 'ends' for every start.
+FIDDLE()
 struct IRLiveRangeEnd : IRLiveRangeMarker
 {
-    IR_LEAF_ISA(LiveRangeEnd);
+    FIDDLE(leafInst())
 };
 
 /// An instruction that queries binding information about an opaque/resource value.
 ///
+FIDDLE()
 struct IRBindingQuery : IRInst
 {
-    IR_PARENT_ISA(BindingQuery);
+    FIDDLE(baseInst())
 
     IRInst* getOpaqueValue() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRGetRegisterIndex : IRBindingQuery
 {
-    IR_LEAF_ISA(GetRegisterIndex);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGetRegisterSpace : IRBindingQuery
 {
-    IR_LEAF_ISA(GetRegisterSpace);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRIntCast : IRInst
 {
-    IR_LEAF_ISA(IntCast)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRFloatCast : IRInst
 {
-    IR_LEAF_ISA(FloatCast)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCastIntToFloat : IRInst
 {
-    IR_LEAF_ISA(CastIntToFloat)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCastFloatToInt : IRInst
 {
-    IR_LEAF_ISA(CastFloatToInt)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDebugSource : IRInst
 {
-    IR_LEAF_ISA(DebugSource)
+    FIDDLE(leafInst())
     IRInst* getFileName() { return getOperand(0); }
     IRInst* getSource() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRDebugBuildIdentifier : IRInst
 {
-    IR_LEAF_ISA(DebugBuildIdentifier)
+    FIDDLE(leafInst())
     IRInst* getBuildIdentifier() { return getOperand(0); }
     IRInst* getFlags() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRDebugLine : IRInst
 {
-    IR_LEAF_ISA(DebugLine)
+    FIDDLE(leafInst())
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLineStart() { return getOperand(1); }
     IRInst* getLineEnd() { return getOperand(2); }
@@ -3475,25 +3281,28 @@ struct IRDebugLine : IRInst
     IRInst* getColEnd() { return getOperand(4); }
 };
 
+FIDDLE()
 struct IRDebugVar : IRInst
 {
-    IR_LEAF_ISA(DebugVar)
+    FIDDLE(leafInst())
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
     IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
 };
 
+FIDDLE()
 struct IRDebugValue : IRInst
 {
-    IR_LEAF_ISA(DebugValue)
+    FIDDLE(leafInst())
     IRInst* getDebugVar() { return getOperand(0); }
     IRInst* getValue() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRDebugInlinedAt : IRInst
 {
-    IR_LEAF_ISA(DebugInlinedAt)
+    FIDDLE(leafInst())
     IRInst* getLine() { return getOperand(0); }
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
@@ -3508,30 +3317,34 @@ struct IRDebugInlinedAt : IRInst
     bool isOuterInlinedPresent() { return operandCount == 5; }
 };
 
+FIDDLE()
 struct IRDebugScope : IRInst
 {
-    IR_LEAF_ISA(DebugScope)
+    FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
     IRInst* getInlinedAt() { return getOperand(1); }
     void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
 };
 
+FIDDLE()
 struct IRDebugNoScope : IRInst
 {
-    IR_LEAF_ISA(DebugNoScope)
+    FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRDebugInlinedVariable : IRInst
 {
-    IR_LEAF_ISA(DebugInlinedVariable)
+    FIDDLE(leafInst())
     IRInst* getVariable() { return getOperand(0); }
     IRInst* getInlinedAt() { return getOperand(1); }
 };
 
+FIDDLE()
 struct IRDebugFunction : IRInst
 {
-    IR_LEAF_ISA(DebugFunction)
+    FIDDLE(leafInst())
     IRInst* getName() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
@@ -3539,26 +3352,28 @@ struct IRDebugFunction : IRInst
     IRInst* getDebugType() { return getOperand(4); }
 };
 
+FIDDLE()
 struct IRDebugFuncDecoration : IRInst
 {
-    IR_LEAF_ISA(DebugFunctionDecoration)
+    FIDDLE(leafInst())
     IRInst* getDebugFunc() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRDebugLocationDecoration : IRDecoration
 {
+    FIDDLE(leafInst())
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
-
-    IR_LEAF_ISA(DebugLocationDecoration)
 };
 
 struct IRSPIRVAsm;
 
+FIDDLE()
 struct IRSPIRVAsmOperand : IRInst
 {
-    IR_PARENT_ISA(SPIRVAsmOperand);
+    FIDDLE(baseInst())
     IRInst* getValue()
     {
         if (getOp() == kIROp_SPIRVAsmOperandResult)
@@ -3573,14 +3388,16 @@ struct IRSPIRVAsmOperand : IRInst
     }
 };
 
+FIDDLE()
 struct IRSPIRVAsmOperandInst : IRSPIRVAsmOperand
 {
-    IR_LEAF_ISA(SPIRVAsmOperandInst);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRSPIRVAsmInst : IRInst
 {
-    IR_LEAF_ISA(SPIRVAsmInst);
+    FIDDLE(leafInst())
 
     IRSPIRVAsmOperand* getOpcodeOperand()
     {
@@ -3618,65 +3435,76 @@ struct IRSPIRVAsmInst : IRInst
     }
 };
 
+FIDDLE()
 struct IRSPIRVAsm : IRInst
 {
-    IR_LEAF_ISA(SPIRVAsm);
+    FIDDLE(leafInst())
     IRFilteredInstList<IRSPIRVAsmInst> getInsts()
     {
         return IRFilteredInstList<IRSPIRVAsmInst>(getFirstChild(), getLastChild());
     }
 };
 
+FIDDLE()
 struct IRGenericAsm : IRTerminatorInst
 {
-    IR_LEAF_ISA(GenericAsm)
+    FIDDLE(leafInst())
     UnownedStringSlice getAsm() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRRequirePrelude : IRInst
 {
-    IR_LEAF_ISA(RequirePrelude)
+    FIDDLE(leafInst())
     UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
+FIDDLE()
 struct IRRequireTargetExtension : IRInst
 {
-    IR_LEAF_ISA(RequireTargetExtension)
+    FIDDLE(leafInst())
     UnownedStringSlice getExtensionName()
     {
         return as<IRStringLit>(getOperand(0))->getStringSlice();
     }
 };
 
+FIDDLE()
 struct IRRequireComputeDerivative : IRInst
 {
-    IR_LEAF_ISA(RequireComputeDerivative)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRRequireMaximallyReconverges : IRInst
 {
-    IR_LEAF_ISA(RequireMaximallyReconverges)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRRequireQuadDerivatives : IRInst
 {
-    IR_LEAF_ISA(RequireQuadDerivatives)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRStaticAssert : IRInst
 {
-    IR_LEAF_ISA(StaticAssert)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IREmbeddedDownstreamIR : IRInst
 {
-    IR_LEAF_ISA(EmbeddedDownstreamIR)
+    FIDDLE(leafInst())
     CodeGenTarget getTarget()
     {
         return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue());
     }
     IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
 };
+
+FIDDLE(allOtherInstStructs())
 
 struct IRBuilderSourceLocRAII;
 
@@ -3873,7 +3701,10 @@ public:
 
     IRTypePack* getTypePack(UInt count, IRType* const* types);
 
-    IRExpandType* getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture);
+    IRExpandTypeOrVal* getExpandTypeOrVal(
+        IRType* type,
+        IRInst* pattern,
+        ArrayView<IRInst*> capture);
 
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
     IROptionalType* getOptionalType(IRType* valueType);
@@ -4138,6 +3969,8 @@ public:
     IRInst* addFloatingModeOverrideDecoration(IRInst* dest, FloatingPointMode mode);
 
     IRInst* addNumThreadsDecoration(IRInst* inst, IRInst* x, IRInst* y, IRInst* z);
+    IRInst* addFpDenormalPreserveDecoration(IRInst* inst, IRInst* width);
+    IRInst* addFpDenormalFlushToZeroDecoration(IRInst* inst, IRInst* width);
     IRInst* addWaveSizeDecoration(IRInst* inst, IRInst* numLanes);
 
     IRInst* emitSpecializeInst(
@@ -4488,6 +4321,7 @@ public:
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
     IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
+    IRInst* emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -5141,7 +4975,7 @@ public:
 
     void addDebugFunctionDecoration(IRInst* value, IRInst* debugFunction)
     {
-        addDecoration(value, kIROp_DebugFunctionDecoration, debugFunction);
+        addDecoration(value, kIROp_DebugFuncDecoration, debugFunction);
     }
 
     void addUnsafeForceInlineDecoration(IRInst* value)
@@ -5598,5 +5432,3 @@ inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
 void addHoistableInst(IRBuilder* builder, IRInst* inst);
 
 } // namespace Slang
-
-#endif

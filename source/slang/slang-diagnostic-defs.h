@@ -1054,6 +1054,11 @@ DIAGNOSTIC(
     Error,
     throwTypeIncompatibleWithErrorType,
     "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+DIAGNOSTIC(
+    30117,
+    Error,
+    forwardReferenceInGenericConstraint,
+    "generic constraint for parameter '$0' references type parameter '$1' before it is declared")
 
 // Include
 DIAGNOSTIC(
@@ -1586,6 +1591,14 @@ DIAGNOSTIC(
     Error,
     switchDuplicateCases,
     "duplicate cases not allowed within a 'switch' statement")
+
+// 310xx: link time specializaion
+DIAGNOSTIC(
+    31000,
+    Warning,
+    linkTimeConstantArraySize,
+    "Link-time constant sized arrays are a work in progress feature, some aspects of the "
+    "reflection API may not work")
 
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
