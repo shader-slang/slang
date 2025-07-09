@@ -2933,12 +2933,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             {
                                 // Emit additional diagnostic for invalid pointer taking operations
                                 auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
-                                if (funcDeclRef && getText(funcDeclRefExpr->name) == "&")
+                                if (funcDeclRef)
                                 {
-                                    auto intrinsicMod =
-                                        funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-                                    // Emit only for intrinsic pointer taking operations
-                                    if (intrinsicMod && intrinsicMod->op == 0)
+                                    auto knownBuiltinAttr = funcDeclRef.getDecl()->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr && knownBuiltinAttr->name == "OperatorAddressOf")
                                     {
                                         getSink()->diagnose(
                                             argExpr,
