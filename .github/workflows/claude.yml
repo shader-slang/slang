@@ -15,6 +15,7 @@ on:
     types: [opened, assigned]
   pull_request_target:
   pull_request:
+    types: [opened, synchronize]
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
@@ -22,13 +23,13 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
-  claude-pr:
+  claude-response:
     name: Claude Code Assistant
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
-      (github.event_NAME == 'pull_request') ||
+      (github.event_name == 'pull_request') ||
       (github.event_name == 'pull_request_target')
 
     runs-on: ubuntu-latest
@@ -144,10 +145,24 @@ jobs:
           rm -f /tmp/token_response.json
 
       # Step 4: Run Claude Code Action with optimized environment variables
-      - name: Execute Claude Code Action
+      - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
         uses: anthropics/claude-code-action@beta
         with:
+          # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
+          direct_prompt: |
+                Please review this pull request and provide comprehensive feedback.
+                Summarize the changes. Use that summary to ask deepwiki ask_question mcp server with GITHUB_REPOSITORY env
+                Feature Summary: <Fill with deepwiki mcp server>
+                Focus on:
+                - Code quality and best practices
+                - Potential bugs or issues
+                - Performance considerations
+                - Security implications
+                - Test coverage
+                - Documentation updates if needed
+                Provide constructive feedback with specific suggestions for improvement.
+                Use inline comments to highlight specific areas of concern.
           mcp_config: |
             {
               "mcpServers": {
