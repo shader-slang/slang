@@ -10702,7 +10702,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclMembers(ExtensionDecl* dec
 void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDecl* decl)
 {
     // Check if any generic parameter on the extension is not referenced by the target type
-    // or by constraints in the generic declaration  
+    // or by constraints in the generic declaration
     if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
     {
         // Collect all declarations referenced by the target type
@@ -10710,7 +10710,8 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         collectReferencedDecls(decl->targetType.type, referencedDecls);
 
         // Also collect declarations referenced by generic constraints
-        for (auto constraint : getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
+        for (auto constraint :
+             getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
             collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
         }
