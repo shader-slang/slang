@@ -1,11 +1,12 @@
 // TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
 
+//CHECK: OpEntryPoint
+//CHECK-NOT: error
+
 RWStructuredBuffer<int> processMemory;
 RWStructuredBuffer<int> output;
 
-#define SUBGROUP_SIZE 8
-#define HALF_SUBGROUP_SIZE SUBGROUP_SIZE/2
-[numthreads(SUBGROUP_SIZE, 1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
     Ptr<int, AddressSpace::UserPointer, PtrAccess::Read, CoherentScope::Device> ptr = &processMemory[id.x];
