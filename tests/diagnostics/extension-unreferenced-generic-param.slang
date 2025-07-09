@@ -29,12 +29,19 @@ extension<T:IFoo> T
     void validSelfExtension() {}
 }
 
-// TODO: This case should be valid but currently fails
-// Generic parameter used in inheritance constraint (should be allowed)
+// Valid case 3: Generic parameter used in inheritance constraint
 interface IFooGeneric<S> {}
 struct MyType {}
 
+// Error: T is not used, but S is validly used in inheritance constraint
+// CHECK: ([[# @LINE+1]]): error 30855:
 extension<T, S> MyType : IFooGeneric<S>
 {
     void test() {}
+}
+
+// Valid case 4: Both parameters used properly
+extension<S> MyType : IFooGeneric<S>
+{
+    void testValid() {}
 }

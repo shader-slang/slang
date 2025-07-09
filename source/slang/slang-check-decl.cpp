@@ -3466,7 +3466,53 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
     //
     void visitExtensionDecl(ExtensionDecl* extensionDecl)
     {
+        // Check for unreferenced generic parameters before checking conformance
+        _validateExtensionDeclGenericParams(extensionDecl);
         checkExtensionConformance(extensionDecl);
+    }
+
+private:
+    void _validateExtensionDeclGenericParams(ExtensionDecl* decl)
+    {
+        // Check if any generic parameter on the extension is not referenced by the target type
+        // or by constraints in the generic declaration  
+        if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        {
+            // Collect all declarations referenced by the target type
+            HashSet<Decl*> referencedDecls;
+            collectReferencedDecls(decl->targetType.type, referencedDecls);
+
+            // Also collect declarations referenced by generic constraints
+            for (auto constraint : getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
+            {
+                collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
+            }
+
+            // Now check inheritance declarations in the extension since they're available at this phase
+            for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+            {
+                if (inheritanceDecl->base.type)
+                {
+                    collectReferencedDecls(inheritanceDecl->base.type, referencedDecls);
+                }
+            }
+
+            // Check each generic parameter directly
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+                {
+                    if (!referencedDecls.contains(member))
+                    {
+                        getSink()->diagnose(
+                            member,
+                            Diagnostics::unreferencedGenericParamInExtension,
+                            member->getName(),
+                            decl->targetType);
+                    }
+                }
+            }
+        }
     }
 };
 
@@ -10620,46 +10666,8 @@ bool getExtensionTargetDeclList(
 
 void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* decl)
 {
-    // Check if any generic parameter on the extension is not referenced by the target type
-    // or by constraints in the generic declaration
-    if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
-    {
-        // Collect all declarations referenced by the target type
-        HashSet<Decl*> referencedDecls;
-        collectReferencedDecls(decl->targetType.type, referencedDecls);
-
-        // Also collect declarations referenced by generic constraints
-        for (auto constraint : getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
-        {
-            collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
-        }
-
-        // TEMPORARY: Also check inheritance declarations in the extension as a workaround
-        // TODO: This should not be needed if inheritance constraints are properly converted to GenericTypeConstraintDecls
-        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
-        {
-            if (inheritanceDecl->base.type)
-            {
-                collectReferencedDecls(inheritanceDecl->base.type, referencedDecls);
-            }
-        }
-
-        // Check each generic parameter directly
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
-            {
-                if (!referencedDecls.contains(member))
-                {
-                    getSink()->diagnose(
-                        member,
-                        Diagnostics::unreferencedGenericParamInExtension,
-                        member->getName(),
-                        decl->targetType);
-                }
-            }
-        }
-    }
+    // Generic parameter validation has been moved to SemanticsDeclConformancesVisitor
+    // since inheritance declarations are available at that phase
 
     if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
     {
