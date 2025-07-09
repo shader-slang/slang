@@ -38,6 +38,7 @@ slangc -help-style markdown -h
 * [vulkan-shift](#vulkan-shift)
 * [capability](#capability)
 * [file-extension](#file-extension)
+* [help-category](#help-category)
 
 <a id="General"></a>
 ## General
@@ -94,7 +95,7 @@ Emit IR typically as a '.slang-module' when outputting to a container.
 <a id="h"></a>
 ### -h, -help, --help
 
-**-h or -h &lt;help-category&gt;**
+**-h or -h &lt;[help-category](#help-category)&gt;**
 
 Print this message, or help in specified category. 
 
@@ -1611,4 +1612,37 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `zip` : container 
 * `slang-module`, `slang-library` : Slang Module/Library 
 * `dir` : Container as a directory 
+
+<a id="help-category"></a>
+## help-category
+
+Available help categories for the [-h](#h) option 
+
+* `General` : General options 
+* `Target` : Target code generation options 
+* `Downstream` : Downstream compiler options 
+* `Debugging` : Compiler debugging/instrumentation options 
+* `Repro` : Slang repro system related 
+* `Experimental` : Experimental options (use at your own risk) 
+* `Internal` : Internal-use options (use at your own risk) 
+* `Deprecated` : Deprecated options (allowed but ignored; may be removed in future) 
+* `compiler` : Downstream Compilers (aka Pass through) 
+* `language` : Language 
+* `language-version` : Language Version 
+* `archive-type` : Archive Type 
+* `line-directive-mode` : Line Directive Mode 
+* `debug-info-format` : Debug Info Format 
+* `fp-mode` : Floating Point Mode 
+* `fp-denormal-mode` : Floating Point Denormal Handling Mode 
+* `help-style` : Help Style 
+* `optimization-level` : Optimization Level 
+* `debug-level` : Debug Level 
+* `file-system-type` : File System Type 
+* `source-embed-style` : Source Embed Style 
+* `target` : Target 
+* `stage` : Stage 
+* `vulkan-shift` : Vulkan Shift 
+* `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
+* `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
+* `help-category` : Available help categories for the [-h](#h) option 
 

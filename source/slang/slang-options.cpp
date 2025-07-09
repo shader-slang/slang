@@ -344,6 +344,24 @@ void initCommandOptions(CommandOptions& options)
         options.addValues(pairs, SLANG_COUNT_OF(pairs));
     }
 
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! help-category !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(
+            CategoryKind::Value,
+            "help-category",
+            "Available help categories for the -h option");
+
+        // Add all existing categories as valid help category values
+        const auto& categories = options.getCategories();
+        for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
+        {
+            const auto& category = categories[categoryIndex];
+            options.addValue(category.name, category.description);
+        }
+    }
+
+
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
     options.setCategory("General");
