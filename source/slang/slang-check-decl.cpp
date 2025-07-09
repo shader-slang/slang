@@ -1414,6 +1414,20 @@ static void _dispatchDeclCheckingVisitor(
     DeclCheckState state,
     SemanticsContext& shared);
 
+void SemanticsVisitor::ensureOuterGenericConstraints(Decl* decl, DeclCheckState state)
+{
+    if (auto genericDecl = GetOuterGeneric(decl))
+    {
+        auto nextGeneric = findNextOuterGeneric(genericDecl);
+        if (nextGeneric)
+        {
+            if (nextGeneric->checkState.getState() < state)
+                ensureOuterGenericConstraints(nextGeneric, state);
+        }
+        ensureDecl(genericDecl, state);
+    }
+}
+
 // Make sure a declaration has been checked, so we can refer to it.
 // Note that this may lead to us recursively invoking checking,
 // so this may not be the best way to handle things.
@@ -10742,6 +10756,11 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
 void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
 {
+    // If the extension is a generic, we need to make sure to check
+    // the outer generic constraints first.
+    //
+    ensureOuterGenericConstraints(decl, DeclCheckState::ReadyForReference);
+
     // We check the target type expression and members, and then validate
     // that the type it names is one that it makes sense
     // to extend.
