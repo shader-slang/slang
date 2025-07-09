@@ -5312,6 +5312,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m = SpvExecutionModeVertexOrderCw;
                         else if (topologyType == OutputTopologyType::TriangleCCW)
                             m = SpvExecutionModeVertexOrderCcw;
+                        else if (topologyType == OutputTopologyType::Point)
+                            m = SpvExecutionModePointMode;
                         break;
                     }
                 }
