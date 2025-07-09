@@ -10623,30 +10623,23 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* 
     // Check if any generic parameter on the extension is not referenced by the target type
     if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
     {
-        // Collect all generic parameters from the extension's generic declaration
-        List<Decl*> genericParams;
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member))
-            {
-                genericParams.add(member);
-            }
-        }
-
         // Collect all declarations referenced by the target type
         HashSet<Decl*> referencedDecls;
         collectReferencedDecls(decl->targetType.type, referencedDecls);
 
-        // Report errors for any generic parameters not referenced by the target type
-        for (auto genericParam : genericParams)
+        // Check each generic parameter directly
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (!referencedDecls.contains(genericParam))
+            if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
             {
-                getSink()->diagnose(
-                    genericParam,
-                    Diagnostics::unreferencedGenericParamInExtension,
-                    genericParam->getName(),
-                    decl->targetType);
+                if (!referencedDecls.contains(member))
+                {
+                    getSink()->diagnose(
+                        member,
+                        Diagnostics::unreferencedGenericParamInExtension,
+                        member->getName(),
+                        decl->targetType);
+                }
             }
         }
     }
