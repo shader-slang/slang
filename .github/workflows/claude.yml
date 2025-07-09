@@ -13,9 +13,8 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
-  pull_request_target:
-  pull_request:
-    types: [opened, synchronize]
+  pull_request_review:
+    types: [submitted]
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
@@ -23,17 +22,16 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
-  claude-response:
+  claude:
     name: Claude Code Assistant
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
-      (github.event_name == 'pull_request') ||
-      (github.event_name == 'pull_request_target')
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
 
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     # Cancel previous runs on new pushes
     concurrency:
@@ -44,9 +42,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # will fetch full repo history for git history as context
+          submodules: "recursive"
+          fetch-depth: 2 # fetch minimal history for git context
 
-      # Step 1: Validate environment and dependencies
+      - name: Setup formatting tools
+        uses: ./.github/actions/format-setup
+
+      # Step 1: Setup environment and prebuild project (following copilot pattern)
+      - name: Setup Environment and Prebuild Project
+        run: |
+          set -euo pipefail
+          echo "🏗️ Setting up environment and building Slang project..."
+
+          # Setup environment dependencies (from copilot setup)
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
+          # Configure and build the project using release config
+          cmake --preset default
+          cmake --build --preset release
+
+          echo "✅ Project preconfigured and prebuilt successfully"
+
+      # Step 2: Validate environment and dependencies
       - name: Validate Environment
         run: |
           set -euo pipefail
@@ -153,6 +171,17 @@ jobs:
           custom_instructions: |
             You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
             Use it at your disposal if you need to think about the problem at hand.
+
+            Build system information:
+            - OS: Ubuntu Linux (ubuntu-latest runner)
+            - Build commands: 
+              * Configure: cmake --preset default
+              * Build: cmake --build --preset release
+              * Test: ./build/Release/bin/slang-test
+              * Format code: ./extras/formatting.sh (formatting tools pre-installed)
+            - Project is pre-built and ready for development tasks
+            - Run formatting script before committing changes
+            - All formatting dependencies (prettier, clang-format, etc.) are pre-installed
           mcp_config: |
             {
               "mcpServers": {
@@ -169,7 +198,7 @@ jobs:
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "10"
+          max_turns: "20"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
