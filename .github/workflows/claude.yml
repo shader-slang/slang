@@ -9,8 +9,6 @@ permissions:
 on:
   issue_comment:
     types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
     types: [opened, assigned]
   pull_request_target:
@@ -27,13 +25,12 @@ jobs:
     name: Claude Code Assistant
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
       (github.event_name == 'pull_request') ||
       (github.event_name == 'pull_request_target')
 
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     # Cancel previous runs on new pushes
     concurrency:
@@ -44,9 +41,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # will fetch full repo history for git history as context
+          fetch-depth: 2 # fetch minimal history for git context
 
-      # Step 1: Validate environment and dependencies
+      # Step 1: Setup environment and prebuild project (following copilot pattern)
+      - name: Setup Environment and Prebuild Project
+        run: |
+          set -euo pipefail
+          echo "🏗️ Setting up environment and building Slang project..."
+          
+          # Setup environment dependencies (from copilot setup)
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+          
+          # Configure and build the project using release config
+          cmake --preset default
+          cmake --build --preset release
+          
+          echo "✅ Project preconfigured and prebuilt successfully"
+
+      # Step 2: Validate environment and dependencies
       - name: Validate Environment
         run: |
           set -euo pipefail
@@ -169,7 +182,7 @@ jobs:
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "10"
+          max_turns: "20"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
