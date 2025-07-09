@@ -2208,6 +2208,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
+        printf("processModule:\n");
         determineSpirvVersion();
 
         // Process global params before anything else, so we don't generate inefficient
@@ -2229,21 +2230,35 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->removeAndDeallocate();
 
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
-        List<IRInst*> textureFootprintTypes;
+        List<IRHLSLStructuredBufferTypeBase*> buffersToLower;
+        List<IRMatrixType*> matricesToLower;
+        List<IRInst*> textureFootprintTypesToLower;
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
-                instsToProcess.add(t);
+                buffersToLower.add(t);
+            }
+            else if (auto matrixType = as<IRMatrixType>(globalInst))
+            {
+                printf("matrix type may need to be legalized:\n");
+                matrixType->dump();
+                auto elementType = matrixType->getElementType();
+                if (as<IRBoolType>(elementType) || as<IRIntType>(elementType))
+                {
+                    printf("\tbool/int matrix... needs to be legalized\n");
+                    matricesToLower.add(matrixType);
+                }
             }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
-                textureFootprintTypes.add(globalInst);
+                textureFootprintTypesToLower.add(globalInst);
             }
         }
-        for (auto t : instsToProcess)
+        
+        // Lowering buffers
+        for (auto t : buffersToLower)
         {
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
@@ -2253,7 +2268,48 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 lowered.structType,
                 getStorageBufferAddressSpace()));
         }
-        for (auto t : textureFootprintTypes)
+
+        // Lowering matrices
+        for (auto t : matricesToLower)
+        {
+            printf("matrix type: %p\n", t);
+            
+            auto matrixType = t;
+
+            // Lower bool/int matrices to struct containing array of vectors
+            auto elementType = matrixType->getElementType();
+            auto rowCount = matrixType->getRowCount();
+            auto columnCount = matrixType->getColumnCount();
+
+            IRBuilder struct_builder(matrixType);
+            struct_builder.setInsertBefore(matrixType);
+
+            // Create vector type for rows
+            auto vectorType = struct_builder.getVectorType(elementType, columnCount);
+
+            // Create array type for the matrix data
+            auto arrayType = struct_builder.getArrayType(vectorType, rowCount);
+
+            //// Create struct type to wrap the array
+            //auto structType = struct_builder.createStructType();
+            //auto dataKey = struct_builder.createStructKey();
+            //struct_builder.addNameHintDecoration(dataKey, UnownedStringSlice("data"));
+            //struct_builder.createStructField(structType, dataKey, arrayType);
+
+            //// Add name hint for the struct
+            //StringBuilder nameSb;
+            //nameSb << "LoweredMatrix_";
+            //getTypeNameHint(nameSb, elementType);
+            //nameSb << "_" << getIntVal(rowCount) << "x" << getIntVal(columnCount);
+            //struct_builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
+
+            IRBuilder builder(t);
+            builder.setInsertBefore(t);
+            t->replaceUsesWith(arrayType);
+        }
+
+        // Lowering texture footprints
+        for (auto t : textureFootprintTypesToLower)
         {
             auto lowered = lowerTextureFootprintType(t);
             IRBuilder builder(t);

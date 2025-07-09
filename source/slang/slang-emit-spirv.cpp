@@ -2039,17 +2039,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
+                auto elementType = matrixType->getElementType();
+                
+                // SPIR-V only supports floating-point matrices
+                // bool/int matrices should be lowered to
+                // arrays of vectors before reaching here
+                if (as<IRBoolType>(elementType) || as<IRIntType>(elementType))
+                {
+                    SLANG_UNEXPECTED("bool/int matrices should be lowered to structs before SPIR-V emission");
+                }
+                
                 auto vectorSpvType = ensureVectorType(
-                    static_cast<IRBasicType*>(matrixType->getElementType())->getBaseType(),
+                    static_cast<IRBasicType*>(elementType)->getBaseType(),
                     static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue(),
                     nullptr);
-                const auto columnCount =
-                    static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
-                auto matrixSPVType = emitOpTypeMatrix(
-                    inst,
-                    vectorSpvType,
-                    SpvLiteralInteger::from32(int32_t(columnCount)));
-                return matrixSPVType;
+                const auto columnCount = static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
+                const auto columnCountSpv = SpvLiteralInteger::from32(int32_t(columnCount));
+                SpvInst *matrixSpvType = emitOpTypeMatrix(inst, vectorSpvType, columnCountSpv);
+                return matrixSpvType;
             }
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
@@ -7728,12 +7735,46 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, operands are raw elements, we need to construct row vectors first,
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
-        auto matrixType = as<IRMatrixType>(inst->getDataType());
-        auto rowCount = getIntVal(matrixType->getRowCount());
-        auto colCount = getIntVal(matrixType->getColumnCount());
+        
+        printf("make matrix:\n");
+        inst->dump();
+        printf("data type:\n");
+        inst->getDataType()->dump();
+
+        auto dataType = inst->getDataType();
+
+        IRIntegerValue rowCount;
+        IRIntegerValue colCount;
+        IRType* elementType;
+
+        // Data type can be either matrix or vector depending on the
+        // legalization requirements
+        if (auto matrixType = as<IRMatrixType>(dataType))
+        {
+            elementType = matrixType->getElementType();
+            rowCount = getIntVal(matrixType->getRowCount());
+            colCount = getIntVal(matrixType->getColumnCount());
+        }
+        else if (auto arrayType = as<IRArrayType>(dataType))
+        {
+            printf("array type!\n");
+            auto vectorType = as<IRVectorType>(arrayType->getElementType());
+            SLANG_ASSERT(vectorType);
+
+            elementType = vectorType->getElementType();
+            rowCount = getIntVal(arrayType->getElementCount());
+            colCount = getIntVal(vectorType->getElementCount());
+        }
+        else
+        {
+            SLANG_UNEXPECTED("data type for makeMatrix operation is "
+                             "expected be either a matrix or array type");
+        }
+
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+        auto rowVectorType = builder.getVectorType(elementType, colCount);
+
         List<IRInst*> colElements;
         UInt index = 0;
         for (IRIntegerValue j = 0; j < rowCount; j++)
