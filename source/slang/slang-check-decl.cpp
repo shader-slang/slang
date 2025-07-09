@@ -10634,6 +10634,16 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* 
             collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
         }
 
+        // TEMPORARY: Also check inheritance declarations in the extension as a workaround
+        // TODO: This should not be needed if inheritance constraints are properly converted to GenericTypeConstraintDecls
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+        {
+            if (inheritanceDecl->base.type)
+            {
+                collectReferencedDecls(inheritanceDecl->base.type, referencedDecls);
+            }
+        }
+
         // Check each generic parameter directly
         for (auto member : genericDecl->getDirectMemberDecls())
         {
