@@ -150,9 +150,9 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
-          custom_instructions	: |
-                You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
-                Use it at your disposal if you need to think about the problem at hand.
+          custom_instructions: |
+            You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
+            Use it at your disposal if you need to think about the problem at hand.
           mcp_config: |
             {
               "mcpServers": {
