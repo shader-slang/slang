@@ -49,15 +49,15 @@ jobs:
         run: |
           set -euo pipefail
           echo "🏗️ Setting up environment and building Slang project..."
-          
+
           # Setup environment dependencies (from copilot setup)
           sudo apt-get update
           sudo apt-get install -y libx11-dev
-          
+
           # Configure and build the project using release config
           cmake --preset default
           cmake --build --preset release
-          
+
           echo "✅ Project preconfigured and prebuilt successfully"
 
       # Step 2: Validate environment and dependencies
@@ -167,7 +167,7 @@ jobs:
           custom_instructions: |
             You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
             Use it at your disposal if you need to think about the problem at hand.
-            
+
             Build system information:
             - OS: Ubuntu Linux (ubuntu-latest runner)
             - Build commands: 
