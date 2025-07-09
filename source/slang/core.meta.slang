@@ -2583,6 +2583,7 @@ __prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
+[KnownBuiltin("OperatorAddressOf")]
 [require(cpp_cuda_spirv)]
 __prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
