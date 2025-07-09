@@ -10705,6 +10705,8 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
     // or by constraints in the generic declaration
     if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
     {
+        ensureDecl(genericDecl, DeclCheckState::ReadyForReference);
+
         // Collect all declarations referenced by the target type
         HashSet<Decl*> referencedDecls;
         collectReferencedDecls(decl->targetType.type, referencedDecls);
@@ -10713,7 +10715,6 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         for (auto constraint :
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
-            ensureDecl(constraint, DeclCheckState::ReadyForReference);
             collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
         }
 
