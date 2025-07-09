@@ -1308,8 +1308,8 @@ enum AddressSpace : uint64_t
     UserPointer = $( (uint64_t)AddressSpace::UserPointer),
 };
 
-    // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-enum MemoryScope
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+enum MemoryScope : uint64_t
 {
     CrossDevice = $( (uint64_t)MemoryScope::CrossDevice),
     Device = $( (uint64_t)MemoryScope::Device),
@@ -1336,7 +1336,7 @@ enum CoherentScope : uint64_t
 __builtin_enum(PtrAccess)
 enum PtrAccess : uint64_t
 {
-    ReadWrite = $((uint64_t)PtrAccess::ReadWrite),
+    ReadWrite = $( (uint64_t)PtrAccess::ReadWrite),
     Read = $( (uint64_t)PtrAccess::Read),
 }
 
