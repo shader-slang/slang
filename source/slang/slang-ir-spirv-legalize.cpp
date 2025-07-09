@@ -294,7 +294,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     ptrType = builder.getPtrType(
                         kIROp_PtrType,
                         user->getDataType(),
-                        basePtrType->getAddressSpace());
+                        basePtrType->getAddressSpace(),
+                        basePtrType->getPtrAccess(),
+                        basePtrType->getCoherentScope());
                 else
                     ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType());
                 IRInst* subAddr = nullptr;
@@ -786,10 +788,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             IRType* newPtrType = oldPtrType->hasAddressSpace()
                                      ? builder.getPtrType(
-                                           oldPtrType->getOp(),
-                                           newPtrValueType,
-                                           oldPtrType->getAddressSpace())
-                                     : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
+                                         oldPtrType->getOp(),
+                                         newPtrValueType,
+                                         oldPtrType->getAddressSpace(),
+                                         oldPtrType->getPtrAccess(),
+                                         oldPtrType->getCoherentScope())
+                                    : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
             inst->setFullType(newPtrType);
         }
 
@@ -1022,7 +1026,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     oldResultType->getValueType(),
-                    ptrType->getAddressSpace());
+                    ptrType->getAddressSpace(),
+                    ptrType->getPtrAccess(),
+                    ptrType->getCoherentScope());
                 IRInst* args[2] = {base, index};
                 auto newInst = builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
                 gepInst->replaceUsesWith(newInst);
@@ -1075,7 +1081,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newResultType = builder.getPtrType(
                 resultPtrType->getOp(),
                 resultPtrType->getValueType(),
-                ptrOperandType->getAddressSpace());
+                ptrOperandType->getAddressSpace(),
+                ptrOperandType->getPtrAccess(),
+                resultPtrType->getCoherentScope());
             auto newInst = builder.replaceOperand(&offsetPtrInst->typeUse, newResultType);
             addUsersToWorkList(newInst);
         }
@@ -1168,7 +1176,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     newValueType,
-                    ptrType->getAddressSpace());
+                    ptrType->getAddressSpace(),
+                    ptrType->getPtrAccess(),
+                    ptrType->getCoherentScope());
                 auto newInst =
                     builder.emitFieldAddress(newPtrType, inst->getBase(), inst->getField());
                 inst->replaceUsesWith(newInst);

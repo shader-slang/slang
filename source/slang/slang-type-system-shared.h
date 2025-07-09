@@ -114,6 +114,37 @@ enum class AddressSpace : uint64_t
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
 };
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+enum class MemoryScope : uint64_t
+{
+    CrossDevice = 0,
+    Device = 1,
+    Workgroup = 2,
+    Subgroup = 3,
+    Invocation = 4,
+    QueueFamily = 5,
+    ShaderCall = 6,
+};
+
+enum class CoherentScope : uint64_t
+{
+    NotCoherent = 0xFF,
+    CrossDevice = MemoryScope::CrossDevice,
+    Device = MemoryScope::Device,
+    Workgroup = MemoryScope::Workgroup,
+    Subgroup = MemoryScope::Subgroup,
+    Invocation = MemoryScope::Invocation,
+    QueueFamily = MemoryScope::QueueFamily,
+    ShaderCall = MemoryScope::ShaderCall,
+};
+
+enum class PtrAccess : uint64_t
+{
+    ReadWrite = 0,
+    Read = 1,
+};
+
 } // namespace Slang
 
 #endif

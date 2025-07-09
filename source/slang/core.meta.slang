@@ -1252,18 +1252,106 @@ struct __none_t
 {
 };
 
+__builtin_enum(AddressSpace)
+enum AddressSpace : uint64_t
+{
+    Generic = $( (uint64_t)AddressSpace::Generic),
+    // Corresponds to SPIR-V's SpvStorageClassPrivate
+    ThreadLocal = $( (uint64_t)AddressSpace::ThreadLocal),
+    Global = $( (uint64_t)AddressSpace::Global),
+    // Corresponds to SPIR-V's SpvStorageClassWorkgroup
+    GroupShared = $( (uint64_t)AddressSpace::GroupShared),
+    // Corresponds to SPIR-V's SpvStorageClassUniform
+    Uniform = $( (uint64_t)AddressSpace::Uniform),
+    // specific address space for payload data in metal
+    MetalObjectData = $( (uint64_t)AddressSpace::MetalObjectData),
+    // Corresponds to SPIR-V's SpvStorageClassInput
+    Input = $( (uint64_t)AddressSpace::Input),
+    // Same as `Input`, but used for builtin input variables
+    BuiltinInput = $( (uint64_t)AddressSpace::BuiltinInput),
+    // Corresponds to SPIR-V's SpvStorageClassOutput
+    Output = $( (uint64_t)AddressSpace::Output),
+    // Same as `Output`, but used for builtin output variables
+    BuiltinOutput = $( (uint64_t)AddressSpace::BuiltinOutput),
+    // Corresponds to SPIR-V's SpvStorageClassTaskPayloadWorkgroupEXT
+    TaskPayloadWorkgroup = $( (uint64_t)AddressSpace::TaskPayloadWorkgroup),
+    // Corresponds to SPIR-V's SpvStorageClassFunction
+    Function = $( (uint64_t)AddressSpace::Function),
+    // Corresponds to SPIR-V's SpvStorageClassStorageBuffer
+    StorageBuffer = $( (uint64_t)AddressSpace::StorageBuffer),
+    // Corresponds to SPIR-V's SpvStorageClassPushConstant
+    PushConstant = $( (uint64_t)AddressSpace::PushConstant),
+    // Corresponds to SPIR-V's SpvStorageClassRayPayloadKHR
+    RayPayloadKHR = $( (uint64_t)AddressSpace::RayPayloadKHR),
+    // Corresponds to SPIR-V's SpvStorageClassIncomingRayPayloadKHR
+    IncomingRayPayload = $( (uint64_t)AddressSpace::IncomingRayPayload),
+    // Corresponds to SPIR-V's SpvStorageClassCallableDataKHR
+    CallableDataKHR = $( (uint64_t)AddressSpace::CallableDataKHR),
+    // Corresponds to SPIR-V's SpvStorageClassIncomingCallableDataKHR
+    IncomingCallableData = $( (uint64_t)AddressSpace::IncomingCallableData),
+    // Corresponds to SPIR-V's SpvStorageClassHitObjectAttributeNV
+    HitObjectAttribute = $( (uint64_t)AddressSpace::HitObjectAttribute),
+    // Corresponds to SPIR-V's SpvStorageClassHitAttributeKHR
+    HitAttribute = $( (uint64_t)AddressSpace::HitAttribute),
+    // Corresponds to SPIR-V's SpvStorageClassShaderRecordBufferKHR
+    ShaderRecordBuffer = $( (uint64_t)AddressSpace::ShaderRecordBuffer),
+    // Corresponds to SPIR-V's SpvStorageClassUniformConstant
+    UniformConstant = $( (uint64_t)AddressSpace::UniformConstant),
+    // Corresponds to SPIR-V's SpvStorageClassImage
+    Image = $( (uint64_t)AddressSpace::Image),
+    // Represents a SPIR-V specialization constant
+    SpecializationConstant = $( (uint64_t)AddressSpace::SpecializationConstant),
+    // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX
+    NodePayloadAMDX = $( (uint64_t)AddressSpace::NodePayloadAMDX),
+
+    // Default address space for a user-defined pointer
+    UserPointer = $( (uint64_t)AddressSpace::UserPointer),
+};
+
+    // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+enum MemoryScope
+{
+    CrossDevice = $( (uint64_t)MemoryScope::CrossDevice),
+    Device = $( (uint64_t)MemoryScope::Device),
+    Workgroup = $( (uint64_t)MemoryScope::Workgroup),
+    Subgroup = $( (uint64_t)MemoryScope::Subgroup),
+    Invocation = $( (uint64_t)MemoryScope::Invocation),
+    QueueFamily = $( (uint64_t)MemoryScope::QueueFamily),
+    ShaderCall = $( (uint64_t)MemoryScope::ShaderCall),
+}
+
+__builtin_enum(CoherentScope)
+enum CoherentScope : uint64_t
+{
+    NotCoherent = $( (uint64_t)CoherentScope::NotCoherent),
+    CrossDevice = $( (uint64_t)CoherentScope::CrossDevice),
+    Device = $( (uint64_t)CoherentScope::Device),
+    Workgroup = $( (uint64_t)CoherentScope::Workgroup),
+    Subgroup = $( (uint64_t)CoherentScope::Subgroup),
+    Invocation = $( (uint64_t)CoherentScope::Invocation),
+    QueueFamily = $( (uint64_t)CoherentScope::QueueFamily),
+    ShaderCall = $( (uint64_t)CoherentScope::ShaderCall),
+}
+
+__builtin_enum(PtrAccess)
+enum PtrAccess : uint64_t
+{
+    ReadWrite = $((uint64_t)PtrAccess::ReadWrite),
+    Read = $( (uint64_t)PtrAccess::Read),
+}
+
 //@public:
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
+__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL, PtrAccess access = PtrAccess::ReadWrite, CoherentScope coherentScope = CoherentScope::NotCoherent>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U, addrSpace> ptr);
+    __init(Ptr<U, addrSpace, access, coherentScope> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -1280,6 +1368,8 @@ struct Ptr
         ref;
     }
 };
+
+typealias CoherentPtr<T> = Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL, PtrAccess::ReadWrite, CoherentScope::Device>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -3523,18 +3613,6 @@ enum MemoryOrder
     /// Provides the strongest ordering: total order exists between all SeqCst operations
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-enum MemoryScope
-{
-    CrossDevice = 0,
-    Device = 1,
-    Workgroup = 2,
-    Subgroup = 3,
-    Invocation = 4,
-    QueueFamily = 5,
-    ShaderCallKHR = 6,
-};
 
 /// Represents types that can be used in any atomic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.

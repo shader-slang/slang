@@ -5645,7 +5645,8 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
     expr->base = CheckProperType(expr->base);
     if (as<ErrorType>(expr->base.type))
         expr->type = expr->base.type;
-    auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
+    auto ptrType =
+        m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer, PtrAccess::ReadWrite, CoherentScope::NotCoherent);
     expr->type = m_astBuilder->getTypeType(ptrType);
     return expr;
 }

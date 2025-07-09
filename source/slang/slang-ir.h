@@ -1715,6 +1715,20 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(1))->getValue()
                    : AddressSpace::Generic;
     }
+
+    PtrAccess getPtrAccess()
+    {
+        return getOperandCount() > 2
+                   ? (PtrAccess) static_cast<IRIntLit*>(getOperand(2))->getValue()
+                   : PtrAccess::ReadWrite;
+    }
+
+    CoherentScope getCoherentScope()
+    {
+        return getOperandCount() > 3
+                   ? (CoherentScope) static_cast<IRIntLit*>(getOperand(3))->getValue()
+                   : CoherentScope::NotCoherent;
+    }
 };
 
 FIDDLE()

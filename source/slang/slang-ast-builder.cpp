@@ -196,6 +196,15 @@ void SharedASTBuilder::registerBuiltinRequirementDecl(
     m_builtinRequirementDecls[modifier->kind] = decl;
 }
 
+void SharedASTBuilder::registerBuiltinEnum(Decl* decl, BuiltinEnumModifier* modifier)
+{
+    // The goal here is to register an enum so it is efficent to generate on the fly
+    // EnumCase's as constants in the AST
+    auto enumDecl = as<EnumDecl>(decl);
+    SLANG_ASSERT(enumDecl);
+    m_builtinEnumDecls[modifier->name] = enumDecl;
+}
+
 void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier)
 {
     // In some cases the modifier will have been applied to the
@@ -218,6 +227,13 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
     auto d = m_magicDecls.tryGetValue(name);
     return d ? *d : nullptr;
+}
+
+EnumDecl* SharedASTBuilder::getBuiltinEnum(String const& name)
+{
+    EnumDecl** decl = m_builtinEnumDecls.tryGetValue(name);
+    SLANG_ASSERT(decl);
+    return *decl;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -280,9 +296,14 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
+PtrType* ASTBuilder::getPtrType(
+    Type* valueType,
+    AddressSpace addrSpace,
+    PtrAccess ptrAccess,
+    CoherentScope coherentScope)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, addrSpace, "PtrType"));
+    return dynamicCast<PtrType>(
+        getPtrType(valueType, addrSpace, ptrAccess, coherentScope, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -319,9 +340,13 @@ InOutType* ASTBuilder::getInOutType(Type* valueType)
     return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
 }
 
-RefType* ASTBuilder::getRefType(Type* valueType, AddressSpace addrSpace)
+RefType* ASTBuilder::getRefType(
+    Type* valueType,
+    AddressSpace addrSpace,
+    PtrAccess ptrAccess,
+    CoherentScope coherentScope)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, addrSpace, "RefType"));
+    return dynamicCast<RefType>(getPtrType(valueType, addrSpace, ptrAccess, coherentScope, "RefType"));
 }
 
 ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
@@ -343,9 +368,20 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
     AddressSpace addrSpace,
+    PtrAccess ptrAccess,
+    CoherentScope coherentScope,
     char const* ptrTypeName)
 {
-    Val* args[] = {valueType, getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace)};
+    Val* args[] = {
+        valueType,
+        getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace),
+        getIntVal(
+            DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("PtrAccess")),
+            (IntegerLiteralValue)ptrAccess),
+        getIntVal(
+            DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("CoherentScope")),
+            (IntegerLiteralValue)coherentScope)
+        };
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
