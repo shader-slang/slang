@@ -2935,8 +2935,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
                                 if (funcDeclRef)
                                 {
-                                    auto knownBuiltinAttr = funcDeclRef.getDecl()->findModifier<KnownBuiltinAttribute>();
-                                    if (knownBuiltinAttr && knownBuiltinAttr->name == "OperatorAddressOf")
+                                    auto knownBuiltinAttr =
+                                        funcDeclRef.getDecl()
+                                            ->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr &&
+                                        knownBuiltinAttr->name == "OperatorAddressOf")
                                     {
                                         getSink()->diagnose(
                                             argExpr,
