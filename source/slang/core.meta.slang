@@ -1318,6 +1318,7 @@ enum MemoryScope : uint64_t
     Invocation = $( (uint64_t)MemoryScope::Invocation),
     QueueFamily = $( (uint64_t)MemoryScope::QueueFamily),
     ShaderCall = $( (uint64_t)MemoryScope::ShaderCall),
+    ShaderCallKHR = $( (uint64_t)MemoryScope::ShaderCall),
 }
 
 __builtin_enum(CoherentScope)
