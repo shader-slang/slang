@@ -3488,14 +3488,9 @@ private:
                 collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
             }
 
-            // Now check inheritance declarations in the extension since they're available at this phase
-            for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
-            {
-                if (inheritanceDecl->base.type)
-                {
-                    collectReferencedDecls(inheritanceDecl->base.type, referencedDecls);
-                }
-            }
+            // Note: We intentionally do NOT check inheritance declarations in the extension.
+            // Being referenced only in inheritance declarations is not sufficient for the
+            // type system to solve for generic parameters when applying the extension.
 
             // Check each generic parameter directly
             for (auto member : genericDecl->getDirectMemberDecls())

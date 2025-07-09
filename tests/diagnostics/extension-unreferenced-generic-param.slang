@@ -2,14 +2,14 @@
 // Test unreferenced generic parameters in extensions
 
 // Error case 1: Simple unreferenced generic parameter
-// CHECK: ([[# @LINE+1]]): error 30855:
+// CHECK: error 30855:
 extension<T> int
 {
     void foo() {}
 }
 
 // Error case 2: Multiple generic parameters, some unused
-// CHECK: ([[# @LINE+1]]): error 30855:
+// CHECK: error 30855:
 extension<T, U> vector<T, 3>
 {
     void bar() {}
@@ -29,19 +29,39 @@ extension<T:IFoo> T
     void validSelfExtension() {}
 }
 
-// Valid case 3: Generic parameter used in inheritance constraint
+// Error case 3: Parameters only used in inheritance declaration should be errors
 interface IFooGeneric<S> {}
 struct MyType {}
 
-// Error: T is not used, but S is validly used in inheritance constraint
-// CHECK: ([[# @LINE+1]]): error 30855:
+// Both T and S should be errors - inheritance declarations don't count as references
+// CHECK: error 30855:
+// CHECK: error 30855:
 extension<T, S> MyType : IFooGeneric<S>
 {
     void test() {}
 }
 
-// Valid case 4: Both parameters used properly
+// Error case 4: Even single parameter only in inheritance should be an error
+// CHECK: error 30855:
 extension<S> MyType : IFooGeneric<S>
 {
+    void shouldFail() {}
+}
+
+// Valid case 3: Parameter used in target type (not just inheritance)
+extension<S> vector<S, 3> : IFooGeneric<S>
+{
     void testValid() {}
+}
+
+// Error case 5: Parameter only used in extension inheritance should still be an error
+interface IBar<T> {}
+struct TestStruct {}
+
+// Both T and U should be errors since they're only in inheritance declaration
+// CHECK: error 30855:
+// CHECK: error 30855:
+extension<T, U> TestStruct : IBar<T>
+{
+    void shouldFail() {}
 }
