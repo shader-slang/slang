@@ -6212,6 +6212,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
                 }
+                else if (semanticName == "sv_vertexid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex, inst);
+                }
+                else if (semanticName == "sv_instanceid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
+                }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
