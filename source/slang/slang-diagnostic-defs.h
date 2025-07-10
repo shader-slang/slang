@@ -816,7 +816,11 @@ DIAGNOSTIC(
     "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
-
+DIAGNOSTIC(
+    30078,
+    Error,
+    coherentKeywordOnAPointer,
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use `CoherentPtr<T>` instead")
 DIAGNOSTIC(
     30100,
     Error,

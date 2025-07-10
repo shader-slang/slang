@@ -2316,6 +2316,14 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Not allowed a `globallycoherent T*` or related
+    if (as<PtrType>(varDecl->type))
+        if (auto memoryQualifierSet = varDecl->findModifier<MemoryQualifierSetModifier>())
+            if (memoryQualifierSet->getMemoryQualifierBit() &
+                MemoryQualifierSetModifier::Flags::kCoherent)
+                getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
+
     checkVisibility(varDecl);
 }
 
