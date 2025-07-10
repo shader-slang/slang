@@ -1334,25 +1334,27 @@ enum CoherentScope : uint64_t
     ShaderCall = $( (uint64_t)CoherentScope::ShaderCall),
 }
 
-__builtin_enum(PtrAccess)
-enum PtrAccess : uint64_t
+__builtin_enum(Access)
+enum Access : uint64_t
 {
-    ReadWrite = $( (uint64_t)PtrAccess::ReadWrite),
-    Read = $( (uint64_t)PtrAccess::Read),
+    ReadWrite = $( (uint64_t)AccessQualifier::ReadWrite),
+    Read = $( (uint64_t)AccessQualifier::Read),
 }
 
 //@public:
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL, PtrAccess access = PtrAccess::ReadWrite, CoherentScope coherentScope = CoherentScope::NotCoherent>
+__generic<T, uint64_t addrSpace = AddressSpace::UserPointer, Access access = Access::ReadWrite, CoherentScope coherentScope = CoherentScope::NotCoherent>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
-    __generic<U>
+    // Can always allow casting to a different coherent scope if same access-qualifier.
+    // This cast is explicit.
+    __generic<U, CoherentScope otherCoherentScope>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U, addrSpace, access, coherentScope> ptr);
+    __init(Ptr<U, addrSpace, access, otherCoherentScope> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -1370,7 +1372,22 @@ struct Ptr
     }
 };
 
-typealias CoherentPtr<T> = Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL, PtrAccess::ReadWrite, CoherentScope::Device>;
+__generic<T, uint64_t addrSpace, Access access = Access::Read, CoherentScope coherentScope>
+extension Ptr<T, addrSpace, access, coherentScope>
+{
+    // `ReadWrite` Ptr can be cast to `Read` Ptr as a narrowing operation implicitly
+    // if the only difference is the access-qualifier
+    __intrinsic_op($(kIROp_BitCast))
+    __implicit_conversion(1)
+    __init(Ptr<T, addrSpace, Access::ReadWrite, coherentScope> ptr);
+
+    // Cast must be explicit if type is potentially different.
+    __generic<U, CoherentScope otherCoherentScope>
+    __intrinsic_op($(kIROp_BitCast))
+    __init(Ptr<U, addrSpace, Access::ReadWrite, otherCoherentScope> ptr);
+}
+
+typealias CoherentPtr<T, Access access = Access::ReadWrite> = Ptr<T, AddressSpace::UserPointer, access, CoherentScope::Device>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -1413,50 +1430,64 @@ void storeAligned<int alignment, T>(T* ptr, T value)
     __store_aligned(ptr, value, __align_attr(alignment));
 }
 
+${{{
+    StringBuilder ptrArgListDefBuilder;
+    ptrArgListDefBuilder << "T, uint64_t addrSpace, Access access, CoherentScope coherentScope";
+    String ptrArgListDef = ptrArgListDefBuilder.toString();
+
+    StringBuilder ptrArgListBuilder;
+    ptrArgListBuilder << "T, addrSpace, access, coherentScope";
+    String ptrArgList = ptrArgListBuilder.toString();
+
+    StringBuilder fullPtrTypeBuilder;
+    fullPtrTypeBuilder << "Ptr<" << ptrArgList << ">";
+    String fullPtrType = fullPtrTypeBuilder.toString();
+
+}}}
 //@hidden:
 __intrinsic_op($(kIROp_Load))
-T __load<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr);
+T __load<$(ptrArgListDef)>($(fullPtrType) ptr);
 
 __intrinsic_op($(kIROp_Store))
-void __store<T, let addrSpace : uint64_t>(Ptr<T, addrSpace> ptr, T val);
+void __store<$(ptrArgListDef)>($(fullPtrType) ptr, T val);
 
 __intrinsic_op($(kIROp_GetElementPtr))
-Ptr<T, addrSpace> __getElementPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
+$(fullPtrType) __getElementPtr<$(ptrArgListDef), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
 
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T, addrSpace> __getOffsetPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
+$(fullPtrType) __getOffsetPtr<$(ptrArgListDef), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Less))
-bool operator <(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator <($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Leq))
-bool operator <=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator <=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Greater))
-bool operator>(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator>($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Geq))
-bool operator >=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator >=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Neq))
-bool operator !=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator !=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_Eql))
-bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
+bool operator ==($(fullPtrType) p1, $(fullPtrType) p2);
 
 //@public:
 extension bool : IRangedValue
 {
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
 
     __generic<T : __EnumType>
     __implicit_conversion($(kConversionCost_IntegerTruncate))
@@ -1472,9 +1503,9 @@ extension bool : IRangedValue
 
 extension uint64_t : IRangedValue
 {
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
 
     static const uint64_t maxValue = 0xFFFFFFFFFFFFFFFFULL;
     static const uint64_t minValue = 0;
@@ -1482,9 +1513,9 @@ extension uint64_t : IRangedValue
 
 extension int64_t : IRangedValue
 {
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
 
     static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
     static const int64_t minValue = -0x8000000000000000LL;
@@ -1492,9 +1523,9 @@ extension int64_t : IRangedValue
 
 extension intptr_t : IRangedValue
 {
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
     static const intptr_t minValue = $(SLANG_PROCESSOR_X86_64?"0x8000000000000000z":"0x80000000z");
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -1502,9 +1533,9 @@ extension intptr_t : IRangedValue
 
 extension uintptr_t : IRangedValue
 {
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_CastPtrToInt))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
@@ -1535,7 +1566,7 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
+typealias __Addr<T> = Ptr<T, AddressSpace::Generic>;
 
 //@public:
 
@@ -1899,10 +1930,10 @@ extension Ptr<void>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
-    __generic<T, let addrSpace : uint64_t>
+    __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
-    __init(Ptr<T, addrSpace> ptr);
+    __init($(fullPtrType) ptr);
 
     __generic<T>
     __intrinsic_op($(kIROp_BitCast))
@@ -2667,28 +2698,28 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__prefix Ref<T> operator*(Ptr<T, addrSpace> value);
+__prefix Ref<T> operator*($(fullPtrType) value);
 
 __generic<T>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
+__prefix Ptr<T, AddressSpace::UserPointer, Access::ReadWrite, CoherentScope::NotCoherent> operator&(__ref T value);
 
 __generic<T>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__Addr<T> __get_addr( __ref T value);
+__Addr<T> __get_addr(__ref T value);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 __intrinsic_op($(kIROp_GetOffsetPtr))
-Ptr<T, addrSpace> operator+(Ptr<T, addrSpace> value, int64_t offset);
+$(fullPtrType) operator+($(fullPtrType) value, int64_t offset);
 
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 [__unsafeForceInlineEarly]
-Ptr<T, addrSpace> operator -(Ptr<T, addrSpace> value, int64_t offset)
+$(fullPtrType) operator -($(fullPtrType) value, int64_t offset)
 {
     return __getOffsetPtr(value, -offset);
 }
@@ -2753,9 +2784,9 @@ matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T, let addrSpace : uint64_t>
+__generic<$(ptrArgListDef)>
 [__unsafeForceInlineEarly]
-Ptr<T, addrSpace> operator$(op.name)(in out Ptr<T, addrSpace> value)
+$(fullPtrType) operator$(op.name)(in out $(fullPtrType) value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
 
 ${{{{
@@ -4354,7 +4385,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
 __generic<T>
-typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+typealias NodePayloadPtr = Ptr<T, AddressSpace::NodePayloadAMDX>;
 
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;

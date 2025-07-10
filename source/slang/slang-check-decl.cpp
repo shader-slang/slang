@@ -3665,6 +3665,10 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
     {
         ioDecls.add(decl);
     }
+    else if (decl->findModifier<BuiltinEnumModifier>())
+    {
+        ioDecls.add(decl);
+    }
 
     if (auto containerDecl = as<ContainerDecl>(decl))
     {

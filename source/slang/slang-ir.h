@@ -1716,11 +1716,11 @@ struct IRPtrTypeBase : IRType
                    : AddressSpace::Generic;
     }
 
-    PtrAccess getPtrAccess()
+    AccessQualifier getAccessQualifier()
     {
         return getOperandCount() > 2
-                   ? (PtrAccess) static_cast<IRIntLit*>(getOperand(2))->getValue()
-                   : PtrAccess::ReadWrite;
+                   ? (AccessQualifier) static_cast<IRIntLit*>(getOperand(2))->getValue()
+                   : AccessQualifier::ReadWrite;
     }
 
     CoherentScope getCoherentScope()

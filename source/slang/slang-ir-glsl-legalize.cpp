@@ -4253,7 +4253,7 @@ void legalizeEntryPointForGLSL(
                     ptrType->getOp(),
                     sizedArrayType,
                     ptrType->getAddressSpace(),
-                    ptrType->getPtrAccess(),
+                    ptrType->getAccessQualifier(),
                     ptrType->getCoherentScope());
             }
 

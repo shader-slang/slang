@@ -680,7 +680,7 @@ class PtrTypeBase : public BuiltinType
     // Get the type of the pointed-to value.
     Type* getValueType();
     Val* getAddressSpace();
-    Val* getPtrAccess();
+    Val* getAccessQualifier();
     Val* getCoherentScope();
 };
 

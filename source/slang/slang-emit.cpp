@@ -440,8 +440,8 @@ void calcRequiredLoweringPassSet(
             result.nonVectorCompositeSelect = true;
         break;
     case kIROp_PtrType:
-        if (as<IRPtrType>(inst)->getPtrAccess == PtrAccess::Read)
-            result.validateReadOnlyPtr;
+        if (as<IRPtrType>(inst)->getAccessQualifier() == AccessQualifier::Read)
+            result.validateReadOnlyPtr = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)

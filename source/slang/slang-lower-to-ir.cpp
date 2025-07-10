@@ -2058,15 +2058,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* addrSpace = nullptr;
-        IRInst* ptrAccess = nullptr;
+        IRInst* accessQualifier = nullptr;
         IRInst* coherentScope = nullptr;
         if (auto astAddrSpace = type->getAddressSpace())
         {
             addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
         }
-        if (auto astPtrAccess = type->getPtrAccess())
+        if (auto astAccessQualifier = type->getAccessQualifier())
         {
-            ptrAccess = getSimpleVal(context, lowerVal(context, astPtrAccess));
+            accessQualifier = getSimpleVal(context, lowerVal(context, astAccessQualifier));
         }
         if (auto astCoherentScope = type->getCoherentScope())
         {
@@ -2078,7 +2078,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 getBuilder()->getUInt64Type(),
                 (IRIntegerValue)AddressSpace::Generic);
         }
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace, ptrAccess, coherentScope);
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace, accessQualifier, coherentScope);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)

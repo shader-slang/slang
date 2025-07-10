@@ -510,7 +510,7 @@ public:
     PtrType* getPtrType(
         Type* valueType,
         AddressSpace addrSpace,
-        PtrAccess ptrAccess,
+        AccessQualifier accessQualifier,
         CoherentScope coherentScope);
 
     // Construct the type `Out<valueType>`
@@ -523,7 +523,7 @@ public:
     RefType* getRefType(
         Type* valueType,
         AddressSpace addrSpace,
-        PtrAccess ptrAccess,
+        AccessQualifier accessQualifier,
         CoherentScope coherentScope);
 
     // Construct the type `ConstRef<valueType>`
@@ -538,7 +538,7 @@ public:
     PtrTypeBase* getPtrType(
         Type* valueType,
         AddressSpace addrSpace,
-        PtrAccess ptrAccess,
+        AccessQualifier accessQualifier,
         CoherentScope coherentScope,
         char const* ptrTypeName);
 

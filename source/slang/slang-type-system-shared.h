@@ -139,7 +139,7 @@ enum class CoherentScope : uint64_t
     ShaderCall = (uint64_t)MemoryScope::ShaderCall,
 };
 
-enum class PtrAccess : uint64_t
+enum class AccessQualifier : uint64_t
 {
     ReadWrite = 0,
     Read = 1,

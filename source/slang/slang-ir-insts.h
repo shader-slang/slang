@@ -3729,7 +3729,7 @@ public:
     IRRefType* getRefType(
         IRType* valueType,
         AddressSpace addrSpace,
-        PtrAccess ptrAccess = PtrAccess::ReadWrite,
+        AccessQualifier accessQualifier = AccessQualifier::ReadWrite,
         CoherentScope coherentScope = CoherentScope::NotCoherent);
     IRConstRefType* getConstRefType(IRType* valueType);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
@@ -3737,21 +3737,21 @@ public:
         IROp op,
         IRType* valueType,
         AddressSpace addressSpace,
-        PtrAccess ptrAccess = PtrAccess::ReadWrite,
+        AccessQualifier accessQualifier = AccessQualifier::ReadWrite,
         CoherentScope coherentScope = CoherentScope::NotCoherent);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
         IRInst* addressSpace,
-        IRInst* ptrAccess,
+        IRInst* accessQualifier,
         IRInst* coherentScope);
     IRPtrType* getPtrType(
         IRType* valueType,
         AddressSpace addressSpace,
-        PtrAccess ptrAccess = PtrAccess::ReadWrite,
+        AccessQualifier accessQualifier = AccessQualifier::ReadWrite,
         CoherentScope coherentScope = CoherentScope::NotCoherent)
     {
-        return getPtrType(kIROp_PtrType, valueType, addressSpace, ptrAccess, coherentScope);
+        return getPtrType(kIROp_PtrType, valueType, addressSpace, accessQualifier, coherentScope);
     }
 
     IRTextureTypeBase* getTextureType(

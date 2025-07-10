@@ -444,7 +444,7 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 1);
 }
 
-Val* PtrTypeBase::getPtrAccess()
+Val* PtrTypeBase::getAccessQualifier()
 {
     return _getGenericTypeArg(this, 2);
 }
@@ -476,13 +476,13 @@ CoherentScope tryGetCoherentScopeValue(Val* coherentScopeVal)
     return coherentScope;
 }
 
-PtrAccess tryGetPtrAccessValue(Val* coherentScopeVal)
+AccessQualifier tryGetAccessQualifierValue(Val* coherentScopeVal)
 {
-    PtrAccess coherentScope = PtrAccess::ReadWrite;
+    AccessQualifier coherentScope = AccessQualifier::ReadWrite;
 
     if (auto cintVal = as<ConstantIntVal>(coherentScopeVal))
     {
-        coherentScope = (PtrAccess)(cintVal->getValue());
+        coherentScope = (AccessQualifier)(cintVal->getValue());
     }
     return coherentScope;
 }
@@ -511,14 +511,14 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     }
 }
 
-void maybePrintPtrAccessOperand(StringBuilder& out, PtrAccess coherentScope)
+void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier coherentScope)
 {
     switch (coherentScope)
     {
-    case PtrAccess::ReadWrite:
+    case AccessQualifier::ReadWrite:
         out << toSlice(", readwrite");
         break;
-    case PtrAccess::Read:
+    case AccessQualifier::Read:
         out << toSlice(", read");
         break;
     default:
@@ -539,7 +539,7 @@ void maybePrintCoherentScopeOperand(StringBuilder& out, CoherentScope coherentSc
         out << toSlice(", device");
         break;
     case CoherentScope::Workgroup:
-        out << toSlice(", work_group");
+        out << toSlice(", workgroup");
         break;
     case CoherentScope::Subgroup:
         out << toSlice(", subgroup");
@@ -561,14 +561,14 @@ void maybePrintCoherentScopeOperand(StringBuilder& out, CoherentScope coherentSc
 void PtrType::_toTextOverride(StringBuilder& out)
 {
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
-    auto ptrAccess = tryGetPtrAccessValue(getPtrAccess());
+    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto coherentScope = tryGetCoherentScopeValue(getCoherentScope());
     if (addrSpace == AddressSpace::Generic)
         out << toSlice("Addr<") << getValueType();
     else
         out << toSlice("Ptr<") << getValueType();
     maybePrintAddrSpaceOperand(out, addrSpace);
-    maybePrintPtrAccessOperand(out, ptrAccess);
+    maybePrintAccessQualifierOperand(out, accessQualifier);
     maybePrintCoherentScopeOperand(out, coherentScope);
     out << toSlice(">");
 }
@@ -576,11 +576,11 @@ void PtrType::_toTextOverride(StringBuilder& out)
 void RefType::_toTextOverride(StringBuilder& out)
 {
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
-    auto ptrAccess = tryGetPtrAccessValue(getPtrAccess());
+    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto coherentScope = tryGetCoherentScopeValue(getCoherentScope());
     out << toSlice("Ref<") << getValueType();
     maybePrintAddrSpaceOperand(out, addrSpace);
-    maybePrintPtrAccessOperand(out, ptrAccess);
+    maybePrintAccessQualifierOperand(out, accessQualifier);
     maybePrintCoherentScopeOperand(out, coherentScope);
     out << toSlice(">");
 }
