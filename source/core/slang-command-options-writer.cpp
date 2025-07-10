@@ -524,7 +524,7 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
         categoryNames.add(category.name);
     }
 
-    _appendWrappedIndented(0, categoryNames, toSlice(", "));
+    _appendWrappedIndented(1, categoryNames, toSlice(", "));
     m_builder << "\n\n";
 }
 
