@@ -515,12 +515,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
-        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
-        m_writer->emit("i32");
+        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
         return;
     case kIROp_UInt16Type:
-        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
-        m_writer->emit("u32");
+        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -981,18 +979,12 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
-                        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
-                        m_writer->emit("i32(");
-                        m_writer->emit(int32_t(litInst->value.intVal));
-                        m_writer->emit(")");
+                        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
                         break;
                     }
                 case BaseType::UInt16:
                     {
-                        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
-                        m_writer->emit("u32(");
-                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
-                        m_writer->emit(")");
+                        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
                         break;
                     }
                 case BaseType::Int:
