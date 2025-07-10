@@ -212,6 +212,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
         // causing errors.
         bool hasConst = false;
+        bool hasUniform = false;
         bool hasExportOrExtern = false;
         bool hasStatic = false;
         for (auto m : decl->modifiers)
@@ -220,6 +221,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 hasExportOrExtern = true;
             else if (as<ConstModifier>(m))
                 hasConst = true;
+            else if (as<HLSLUniformModifier>(m))
+                hasUniform = true;
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
         }
@@ -228,6 +231,17 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 decl,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
                 decl->getName());
+
+        // Global const or uniform variables with initializers must be static
+        // In HLSL, const global variables without static are uniform parameters
+        // that cannot have default values
+        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic && decl->initExpr)
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::constGlobalVarWithInitRequiresStatic,
+                decl->getName());
+        }
     }
 
     void visitDecl(Decl* decl) { checkModifiers(decl); }

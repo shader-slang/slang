@@ -1502,6 +1502,12 @@ DIAGNOSTIC(
     ExternAndExportVarDeclMustBeConst,
     "extern and export variables must be static const: '$0'")
 
+DIAGNOSTIC(
+    31224,
+    Error,
+    constGlobalVarWithInitRequiresStatic,
+    "global const variable with initializer must be declared static: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
