@@ -578,7 +578,7 @@ SpvInst* emitOpDebugGlobalVariable(
         idResultType,
         kResultID,
         set,
-        SpvWord(18),  // DebugGlobalVariable opcode in NonSemantic.Shader.DebugInfo.100
+        SpvWord(18), // DebugGlobalVariable opcode in NonSemantic.Shader.DebugInfo.100
         name,
         type,
         source,
