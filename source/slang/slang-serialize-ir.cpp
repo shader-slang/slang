@@ -2,9 +2,11 @@
 #include "slang-serialize-ir.h"
 
 #include "core/slang-blob-builder.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
+#include "slang-serialize-riff.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 
@@ -26,6 +28,8 @@ struct IRModuleInfo
 //
 struct IRSerialContext;
 using IRSerializer = Serializer_<ISerializerImpl, IRSerialContext>;
+
+using IRReadSerializer = Serializer_<Fossil::SerialReader, IRSerialContext>;
 
 struct IRSerialContext : SourceLocSerialContext
 {
@@ -244,14 +248,16 @@ void serializeObjectContents(IRSerializer const& serializer, T*& value, IRInst*)
     // This is all that's necessary for normal instructions
     // We serialize the source location, type, operands and children
     //
+
+    // There's an overload for this call further up in this file
+    serialize(serializer, value->m_decorationsAndChildren);
+
     serialize(serializer, value->sourceLoc);
     serializeUse(serializer, value, value->typeUse);
     for (Index i = 0; i < value->operandCount; ++i)
     {
         serializeUse(serializer, value, value->getOperands()[i]);
     }
-    // There's an overload for this call further up in this file
-    serialize(serializer, value->m_decorationsAndChildren);
 
     //
     // IRConstants require a little special handling
@@ -349,6 +355,8 @@ void IRSerialReadContext::handleName(IRSerializer const& serializer, Name*& valu
 // {write,read}SerializedModuleIR()
 //
 
+#define USE_RIFF 0
+
 void writeSerializedModuleIR(
     RIFF::BuildCursor& cursor,
     IRModule* irModule,
@@ -359,6 +367,16 @@ void writeSerializedModuleIR(
 
     IRModuleInfo moduleInfo{.module = irModule};
 
+#if USE_RIFF
+    {
+        RIFFSerialWriter writer(cursor.getCurrentChunk());
+        IRSerialWriteContext context{sourceLocWriter};
+        IRSerializer serializer(&writer, &context);
+        serialize(serializer, moduleInfo);
+    }
+
+    ComPtr<ISlangBlob> blob;
+#else
     BlobBuilder blobBuilder;
     {
         Fossil::SerialWriter writer(blobBuilder);
@@ -373,6 +391,7 @@ void writeSerializedModuleIR(
     void const* data = blob->getBufferPointer();
     size_t size = blob->getBufferSize();
     cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
+#endif
 }
 
 //
@@ -384,6 +403,36 @@ void readSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
+    SLANG_PROFILE;
+
+#if USE_RIFF
+    auto dataChunk = as<RIFF::ListChunk>(chunk);
+    if (!dataChunk)
+    {
+        SLANG_UNEXPECTED("invalid format for serialized module IR");
+    }
+
+    // Fossil::AnyValPtr rootValPtr =
+    //     Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    // if (!rootValPtr)
+    // {
+    //     SLANG_UNEXPECTED("invalid format for serialized module IR");
+    // }
+
+    IRModuleInfo info;
+    {
+        auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
+        // Fossil::ReadContext readContext;
+        // Fossil::SerialReader reader(
+        //     readContext,
+        //     rootValPtr,
+        //     Fossil::SerialReader::InitialStateType::Root);
+        RIFFSerialReader reader(dataChunk);
+
+        IRSerializer serializer(&reader, sharedDecodingContext);
+        serialize(serializer, info);
+    }
+#else
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -409,6 +458,7 @@ void readSerializedModuleIR(
         IRSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
     }
+#endif
     SLANG_ASSERT(info.module);
 
     //
