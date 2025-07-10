@@ -234,17 +234,20 @@ public:
     {
         // For diagnostics with parameters, we'll use the first parameter to create a unique key
         // This prevents duplicate diagnostics for the same type but allows different types
-        if constexpr (sizeof...(args) > 0) {
+        if constexpr (sizeof...(args) > 0)
+        {
             auto firstArg = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
             String key = String(diagnostic.id) + "|" + String(firstArg);
             if (!m_reportedDiagnosticKeys.add(key))
                 return;
-        } else {
+        }
+        else
+        {
             // For diagnostics without parameters, just use the ID
             if (!m_reportedDiagnosticIds.add(diagnostic.id))
                 return;
         }
-        
+
         // Report the diagnostic
         getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
     }
@@ -771,8 +774,9 @@ protected:
 
     // Set of diagnostic IDs that have already been reported to prevent duplicates
     HashSet<int> m_reportedDiagnosticIds;
-    
-    // Set of diagnostic keys (ID + first parameter) that have already been reported to prevent duplicates
+
+    // Set of diagnostic keys (ID + first parameter) that have already been reported to prevent
+    // duplicates
     HashSet<String> m_reportedDiagnosticKeys;
 };
 
