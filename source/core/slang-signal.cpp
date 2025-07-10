@@ -58,7 +58,7 @@ String _getMessage(SignalType type, char const* message)
 
     g_lastSignalMessage = _getMessage(type, message);
 
-#if SLANG_HAS_EXCEPTIONS and 0
+#if SLANG_HAS_EXCEPTIONS
     switch (type)
     {
     case SignalType::InvalidOperation:
