@@ -126,8 +126,7 @@ if(SLANG_ENABLE_SLANGI)
 endif()
 
 if(SLANG_ENABLE_GFX)
-
-   #
+    #
     # GFX
     #
     slang_add_target(
