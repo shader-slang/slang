@@ -5467,32 +5467,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 break;
             }
         case kIROp_DownstreamModuleExportDecoration:
+        case kIROp_HLSLExportDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                auto exportDecoration =
+                    decoration->getParent()->findDecoration<IRExportDecoration>();
+                if (!exportDecoration)
+                    break;
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
                     SpvOpDecorate,
                     dstID,
                     SpvDecorationLinkageAttributes,
-                    name,
+                    exportDecoration->getMangledName(),
                     SpvLinkageTypeExport);
                 break;
             }
         case kIROp_DownstreamModuleImportDecoration:
+        case kIROp_UserExternDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                auto importDecoration =
+                    decoration->getParent()->findDecoration<IRImportDecoration>();
+                if (!importDecoration)
+                    break;
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
                     SpvOpDecorate,
                     dstID,
                     SpvDecorationLinkageAttributes,
-                    name,
+                    importDecoration->getMangledName(),
                     SpvLinkageTypeImport);
                 break;
             }
@@ -9257,7 +9263,8 @@ SlangResult emitSPIRVFromIR(
         {
             if (auto func = as<IRFunc>(inst))
             {
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+                if (func->findDecoration<IRDownstreamModuleExportDecoration>() ||
+                    func->findDecoration<IRHLSLExportDecoration>())
                 {
                     context.ensureInst(inst);
                     symbolsEmitted = true;
