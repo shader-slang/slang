@@ -1647,6 +1647,11 @@ DIAGNOSTIC(
     requiredConstraintIsNotChecked,
     "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
     "usage.")
+DIAGNOSTIC(
+    30404,
+    Error,
+    invalidEqualityConstraintSupType,
+    "type '$0' is not a proper type to use in a generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
