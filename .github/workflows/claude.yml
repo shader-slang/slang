@@ -6,6 +6,7 @@ permissions:
   issues: write
   actions: read
   id-token: write
+
 on:
   issue_comment:
     types: [created]
@@ -28,7 +29,7 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude')))
 
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -45,26 +46,7 @@ jobs:
           submodules: "recursive"
           fetch-depth: 2 # fetch minimal history for git context
 
-      - name: Setup formatting tools
-        uses: ./.github/actions/format-setup
-
-      # Step 1: Setup environment and prebuild project (following copilot pattern)
-      - name: Setup Environment and Prebuild Project
-        run: |
-          set -euo pipefail
-          echo "🏗️ Setting up environment and building Slang project..."
-
-          # Setup environment dependencies (from copilot setup)
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev
-
-          # Configure and build the project using release config
-          cmake --preset default
-          cmake --build --preset release
-
-          echo "✅ Project preconfigured and prebuilt successfully"
-
-      # Step 2: Validate environment and dependencies
+      # Step 1: Validate environment and dependencies
       - name: Validate Environment
         run: |
           set -euo pipefail
@@ -81,7 +63,24 @@ jobs:
 
           echo "✅ Environment validation passed"
 
-      # Step 2: Generate custom auth token and set as environment variable
+      # Step 2: Setup environment and prebuild project (following copilot pattern)
+      - name: Setup Environment and Prebuild Project
+        uses: ./.github/actions/format-setup
+        run: |
+          set -euo pipefail
+          echo "🏗️ Setting up environment and building Slang project..."
+
+          # Setup environment dependencies (from copilot setup)
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
+          # Configure and build the project using release config
+          cmake --preset default
+          cmake --build --preset debug
+
+          echo "✅ Project preconfigured and prebuilt successfully"
+
+      # Step 3: Generate custom auth token and set as environment variable
       - name: Generate Custom Auth Token
         id: auth-token
         env:
@@ -162,7 +161,31 @@ jobs:
           # Clean up response file
           rm -f /tmp/token_response.json
 
-      # Step 4: Run Claude Code Action with optimized environment variables
+      # Step 4: Generate GitHub App token for better GitHub API access
+      - name: Generate GitHub App Token
+        id: github-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        continue-on-error: true
+
+      # Step 5: Set up fallback authentication
+      - name: Configure Authentication
+        id: auth-config
+        run: |
+          set -euo pipefail
+
+          # Use GitHub App token if available, otherwise use GITHUB_TOKEN
+          if [ -n "${{ steps.github-token.outputs.token }}" ]; then
+            echo "github-token=${{ steps.github-token.outputs.token }}" >> $GITHUB_OUTPUT
+            echo "✅ Using GitHub App authentication"
+          else
+            echo "github-token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "⚠️  Using fallback GITHUB_TOKEN authentication"
+          fi
+
+      # Step 6: Run Claude Code Action with optimized environment variables
       - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
         uses: anthropics/claude-code-action@beta
@@ -173,12 +196,12 @@ jobs:
             Use it at your disposal if you need to think about the problem at hand.
 
             Build system information:
-            - OS: Ubuntu Linux (ubuntu-latest runner)
+            - OS: Ubuntu Linux
             - Build commands: 
-              * Configure: cmake --preset default
-              * Build: cmake --build --preset release
-              * Test: ./build/Release/bin/slang-test
-              * Format code: ./extras/formatting.sh (formatting tools pre-installed)
+              * Configure: `cmake --preset default`
+              * Build: `cmake --build --preset debug`
+              * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
+              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
             - Run formatting script before committing changes
             - All formatting dependencies (prettier, clang-format, etc.) are pre-installed
@@ -213,7 +236,7 @@ jobs:
         # The ANTHROPIC_API_KEY environment variable is automatically picked up
         continue-on-error: true
 
-      # Step 6: Handle action results and errors
+      # Step 7: Handle action results and errors
       - name: Handle Action Results
         if: always()
         run: |
@@ -251,7 +274,7 @@ jobs:
             echo "⚠️  Claude Code action was cancelled or skipped"
           fi
 
-      # Step 7: Security cleanup
+      # Step 8: Security cleanup
       - name: Security Cleanup
         if: always()
         run: |
@@ -270,7 +293,7 @@ jobs:
 
           echo "✅ Security cleanup completed"
 
-      # Step 8: Workflow summary
+      # Step 9: Workflow summary
       - name: Workflow Summary
         if: always()
         run: |
