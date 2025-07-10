@@ -346,7 +346,8 @@ RefType* ASTBuilder::getRefType(
     AccessQualifier accessQualifier,
     CoherentScope coherentScope)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, addrSpace, accessQualifier, coherentScope, "RefType"));
+    return dynamicCast<RefType>(
+        getPtrType(valueType, addrSpace, accessQualifier, coherentScope, "RefType"));
 }
 
 ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
@@ -380,8 +381,7 @@ PtrTypeBase* ASTBuilder::getPtrType(
             (IntegerLiteralValue)accessQualifier),
         getIntVal(
             DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("CoherentScope")),
-            (IntegerLiteralValue)coherentScope)
-        };
+            (IntegerLiteralValue)coherentScope)};
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 

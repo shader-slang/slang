@@ -2078,7 +2078,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 getBuilder()->getUInt64Type(),
                 (IRIntegerValue)AddressSpace::Generic);
         }
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace, accessQualifier, coherentScope);
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, addrSpace, accessQualifier, coherentScope);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)

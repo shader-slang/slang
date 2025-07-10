@@ -496,23 +496,23 @@ void validatePointerAccess(DiagnosticSink* sink, IRInst* inst)
     switch (inst->getOp())
     {
     case kIROp_Store:
-    {
-        auto storeInst = as<IRStore>(inst);
-        errorIfReadOnlyPtrInst(storeInst->getPtr());
-        break;
-    }
+        {
+            auto storeInst = as<IRStore>(inst);
+            errorIfReadOnlyPtrInst(storeInst->getPtr());
+            break;
+        }
     case kIROp_SwizzledStore:
-    {
-        auto swizzledStoreInst = as<IRSwizzledStore>(inst);
-        errorIfReadOnlyPtrInst(swizzledStoreInst->getDest());
-        break;
-    }
+        {
+            auto swizzledStoreInst = as<IRSwizzledStore>(inst);
+            errorIfReadOnlyPtrInst(swizzledStoreInst->getDest());
+            break;
+        }
     case kIROp_AtomicStore:
-    {
-        auto atomicStoreInst = as<IRAtomicStore>(inst);
-        errorIfReadOnlyPtrInst(atomicStoreInst->getPtr());
-        break;
-    }
+        {
+            auto atomicStoreInst = as<IRAtomicStore>(inst);
+            errorIfReadOnlyPtrInst(atomicStoreInst->getPtr());
+            break;
+        }
     }
 
     for (auto child : inst->getModifiableChildren())

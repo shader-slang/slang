@@ -788,12 +788,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             IRType* newPtrType = oldPtrType->hasAddressSpace()
                                      ? builder.getPtrType(
-                                         oldPtrType->getOp(),
-                                         newPtrValueType,
-                                         oldPtrType->getAddressSpace(),
-                                         oldPtrType->getAccessQualifier(),
-                                         oldPtrType->getCoherentScope())
-                                    : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
+                                           oldPtrType->getOp(),
+                                           newPtrValueType,
+                                           oldPtrType->getAddressSpace(),
+                                           oldPtrType->getAccessQualifier(),
+                                           oldPtrType->getCoherentScope())
+                                     : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
             inst->setFullType(newPtrType);
         }
 

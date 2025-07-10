@@ -3615,7 +3615,7 @@ void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
-    if(auto builtinEnum = decl->findModifier<BuiltinEnumModifier>())
+    if (auto builtinEnum = decl->findModifier<BuiltinEnumModifier>())
     {
         sharedASTBuilder->registerBuiltinEnum(decl, builtinEnum);
     }
