@@ -6,6 +6,7 @@ permissions:
   issues: write
   actions: read
   id-token: write
+
 on:
   issue_comment:
     types: [created]
@@ -28,7 +29,7 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude')))
 
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -39,32 +40,31 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      # Format setup and environment preparation
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: 2 # fetch minimal history for git context
 
-      - name: Setup formatting tools
+      - name: Format Setup and Environment Preparation
         uses: ./.github/actions/format-setup
 
-      # Step 1: Setup environment and prebuild project (following copilot pattern)
-      - name: Setup Environment and Prebuild Project
+      - name: Setup Environment Dependencies
         run: |
           set -euo pipefail
-          echo "🏗️ Setting up environment and building Slang project..."
+          echo "🏗️ Setting up environment dependencies..."
 
-          # Setup environment dependencies (from copilot setup)
           sudo apt-get update
           sudo apt-get install -y libx11-dev
 
-          # Configure and build the project using release config
-          cmake --preset default
-          cmake --build --preset release
+          # Configure and build the project
+          cmake --preset default --fresh
+          cmake --workflow --preset debug
 
-          echo "✅ Project preconfigured and prebuilt successfully"
+          echo "✅ Environment setup completed"
 
-      # Step 2: Validate environment and dependencies
+      # Validate environment and dependencies
       - name: Validate Environment
         run: |
           set -euo pipefail
@@ -81,7 +81,7 @@ jobs:
 
           echo "✅ Environment validation passed"
 
-      # Step 2: Generate custom auth token and set as environment variable
+      # Generate custom auth token and set as environment variable
       - name: Generate Custom Auth Token
         id: auth-token
         env:
@@ -162,26 +162,58 @@ jobs:
           # Clean up response file
           rm -f /tmp/token_response.json
 
-      # Step 4: Run Claude Code Action with optimized environment variables
+      # Generate GitHub App token for better GitHub API access
+      - name: Generate GitHub App Token
+        id: github-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        continue-on-error: true
+
+      # Set up fallback authentication
+      - name: Configure Authentication
+        id: auth-config
+        run: |
+          set -euo pipefail
+
+          # Use GitHub App token if available, otherwise use GITHUB_TOKEN
+          if [ -n "${{ steps.github-token.outputs.token }}" ]; then
+            echo "github-token=${{ steps.github-token.outputs.token }}" >> $GITHUB_OUTPUT
+            echo "✅ Using GitHub App authentication"
+          else
+            echo "github-token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "⚠️  Using fallback GITHUB_TOKEN authentication"
+          fi
+
+      # Run Claude Code Action with optimized environment variables
       - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
         uses: anthropics/claude-code-action@beta
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
-            You can call deepwiki mcp server with GITHUB_REPOSITORY env with tool: ask_question to get more clarity about slang feature.
-            Use it at your disposal if you need to think about the problem at hand.
-
             Build system information:
-            - OS: Ubuntu Linux (ubuntu-latest runner)
+            - OS: Ubuntu Linux
             - Build commands: 
-              * Configure: cmake --preset default
-              * Build: cmake --build --preset release
-              * Test: ./build/Release/bin/slang-test
-              * Format code: ./extras/formatting.sh (formatting tools pre-installed)
+              * Configure: `cmake --preset default`
+              * Build: `cmake --build --preset debug`
+              * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
+              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
             - Run formatting script before committing changes
-            - All formatting dependencies (prettier, clang-format, etc.) are pre-installed
+
+            CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
+
+            **How to use this tool effectively:**
+            - Use repoName: "shader-slang/slang" for all queries
+            - Ask specific technical questions about architecture, patterns, or implementation approaches
+            - Examples: "How does the IR optimization system work?" or "What's the pattern for adding new code generation targets?"
+            - Use responses to understand existing patterns before implementing changes
+
+            **Implementation Guidelines:**
+            - Always follow existing code patterns and architectural decisions discovered through deepwiki
+            - Consult the tool when you need context about unfamiliar parts of the codebase
           mcp_config: |
             {
               "mcpServers": {
@@ -191,14 +223,14 @@ jobs:
                 }
               }
             }
-          allowed_tools: "Bash(git diff --name-only HEAD~1),Bash(git diff HEAD~1),Bash(git:*),View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
+          allowed_tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
           trigger_phrase: "@claude"
           assignee_trigger: "claude"
           timeout_minutes: "25"
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "20"
+          max_turns: "25"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
@@ -213,7 +245,7 @@ jobs:
         # The ANTHROPIC_API_KEY environment variable is automatically picked up
         continue-on-error: true
 
-      # Step 6: Handle action results and errors
+      # Handle action results and errors
       - name: Handle Action Results
         if: always()
         run: |
@@ -251,7 +283,7 @@ jobs:
             echo "⚠️  Claude Code action was cancelled or skipped"
           fi
 
-      # Step 7: Security cleanup
+      # Security cleanup
       - name: Security Cleanup
         if: always()
         run: |
@@ -270,7 +302,7 @@ jobs:
 
           echo "✅ Security cleanup completed"
 
-      # Step 8: Workflow summary
+      # Workflow summary
       - name: Workflow Summary
         if: always()
         run: |
