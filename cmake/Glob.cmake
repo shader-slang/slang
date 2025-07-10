@@ -53,6 +53,12 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)open-gl/.*")
     endif()
 
+    # Exclude generated directories to prevent duplicate symbol definitions
+    # These directories contain generated .cpp files that are explicitly
+    # included in their own specialized targets (slang-capability-lookup, slang-lookup-tables)
+    list(FILTER files EXCLUDE REGEX "(^|/)capability/.*")
+    list(FILTER files EXCLUDE REGEX "(^|/)slang-lookup-tables/.*")
+
     list(APPEND ${var} ${files})
     set(${var} ${${var}} PARENT_SCOPE)
 endfunction()
