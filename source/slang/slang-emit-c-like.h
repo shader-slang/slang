@@ -237,14 +237,12 @@ public:
         if constexpr (sizeof...(args) > 0) {
             auto firstArg = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
             String key = String(diagnostic.id) + "|" + String(firstArg);
-            if (m_reportedDiagnosticKeys.contains(key))
+            if (!m_reportedDiagnosticKeys.add(key))
                 return;
-            m_reportedDiagnosticKeys.add(key);
         } else {
             // For diagnostics without parameters, just use the ID
-            if (m_reportedDiagnosticIds.contains(diagnostic.id))
+            if (!m_reportedDiagnosticIds.add(diagnostic.id))
                 return;
-            m_reportedDiagnosticIds.add(diagnostic.id);
         }
         
         // Report the diagnostic
