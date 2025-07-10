@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -g2 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
 
 Texture2D    testTex      :   register(t0);
 SamplerState testSampler  :   register(s0);
@@ -18,4 +18,5 @@ float4 main(PSIn input) : SV_TARGET
 }
 
 // CHECK: %[[FUNC_ID:[0-9]+]] = OpExtInst %void {{.*}} DebugFunction %{{[0-9]+}}
-// CHECK: DebugLocalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[FUNC_ID]]
+// CHECK: %input = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{[^ ]*}} %{{[^ ]*}} %[[FUNC_ID]]
+// CHECK: %testPos = OpExtInst %void %{{[0-9]+}} DebugLocalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{[^ ]*}} %{{[^ ]*}} %[[FUNC_ID]]
