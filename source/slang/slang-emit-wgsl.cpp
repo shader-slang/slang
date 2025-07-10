@@ -515,8 +515,12 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
+        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
+        m_writer->emit("i32");
+        return;
     case kIROp_UInt16Type:
-        SLANG_UNEXPECTED("16 bit integer value emitted");
+        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
+        m_writer->emit("u32");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -976,9 +980,19 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         break;
                     }
                 case BaseType::Int16:
+                    {
+                        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
+                        m_writer->emit("i32(");
+                        m_writer->emit(int32_t(litInst->value.intVal));
+                        m_writer->emit(")");
+                        break;
+                    }
                 case BaseType::UInt16:
                     {
-                        SLANG_UNEXPECTED("16 bit integer value emitted");
+                        // WGSL doesn't support 16-bit integers natively, so promote to 32-bit
+                        m_writer->emit("u32(");
+                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
+                        m_writer->emit(")");
                         break;
                     }
                 case BaseType::Int:
