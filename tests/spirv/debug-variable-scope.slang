@@ -18,7 +18,6 @@ float4 main(PSIn input) : SV_TARGET
 }
 
 // CHECK: %[[COMPILATION_UNIT_ID:[0-9]+]] = OpExtInst %void {{.*}} DebugCompilationUnit
-// CHECK: DebugGlobalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[COMPILATION_UNIT_ID]]
-
 // CHECK: %[[FUNC_ID:[0-9]+]] = OpExtInst %void {{.*}} DebugFunction %{{[0-9]+}}
 // CHECK: DebugLocalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[FUNC_ID]]
+// CHECK: DebugGlobalVariable %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{.*}} %{{.*}} %[[COMPILATION_UNIT_ID]]
