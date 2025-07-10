@@ -7994,9 +7994,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
         {
-            printf("legalizing array type arithmetic:\n");
-            inst->dump();
-            printf("\tnumber of operands: %d\n", inst->getOperandCount());
             // Only for legalization
             auto arrayElementType = arrayType->getElementType();
             SLANG_ASSERT(as<IRVectorType>(arrayElementType));
@@ -8032,7 +8029,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operands.add(originalOperand);
                     }
                 }
-                printf("\trow %d: collected %d opds\n", i, operands.getCount());
                 rows.add(emitVectorOrScalarArithmetic(
                     parent,
                     nullptr,

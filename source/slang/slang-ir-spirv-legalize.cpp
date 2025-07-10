@@ -2208,7 +2208,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processModule()
     {
-        printf("processModule:\n");
         determineSpirvVersion();
 
         // Process global params before anything else, so we don't generate inefficient
@@ -2242,14 +2241,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if (auto matrixType = as<IRMatrixType>(globalInst))
             {
-                printf("matrix type may need to be legalized:\n");
-                matrixType->dump();
                 auto elementType = matrixType->getElementType();
                 if (as<IRBoolType>(elementType) ||
                     as<IRUIntType>(elementType) ||
                     as<IRIntType>(elementType))
                 {
-                    printf("\tbool/int/uint matrix... needs to be legalized\n");
                     matricesToLower.add(matrixType);
                 }
             }
@@ -2274,36 +2270,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Lowering matrices
         for (auto t : matricesToLower)
         {
-            printf("matrix type: %p\n", t);
-            
             auto matrixType = t;
 
-            // Lower bool/int matrices to struct containing array of vectors
             auto elementType = matrixType->getElementType();
             auto rowCount = matrixType->getRowCount();
             auto columnCount = matrixType->getColumnCount();
 
-            IRBuilder struct_builder(matrixType);
-            struct_builder.setInsertBefore(matrixType);
-
-            // Create vector type for rows
-            auto vectorType = struct_builder.getVectorType(elementType, columnCount);
-
-            // Create array type for the matrix data
-            auto arrayType = struct_builder.getArrayType(vectorType, rowCount);
-
-            //// Create struct type to wrap the array
-            //auto structType = struct_builder.createStructType();
-            //auto dataKey = struct_builder.createStructKey();
-            //struct_builder.addNameHintDecoration(dataKey, UnownedStringSlice("data"));
-            //struct_builder.createStructField(structType, dataKey, arrayType);
-
-            //// Add name hint for the struct
-            //StringBuilder nameSb;
-            //nameSb << "LoweredMatrix_";
-            //getTypeNameHint(nameSb, elementType);
-            //nameSb << "_" << getIntVal(rowCount) << "x" << getIntVal(columnCount);
-            //struct_builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
+            IRBuilder array_builder(matrixType);
+            array_builder.setInsertBefore(matrixType);
+            auto vectorType = array_builder.getVectorType(elementType, columnCount);
+            auto arrayType = array_builder.getArrayType(vectorType, rowCount);
 
             IRBuilder builder(t);
             builder.setInsertBefore(t);
