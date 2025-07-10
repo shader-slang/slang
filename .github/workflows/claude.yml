@@ -230,7 +230,7 @@ jobs:
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "25"
+          max_turns: "100"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
