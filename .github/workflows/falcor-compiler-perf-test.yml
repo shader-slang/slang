@@ -83,7 +83,6 @@ jobs:
           # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
           fileName: "falcor_perf_test-*-win-64.zip"
 
-
           # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
           # It will create the target directory automatically if not present
           # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
@@ -108,7 +107,7 @@ jobs:
 
           # View current PATH
           Write-Host "PATH is $env:PATH"
-  
+
           # Run the executable and check exit code
           Write-Host "Running falcor performance test..."
           & .\falcor-perf-test\bin\Release\falcor_perftest.exe
