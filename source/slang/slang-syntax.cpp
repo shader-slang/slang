@@ -919,7 +919,11 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         auto paramType = getParamType(astBuilder, paramDeclRef);
         if (paramDecl->findModifier<RefModifier>())
         {
-            paramType = astBuilder->getRefType(paramType, AddressSpace::Generic, AccessQualifier::ReadWrite, CoherentScope::NotCoherent);
+            paramType = astBuilder->getRefType(
+                paramType,
+                AddressSpace::Generic,
+                AccessQualifier::ReadWrite,
+                CoherentScope::NotCoherent);
         }
         else if (paramDecl->findModifier<ConstRefModifier>())
         {
