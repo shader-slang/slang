@@ -503,7 +503,7 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
         const auto& category = categories[categoryIndex];
-        
+
         // Omit the value categories
         if (category.kind != CategoryKind::Value)
         {
