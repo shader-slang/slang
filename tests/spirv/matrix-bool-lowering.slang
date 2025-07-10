@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -O0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -48,10 +48,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     mat1[0][1] = true;
     mat2[1][2] = false;
 
-    // Test passing matrices to functions
+    // Test passing bool matrices to functions
     bool anded = elementAnd(mat1);
 
-    // Test structs with matrix fields
+    // Test structs with bool matrix fields
     matrixWrapper wrapper = {};
 
     // Store results

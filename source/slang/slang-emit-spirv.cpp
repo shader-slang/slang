@@ -8015,7 +8015,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             for (IRIntegerValue i = 0; i < rowCount; i++)
             {
                 List<IRInst*> operands;
-                for (IRIntegerValue j = 0; j < inst->getOperandCount(); j++)
+                for (UInt j = 0; j < inst->getOperandCount(); j++)
                 {
                     auto originalOperand = inst->getOperand(j);
                     if (as<IRArrayType>(originalOperand->getDataType()))
