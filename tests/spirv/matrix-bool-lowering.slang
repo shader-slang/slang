@@ -1,53 +1,81 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
+
+struct matrixWrapper {
+    bool2x2 mat1 = bool2x2(false, false, false, false);
+    bool2x3 mat2 = bool2x3(true, true, false, false, false, true);
+}
+
+bool elementAnd(bool2x2 matrix)
+{
+    return true
+        && matrix[0][0]
+        && matrix[0][1]
+        && matrix[1][0]
+        && matrix[1][1];
+}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // Test that bool matrices work on SPIRV through lowering
-    // SPIRV has no native bool matrix types, so these must be lowered to arrays of bool vectors
-    
-    bool2x2 bmat1 = bool2x2(true, false, false, true);
-    bool3x3 bmat2 = bool3x3(
+    // Test bool matrix construction
+    bool2x2 mat1 = bool2x2(true, false, false, true);
+    bool3x3 mat2 = bool3x3(
         true, false, true,
         false, true, false,
         true, false, true
     );
+    bool2x4 mat3 = bool2x4(
+        true, false, true, false,
+        true, false, true, false
+    );
     
     // Test bool matrix element access
-    bool b_val1 = bmat1[0][0];
-    bool b_val2 = bmat2[2][1];
+    bool val1 = mat1[0][0];
+    bool val2 = mat2[2][1];
     
     // Test bool matrix row access
-    bool2 brow = bmat1[1];
-    bool3 brow3 = bmat2[0];
+    bool2 row = mat1[1];
+    bool3 row3 = mat2[0];
     
     // Test logical operations
-    bool2x2 not_bmat = !bmat1;
-    bool2x2 and_bmat = bmat1 && bool2x2(true, true, false, false);
+    bool2x2 not_mat = !mat1;
+    bool2x2 and_mat = mat1 && bool2x2(true, true, false, false);
     
     // Test element assignment
-    bmat1[0][1] = true;
-    bmat2[1][2] = false;
-    
+    mat1[0][1] = true;
+    mat2[1][2] = false;
+
+    // Test passing matrices to functions
+    bool anded = elementAnd(mat1);
+
+    // Test structs with matrix fields
+    matrixWrapper wrapper = {};
+
     // Store results
-    outputBuffer[0] = b_val1 ? 1 : 0; // true = 1
-    outputBuffer[1] = b_val2 ? 1 : 0; // false = 0
-    outputBuffer[2] = brow.x ? 1 : 0; // false = 0
-    outputBuffer[3] = brow.y ? 1 : 0; // true = 1
-    outputBuffer[4] = brow3.y ? 1 : 0; // false = 0
-    outputBuffer[5] = not_bmat[0][0] ? 1 : 0; // !true = false = 0
-    outputBuffer[6] = and_bmat[0][0] ? 1 : 0; // true && true = 1
-    outputBuffer[7] = bmat1[0][1] ? 1 : 0; // modified to true = 1
+    outputBuffer[0] = val1;
+    outputBuffer[1] = val2;
+    outputBuffer[2] = row.x;
+    outputBuffer[3] = row.y;
+    outputBuffer[4] = row3.y;
+    outputBuffer[5] = not_mat[0][0];
+    outputBuffer[6] = and_mat[0][0];
+    outputBuffer[7] = mat1[0][1];
+    outputBuffer[8] = mat3[0][1];
+    outputBuffer[9] = anded;
+    outputBuffer[10] = wrapper.mat1[0][0] || wrapper.mat2[0][0];
 }
 
 // CHECK: 1
-// CHECK: 0
-// CHECK: 0
-// CHECK: 1
-// CHECK: 0
-// CHECK: 0
-// CHECK: 1
-// CHECK: 1 
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
+// CHECK-NEXT: 0
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1 
+// CHECK-NEXT: 0 
+// CHECK-NEXT: 0 
+// CHECK-NEXT: 1
