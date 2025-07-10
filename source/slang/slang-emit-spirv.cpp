@@ -8559,31 +8559,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugBaseType,
                 builder.getIntValue(builder.getUIntType(), kDebugTypeAtomicQualifier));
         }
-        else if (type->getOp() == kIROp_TextureType)
-        {
-            // Declare variables for debug location like struct handling does
-            IRInst* source = m_defaultDebugSource;
-            IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
-            IRInst* col = line;
-
-            // Emit a composite debug type for texture types
-            return emitOpDebugTypeComposite(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                name,
-                builder.getIntValue(builder.getUIntType(), 0), // Class (0 = struct)
-                source,
-                line,
-                col,
-                scope,
-                name,
-                builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
-                builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
-                List<SpvInst*>()); // No members
-        }
-        else if (type->getOp() == kIROp_SamplerStateType)
+        else if (as<IRSamplerStateTypeBase>(type))
         {
             // Declare variables for debug location like struct handling does
             IRInst* source = m_defaultDebugSource;
@@ -8607,38 +8583,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
                 List<SpvInst*>()); // No members
         }
-        else if (type->getOp() == kIROp_SamplerComparisonStateType)
+        else // Fallback for texture types, raytracing types, and other composite types
         {
             // Declare variables for debug location like struct handling does
             IRInst* source = m_defaultDebugSource;
             IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
             IRInst* col = line;
 
-            // Emit a composite debug type for comparison sampler types
-            return emitOpDebugTypeComposite(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                name,
-                builder.getIntValue(builder.getUIntType(), 1), // Class (1 = union/sampler)
-                source,
-                line,
-                col,
-                scope,
-                name,
-                builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
-                builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
-                List<SpvInst*>()); // No members
-        }
-        else if (type->getOp() == kIROp_RaytracingAccelerationStructureType)
-        {
-            // Declare variables for debug location like struct handling does
-            IRInst* source = m_defaultDebugSource;
-            IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
-            IRInst* col = line;
-
-            // Emit a composite debug type for raytracing acceleration structure types
+            // Emit a composite debug type (struct-like for most types)
             return emitOpDebugTypeComposite(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
