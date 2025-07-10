@@ -10722,14 +10722,18 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         ensureDecl(genericDecl, DeclCheckState::ReadyForReference);
 
         // Collect all declarations referenced by the target type
-        HashSet<Decl*> referencedDecls;
-        collectReferencedDecls(decl->targetType.type, referencedDecls);
+        HashSet<Decl*> genericParamsReferencedByTargetType;
+        collectReferencedDecls(decl->targetType.type, genericParamsReferencedByTargetType);
+
+        HashSet<Decl*> genericParamsReferencedByConstraints;
 
         // Also collect declarations referenced by generic constraints
         for (auto constraint :
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
-            collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
+            collectReferencedDecls(
+                constraint.getDecl()->sup.type,
+                genericParamsReferencedByConstraints);
         }
 
         // Note: We intentionally do NOT check inheritance declarations in the extension.
@@ -10741,11 +10745,21 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         {
             if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
             {
-                if (!referencedDecls.contains(member))
+                bool referencedByTargetType = genericParamsReferencedByTargetType.contains(member);
+                bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
+                if (!referencedByTargetType && !referencedByConstraint)
                 {
                     getSink()->diagnose(
                         member,
                         Diagnostics::unreferencedGenericParamInExtension,
+                        member->getName(),
+                        decl->targetType);
+                }
+                else if (!referencedByTargetType && !isFromCoreModule(decl))
+                {
+                    getSink()->diagnose(
+                        member,
+                        Diagnostics::genericParamInExtensionNotReferencedByTargetType,
                         member->getName(),
                         decl->targetType);
                 }

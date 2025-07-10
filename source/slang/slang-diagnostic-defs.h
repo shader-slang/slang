@@ -1795,7 +1795,12 @@ DIAGNOSTIC(
     Error,
     unreferencedGenericParamInExtension,
     "generic parameter '$0' is not referenced by extension target type '$1'.")
-
+DIAGNOSTIC(
+    30856,
+    Warning,
+    genericParamInExtensionNotReferencedByTargetType,
+    "the extension is non-standard and may not work as intended because the generic parameter '$0' "
+    "is not referenced by extension target type '$1'.")
 // 309xx: subscripts
 DIAGNOSTIC(
     30900,
