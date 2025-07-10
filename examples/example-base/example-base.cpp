@@ -58,7 +58,7 @@ Slang::Result WindowedAppBase::initializeBase(
 
         rhi::SurfaceConfig surfaceConfig = {};
 
-        surfaceConfig.format = Format::RGBA8Unorm;
+        surfaceConfig.format = gSurface->getInfo().preferredFormat;
         surfaceConfig.width = width;
         surfaceConfig.height = height;
         surfaceConfig.desiredImageCount = kSwapchainImageCount;
