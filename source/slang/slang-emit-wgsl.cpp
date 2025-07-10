@@ -515,10 +515,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
-        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
         return;
     case kIROp_UInt16Type:
-        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -979,12 +979,12 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
-                        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
                         break;
                     }
                 case BaseType::UInt16:
                     {
-                        getSink()->diagnose(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
                         break;
                     }
                 case BaseType::Int:

@@ -228,6 +228,29 @@ public:
     /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_codeGenContext->getSink(); }
 
+    /// Diagnose a diagnostic only once per diagnostic ID and first parameter
+    template<typename... Args>
+    void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
+    {
+        // For diagnostics with parameters, we'll use the first parameter to create a unique key
+        // This prevents duplicate diagnostics for the same type but allows different types
+        if constexpr (sizeof...(args) > 0) {
+            auto firstArg = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
+            String key = String(diagnostic.id) + "|" + String(firstArg);
+            if (m_reportedDiagnosticKeys.contains(key))
+                return;
+            m_reportedDiagnosticKeys.add(key);
+        } else {
+            // For diagnostics without parameters, just use the ID
+            if (m_reportedDiagnosticIds.contains(diagnostic.id))
+                return;
+            m_reportedDiagnosticIds.add(diagnostic.id);
+        }
+        
+        // Report the diagnostic
+        getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
     /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
     /// Get the source style
@@ -747,6 +770,12 @@ protected:
 
     // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;
+
+    // Set of diagnostic IDs that have already been reported to prevent duplicates
+    HashSet<int> m_reportedDiagnosticIds;
+    
+    // Set of diagnostic keys (ID + first parameter) that have already been reported to prevent duplicates
+    HashSet<String> m_reportedDiagnosticKeys;
 };
 
 } // namespace Slang
