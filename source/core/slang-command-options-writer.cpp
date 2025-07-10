@@ -502,7 +502,13 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     const auto& categories = m_commandOptions->getCategories();
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
-        _appendDescriptionForCategory(categoryIndex);
+        const auto& category = categories[categoryIndex];
+        
+        // For the value category, only include the "help-category" category
+        if (category.kind != CategoryKind::Value || category.name == "help-category")
+        {
+            _appendDescriptionForCategory(categoryIndex);
+        }
     }
 
     // Add instructions for getting help for specific categories
