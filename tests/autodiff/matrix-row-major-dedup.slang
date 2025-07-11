@@ -16,7 +16,7 @@ float3 matmul33_row(no_diff float3 v, row_major float3x3 w) {
 }
 
 [Differentiable]
-float3 matmul33_col(no_diff float3 v, float3x3 w) {
+float3 matmul33_col(no_diff float3 v, column_major float3x3 w) {
     return mul(w, v);
 }
 
@@ -33,10 +33,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     outputBuffer[0] = dpW_row.d[0][0]; // CHECK: 1
     outputBuffer[1] = dpW_row.d[0][1]; // CHECK: 1  
     outputBuffer[2] = dpW_row.d[0][2]; // CHECK: 1
-    
+
     // Test column_major matrix to ensure they share the same DiffPair struct
-    float3x3 w_col = float3x3(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
-    DifferentialPair<float3x3> dpW_col = diffPair(w_col);
+    column_major float3x3 w_col = float3x3(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    DifferentialPair<column_major float3x3> dpW_col = diffPair(w_col);
     __bwd_diff(matmul33_col)(v, dpW_col, float3(1.0, 1.0, 1.0));
     
     outputBuffer[3] = dpW_col.d[0][0]; // CHECK: 1
