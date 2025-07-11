@@ -1414,6 +1414,20 @@ static void _dispatchDeclCheckingVisitor(
     DeclCheckState state,
     SemanticsContext& shared);
 
+void SemanticsVisitor::ensureOuterGenericConstraints(Decl* decl, DeclCheckState state)
+{
+    if (auto genericDecl = GetOuterGeneric(decl))
+    {
+        auto nextGeneric = findNextOuterGeneric(genericDecl);
+        if (nextGeneric)
+        {
+            if (nextGeneric->checkState.getState() < state)
+                ensureOuterGenericConstraints(nextGeneric, state);
+        }
+        ensureDecl(genericDecl, state);
+    }
+}
+
 // Make sure a declaration has been checked, so we can refer to it.
 // Note that this may lead to us recursively invoking checking,
 // so this may not be the best way to handle things.
@@ -3159,6 +3173,18 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     return true;
 }
 
+bool isProperConstraineeType(Type* type)
+{
+    auto declRef = isDeclRefTypeOf<Decl>(type);
+    if (!declRef)
+        return false;
+    if (as<InterfaceDecl>(declRef.getDecl()))
+        return false;
+    // TODO: `some` type and `dyn` types are also inproper constrainee types.
+
+    return true;
+}
+
 void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     GenericTypeConstraintDecl* decl,
     TypeExp type)
@@ -3220,6 +3246,13 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             type.type = baseType;
             validateGenericConstraintSubType(decl, type);
         }
+    }
+    if (!isProperConstraineeType(type.type))
+    {
+        // It is meaningless for certain types to be used in type constraints.
+        // For example, `IFoo<T>` should not appear as the left-hand-side of a generic constraint.
+        getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+        return;
     }
 }
 
@@ -3333,12 +3366,6 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
 
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
-    // TODO: are there any other validations we can do at this point?
-    //
-    // There probably needs to be a kind of "occurs check" to make
-    // sure that the constraint actually applies to at least one
-    // of the parameters of the generic.
-    //
     CheckConstraintSubType(decl->sub);
 
     if (!decl->sub.type)
@@ -3346,18 +3373,32 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
     if (!decl->sup.type)
         decl->sup = TranslateTypeNodeForced(decl->sup);
 
-    // Check for forward references in generic constraints after type translation
-    checkForwardReferencesInGenericConstraint(decl);
-
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
-        validateGenericConstraintSubType(decl, decl->sub);
-    }
+        // Check for forward references in generic constraints after type translation
+        checkForwardReferencesInGenericConstraint(decl);
 
-    if (!decl->isEqualityConstraint && !isValidGenericConstraintType(decl->sup) &&
-        !as<ErrorType>(decl->sub.type))
-    {
-        getSink()->diagnose(decl->sup.exp, Diagnostics::invalidTypeForConstraint, decl->sup);
+        validateGenericConstraintSubType(decl, decl->sub);
+        if (decl->isEqualityConstraint)
+        {
+            if (!isProperConstraineeType(decl->sup) && !as<ErrorType>(decl->sup.type))
+            {
+                getSink()->diagnose(
+                    decl->sup.exp,
+                    Diagnostics::invalidEqualityConstraintSupType,
+                    decl->sup);
+            }
+        }
+        else
+        {
+            if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sup.type))
+            {
+                getSink()->diagnose(
+                    decl->sup.exp,
+                    Diagnostics::invalidTypeForConstraint,
+                    decl->sup);
+            }
+        }
     }
 }
 
@@ -10708,14 +10749,18 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         ensureDecl(genericDecl, DeclCheckState::ReadyForReference);
 
         // Collect all declarations referenced by the target type
-        HashSet<Decl*> referencedDecls;
-        collectReferencedDecls(decl->targetType.type, referencedDecls);
+        HashSet<Decl*> genericParamsReferencedByTargetType;
+        collectReferencedDecls(decl->targetType.type, genericParamsReferencedByTargetType);
+
+        HashSet<Decl*> genericParamsReferencedByConstraints;
 
         // Also collect declarations referenced by generic constraints
         for (auto constraint :
              getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
         {
-            collectReferencedDecls(constraint.getDecl()->sup.type, referencedDecls);
+            collectReferencedDecls(
+                constraint.getDecl()->sup.type,
+                genericParamsReferencedByConstraints);
         }
 
         // Note: We intentionally do NOT check inheritance declarations in the extension.
@@ -10727,11 +10772,21 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         {
             if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
             {
-                if (!referencedDecls.contains(member))
+                bool referencedByTargetType = genericParamsReferencedByTargetType.contains(member);
+                bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
+                if (!referencedByTargetType && !referencedByConstraint)
                 {
                     getSink()->diagnose(
                         member,
                         Diagnostics::unreferencedGenericParamInExtension,
+                        member->getName(),
+                        decl->targetType);
+                }
+                else if (!referencedByTargetType && !isFromCoreModule(decl))
+                {
+                    getSink()->diagnose(
+                        member,
+                        Diagnostics::genericParamInExtensionNotReferencedByTargetType,
                         member->getName(),
                         decl->targetType);
                 }
@@ -10742,6 +10797,11 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
 void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
 {
+    // If the extension is a generic, we need to make sure to check
+    // the outer generic constraints first.
+    //
+    ensureOuterGenericConstraints(decl, DeclCheckState::ReadyForReference);
+
     // We check the target type expression and members, and then validate
     // that the type it names is one that it makes sense
     // to extend.
