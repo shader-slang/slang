@@ -15,6 +15,7 @@
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
+#include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -4524,8 +4525,10 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
     if (!knownBuiltinAttr)
         return;
-    if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
     {
+        if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::GetAttributeAtVertex)
+        {
         if (checkedInvokeExpr->arguments.getCount() != 2)
             return;
         auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
@@ -4547,6 +4550,7 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
                 vertexAttributeArgDeclRefExpr,
                 Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
             return;
+        }
         }
     }
 }

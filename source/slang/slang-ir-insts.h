@@ -5342,6 +5342,14 @@ public:
         addDecoration(value, d, maxCount);
     }
 
+    void addKnownBuiltinDecoration(IRInst* value, KnownBuiltinDeclName enumValue)
+    {
+        addDecoration(
+            value,
+            kIROp_KnownBuiltinDecoration,
+            getIntValue(getIntType(), IRIntegerValue(enumValue)));
+    }
+
     void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         auto enumValue = getKnownBuiltinDeclNameFromString(name);

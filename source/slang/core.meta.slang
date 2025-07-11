@@ -603,7 +603,7 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///
 /// 
 __magic_type(DifferentiableType)
-[KnownBuiltin("IDifferentiable")]
+[KnownBuiltin(6)]
 interface IDifferentiable
 {
     // Note: the compiler implementation requires the `Differential` associated type to be defined
@@ -646,7 +646,7 @@ interface IDifferentiable
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
 __magic_type(DifferentiablePtrType)
-[KnownBuiltin("IDifferentiablePtr")]
+[KnownBuiltin(7)]
 interface IDifferentiablePtrType
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
@@ -4233,7 +4233,7 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 // @hidden:
 __attributeTarget(DeclBase)
-attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
+attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
