@@ -1698,6 +1698,11 @@ DIAGNOSTIC(
     Error,
     genericValueParameterMustHaveType,
     "a generic value parameter must be given an explicit type")
+DIAGNOSTIC(
+    30624,
+    Error,
+    invalidGenericValueParameterType,
+    "generic value parameter must have an integer or enum type, got '$0'")
 
 // 307xx: parameters
 DIAGNOSTIC(
