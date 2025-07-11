@@ -127,6 +127,67 @@ endif()
 
 if(SLANG_ENABLE_GFX)
     #
+    # GFX
+    #
+    slang_add_target(
+        gfx
+        ${SLANG_LIB_TYPE}
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            slang
+            Vulkan-Headers
+            metal-cpp
+            stb
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:${NVAPI_LIBRARIES}>
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
+            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
+            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:GFX_NVAPI>
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
+        # This is a shared library, so we need to set a preprocessor macro to mark
+        # exported symbols
+        EXPORT_MACRO_PREFIX SLANG_GFX
+        # slang-gfx is in this directory, anything which depends on gfx should include
+        # this
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}
+            ${slang_SOURCE_DIR}/include
+            if
+            (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_GLM_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_IMGUI_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_IMGUI_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
+        INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
+        INSTALL
+        EXPORT_SET_NAME SlangTargets
+        FOLDER gfx
+    )
+
+    #
     # `platform` contains all the platform abstractions for a GUI application.
     #
     slang_add_target(
