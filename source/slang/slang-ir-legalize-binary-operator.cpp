@@ -177,7 +177,8 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
 void legalizeLogicalAndOr(IRInst* inst)
 {
     auto op = inst->getOp();
-    if (op == kIROp_And || op == kIROp_Or) {
+    if (op == kIROp_And || op == kIROp_Or)
+    {
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
@@ -191,9 +192,8 @@ void legalizeLogicalAndOr(IRInst* inst)
             auto operandDataType = operand->getDataType();
 
             SLANG_ASSERT(
-                as <IRMatrixType> (operandDataType) ||
-                as <IRVectorType> (operandDataType) ||
-                as <IRBoolType> (operandDataType));
+                as<IRMatrixType>(operandDataType) || as<IRVectorType>(operandDataType) ||
+                as<IRBoolType>(operandDataType));
 
             if (auto vecType = as<IRVectorType>(operandDataType))
             {
@@ -220,9 +220,7 @@ void legalizeLogicalAndOr(IRInst* inst)
         IRInst* newInst = nullptr;
 
         SLANG_ASSERT(
-            as <IRMatrixType> (dataType) ||
-            as <IRVectorType> (dataType) ||
-            as <IRBoolType> (dataType));
+            as<IRMatrixType>(dataType) || as<IRVectorType>(dataType) || as<IRBoolType>(dataType));
         if (auto vecType = as<IRVectorType>(dataType))
         {
             if (!as<IRBoolType>(vecType->getElementType()))

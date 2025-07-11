@@ -2242,8 +2242,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             else if (auto matrixType = as<IRMatrixType>(globalInst))
             {
                 auto elementType = matrixType->getElementType();
-                if (as<IRBoolType>(elementType) ||
-                    as<IRUIntType>(elementType) ||
+                if (as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                     as<IRIntType>(elementType))
                 {
                     matricesToLower.add(matrixType);
@@ -2254,7 +2253,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 textureFootprintTypesToLower.add(globalInst);
             }
         }
-        
+
         // Lowering buffers
         for (auto t : buffersToLower)
         {
