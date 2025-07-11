@@ -117,7 +117,7 @@ enum class AddressSpace : uint64_t
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
 // must be 32 bit to match SPIR-V
-enum class MemoryScope : uint32_t
+enum class MemoryScope : int32_t
 {
     CrossDevice = 0,
     Device = 1,
@@ -129,16 +129,16 @@ enum class MemoryScope : uint32_t
 };
 
 // must be 32 bit to match SPIR-V
-enum class CoherentScope : uint32_t
+enum class CoherentScope : int32_t
 {
     NotCoherent = 0xFF,
-    CrossDevice = (uint64_t)MemoryScope::CrossDevice,
-    Device = (uint64_t)MemoryScope::Device,
-    Workgroup = (uint64_t)MemoryScope::Workgroup,
-    Subgroup = (uint64_t)MemoryScope::Subgroup,
-    Invocation = (uint64_t)MemoryScope::Invocation,
-    QueueFamily = (uint64_t)MemoryScope::QueueFamily,
-    ShaderCall = (uint64_t)MemoryScope::ShaderCall,
+    CrossDevice = (int32_t)MemoryScope::CrossDevice,
+    Device = (int32_t)MemoryScope::Device,
+    Workgroup = (int32_t)MemoryScope::Workgroup,
+    Subgroup = (int32_t)MemoryScope::Subgroup,
+    Invocation = (int32_t)MemoryScope::Invocation,
+    QueueFamily = (int32_t)MemoryScope::QueueFamily,
+    ShaderCall = (int32_t)MemoryScope::ShaderCall,
 };
 
 enum class AccessQualifier : uint64_t
