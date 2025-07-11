@@ -54,7 +54,7 @@ slang-test must run from repository root
 ### Code Formatting
 ```bash
 # Format code before submitting PR
-./extras/formatting.sh --no-version-check --since HEAD
+./extras/formatting.sh --no-version-check --cpp --since HEAD
 ```
 
 ## Architecture Overview
