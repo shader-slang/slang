@@ -96,4 +96,32 @@ void printDiagnosticArg(StringBuilder& sb, ParameterDirection direction)
     }
 }
 
+KnownBuiltinDeclName getKnownBuiltinDeclName(UnownedStringSlice name)
+{
+    if (name == UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+        return KnownBuiltinDeclName::GeometryStreamAppend;
+    else if (name == UnownedStringSlice::fromLiteral("GeometryStreamRestart"))
+        return KnownBuiltinDeclName::GeometryStreamRestart;
+    else if (name == UnownedStringSlice::fromLiteral("GetAttributeAtVertex"))
+        return KnownBuiltinDeclName::GetAttributeAtVertex;
+    else if (name == UnownedStringSlice::fromLiteral("DispatchMesh"))
+        return KnownBuiltinDeclName::DispatchMesh;
+    else if (name == UnownedStringSlice::fromLiteral("saturated_cooperation"))
+        return KnownBuiltinDeclName::saturated_cooperation;
+    else if (name == UnownedStringSlice::fromLiteral("saturated_cooperation_using"))
+        return KnownBuiltinDeclName::saturated_cooperation_using;
+    else if (name == UnownedStringSlice::fromLiteral("IDifferentiable"))
+        return KnownBuiltinDeclName::IDifferentiable;
+    else if (name == UnownedStringSlice::fromLiteral("IDifferentiablePtr"))
+        return KnownBuiltinDeclName::IDifferentiablePtr;
+    else if (name == UnownedStringSlice::fromLiteral("IDifferentiablePtrType"))
+        return KnownBuiltinDeclName::IDifferentiablePtrType;
+    else if (name == UnownedStringSlice::fromLiteral("DrawIndex"))
+        return KnownBuiltinDeclName::DrawIndex;
+    else if (name == UnownedStringSlice::fromLiteral("NullDifferential"))
+        return KnownBuiltinDeclName::NullDifferential;
+    else
+        return KnownBuiltinDeclName::None;
+}
+
 } // namespace Slang

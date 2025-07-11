@@ -1775,6 +1775,42 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
     if (!decor)
         return UnownedStringSlice();
+    auto name = decor->getName();
+    // For backward compatibility, convert enum back to string
+    switch (name)
+    {
+    case KnownBuiltinDeclName::GeometryStreamAppend:
+        return UnownedStringSlice::fromLiteral("GeometryStreamAppend");
+    case KnownBuiltinDeclName::GeometryStreamRestart:
+        return UnownedStringSlice::fromLiteral("GeometryStreamRestart");
+    case KnownBuiltinDeclName::GetAttributeAtVertex:
+        return UnownedStringSlice::fromLiteral("GetAttributeAtVertex");
+    case KnownBuiltinDeclName::DispatchMesh:
+        return UnownedStringSlice::fromLiteral("DispatchMesh");
+    case KnownBuiltinDeclName::saturated_cooperation:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation");
+    case KnownBuiltinDeclName::saturated_cooperation_using:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation_using");
+    case KnownBuiltinDeclName::IDifferentiable:
+        return UnownedStringSlice::fromLiteral("IDifferentiable");
+    case KnownBuiltinDeclName::IDifferentiablePtr:
+        return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
+    case KnownBuiltinDeclName::IDifferentiablePtrType:
+        return UnownedStringSlice::fromLiteral("IDifferentiablePtrType");
+    case KnownBuiltinDeclName::DrawIndex:
+        return UnownedStringSlice::fromLiteral("DrawIndex");
+    case KnownBuiltinDeclName::NullDifferential:
+        return UnownedStringSlice::fromLiteral("NullDifferential");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee)
+{
+    auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
+    if (!decor)
+        return KnownBuiltinDeclName::None;
     return decor->getName();
 }
 

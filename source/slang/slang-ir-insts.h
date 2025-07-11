@@ -7,6 +7,7 @@
 //
 // TODO: the builder probably needs its own file.
 
+#include "slang-ast-support-types.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-ir.h"
@@ -678,8 +679,8 @@ struct IRKnownBuiltinDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
-    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+    IRIntLit* getNameOperand() { return cast<IRIntLit>(getOperand(0)); }
+    KnownBuiltinDeclName getName() { return KnownBuiltinDeclName(getNameOperand()->getValue()); }
 };
 
 FIDDLE()
@@ -5341,9 +5342,12 @@ public:
         addDecoration(value, d, maxCount);
     }
 
-    void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
+    void addKnownBuiltinDecoration(IRInst* value, KnownBuiltinDeclName name)
     {
-        addDecoration(value, kIROp_KnownBuiltinDecoration, getStringValue(name));
+        addDecoration(
+            value,
+            kIROp_KnownBuiltinDecoration,
+            getIntValue(getIntType(), IRIntegerValue(name)));
     }
 
     void addMemoryQualifierSetDecoration(IRInst* inst, IRIntegerValue flags)

@@ -3366,8 +3366,7 @@ void legalizeEntryPointParameterForGLSL(
                     if (callee->getOp() != kIROp_Func)
                         continue;
 
-                    if (getBuiltinFuncName(callee) !=
-                        UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    if (getBuiltinFuncEnum(callee) != KnownBuiltinDeclName::GeometryStreamAppend)
                     {
                         // If we are calling a function that takes a output stream as a parameter,
                         // we need to add it to the work list to be processed.
@@ -4386,7 +4385,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         {
             if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
             {
-                if (dec->getName() == "DispatchMesh")
+                if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                 {
                     SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                     dispatchMeshFunc = func;

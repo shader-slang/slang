@@ -1691,6 +1691,27 @@ FIDDLE() namespace Slang
         Not,                ///< The `ILogical.not` mtehod.
     };
 
+    /// An enumeration of known builtin declarations that can be identified during
+    /// compilation, regardless of obfuscation or linkage removing optimizations.
+    enum class KnownBuiltinDeclName : uint32_t
+    {
+        None = 0,
+        GeometryStreamAppend,
+        GeometryStreamRestart,
+        GetAttributeAtVertex,
+        DispatchMesh,
+        saturated_cooperation,
+        saturated_cooperation_using,
+        IDifferentiable,
+        IDifferentiablePtr,
+        IDifferentiablePtrType,
+        DrawIndex,
+        NullDifferential,
+    };
+
+    /// Convert a string name to a KnownBuiltinDeclName enum value
+    KnownBuiltinDeclName getKnownBuiltinDeclName(UnownedStringSlice name);
+
     enum class FunctionDifferentiableLevel
     {
         None,

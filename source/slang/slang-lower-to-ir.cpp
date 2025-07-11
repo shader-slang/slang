@@ -1446,7 +1446,7 @@ static void addLinkageDecoration(
             // lost during specialization.
             builder->addKnownBuiltinDecoration(
                 inInst,
-                knownBuiltinModifier->name.getUnownedSlice());
+                getKnownBuiltinDeclName(knownBuiltinModifier->name.getUnownedSlice()));
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
