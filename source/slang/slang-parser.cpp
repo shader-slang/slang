@@ -9288,6 +9288,15 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
+static NodeBase* parseBuiltinEnumModifier(Parser* parser, void* /*userData*/)
+{
+    BuiltinEnumModifier* modifier = parser->astBuilder->create<BuiltinEnumModifier>();
+    parser->ReadToken(TokenType::LParent);
+    modifier->name = parser->ReadToken(TokenType::Identifier).getContent();
+    parser->ReadToken(TokenType::RParent);
+    return modifier;
+}
+
 static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
@@ -9531,6 +9540,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
 
     _makeParseModifier("__builtin_type", parseBuiltinTypeModifier),
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
+
+    _makeParseModifier("__builtin_enum", parseBuiltinEnumModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),

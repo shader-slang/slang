@@ -2898,9 +2898,14 @@ IRInOutType* IRBuilder::getInOutType(IRType* valueType)
     return (IRInOutType*)getPtrType(kIROp_InOutType, valueType);
 }
 
-IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
+IRRefType* IRBuilder::getRefType(
+    IRType* valueType,
+    AddressSpace addrSpace,
+    AccessQualifier accessQualifier,
+    CoherentScope coherentScope)
 {
-    return (IRRefType*)getPtrType(kIROp_RefType, valueType, addrSpace);
+    return (
+        IRRefType*)getPtrType(kIROp_RefType, valueType, addrSpace, accessQualifier, coherentScope);
 }
 
 IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
@@ -2925,23 +2930,39 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRPtrTypeBase* ptrWithAddrSpace)
 {
     if (ptrWithAddrSpace->hasAddressSpace())
-        return (IRPtrTypeBase*)
-            getPtrType(ptrWithAddrSpace->getOp(), valueType, ptrWithAddrSpace->getAddressSpace());
+        return (IRPtrTypeBase*)getPtrType(
+            ptrWithAddrSpace->getOp(),
+            valueType,
+            ptrWithAddrSpace->getAddressSpace(),
+            ptrWithAddrSpace->getAccessQualifier(),
+            ptrWithAddrSpace->getCoherentScope());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
 }
 
-IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+IRPtrType* IRBuilder::getPtrType(
+    IROp op,
+    IRType* valueType,
+    AddressSpace addressSpace,
+    AccessQualifier accessQualifier,
+    CoherentScope coherentScope)
 {
     return (IRPtrType*)getPtrType(
         op,
         valueType,
-        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)),
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(coherentScope)));
 }
 
-IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
+IRPtrType* IRBuilder::getPtrType(
+    IROp op,
+    IRType* valueType,
+    IRInst* addressSpace,
+    IRInst* accessQualifier,
+    IRInst* coherentScope)
 {
-    IRInst* operands[] = {valueType, addressSpace};
-    return (IRPtrType*)getType(op, addressSpace ? 2 : 1, operands);
+    IRInst* operands[] = {valueType, addressSpace, accessQualifier, coherentScope};
+    return (IRPtrType*)getType(op, addressSpace ? 4 : 1, operands);
 }
 
 IRTextureTypeBase* IRBuilder::getTextureType(
@@ -5268,7 +5289,9 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
                 type = builder->getPtrType(
                     resultPtrType->getOp(),
                     resultPtrType->getValueType(),
-                    basePtrType->getAddressSpace());
+                    basePtrType->getAddressSpace(),
+                    basePtrType->getAccessQualifier(),
+                    basePtrType->getCoherentScope());
             }
         }
     }
@@ -5278,10 +5301,14 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
 IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    CoherentScope coherentScope = CoherentScope::NotCoherent;
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
+        coherentScope = ptrType->getCoherentScope();
+        accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
         valueType = ptrType->getValueType();
     }
@@ -5304,7 +5331,10 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(kIROp_PtrType, resultType, addrSpace), basePtr, fieldKey);
+    return emitFieldAddress(
+        getPtrType(kIROp_PtrType, resultType, addrSpace, accessQualifier, coherentScope),
+        basePtr,
+        fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -5408,10 +5438,14 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRIntegerValue index)
 IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    CoherentScope coherentScope = CoherentScope::NotCoherent;
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
+        coherentScope = ptrType->getCoherentScope();
+        accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
         valueType = ptrType->getValueType();
     }
@@ -5460,7 +5494,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(kIROp_PtrType, type, addrSpace),
+        getPtrType(kIROp_PtrType, type, addrSpace, accessQualifier, coherentScope),
         basePtr,
         index);
 

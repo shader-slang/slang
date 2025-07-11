@@ -3699,7 +3699,9 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
             irGlobalVar,
             context->builder->getPtrType(
                 legalValueType.getSimple(),
-                varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global));
+                varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global,
+                varPtrType ? varPtrType->getAccessQualifier() : AccessQualifier::ReadWrite,
+                varPtrType ? varPtrType->getCoherentScope() : CoherentScope::NotCoherent));
         return LegalVal::simple(irGlobalVar);
 
     default:
