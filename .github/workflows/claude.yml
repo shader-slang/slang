@@ -235,7 +235,7 @@ jobs:
           allowed_tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
           trigger_phrase: "@claude"
           assignee_trigger: "claude"
-          timeout_minutes: "60"
+          timeout_minutes: "90"
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
