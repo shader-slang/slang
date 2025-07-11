@@ -515,8 +515,7 @@ struct SCCPContext
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
-        const TFloatFunc& floatFunc,
-        bool isNotEqualComparison = false)
+        const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
         auto c0 = as<IRConstant>(v0.value);
@@ -536,25 +535,12 @@ struct SCCPContext
         IROp op0 = operandType0->getOp();
         IROp op1 = operandType1->getOp();
 
-        // Use floating-point path if either operand is floating-point (for IEEE 754 NaN handling)
+        // Use floating-point path if either operand is floating-point
         // Otherwise use integer path
         if (isFloatingPointType(op0) || isFloatingPointType(op1))
         {
-            // Floating-point path with IEEE 754 NaN handling
-            IRFloatingPointValue val0 = c0->value.floatVal;
-            IRFloatingPointValue val1 = c1->value.floatVal;
-
-            // Check for NaN values according to IEEE 754
-            if (Math::IsNaN(val0) || Math::IsNaN(val1))
-            {
-                // NaN comparisons: != returns true, all others return false
-                resultVal = getBuilder()->getBoolValue(isNotEqualComparison);
-            }
-            else
-            {
-                // Normal comparison for non-NaN values
-                resultVal = getBuilder()->getBoolValue(floatFunc(val0, val1));
-            }
+            // Floating-point path - C++ operators follow IEEE 754 automatically
+            resultVal = getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
         }
         else
         {
@@ -618,8 +604,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 == c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 == c1; },
-            false); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 == c1; });
     }
     LatticeVal evalNeq(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -628,8 +613,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 != c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 != c1; },
-            true); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 != c1; });
     }
     LatticeVal evalGeq(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -638,8 +622,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >= c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 >= c1; },
-            false); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 >= c1; });
     }
     LatticeVal evalLeq(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -648,8 +631,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 <= c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 <= c1; },
-            false); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 <= c1; });
     }
     LatticeVal evalGreater(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -658,8 +640,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 > c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 > c1; },
-            false); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 > c1; });
     }
     LatticeVal evalLess(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -668,8 +649,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 < c1; },
-            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 < c1; },
-            false); // isNotEqualComparison
+            [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 < c1; });
     }
     LatticeVal evalAnd(IRType* type, LatticeVal v0, LatticeVal v1)
     {
