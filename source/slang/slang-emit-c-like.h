@@ -228,6 +228,30 @@ public:
     /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_codeGenContext->getSink(); }
 
+    /// Diagnose a diagnostic only once per diagnostic ID and all parameters
+    template<typename... Args>
+    void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
+    {
+        // For diagnostics with parameters, we'll use all parameters to create a unique key
+        // This prevents duplicate diagnostics while allowing different parameter combinations
+        if constexpr (sizeof...(args) > 0)
+        {
+            String key = String(diagnostic.id);
+            ((key = key + "|" + String(args)), ...); // Fold expression to append all args
+            if (!m_reportedDiagnosticKeys.add(key))
+                return;
+        }
+        else
+        {
+            // For diagnostics without parameters, just use the ID
+            if (!m_reportedDiagnosticIds.add(diagnostic.id))
+                return;
+        }
+
+        // Report the diagnostic
+        getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
     /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
     /// Get the source style
@@ -747,6 +771,13 @@ protected:
 
     // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;
+
+    // Set of diagnostic IDs that have already been reported to prevent duplicates
+    HashSet<int> m_reportedDiagnosticIds;
+
+    // Set of diagnostic keys (ID + all parameters) that have already been reported to prevent
+    // duplicates
+    HashSet<String> m_reportedDiagnosticKeys;
 };
 
 } // namespace Slang

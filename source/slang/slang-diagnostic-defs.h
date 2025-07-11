@@ -2866,6 +2866,12 @@ DIAGNOSTIC(
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
 
+DIAGNOSTIC(
+    56103,
+    Error,
+    int16NotSupportedInWGSL,
+    "16-bit integer type '$0' is not supported by the WGSL backend.")
+
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
 DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
