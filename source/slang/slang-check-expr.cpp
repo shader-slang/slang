@@ -1835,7 +1835,8 @@ Expr* SemanticsExprVisitor::visitFloatingPointLiteralExpr(FloatingPointLiteralEx
 
 Expr* SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
 {
-    expr->type = m_astBuilder->getStringType();
+    auto length = m_astBuilder->getIntVal(m_astBuilder->getIntType(), expr->value.getLength());
+    expr->type = m_astBuilder->getShortStringType(length);
     return expr;
 }
 

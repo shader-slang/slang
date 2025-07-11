@@ -1196,11 +1196,11 @@ String getStringLiteralTokenValue(Token const& token)
                     }
                     else if (('a' <= d) && (d <= 'f'))
                     {
-                        digitValue = d - 'a';
+                        digitValue = d - 'a' + 10;
                     }
                     else if (('A' <= d) && (d <= 'F'))
                     {
-                        digitValue = d - 'A';
+                        digitValue = d - 'A' + 10;
                     }
                     else
                     {

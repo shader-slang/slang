@@ -50,6 +50,7 @@ local insts = {
 			{
 				StringTypeBase = {
 					hoistable = true,
+					{ ShortString = { struct_name = "ShortStringType", min_operands = 1 } },
 					{ String = { struct_name = "StringType" } },
 					{ NativeString = { struct_name = "NativeStringType" } },
 				},
@@ -686,7 +687,12 @@ local insts = {
 		},
 	},
 	{ get_field_addr = { struct_name = "FieldAddress", min_operands = 2 } },
-	{ getElement = { min_operands = 2 } },
+	{
+		getElementBase = {
+			{ getElement = { min_operands = 2 } },
+			{ getElementFromString = { min_operands = 2 } },
+		},
+	},
 	{ getElementPtr = { min_operands = 2 } },
 	-- Pointer offset: computes pBase + offset_in_elements
 	{ getOffsetPtr = { min_operands = 2 } },
@@ -1905,6 +1911,7 @@ local insts = {
 	{ alignOf = { min_operands = 1 } },
 	{ countOf = { min_operands = 1 } },
 	{ GetArrayLength = { min_operands = 1 } },
+	{ GetShortStringAsArray = { min_operands = 1} },
 	{ IsType = { min_operands = 3 } },
 	{ TypeEquals = { min_operands = 2 } },
 	{ IsInt = { min_operands = 1 } },

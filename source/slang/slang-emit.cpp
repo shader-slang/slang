@@ -93,6 +93,7 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-short-string.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -438,6 +439,9 @@ void calcRequiredLoweringPassSet(
     case kIROp_Select:
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
+        break;
+    case kIROp_ShortStringType:
+        result.shortString = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1899,6 +1903,16 @@ Result linkAndOptimizeIR(
         {
             applyGLSLLiveness(irModule);
         }
+    }
+
+    if (requiredLoweringPassSet.shortString)
+    {
+        const bool targetSupportsStringLiterals =
+            (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+             target == CodeGenTarget::CSource);
+        ShortStringsOptions strLitOptions = {};
+        strLitOptions.targetSupportsStringLiterals = targetSupportsStringLiterals;
+        lowerShortStringReturnChanged(targetProgram, irModule, strLitOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)

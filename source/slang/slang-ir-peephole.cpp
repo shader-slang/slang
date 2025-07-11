@@ -4,6 +4,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-short-string.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -305,6 +306,56 @@ struct PeepholeContext : InstPassBase
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
+            else if (auto strLitType = as<IRShortStringType>(inst->getOperand(0)->getDataType()))
+            {
+                inst->replaceUsesWith(strLitType->getLength());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_GetStringHash:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto slice = strLit->getStringSlice();
+                const auto h = getStableHashCode32(slice.begin(), slice.getLength()).hash;
+                auto replacement = builder.getIntValue(inst->getDataType(), h);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_MakeString:
+        case kIROp_GetNativeStr:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                IROp type =
+                    inst->getOp() == kIROp_MakeString ? kIROp_StringType : kIROp_NativeStringType;
+                auto replacement = builder.getStringValue(strLit->getStringSlice(), type);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_GetShortStringAsArray:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto asArray = getShortStringAsArray(
+                    builder,
+                    strLit,
+                    as<IRBasicType>(as<IRArrayType>(inst->getDataType())->getElementType()));
+                inst->replaceUsesWith(asArray);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
             break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
@@ -429,6 +480,7 @@ struct PeepholeContext : InstPassBase
                 changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
+        case kIROp_GetElementFromString:
         case kIROp_GetElement:
             if (inst->getOperand(0)->getOp() == kIROp_MakeArray)
             {
@@ -495,6 +547,40 @@ struct PeepholeContext : InstPassBase
                 inst->getOperand(0)->getOp() == kIROp_MakeVectorFromScalar)
             {
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                auto index = as<IRIntLit>(as<IRGetElementBase>(inst)->getIndex());
+                if (index)
+                {
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+                    auto sv = strLit->getStringSlice();
+                    uint32_t c = 0;
+                    if (index->getValue() < sv.getLength())
+                    {
+                        c = sv[index->getValue()];
+                    }
+                    // else diagnose an out of bound error
+                    inst->replaceUsesWith(builder.getIntValue(inst->getDataType(), c));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            else if (inst->getOp() == kIROp_GetElementFromString)
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto getElement = builder.emitElementExtract(
+                    builder.getCharType(),
+                    inst->getOperand(0),
+                    inst->getOperand(1));
+                auto casted = builder.emitCast(inst->getDataType(), getElement);
+                inst->replaceUsesWith(casted);
                 maybeRemoveOldInst(inst);
                 changed = true;
             }

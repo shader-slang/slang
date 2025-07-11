@@ -1720,6 +1720,56 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 }
 
 //@public:
+__generic<T, let N:int>
+__magic_type(ArrayExpressionType)
+struct Array : IRWArray<T>
+{
+    __intrinsic_op($(kIROp_GetArrayLength))
+    int getCount();
+}
+
+//@public:
+__generic<int N>
+__magic_type(ShortStringType)
+__intrinsic_type($(kIROp_ShortStringType))
+struct ShortString : IArray<uint8_t>
+{
+    __intrinsic_op($(kIROp_GetArrayLength))
+    [__unsafeForceInlineEarly]
+    int getCount();
+
+    property uint length
+    {
+        [__unsafeForceInlineEarly] get { return (uint)getCount(); }
+    }
+
+    __intrinsic_op($(kIROp_GetShortStringAsArray))
+    [__unsafeForceInlineEarly]
+    Array<uint8_t, N> getArray();
+
+    [__unsafeForceInlineEarly] 
+    __intrinsic_op($(kIROp_GetElement))
+    internal uint8_t getElement(uint i);
+
+    [__unsafeForceInlineEarly] 
+    __intrinsic_op($(kIROp_GetElementFromString))
+    internal uint8_t getElementFromNativeString(uint i);
+
+    __subscript(uint i) -> uint8_t
+    {
+        [__unsafeForceInlineEarly] get
+        {
+            uint8_t res;
+            __target_switch
+            {
+                case cpp: res = getElementFromNativeString(i);
+                case cuda: res = getElementFromNativeString(i);
+                default: res = getElement(i);
+            }
+            return res;
+        }
+    }
+};
 
 /// Represents a string.
 /// This type can only be used on the CPU target.
@@ -1752,9 +1802,14 @@ struct String
     __init(double val);
 
     [require(cpp)]
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_StringToString))
     __intrinsic_op($(kIROp_MakeString))
     __init(NativeString value);
+
+    [__unsafeForceInlineEarly]
+    __implicit_conversion($(kConversionCost_StringToString))
+    __intrinsic_op($(kIROp_MakeString))
+    __init<int N>(ShortString<N> value);
 
     /// Returns the length of the string.
     [require(cpp)]
@@ -1795,9 +1850,13 @@ struct NativeString
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
-    __implicit_conversion($(kConversionCost_None))
+    __implicit_conversion($(kConversionCost_StringToString))
     __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
+
+    __implicit_conversion($(kConversionCost_StringToString ))
+    __intrinsic_op($(kIROp_GetNativeStr))
+    __init<int N>(ShortString<N> value);
 
     __init() { this = NativeString(""); }
 };
@@ -1880,14 +1939,6 @@ extension int16_t : IRangedValue
 {
     static const int16_t maxValue = 32767;
     static const int16_t minValue = -32768;
-}
-
-__generic<T, let N:int>
-__magic_type(ArrayExpressionType)
-struct Array : IRWArray<T>
-{
-    __intrinsic_op($(kIROp_GetArrayLength))
-    int getCount();
 }
 
 /// @category math_types Math types
@@ -3015,8 +3066,13 @@ void unmodified(out T){}
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
+[__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
-int getStringHash(String string);
+uint32_t getStringHash<int N>(ShortString<N> string);
+
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_GetStringHash))
+uint32_t getStringHash(String string);
 
 /// Use will produce a syntax error in downstream compiler
 /// Useful for testing diagnostics around compilation errors of downstream compiler

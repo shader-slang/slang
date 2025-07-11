@@ -2272,11 +2272,23 @@ struct IRFieldAddress : IRInst
 };
 
 FIDDLE()
-struct IRGetElement : IRInst
+struct IRGetElementBase : IRInst
 {
-    FIDDLE(leafInst())
+    FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
+};
+
+FIDDLE()
+struct IRGetElement : IRGetElementBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRGetElementFromString : IRGetElementBase
+{
+    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -3652,7 +3664,9 @@ public:
     IRInst* getIntValue(IRIntegerValue value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
-    IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRStringLit* getStringValue(
+        const UnownedStringSlice& slice,
+        IROp desiredType = kIROp_StringType);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
     IRPtrLit* getPtrValue(IRType* type, void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -3671,6 +3685,7 @@ public:
     IRBasicType* getUInt8Type();
     IRBasicType* getFloatType();
     IRBasicType* getCharType();
+    IRShortStringType* getShortStringType(IRIntLit* length);
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
     IRNativePtrType* getNativePtrType(IRType* valueType);
