@@ -8559,30 +8559,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugBaseType,
                 builder.getIntValue(builder.getUIntType(), kDebugTypeAtomicQualifier));
         }
-        else if (as<IRSamplerStateTypeBase>(type))
-        {
-            // Declare variables for debug location like struct handling does
-            IRInst* source = m_defaultDebugSource;
-            IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
-            IRInst* col = line;
-
-            // Emit a composite debug type for sampler types
-            return emitOpDebugTypeComposite(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                name,
-                builder.getIntValue(builder.getUIntType(), 1), // Class (1 = union/sampler)
-                source,
-                line,
-                col,
-                scope,
-                name,
-                builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
-                builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
-                List<SpvInst*>()); // No members
-        }
 
         // Fallback for texture types, raytracing types, and other composite types
         // Declare variables for debug location like struct handling does
@@ -8597,7 +8573,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
             name,
-            builder.getIntValue(builder.getUIntType(), 0), // Class (0 = struct)
+            builder.getIntValue(builder.getUIntType(), 0),
             source,
             line,
             col,
