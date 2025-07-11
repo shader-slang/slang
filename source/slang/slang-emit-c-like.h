@@ -228,16 +228,16 @@ public:
     /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_codeGenContext->getSink(); }
 
-    /// Diagnose a diagnostic only once per diagnostic ID and first parameter
+    /// Diagnose a diagnostic only once per diagnostic ID and all parameters
     template<typename... Args>
     void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
     {
-        // For diagnostics with parameters, we'll use the first parameter to create a unique key
-        // This prevents duplicate diagnostics for the same type but allows different types
+        // For diagnostics with parameters, we'll use all parameters to create a unique key
+        // This prevents duplicate diagnostics while allowing different parameter combinations
         if constexpr (sizeof...(args) > 0)
         {
-            auto firstArg = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
-            String key = String(diagnostic.id) + "|" + String(firstArg);
+            String key = String(diagnostic.id);
+            ((key = key + "|" + String(args)), ...); // Fold expression to append all args
             if (!m_reportedDiagnosticKeys.add(key))
                 return;
         }
@@ -775,7 +775,7 @@ protected:
     // Set of diagnostic IDs that have already been reported to prevent duplicates
     HashSet<int> m_reportedDiagnosticIds;
 
-    // Set of diagnostic keys (ID + first parameter) that have already been reported to prevent
+    // Set of diagnostic keys (ID + all parameters) that have already been reported to prevent
     // duplicates
     HashSet<String> m_reportedDiagnosticKeys;
 };
