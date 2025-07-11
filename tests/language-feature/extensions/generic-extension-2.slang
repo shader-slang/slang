@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+
+#pragma warning(disable:30856)
 interface IFoo<T>
 {
     T getFirst();    

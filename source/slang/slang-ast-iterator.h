@@ -133,6 +133,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
 
             dispatchIfNotNull(expr->functionExpr);
+            dispatchIfNotNull(expr->originalFunctionExpr);
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }

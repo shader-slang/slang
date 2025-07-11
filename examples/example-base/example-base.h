@@ -3,7 +3,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-io.h"
 #include "platform/window.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 #include "test-base.h"
 
 #ifdef _WIN32
@@ -23,6 +23,8 @@ void _Win32OutputDebugString(const char* str);
 #define EXAMPLE_MAIN(innerMain) PLATFORM_UI_MAIN(innerMain)
 #endif // _WIN32
 
+static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+
 struct WindowedAppBase : public TestBase
 {
 protected:
@@ -32,39 +34,31 @@ protected:
     uint32_t windowWidth;
     uint32_t windowHeight;
 
-    Slang::ComPtr<gfx::IDevice> gDevice;
+    Slang::ComPtr<rhi::IDevice> gDevice;
+    Slang::ComPtr<rhi::ICommandQueue> gQueue;
+    Slang::ComPtr<rhi::ISurface> gSurface;
 
-    Slang::ComPtr<gfx::ISwapchain> gSwapchain;
-    Slang::ComPtr<gfx::IFramebufferLayout> gFramebufferLayout;
-    Slang::List<Slang::ComPtr<gfx::IFramebuffer>> gFramebuffers;
-    Slang::List<Slang::ComPtr<gfx::ITransientResourceHeap>> gTransientHeaps;
-    Slang::ComPtr<gfx::IRenderPassLayout> gRenderPass;
-    Slang::ComPtr<gfx::ICommandQueue> gQueue;
+    Slang::List<Slang::ComPtr<rhi::ITexture>> gOfflineTextures;
 
     Slang::Result initializeBase(
         const char* title,
         int width,
         int height,
-        gfx::DeviceType deviceType = gfx::DeviceType::Default);
-
-    void createFramebuffers(
-        uint32_t width,
-        uint32_t height,
-        gfx::Format colorFormat,
-        uint32_t frameBufferCount);
-    void createSwapchainFramebuffers();
-    void createOfflineFramebuffers();
+        rhi::DeviceType deviceType = rhi::DeviceType::Default);
 
     void mainLoop();
 
-    Slang::ComPtr<gfx::IResourceView> createTextureFromFile(
+    Slang::ComPtr<rhi::ITextureView> createTextureFromFile(
         Slang::String fileName,
         int& textureWidth,
         int& textureHeight);
+
+    void createOfflineTextures();
+
     virtual void windowSizeChanged();
 
 protected:
-    virtual void renderFrame(int framebufferIndex) = 0;
+    virtual void renderFrame(rhi::ITexture* texture) = 0;
 
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
@@ -136,13 +130,9 @@ inline void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
     }
 }
 
-void initDebugCallback();
-
 template<typename TApp>
 int innerMain(int argc, char** argv)
 {
-    initDebugCallback();
-
     TApp app;
 
     app.parseOption(argc, argv);

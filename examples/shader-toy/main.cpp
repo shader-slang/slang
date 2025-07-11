@@ -21,16 +21,16 @@ using Slang::ComPtr;
 //
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/performance-counter.h"
 #include "platform/window.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 
 #include <chrono>
 
 static const ExampleResources resourceBase("shader-toy");
 
-using namespace gfx;
+using namespace rhi;
 
 // In order to display a shader toy effect using rasterization-based shader
 // execution we need to render a full-screen triangle. We will define a
@@ -83,15 +83,15 @@ struct ShaderToyApp : public WindowedAppBase
     // The main interesting part of the host application code is where we
     // load, compile, inspect, and compose the Slang shader code.
     //
-    Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outShaderProgram)
+    Result loadShaderProgram(IDevice* device, ComPtr<IShaderProgram>& outShaderProgram)
     {
         // We need to obatin a compilation session (`slang::ISession`) that will provide
         // a scope to all the compilation and loading of code we do.
         //
-        // Our example application uses the `gfx` graphics API abstraction layer, which already
-        // creates a Slang compilation session for us, so we just grab and use it here.
+        // Our example application uses the `slang-rhi` graphics API abstraction layer, which
+        // already creates a Slang compilation session for us, so we just grab and use it here.
         ComPtr<slang::ISession> slangSession;
-        SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+        slangSession = device->getSlangSession();
 
         // Once the session has been obtained, we can start loading code into it.
         //
@@ -269,16 +269,17 @@ struct ShaderToyApp : public WindowedAppBase
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
 
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram.get();
-        auto shaderProgram = device->createProgram(programDesc);
+        auto shaderProgram = device->createShaderProgram(programDesc);
         outShaderProgram = shaderProgram;
         return SLANG_OK;
     }
 
     ComPtr<IShaderProgram> gShaderProgram;
-    ComPtr<gfx::IPipelineState> gPipelineState;
-    ComPtr<gfx::IBufferResource> gVertexBuffer;
+    ComPtr<IPipeline> gPipeline;
+    ComPtr<IBuffer> gVertexBuffer;
+    const Format format = Format::RG32Float;
 
     Result initialize()
     {
@@ -296,7 +297,7 @@ struct ShaderToyApp : public WindowedAppBase
         }
 
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position)},
+            {"POSITION", 0, format, offsetof(FullScreenTriangle::Vertex, position)},
         };
         auto inputLayout = gDevice->createInputLayout(
             sizeof(FullScreenTriangle::Vertex),
@@ -305,28 +306,31 @@ struct ShaderToyApp : public WindowedAppBase
         if (!inputLayout)
             return SLANG_FAIL;
 
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes =
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.size =
             FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex);
-        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        gVertexBuffer =
-            gDevice->createBufferResource(vertexBufferDesc, &FullScreenTriangle::kVertices[0]);
+        vertexBufferDesc.elementSize = sizeof(FullScreenTriangle::Vertex);
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        gVertexBuffer = gDevice->createBuffer(vertexBufferDesc, &FullScreenTriangle::kVertices[0]);
         if (!gVertexBuffer)
             return SLANG_FAIL;
 
         SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, gShaderProgram));
 
         // Create pipeline.
-        GraphicsPipelineStateDesc desc;
+        ColorTargetDesc colorTarget;
+        colorTarget.format = Format::RGBA8Unorm;
+        RenderPipelineDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = gShaderProgram;
-        desc.framebufferLayout = gFramebufferLayout;
-        auto pipelineState = gDevice->createGraphicsPipelineState(desc);
-        if (!pipelineState)
+        desc.targetCount = 1;
+        desc.targets = &colorTarget;
+        desc.depthStencil.depthTestEnable = false;
+        desc.depthStencil.depthWriteEnable = false;
+        desc.primitiveTopology = PrimitiveTopology::TriangleList;
+        gPipeline = gDevice->createRenderPipeline(desc);
+        if (!gPipeline)
             return SLANG_FAIL;
-
-        gPipelineState = pipelineState;
 
         return SLANG_OK;
     }
@@ -341,9 +345,9 @@ struct ShaderToyApp : public WindowedAppBase
     bool firstTime = true;
     platform::TimePoint startTime;
 
-    virtual void renderFrame(int frameIndex) override
+    virtual void renderFrame(ITexture* texture) override
     {
-        auto commandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
+        auto commandEncoder = gQueue->createCommandEncoder();
         if (firstTime)
         {
             startTime = platform::PerformanceCounter::now();
@@ -373,29 +377,43 @@ struct ShaderToyApp : public WindowedAppBase
         }
 
         // Encode render commands.
-        auto encoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
+        ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = textureView;
+        colorAttachment.loadOp = LoadOp::Clear;
 
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)windowWidth;
-        viewport.extentY = (float)windowHeight;
-        encoder->setViewportAndScissor(viewport);
-        auto rootObject = encoder->bindPipeline(gPipelineState);
+        RenderPassDesc renderPass = {};
+        renderPass.colorAttachments = &colorAttachment;
+        renderPass.colorAttachmentCount = 1;
+
+        auto encoder = commandEncoder->beginRenderPass(renderPass);
+
+        RenderState renderState = {};
+        renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+        renderState.scissorRectCount = 1;
+
+        auto rootObject = encoder->bindPipeline(static_cast<IRenderPipeline*>(gPipeline.get()));
         auto constantBuffer = rootObject->getObject(ShaderOffset());
         constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
 
-        encoder->setVertexBuffer(0, gVertexBuffer);
-        encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-        encoder->draw(3);
-        encoder->endEncoding();
-        commandBuffer->close();
+        renderState.vertexBuffers[0] = gVertexBuffer;
+        renderState.vertexBufferCount = 1;
+        encoder->setRenderState(renderState);
 
-        gQueue->executeCommandBuffer(commandBuffer);
+        DrawArguments drawArgs = {};
+        drawArgs.vertexCount = 3;
+        encoder->draw(drawArgs);
 
-        // We may not have a swapchain if we're running in test mode
-        SLANG_ASSERT(isTestMode() || gSwapchain);
-        if (gSwapchain)
-            gSwapchain->present();
+        encoder->end();
+
+        gQueue->submit(commandEncoder->finish());
+
+        if (!isTestMode())
+        {
+            gSurface->present();
+        }
     }
 
     void handleEvent(const platform::MouseEventArgs& event)

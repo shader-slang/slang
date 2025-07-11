@@ -1,10 +1,10 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -14,47 +14,37 @@ void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContex
     // handle using dstDevice. Read back the buffer and check that its contents are correct.
     const int numberCount = 4;
     float initialData[] = {0.0f, 1.0f, 2.0f, 3.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopySource | BufferUsage::CopyDestination | BufferUsage::Shared;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
-    bufferDesc.isShared = true;
 
-    ComPtr<IBufferResource> srcBuffer;
+    ComPtr<IBuffer> srcBuffer;
     GFX_CHECK_CALL_ABORT(
-        srcDevice->createBufferResource(bufferDesc, (void*)initialData, srcBuffer.writeRef()));
+        srcDevice->createBuffer(bufferDesc, (void*)initialData, srcBuffer.writeRef()));
 
-    InteropHandle sharedHandle;
+    NativeHandle sharedHandle;
     GFX_CHECK_CALL_ABORT(srcBuffer->getSharedHandle(&sharedHandle));
-    ComPtr<IBufferResource> dstBuffer;
+    ComPtr<IBuffer> dstBuffer;
     GFX_CHECK_CALL_ABORT(
         dstDevice->createBufferFromSharedHandle(sharedHandle, bufferDesc, dstBuffer.writeRef()));
     // Reading back the buffer from srcDevice to make sure it's been filled in before reading
     // anything back from dstDevice
     // TODO: Implement actual synchronization (and not this hacky solution)
-    compareComputeResult(srcDevice, srcBuffer, Slang::makeArray<float>(0.0f, 1.0f, 2.0f, 3.0f));
+    compareComputeResult(srcDevice, srcBuffer, std::array{0.0f, 1.0f, 2.0f, 3.0f});
 
-    InteropHandle testHandle;
-    GFX_CHECK_CALL_ABORT(dstBuffer->getNativeResourceHandle(&testHandle));
-    IBufferResource::Desc* testDesc = dstBuffer->getDesc();
-    SLANG_CHECK(testDesc->elementSize == sizeof(float));
-    SLANG_CHECK(testDesc->sizeInBytes == numberCount * sizeof(float));
-    compareComputeResult(dstDevice, dstBuffer, Slang::makeArray<float>(0.0f, 1.0f, 2.0f, 3.0f));
+    NativeHandle testHandle;
+    GFX_CHECK_CALL_ABORT(dstBuffer->getNativeHandle(&testHandle));
+    const BufferDesc& testDesc = dstBuffer->getDesc();
+    SLANG_CHECK(testDesc.elementSize == sizeof(float));
+    SLANG_CHECK(testDesc.size == numberCount * sizeof(float));
+    compareComputeResult(dstDevice, dstBuffer, std::array{0.0f, 1.0f, 2.0f, 3.0f});
 
     // Check that dstBuffer can be successfully used in a compute dispatch using dstDevice.
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        dstDevice->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -64,46 +54,31 @@ void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContex
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        dstDevice->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> pipelineState;
+    GFX_CHECK_CALL_ABORT(dstDevice->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        dstDevice->createBufferView(dstBuffer, nullptr, viewDesc, bufferView.writeRef()));
+    auto queue = dstDevice->getQueue(QueueType::Graphics);
+    auto commandEncoder = queue->createCommandEncoder();
+    auto computePassEncoder = commandEncoder->beginComputePass();
 
-    {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = dstDevice->createCommandQueue(queueDesc);
+    auto rootObject = computePassEncoder->bindPipeline(pipelineState);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+    ShaderCursor rootCursor(rootObject);
+    // Bind buffer to the entry point.
+    rootCursor.getPath("buffer").setBinding(Binding(dstBuffer));
 
-        auto rootObject = encoder->bindPipeline(pipelineState);
+    computePassEncoder->dispatchCompute(1, 1, 1);
+    computePassEncoder->end();
+    auto commandBuffer = commandEncoder->finish();
+    queue->submit(commandBuffer);
+    queue->waitOnHost();
 
-        ShaderCursor rootCursor(rootObject);
-        // Bind buffer view to the entry point.
-        rootCursor.getPath("buffer").setResource(bufferView);
-
-        encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
-        queue->waitOnHost();
-    }
-
-    compareComputeResult(dstDevice, dstBuffer, Slang::makeArray<float>(1.0f, 2.0f, 3.0f, 4.0f));
+    compareComputeResult(dstDevice, dstBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
-void sharedBufferTestAPI(
-    UnitTestContext* context,
-    Slang::RenderApiFlag::Enum srcApi,
-    Slang::RenderApiFlag::Enum dstApi)
+void sharedBufferTestAPI(UnitTestContext* context, DeviceType srcApi, DeviceType dstApi)
 {
     auto srcDevice = createTestingDevice(context, srcApi);
     auto dstDevice = createTestingDevice(context, dstApi);
@@ -117,12 +92,12 @@ void sharedBufferTestAPI(
 #if SLANG_WIN64
 SLANG_UNIT_TEST(sharedBufferD3D12ToCUDA)
 {
-    sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
+    sharedBufferTestAPI(unitTestContext, DeviceType::D3D12, DeviceType::CUDA);
 }
 
 SLANG_UNIT_TEST(sharedBufferVulkanToCUDA)
 {
-    sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
+    sharedBufferTestAPI(unitTestContext, DeviceType::Vulkan, DeviceType::CUDA);
 }
 #endif
 } // namespace gfx_test

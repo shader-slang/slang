@@ -1,34 +1,36 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
-Slang::ComPtr<IBufferResource> createBuffer(
-    IDevice* device,
-    uint32_t data,
-    ResourceState defaultState)
+Slang::ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t data, ResourceState defaultState)
 {
     uint32_t initialData[] = {data, data, data, data};
     const int numberCount = SLANG_COUNT_OF(initialData);
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = sizeof(initialData);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = sizeof(initialData);
+    bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(uint32_t) * 4;
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
     bufferDesc.defaultState = defaultState;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    // Set appropriate usage flags based on the default state
+    if (defaultState == ResourceState::ShaderResource)
+    {
+        bufferDesc.usage = BufferUsage::ShaderResource;
+    }
+    else if (defaultState == ResourceState::UnorderedAccess)
+    {
+        bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    }
+
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
     return numbersBuffer;
 }
 
@@ -39,12 +41,6 @@ struct uint4
 
 void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -54,57 +50,38 @@ void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<rhi::IComputePipeline> pipeline;
+    pipeline = device->createComputePipeline(pipelineDesc);
 
     ComPtr<IShaderObject> shaderObject;
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        device->createMutableRootShaderObject(shaderProgram, shaderObject.writeRef())));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(device->createRootShaderObject(shaderProgram, shaderObject.writeRef())));
 
-    Slang::List<Slang::ComPtr<IBufferResource>> srvBuffers;
-    Slang::List<Slang::ComPtr<IResourceView>> srvs;
+    Slang::List<Slang::ComPtr<IBuffer>> srvBuffers;
 
     for (uint32_t i = 0; i < 6; i++)
     {
-        srvBuffers.add(createBuffer(device, i, gfx::ResourceState::ShaderResource));
-        IResourceView::Desc srvDesc = {};
-        srvDesc.type = IResourceView::Type::ShaderResource;
-        srvDesc.format = Format::Unknown;
-        srvDesc.bufferRange.offset = 0;
-        srvDesc.bufferRange.size = sizeof(uint32_t) * 4;
-        srvs.add(device->createBufferView(srvBuffers[i], nullptr, srvDesc));
+        srvBuffers.add(createBuffer(device, i, rhi::ResourceState::ShaderResource));
     }
-    Slang::ComPtr<IBufferResource> resultBuffer =
-        createBuffer(device, 0, gfx::ResourceState::UnorderedAccess);
-    IResourceView::Desc resultBufferViewDesc = {};
-    resultBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
-    resultBufferViewDesc.format = Format::Unknown;
-    resultBufferViewDesc.bufferRange.offset = 0;
-    resultBufferViewDesc.bufferRange.size = sizeof(uint32_t) * 4;
-    Slang::ComPtr<IResourceView> resultBufferView;
-    SLANG_CHECK(SLANG_SUCCEEDED(device->createBufferView(
-        resultBuffer,
-        nullptr,
-        resultBufferViewDesc,
-        resultBufferView.writeRef())));
+    Slang::ComPtr<IBuffer> resultBuffer =
+        createBuffer(device, 0, rhi::ResourceState::UnorderedAccess);
 
     Slang::ComPtr<IShaderObject> materialObject;
-    SLANG_CHECK(SLANG_SUCCEEDED(device->createMutableShaderObject(
+    SLANG_CHECK(SLANG_SUCCEEDED(device->createShaderObject(
         slangReflection->findTypeByName("MaterialSystem"),
         ShaderObjectContainerType::None,
         materialObject.writeRef())));
 
     Slang::ComPtr<IShaderObject> sceneObject;
-    SLANG_CHECK(SLANG_SUCCEEDED(device->createMutableShaderObject(
+    SLANG_CHECK(SLANG_SUCCEEDED(device->createShaderObject(
         slangReflection->findTypeByName("Scene"),
         ShaderObjectContainerType::None,
         sceneObject.writeRef())));
 
     ShaderCursor cursor(shaderObject);
-    cursor["resultBuffer"].setResource(resultBufferView);
+    cursor["resultBuffer"].setBinding(Binding(resultBuffer));
     cursor["scene"].setObject(sceneObject);
 
     Slang::ComPtr<IShaderObject> globalCB;
@@ -119,44 +96,39 @@ void nestedParameterBlockTestImpl(IDevice* device, UnitTestContext* context)
 
     ShaderCursor sceneCursor(sceneObject);
     sceneCursor["sceneCb"].setData(uint4{100, 100, 100, 100});
-    sceneCursor["data"].setResource(srvs[1]);
+    sceneCursor["data"].setBinding(Binding(srvBuffers[1]));
     sceneCursor["material"].setObject(materialObject);
 
     ShaderCursor materialCursor(materialObject);
     materialCursor["cb"].setData(uint4{1000, 1000, 1000, 1000});
-    materialCursor["data"].setResource(srvs[2]);
+    materialCursor["data"].setBinding(Binding(srvBuffers[2]));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+        auto commandEncoder = queue->createCommandEncoder();
+        auto encoder = commandEncoder->beginComputePass();
 
-        encoder->bindPipelineWithRootObject(pipelineState, shaderObject);
+        encoder->bindPipeline(pipeline, shaderObject);
 
         encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        encoder->end();
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
     }
 
-    compareComputeResult(
-        device,
-        resultBuffer,
-        Slang::makeArray<uint32_t>(1123u, 1123u, 1123u, 1123u));
+    compareComputeResult(device, resultBuffer, std::array{1123u, 1123u, 1123u, 1123u});
 }
 
 SLANG_UNIT_TEST(nestedParameterBlockTestD3D12)
 {
-    runTestImpl(nestedParameterBlockTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(nestedParameterBlockTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(nestedParameterBlockTestVulkan)
 {
-    runTestImpl(nestedParameterBlockTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(nestedParameterBlockTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test

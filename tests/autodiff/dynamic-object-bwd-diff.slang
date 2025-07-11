@@ -26,7 +26,9 @@ struct C : IInterface2
 struct A : IInterface
 {
     float a;
+
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));
@@ -37,7 +39,9 @@ struct A : IInterface
 struct B : IInterface
 {
     float a;
+
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));

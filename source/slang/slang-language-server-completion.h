@@ -56,6 +56,8 @@ struct CompletionContext
         Index fileNameStartPos,
         bool isImportString);
 
+    List<Type*> getExpectedTypesAtCompletion(const List<ASTLookupResult>& astNodes);
+    Index determineCompletionItemSortOrder(Decl* item, const List<Type*>& expectedTypes);
 
     CompletionResult collectMembersAndSymbols();
     String formatDeclForCompletion(

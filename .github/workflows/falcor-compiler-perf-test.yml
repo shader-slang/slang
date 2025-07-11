@@ -25,7 +25,7 @@ concurrency:
 jobs:
   build:
     timeout-minutes: 100
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +66,7 @@ jobs:
             -DSLANG_ENABLE_CUDA=1
           cmake --workflow --preset "${{matrix.config}}"
 
-      - uses: robinraju/release-downloader@v1.11
+      - uses: robinraju/release-downloader@v1.12
         id: download
         with:
           # The source repository path.
@@ -83,13 +83,10 @@ jobs:
           # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
           fileName: "falcor_perf_test-*-win-64.zip"
 
-          # Download the attached zipball (*.zip)
-          zipBall: true
-
           # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
           # It will create the target directory automatically if not present
           # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
-          out-file-path: "./falcor-perf-test"
+          out-file-path: "falcor-perf-test"
 
           # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
           # extract ourselves.
@@ -98,7 +95,24 @@ jobs:
       - name: run falcor-compiler-perf-test
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
+          # Check if the downloaded file exists
+          if (-not (Test-Path $filename)) {
+            Write-Error "Downloaded file not found: $filename"
+            exit 1
+          }
           Expand-Archive $filename -DestinationPath .\falcor-perf-test
           $env:PATH = ".\build\${{matrix.config}}\bin;" + $env:PATH
-          .\falcor-perf-test\bin\Release\falcor_perftest.exe
+
+          # View current PATH
+          Write-Host "PATH is $env:PATH"
+
+          # Run the executable and check exit code
+          Write-Host "Running falcor performance test..."
+          & .\falcor-perf-test\bin\Release\falcor_perftest.exe
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "falcor_perftest.exe failed with exit code: $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          Write-Host "falcor performance test completed successfully"

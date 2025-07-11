@@ -1,12 +1,15 @@
-#include "core/slang-basic.h"
+#if 0
+
+// Duplicated: This test is similar to slang-rhi\tests\test-surface.cpp
+
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/window.h"
-#include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
-using namespace Slang;
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
+
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -17,7 +20,6 @@ struct Vertex
 
 static const int kVertexCount = 3;
 static const Vertex kVertexData[kVertexCount] = {
-    // Triangle 1
     {0, 0, 1},
     {4, 0, 1},
     {0, 4, 1},
@@ -28,22 +30,22 @@ struct SwapchainResizeTest
     IDevice* device;
     UnitTestContext* context;
 
-    RefPtr<platform::Window> window;
+    ComPtr<platform::Window> window;
     ComPtr<ICommandQueue> queue;
-    ComPtr<ISwapchain> swapchain;
+    ComPtr<ISurface> surface;
 
-    ComPtr<ITransientResourceHeap> transientHeap;
-    ComPtr<gfx::IFramebufferLayout> framebufferLayout;
-    ComPtr<IPipelineState> pipelineState;
-    ComPtr<IRenderPassLayout> renderPass;
-    List<ComPtr<IFramebuffer>> framebuffers;
+    ComPtr<ITexture> swapchainImages[2];
+    uint32_t swapchainImageCount = 2;
+    Format desiredFormat = Format::RGBA8Unorm;
 
-    ComPtr<IBufferResource> vertexBuffer;
+    ComPtr<IBuffer> vertexBuffer;
+    ComPtr<IInputLayout> inputLayout;
+    ComPtr<IRenderPipeline> pipeline;
+    ComPtr<IShaderProgram> shaderProgram;
+    ComPtr<IShaderObject> rootShaderObject;
 
-    GfxCount width = 500;
-    GfxCount height = 500;
-    static const int kSwapchainImageCount = 2;
-    const Format desiredFormat = Format::R8G8B8A8_UNORM;
+    uint32_t width = 500;
+    uint32_t height = 500;
 
     void init(IDevice* device, UnitTestContext* context)
     {
@@ -51,38 +53,10 @@ struct SwapchainResizeTest
         this->context = context;
     }
 
-    void createSwapchainFramebuffers()
+    void createSwapchainAndResources()
     {
-        framebuffers.clear();
-        for (GfxIndex i = 0; i < kSwapchainImageCount; ++i)
-        {
-            ComPtr<ITextureResource> colorBuffer;
-            swapchain->getImage(i, colorBuffer.writeRef());
-
-            gfx::IResourceView::Desc colorBufferViewDesc;
-            memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-            colorBufferViewDesc.format = swapchain->getDesc().format;
-            colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-            colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-            auto rtv = device->createTextureView(colorBuffer.get(), colorBufferViewDesc);
-
-            gfx::IFramebuffer::Desc framebufferDesc;
-            framebufferDesc.renderTargetCount = 1;
-            framebufferDesc.depthStencilView = nullptr;
-            framebufferDesc.renderTargetViews = rtv.readRef();
-            framebufferDesc.layout = framebufferLayout;
-            ComPtr<IFramebuffer> framebuffer;
-            GFX_CHECK_CALL_ABORT(
-                device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
-
-            framebuffers.add(framebuffer);
-        }
-    }
-
-    void createRequiredResources()
-    {
+        // Create window
         platform::Application::init();
-
         platform::WindowDesc windowDesc;
         windowDesc.title = "";
         windowDesc.width = width;
@@ -90,140 +64,141 @@ struct SwapchainResizeTest
         windowDesc.style = platform::WindowStyle::Default;
         window = platform::Application::createWindow(windowDesc);
 
-        ICommandQueue::Desc queueDesc = {};
-        queueDesc.type = ICommandQueue::QueueType::Graphics;
-        queue = device->createCommandQueue(queueDesc);
+        // Create surface
+        WindowHandle windowHandle = WindowHandle::fromHwnd((void*)window->getNativeHandle().handleValues[0]);
+        surface = device->createSurface(windowHandle);
 
-        ISwapchain::Desc swapchainDesc = {};
-        swapchainDesc.format = desiredFormat;
-        swapchainDesc.width = width;
-        swapchainDesc.height = height;
-        swapchainDesc.imageCount = kSwapchainImageCount;
-        swapchainDesc.queue = queue;
-        WindowHandle windowHandle = window->getNativeHandle().convert<WindowHandle>();
-        auto createSwapchainResult =
-            device->createSwapchain(swapchainDesc, windowHandle, swapchain.writeRef());
-        if (SLANG_FAILED(createSwapchainResult))
-        {
-            SLANG_IGNORE_TEST;
-        }
+        // Configure surface (swapchain)
+        SurfaceConfig config = {};
+        config.format = desiredFormat;
+        config.width = width;
+        config.height = height;
+        config.desiredImageCount = swapchainImageCount;
+        config.vsync = true;
+        surface->configure(config);
 
+        // Create vertex buffer
+        BufferDesc vertexBufferDesc = {};
+        vertexBufferDesc.size = sizeof(Vertex) * kVertexCount;
+        vertexBufferDesc.memoryType = MemoryType::DeviceLocal;
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+        vertexBuffer = device->createBuffer(vertexBufferDesc, kVertexData);
+
+        // Input layout
+        InputElementDesc inputElements[] = {
+            {"POSITIONA", 0, Format::RGB32Float, offsetof(Vertex, position), 0},
+        };
         VertexStreamDesc vertexStreams[] = {
             {sizeof(Vertex), InputSlotClass::PerVertex, 0},
         };
-
-        InputElementDesc inputElements[] = {
-            // Vertex buffer data
-            {"POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0},
-        };
-        IInputLayout::Desc inputLayoutDesc = {};
-        inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+        InputLayoutDesc inputLayoutDesc = {};
+        inputLayoutDesc.inputElementCount = sizeof(inputElements) / sizeof(InputElementDesc);
         inputLayoutDesc.inputElements = inputElements;
-        inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+        inputLayoutDesc.vertexStreamCount = sizeof(vertexStreams) / sizeof(VertexStreamDesc);;
         inputLayoutDesc.vertexStreams = vertexStreams;
-        auto inputLayout = device->createInputLayout(inputLayoutDesc);
-        SLANG_CHECK_ABORT(inputLayout != nullptr);
 
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
-        SLANG_CHECK_ABORT(vertexBuffer != nullptr);
-
-        ITransientResourceHeap::Desc transientHeapDesc = {};
-        transientHeapDesc.constantBufferSize = 4096 * 1024;
-        GFX_CHECK_CALL_ABORT(
-            device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+        GFX_CHECK_CALL_ABORT(device->createInputLayout(inputLayoutDesc, inputLayout.writeRef()));
 
         ComPtr<IShaderProgram> shaderProgram;
-        slang::ProgramLayout* slangReflection;
+        slang::ProgramLayout* slangReflection = nullptr;
         GFX_CHECK_CALL_ABORT(loadGraphicsProgram(
             device,
             shaderProgram,
             "swapchain-shader",
             "vertexMain",
             "fragmentMain",
-            slangReflection));
+            slangReflection
+        ));
 
-        IFramebufferLayout::TargetLayout targetLayout;
-        targetLayout.format = swapchain->getDesc().format;
-        targetLayout.sampleCount = 1;
 
-        IFramebufferLayout::Desc framebufferLayoutDesc;
-        framebufferLayoutDesc.renderTargetCount = 1;
-        framebufferLayoutDesc.renderTargets = &targetLayout;
-        framebufferLayout = device->createFramebufferLayout(framebufferLayoutDesc);
-        SLANG_CHECK_ABORT(framebufferLayout != nullptr);
-
-        GraphicsPipelineStateDesc pipelineDesc = {};
+        // Pipeline
+        ColorTargetDesc colorTarget = {};
+        colorTarget.format = desiredFormat;
+        RenderPipelineDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
-        pipelineDesc.inputLayout = inputLayout;
-        pipelineDesc.framebufferLayout = framebufferLayout;
-        pipelineDesc.depthStencil.depthTestEnable = false;
-        pipelineDesc.depthStencil.depthWriteEnable = false;
-        GFX_CHECK_CALL_ABORT(
-            device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
-
-        IRenderPassLayout::Desc renderPassDesc = {};
-        renderPassDesc.framebufferLayout = framebufferLayout;
-        renderPassDesc.renderTargetCount = 1;
-        IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
-        renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-        renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-        renderTargetAccess.initialState = ResourceState::Undefined;
-        renderTargetAccess.finalState = ResourceState::Present;
-        renderPassDesc.renderTargetAccess = &renderTargetAccess;
-        GFX_CHECK_CALL_ABORT(device->createRenderPassLayout(renderPassDesc, renderPass.writeRef()));
-
-        createSwapchainFramebuffers();
+        pipelineDesc.inputLayout = inputLayout.get();
+        pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
+        pipelineDesc.targets = &colorTarget;
+        pipelineDesc.targetCount = 1;
+        pipeline = device->createRenderPipeline(pipelineDesc);
     }
 
-    void renderFrame(GfxIndex framebufferIndex)
-    {
-        auto commandBuffer = transientHeap->createCommandBuffer();
+    void renderFrame(uint32_t imageIndex)  
+    {  
+        // Acquire next image  
+        ComPtr<ITexture> backBuffer;  
+        if (SLANG_FAILED(surface->acquireNextImage(backBuffer.writeRef())))  
+        {  
+            return;  
+        }  
 
-        auto encoder =
-            commandBuffer->encodeRenderCommands(renderPass, framebuffers[framebufferIndex]);
-        auto rootObject = encoder->bindPipeline(pipelineState);
+        // Create command encoder  
+        ComPtr<ICommandQueue> queue = device->getQueue(QueueType::Graphics);  
+        ComPtr<ICommandEncoder> encoder = queue->createCommandEncoder();  
 
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)width;
-        viewport.extentY = (float)height;
-        encoder->setViewportAndScissor(viewport);
+        // Render pass setup  
+        RenderPassColorAttachment colorAttachment = {};  
+        colorAttachment.view = backBuffer->getDefaultView();  
+        colorAttachment.loadOp = LoadOp::Clear;  
+        colorAttachment.storeOp = StoreOp::Store;  
+        float clearColor[4] = {0.2f, 0.2f, 0.2f, 1.0f};  
+        memcpy(colorAttachment.clearValue, clearColor, sizeof(clearColor));  
+        RenderPassDesc passDesc = {};  
+        passDesc.colorAttachments = &colorAttachment;  
+        passDesc.colorAttachmentCount = 1;  
 
-        encoder->setVertexBuffer(0, vertexBuffer);
-        encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+        // Begin render pass  
+        auto pass = encoder->beginRenderPass(passDesc);  
 
-        swapchain->acquireNextImage();
-        encoder->draw(kVertexCount);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
-        swapchain->present();
+        // Bind pipeline and root object  
+        pass->bindPipeline(pipeline, rootShaderObject);  
+
+        // Set render state  
+        RenderState state = {};  
+        state.vertexBuffers[0] = BufferOffsetPair(vertexBuffer, 0);  
+        state.vertexBufferCount = 1;  
+        // Set viewport  
+        Viewport viewport = Viewport::fromSize((float)width, (float)height);  
+        state.viewportCount = 1;
+        state.viewports[0] = viewport;
+
+        pass->setRenderState(state);  
+
+        // Draw  
+        DrawArguments args = {};  
+        args.vertexCount = kVertexCount;  
+        pass->draw(args);  
+
+        pass->end();  
+        ComPtr<ICommandBuffer> cmdBuffer;  
+        encoder->finish(cmdBuffer.writeRef());  
+        queue->submit(cmdBuffer);  
+
+        // Present  
+        surface->present();  
     }
 
     void run()
     {
-        createRequiredResources();
-        // Render for 5 frames then resize the swapchain and render for another 5 frames to ensure
-        // the swapchain remains usable after resizing.
-        for (GfxIndex i = 0; i < 5; ++i)
+        createSwapchainAndResources();
+        for (uint32_t i = 0; i < 5; ++i)
         {
-            renderFrame(i % kSwapchainImageCount);
+            renderFrame(i % swapchainImageCount);
         }
         queue->waitOnHost();
 
-        framebuffers = decltype(framebuffers)();
-        GFX_CHECK_CALL(swapchain->resize(700, 700));
-        createSwapchainFramebuffers();
+        // Resize swapchain
         width = 700;
         height = 700;
+        SurfaceConfig config = surface->getConfig();
+        config.width = width;
+        config.height = height;
+        surface->configure(config);
 
-        for (GfxIndex i = 0; i < 5; ++i)
+        for (uint32_t i = 0; i < 5; ++i)
         {
-            renderFrame(i % kSwapchainImageCount);
+            renderFrame(i % swapchainImageCount);
         }
         queue->waitOnHost();
     }
@@ -238,12 +213,14 @@ void swapchainResizeTestImpl(IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(swapchainResizeD3D12)
 {
-    runTestImpl(swapchainResizeTestImpl, unitTestContext, RenderApiFlag::D3D12);
+    runTestImpl(swapchainResizeTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(swapchainResizeVulkan)
 {
-    runTestImpl(swapchainResizeTestImpl, unitTestContext, RenderApiFlag::Vulkan);
+    runTestImpl(swapchainResizeTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test
+
+#endif

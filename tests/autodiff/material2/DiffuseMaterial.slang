@@ -16,6 +16,7 @@ public struct DiffuseMaterial : IMaterial
     }
 
     [BackwardDifferentiable]
+    [NoDiffThis]
     public DiffuseMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);

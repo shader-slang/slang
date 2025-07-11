@@ -1185,8 +1185,15 @@ bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFor
     if (name.endsWith(kSNorm))
     {
         StringBuilder buf;
-        //  format names end with snormal after a '_', so replace with that
-        buf << name.head(name.getLength() - kSNorm.getLength()) << "_" << kSNorm;
+        auto prefix = name.head(name.getLength() - kSNorm.getLength());
+        buf << prefix;
+        // format names end with snormal after a '_', so add an underscore
+        // if the prefix doesn't already end with one
+        if (prefix.getLength() == 0 || prefix[prefix.getLength() - 1] != '_')
+        {
+            buf << "_";
+        }
+        buf << kSNorm;
         return findImageFormatByName(buf.getUnownedSlice(), outFormat);
     }
 

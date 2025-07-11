@@ -1054,6 +1054,11 @@ DIAGNOSTIC(
     Error,
     throwTypeIncompatibleWithErrorType,
     "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+DIAGNOSTIC(
+    30117,
+    Error,
+    forwardReferenceInGenericConstraint,
+    "generic constraint for parameter '$0' references type parameter '$1' before it is declared")
 
 // Include
 DIAGNOSTIC(
@@ -1394,6 +1399,15 @@ DIAGNOSTIC(
     primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
     "primal substitute function for differentiable method must also be differentiable. Use "
     "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
+DIAGNOSTIC(
+    31159,
+    Warning,
+    noDerivativeOnNonDifferentiableThisType,
+    "There is no derivative calculated for member '$0' because the parent struct is not "
+    "differentiable. "
+    "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
+    "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
+    "derivatives.")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
@@ -1633,6 +1647,11 @@ DIAGNOSTIC(
     requiredConstraintIsNotChecked,
     "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
     "usage.")
+DIAGNOSTIC(
+    30404,
+    Error,
+    invalidEqualityConstraintSupType,
+    "type '$0' is not a proper type to use in a generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -1776,7 +1795,17 @@ DIAGNOSTIC(
     Error,
     overrideModifierNotOverridingBaseDecl,
     "'$0' marked as 'override' is not overriding any base declarations.")
-
+DIAGNOSTIC(
+    30855,
+    Error,
+    unreferencedGenericParamInExtension,
+    "generic parameter '$0' is not referenced by extension target type '$1'.")
+DIAGNOSTIC(
+    30856,
+    Warning,
+    genericParamInExtensionNotReferencedByTargetType,
+    "the extension is non-standard and may not work as intended because the generic parameter '$0' "
+    "is not referenced by extension target type '$1'.")
 // 309xx: subscripts
 DIAGNOSTIC(
     30900,
@@ -2846,6 +2875,12 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
+
+DIAGNOSTIC(
+    56103,
+    Error,
+    int16NotSupportedInWGSL,
+    "16-bit integer type '$0' is not supported by the WGSL backend.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

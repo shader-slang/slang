@@ -502,8 +502,30 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     const auto& categories = m_commandOptions->getCategories();
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
-        _appendDescriptionForCategory(categoryIndex);
+        const auto& category = categories[categoryIndex];
+
+        // Omit the value categories
+        if (category.kind != CategoryKind::Value)
+        {
+            _appendDescriptionForCategory(categoryIndex);
+        }
     }
+
+    // Add instructions for getting help for specific categories
+    m_builder << "Getting Help for Specific Categories\n";
+    m_builder << "=====================================\n\n";
+    m_builder << "To get help for a specific category of options or values, use: slangc -h "
+                 "<help-category>\n";
+    m_builder << m_options.indent << "<help-category> can be: ";
+
+    List<UnownedStringSlice> categoryNames;
+    for (const auto& category : categories)
+    {
+        categoryNames.add(category.name);
+    }
+
+    _appendWrappedIndented(1, categoryNames, toSlice(", "));
+    m_builder << "\n\n";
 }
 
 void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex)

@@ -3,7 +3,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK -xslang -minimum-slang-optimization
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CUDA):-cuda -compute -shaderobj -output-using-type
 
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=uintBuffer
@@ -280,3 +280,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 // VK: 207
 // VK: 230
 // VK: 253
+// CUDA: 184
+// CUDA: 207
+// CUDA: 230
+// CUDA: 253

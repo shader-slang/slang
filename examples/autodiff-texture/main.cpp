@@ -1,13 +1,13 @@
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/vector-math.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "slang.h"
 
-using namespace gfx;
+using namespace rhi;
 using namespace Slang;
 
 static const ExampleResources resourceBase("autodiff-texture");
@@ -24,6 +24,8 @@ static const Vertex kVertexData[kVertexCount] = {
     {{1, 0, 0}},
     {{1, 1, 0}},
 };
+float clearValue[] = {0.0f, 0.0f, 0.0f, 0.0f};
+
 
 struct AutoDiffTexture : public WindowedAppBase
 {
@@ -40,11 +42,11 @@ struct AutoDiffTexture : public WindowedAppBase
         }
     }
 
-    gfx::Result loadRenderProgram(
-        gfx::IDevice* device,
+    Result loadRenderProgram(
+        IDevice* device,
         const char* fileName,
         const char* fragmentShader,
-        gfx::IShaderProgram** outProgram)
+        IShaderProgram** outProgram)
     {
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
@@ -87,17 +89,14 @@ struct AutoDiffTexture : public WindowedAppBase
             printEntrypointHashes(componentTypes.getCount() - 1, 1, linkedProgram);
         }
 
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
-        SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+        SLANG_RETURN_ON_FAIL(device->createShaderProgram(programDesc, outProgram));
 
         return SLANG_OK;
     }
 
-    gfx::Result loadComputeProgram(
-        gfx::IDevice* device,
-        const char* fileName,
-        gfx::IShaderProgram** outProgram)
+    Result loadComputeProgram(IDevice* device, const char* fileName, IShaderProgram** outProgram)
     {
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
@@ -131,161 +130,131 @@ struct AutoDiffTexture : public WindowedAppBase
             printEntrypointHashes(componentTypes.getCount() - 1, 1, linkedProgram);
         }
 
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
-        SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+        SLANG_RETURN_ON_FAIL(device->createShaderProgram(programDesc, outProgram));
 
         return SLANG_OK;
     }
 
-    ComPtr<gfx::IPipelineState> gRefPipelineState;
-    ComPtr<gfx::IPipelineState> gIterPipelineState;
-    ComPtr<gfx::IPipelineState> gReconstructPipelineState;
-    ComPtr<gfx::IPipelineState> gConvertPipelineState;
-    ComPtr<gfx::IPipelineState> gBuildMipPipelineState;
-    ComPtr<gfx::IPipelineState> gLearnMipPipelineState;
-    ComPtr<gfx::IPipelineState> gDrawQuadPipelineState;
+    ComPtr<IRenderPipeline> gRefPipeline;
+    ComPtr<IRenderPipeline> gIterPipeline;
+    ComPtr<IComputePipeline> gReconstructPipeline;
+    ComPtr<IComputePipeline> gConvertPipeline;
+    ComPtr<IComputePipeline> gBuildMipPipeline;
+    ComPtr<IComputePipeline> gLearnMipPipeline;
+    ComPtr<IRenderPipeline> gDrawQuadPipeline;
 
-    ComPtr<gfx::ITextureResource> gLearningTexture;
-    ComPtr<gfx::IResourceView> gLearningTextureSRV;
-    List<ComPtr<gfx::IResourceView>> gLearningTextureUAVs;
+    ComPtr<ITexture> gLearningTexture;
+    ComPtr<ITextureView> gLearningTextureSRV;
+    List<ComPtr<ITextureView>> gLearningTextureUAVs;
 
-    ComPtr<gfx::ITextureResource> gDiffTexture;
-    ComPtr<gfx::IResourceView> gDiffTextureSRV;
-    List<ComPtr<gfx::IResourceView>> gDiffTextureUAVs;
+    ComPtr<ITexture> gDiffTexture;
+    ComPtr<ITextureView> gDiffTextureSRV;
+    List<ComPtr<ITextureView>> gDiffTextureUAVs;
 
-    ComPtr<gfx::IBufferResource> gVertexBuffer;
-    ComPtr<gfx::IResourceView> gTexView;
-    ComPtr<gfx::ISamplerState> gSampler;
-    ComPtr<gfx::IFramebuffer> gRefFrameBuffer;
-    ComPtr<gfx::IFramebuffer> gIterFrameBuffer;
+    ComPtr<IBuffer> gVertexBuffer;
+    ComPtr<ITextureView> gTexView;
+    ComPtr<ISampler> gSampler;
 
-    ComPtr<gfx::ITextureResource> gDepthTexture;
-    ComPtr<gfx::IResourceView> gDepthTextureView;
+    ComPtr<ITexture> gDepthTexture;
+    ComPtr<ITextureView> gDepthTextureView;
 
-    ComPtr<gfx::IResourceView> gIterImageDSV;
+    ComPtr<ITexture> gIterImage;
+    ComPtr<ITextureView> gIterImageSRV;
 
-    ComPtr<gfx::ITextureResource> gIterImage;
-    ComPtr<gfx::IResourceView> gIterImageSRV;
-    ComPtr<gfx::IResourceView> gIterImageRTV;
+    ComPtr<ITexture> gRefImage;
+    ComPtr<ITextureView> gRefImageSRV;
 
-    ComPtr<gfx::ITextureResource> gRefImage;
-    ComPtr<gfx::IResourceView> gRefImageSRV;
-    ComPtr<gfx::IResourceView> gRefImageRTV;
+    ComPtr<IBuffer> gAccumulateBuffer;
+    ComPtr<ITextureView> gAccumulateBufferView;
 
-    ComPtr<gfx::IBufferResource> gAccumulateBuffer;
-    ComPtr<gfx::IBufferResource> gReconstructBuffer;
-    ComPtr<gfx::IResourceView> gAccumulateBufferView;
-    ComPtr<gfx::IResourceView> gReconstructBufferView;
+    ComPtr<IBuffer> gReconstructBuffer;
+    ComPtr<ITextureView> gReconstructBufferView;
 
-    ClearValue kClearValue;
+
     bool resetLearntTexture = false;
 
-    ComPtr<gfx::ITextureResource> createRenderTargetTexture(
-        gfx::Format format,
-        int w,
-        int h,
-        int levels)
+    ComPtr<ITexture> createRenderTargetTexture(Format format, int w, int h, int levels)
     {
-        gfx::ITextureResource::Desc textureDesc = {};
-        textureDesc.allowedStates.add(ResourceState::ShaderResource);
-        textureDesc.allowedStates.add(ResourceState::UnorderedAccess);
-        textureDesc.allowedStates.add(ResourceState::RenderTarget);
-        textureDesc.defaultState = ResourceState::RenderTarget;
+        TextureDesc textureDesc = {};
         textureDesc.format = format;
-        textureDesc.numMipLevels = levels;
-        textureDesc.type = gfx::IResource::Type::Texture2D;
         textureDesc.size.width = w;
         textureDesc.size.height = h;
         textureDesc.size.depth = 1;
-        textureDesc.optimalClearValue = &kClearValue;
-        return gDevice->createTextureResource(textureDesc, nullptr);
+        textureDesc.mipCount = levels;
+        textureDesc.usage = TextureUsage::ShaderResource | TextureUsage::UnorderedAccess |
+                            TextureUsage::RenderTarget;
+        textureDesc.defaultState = ResourceState::RenderTarget;
+        return gDevice->createTexture(textureDesc);
     }
-    ComPtr<gfx::ITextureResource> createDepthTexture()
+    ComPtr<ITexture> createDepthTexture()
     {
-        gfx::ITextureResource::Desc textureDesc = {};
-        textureDesc.allowedStates.add(ResourceState::DepthWrite);
-        textureDesc.defaultState = ResourceState::DepthWrite;
-        textureDesc.format = gfx::Format::D32_FLOAT;
-        textureDesc.numMipLevels = 1;
-        textureDesc.type = gfx::IResource::Type::Texture2D;
+        TextureDesc textureDesc = {};
+        textureDesc.format = Format::D32Float;
         textureDesc.size.width = windowWidth;
         textureDesc.size.height = windowHeight;
         textureDesc.size.depth = 1;
-        ClearValue clearValue = {};
-        textureDesc.optimalClearValue = &clearValue;
-        return gDevice->createTextureResource(textureDesc, nullptr);
+        textureDesc.mipCount = 1;
+        textureDesc.usage = TextureUsage::DepthStencil;
+        textureDesc.defaultState = ResourceState::DepthWrite;
+        return gDevice->createTexture(textureDesc);
     }
-    ComPtr<gfx::IFramebuffer> createRenderTargetFramebuffer(IResourceView* tex)
+    ComPtr<ITextureView> createRTV(ITexture* tex, Format f)
     {
-        IFramebuffer::Desc desc = {};
-        desc.layout = gFramebufferLayout.get();
-        desc.renderTargetCount = 1;
-        desc.renderTargetViews = &tex;
-        desc.depthStencilView = gDepthTextureView;
-        return gDevice->createFramebuffer(desc);
-    }
-    ComPtr<gfx::IResourceView> createRTV(ITextureResource* tex, Format f)
-    {
-        IResourceView::Desc rtvDesc = {};
-        rtvDesc.type = IResourceView::Type::RenderTarget;
-        rtvDesc.subresourceRange.mipLevelCount = 1;
+        TextureViewDesc rtvDesc = {};
         rtvDesc.format = f;
-        rtvDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        rtvDesc.subresourceRange.mipCount = 1;
         return gDevice->createTextureView(tex, rtvDesc);
     }
-    ComPtr<gfx::IResourceView> createDSV(ITextureResource* tex)
+    ComPtr<ITextureView> createDSV(ITexture* tex)
     {
-        IResourceView::Desc dsvDesc = {};
-        dsvDesc.type = IResourceView::Type::DepthStencil;
-        dsvDesc.subresourceRange.mipLevelCount = 1;
-        dsvDesc.format = Format::D32_FLOAT;
-        dsvDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        TextureViewDesc dsvDesc = {};
+        dsvDesc.format = Format::D32Float;
+        dsvDesc.subresourceRange.mipCount = 1;
         return gDevice->createTextureView(tex, dsvDesc);
     }
-    ComPtr<gfx::IResourceView> createSRV(ITextureResource* tex)
+    ComPtr<ITextureView> createSRV(ITexture* tex)
     {
-        IResourceView::Desc rtvDesc = {};
-        rtvDesc.type = IResourceView::Type::ShaderResource;
-        return gDevice->createTextureView(tex, rtvDesc);
+        TextureViewDesc srvDesc = {};
+        return gDevice->createTextureView(tex, srvDesc);
     }
-    ComPtr<gfx::IPipelineState> createRenderPipelineState(
-        IInputLayout* inputLayout,
-        IShaderProgram* program)
+    ComPtr<IRenderPipeline> createRenderPipeline(IInputLayout* inputLayout, IShaderProgram* program)
     {
-        GraphicsPipelineStateDesc desc;
+        ColorTargetDesc colorTarget;
+        colorTarget.format = Format::RGBA8Unorm;
+        RenderPipelineDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = program;
-        desc.rasterizer.cullMode = gfx::CullMode::None;
-        desc.framebufferLayout = gFramebufferLayout;
-        auto pipelineState = gDevice->createGraphicsPipelineState(desc);
-        return pipelineState;
+        desc.targetCount = 1;
+        desc.targets = &colorTarget;
+        desc.depthStencil.depthTestEnable = true;
+        desc.depthStencil.depthWriteEnable = true;
+        desc.depthStencil.format = Format::D32Float;
+        desc.rasterizer.cullMode = CullMode::None;
+        desc.primitiveTopology = PrimitiveTopology::TriangleStrip;
+        return gDevice->createRenderPipeline(desc);
     }
-    ComPtr<gfx::IPipelineState> createComputePipelineState(IShaderProgram* program)
+    ComPtr<IComputePipeline> createComputePipeline(IShaderProgram* program)
     {
-        ComputePipelineStateDesc desc = {};
+        ComputePipelineDesc desc = {};
         desc.program = program;
-        auto pipelineState = gDevice->createComputePipelineState(desc);
-        return pipelineState;
+        return gDevice->createComputePipeline(desc);
     }
-    ComPtr<gfx::IResourceView> createUAV(IBufferResource* buffer)
+    ComPtr<ITextureView> createUAV(ITexture* texture, int level)
     {
-        IResourceView::Desc desc = {};
-        desc.type = IResourceView::Type::UnorderedAccess;
-        return gDevice->createBufferView(buffer, nullptr, desc);
-    }
-    ComPtr<gfx::IResourceView> createUAV(ITextureResource* texture, int level)
-    {
-        IResourceView::Desc desc = {};
-        desc.type = IResourceView::Type::UnorderedAccess;
-        desc.subresourceRange.layerCount = 1;
-        desc.subresourceRange.mipLevel = level;
-        desc.subresourceRange.baseArrayLayer = 0;
+        TextureViewDesc desc = {};
+        SubresourceRange textureViewRange = {};
+        textureViewRange.mipCount = 1;
+        textureViewRange.mip = level;    // Fixed: should be level, not 0
+        textureViewRange.layerCount = 1; // Fixed: should be 1, not level
+        textureViewRange.layer = 0;
+        desc.subresourceRange = textureViewRange;
         return gDevice->createTextureView(texture, desc);
     }
     Slang::Result initialize()
     {
-        SLANG_RETURN_ON_FAIL(initializeBase("autodiff-texture", 1024, 768));
+        SLANG_RETURN_ON_FAIL(initializeBase("autodiff-texture", 1024, 768, DeviceType::Default));
         srand(20421);
 
         if (!isTestMode())
@@ -296,11 +265,6 @@ struct AutoDiffTexture : public WindowedAppBase
                     resetLearntTexture = true;
             };
         }
-
-        kClearValue.color.floatValues[0] = 0.3f;
-        kClearValue.color.floatValues[1] = 0.5f;
-        kClearValue.color.floatValues[2] = 0.7f;
-        kClearValue.color.floatValues[3] = 1.0f;
 
         platform::Rect clientRect{};
         if (isTestMode())
@@ -317,16 +281,16 @@ struct AutoDiffTexture : public WindowedAppBase
         windowHeight = clientRect.height;
 
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)}};
+            {"POSITION", 0, Format::RGB32Float, offsetof(Vertex, position)}};
         auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 1);
         if (!inputLayout)
             return SLANG_FAIL;
 
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        gVertexBuffer = gDevice->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
+        vertexBufferDesc.elementSize = sizeof(Vertex);
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        gVertexBuffer = gDevice->createBuffer(vertexBufferDesc, &kVertexData[0]);
         if (!gVertexBuffer)
             return SLANG_FAIL;
 
@@ -337,7 +301,7 @@ struct AutoDiffTexture : public WindowedAppBase
                 "train.slang",
                 "fragmentMain",
                 shaderProgram.writeRef()));
-            gRefPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
+            gRefPipeline = createRenderPipeline(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
@@ -346,7 +310,7 @@ struct AutoDiffTexture : public WindowedAppBase
                 "train.slang",
                 "diffFragmentMain",
                 shaderProgram.writeRef()));
-            gIterPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
+            gIterPipeline = createRenderPipeline(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
@@ -355,126 +319,92 @@ struct AutoDiffTexture : public WindowedAppBase
                 "draw-quad.slang",
                 "fragmentMain",
                 shaderProgram.writeRef()));
-            gDrawQuadPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
+            gDrawQuadPipeline = createRenderPipeline(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
                 loadComputeProgram(gDevice, "reconstruct.slang", shaderProgram.writeRef()));
-            gReconstructPipelineState = createComputePipelineState(shaderProgram);
+            gReconstructPipeline = createComputePipeline(shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
                 loadComputeProgram(gDevice, "convert.slang", shaderProgram.writeRef()));
-            gConvertPipelineState = createComputePipelineState(shaderProgram);
+            gConvertPipeline = createComputePipeline(shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
                 loadComputeProgram(gDevice, "buildmip.slang", shaderProgram.writeRef()));
-            gBuildMipPipelineState = createComputePipelineState(shaderProgram);
+            gBuildMipPipeline = createComputePipeline(shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
                 loadComputeProgram(gDevice, "learnmip.slang", shaderProgram.writeRef()));
-            gLearnMipPipelineState = createComputePipelineState(shaderProgram);
+            gLearnMipPipeline = createComputePipeline(shaderProgram);
         }
 
+        // Load texture from file - this would need to be adapted to use slang-rhi texture loading
         Slang::String imagePath = resourceBase.resolveResource("checkerboard.jpg");
         gTexView = createTextureFromFile(imagePath.getBuffer(), textureWidth, textureHeight);
+        textureWidth = 512; // Placeholder values
+        textureHeight = 512;
         initMipOffsets(textureWidth, textureHeight);
 
-        gfx::IBufferResource::Desc bufferDesc = {};
-        bufferDesc.allowedStates.add(ResourceState::ShaderResource);
-        bufferDesc.allowedStates.add(ResourceState::UnorderedAccess);
-        bufferDesc.allowedStates.add(ResourceState::General);
-        bufferDesc.sizeInBytes = mipMapOffset.getLast() * sizeof(uint32_t);
-        bufferDesc.type = IResource::Type::Buffer;
-        gAccumulateBuffer = gDevice->createBufferResource(bufferDesc);
-        gReconstructBuffer = gDevice->createBufferResource(bufferDesc);
+        BufferDesc bufferDesc = {};
+        bufferDesc.size = mipMapOffset.getLast() * sizeof(uint32_t);
+        bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess;
 
-        gAccumulateBufferView = createUAV(gAccumulateBuffer);
-        gReconstructBufferView = createUAV(gReconstructBuffer);
+        gAccumulateBuffer = gDevice->createBuffer(bufferDesc);
+        if (!gAccumulateBuffer)
+        {
+            printf("ERROR: Failed to create accumulate buffer!\n");
+            return SLANG_FAIL;
+        }
+
+        gReconstructBuffer = gDevice->createBuffer(bufferDesc);
+        if (!gReconstructBuffer)
+        {
+            printf("ERROR: Failed to create reconstruct buffer!\n");
+            return SLANG_FAIL;
+        }
 
         int mipCount = 1 + Math::Log2Ceil(Math::Max(textureWidth, textureHeight));
-        gLearningTexture = createRenderTargetTexture(
-            Format::R32G32B32A32_FLOAT,
-            textureWidth,
-            textureHeight,
-            mipCount);
+        SubresourceData initialData = {};
+        initialData.data = gLearningTexture =
+            createRenderTargetTexture(Format::RGBA32Float, textureWidth, textureHeight, mipCount);
         gLearningTextureSRV = createSRV(gLearningTexture);
         for (int i = 0; i < mipCount; i++)
             gLearningTextureUAVs.add(createUAV(gLearningTexture, i));
 
-        gDiffTexture = createRenderTargetTexture(
-            Format::R32G32B32A32_FLOAT,
-            textureWidth,
-            textureHeight,
-            mipCount);
+        gDiffTexture =
+            createRenderTargetTexture(Format::RGBA32Float, textureWidth, textureHeight, mipCount);
         gDiffTextureSRV = createSRV(gDiffTexture);
         for (int i = 0; i < mipCount; i++)
             gDiffTextureUAVs.add(createUAV(gDiffTexture, i));
 
-        gfx::ISamplerState::Desc samplerDesc = {};
-        // samplerDesc.maxLOD = 0.0f;
-        gSampler = gDevice->createSamplerState(samplerDesc);
+        SamplerDesc samplerDesc = {};
+        gSampler = gDevice->createSampler(samplerDesc);
 
         gDepthTexture = createDepthTexture();
         gDepthTextureView = createDSV(gDepthTexture);
 
-        gRefImage = createRenderTargetTexture(Format::R8G8B8A8_UNORM, windowWidth, windowHeight, 1);
-        gRefImageRTV = createRTV(gRefImage, Format::R8G8B8A8_UNORM);
+        gRefImage = createRenderTargetTexture(Format::RGBA8Unorm, windowWidth, windowHeight, 1);
         gRefImageSRV = createSRV(gRefImage);
 
-        gIterImage =
-            createRenderTargetTexture(Format::R8G8B8A8_UNORM, windowWidth, windowHeight, 1);
-        gIterImageRTV = createRTV(gIterImage, Format::R8G8B8A8_UNORM);
+        gIterImage = createRenderTargetTexture(Format::RGBA8Unorm, windowWidth, windowHeight, 1);
         gIterImageSRV = createSRV(gIterImage);
 
-        gRefFrameBuffer = createRenderTargetFramebuffer(gRefImageRTV);
-        gIterFrameBuffer = createRenderTargetFramebuffer(gIterImageRTV);
-
+        // Initialize textures
         {
-            ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[0]->createCommandBuffer();
-            auto encoder = commandBuffer->encodeResourceCommands();
-            encoder->textureBarrier(
-                gLearningTexture,
-                ResourceState::RenderTarget,
-                ResourceState::UnorderedAccess);
-            encoder->textureBarrier(
-                gDiffTexture,
-                ResourceState::RenderTarget,
-                ResourceState::UnorderedAccess);
-            encoder->textureBarrier(
-                gRefImage,
-                ResourceState::RenderTarget,
-                ResourceState::ShaderResource);
-            encoder->textureBarrier(
-                gIterImage,
-                ResourceState::RenderTarget,
-                ResourceState::ShaderResource);
-            for (int i = 0; i < gLearningTextureUAVs.getCount(); i++)
-            {
-                ClearValue clearValue = {};
-                encoder->clearResourceView(
-                    gLearningTextureUAVs[i],
-                    &clearValue,
-                    ClearResourceViewFlags::None);
-                encoder->clearResourceView(
-                    gDiffTextureUAVs[i],
-                    &clearValue,
-                    ClearResourceViewFlags::None);
-            }
-            encoder->textureBarrier(
-                gLearningTexture,
-                ResourceState::UnorderedAccess,
-                ResourceState::ShaderResource);
+            auto commandEncoder = gQueue->createCommandEncoder();
+            // Clear learning and diff textures
+            commandEncoder->clearTextureFloat(gLearningTexture, kEntireTexture, clearValue);
+            commandEncoder->clearTextureFloat(gDiffTexture, kEntireTexture, clearValue);
 
-            encoder->endEncoding();
-            commandBuffer->close();
-            gQueue->executeCommandBuffer(commandBuffer);
+            gQueue->submit(commandEncoder->finish());
         }
 
         return SLANG_OK;
@@ -518,160 +448,122 @@ struct AutoDiffTexture : public WindowedAppBase
     }
 
     template<typename SetupPipelineFunc>
-    void renderImage(
-        int transientHeapIndex,
-        IFramebuffer* fb,
-        const SetupPipelineFunc& setupPipeline)
+    void renderImage(ITexture* renderTarget, const SetupPipelineFunc& setupPipeline)
     {
-        ComPtr<ICommandBuffer> commandBuffer =
-            gTransientHeaps[transientHeapIndex]->createCommandBuffer();
-        auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, fb);
+        auto commandEncoder = gQueue->createCommandEncoder();
 
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)windowWidth;
-        viewport.extentY = (float)windowHeight;
-        renderEncoder->setViewportAndScissor(viewport);
+        ComPtr<ITextureView> renderTargetView = createRTV(renderTarget, Format::RGBA8Unorm);
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = renderTargetView;
+        colorAttachment.loadOp = LoadOp::Clear;
+        colorAttachment.clearValue[0] = 0.3f;
+        colorAttachment.clearValue[1] = 0.5f;
+        colorAttachment.clearValue[2] = 0.7f;
+        colorAttachment.clearValue[3] = 1.0f;
+
+        RenderPassDepthStencilAttachment depthAttachment = {};
+        depthAttachment.view = gDepthTextureView;
+        depthAttachment.depthLoadOp = LoadOp::Clear;
+        depthAttachment.depthClearValue = 1.0f;
+
+        RenderPassDesc renderPass = {};
+        renderPass.colorAttachments = &colorAttachment;
+        renderPass.colorAttachmentCount = 1;
+        renderPass.depthStencilAttachment = &depthAttachment;
+
+        auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
+
+        RenderState renderState = {};
+        renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+        renderState.scissorRectCount = 1;
+        renderState.vertexBuffers[0] = gVertexBuffer;
+        renderState.vertexBufferCount = 1;
 
         setupPipeline(renderEncoder);
 
-        renderEncoder->setVertexBuffer(0, gVertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleStrip);
 
-        renderEncoder->draw(4);
-        renderEncoder->endEncoding();
-        commandBuffer->close();
-        gQueue->executeCommandBuffer(commandBuffer);
+        renderEncoder->setRenderState(renderState);
+
+        DrawArguments drawArgs = {};
+        drawArgs.vertexCount = 4;
+        renderEncoder->draw(drawArgs);
+        renderEncoder->end();
+        gQueue->submit(commandEncoder->finish());
     }
 
-    void renderReferenceImage(int transientHeapIndex, glm::mat4x4 transformMatrix)
+    void renderReferenceImage(glm::mat4x4 transformMatrix)
     {
-        {
-            ComPtr<ICommandBuffer> commandBuffer =
-                gTransientHeaps[transientHeapIndex]->createCommandBuffer();
-            auto encoder = commandBuffer->encodeResourceCommands();
-            encoder->textureBarrier(
-                gRefImage,
-                ResourceState::ShaderResource,
-                ResourceState::RenderTarget);
-            encoder->endEncoding();
-            commandBuffer->close();
-            gQueue->executeCommandBuffer(commandBuffer);
-        }
-
         renderImage(
-            transientHeapIndex,
-            gRefFrameBuffer,
-            [&](IRenderCommandEncoder* encoder)
+            gRefImage,
+            [&](IRenderPassEncoder* encoder)
             {
-                auto rootObject = encoder->bindPipeline(gRefPipelineState);
+                auto rootObject =
+                    encoder->bindPipeline(static_cast<IRenderPipeline*>(gRefPipeline.get()));
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["Uniforms"]["modelViewProjection"].setData(
                     &transformMatrix,
                     sizeof(float) * 16);
-                rootCursor["Uniforms"]["bwdTexture"]["texture"].setResource(gTexView);
-                rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
+                rootCursor["Uniforms"]["bwdTexture"]["texture"].setBinding(gTexView);
+                rootCursor["Uniforms"]["sampler"].setBinding(gSampler);
                 rootCursor["Uniforms"]["mipOffset"].setData(
                     mipMapOffset.getBuffer(),
                     sizeof(uint32_t) * mipMapOffset.getCount());
-                rootCursor["Uniforms"]["texRef"].setResource(gTexView);
-                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setResource(
-                    gAccumulateBufferView);
+                rootCursor["Uniforms"]["texRef"].setBinding(gTexView);
+                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(
+                    gAccumulateBuffer);
             });
     }
 
-    virtual void renderFrame(int frameBufferIndex) override
+    virtual void renderFrame(ITexture* texture) override
     {
         static uint32_t frameCount = 0;
         frameCount++;
         auto transformMatrix = getTransformMatrix();
-        renderReferenceImage(frameBufferIndex, transformMatrix);
+        renderReferenceImage(transformMatrix);
 
-        // Barriers.
+        // Clear buffers
         {
-            ComPtr<ICommandBuffer> commandBuffer =
-                gTransientHeaps[frameBufferIndex]->createCommandBuffer();
-            auto resEncoder = commandBuffer->encodeResourceCommands();
-            ClearValue clearValue = {};
-            resEncoder->bufferBarrier(
-                gAccumulateBuffer,
-                ResourceState::Undefined,
-                ResourceState::UnorderedAccess);
-            resEncoder->bufferBarrier(
-                gReconstructBuffer,
-                ResourceState::Undefined,
-                ResourceState::UnorderedAccess);
-            resEncoder->textureBarrier(
-                gRefImage,
-                ResourceState::Present,
-                ResourceState::ShaderResource);
-            resEncoder->textureBarrier(
-                gIterImage,
-                ResourceState::ShaderResource,
-                ResourceState::RenderTarget);
-            resEncoder->clearResourceView(
-                gAccumulateBufferView,
-                &clearValue,
-                ClearResourceViewFlags::None);
-            resEncoder->clearResourceView(
-                gReconstructBufferView,
-                &clearValue,
-                ClearResourceViewFlags::None);
+            auto commandEncoder = gQueue->createCommandEncoder();
+            commandEncoder->clearBuffer(gAccumulateBuffer, 0, gAccumulateBuffer->getDesc().size);
+            commandEncoder->clearBuffer(gReconstructBuffer, 0, gReconstructBuffer->getDesc().size);
+
             if (resetLearntTexture)
             {
-                resEncoder->textureBarrier(
-                    gLearningTexture,
-                    ResourceState::ShaderResource,
-                    ResourceState::UnorderedAccess);
-                for (Index i = 0; i < gLearningTextureUAVs.getCount(); i++)
-                    resEncoder->clearResourceView(
-                        gLearningTextureUAVs[i],
-                        &clearValue,
-                        ClearResourceViewFlags::None);
-                resEncoder->textureBarrier(
-                    gLearningTexture,
-                    ResourceState::UnorderedAccess,
-                    ResourceState::ShaderResource);
+                commandEncoder->clearTextureFloat(gLearningTexture, kEntireTexture, clearValue);
                 resetLearntTexture = false;
             }
-            resEncoder->endEncoding();
-            commandBuffer->close();
-            gQueue->executeCommandBuffer(commandBuffer);
+            gQueue->submit(commandEncoder->finish());
         }
 
         // Render image using backward propagate shader to obtain texture-space gradients.
         renderImage(
-            frameBufferIndex,
-            gIterFrameBuffer,
-            [&](IRenderCommandEncoder* encoder)
+            gIterImage,
+            [&](IRenderPassEncoder* encoder)
             {
-                auto rootObject = encoder->bindPipeline(gIterPipelineState);
+                auto rootObject = encoder->bindPipeline(gIterPipeline.get());
                 ShaderCursor rootCursor(rootObject);
 
                 rootCursor["Uniforms"]["modelViewProjection"].setData(
                     &transformMatrix,
                     sizeof(float) * 16);
-                rootCursor["Uniforms"]["bwdTexture"]["texture"].setResource(gLearningTextureSRV);
-                rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
+                rootCursor["Uniforms"]["bwdTexture"]["texture"].setBinding(gLearningTextureSRV);
+                rootCursor["Uniforms"]["sampler"].setBinding(gSampler);
                 rootCursor["Uniforms"]["mipOffset"].setData(
                     mipMapOffset.getBuffer(),
                     sizeof(uint32_t) * mipMapOffset.getCount());
-                rootCursor["Uniforms"]["texRef"].setResource(gRefImageSRV);
-                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setResource(
-                    gAccumulateBufferView);
+                rootCursor["Uniforms"]["texRef"].setBinding(gRefImageSRV);
+                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setBinding(
+                    gAccumulateBuffer);
                 rootCursor["Uniforms"]["bwdTexture"]["minLOD"].setData(5.0);
             });
 
         // Propagete gradients through mip map layers from top (lowest res) to bottom (highest res).
         {
-            ComPtr<ICommandBuffer> commandBuffer =
-                gTransientHeaps[frameBufferIndex]->createCommandBuffer();
-            auto encoder = commandBuffer->encodeComputeCommands();
-            encoder->textureBarrier(
-                gLearningTexture,
-                ResourceState::ShaderResource,
-                ResourceState::UnorderedAccess);
-            auto rootObject = encoder->bindPipeline(gReconstructPipelineState);
+            auto commandEncoder = gQueue->createCommandEncoder();
+            auto encoder = commandEncoder->beginComputePass();
+            auto rootObject = encoder->bindPipeline(gReconstructPipeline.get());
             for (int i = (int)mipMapOffset.getCount() - 2; i >= 0; i--)
             {
                 ShaderCursor rootCursor(rootObject);
@@ -682,90 +574,91 @@ struct AutoDiffTexture : public WindowedAppBase
                 rootCursor["Uniforms"]["layerCount"].setData(mipMapOffset.getCount() - 1);
                 rootCursor["Uniforms"]["width"].setData(textureWidth);
                 rootCursor["Uniforms"]["height"].setData(textureHeight);
-                rootCursor["Uniforms"]["accumulateBuffer"].setResource(gAccumulateBufferView);
-                rootCursor["Uniforms"]["dstBuffer"].setResource(gReconstructBufferView);
+                rootCursor["Uniforms"]["accumulateBuffer"].setBinding(gAccumulateBuffer);
+                rootCursor["Uniforms"]["dstBuffer"].setBinding(gReconstructBuffer);
+
                 encoder->dispatchCompute(
                     ((textureWidth >> i) + 15) / 16,
                     ((textureHeight >> i) + 15) / 16,
                     1);
-                encoder->bufferBarrier(
-                    gReconstructBuffer,
-                    ResourceState::UnorderedAccess,
-                    ResourceState::UnorderedAccess);
+            }
+            encoder->end();
+            gQueue->submit(commandEncoder->finish());
+
+            commandEncoder = gQueue->createCommandEncoder();
+            // Convert bottom layer mip from buffer to texture
+            {
+                auto encoder = commandEncoder->beginComputePass();
+                auto rootObject = encoder->bindPipeline(gConvertPipeline.get());
+                ShaderCursor rootCursor(rootObject);
+                rootCursor["Uniforms"]["mipOffset"].setData(
+                    mipMapOffset.getBuffer(),
+                    sizeof(uint32_t) * mipMapOffset.getCount());
+                rootCursor["Uniforms"]["dstLayer"].setData(0);
+                rootCursor["Uniforms"]["width"].setData(textureWidth);
+                rootCursor["Uniforms"]["height"].setData(textureHeight);
+                rootCursor["Uniforms"]["srcBuffer"].setBinding(gReconstructBuffer);
+                rootCursor["Uniforms"]["dstTexture"].setBinding(gDiffTextureUAVs[0]);
+                encoder->dispatchCompute((textureWidth + 15) / 16, (textureHeight + 15) / 16, 1);
+                encoder->end();
             }
 
-            // Convert bottom layer mip from buffer to texture.
-            rootObject = encoder->bindPipeline(gConvertPipelineState);
-            ShaderCursor rootCursor(rootObject);
-            rootCursor["Uniforms"]["mipOffset"].setData(
-                mipMapOffset.getBuffer(),
-                sizeof(uint32_t) * mipMapOffset.getCount());
-            rootCursor["Uniforms"]["dstLayer"].setData(0);
-            rootCursor["Uniforms"]["width"].setData(textureWidth);
-            rootCursor["Uniforms"]["height"].setData(textureHeight);
-            rootCursor["Uniforms"]["srcBuffer"].setResource(gReconstructBufferView);
-            rootCursor["Uniforms"]["dstTexture"].setResource(gDiffTextureUAVs[0]);
-            encoder->dispatchCompute((textureWidth + 15) / 16, (textureHeight + 15) / 16, 1);
-            encoder->textureBarrier(
-                gDiffTexture,
-                ResourceState::UnorderedAccess,
-                ResourceState::UnorderedAccess);
-
-            // Build higher level mip map layers.
-            rootObject = encoder->bindPipeline(gBuildMipPipelineState);
+            // Build higher level mip map layers
+            encoder = commandEncoder->beginComputePass();
+            rootObject = encoder->bindPipeline(gBuildMipPipeline.get());
             for (int i = 1; i < (int)mipMapOffset.getCount() - 1; i++)
             {
+
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["Uniforms"]["dstWidth"].setData(textureWidth >> i);
                 rootCursor["Uniforms"]["dstHeight"].setData(textureHeight >> i);
-                rootCursor["Uniforms"]["srcTexture"].setResource(gDiffTextureUAVs[i - 1]);
-                rootCursor["Uniforms"]["dstTexture"].setResource(gDiffTextureUAVs[i]);
+                rootCursor["Uniforms"]["srcTexture"].setBinding(gDiffTextureUAVs[i - 1]);
+                rootCursor["Uniforms"]["dstTexture"].setBinding(gDiffTextureUAVs[i]);
                 encoder->dispatchCompute(
                     ((textureWidth >> i) + 15) / 16,
                     ((textureHeight >> i) + 15) / 16,
                     1);
-                encoder->textureBarrier(
-                    gDiffTexture,
-                    ResourceState::UnorderedAccess,
-                    ResourceState::UnorderedAccess);
             }
+            encoder->end();
 
-            // Accumulate gradients to learnt texture.
-            rootObject = encoder->bindPipeline(gLearnMipPipelineState);
+            // Accumulate gradients to learnt texture
+            encoder = commandEncoder->beginComputePass();
+            rootObject = encoder->bindPipeline(gLearnMipPipeline.get());
             for (int i = 0; i < (int)mipMapOffset.getCount() - 1; i++)
             {
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["Uniforms"]["dstWidth"].setData(textureWidth >> i);
                 rootCursor["Uniforms"]["dstHeight"].setData(textureHeight >> i);
                 rootCursor["Uniforms"]["learningRate"].setData(0.1f);
-                rootCursor["Uniforms"]["srcTexture"].setResource(gDiffTextureUAVs[i]);
-                rootCursor["Uniforms"]["dstTexture"].setResource(gLearningTextureUAVs[i]);
+                rootCursor["Uniforms"]["srcTexture"].setBinding(gDiffTextureUAVs[i]);
+                rootCursor["Uniforms"]["dstTexture"].setBinding(gLearningTextureUAVs[i]);
                 encoder->dispatchCompute(
                     ((textureWidth >> i) + 15) / 16,
                     ((textureHeight >> i) + 15) / 16,
                     1);
             }
-            encoder->textureBarrier(
-                gLearningTexture,
-                ResourceState::UnorderedAccess,
-                ResourceState::ShaderResource);
-            encoder->textureBarrier(
-                gIterImage,
-                ResourceState::Present,
-                ResourceState::ShaderResource);
+            encoder->end();
 
-            encoder->endEncoding();
-            commandBuffer->close();
-            gQueue->executeCommandBuffer(commandBuffer);
+            gQueue->submit(commandEncoder->finish());
         }
 
-        // Draw currently learnt texture.
+        // Draw currently learnt texture
         {
-            ComPtr<ICommandBuffer> commandBuffer =
-                gTransientHeaps[frameBufferIndex]->createCommandBuffer();
-            auto renderEncoder =
-                commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
+            auto commandEncoder = gQueue->createCommandEncoder();
+
+            ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+            RenderPassColorAttachment colorAttachment = {};
+            colorAttachment.view = textureView;
+            colorAttachment.loadOp = LoadOp::Clear;
+
+            RenderPassDesc renderPass = {};
+            renderPass.colorAttachments = &colorAttachment;
+            renderPass.colorAttachmentCount = 1;
+
+            auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
+
             drawTexturedQuad(renderEncoder, 0, 0, textureWidth, textureHeight, gLearningTextureSRV);
+
             int refImageWidth = windowWidth - textureWidth - 10;
             int refImageHeight = refImageWidth * windowHeight / windowWidth;
             drawTexturedQuad(
@@ -775,6 +668,7 @@ struct AutoDiffTexture : public WindowedAppBase
                 refImageWidth,
                 refImageHeight,
                 gRefImageSRV);
+
             drawTexturedQuad(
                 renderEncoder,
                 textureWidth + 10,
@@ -782,32 +676,35 @@ struct AutoDiffTexture : public WindowedAppBase
                 refImageWidth,
                 refImageHeight,
                 gIterImageSRV);
-            renderEncoder->endEncoding();
-            commandBuffer->close();
-            gQueue->executeCommandBuffer(commandBuffer);
+            renderEncoder->end();
+            gQueue->submit(commandEncoder->finish());
         }
 
         if (!isTestMode())
         {
-            gSwapchain->present();
+            gSurface->present();
         }
     }
 
     void drawTexturedQuad(
-        IRenderCommandEncoder* renderEncoder,
+        IRenderPassEncoder* renderEncoder,
         int x,
         int y,
         int w,
         int h,
-        IResourceView* srv)
+        ITextureView* srv)
     {
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)windowWidth;
-        viewport.extentY = (float)windowHeight;
-        renderEncoder->setViewportAndScissor(viewport);
+        RenderState renderState = {};
+        renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+        renderState.scissorRectCount = 1;
+        renderState.vertexBuffers[0] = gVertexBuffer;
+        renderState.vertexBufferCount = 1;
+        renderEncoder->setRenderState(renderState);
 
-        auto root = renderEncoder->bindPipeline(gDrawQuadPipelineState);
+        auto root =
+            renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gDrawQuadPipeline.get()));
         ShaderCursor rootCursor(root);
         rootCursor["Uniforms"]["x"].setData(x);
         rootCursor["Uniforms"]["y"].setData(y);
@@ -815,11 +712,12 @@ struct AutoDiffTexture : public WindowedAppBase
         rootCursor["Uniforms"]["height"].setData(h);
         rootCursor["Uniforms"]["viewWidth"].setData(windowWidth);
         rootCursor["Uniforms"]["viewHeight"].setData(windowHeight);
-        rootCursor["Uniforms"]["texture"].setResource(srv);
-        rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
-        renderEncoder->setVertexBuffer(0, gVertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleStrip);
-        renderEncoder->draw(4);
+        rootCursor["Uniforms"]["texture"].setBinding(srv);
+        rootCursor["Uniforms"]["sampler"].setBinding(gSampler);
+
+        DrawArguments drawArgs = {};
+        drawArgs.vertexCount = 4;
+        renderEncoder->draw(drawArgs);
     }
 };
 

@@ -16,7 +16,9 @@ interface IInterface
 struct A : IInterface
 {
     float z;
+
     [ForwardDifferentiable]
+    [NoDiffThis]
     float calc(float x) { return x * x * x; }
 };
 
@@ -25,6 +27,7 @@ struct B : IInterface
     float z;
 
     [ForwardDifferentiable]
+    [NoDiffThis]
     float calc(float x) { return x * x + z; }
 };
 

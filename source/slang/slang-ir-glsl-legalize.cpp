@@ -4006,6 +4006,13 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(
+                varInst,
+                IRTargetBuiltinVarName::SpvInstanceIndex);
         }
         // Repalce SV_VertexID with gl_VertexIndex - gl_BaseVertex.
         else if (builtinVarName == IRTargetBuiltinVarName::HlslVertexID)
@@ -4032,6 +4039,11 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(varInst, IRTargetBuiltinVarName::SpvVertexIndex);
         }
     }
 }

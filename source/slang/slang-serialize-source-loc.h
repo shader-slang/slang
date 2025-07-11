@@ -8,6 +8,7 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
 #include "slang-serialize-types.h"
+#include "slang-serialize.h"
 
 namespace Slang
 {
@@ -232,6 +233,81 @@ public:
     SourceLoc::RawValue m_freeSourceLoc; ///< Locations greater than this are free
     Dictionary<SourceFile*, RefPtr<Source>> m_sourceFileMap;
 };
+
+// A class a custom serialization context can inherit from to enable
+// serializing SourceLoc
+struct SourceLocSerialContext
+{
+    virtual SerialSourceLocReader* getSourceLocReader() { return nullptr; }
+    virtual SerialSourceLocWriter* getSourceLocWriter() { return nullptr; }
+};
+
+template<typename S>
+void serialize(S const& serializer, SourceLoc& value)
+{
+    static_assert(
+        std::is_convertible_v<decltype(serializer.getContext()), SourceLocSerialContext*>,
+        "getContext() must return a SourceLocSerialContext*");
+
+    SourceLocSerialContext* context = serializer.getContext();
+
+    // Writing of source location information can be disabled by
+    // compiler options, and in that case the `_sourceLocWriter`
+    // may be null.
+    //
+    // In order to handle that possibility, we serialize a `SourceLoc`
+    // as an optional value, dependent on whether we have a
+    // `_sourceLocWriter` that can be used.
+    //
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (isWriting(serializer))
+    {
+        // The `SourceLoc` type is implemented under the hood as an
+        // integer offset that can only be decoded using the specific
+        // `SourceManager` that created it.
+        //
+        // The source location writer handles the task of translating
+        // the under-the-hood representation to a single integer value
+        // (represented as `SerialSourceLocData::SourceLoc`) that can
+        // be decoded on the other side using other data that the
+        // source location writer will write out as part of its own
+        // representation (all of which goes into the dedicated debug
+        // data chunk, distinct from the AST/IR module).
+        //
+        if (const auto sourceLocWriter = context->getSourceLocWriter())
+        {
+            SerialSourceLocData::SourceLoc rawValue = sourceLocWriter->addSourceLoc(value);
+            serialize(serializer, rawValue);
+        }
+    }
+    else
+    {
+        if (hasElements(serializer))
+        {
+            SerialSourceLocData::SourceLoc rawValue;
+            serialize(serializer, rawValue);
+
+            // Even if the serialized optional had a value, it is
+            // possible that the debug-data chunk got stripped from
+            // the compiled module file, in which case we wouldn't
+            // have access to the data needed to decode it.
+            //
+            // In that case, the `_sourceLocReader` member would be
+            // null, so we handle that possibility here.
+            //
+            if (const auto sourceLocReader = context->getSourceLocReader())
+            {
+                value = sourceLocReader->getSourceLoc(rawValue);
+            }
+        }
+    }
+}
+
+// Now that we've seen the relevant serialization logic, it is clear that
+// a `SourceLoc` gets fossilized the same way that an optional wrapping
+// an integer (of type `SerialSourceLocData::SourceLoc`) would.
+//
+SLANG_DECLARE_FOSSILIZED_AS(SourceLoc, std::optional<SerialSourceLocData::SourceLoc>);
 
 } // namespace Slang
 

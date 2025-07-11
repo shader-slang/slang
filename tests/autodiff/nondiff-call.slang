@@ -35,6 +35,7 @@ struct A
     float o;
 
     [ForwardDifferentiable]
+    [NoDiffThis]
     float doSomethingDifferentiable(float b)
     {
         return o + b;

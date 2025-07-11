@@ -7,10 +7,10 @@
 #include "../../source/core/slang-string-util.h"
 #include "examples/hello-world/vulkan-api.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
 #include "slang.h"
 
 #include <chrono>
+#include <slang-rhi.h>
 
 #if SLANG_WINDOWS_FAMILY
 #include <windows.h>
@@ -19,6 +19,7 @@
 #endif
 
 using namespace Slang;
+using namespace rhi;
 
 struct PipelineCreationReplay
 {
@@ -233,7 +234,7 @@ struct PipelineCreationReplay
 
     int run(int argc, const char** argv);
 
-    void initVulkanAPI(gfx::IDevice* device);
+    void initVulkanAPI(IDevice* device);
 };
 
 int main(int argc, const char** argv)
@@ -244,10 +245,10 @@ int main(int argc, const char** argv)
 
 int PipelineCreationReplay::run(int argc, const char** argv)
 {
-    gfx::IDevice::Desc deviceDesc = {};
-    deviceDesc.deviceType = gfx::DeviceType::Vulkan;
-    ComPtr<gfx::IDevice> device;
-    gfx::gfxCreateDevice(&deviceDesc, device.writeRef());
+    DeviceDesc deviceDesc = {};
+    deviceDesc.deviceType = DeviceType::Vulkan;
+    ComPtr<IDevice> device;
+    SLANG_RETURN_ON_FAIL(createDevice(&deviceDesc, device.writeRef()));
     initVulkanAPI(device);
 
     if (argc < 2)
@@ -270,12 +271,12 @@ int PipelineCreationReplay::run(int argc, const char** argv)
     return 0;
 }
 
-void PipelineCreationReplay::initVulkanAPI(gfx::IDevice* device)
+void PipelineCreationReplay::initVulkanAPI(IDevice* device)
 {
-    gfx::IDevice::InteropHandles handle;
+    DeviceNativeHandles handle;
     device->getNativeDeviceHandles(&handle);
-    vkAPI.device = (VkDevice)(handle.handles[2].handleValue);
-    vkAPI.instance = (VkInstance)(handle.handles[0].handleValue);
+    vkAPI.device = (VkDevice)(handle.handles[2].value);
+    vkAPI.instance = (VkInstance)(handle.handles[0].value);
 #if SLANG_WINDOWS_FAMILY
     auto dynamicLibraryName = "vulkan-1.dll";
     HMODULE module = ::LoadLibraryA(dynamicLibraryName);

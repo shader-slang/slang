@@ -3,18 +3,18 @@
 #include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <mutex>
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 // Test that precompiled module cache is working.
 
-Slang::ComPtr<slang::ISession> createSession(gfx::IDevice* device, ISlangFileSystemExt* fileSys)
+Slang::ComPtr<slang::ISession> createSession(rhi::IDevice* device, ISlangFileSystemExt* fileSys)
 {
     static std::mutex m;
     std::lock_guard<std ::mutex> lock(m);
@@ -33,13 +33,13 @@ Slang::ComPtr<slang::ISession> createSession(gfx::IDevice* device, ISlangFileSys
     entry.value.intValue0 = 1;
     sessionDesc.compilerOptionEntries = &entry;
     slang::TargetDesc targetDesc = {};
-    switch (device->getDeviceInfo().deviceType)
+    switch (device->getInfo().deviceType)
     {
-    case gfx::DeviceType::DirectX12:
+    case rhi::DeviceType::D3D12:
         targetDesc.format = SLANG_DXIL;
         targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("sm_6_1");
         break;
-    case gfx::DeviceType::Vulkan:
+    case rhi::DeviceType::Vulkan:
         targetDesc.format = SLANG_SPIRV;
         targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("GLSL_460");
         break;
@@ -52,7 +52,7 @@ Slang::ComPtr<slang::ISession> createSession(gfx::IDevice* device, ISlangFileSys
 }
 
 static Slang::Result precompileProgram(
-    gfx::IDevice* device,
+    rhi::IDevice* device,
     ISlangMutableFileSystem* fileSys,
     const char* shaderModuleName)
 {
@@ -84,12 +84,6 @@ static Slang::Result precompileProgram(
 
 void precompiledModuleCacheTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     // First, Initialize our file system.
     ComPtr<ISlangMutableFileSystem> memoryFileSystem =
         ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
@@ -164,61 +158,47 @@ void precompiledModuleCacheTestImpl(IDevice* device, UnitTestContext* context)
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> computePipeline;
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, computePipeline.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
-    bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
-    bufferDesc.defaultState = ResourceState::UnorderedAccess;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::ShaderResource |
+                       BufferUsage::CopySource | BufferUsage::CopyDestination;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+        device->createBuffer(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+        auto commandEncoder = queue->createCommandEncoder();
+        auto encoder = commandEncoder->beginComputePass();
 
-        auto rootObject = encoder->bindPipeline(pipelineState);
+        ComPtr<IShaderObject> rootObject;
+        device->createRootShaderObject(shaderProgram, rootObject.writeRef());
+        encoder->bindPipeline(computePipeline, rootObject);
 
         ShaderCursor entryPointCursor(
             rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
-        // Bind buffer view to the entry point.
-        entryPointCursor.getPath("buffer").setResource(bufferView);
+        // Bind buffer to the entry point.
+        entryPointCursor.getPath("buffer").setBinding(numbersBuffer);
 
         encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        encoder->end();
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
+    compareComputeResult(device, numbersBuffer, std::array{3.0f, 3.0f, 3.0f, 3.0f});
 
     // Now we change the source and check if the precompiled module is still up-to-date.
     const char* moduleSrc4 = R"(
@@ -239,12 +219,12 @@ void precompiledModuleCacheTestImpl(IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(precompiledModuleCacheD3D12)
 {
-    runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, DeviceType::D3D12, {});
 }
 
 SLANG_UNIT_TEST(precompiledModuleCacheVulkan)
 {
-    runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(precompiledModuleCacheTestImpl, unitTestContext, DeviceType::Vulkan, {});
 }
 
 } // namespace gfx_test

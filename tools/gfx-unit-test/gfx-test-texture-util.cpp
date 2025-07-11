@@ -1,9 +1,6 @@
 #include "gfx-test-texture-util.h"
 
-#include "gfx-test-util.h"
-#include "slang-com-ptr.h"
-#include "unit-test/slang-unit-test.h"
-
+#include <slang-com-ptr.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,216 +14,169 @@
 #pragma warning(pop)
 #endif
 
-#define GFX_ENABLE_RENDERDOC_INTEGRATION 0
-
-#if GFX_ENABLE_RENDERDOC_INTEGRATION
-#include "external/renderdoc_app.h"
-
-#include <windows.h>
-#endif
-
-using namespace Slang;
-using namespace gfx;
-
 namespace gfx_test
 {
-TextureAspect getTextureAspect(Format format)
+
+TextureInfo::~TextureInfo()
 {
-    switch (format)
+    for (SubresourceData subresourceData : subresourceDatas)
     {
-    case Format::D16_UNORM:
-    case Format::D32_FLOAT:
-        return TextureAspect::Depth;
-    default:
-        return TextureAspect::Color;
+        ::free((void*)subresourceData.data);
     }
 }
 
-gfx::Size getTexelSize(Format format)
+Size getTexelSize(Format format)
 {
-    FormatInfo info;
-    GFX_CHECK_CALL_ABORT(gfxGetFormatInfo(format, &info));
+    const FormatInfo& info = getFormatInfo(format);
     return info.blockSizeInBytes / info.pixelsPerBlock;
-}
-
-GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer)
-{
-    return baseArrayLayer * mipLevelCount + mipLevel;
 }
 
 RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
 {
     switch (format)
     {
-    case Format::R32G32B32A32_TYPELESS:
-        return new ValidationTextureFormat<uint32_t>(4);
-    case Format::R32G32B32_TYPELESS:
-        return new ValidationTextureFormat<uint32_t>(3);
-    case Format::R32G32_TYPELESS:
-        return new ValidationTextureFormat<uint32_t>(2);
-    case Format::R32_TYPELESS:
-        return new ValidationTextureFormat<uint32_t>(1);
-
-    case Format::R16G16B16A16_TYPELESS:
-        return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_TYPELESS:
-        return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_TYPELESS:
-        return new ValidationTextureFormat<uint16_t>(1);
-
-    case Format::R8G8B8A8_TYPELESS:
-        return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_TYPELESS:
-        return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_TYPELESS:
-        return new ValidationTextureFormat<uint8_t>(1);
-    case Format::B8G8R8A8_TYPELESS:
-        return new ValidationTextureFormat<uint8_t>(4);
-
-    case Format::R32G32B32A32_FLOAT:
+    case Format::RGBA32Float:
         return new ValidationTextureFormat<float>(4);
-    case Format::R32G32B32_FLOAT:
+    case Format::RGB32Float:
         return new ValidationTextureFormat<float>(3);
-    case Format::R32G32_FLOAT:
+    case Format::RG32Float:
         return new ValidationTextureFormat<float>(2);
-    case Format::R32_FLOAT:
+    case Format::R32Float:
         return new ValidationTextureFormat<float>(1);
 
-    case Format::R16G16B16A16_FLOAT:
+    case Format::RGBA16Float:
         return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_FLOAT:
+    case Format::RG16Float:
         return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_FLOAT:
+    case Format::R16Float:
         return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R64_UINT:
+    case Format::R64Uint:
         return new ValidationTextureFormat<uint64_t>(1);
 
-    case Format::R32G32B32A32_UINT:
+    case Format::RGBA32Uint:
         return new ValidationTextureFormat<uint32_t>(4);
-    case Format::R32G32B32_UINT:
+    case Format::RGB32Uint:
         return new ValidationTextureFormat<uint32_t>(3);
-    case Format::R32G32_UINT:
+    case Format::RG32Uint:
         return new ValidationTextureFormat<uint32_t>(2);
-    case Format::R32_UINT:
+    case Format::R32Uint:
         return new ValidationTextureFormat<uint32_t>(1);
 
-    case Format::R16G16B16A16_UINT:
+    case Format::RGBA16Uint:
         return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_UINT:
+    case Format::RG16Uint:
         return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_UINT:
+    case Format::R16Uint:
         return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R8G8B8A8_UINT:
+    case Format::RGBA8Uint:
         return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_UINT:
+    case Format::RG8Uint:
         return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_UINT:
+    case Format::R8Uint:
         return new ValidationTextureFormat<uint8_t>(1);
 
-    case Format::R64_SINT:
+    case Format::R64Sint:
         return new ValidationTextureFormat<int64_t>(1);
 
-    case Format::R32G32B32A32_SINT:
+    case Format::RGBA32Sint:
         return new ValidationTextureFormat<int32_t>(4);
-    case Format::R32G32B32_SINT:
+    case Format::RGB32Sint:
         return new ValidationTextureFormat<int32_t>(3);
-    case Format::R32G32_SINT:
+    case Format::RG32Sint:
         return new ValidationTextureFormat<int32_t>(2);
-    case Format::R32_SINT:
+    case Format::R32Sint:
         return new ValidationTextureFormat<int32_t>(1);
 
-    case Format::R16G16B16A16_SINT:
+    case Format::RGBA16Sint:
         return new ValidationTextureFormat<int16_t>(4);
-    case Format::R16G16_SINT:
+    case Format::RG16Sint:
         return new ValidationTextureFormat<int16_t>(2);
-    case Format::R16_SINT:
+    case Format::R16Sint:
         return new ValidationTextureFormat<int16_t>(1);
 
-    case Format::R8G8B8A8_SINT:
+    case Format::RGBA8Sint:
         return new ValidationTextureFormat<int8_t>(4);
-    case Format::R8G8_SINT:
+    case Format::RG8Sint:
         return new ValidationTextureFormat<int8_t>(2);
-    case Format::R8_SINT:
+    case Format::R8Sint:
         return new ValidationTextureFormat<int8_t>(1);
 
-    case Format::R16G16B16A16_UNORM:
+    case Format::RGBA16Unorm:
         return new ValidationTextureFormat<uint16_t>(4);
-    case Format::R16G16_UNORM:
+    case Format::RG16Unorm:
         return new ValidationTextureFormat<uint16_t>(2);
-    case Format::R16_UNORM:
+    case Format::R16Unorm:
         return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::R8G8B8A8_UNORM:
+    case Format::RGBA8Unorm:
         return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8B8A8_UNORM_SRGB:
+    case Format::RGBA8UnormSrgb:
         return new ValidationTextureFormat<uint8_t>(4);
-    case Format::R8G8_UNORM:
+    case Format::RG8Unorm:
         return new ValidationTextureFormat<uint8_t>(2);
-    case Format::R8_UNORM:
+    case Format::R8Unorm:
         return new ValidationTextureFormat<uint8_t>(1);
-    case Format::B8G8R8A8_UNORM:
+    case Format::BGRA8Unorm:
         return new ValidationTextureFormat<uint8_t>(4);
-    case Format::B8G8R8A8_UNORM_SRGB:
+    case Format::BGRA8UnormSrgb:
         return new ValidationTextureFormat<uint8_t>(4);
-    case Format::B8G8R8X8_UNORM:
+    case Format::BGRX8Unorm:
         return new ValidationTextureFormat<uint8_t>(3);
-    case Format::B8G8R8X8_UNORM_SRGB:
+    case Format::BGRX8UnormSrgb:
         return new ValidationTextureFormat<uint8_t>(3);
 
-    case Format::R16G16B16A16_SNORM:
+    case Format::RGBA16Snorm:
         return new ValidationTextureFormat<int16_t>(4);
-    case Format::R16G16_SNORM:
+    case Format::RG16Snorm:
         return new ValidationTextureFormat<int16_t>(2);
-    case Format::R16_SNORM:
+    case Format::R16Snorm:
         return new ValidationTextureFormat<int16_t>(1);
 
-    case Format::R8G8B8A8_SNORM:
+    case Format::RGBA8Snorm:
         return new ValidationTextureFormat<int8_t>(4);
-    case Format::R8G8_SNORM:
+    case Format::RG8Snorm:
         return new ValidationTextureFormat<int8_t>(2);
-    case Format::R8_SNORM:
+    case Format::R8Snorm:
         return new ValidationTextureFormat<int8_t>(1);
 
-    case Format::D32_FLOAT:
+    case Format::D32Float:
         return new ValidationTextureFormat<float>(1);
-    case Format::D16_UNORM:
+    case Format::D16Unorm:
         return new ValidationTextureFormat<uint16_t>(1);
 
-    case Format::B4G4R4A4_UNORM:
+    case Format::BGRA4Unorm:
         return new PackedValidationTextureFormat<uint16_t>(4, 4, 4, 4);
-    case Format::B5G6R5_UNORM:
+    case Format::B5G6R5Unorm:
         return new PackedValidationTextureFormat<uint16_t>(5, 6, 5, 0);
-    case Format::B5G5R5A1_UNORM:
+    case Format::BGR5A1Unorm:
         return new PackedValidationTextureFormat<uint16_t>(5, 5, 5, 1);
 
-    case Format::R9G9B9E5_SHAREDEXP:
+    case Format::RGB9E5Ufloat:
         return new ValidationTextureFormat<uint32_t>(1);
-    case Format::R10G10B10A2_TYPELESS:
+    case Format::RGB10A2Unorm:
         return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-    case Format::R10G10B10A2_UNORM:
+    case Format::RGB10A2Uint:
         return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-    case Format::R10G10B10A2_UINT:
-        return new PackedValidationTextureFormat<uint32_t>(10, 10, 10, 2);
-    case Format::R11G11B10_FLOAT:
+    case Format::R11G11B10Float:
         return new PackedValidationTextureFormat<uint32_t>(11, 11, 10, 0);
 
         // TODO: Add testing support for BC formats
-        //                     BC1_UNORM,
-        //                     BC1_UNORM_SRGB,
-        //                     BC2_UNORM,
-        //                     BC2_UNORM_SRGB,
-        //                     BC3_UNORM,
-        //                     BC3_UNORM_SRGB,
-        //                     BC4_UNORM,
-        //                     BC4_SNORM,
-        //                     BC5_UNORM,
-        //                     BC5_SNORM,
-        //                     BC6H_UF16,
-        //                     BC6H_SF16,
-        //                     BC7_UNORM,
-        //                     BC7_UNORM_SRGB,
+        //                     BC1Unorm,
+        //                     BC1UnormSrgb,
+        //                     BC2Unorm,
+        //                     BC2UnormSrgb,
+        //                     BC3Unorm,
+        //                     BC3UnormSrgb,
+        //                     BC4Unorm,
+        //                     BC4Snorm,
+        //                     BC5Unorm,
+        //                     BC5Snorm,
+        //                     BC6HUfloat,
+        //                     BC6HSfloat,
+        //                     BC7Unorm,
+        //                     BC7UnormSrgb,
     default:
         return nullptr;
     }
@@ -234,31 +184,33 @@ RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format)
 
 void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBase* validationFormat)
 {
-    auto extents = texture->extents;
-    auto arrayLayers = texture->arrayLayerCount;
-    auto mipLevels = texture->mipLevelCount;
-    auto texelSize = getTexelSize(texture->format);
+    Extent3D extent = texture->extent;
+    uint32_t layerCount = texture->arrayLength;
+    if (texture->textureType == TextureType::TextureCube)
+        layerCount *= 6;
+    uint32_t mipLevels = texture->mipCount;
+    Size texelSize = getTexelSize(texture->format);
 
-    for (GfxIndex layer = 0; layer < arrayLayers; ++layer)
+    for (uint32_t layer = 0; layer < layerCount; ++layer)
     {
-        for (GfxIndex mip = 0; mip < mipLevels; ++mip)
+        for (uint32_t mip = 0; mip < mipLevels; ++mip)
         {
             RefPtr<ValidationTextureData> subresource = new ValidationTextureData();
 
-            auto mipWidth = Math::Max(extents.width >> mip, 1);
-            auto mipHeight = Math::Max(extents.height >> mip, 1);
-            auto mipDepth = Math::Max(extents.depth >> mip, 1);
-            auto mipSize = mipWidth * mipHeight * mipDepth * texelSize;
-            subresource->textureData = malloc(mipSize);
-            SLANG_CHECK_ABORT(subresource->textureData);
+            uint32_t mipWidth = std::max(extent.width >> mip, 1u);
+            uint32_t mipHeight = std::max(extent.height >> mip, 1u);
+            uint32_t mipDepth = std::max(extent.depth >> mip, 1u);
+            uint32_t mipSize = mipWidth * mipHeight * mipDepth * texelSize;
+            subresource->textureData = ::malloc(mipSize);
+            assert(subresource->textureData != nullptr);
 
-            subresource->extents.width = mipWidth;
-            subresource->extents.height = mipHeight;
-            subresource->extents.depth = mipDepth;
-            subresource->strides.x = texelSize;
-            subresource->strides.y = mipWidth * texelSize;
-            subresource->strides.z = mipHeight * subresource->strides.y;
-            texture->subresourceObjects.add(subresource);
+            subresource->extent.width = mipWidth;
+            subresource->extent.height = mipHeight;
+            subresource->extent.depth = mipDepth;
+            subresource->pitches.x = texelSize;
+            subresource->pitches.y = mipWidth * texelSize;
+            subresource->pitches.z = mipHeight * subresource->pitches.y;
+            texture->subresourceObjects.push_back(subresource);
 
             for (int z = 0; z < mipDepth; ++z)
             {
@@ -272,30 +224,30 @@ void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBas
                 }
             }
 
-            ITextureResource::SubresourceData subData = {};
+            SubresourceData subData = {};
             subData.data = subresource->textureData;
-            subData.strideY = subresource->strides.y;
-            subData.strideZ = subresource->strides.z;
-            texture->subresourceDatas.add(subData);
+            subData.rowPitch = subresource->pitches.y;
+            subData.slicePitch = subresource->pitches.z;
+            texture->subresourceDatas.push_back(subData);
         }
     }
 }
 
-List<uint8_t> removePadding(
+std::vector<uint8_t> removePadding(
     ISlangBlob* pixels,
-    GfxCount width,
-    GfxCount height,
-    gfx::Size rowPitch,
-    gfx::Size pixelSize)
+    uint32_t width,
+    uint32_t height,
+    Size rowPitch,
+    Size pixelSize)
 {
-    List<uint8_t> buffer;
-    buffer.setCount(height * rowPitch);
-    for (GfxIndex i = 0; i < height; ++i)
+    std::vector<uint8_t> buffer;
+    buffer.resize(height * rowPitch);
+    for (uint32_t i = 0; i < height; ++i)
     {
         Offset srcOffset = i * rowPitch;
         Offset dstOffset = i * width * pixelSize;
         memcpy(
-            buffer.getBuffer() + dstOffset,
+            buffer.data() + dstOffset,
             (char*)pixels->getBufferPointer() + srcOffset,
             width * pixelSize);
     }
@@ -303,14 +255,14 @@ List<uint8_t> removePadding(
     return buffer;
 }
 
-Slang::Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height)
+Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height)
 {
     int stbResult = stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
 
     return stbResult ? SLANG_OK : SLANG_FAIL;
 }
 
-Slang::Result writeImage(
+Result writeImage(
     const char* filename,
     ISlangBlob* pixels,
     uint32_t width,
@@ -321,10 +273,11 @@ Slang::Result writeImage(
     if (rowPitch == width * pixelSize)
         return writeImage(filename, pixels, width, height);
 
-    List<uint8_t> buffer = removePadding(pixels, width, height, rowPitch, pixelSize);
+    std::vector<uint8_t> buffer = removePadding(pixels, width, height, rowPitch, pixelSize);
 
-    int stbResult = stbi_write_hdr(filename, width, height, 4, (float*)buffer.getBuffer());
+    int stbResult = stbi_write_hdr(filename, width, height, 4, (float*)buffer.data());
 
     return stbResult ? SLANG_OK : SLANG_FAIL;
 }
+
 } // namespace gfx_test

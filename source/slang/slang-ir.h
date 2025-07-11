@@ -2357,8 +2357,10 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
+FIDDLE()
 struct IRModule : RefObject
 {
+    FIDDLE(...)
 public:
     enum
     {
@@ -2441,7 +2443,29 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
+    //
+    // The range of module versions this compiler supports
+    //
+    // This will need to be updated if for example an instruction is removed,
+    // the max supported version should be incremented and the min supported
+    // version set to above the last version an instance of that instruction
+    // could be found
+    //
+    // Additionally this should be updated when new instructions are added,
+    // however only k_maxSupportedModuleVersion needs to be incremented in that
+    // case
+    //
+    // It represents the version of module regarding semantics and doesn't have
+    // anything to do with serialization format
+    //
+    const static UInt k_minSupportedModuleVersion = 0;
+    const static UInt k_maxSupportedModuleVersion = 0;
+
 private:
+    friend struct IRSerialReadContext;
+    friend struct IRSerialWriteContext;
+    friend struct Fossilized_IRModule;
+
     IRModule() = delete;
 
     /// Ctor
@@ -2460,10 +2484,13 @@ private:
     /// instructions from an arbitrary IR instruction we expect to find the
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
-    IRModuleInst* m_moduleInst = nullptr;
+    FIDDLE() IRModuleInst* m_moduleInst = nullptr;
 
     // The name of the module.
-    Name* m_name = nullptr;
+    FIDDLE() Name* m_name = nullptr;
+
+    // The version of the module as it was loaded
+    FIDDLE() UInt m_version = k_maxSupportedModuleVersion;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.

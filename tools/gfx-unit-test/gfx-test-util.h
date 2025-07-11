@@ -1,9 +1,18 @@
 #pragma once
 
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 #include "core/slang-render-api-util.h"
-#include "slang-gfx.h"
+#include "core/slang-test-tool-util.h"
+#include "slang-rhi.h"
+#include "span.h"
 #include "unit-test/slang-unit-test.h"
+
+// GFX_CHECK_CALL and GFX_CHECK_CALL_ABORT are used to check SlangResult
+#define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
+#define GFX_CHECK_CALL_ABORT(x) SLANG_CHECK_ABORT(!SLANG_FAILED(x))
+
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -17,90 +26,134 @@ enum class PrecompilationMode
 /// Helper function for print out diagnostic messages output by Slang compiler.
 void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
-/// Loads a compute shader module and produces a `gfx::IShaderProgram`.
+/// Loads a compute shader module and produces a `rhi::IShaderProgram`.
 Slang::Result loadComputeProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
     slang::ProgramLayout*& slangReflection);
 
 Slang::Result loadComputeProgram(
-    gfx::IDevice* device,
+    rhi::IDevice* device,
     slang::ISession* slangSession,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
-    slang::ProgramLayout*& slangReflection,
-    PrecompilationMode precompilationMode = PrecompilationMode::None);
+    slang::ProgramLayout*& slangReflection);
 
 Slang::Result loadComputeProgramFromSource(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
-    Slang::String source);
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
+    std::string_view source);
 
 Slang::Result loadGraphicsProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* vertexEntryPointName,
     const char* fragmentEntryPointName,
     slang::ProgramLayout*& slangReflection);
 
-/// Reads back the content of `buffer` and compares it against `expectedResult`.
-void compareComputeResult(
-    gfx::IDevice* device,
-    gfx::IBufferResource* buffer,
-    size_t offset,
-    const void* expectedResult,
-    size_t expectedBufferSize);
-
-/// Reads back the content of `texture` and compares it against `expectedResult`.
-void compareComputeResult(
-    gfx::IDevice* device,
-    gfx::ITextureResource* texture,
-    gfx::ResourceState state,
-    void* expectedResult,
-    size_t expectedResultRowPitch,
-    size_t rowCount);
-
-void compareComputeResultFuzzy(
-    const float* result,
-    float* expectedResult,
-    size_t expectedBufferSize);
-
-/// Reads back the content of `buffer` and compares it against `expectedResult` with a set
-/// tolerance.
-void compareComputeResultFuzzy(
-    gfx::IDevice* device,
-    gfx::IBufferResource* buffer,
-    float* expectedResult,
-    size_t expectedBufferSize);
-
-template<typename T, Slang::Index count>
-void compareComputeResult(
-    gfx::IDevice* device,
-    gfx::IBufferResource* buffer,
-    Slang::Array<T, count> expectedResult)
+template<typename T>
+void compareResultFuzzy(const T* result, const T* expectedResult, size_t count)
 {
-    Slang::List<uint8_t> expectedBuffer;
-    size_t bufferSize = sizeof(T) * count;
-    expectedBuffer.setCount(bufferSize);
-    memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
-    if (std::is_same<T, float>::value)
-        return compareComputeResultFuzzy(
-            device,
-            buffer,
-            (float*)expectedBuffer.getBuffer(),
-            bufferSize);
-    return compareComputeResult(device, buffer, 0, expectedBuffer.getBuffer(), bufferSize);
+    for (size_t i = 0; i < count; ++i)
+    {
+        SLANG_CHECK(abs(result[i] - expectedResult[i]) < 0.01f);
+    }
 }
 
-Slang::ComPtr<gfx::IDevice> createTestingDevice(
+template<typename T>
+void compareResult(const T* result, const T* expectedResult, size_t count)
+{
+    for (size_t i = 0; i < count; i++)
+    {
+        SLANG_CHECK(result[i] == expectedResult[i]);
+    }
+}
+
+template<typename T>
+void compareComputeResult(rhi::IDevice* device, rhi::IBuffer* buffer, span<T> expectedResult)
+{
+    size_t bufferSize = expectedResult.size() * sizeof(T);
+    // Read back the results.`
+    ComPtr<ISlangBlob> bufferData;
+    SLANG_CHECK(SLANG_SUCCEEDED(device->readBuffer(buffer, 0, bufferSize, bufferData.writeRef())));
+    SLANG_CHECK(bufferData->getBufferSize() == bufferSize);
+    const T* result = reinterpret_cast<const T*>(bufferData->getBufferPointer());
+
+    if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
+        compareResultFuzzy(result, expectedResult.data(), expectedResult.size());
+    else
+        compareResult<T>(result, expectedResult.data(), expectedResult.size());
+}
+
+template<typename T, size_t Count>
+void compareComputeResult(
+    rhi::IDevice* device,
+    rhi::IBuffer* buffer,
+    std::array<T, Count> expectedResult)
+{
+    compareComputeResult(device, buffer, span<T>(expectedResult.data(), Count));
+}
+
+template<typename T>
+void compareComputeResult(
+    rhi::IDevice* device,
+    rhi::ITexture* texture,
+    uint32_t layer,
+    uint32_t mip,
+    span<T> expectedResult)
+{
+    size_t bufferSize = expectedResult.size() * sizeof(T);
+    // Read back the results.
+    ComPtr<ISlangBlob> textureData;
+    rhi::SubresourceLayout layout;
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(device->readTexture(texture, layer, mip, textureData.writeRef(), &layout)));
+    SLANG_CHECK(textureData->getBufferSize() >= bufferSize);
+
+    uint8_t* buffer = (uint8_t*)textureData->getBufferPointer();
+    for (uint32_t z = 0; z < layout.size.depth; z++)
+    {
+        for (uint32_t y = 0; y < layout.size.height; y++)
+        {
+            for (uint32_t x = 0; x < layout.size.width; x++)
+            {
+                const uint8_t* src = reinterpret_cast<const uint8_t*>(
+                    buffer + z * layout.slicePitch + y * layout.rowPitch + x * layout.colPitch);
+                uint8_t* dst = reinterpret_cast<uint8_t*>(
+                    buffer +
+                    (((z * layout.size.depth + y) * layout.size.width) + x) * layout.colPitch);
+                ::memcpy(dst, src, layout.colPitch);
+            }
+        }
+    }
+
+    const T* result = reinterpret_cast<const T*>(textureData->getBufferPointer());
+
+    if constexpr (std::is_same<T, float>::value)
+        compareResultFuzzy(result, expectedResult.data(), expectedResult.size());
+    else
+        compareResult<T>(result, expectedResult.data(), expectedResult.size());
+}
+
+template<typename T, size_t Count>
+void compareComputeResult(
+    rhi::IDevice* device,
+    rhi::ITexture* texture,
+    uint32_t layer,
+    uint32_t mip,
+    std::array<T, Count> expectedResult)
+{
+    compareComputeResult(device, texture, layer, mip, span<T>(expectedResult.data(), Count));
+}
+
+Slang::ComPtr<rhi::IDevice> createTestingDevice(
     UnitTestContext* context,
-    Slang::RenderApiFlag::Enum api,
-    Slang::List<const char*> additionalSearchPaths = {},
-    gfx::IDevice::ShaderCacheDesc shaderCache = {});
+    rhi::DeviceType deviceType,
+    Slang::List<const char*> additionalSearchPaths = {});
 
 Slang::List<const char*> getSlangSearchPaths();
 
@@ -108,33 +161,64 @@ void initializeRenderDoc();
 void renderDocBeginFrame();
 void renderDocEndFrame();
 
+template<typename T, typename... Args>
+auto makeArray(Args... args)
+{
+    return std::array<T, sizeof...(Args)>{static_cast<T>(args)...};
+}
+
+inline bool deviceTypeInEnabledApis(rhi::DeviceType deviceType, Slang::RenderApiFlags enabledApis)
+{
+    switch (deviceType)
+    {
+    case rhi::DeviceType::Default:
+        return true;
+    case rhi::DeviceType::CPU:
+        return enabledApis & Slang::RenderApiFlag::CPU;
+    case rhi::DeviceType::CUDA:
+        return enabledApis & Slang::RenderApiFlag::CUDA;
+    case rhi::DeviceType::Metal:
+        return enabledApis & Slang::RenderApiFlag::Metal;
+    case rhi::DeviceType::WGPU:
+        return enabledApis & Slang::RenderApiFlag::WebGPU;
+    case rhi::DeviceType::Vulkan:
+        return enabledApis & Slang::RenderApiFlag::Vulkan;
+    case rhi::DeviceType::D3D11:
+        return enabledApis & Slang::RenderApiFlag::D3D11;
+    case rhi::DeviceType::D3D12:
+        return enabledApis & Slang::RenderApiFlag::D3D12;
+    }
+    return true;
+}
+
+
 template<typename ImplFunc>
 void runTestImpl(
     const ImplFunc& f,
     UnitTestContext* context,
-    Slang::RenderApiFlag::Enum api,
-    Slang::List<const char*> searchPaths = {},
-    gfx::IDevice::ShaderCacheDesc shaderCache = {})
+    rhi::DeviceType deviceType,
+    Slang::List<const char*> searchPaths = {})
 {
-    if ((api & context->enabledApis) == 0)
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
     {
         SLANG_IGNORE_TEST
     }
-    auto device = createTestingDevice(context, api, searchPaths, shaderCache);
+
+    auto device = createTestingDevice(context, deviceType, searchPaths);
     if (!device)
     {
         SLANG_IGNORE_TEST
     }
 #if SLANG_WIN32
     // Skip d3d12 tests on x86 now since dxc doesn't function correctly there on Windows 11.
-    if (api == Slang::RenderApiFlag::D3D12)
+    if (rhi::DeviceType == rhi::DeviceType::D3D12)
     {
         SLANG_IGNORE_TEST
     }
 #endif
     // Skip d3d11 tests when we don't have DXBC support as they're bound to
     // fail without a backend compiler
-    if (api == Slang::RenderApiFlag::D3D11 && !SLANG_ENABLE_DXBC_SUPPORT)
+    if (deviceType == rhi::DeviceType::D3D11 && !SLANG_ENABLE_DXBC_SUPPORT)
     {
         SLANG_IGNORE_TEST
     }
@@ -150,8 +234,5 @@ void runTestImpl(
     }
     renderDocEndFrame();
 }
-
-#define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
-#define GFX_CHECK_CALL_ABORT(x) SLANG_CHECK_ABORT(!SLANG_FAILED(x))
 
 } // namespace gfx_test

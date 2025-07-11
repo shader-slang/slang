@@ -13,6 +13,7 @@ interface IRWBuf<T> : IBuf<T>
     void write(int x, T v);
 }
 
+#pragma warning(disable:30856)
 extension<T, U : IBuf<T>> U
 {
     __subscript(int x) -> T { get { return read(x); } }
