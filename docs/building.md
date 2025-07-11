@@ -322,7 +322,7 @@ have the Nix environment automatically activate when you enter your clone of
 this repository:
 
 ```bash
-echo 'use flake' >> .envrc
+echo 'use flake' > .envrc
 direnv allow
 ```
 
