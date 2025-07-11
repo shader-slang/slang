@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11 -output-using-type
 
 // This test verifies that row_major and column_major matrices don't create
 // duplicate DiffPair structs when used together in autodiff code.
@@ -8,12 +10,12 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[BackwardDifferentiable]
+[Differentiable]
 float3 matmul33_row(no_diff float3 v, row_major float3x3 w) {
     return mul(w, v);
 }
 
-[BackwardDifferentiable]
+[Differentiable]
 float3 matmul33_col(no_diff float3 v, float3x3 w) {
     return mul(w, v);
 }
