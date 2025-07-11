@@ -24494,6 +24494,10 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 OpCapability ReplicatedCompositesEXT;
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
+        case glsl:
+            for(int i = 0; i < N; ++i)
+                this[i] = t;
+            return;
         case hlsl:
              __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
@@ -24561,12 +24565,16 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     void store(T* buffer, int32_t byteOffset16ByteAligned = 0)
     {
-        let pointer = Ptr<T[]>(buffer);
-        let alignment = 16;
-        return spirv_asm
+        __target_switch
         {
-            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned !alignment;
-        };
+        case spirv:
+            let pointer = Ptr<T[]>(buffer);
+            let alignment = 16;
+            return spirv_asm
+            {
+                OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned !alignment;
+            };
+        }
     }
 
     [ForceInline]
@@ -24733,12 +24741,16 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     static CoopVec<T, N> load(T* buffer, int32_t byteOffset16ByteAligned = 0)
     {
-        let pointer = Ptr<T[]>(buffer);
-        let alignment = 16;
-        return spirv_asm
+        __target_switch
         {
-            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
-        };
+        case spirv:
+            let pointer = Ptr<T[]>(buffer);
+            let alignment = 16;
+            return spirv_asm
+            {
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+            };
+        }
     }
 
     // Groupshared
