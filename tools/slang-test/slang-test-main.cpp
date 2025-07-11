@@ -4998,7 +4998,7 @@ SlangResult innerMain(int argc, char** argv)
     }
 
     SLANG_RETURN_ON_FAIL(
-        Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
+        Options::parse(argc, argv, &categorySet, StdWriters::getOut(), StdWriters::getError(), &context.options));
 
     Options& options = context.options;
 
