@@ -540,7 +540,8 @@ struct SCCPContext
         if (isFloatingPointType(op0) || isFloatingPointType(op1))
         {
             // Floating-point path - C++ operators follow IEEE 754 automatically
-            resultVal = getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
+            resultVal =
+                getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
         }
         else
         {
