@@ -5,7 +5,7 @@
 // TODO(JS): Doesn't work on vk currently
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 // TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 // Not supported in WGSL: 1D array texture not supported in WGSL
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
