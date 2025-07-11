@@ -255,11 +255,11 @@ jobs:
           allowed_tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
           trigger_phrase: "@claude"
           assignee_trigger: "claude"
-          timeout_minutes: "25"
+          timeout_minutes: "60"
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "100"
+          max_turns: "500"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
