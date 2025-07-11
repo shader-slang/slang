@@ -3372,6 +3372,13 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
 void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDecl* decl)
 {
     checkVarDeclCommon(decl);
+
+    // Validate that the type is appropriate for a compile-time constant
+    // (only integers, bools, and enums are supported)
+    if (decl->type.type && !isValidCompileTimeConstantType(decl->type.type))
+    {
+        getSink()->diagnose(decl, Diagnostics::invalidGenericValueParameterType, decl->type.type);
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
