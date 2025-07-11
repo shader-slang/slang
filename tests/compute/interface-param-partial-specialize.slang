@@ -3,8 +3,11 @@
 // with __Dynamic. This verifies that the handling of
 // "partially" specializing an existential type is correct.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 [anyValueSize(8)]
 interface IInterface

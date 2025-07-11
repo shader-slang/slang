@@ -13,6 +13,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj -cuda
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -matrix-layout-row-major -shaderobj
 

@@ -4,10 +4,11 @@
 // concrete types that have data within them, instead of
 // just empty types.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 // A lot of the setup is the same as for `interface-shader-param`,
 // so look there if you want the comments.

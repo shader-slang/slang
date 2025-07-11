@@ -4,6 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 

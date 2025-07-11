@@ -3,6 +3,7 @@
 //TEST(compute):PERFORMANCE_PROFILE:-slang -compute -compute-dispatch 256,1,1 -shaderobj
 //TEST(compute):PERFORMANCE_PROFILE:-slang -compute -dx12 -compute-dispatch 256,1,1 -shaderobj
 //TEST(compute, vulkan):PERFORMANCE_PROFILE:-vk -compute -compute-dispatch 256,1,1 -shaderobj
+//TEST(compute):PERFORMANCE_PROFILE:-cuda -compute -compute-dispatch 256,1,1 -shaderobj
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1, 1), stride=4):out,name outputBuffer
 

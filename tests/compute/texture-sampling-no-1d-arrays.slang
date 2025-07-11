@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -cuda
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
 

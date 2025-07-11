@@ -4,6 +4,7 @@
 // inside of structure types to make sure that works
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute, cuda):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_5_0
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl

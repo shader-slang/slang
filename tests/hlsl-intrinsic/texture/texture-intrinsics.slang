@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12CS6):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type -xslang -DCS60
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT: Texture1D(size=4, format=D32Float, content = one):name t1D
 Texture1D<float> t1D;
