@@ -1,41 +1,38 @@
+// Duplicated: This test is identical slang-rhi\tests\test-root-shader-parameter.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
-static ComPtr<IBufferResource> createBuffer(IDevice* device, uint32_t content)
+static ComPtr<IBuffer> createBuffer(IDevice* device, uint32_t content)
 {
-    ComPtr<IBufferResource> buffer;
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = sizeof(uint32_t);
-    bufferDesc.format = gfx::Format::Unknown;
+    ComPtr<IBuffer> buffer;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = sizeof(uint32_t);
+    bufferDesc.format = rhi::Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> numbersBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, (void*)&content, buffer.writeRef()));
+    ComPtr<IBuffer> numbersBuffer;
+    GFX_CHECK_CALL_ABORT(device->createBuffer(bufferDesc, (void*)&content, buffer.writeRef()));
 
     return buffer;
 }
 void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+    if (!device->hasFeature(Feature::ParameterBlock))
+    {
+        SLANG_CHECK("no support for parameter blocks");
+    }
 
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
@@ -46,106 +43,84 @@ void rootShaderParameterTestImpl(IDevice* device, UnitTestContext* context)
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<rhi::IComputePipeline> pipeline = device->createComputePipeline(pipelineDesc);
 
-    Slang::List<ComPtr<IBufferResource>> buffers;
-    Slang::List<ComPtr<IResourceView>> srvs, uavs;
+    Slang::List<ComPtr<IBuffer>> buffers;
 
     for (uint32_t i = 0; i < 9; i++)
     {
         buffers.add(createBuffer(device, i == 0 ? 10 : i));
-
-        ComPtr<IResourceView> bufferView;
-        IResourceView::Desc viewDesc = {};
-        viewDesc.type = IResourceView::Type::UnorderedAccess;
-        viewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(
-            device->createBufferView(buffers[i], nullptr, viewDesc, bufferView.writeRef()));
-        uavs.add(bufferView);
-
-        viewDesc.type = IResourceView::Type::ShaderResource;
-        viewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(
-            device->createBufferView(buffers[i], nullptr, viewDesc, bufferView.writeRef()));
-        srvs.add(bufferView);
     }
 
     ComPtr<IShaderObject> rootObject;
-    device->createMutableRootShaderObject(shaderProgram, rootObject.writeRef());
+    device->createRootShaderObject(shaderProgram, rootObject.writeRef());
 
     ComPtr<IShaderObject> g, s1, s2;
-    device->createMutableShaderObject(
+    device->createShaderObject(
         slangReflection->findTypeByName("S0"),
         ShaderObjectContainerType::None,
         g.writeRef());
-    device->createMutableShaderObject(
+    device->createShaderObject(
         slangReflection->findTypeByName("S1"),
         ShaderObjectContainerType::None,
         s1.writeRef());
-    device->createMutableShaderObject(
+    device->createShaderObject(
         slangReflection->findTypeByName("S1"),
         ShaderObjectContainerType::None,
         s2.writeRef());
 
     {
         auto cursor = ShaderCursor(s1);
-        cursor["c0"].setResource(srvs[2]);
-        cursor["c1"].setResource(uavs[3]);
-        cursor["c2"].setResource(srvs[4]);
+        cursor["c0"].setBinding(buffers[2]);
+        cursor["c1"].setBinding(buffers[3]);
+        cursor["c2"].setBinding(buffers[4]);
     }
     {
         auto cursor = ShaderCursor(s2);
-        cursor["c0"].setResource(srvs[5]);
-        cursor["c1"].setResource(uavs[6]);
-        cursor["c2"].setResource(srvs[7]);
+        cursor["c0"].setBinding(buffers[5]);
+        cursor["c1"].setBinding(buffers[6]);
+        cursor["c2"].setBinding(buffers[7]);
     }
     {
         auto cursor = ShaderCursor(g);
-        cursor["b0"].setResource(srvs[0]);
-        cursor["b1"].setResource(srvs[1]);
+        cursor["b0"].setBinding(buffers[0]);
+        cursor["b1"].setBinding(buffers[1]);
         cursor["s1"].setObject(s1);
         cursor["s2"].setObject(s2);
     }
     {
         auto cursor = ShaderCursor(rootObject);
         cursor["g"].setObject(g);
-        cursor["buffer"].setResource(uavs[8]);
+        cursor["buffer"].setBinding(buffers[8]);
     }
 
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
+        auto commandBuffer = queue->createCommandEncoder();
         {
-            auto encoder = commandBuffer->encodeComputeCommands();
-            encoder->bindPipelineWithRootObject(pipelineState, rootObject);
+            auto encoder = commandBuffer->beginComputePass();
+            encoder->bindPipeline(pipeline, rootObject);
             encoder->dispatchCompute(1, 1, 1);
-            encoder->endEncoding();
+            encoder->end();
         }
 
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        queue->submit(commandBuffer->finish());
         queue->waitOnHost();
     }
 
-    compareComputeResult(
-        device,
-        buffers[8],
-        Slang::makeArray<uint32_t>(10 - 1 + 2 - 3 + 4 + 5 - 6 + 7));
+    compareComputeResult(device, buffers[8], std::array{10 - 1 + 2 - 3 + 4 + 5 - 6 + 7});
 }
 
 SLANG_UNIT_TEST(rootShaderParameterD3D12)
 {
-    runTestImpl(rootShaderParameterTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(rootShaderParameterTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(rootShaderParameterVulkan)
 {
-    runTestImpl(rootShaderParameterTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(rootShaderParameterTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test

@@ -32,7 +32,7 @@ struct EliminateMultiLevelBreakContext
         {
             switch (headerInst->getOp())
             {
-            case kIROp_loop:
+            case kIROp_Loop:
                 return as<IRLoop>(headerInst)->getBreakBlock();
             case kIROp_Switch:
                 return as<IRSwitch>(headerInst)->getBreakLabel();
@@ -45,7 +45,7 @@ struct EliminateMultiLevelBreakContext
         {
             switch (headerInst->getOp())
             {
-            case kIROp_loop:
+            case kIROp_Loop:
                 builder->replaceOperand(&(as<IRLoop>(headerInst)->breakBlock), block);
                 break;
             case kIROp_Switch:
@@ -103,7 +103,7 @@ struct EliminateMultiLevelBreakContext
                     continue;
                 switch (block->getTerminator()->getOp())
                 {
-                case kIROp_loop:
+                case kIROp_Loop:
                 case kIROp_Switch:
                     {
                         // Both region and switch insts mark the start a breakable region.
@@ -146,7 +146,7 @@ struct EliminateMultiLevelBreakContext
                 auto terminator = block->getTerminator();
                 switch (terminator->getOp())
                 {
-                case kIROp_loop:
+                case kIROp_Loop:
                 case kIROp_Switch:
                     {
                         RefPtr<BreakableRegionInfo> regionInfo = new BreakableRegionInfo();
@@ -434,8 +434,8 @@ struct EliminateMultiLevelBreakContext
                 auto user = use->getUser();
                 switch (user->getOp())
                 {
-                case kIROp_conditionalBranch:
-                case kIROp_ifElse:
+                case kIROp_ConditionalBranch:
+                case kIROp_IfElse:
                 case kIROp_Switch:
                     // For complex branches, insert an intermediate block so we can specify the
                     // target index argument.
@@ -457,10 +457,10 @@ struct EliminateMultiLevelBreakContext
                         use->set(tmpBlock);
                     }
                     break;
-                case kIROp_loop:
+                case kIROp_Loop:
                     // Ignore.
                     continue;
-                case kIROp_unconditionalBranch:
+                case kIROp_UnconditionalBranch:
                     {
                         auto originalBranch = as<IRUnconditionalBranch>(user);
                         if (originalBranch->getOperandCount() == 1)

@@ -1780,7 +1780,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto supType = lowerType(context, witness->getSup());
         auto witnessTableType = irBuilder->getWitnessTableType(supType);
         ShortList<IRInst*> captures;
-        if (auto expandType = as<IRExpandType>(subType))
+        if (auto expandType = as<IRExpandTypeOrVal>(subType))
         {
             for (UInt i = 0; i < expandType->getCaptureCount(); i++)
             {
@@ -1991,6 +1991,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
+    LoweredValInfo visitNoneWitness(NoneWitness*)
+    {
+        auto builder = getBuilder();
+        auto voidType = builder->getVoidType();
+        return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
+    }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
@@ -4748,7 +4754,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto irBuilder = getBuilder();
         auto irType = lowerType(context, expr->type);
         List<IRInst*> irCapturedPacks;
-        if (auto expandType = as<IRExpandType>(irType))
+        if (auto expandType = as<IRExpandTypeOrVal>(irType))
         {
             for (UInt i = 0; i < expandType->getCaptureCount(); i++)
             {
@@ -5473,23 +5479,37 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
     {
+        auto builder = getBuilder();
         if (expr->constantVal)
         {
-            return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
+            return LoweredValInfo::simple(builder->getBoolValue(expr->constantVal->value));
         }
-        // If expr is a witness, then this is a run-time type check from for an existential type.
         if (expr->witnessArg)
         {
-            auto value = lowerLValueExpr(context, expr->value);
             auto type = lowerType(context, expr->typeExpr.type);
             auto witness = lowerSimpleVal(context, expr->witnessArg);
-            auto existentialInfo = value.getExtractedExistentialValInfo();
-            auto irVal = getBuilder()->emitIsType(
-                existentialInfo->extractedVal,
-                existentialInfo->witnessTable,
-                type,
-                witness);
-            return LoweredValInfo::simple(irVal);
+            auto declWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
+
+            if (declWitness && declWitness->isOptional())
+            {
+                // Optional constraint check. NoneWitness lowers to a specific
+                // ID, so that we can check for that here.
+                auto witnessID = builder->emitGetSequentialIDInst(witness);
+                auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
+                auto irVal = builder->emitNeq(witnessID, noneWitnessID);
+                return LoweredValInfo::simple(irVal);
+            }
+            else
+            { // This is a run-time type check from for an existential type.
+                auto value = lowerLValueExpr(context, expr->value);
+                auto existentialInfo = value.getExtractedExistentialValInfo();
+                auto irVal = builder->emitIsType(
+                    existentialInfo->extractedVal,
+                    existentialInfo->witnessTable,
+                    type,
+                    witness);
+                return LoweredValInfo::simple(irVal);
+            }
         }
         // For all other cases, we map to a simple type equality check in the IR.
         IRType* leftType = nullptr;
@@ -5503,8 +5523,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         auto rightType = lowerType(context, expr->typeExpr.type);
         IRInst* args[] = {leftType, rightType};
-        auto irVal =
-            getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
+        auto irVal = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 
@@ -8252,10 +8271,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
         auto inst = builder->getInsertLoc().getInst();
-        if (inst->getOp() == kIROp_Module)
+        if (inst->getOp() == kIROp_ModuleInst)
             return;
 
-        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_Module)
+        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_ModuleInst)
         {
             inst = inst->getParent();
         }
@@ -9610,10 +9629,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
-        if (const auto payloadAttribute = decl->findModifier<PayloadAttribute>())
-        {
-            subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
-        }
 
         if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
         {
@@ -11298,7 +11313,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     debugType);
 
                 // Add a decoration to link the function to its debug function
-                getBuilder()->addDecoration(irFunc, kIROp_DebugFunctionDecoration, debugFuncCallee);
+                getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
             }
         }
 

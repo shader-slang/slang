@@ -19,9 +19,6 @@ class Name;
 
 struct IRSerialBinary
 {
-    /// IR module list
-    static const FourCC::RawValue kIRModuleFourCc = SLANG_FOUR_CC('S', 'i', 'm', 'd');
-
     /* NOTE! All FourCC that can be compressed must start with capital 'S', because compressed
     version is the same FourCC with the 'S' replaced with 's' */
 

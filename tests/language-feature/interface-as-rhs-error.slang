@@ -21,13 +21,13 @@ struct AnotherType
 // These should produce errors - interface types as RHS
 bool testIsOperatorWithInterface<T>()
 {
-    //CHECK: ([[# @LINE+1]]): error 30301: 'is' and 'as' operators do not support interface types as the right-hand side
+    //CHECK: ([[# @LINE+1]]): error 30301: cannot use 'is' operator with an interface type as the right-hand side
     return (T is IMyInterface);
 }
 
 void testAsOperatorWithInterface<T>(T value)
 {
-    //CHECK: ([[# @LINE+1]]): error 30301: 'is' and 'as' operators do not support interface types as the right-hand side
+    //CHECK: ([[# @LINE+1]]): error 30302: cannot use 'as' operator with an interface type as the right-hand side
     let result = value as IMyInterface;
 }
 

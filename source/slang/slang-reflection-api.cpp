@@ -4,6 +4,7 @@
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
+#include "slang-deprecated.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang.h"
@@ -40,6 +41,12 @@ static inline Type* convert(SlangReflectionType* type)
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    // Prevent the AtomicType struct from being visible to the user
+    // through the reflection API.
+    if (auto atomicType = as<AtomicType>(type))
+    {
+        return (SlangReflectionType*)atomicType->getElementType();
+    }
     return (SlangReflectionType*)type;
 }
 
@@ -562,20 +569,45 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
 
 SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
 {
+    return spReflectionType_GetSpecializedElementCount(inType, nullptr);
+}
+
+SLANG_API size_t spReflectionType_GetSpecializedElementCount(
+    SlangReflectionType* inType,
+    SlangReflection* reflection)
+{
     auto type = convert(inType);
     if (!type)
         return 0;
 
+    IntVal* elementCount;
+    bool isUnsized;
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return !arrayType->isUnsized() ? (size_t)getIntVal(arrayType->getElementCount()) : 0;
+        elementCount = arrayType->getElementCount();
+        isUnsized = arrayType->isUnsized();
     }
     else if (auto vectorType = as<VectorExpressionType>(type))
     {
-        return (size_t)getIntVal(vectorType->getElementCount());
+        elementCount = vectorType->getElementCount();
+        isUnsized = false;
+    }
+    else
+    {
+        return 0;
     }
 
-    return 0;
+    if (const auto program = convert(reflection))
+    {
+        if (const auto componentType = program->getProgram())
+        {
+            if (const auto c = componentType->tryFoldIntVal(elementCount))
+                return c->getValue();
+        }
+    }
+
+    const auto isWithoutSize = isUnsized || elementCount->isLinkTimeVal();
+    return isWithoutSize ? 0 : (size_t)getIntVal(elementCount);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* inType)
@@ -586,7 +618,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
 
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return (SlangReflectionType*)arrayType->getElementType();
+        return convert(arrayType->getElementType());
     }
     else if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
@@ -1026,7 +1058,7 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
 
         if (as<ErrorType>(result))
             return nullptr;
-        return (SlangReflectionType*)result;
+        return convert(result);
     }
     catch (...)
     {
@@ -1158,7 +1190,7 @@ SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(
     if (!typeLayout)
         return nullptr;
 
-    return (SlangReflectionType*)typeLayout->type;
+    return convert(typeLayout->type);
 }
 
 SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout* inTypeLayout)
@@ -1939,7 +1971,9 @@ struct ExtendedTypeLayoutContext
             LayoutSize elementCount = LayoutSize::infinite();
             if (auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type))
             {
-                if (!arrayType->isUnsized())
+                const auto isWithoutSize =
+                    arrayType->isUnsized() || arrayType->getElementCount()->isLinkTimeVal();
+                if (!isWithoutSize)
                 {
                     elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
                 }
@@ -4227,7 +4261,7 @@ SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(
         {
             auto constraints =
                 globalGenericParamDecl->getMembersOfType<GenericTypeConstraintDecl>();
-            return (SlangReflectionType*)constraints[index]->sup.Ptr();
+            return convert(constraints[index]->sup.Ptr());
         }
         // TODO: Add case for entry-point generic parameters.
     }

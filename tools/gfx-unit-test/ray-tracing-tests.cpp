@@ -1,14 +1,17 @@
+#if 0
+// Duplcated: This is ported to slang-rhi\tests\test-ray-tracing.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/vector-math.h"
-#include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <chrono>
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
-using namespace gfx;
+using namespace rhi;
 using namespace Slang;
 
 namespace gfx_test
@@ -53,21 +56,19 @@ struct BaseRayTracingTest
     IDevice* device;
     UnitTestContext* context;
 
-    ComPtr<IFramebufferLayout> framebufferLayout;
-    ComPtr<ITransientResourceHeap> transientHeap;
     ComPtr<ICommandQueue> queue;
 
-    ComPtr<IPipelineState> renderPipelineState;
-    ComPtr<IBufferResource> vertexBuffer;
-    ComPtr<IBufferResource> indexBuffer;
-    ComPtr<IBufferResource> transformBuffer;
-    ComPtr<IBufferResource> instanceBuffer;
-    ComPtr<IBufferResource> BLASBuffer;
+    ComPtr<IRayTracingPipeline> renderPipelineState;
+    ComPtr<IBuffer> vertexBuffer;
+    ComPtr<IBuffer> indexBuffer;
+    ComPtr<IBuffer> transformBuffer;
+    ComPtr<IBuffer> instanceBuffer;
+    ComPtr<IBuffer> BLASBuffer;
     ComPtr<IAccelerationStructure> BLAS;
-    ComPtr<IBufferResource> TLASBuffer;
+    ComPtr<IBuffer> TLASBuffer;
     ComPtr<IAccelerationStructure> TLAS;
-    ComPtr<ITextureResource> resultTexture;
-    ComPtr<IResourceView> resultTextureUAV;
+    ComPtr<ITexture> resultTexture;
+    ComPtr<ITextureView> resultTextureUAV;
     ComPtr<IShaderTable> shaderTable;
 
     uint32_t width = 2;
@@ -85,7 +86,7 @@ struct BaseRayTracingTest
     }
 
     // Load and compile shader code from source.
-    gfx::Result loadShaderProgram(gfx::IDevice* device, gfx::IShaderProgram** outProgram)
+    Result loadShaderProgram(IDevice* device, IShaderProgram** outProgram)
     {
         ComPtr<slang::ISession> slangSession;
         slangSession = device->getSlangSession();
@@ -122,181 +123,151 @@ struct BaseRayTracingTest
             diagnosticsBlob.writeRef());
         SLANG_RETURN_ON_FAIL(result);
 
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
-        SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+        SLANG_RETURN_ON_FAIL(device->createShaderProgram(programDesc, outProgram));
 
         return SLANG_OK;
     }
 
     void createResultTexture()
     {
-        ITextureResource::Desc resultTextureDesc = {};
-        resultTextureDesc.type = IResource::Type::Texture2D;
-        resultTextureDesc.numMipLevels = 1;
+        TextureDesc resultTextureDesc = {};
+        resultTextureDesc.type = TextureType::Texture2D;
+        resultTextureDesc.mipCount = 1;
         resultTextureDesc.size.width = width;
         resultTextureDesc.size.height = height;
         resultTextureDesc.size.depth = 1;
         resultTextureDesc.defaultState = ResourceState::UnorderedAccess;
-        resultTextureDesc.format = Format::R32G32B32A32_FLOAT;
-        resultTexture = device->createTextureResource(resultTextureDesc);
-        IResourceView::Desc resultUAVDesc = {};
+        resultTextureDesc.format = Format::RGBA32Float;
+        resultTextureDesc.usage = TextureUsage::UnorderedAccess | TextureUsage::CopySource;
+        resultTexture = device->createTexture(resultTextureDesc);
+        
+        TextureViewDesc resultUAVDesc = {};
         resultUAVDesc.format = resultTextureDesc.format;
-        resultUAVDesc.type = IResourceView::Type::UnorderedAccess;
-        resultTextureUAV = device->createTextureView(resultTexture, resultUAVDesc);
+        resultTextureUAV = resultTexture->createView(resultUAVDesc);
     }
 
     void createRequiredResources()
     {
-        ICommandQueue::Desc queueDesc = {};
-        queueDesc.type = ICommandQueue::QueueType::Graphics;
-        queue = device->createCommandQueue(queueDesc);
+        GFX_CHECK_CALL_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
 
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
         vertexBufferDesc.defaultState = ResourceState::ShaderResource;
-        vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+        vertexBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
+        vertexBuffer = device->createBuffer(vertexBufferDesc, &kVertexData[0]);
         SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
-        IBufferResource::Desc indexBufferDesc;
-        indexBufferDesc.type = IResource::Type::Buffer;
-        indexBufferDesc.sizeInBytes = kIndexCount * sizeof(int32_t);
+        BufferDesc indexBufferDesc;
+        indexBufferDesc.size = kIndexCount * sizeof(int32_t);
         indexBufferDesc.defaultState = ResourceState::ShaderResource;
-        indexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
+        indexBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
+        indexBuffer = device->createBuffer(indexBufferDesc, &kIndexData[0]);
         SLANG_CHECK_ABORT(indexBuffer != nullptr);
 
-        IBufferResource::Desc transformBufferDesc;
-        transformBufferDesc.type = IResource::Type::Buffer;
-        transformBufferDesc.sizeInBytes = sizeof(float) * 12;
+        BufferDesc transformBufferDesc;
+        transformBufferDesc.size = sizeof(float) * 12;
         transformBufferDesc.defaultState = ResourceState::ShaderResource;
+        transformBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
         float transformData[12] =
             {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-        transformBuffer = device->createBufferResource(transformBufferDesc, &transformData);
+        transformBuffer = device->createBuffer(transformBufferDesc, &transformData);
         SLANG_CHECK_ABORT(transformBuffer != nullptr);
 
         createResultTexture();
 
-        IFramebufferLayout::TargetLayout renderTargetLayout = {Format::R8G8B8A8_UNORM, 1};
-        IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
-        IFramebufferLayout::Desc framebufferLayoutDesc;
-        framebufferLayoutDesc.renderTargetCount = 1;
-        framebufferLayoutDesc.renderTargets = &renderTargetLayout;
-        framebufferLayoutDesc.depthStencil = &depthLayout;
-        GFX_CHECK_CALL_ABORT(
-            device->createFramebufferLayout(framebufferLayoutDesc, framebufferLayout.writeRef()));
-
-        ITransientResourceHeap::Desc transientHeapDesc = {};
-        transientHeapDesc.constantBufferSize = 4096 * 1024;
-        GFX_CHECK_CALL_ABORT(
-            device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
         // Build bottom level acceleration structure.
         {
-            IAccelerationStructure::BuildInputs accelerationStructureBuildInputs;
-            IAccelerationStructure::PrebuildInfo accelerationStructurePrebuildInfo;
-            accelerationStructureBuildInputs.descCount = 1;
-            accelerationStructureBuildInputs.kind = IAccelerationStructure::Kind::BottomLevel;
-            accelerationStructureBuildInputs.flags =
-                IAccelerationStructure::BuildFlags::AllowCompaction;
-            IAccelerationStructure::GeometryDesc geomDesc;
-            geomDesc.flags = IAccelerationStructure::GeometryFlags::Opaque;
-            geomDesc.type = IAccelerationStructure::GeometryType::Triangles;
-            geomDesc.content.triangles.indexCount = kIndexCount;
-            geomDesc.content.triangles.indexData = indexBuffer->getDeviceAddress();
-            geomDesc.content.triangles.indexFormat = Format::R32_UINT;
-            geomDesc.content.triangles.vertexCount = kVertexCount;
-            geomDesc.content.triangles.vertexData = vertexBuffer->getDeviceAddress();
-            geomDesc.content.triangles.vertexFormat = Format::R32G32B32_FLOAT;
-            geomDesc.content.triangles.vertexStride = sizeof(Vertex);
-            geomDesc.content.triangles.transform3x4 = transformBuffer->getDeviceAddress();
-            accelerationStructureBuildInputs.geometryDescs = &geomDesc;
+            AccelerationStructureBuildInput geomInput = {};
+            geomInput.type = AccelerationStructureBuildInputType::Triangles;
+            geomInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
+            geomInput.triangles.indexCount = kIndexCount;
+            geomInput.triangles.indexBuffer = BufferOffsetPair(indexBuffer, 0);
+            geomInput.triangles.indexFormat = IndexFormat::Uint32;
+            geomInput.triangles.vertexCount = kVertexCount;
+            geomInput.triangles.vertexBuffers[0] = BufferOffsetPair(vertexBuffer, 0);
+            geomInput.triangles.vertexBufferCount = 1;
+            geomInput.triangles.vertexFormat = Format::RGB32Float;
+            geomInput.triangles.vertexStride = sizeof(Vertex);
+            geomInput.triangles.preTransformBuffer = BufferOffsetPair(transformBuffer, 0);
+
+            AccelerationStructureBuildDesc buildInputs = {};
+            buildInputs.inputs = &geomInput;
+            buildInputs.inputCount = 1;
+            buildInputs.flags = AccelerationStructureBuildFlags::AllowCompaction;
 
             // Query buffer size for acceleration structure build.
-            GFX_CHECK_CALL_ABORT(device->getAccelerationStructurePrebuildInfo(
-                accelerationStructureBuildInputs,
-                &accelerationStructurePrebuildInfo));
+            AccelerationStructureSizes sizes;
+            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
+            
             // Allocate buffers for acceleration structure.
-            IBufferResource::Desc asDraftBufferDesc;
-            asDraftBufferDesc.type = IResource::Type::Buffer;
+            BufferDesc asDraftBufferDesc;
             asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
-            asDraftBufferDesc.sizeInBytes =
-                (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
-            ComPtr<IBufferResource> draftBuffer = device->createBufferResource(asDraftBufferDesc);
-            IBufferResource::Desc scratchBufferDesc;
-            scratchBufferDesc.type = IResource::Type::Buffer;
+            asDraftBufferDesc.size = sizes.accelerationStructureSize;
+            asDraftBufferDesc.usage = BufferUsage::AccelerationStructure;
+            ComPtr<IBuffer> draftBuffer = device->createBuffer(asDraftBufferDesc);
+            
+            BufferDesc scratchBufferDesc;
             scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-            scratchBufferDesc.sizeInBytes =
-                (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
-            ComPtr<IBufferResource> scratchBuffer = device->createBufferResource(scratchBufferDesc);
+            scratchBufferDesc.size = sizes.scratchSize;
+            scratchBufferDesc.usage = BufferUsage::UnorderedAccess;
+            ComPtr<IBuffer> scratchBuffer = device->createBuffer(scratchBufferDesc);
 
             // Build acceleration structure.
             ComPtr<IQueryPool> compactedSizeQuery;
-            IQueryPool::Desc queryPoolDesc;
+            QueryPoolDesc queryPoolDesc;
             queryPoolDesc.count = 1;
             queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
             GFX_CHECK_CALL_ABORT(
                 device->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef()));
 
             ComPtr<IAccelerationStructure> draftAS;
-            IAccelerationStructure::CreateDesc draftCreateDesc;
-            draftCreateDesc.buffer = draftBuffer;
-            draftCreateDesc.kind = IAccelerationStructure::Kind::BottomLevel;
-            draftCreateDesc.offset = 0;
-            draftCreateDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
+            AccelerationStructureDesc draftCreateDesc;
+            draftCreateDesc.size = sizes.accelerationStructureSize;
             GFX_CHECK_CALL_ABORT(
                 device->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
 
             compactedSizeQuery->reset();
 
-            auto commandBuffer = transientHeap->createCommandBuffer();
-            auto encoder = commandBuffer->encodeRayTracingCommands();
-            IAccelerationStructure::BuildDesc buildDesc = {};
-            buildDesc.dest = draftAS;
-            buildDesc.inputs = accelerationStructureBuildInputs;
-            buildDesc.scratchData = scratchBuffer->getDeviceAddress();
+            auto commandEncoder = queue->createCommandEncoder();
             AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
             compactedSizeQueryDesc.queryPool = compactedSizeQuery;
             compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-            encoder->buildAccelerationStructure(buildDesc, 1, &compactedSizeQueryDesc);
-            encoder->endEncoding();
-            commandBuffer->close();
-            queue->executeCommandBuffer(commandBuffer);
+            commandEncoder->buildAccelerationStructure(buildInputs, draftAS, nullptr, BufferOffsetPair(scratchBuffer, 0), 1, &compactedSizeQueryDesc);
+            auto commandBuffer = commandEncoder->finish();
+            queue->submit(commandBuffer);
             queue->waitOnHost();
 
             uint64_t compactedSize = 0;
             compactedSizeQuery->getResult(0, 1, &compactedSize);
-            IBufferResource::Desc asBufferDesc;
-            asBufferDesc.type = IResource::Type::Buffer;
+            
+            BufferDesc asBufferDesc;
             asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-            asBufferDesc.sizeInBytes = (size_t)compactedSize;
-            BLASBuffer = device->createBufferResource(asBufferDesc);
-            IAccelerationStructure::CreateDesc createDesc;
-            createDesc.buffer = BLASBuffer;
-            createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
-            createDesc.offset = 0;
+            asBufferDesc.size = (size_t)compactedSize;
+            asBufferDesc.usage = BufferUsage::AccelerationStructure;
+            BLASBuffer = device->createBuffer(asBufferDesc);
+            
+            AccelerationStructureDesc createDesc;
             createDesc.size = (size_t)compactedSize;
             device->createAccelerationStructure(createDesc, BLAS.writeRef());
 
-            commandBuffer = transientHeap->createCommandBuffer();
-            encoder = commandBuffer->encodeRayTracingCommands();
-            encoder->copyAccelerationStructure(
+            commandEncoder = queue->createCommandEncoder();
+            commandEncoder->copyAccelerationStructure(
                 BLAS,
                 draftAS,
                 AccelerationStructureCopyMode::Compact);
-            encoder->endEncoding();
-            commandBuffer->close();
-            queue->executeCommandBuffer(commandBuffer);
+            commandBuffer = commandEncoder->finish();
+            queue->submit(commandBuffer);
             queue->waitOnHost();
         }
 
         // Build top level acceleration structure.
         {
-            List<IAccelerationStructure::InstanceDesc> instanceDescs;
+            List<AccelerationStructureInstanceDescGeneric> instanceDescs;
             instanceDescs.setCount(1);
-            instanceDescs[0].accelerationStructure = BLAS->getDeviceAddress();
-            instanceDescs[0].flags =
-                IAccelerationStructure::GeometryInstanceFlags::TriangleFacingCullDisable;
+            instanceDescs[0].accelerationStructure.value = BLAS->getDeviceAddress();
+            instanceDescs[0].flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
             instanceDescs[0].instanceContributionToHitGroupIndex = 0;
             instanceDescs[0].instanceID = 0;
             instanceDescs[0].instanceMask = 0xFF;
@@ -304,64 +275,55 @@ struct BaseRayTracingTest
                 {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
             memcpy(&instanceDescs[0].transform[0][0], transformMatrix, sizeof(float) * 12);
 
-            IBufferResource::Desc instanceBufferDesc;
-            instanceBufferDesc.type = IResource::Type::Buffer;
-            instanceBufferDesc.sizeInBytes =
-                instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
+            BufferDesc instanceBufferDesc;
+            instanceBufferDesc.size = instanceDescs.getCount() * sizeof(AccelerationStructureInstanceDescGeneric);
             instanceBufferDesc.defaultState = ResourceState::ShaderResource;
-            instanceBuffer =
-                device->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
+            instanceBufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
+            instanceBuffer = device->createBuffer(instanceBufferDesc, instanceDescs.getBuffer());
             SLANG_CHECK_ABORT(instanceBuffer != nullptr);
 
-            IAccelerationStructure::BuildInputs accelerationStructureBuildInputs = {};
-            IAccelerationStructure::PrebuildInfo accelerationStructurePrebuildInfo = {};
-            accelerationStructureBuildInputs.descCount = 1;
-            accelerationStructureBuildInputs.kind = IAccelerationStructure::Kind::TopLevel;
-            accelerationStructureBuildInputs.instanceDescs = instanceBuffer->getDeviceAddress();
+            AccelerationStructureBuildInput instanceInput = {};
+            instanceInput.type = AccelerationStructureBuildInputType::Instances;
+            instanceInput.instances.instanceBuffer = BufferOffsetPair(instanceBuffer, 0);
+            instanceInput.instances.instanceStride = sizeof(AccelerationStructureInstanceDescGeneric);
+            instanceInput.instances.instanceCount = instanceDescs.getCount();
+
+            AccelerationStructureBuildDesc buildInputs = {};
+            buildInputs.inputs = &instanceInput;
+            buildInputs.inputCount = 1;
 
             // Query buffer size for acceleration structure build.
-            GFX_CHECK_CALL_ABORT(device->getAccelerationStructurePrebuildInfo(
-                accelerationStructureBuildInputs,
-                &accelerationStructurePrebuildInfo));
+            AccelerationStructureSizes sizes;
+            GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(buildInputs, &sizes));
 
-            IBufferResource::Desc asBufferDesc;
-            asBufferDesc.type = IResource::Type::Buffer;
+            BufferDesc asBufferDesc;
             asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-            asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
-            TLASBuffer = device->createBufferResource(asBufferDesc);
+            asBufferDesc.size = sizes.accelerationStructureSize;
+            asBufferDesc.usage = BufferUsage::AccelerationStructure;
+            TLASBuffer = device->createBuffer(asBufferDesc);
 
-            IBufferResource::Desc scratchBufferDesc;
-            scratchBufferDesc.type = IResource::Type::Buffer;
+            BufferDesc scratchBufferDesc;
             scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-            scratchBufferDesc.sizeInBytes =
-                (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
-            ComPtr<IBufferResource> scratchBuffer = device->createBufferResource(scratchBufferDesc);
+            scratchBufferDesc.size = sizes.scratchSize;
+            scratchBufferDesc.usage = BufferUsage::UnorderedAccess;
+            ComPtr<IBuffer> scratchBuffer = device->createBuffer(scratchBufferDesc);
 
-            IAccelerationStructure::CreateDesc createDesc;
-            createDesc.buffer = TLASBuffer;
-            createDesc.kind = IAccelerationStructure::Kind::TopLevel;
-            createDesc.offset = 0;
-            createDesc.size = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
+            AccelerationStructureDesc createDesc;
+            createDesc.size = sizes.accelerationStructureSize;
             GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(createDesc, TLAS.writeRef()));
 
-            auto commandBuffer = transientHeap->createCommandBuffer();
-            auto encoder = commandBuffer->encodeRayTracingCommands();
-            IAccelerationStructure::BuildDesc buildDesc = {};
-            buildDesc.dest = TLAS;
-            buildDesc.inputs = accelerationStructureBuildInputs;
-            buildDesc.scratchData = scratchBuffer->getDeviceAddress();
-            encoder->buildAccelerationStructure(buildDesc, 0, nullptr);
-            encoder->endEncoding();
-            commandBuffer->close();
-            queue->executeCommandBuffer(commandBuffer);
+            auto commandEncoder = queue->createCommandEncoder();
+            commandEncoder->buildAccelerationStructure(buildInputs, TLAS, nullptr, BufferOffsetPair(scratchBuffer, 0), 0, nullptr);
+            auto commandBuffer = commandEncoder->finish();
+            queue->submit(commandBuffer);
             queue->waitOnHost();
         }
 
         const char* hitgroupNames[] = {"hitgroupA", "hitgroupB"};
 
         ComPtr<IShaderProgram> rayTracingProgram;
-        GFX_CHECK_CALL_ABORT(loadShaderProgram(device, rayTracingProgram.writeRef()));
-        RayTracingPipelineStateDesc rtpDesc = {};
+        SLANG_CHECK_ABORT(loadShaderProgram(device, rayTracingProgram.writeRef()));
+        RayTracingPipelineDesc rtpDesc = {};
         rtpDesc.program = rayTracingProgram;
         rtpDesc.hitGroupCount = 2;
         HitGroupDesc hitGroups[2];
@@ -373,13 +335,13 @@ struct BaseRayTracingTest
         rtpDesc.maxRayPayloadSize = 64;
         rtpDesc.maxRecursion = 2;
         GFX_CHECK_CALL_ABORT(
-            device->createRayTracingPipelineState(rtpDesc, renderPipelineState.writeRef()));
+            device->createRayTracingPipeline(rtpDesc, renderPipelineState.writeRef()));
         SLANG_CHECK_ABORT(renderPipelineState != nullptr);
 
         const char* raygenNames[] = {"rayGenShaderA", "rayGenShaderB"};
         const char* missNames[] = {"missShaderA", "missShaderB"};
 
-        IShaderTable::Desc shaderTableDesc = {};
+        ShaderTableDesc shaderTableDesc = {};
         shaderTableDesc.program = rayTracingProgram;
         shaderTableDesc.hitGroupCount = 2;
         shaderTableDesc.hitGroupNames = hitgroupNames;
@@ -393,31 +355,26 @@ struct BaseRayTracingTest
     void checkTestResults(float* expectedResult, uint32_t count)
     {
         ComPtr<ISlangBlob> resultBlob;
-        size_t rowPitch = 0;
-        size_t pixelSize = 0;
-        auto cmdBuffer = transientHeap->createCommandBuffer();
-        auto encoder = cmdBuffer->encodeResourceCommands();
-        encoder->textureBarrier(
-            resultTexture.get(),
-            ResourceState::UnorderedAccess,
-            ResourceState::CopySource);
-        encoder->endEncoding();
-        cmdBuffer->close();
-        queue->executeCommandBuffer(cmdBuffer.get());
+        auto commandEncoder = queue->createCommandEncoder();
+        commandEncoder->setTextureState(resultTexture, ResourceState::CopySource);
+        queue->submit(commandEncoder->finish());
         queue->waitOnHost();
 
-        GFX_CHECK_CALL_ABORT(device->readTextureResource(
+        SubresourceLayout layout;
+        GFX_CHECK_CALL_ABORT(device->readTexture(
             resultTexture,
-            ResourceState::CopySource,
+            0, 0,
             resultBlob.writeRef(),
-            &rowPitch,
-            &pixelSize));
+            &layout));
+        size_t rowPitch = layout.rowPitch;
+        size_t pixelSize = 4 ;
+
 #if 0 // for debugging only
             writeImage("test.hdr", resultBlob, width, height, (uint32_t)rowPitch, (uint32_t)pixelSize);
 #endif
         auto buffer = removePadding(resultBlob, width, height, rowPitch, pixelSize);
-        auto actualData = (float*)buffer.getBuffer();
-        SLANG_CHECK(memcmp(actualData, expectedResult, count * sizeof(float)) == 0)
+        auto actualData = (float*)buffer.data();
+        SLANG_CHECK_ABORT(memcmp(actualData, expectedResult, count * sizeof(float)) == 0)
     }
 };
 
@@ -425,17 +382,16 @@ struct RayTracingTestA : BaseRayTracingTest
 {
     void renderFrame()
     {
-        ComPtr<ICommandBuffer> renderCommandBuffer = transientHeap->createCommandBuffer();
-        auto renderEncoder = renderCommandBuffer->encodeRayTracingCommands();
-        IShaderObject* rootObject = nullptr;
-        renderEncoder->bindPipeline(renderPipelineState, &rootObject);
+        auto commandEncoder = queue->createCommandEncoder();
+        auto renderEncoder = commandEncoder->beginRayTracingPass();
+        auto rootObject = renderEncoder->bindPipeline(renderPipelineState, shaderTable);
         auto cursor = ShaderCursor(rootObject);
-        cursor["resultTexture"].setResource(resultTextureUAV);
-        cursor["sceneBVH"].setResource(TLAS);
-        renderEncoder->dispatchRays(0, shaderTable, width, height, 1);
-        renderEncoder->endEncoding();
-        renderCommandBuffer->close();
-        queue->executeCommandBuffer(renderCommandBuffer);
+        cursor["resultTexture"].setBinding(Binding(resultTextureUAV));
+        cursor["sceneBVH"].setBinding(Binding(TLAS));
+        renderEncoder->dispatchRays(0, width, height, 1);
+        renderEncoder->end();
+        auto commandBuffer = commandEncoder->finish();
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
@@ -453,17 +409,16 @@ struct RayTracingTestB : BaseRayTracingTest
 {
     void renderFrame()
     {
-        ComPtr<ICommandBuffer> renderCommandBuffer = transientHeap->createCommandBuffer();
-        auto renderEncoder = renderCommandBuffer->encodeRayTracingCommands();
-        IShaderObject* rootObject = nullptr;
-        renderEncoder->bindPipeline(renderPipelineState, &rootObject);
+        auto commandEncoder = queue->createCommandEncoder();
+        auto renderEncoder = commandEncoder->beginRayTracingPass();
+        auto rootObject = renderEncoder->bindPipeline(renderPipelineState, shaderTable);
         auto cursor = ShaderCursor(rootObject);
-        cursor["resultTexture"].setResource(resultTextureUAV);
-        cursor["sceneBVH"].setResource(TLAS);
-        renderEncoder->dispatchRays(1, shaderTable, width, height, 1);
-        renderEncoder->endEncoding();
-        renderCommandBuffer->close();
-        queue->executeCommandBuffer(renderCommandBuffer);
+        cursor["resultTexture"].setBinding(Binding(resultTextureUAV));
+        cursor["sceneBVH"].setBinding(Binding(TLAS));
+        renderEncoder->dispatchRays(1, width, height, 1);
+        renderEncoder->end();
+        auto commandBuffer = commandEncoder->finish();
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
@@ -487,21 +442,22 @@ void rayTracingTestImpl(IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(RayTracingTestAD3D12)
 {
-    runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(RayTracingTestAVulkan)
 {
-    runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(rayTracingTestImpl<RayTracingTestA>, unitTestContext, DeviceType::Vulkan);
 }
 
 SLANG_UNIT_TEST(RayTracingTestBD3D12)
 {
-    runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(RayTracingTestBVulkan)
 {
-    runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(rayTracingTestImpl<RayTracingTestB>, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test
+#endif

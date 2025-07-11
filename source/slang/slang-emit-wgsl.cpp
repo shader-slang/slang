@@ -515,8 +515,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+        return;
     case kIROp_UInt16Type:
-        SLANG_UNEXPECTED("16 bit integer value emitted");
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -734,15 +736,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    if (inst->getParent()->getOp() == kIROp_Module)
+    if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
     }
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_CastFloatToInt:
@@ -976,9 +978,13 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         break;
                     }
                 case BaseType::Int16:
+                    {
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+                        break;
+                    }
                 case BaseType::UInt16:
                     {
-                        SLANG_UNEXPECTED("16 bit integer value emitted");
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
                         break;
                     }
                 case BaseType::Int:

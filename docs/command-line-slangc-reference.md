@@ -27,6 +27,7 @@ slangc -help-style markdown -h
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
 * [fp-mode](#fp-mode)
+* [fp-denormal-mode](#fp-denormal-mode)
 * [help-style](#help-style)
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
@@ -37,6 +38,7 @@ slangc -help-style markdown -h
 * [vulkan-shift](#vulkan-shift)
 * [capability](#capability)
 * [file-extension](#file-extension)
+* [help-category](#help-category)
 
 <a id="General"></a>
 ## General
@@ -93,7 +95,7 @@ Emit IR typically as a '.slang-module' when outputting to a container.
 <a id="h"></a>
 ### -h, -help, --help
 
-**-h or -h &lt;help-category&gt;**
+**-h or -h &lt;[help-category](#help-category)&gt;**
 
 Print this message, or help in specified category. 
 
@@ -354,7 +356,7 @@ Include additional type conformance during linking for dynamic dispatch.
 <a id="reflection-json"></a>
 ### -reflection-json
 
-**reflection-json &lt;path&gt;**
+**-reflection-json &lt;path&gt;**
 
 Emit reflection data in JSON format to a file. 
 
@@ -394,6 +396,30 @@ Disables generics and specialization pass.
 **-fp-mode &lt;[fp-mode](#fp-mode)&gt;, -floating-point-mode &lt;[fp-mode](#fp-mode)&gt;**
 
 Control floating point optimizations 
+
+
+<a id="denorm-mode-fp16"></a>
+### -denorm-mode-fp16
+
+**-denorm-mode-fp16 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp32"></a>
+### -denorm-mode-fp32
+
+**-denorm-mode-fp32 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, preserve, ftz) 
+
+
+<a id="denorm-mode-fp64"></a>
+### -denorm-mode-fp64
+
+**-denorm-mode-fp64 &lt;[fp-denormal-mode](#fp-denormal-mode)&gt;**
+
+Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, ftz) 
 
 
 <a id="g"></a>
@@ -529,6 +555,11 @@ Allow generating code from incomplete libraries with unresolved external functio
 Specify the space index for the system defined global bindless resource array. 
 
 
+<a id="separate-debug-info"></a>
+### -separate-debug-info
+Emit debug data to a separate file, and strip it from the main output file. 
+
+
 
 <a id="Downstream"></a>
 ## Downstream
@@ -622,7 +653,7 @@ Print the hierarchy of the processed source files.
 
 <a id="serial-ir"></a>
 ### -serial-ir
-Serialize the IR between front-end and back-end. 
+\[REMOVED\] Serialize the IR between front-end and back-end. 
 
 
 <a id="skip-codegen"></a>
@@ -650,9 +681,14 @@ Verify IR in the front-end.
 Disassemble and print the module IR. 
 
 
-<a id="separate-debug-info"></a>
-### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. 
+<a id="get-module-info"></a>
+### -get-module-info
+Print the name and version of a serialized IR Module 
+
+
+<a id="get-supported-module-versions"></a>
+### -get-supported-module-versions
+Print the minimum and maximum module versions this compiler supports 
 
 
 
@@ -962,6 +998,15 @@ Floating Point Mode
 * `fast` : Allow optimizations that may change results of floating-point computations. Prefer the fastest version of special functions supported by the target. 
 * `default` : Default floating point mode 
 
+<a id="fp-denormal-mode"></a>
+## fp-denormal-mode
+
+Floating Point Denormal Handling Mode 
+
+* `any` : Use any denormal handling mode (default). The mode used is implementation defined. 
+* `preserve` : Preserve denormal values 
+* `ftz` : Flush denormals to zero 
+
 <a id="help-style"></a>
 ## help-style
 
@@ -1068,7 +1113,7 @@ Stage
 * `miss` 
 * `callable` 
 * `mesh` 
-* `amplification` 
+* `amplification`, `task` 
 * `dispatch` 
 
 <a id="vulkan-shift"></a>
@@ -1133,6 +1178,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
+* `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
@@ -1152,6 +1198,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
+* `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
 * `spvAtomicFloat64AddEXT` 
@@ -1254,6 +1301,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_demote_to_helper_invocation` : enables the GL_EXT_demote_to_helper_invocation extension 
 * `GL_EXT_maximal_reconvergence` : enables the GL_EXT_maximal_reconvergence extension 
 * `GL_EXT_shader_quad_control` : enables the GL_EXT_shader_quad_control extension 
+* `GL_EXT_device_group` : enables the GL_EXT_device_group extension 
 * `GL_EXT_fragment_shader_barycentric` : enables the GL_EXT_fragment_shader_barycentric extension 
 * `GL_EXT_mesh_shader` : enables the GL_EXT_mesh_shader extension 
 * `GL_EXT_nonuniform_qualifier` : enables the GL_EXT_nonuniform_qualifier extension 
@@ -1346,6 +1394,7 @@ A capability describes an optional feature that a target may or may not support.
 * `callable` 
 * `miss` 
 * `mesh` 
+* `task` 
 * `amplification` 
 * `any_stage` 
 * `amplification_mesh` 
@@ -1548,6 +1597,8 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `tesc` : glsl (hull) 
 * `tese` : glsl (domain) 
 * `comp` : glsl (compute) 
+* `mesh` : glsl (mesh) 
+* `task` : glsl (amplification) 
 * `slang` 
 * `spv` : SPIR-V 
 * `spv-asm` : SPIR-V assembly 
@@ -1561,4 +1612,37 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `zip` : container 
 * `slang-module`, `slang-library` : Slang Module/Library 
 * `dir` : Container as a directory 
+
+<a id="help-category"></a>
+## help-category
+
+Available help categories for the [-h](#h) option 
+
+* `General` : General options 
+* `Target` : Target code generation options 
+* `Downstream` : Downstream compiler options 
+* `Debugging` : Compiler debugging/instrumentation options 
+* `Repro` : Slang repro system related 
+* `Experimental` : Experimental options (use at your own risk) 
+* `Internal` : Internal-use options (use at your own risk) 
+* `Deprecated` : Deprecated options (allowed but ignored; may be removed in future) 
+* `compiler` : Downstream Compilers (aka Pass through) 
+* `language` : Language 
+* `language-version` : Language Version 
+* `archive-type` : Archive Type 
+* `line-directive-mode` : Line Directive Mode 
+* `debug-info-format` : Debug Info Format 
+* `fp-mode` : Floating Point Mode 
+* `fp-denormal-mode` : Floating Point Denormal Handling Mode 
+* `help-style` : Help Style 
+* `optimization-level` : Optimization Level 
+* `debug-level` : Debug Level 
+* `file-system-type` : File System Type 
+* `source-embed-style` : Source Embed Style 
+* `target` : Target 
+* `stage` : Stage 
+* `vulkan-shift` : Vulkan Shift 
+* `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
+* `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
+* `help-category` : Available help categories for the [-h](#h) option 
 

@@ -66,6 +66,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_DispatchThreadID`         | `BuiltIn GlobalInvocationId`      |
 | `SV_DomainLocation`           | `BuiltIn TessCoord`               |
 | `SV_DrawIndex`<sup>*</sup>    | `Builtin DrawIndex`               |
+| `SV_DeviceIndex`              | `Builtin DeviceIndex`             |
 | `SV_GSInstanceID`             | `BuiltIn InvocationId`            |
 | `SV_GroupID`                  | `BuiltIn WorkgroupId`             |
 | `SV_GroupIndex`               | `BuiltIn LocalInvocationIndex`    |

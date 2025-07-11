@@ -91,7 +91,7 @@ void processNonUniformResourceIndex(
                             user->getOperand(1));
                     }
                     break;
-                case kIROp_swizzle:
+                case kIROp_Swizzle:
                     // Ignore when `NonUniformResourceIndex` is not on base
                     if (user->getOperand(0) == inst)
                     {
@@ -103,7 +103,7 @@ void processNonUniformResourceIndex(
                         operands[0] = inst->getOperand(0);
                         newUser = builder.emitIntrinsicInst(
                             user->getFullType(),
-                            kIROp_swizzle,
+                            kIROp_Swizzle,
                             operands.getCount(),
                             operands.getArrayView().getBuffer());
                     }
@@ -141,7 +141,7 @@ void processNonUniformResourceIndex(
                 case kIROp_NonUniformResourceIndex:
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
-                case kIROp_swizzle:
+                case kIROp_Swizzle:
                     resWorkList.add(nonuniformUser);
                     break;
                 };

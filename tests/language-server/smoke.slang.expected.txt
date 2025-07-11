@@ -16,10 +16,8 @@ content:
 --------
 activeParameter: 0
 activeSignature: 0
-func IFoo.getSum() -> int:
+(selected) func T.getSum() -> int:
 
 Returns the sum of the contents.  
 
 {REDACTED}.slang(10)
-
-

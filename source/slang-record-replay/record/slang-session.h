@@ -29,6 +29,11 @@ public:
         const char* path,
         slang::IBlob* source,
         slang::IBlob** outDiagnostics = nullptr) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) override;
     SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
         const char* path,

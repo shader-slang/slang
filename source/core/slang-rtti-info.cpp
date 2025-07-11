@@ -13,11 +13,11 @@ namespace Slang
     {                                 \
         RttiInfo::Kind::Invalid, 0, 0 \
     }
-#define SLANG_RTTI_INFO_BASIC(name, type)                                    \
-    RttiInfo                                                                 \
-    {                                                                        \
-        RttiInfo::Kind::name, RttiInfo::AlignmentType(SLANG_ALIGN_OF(type)), \
-            RttiInfo::SizeType(sizeof(type))                                 \
+#define SLANG_RTTI_INFO_BASIC(name, type)                             \
+    RttiInfo                                                          \
+    {                                                                 \
+        RttiInfo::Kind::name, RttiInfo::AlignmentType(alignof(type)), \
+            RttiInfo::SizeType(sizeof(type))                          \
     }
 
 /* static */ const RttiInfo RttiInfo::g_basicTypes[Index(Kind::CountOf)] = {
