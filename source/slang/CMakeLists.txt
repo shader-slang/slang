@@ -106,11 +106,14 @@ slang_add_target(
 # generated lookup tables
 #
 
-get_target_property(
-    SLANG_SPIRV_HEADERS_INCLUDE_DIR
-    SPIRV-Headers::SPIRV-Headers
-    INTERFACE_INCLUDE_DIRECTORIES
-)
+# Get SPIRV headers include directory
+if(NOT SLANG_SPIRV_HEADERS_INCLUDE_DIR)
+    get_target_property(
+        SLANG_SPIRV_HEADERS_INCLUDE_DIR
+        SPIRV-Headers::SPIRV-Headers
+        INTERFACE_INCLUDE_DIRECTORIES
+    )
+endif()
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"
