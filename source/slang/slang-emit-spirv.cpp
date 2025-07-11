@@ -2040,24 +2040,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
                 auto elementType = matrixType->getElementType();
-                
+
                 // SPIR-V only supports floating-point matrices
                 // bool/int matrices should be lowered to
                 // arrays of vectors before reaching here
-                if (as<IRBoolType>(elementType) ||
-                    as<IRUIntType>(elementType) ||
+                if (as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                     as<IRIntType>(elementType))
                 {
-                    SLANG_UNEXPECTED("bool/int/uint matrices should be lowered to structs before SPIR-V emission");
+                    SLANG_UNEXPECTED("bool/int/uint matrices should be lowered to structs before "
+                                     "SPIR-V emission");
                 }
-                
+
                 auto vectorSpvType = ensureVectorType(
                     static_cast<IRBasicType*>(elementType)->getBaseType(),
                     static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue(),
                     nullptr);
-                const auto columnCount = static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
+                const auto columnCount =
+                    static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
                 const auto columnCountSpv = SpvLiteralInteger::from32(int32_t(columnCount));
-                SpvInst *matrixSpvType = emitOpTypeMatrix(inst, vectorSpvType, columnCountSpv);
+                SpvInst* matrixSpvType = emitOpTypeMatrix(inst, vectorSpvType, columnCountSpv);
                 return matrixSpvType;
             }
         case kIROp_ArrayType:
@@ -7731,7 +7732,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, operands are raw elements, we need to construct row vectors first,
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
-        
+
         IRIntegerValue rowCount;
         IRIntegerValue colCount;
         IRType* elementType;
@@ -8001,8 +8002,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto vectorType = as<IRVectorType>(arrayElementType);
             auto elementType = vectorType->getElementType();
             SLANG_ASSERT(
-                as<IRBoolType>(elementType) ||
-                as<IRUIntType>(elementType) ||
+                as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                 as<IRIntType>(elementType));
 
             auto rowCount = getIntVal(arrayType->getElementCount());
@@ -8032,7 +8032,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 rows.add(emitVectorOrScalarArithmetic(
                     parent,
                     nullptr,
-                    rowVectorType, 
+                    rowVectorType,
                     inst->getOp(),
                     inst->getOperandCount(),
                     operands.getArrayView()));

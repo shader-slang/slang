@@ -599,7 +599,8 @@ void validateVectorsAndMatrices(
             }
 
             // Matrix element type validation removed to allow integer/bool matrices
-            // which will be lowered to arrays of vectors on targets that don't support them natively
+            // which will be lowered to arrays of vectors on targets that don't support them
+            // natively
         }
         else if (auto vectorType = as<IRVectorType>(globalInst))
         {
