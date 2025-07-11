@@ -47,15 +47,15 @@
 // GLSL-DAG: int constValue3_0 = 111;
 
 [vk::specialization_constant]
-const int constValue0 = 1;
+static const int constValue0 = 1;
 
 [vk::constant_id(7)]
-const float constValue1 = 3.0f;
+static const float constValue1 = 3.0f;
 
 [SpecializationConstant]
-const bool constValue2 = true;
+static const bool constValue2 = true;
 
-layout(constant_id = 9) const int constValue3 = 111;
+layout(constant_id = 9) static const int constValue3 = 111;
 
 RWStructuredBuffer<float> outputBuffer;
 
