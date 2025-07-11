@@ -217,31 +217,11 @@ jobs:
 
             # Debugging backend crashes or invalid downstream code:
 
-              When you are debugging bugs related to Slang generating invalid downstream code or crashing/assertion failures
-              during IR transformation passes, you can use the `-dump-ir` slangc option to dump the IR at various stages.
-                            
-              You can also rewrite the code and insert a call to `dumpIRToString()` at any point of interest to dump any part of the IR
-              to string. You can then write that string to a temp file with `File::writeAllText()` to analyze what is going on.
-              
-              When checking the IR dump, look for type consistency or logical errors in the IR to locate the potential transformation
-              pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
-              type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
-
               Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
               early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
               of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
               keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
               in the IR passes.
-
-            # Testing
-              Many of the Slang tests requires a GPU to run. However your local environment may not have a GPU. Prefer crafting the
-              test that runs on the CPU with `//TEST:COMPARE_COMPUTE(filecheck=CHECK): -cpu -output-using-type`, or with
-              `//TEST:INTERPRET(filecheck=CHECK):`. Prefer creating executable tests over compile-only tests, unless the test is to
-              check for a specific form of downstream code or diagnostics output.
-
-              When using `slangc` to produce SPIRV, you should set the `SLANG_RUN_SPIRV_VALIDATION` environment variable to `1` to ensure
-              that slangc runs SPIRV validation on the generated SPIRV. If you don't see any errors you are good.
-              Don't use the system's `spirv-val` tool to validate the SPIRV because it is not up-to-date.
 
           mcp_config: |
             {
