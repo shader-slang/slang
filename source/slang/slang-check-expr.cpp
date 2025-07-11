@@ -4529,28 +4529,28 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     {
         if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::GetAttributeAtVertex)
         {
-        if (checkedInvokeExpr->arguments.getCount() != 2)
-            return;
-        auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
-        auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
-        if (!vertexAttributeArgDeclRefExpr)
-        {
-            getSink()->diagnose(
-                invokeExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
-        }
-        auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
-        if (!vertexAttributeArgDecl)
-            return;
-        if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
-            !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
-        {
-            getSink()->diagnose(
-                vertexAttributeArgDeclRefExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
-        }
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(
+                    invokeExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(
+                    vertexAttributeArgDeclRefExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
         }
     }
 }

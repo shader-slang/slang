@@ -1448,9 +1448,7 @@ static void addLinkageDecoration(
             if (constantIntVal)
             {
                 auto enumValue = constantIntVal->getValue();
-                builder->addKnownBuiltinDecoration(
-                    inInst,
-                    KnownBuiltinDeclName(enumValue));
+                builder->addKnownBuiltinDecoration(inInst, KnownBuiltinDeclName(enumValue));
             }
         }
     }
