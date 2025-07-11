@@ -16,7 +16,7 @@ StructuredBuffer<TypeB> b_buffer : register(t0, space0);
 
 struct VertexIn {
   int32_t vert_idx : SV_VertexID;
-  [[KnownBuiltin("DrawIndex")]]
+  [[KnownBuiltin(0)]]
   uint32_t draw_idx : POSITION0;
 };
 

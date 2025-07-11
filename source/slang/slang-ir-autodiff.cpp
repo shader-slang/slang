@@ -1046,7 +1046,7 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
             {
                 if (auto decor = intf->findDecoration<IRKnownBuiltinDecoration>())
                 {
-                    if (decor->getName() == toSlice("IDifferentiable"))
+                    if (decor->getName() == KnownBuiltinDeclName::IDifferentiable)
                     {
                         return globalInst;
                     }

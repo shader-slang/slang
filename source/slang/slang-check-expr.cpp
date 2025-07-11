@@ -15,6 +15,7 @@
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
+#include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -4524,29 +4525,32 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
     if (!knownBuiltinAttr)
         return;
-    if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
     {
-        if (checkedInvokeExpr->arguments.getCount() != 2)
-            return;
-        auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
-        auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
-        if (!vertexAttributeArgDeclRefExpr)
+        if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::GetAttributeAtVertex)
         {
-            getSink()->diagnose(
-                invokeExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
-        }
-        auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
-        if (!vertexAttributeArgDecl)
-            return;
-        if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
-            !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
-        {
-            getSink()->diagnose(
-                vertexAttributeArgDeclRefExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(
+                    invokeExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(
+                    vertexAttributeArgDeclRefExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
         }
     }
 }

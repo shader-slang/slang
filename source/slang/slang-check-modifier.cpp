@@ -1060,13 +1060,13 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
 
-        String name;
-        if (!checkLiteralStringVal(attr->args[0], &name))
+        ConstantIntVal* value = checkConstantEnumVal(attr->args[0]);
+        if (!value)
         {
             return nullptr;
         }
 
-        knownBuiltinAttr->name = name;
+        knownBuiltinAttr->name = value;
     }
     else if (auto pyExportAttr = as<PyExportAttribute>(attr))
     {

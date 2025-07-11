@@ -327,6 +327,7 @@ IRBlock* getBlock(IRInst* inst);
 IRVarLayout* findVarLayout(IRInst* value);
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
 // Run an operation over every block in a module
 template<typename F>

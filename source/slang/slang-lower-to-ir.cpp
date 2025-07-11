@@ -1444,9 +1444,12 @@ static void addLinkageDecoration(
             // We add this to the internal instruction, like other name-like
             // decorations, for instance "nameHint". This prevents it becoming
             // lost during specialization.
-            builder->addKnownBuiltinDecoration(
-                inInst,
-                knownBuiltinModifier->name.getUnownedSlice());
+            auto constantIntVal = as<ConstantIntVal>(knownBuiltinModifier->name);
+            if (constantIntVal)
+            {
+                auto enumValue = constantIntVal->getValue();
+                builder->addKnownBuiltinDecoration(inInst, KnownBuiltinDeclName(enumValue));
+            }
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
