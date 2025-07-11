@@ -6813,15 +6813,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             baseStructType = as<IRStructType>(ptrType->getValueType());
             baseId = getID(ensureInst(base));
+            SLANG_ASSERT(
+                as<IRPtrTypeBase>(fieldAddress->getFullType())->getAddressSpace() ==
+                    ptrType->getAddressSpace() &&
+                "field_address requires base and result to have same address space.");
         }
         else
         {
-            baseStructType = as<IRStructType>(base->getDataType());
-
-            auto structPtrType = builder.getPtrType(baseStructType);
-            auto varInst = emitOpVariable(parent, nullptr, structPtrType, SpvStorageClassFunction);
-            emitOpStore(parent, nullptr, varInst, base);
-            baseId = getID(varInst);
+            SLANG_UNEXPECTED("field_address requires base to be an address.");
         }
         SLANG_ASSERT(baseStructType && "field_address requires base to be a struct.");
         auto fieldId = emitIntConstant(
