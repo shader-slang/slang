@@ -1,25 +1,28 @@
-//TEST:COMPILE: -target hlsl
+//TEST:INTERPRET(filecheck=CHECK):
 
 // Test for issue #7656: Compiler segfault with Ptr<T> extension referring to This
 // This test ensures that the compiler doesn't segfault when 'This' is used in Ptr<T> extensions
 
 public interface IThing
 {
-    void f(This other);
+    int f(This other);
 }
 
 public extension Ptr<int>: IThing
 {
-    public void f(This other)
+    public int f(This other)
     {
-        // This function should compile without segfault
-        // 'This' should refer to Ptr<int>, not the pointed-to type int
+        // Test that 'This' refers to Ptr<int>, not the pointed-to type int
+        return sizeof(This) - sizeof(Ptr<int>) + 1;
     }
 }
 
-[numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+void main()
 {
-    // The main test is that the extension compiles without segfault
-    // The 'This' type resolution should work correctly
+    Ptr<int> p;
+    Ptr<int> other;
+    int result = p.f(other);
+    
+    // CHECK: 1
+    printf("%d\n", result);
 }
