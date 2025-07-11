@@ -116,7 +116,8 @@ enum class AddressSpace : uint64_t
 };
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-enum class MemoryScope : uint64_t
+// must be 32 bit to match SPIR-V
+enum class MemoryScope : uint32_t
 {
     CrossDevice = 0,
     Device = 1,
@@ -127,7 +128,8 @@ enum class MemoryScope : uint64_t
     ShaderCall = 6,
 };
 
-enum class CoherentScope : uint64_t
+// must be 32 bit to match SPIR-V
+enum class CoherentScope : uint32_t
 {
     NotCoherent = 0xFF,
     CrossDevice = (uint64_t)MemoryScope::CrossDevice,

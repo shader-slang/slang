@@ -1309,29 +1309,29 @@ enum AddressSpace : uint64_t
 };
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-enum MemoryScope : uint64_t
+enum MemoryScope : uint32_t
 {
-    CrossDevice = $( (uint64_t)MemoryScope::CrossDevice),
-    Device = $( (uint64_t)MemoryScope::Device),
-    Workgroup = $( (uint64_t)MemoryScope::Workgroup),
-    Subgroup = $( (uint64_t)MemoryScope::Subgroup),
-    Invocation = $( (uint64_t)MemoryScope::Invocation),
-    QueueFamily = $( (uint64_t)MemoryScope::QueueFamily),
-    ShaderCall = $( (uint64_t)MemoryScope::ShaderCall),
-    ShaderCallKHR = $( (uint64_t)MemoryScope::ShaderCall),
+    CrossDevice = $( (uint32_t)MemoryScope::CrossDevice),
+    Device = $( (uint32_t)MemoryScope::Device),
+    Workgroup = $( (uint32_t)MemoryScope::Workgroup),
+    Subgroup = $( (uint32_t)MemoryScope::Subgroup),
+    Invocation = $( (uint32_t)MemoryScope::Invocation),
+    QueueFamily = $( (uint32_t)MemoryScope::QueueFamily),
+    ShaderCall = $( (uint32_t)MemoryScope::ShaderCall),
+    ShaderCallKHR = $( (uint32_t)MemoryScope::ShaderCall),
 }
 
 __builtin_enum(CoherentScope)
-enum CoherentScope : uint64_t
+enum CoherentScope : uint32_t
 {
-    NotCoherent = $( (uint64_t)CoherentScope::NotCoherent),
-    CrossDevice = $( (uint64_t)CoherentScope::CrossDevice),
-    Device = $( (uint64_t)CoherentScope::Device),
-    Workgroup = $( (uint64_t)CoherentScope::Workgroup),
-    Subgroup = $( (uint64_t)CoherentScope::Subgroup),
-    Invocation = $( (uint64_t)CoherentScope::Invocation),
-    QueueFamily = $( (uint64_t)CoherentScope::QueueFamily),
-    ShaderCall = $( (uint64_t)CoherentScope::ShaderCall),
+    NotCoherent = $( (uint32_t)CoherentScope::NotCoherent),
+    CrossDevice = $( (uint32_t)CoherentScope::CrossDevice),
+    Device = $( (uint32_t)CoherentScope::Device),
+    Workgroup = $( (uint32_t)CoherentScope::Workgroup),
+    Subgroup = $( (uint32_t)CoherentScope::Subgroup),
+    Invocation = $( (uint32_t)CoherentScope::Invocation),
+    QueueFamily = $( (uint32_t)CoherentScope::QueueFamily),
+    ShaderCall = $( (uint32_t)CoherentScope::ShaderCall),
 }
 
 __builtin_enum(Access)
