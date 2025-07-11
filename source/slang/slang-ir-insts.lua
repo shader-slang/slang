@@ -1,6 +1,12 @@
 --
 -- This file contains the canonical definitions for the instions to the Slang IR.
--- Add new instructions here
+--
+-- Add new instructions here.
+--
+-- !!
+-- !! Please make sure to update the supported module versions in
+-- !! Slang::IRModule accordingly when modifying this file.
+-- !!
 --
 -- The instructions struct name, i.e. something like "IRVoidType" can be specified with struct_name, otherwise it will be a PascalCase version of the instruction key
 --
@@ -13,6 +19,10 @@
 
 local insts = {
 	{ nop = {} },
+	-- This opcode is used as a placeholder if we were ever to deserialize a
+	-- module which contains an instruction we don't have defined in this file,
+	-- it should never appear except immediately after deserialization.
+	{ Unrecognized = {} },
 	{
 		Type = {
 			{
@@ -2176,10 +2186,11 @@ local insts = {
 
 -- A function to calculate some useful properties and put it in the table,
 --
--- Returns the tree as well as the flattened tree in preorder
 -- Annotates instructions with whether they are a leaf or not
 -- Calculates flags from the parent flags
 local function process(insts)
+	local stable_names_file = "source/slang/slang-ir-insts-stable-names.lua"
+
 	local function to_pascal_case(str)
 		local result = str:gsub("_(.)", function(c)
 			return c:upper()
@@ -2193,6 +2204,29 @@ local function process(insts)
 			return false
 		end
 		return true
+	end
+
+	-- Load stable names if file is provided
+	local name_to_stable_name = loadfile(stable_names_file)()
+	local stable_name_to_inst = {}
+	local max_stable_name = 0
+
+	-- Build full path for stable name lookup
+	local function build_path(inst, name)
+		local path = { name }
+		local current = inst.parent_inst
+		while current and current.parent_inst do
+			-- Find the name of current in its parent
+			for _, entry in ipairs(current.parent_inst) do
+				local k, v = next(entry)
+				if v == current then
+					table.insert(path, 1, k)
+					break
+				end
+			end
+			current = current.parent_inst
+		end
+		return table.concat(path, ".")
 	end
 
 	-- Recursively process instructions
@@ -2257,8 +2291,52 @@ local function process(insts)
 	-- Process the entire tree
 	process_inst(insts)
 
+	-- Now add stable names after parent_inst is set
+	local function add_stable_names(tbl)
+		for _, i in ipairs(tbl) do
+			local key, value = next(i)
+
+			-- Build the full path for this instruction
+			local full_path = build_path(value, key)
+
+			-- Look up stable name
+			local stable_id = name_to_stable_name[full_path]
+			if stable_id then
+				value.stable_name = stable_id
+				stable_name_to_inst[stable_id] = value
+				if stable_id > max_stable_name then
+					max_stable_name = stable_id
+				end
+			end
+
+			-- Recursively process children
+			add_stable_names(value)
+		end
+	end
+
+	-- Add stable names to all instructions
+	add_stable_names(insts)
+
+	-- Helper function to traverse the instruction tree
+	local function traverse(callback)
+		local function walk_insts(tbl)
+			for _, i in ipairs(tbl) do
+				local _, value = next(i)
+				callback(value)
+				-- Recursively process nested instructions
+				walk_insts(value)
+			end
+		end
+
+		-- Start walking from the top-level insts
+		walk_insts(insts)
+	end
+
 	return {
 		insts = insts,
+		stable_name_to_inst = stable_name_to_inst,
+		max_stable_name = max_stable_name,
+		traverse = traverse,
 	}
 end
 

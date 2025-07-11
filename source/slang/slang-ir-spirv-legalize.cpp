@@ -12,6 +12,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
@@ -38,6 +39,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVEmitSharedContext* m_sharedContext;
 
     IRModule* m_module;
+
+    CodeGenContext* m_codeGenContext;
 
     DiagnosticSink* m_sink;
 
@@ -202,8 +205,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVLegalizationContext(
         SPIRVEmitSharedContext* sharedContext,
         IRModule* module,
+        CodeGenContext* codeGenContext,
         DiagnosticSink* sink)
-        : m_sharedContext(sharedContext), m_module(module), m_sink(sink)
+        : m_sharedContext(sharedContext)
+        , m_module(module)
+        , m_codeGenContext(codeGenContext)
+        , m_sink(sink)
     {
     }
 
@@ -2100,6 +2107,105 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void legalizeStructBlocks()
+    {
+        // SPIRV does not allow using a struct with a block declaration as a field
+        // of another struct. Only top-level usage (e.g., global parameter blocks) should
+        // have the block decoration. If a struct is used both as a field and as a block,
+        // we must move the top-level usage to a wrapper struct, and move the block
+        // decoration to the wrapper struct.
+
+        HashSet<IRStructType*> embeddedBlockStructs;
+        List<IRGlobalParam*> structGlobalParams;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            if (auto outerStruct = as<IRStructType>(globalInst))
+            {
+                for (auto field : outerStruct->getFields())
+                {
+                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
+                    {
+                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                        {
+                            embeddedBlockStructs.add(innerStruct);
+                        }
+                    }
+                }
+            }
+            else if (auto globalParam = as<IRGlobalParam>(globalInst))
+            {
+                if (auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType()))
+                {
+                    if (as<IRStructType>(ptrType->getValueType()))
+                    {
+                        structGlobalParams.add(globalParam);
+                    }
+                }
+            }
+        }
+
+        for (auto globalParam : structGlobalParams)
+        {
+            auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+            auto structType = as<IRStructType>(ptrType->getValueType());
+
+            if (!embeddedBlockStructs.contains(structType))
+                continue;
+
+            // Create a wrapper struct type
+            IRBuilder builder(globalParam);
+            builder.setInsertBefore(globalParam);
+
+            auto wrapperStruct = builder.createStructType();
+            auto key = builder.createStructKey();
+            builder.createStructField(wrapperStruct, key, structType);
+
+            // Copy the block decoration from the inner struct to the wrapper
+            if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
+            }
+            if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBufferBlockDecoration);
+            }
+
+            // Update the global param's type to use the wrapper struct
+            auto newPtrType =
+                builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+            globalParam->setFullType(newPtrType);
+
+            // Traverse all uses of the global param and insert a FieldAddress to access the
+            // inner struct
+            traverseUses(
+                globalParam,
+                [&](IRUse* use)
+                {
+                    builder.setInsertBefore(use->getUser());
+                    auto addr = builder.emitFieldAddress(
+                        builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
+                        globalParam,
+                        key);
+                    use->set(addr);
+                });
+        }
+
+        // Remove block/buffer block decorations from all embedded block structs
+        for (auto structType : embeddedBlockStructs)
+        {
+            if (auto blockDecor = structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                blockDecor->removeAndDeallocate();
+            }
+            if (auto bufferBlockDecor =
+                    structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                bufferBlockDecor->removeAndDeallocate();
+            }
+        }
+    }
+
     void processModule()
     {
         determineSpirvVersion();
@@ -2189,6 +2295,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_module,
             bufferElementTypeLoweringOptions);
 
+        // Look for structs that are both used as fields and marked with Block
+        // decorations, and move the Block decoration to a wrapper struct.
+        legalizeStructBlocks();
+
         // Inline all pack/unpack storage type functions generated during buffer element
         // lowering pass.
         performForceInlining(m_module);
@@ -2208,6 +2318,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+
+        // If older than spirv 1.4, legalize OpSelect returning non-vector-composites
+        if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect &&
+            !m_sharedContext->isSpirv14OrLater())
+            legalizeNonVectorCompositeSelect(m_module);
     }
 
     void updateFunctionTypes()
@@ -2281,9 +2396,16 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
+void legalizeSPIRV(
+    SPIRVEmitSharedContext* sharedContext,
+    IRModule* module,
+    CodeGenContext* codeGenContext)
 {
-    SPIRVLegalizationContext context(sharedContext, module, sink);
+    SPIRVLegalizationContext context(
+        sharedContext,
+        module,
+        codeGenContext,
+        codeGenContext->getSink());
     context.processModule();
 }
 
@@ -2424,7 +2546,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module, codeGenContext->getSink());
+    legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);

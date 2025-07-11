@@ -1695,6 +1695,31 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 }
 
+// This checks that if a differentiable function access a non-diff type "This", in such case we
+// want to provide a non-error diagnostic to the user to notify that there could be an unexpected
+// behavior because every member access will not have derivative computed for it. User can use
+// [NoDiffThis] to clarify that this is intended.
+void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
+{
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
+        if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
+        {
+            if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
+                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+            {
+                return;
+            }
+
+            getSink()->diagnose(
+                memberExpr->loc,
+                Diagnostics::noDerivativeOnNonDifferentiableThisType,
+                memberExpr->declRef.getDecl(),
+                this->m_parentFunc);
+        }
+    }
+}
 
 Expr* SemanticsVisitor::CheckTerm(Expr* term)
 {
@@ -1712,7 +1737,13 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
         maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+
+        if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            maybeCheckMissingNoDiffThis(checkedTerm);
+        }
     }
+
     return checkedTerm;
 }
 

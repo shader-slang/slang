@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
 concurrency:
@@ -71,7 +69,7 @@ jobs:
             platform: x86_64
             test-category: full
             # Run full gpu tests on PR/Main branch, but not on merge_group.
-            full-gpu-tests: ${{ github.event_name != 'merge_group' }}
+            full-gpu-tests: true
             # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
             runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
@@ -82,7 +80,7 @@ jobs:
             compiler: cl
             platform: x86_64
             test-category: full
-            full-gpu-tests: ${{ github.event_name != 'merge_group' }}
+            full-gpu-tests: true
             runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
@@ -125,7 +123,7 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" = "linux" ]]; then
               sudo apt-get update
-              sudo apt-get install -y libx11-dev
+              sudo apt-get install -y libx11-dev 
           fi
       - name: Setup Node.js
         if: matrix.os == 'linux'
@@ -141,6 +139,12 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
+
+      # Don't need to check this on every config
+      - name: Check Stable Names Table
+        if: ${{ matrix.os == 'linux' && matrix.config == 'debug' }}
+        run: ./extras/check-ir-stable-names-gh-actions.sh
+
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |

@@ -34,12 +34,13 @@
 //
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "gfx-util/shader-cursor.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 
-using namespace gfx;
+#include <slang-rhi/shader-cursor.h>
+
+using namespace rhi;
 using namespace Slang;
 
 static const ExampleResources resourceBase("triangle");
@@ -88,7 +89,7 @@ struct HelloWorld : public WindowedAppBase
     // In addition, an application may want to receive reflection information
     // about the program, which is what a `slang::ProgramLayout` provides.
     //
-    gfx::Result loadShaderProgram(gfx::IDevice* device, gfx::IShaderProgram** outProgram)
+    Result loadShaderProgram(IDevice* device, IShaderProgram** outProgram)
     {
         // We need to obtain a compilation session (`slang::ISession`) that will provide
         // a scope to all the compilation and loading of code we do.
@@ -183,9 +184,9 @@ struct HelloWorld : public WindowedAppBase
         // to extract compiled kernel code and load it into the API-specific
         // program representation.
         //
-        gfx::IShaderProgram::Desc programDesc = {};
+        ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
-        SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+        SLANG_RETURN_ON_FAIL(device->createShaderProgram(programDesc, outProgram));
 
         if (isTestMode())
         {
@@ -212,8 +213,9 @@ struct HelloWorld : public WindowedAppBase
     // of them come from the utility library we are using to simplify
     // building an example program.
     //
-    ComPtr<gfx::IPipelineState> gPipelineState;
-    ComPtr<gfx::IBufferResource> gVertexBuffer;
+    ComPtr<IPipeline> gPipeline;
+    ComPtr<IBuffer> gVertexBuffer;
+    const Format format = Format::RGB32Float;
 
     // Now that we've covered the function that actually loads and
     // compiles our Slang shade code, we can go through the rest
@@ -231,8 +233,8 @@ struct HelloWorld : public WindowedAppBase
         // First, we create an input layout:
         //
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
-            {"COLOR", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
+            {"POSITION", 0, format, offsetof(Vertex, position)},
+            {"COLOR", 0, format, offsetof(Vertex, color)},
         };
         auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
         if (!inputLayout)
@@ -241,11 +243,12 @@ struct HelloWorld : public WindowedAppBase
         // Next we allocate a vertex buffer for our pre-initialized
         // vertex data.
         //
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-        vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        gVertexBuffer = gDevice->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.format = format;
+        vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
+        vertexBufferDesc.elementSize = sizeof(Vertex);
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        gVertexBuffer = gDevice->createBuffer(vertexBufferDesc, &kVertexData[0]);
         if (!gVertexBuffer)
             return SLANG_FAIL;
 
@@ -258,15 +261,19 @@ struct HelloWorld : public WindowedAppBase
         // Following the D3D12/Vulkan style of API, we need a pipeline state object
         // (PSO) to encapsulate the configuration of the overall graphics pipeline.
         //
-        GraphicsPipelineStateDesc desc;
+        ColorTargetDesc colorTarget;
+        colorTarget.format = format;
+        RenderPipelineDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = shaderProgram;
-        desc.framebufferLayout = gFramebufferLayout;
-        auto pipelineState = gDevice->createGraphicsPipelineState(desc);
-        if (!pipelineState)
+        desc.targetCount = 1;
+        desc.targets = &colorTarget;
+        desc.depthStencil.depthTestEnable = false;
+        desc.depthStencil.depthWriteEnable = false;
+        desc.primitiveTopology = PrimitiveTopology::TriangleList;
+        gPipeline = gDevice->createRenderPipeline(desc);
+        if (!gPipeline)
             return SLANG_FAIL;
-
-        gPipelineState = pipelineState;
 
         return SLANG_OK;
     }
@@ -276,18 +283,27 @@ struct HelloWorld : public WindowedAppBase
     // nothing really Slang-specific here, so the commentary doesn't need
     // to be very detailed.
     //
-    virtual void renderFrame(int frameBufferIndex) override
+    virtual void renderFrame(ITexture* texture) override
     {
-        ComPtr<ICommandBuffer> commandBuffer =
-            gTransientHeaps[frameBufferIndex]->createCommandBuffer();
-        auto renderEncoder =
-            commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
+        auto commandEncoder = gQueue->createCommandEncoder();
 
-        gfx::Viewport viewport = {};
-        viewport.maxZ = 1.0f;
-        viewport.extentX = (float)windowWidth;
-        viewport.extentY = (float)windowHeight;
-        renderEncoder->setViewportAndScissor(viewport);
+        ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = textureView;
+        colorAttachment.loadOp = LoadOp::Clear;
+
+        RenderPassDesc renderPass = {};
+        renderPass.colorAttachments = &colorAttachment;
+        renderPass.colorAttachmentCount = 1;
+
+        auto renderEncoder = commandEncoder->beginRenderPass(renderPass);
+
+
+        RenderState renderState = {};
+        renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
+        renderState.viewportCount = 1;
+        renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
+        renderState.scissorRectCount = 1;
 
         // In order to bind shader parameters to the pipeline, we need
         // to know how those parameters were assigned to locations/bindings/registers
@@ -319,14 +335,15 @@ struct HelloWorld : public WindowedAppBase
         // This method will return a transient root shader object for us to write our
         // shader parameters into.
         //
-        auto rootObject = renderEncoder->bindPipeline(gPipelineState);
+        auto rootObject =
+            renderEncoder->bindPipeline(static_cast<IRenderPipeline*>(gPipeline.get()));
 
         // We will update the model-view-projection matrix that is passed
         // into the shader code via the `Uniforms` buffer on a per-frame
         // basis, even though the data that is loaded does not change
         // per-frame (we always use an identity matrix).
         //
-        auto deviceInfo = gDevice->getDeviceInfo();
+        auto deviceInfo = gDevice->getInfo();
 
         // We know that `rootObject` is a root shader object created
         // from our program, and that it is set up to hold values for
@@ -361,9 +378,7 @@ struct HelloWorld : public WindowedAppBase
         // Once we have formed a cursor that "points" at the
         // model-view projection matrix, we can set its data directly.
         //
-        rootCursor["Uniforms"]["modelViewProjection"].setData(
-            deviceInfo.identityProjectionMatrix,
-            sizeof(float) * 16);
+        rootCursor["Uniforms"]["modelViewProjection"].setData(kIdentity, sizeof(float) * 16);
         //
         // Some readers might be concerned about the performance of
         // the above operations because of the use of strings. For
@@ -384,21 +399,24 @@ struct HelloWorld : public WindowedAppBase
         // We also need to set up a few pieces of fixed-function pipeline
         // state that are not bound by the pipeline state above.
         //
-        renderEncoder->setVertexBuffer(0, gVertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+        renderState.vertexBuffers[0] = gVertexBuffer;
+        renderState.vertexBufferCount = 1;
+        renderEncoder->setRenderState(renderState);
 
         // Finally, we are ready to issue a draw call for a single triangle.
         //
-        renderEncoder->draw(3);
-        renderEncoder->endEncoding();
-        commandBuffer->close();
-        gQueue->executeCommandBuffer(commandBuffer);
+        DrawArguments drawArgs = {};
+        drawArgs.vertexCount = 3;
+        renderEncoder->draw(drawArgs);
+
+        renderEncoder->end();
+        gQueue->submit(commandEncoder->finish());
 
         if (!isTestMode())
         {
             // With that, we are done drawing for one frame, and ready for the next.
             //
-            gSwapchain->present();
+            gSurface->present();
         }
     }
 };

@@ -2423,6 +2423,17 @@ struct IRImageStore : IRInst
 // Terminators
 
 FIDDLE()
+struct IRSelect : IRInst
+{
+    FIDDLE(leafInst());
+
+    IRInst* getCondition() { return getOperand(0); }
+    IRInst* getTrueResult() { return getOperand(1); }
+    IRInst* getFalseResult() { return getOperand(2); }
+};
+
+
+FIDDLE()
 struct IRReturn : IRTerminatorInst
 {
     FIDDLE(leafInst())

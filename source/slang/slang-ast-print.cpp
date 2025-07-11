@@ -1153,6 +1153,7 @@ void ASTPrinter::addVal(Val* val)
 
 /* static */ void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
+    decl = maybeGetInner(decl);
     if (as<ConstructorDecl>(decl))
     {
         out << "init";
@@ -1255,8 +1256,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
     else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
-        ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
-        Type* type = extensionDecl->targetType.type;
+        Type* type = getTargetType(m_astBuilder, extensionDeclRef);
         if (m_optionFlags & OptionFlag::NoSpecializedExtensionTypeName)
         {
             if (auto unspecializedDeclRef = isDeclRefTypeOf<Decl>(type))
@@ -1545,6 +1545,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                 if (as<GLSLLayoutModifierGroupMarker>(modifier))
                     continue;
                 if (as<HLSLLayoutSemantic>(modifier))
+                    continue;
+                if (as<ImplicitConversionModifier>(modifier))
                     continue;
             }
             // Don't print out attributes.
