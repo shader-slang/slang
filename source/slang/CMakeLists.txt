@@ -107,7 +107,19 @@ slang_add_target(
 #
 
 # Get SPIRV headers include directory
-if(NOT SLANG_SPIRV_HEADERS_INCLUDE_DIR)
+if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    # When using system headers, always get from the target created by find_package
+    if(TARGET SPIRV-Headers::SPIRV-Headers)
+        get_target_property(
+            SLANG_SPIRV_HEADERS_INCLUDE_DIR
+            SPIRV-Headers::SPIRV-Headers
+            INTERFACE_INCLUDE_DIRECTORIES
+        )
+    else()
+        message(FATAL_ERROR "SLANG_USE_SYSTEM_SPIRV_HEADERS=TRUE but SPIRV-Headers::SPIRV-Headers target not found. Please ensure SPIRV-Headers is properly installed.")
+    endif()
+elseif(NOT SLANG_SPIRV_HEADERS_INCLUDE_DIR)
+    # For bundled headers, get from target if not manually specified
     get_target_property(
         SLANG_SPIRV_HEADERS_INCLUDE_DIR
         SPIRV-Headers::SPIRV-Headers
