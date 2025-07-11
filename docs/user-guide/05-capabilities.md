@@ -61,10 +61,9 @@ their corresponding group.
 If two capability requirements contain different atoms that are conflicting with each other, these two requirements are considered __incompatible__.
 For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShaderClockKHR + vertex` are incompatible, because `fragment` conflicts with `vertex`.
 
-## Requirements in Parent Scope
+## Capabilities Between Parent and Members
 
-The capability requirement of a decl is always merged with the requirements declared in its parents. If the decl declares requirements for additional compilation targets, they are added
-to the requirement set as a separate disjunction.
+The capability requirement of a member is always merged with the requirements declared in its parent(s). If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
 For example, given:
 ```csharp
 [require(glsl)]
@@ -79,7 +78,7 @@ struct MyType
 `MyType.method` will have requirement `glsl | hlsl + hlsl_nvapi | spirv`.
 
 The `[require]` attribute can also be used on module declarations, so that the requirement will
-apply to all decls within the module. For example:
+apply to all members within the module. For example:
 ```csharp
 [require(glsl)]
 [require(hlsl)]
@@ -92,7 +91,124 @@ public void myFunc()
 }
 ```
 
-## Inference of Capability Requirements
+## Capabilities Between Subtype and Supertype
+
+For inheritance/implementing-interfaces the story is a bit different.
+We require that the subtype (`Foo1`) have a subset of capabilities to the supertype (`IFoo1`).
+
+For example:
+```csharp
+[require(sm_4_0)]
+interface IFoo1
+{
+}
+[require(sm_6_0)]
+struct Foo1 : IFoo1
+{
+}
+```
+We error here since `Foo1` is not a subset to `IFoo1`. `Foo1` has `sm_6_0`, which includes capabilities `sm_4_0` does not have.
+
+```csharp
+[require(sm_6_0)]
+interface IFoo2
+{
+}
+[require(sm_4_0)]
+interface IFoo1
+{
+}
+[require(sm_4_0)]
+struct Foo1 : IFoo1, IFoo2
+{
+}
+```
+We do not error here since `IFoo2` and `IFoo1` are supersets to `Foo1`.
+
+Additionally, any supertype to subtype relationship must share the same shader stage and shader target support.
+
+```csharp
+// Error, Foo1 is missing `spirv`
+[require(hlsl)]
+[require(spirv)]
+interface IFoo1
+{
+}
+[require(hlsl)]
+struct Foo1 : IFoo1
+{
+}
+
+// Error, IFoo1 is missing `hlsl`
+[require(hlsl)]
+interface IFoo1
+{
+}
+[require(hlsl)]
+[require(spirv)]
+struct Foo1 : IFoo1
+{
+}
+```
+
+## Capabilities Between Requirement and Implementation
+
+We require that all requirement capabilities are supersets of their implementation (only required if capabilities are explicitly annotated). 
+
+```csharp
+public interface IAtomicAddable_Pass
+{
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension int64_t : IAtomicAddable_Pass
+{
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+
+public interface IAtomicAddable_Error
+{
+    [require(glsl, sm_4_0)]
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension uint : IAtomicAddable_Error
+{
+    // Error: implementation has superset of capabilites, sm_6_0 vs. sm_4_0
+    // Note: sm_6_0 is inferred from `InterlockedAddI64`
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+```
+
+Requirment and implementation must also share the same shader stage and shader target support.
+
+```csharp
+public interface IAtomicAddable_Error
+{
+    [require(glsl)]
+    [require(hlsl)]
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension uint : IAtomicAddable_Error
+{
+    [require(glsl)] // Error, missing `hlsl`
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+
+public interface IAtomicAddable_Error
+{
+    [require(glsl)]
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, This value);
+}
+public extension uint : IAtomicAddable_Error
+{
+    [require(glsl)]
+    [require(hlsl)] // Error, has additional capability `hlsl`
+    public static void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { buf.InterlockedAddI64(addr, value); }
+}
+```
+
+## Capabilities of Functions
+
+### Inference of Capability Requirements
 
 By default, Slang will infer the capability requirements of a function given its definition, as long as the function has `internal` or `private` visibility. For example, given:
 ```csharp
@@ -110,7 +226,7 @@ Slang will automatically deduce that `myFunc` has capability
 ```
 Since `discard` statement requires capability `fragment`.
 
-## Inference on target_switch
+### Inference on target_switch
 
 A `__target_switch` statement will introduce disjunctions in its inferred capability requirement. For example:
 ```csharp
@@ -126,10 +242,71 @@ void myFunc()
 The capability requirement of `myFunc` is `(spirv | hlsl)`, meaning that the function can be called from a context where either `spirv` or `hlsl` capability
 is available.
 
-## Capability Aliases
+### Capability Incompatabilities
+
+The function declaration must be a superset of the capabilities the function body uses **for any shader stage/target the function declaration implicitly/explicitly requires**.
+
+```csharp
+[require(sm_5_0)]
+public void requires_sm_5_0()
+{
+
+} 
+[require(sm_4_0)]
+public void logic_sm_5_0_error() // Error, missing `sm_5_0` support
+{
+    requires_sm_5_0();
+}
+
+public void logic_sm_5_0__pass() // Pass, no requirements
+{
+    requires_sm_5_0();
+}
+
+[require(hlsl, vertex)]
+public void logic_vertex()
+{
+
+}
+[require(hlsl, fragment)]
+public void logic_fragment()
+{
+
+}
+[require(hlsl, vertex, fragment)]
+public void logic_stage_pass_1() // Pass, `vertex` and `fragment` supported
+{
+    __stage_switch
+    {
+        case vertex:
+            logic_vertex();
+        case fragment:
+            logic_fragment();
+    }
+}
+
+[require(hlsl, vertex, fragment, mesh, hull, domain)]
+public void logic_many_stages()
+{
+
+}
+[require(hlsl, vertex, fragment)]
+public void logic_stage_pass_2() // Pass, function only requires that the body implements the stages `vertex` & `fragment`, the rest are irelevant
+{
+    logic_many_stages();
+}
+
+[require(hlsl, any_hit)]
+public void logic_stage_fail_1() // Error, function requires `any_hit`, body does not support `any_hit`
+{
+    logic_many_stages();
+}
+```
+
+## Capability Aliases 
 
 To make it easy to specify capabilities on different platforms, Slang also defines many aliases that can be used in `[require]` attributes.
-For example, Slang declares:
+For example, Slang declares in `slang-capabilities.capdef`:
 ```
 alias sm_6_6 = _sm_6_6
              | glsl_spirv_1_5 + sm_6_5
