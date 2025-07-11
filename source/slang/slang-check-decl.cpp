@@ -3232,8 +3232,8 @@ bool isProperConstraineeType(Type* type)
         return false;
     if (as<InterfaceDecl>(declRef.getDecl()))
         return false;
-    // TODO: `some` type and `dyn` types are also inproper constrainee types.
-
+    if(as<SomeTypeDecl>(declRef.getDecl()))
+        return false;
     return true;
 }
 
