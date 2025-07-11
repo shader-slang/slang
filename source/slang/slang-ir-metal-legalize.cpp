@@ -36,7 +36,7 @@ void legalizeImageStoreValue(IRBuilder& builder, IRImageStore* imageStore)
         // Extract components using IRElementExtract to handle any vector instruction type
         if (auto originalElementCount = as<IRIntLit>(valueVectorType->getElementCount()))
         {
-            for (UInt i = 0; i < originalElementCount->getValue(); i++)
+            for (UInt i = 0; i < (UInt)originalElementCount->getValue(); i++)
             {
                 auto elementExtract = builder.emitElementExtract(
                     elementType,
