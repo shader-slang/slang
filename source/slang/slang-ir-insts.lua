@@ -677,7 +677,12 @@ local insts = {
 		},
 	},
 	{ get_field_addr = { struct_name = "FieldAddress", min_operands = 2 } },
-	{ getElement = { min_operands = 2 } },
+	{
+		getElementBase = {
+			{ getElement = { min_operands = 2 } },
+			{ getElementFromString = { min_operands = 2 } },
+		},
+	},
 	{ getElementPtr = { min_operands = 2 } },
 	-- Pointer offset: computes pBase + offset_in_elements
 	{ getOffsetPtr = { min_operands = 2 } },

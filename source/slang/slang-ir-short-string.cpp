@@ -12,35 +12,74 @@ IRArrayType* getShortStringArrayType(
 {
     if (!charType)
     {
-        charType = builder.getUIntType();
+        charType = builder.getUInt8Type();
     }
     return builder.getArrayType(charType, strLitType->getLength());
 }
 
-IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* strLit, IRBasicType* charType)
+IRInst* getShortStringAsArray(
+    IRBuilder& builder,
+    IRInst* src,
+    IRBasicType* charType,
+    bool supportStringLiteral)
 {
-    auto sv = strLit->getStringSlice();
+    UInt n = 0;
+    auto type = src->getDataType();
+    auto srcStrType = as<IRShortStringType>(type);
+    if (srcStrType)
+    {
+        n = static_cast<UInt>(as<IRIntLit>(srcStrType->getLength())->value.intVal);
+    }
+    else if (auto arrayType = as<IRArrayType>(type))
+    {
+        n = static_cast<UInt>(as<IRIntLit>(arrayType->getElementCount())->value.intVal);
+    }
+    else
+    {
+        SLANG_UNEXPECTED("Type not handled!");
+    }
     List<IRInst*> chars;
-    chars.reserve(sv.getLength());
+    chars.setCount(n);
     if (!charType)
     {
-        charType = builder.getUIntType();
+        charType = builder.getUInt8Type();
     }
-    for (uint32_t i = 0; i < sv.getLength(); ++i)
+    if (auto strLit = as<IRStringLit>(src))
     {
-        // TODO check encoding
-        uint32_t c = uint8_t(sv[i]);
-        chars.add(builder.getIntValue(charType, c));
+        auto sv = strLit->getStringSlice();
+        for (UInt i = 0; i < n; ++i)
+        {
+            IRIntegerValue c = IRIntegerValue(uint8_t(sv[i]));
+            chars[i] = builder.getIntValue(charType, c);
+        }
+    }
+    else
+    {
+        // C/C++ string literals are typed with 'char', but charType might be uint8_t
+        // To avoid any error / warning, we need to explicitely cast 'char' to charType
+        IRBasicType* strCharType = charType;
+        if (supportStringLiteral && srcStrType)
+        {
+            strCharType = builder.getCharType();
+        }
+        for (UInt i = 0; i < n; ++i)
+        {
+            auto getElement = builder.emitGetElement(strCharType, src, i);
+            auto casted = builder.emitCast(charType, getElement, false);
+            chars[i] = casted;
+        }
     }
     auto arrayType = builder.getArrayType(charType, builder.getIntValue(chars.getCount()));
     auto asArray = builder.emitMakeArray(arrayType, chars.getCount(), chars.getBuffer());
     return asArray;
 }
 
-struct ShortStringReplacementPass : InstPassBase
+struct ShortStringLoweringPass : InstPassBase
 {
-    ShortStringReplacementPass(IRModule* irModule)
-        : InstPassBase(irModule)
+    ShortStringsOptions options;
+
+    ShortStringLoweringPass(IRModule* irModule, ShortStringsOptions const& options)
+        : InstPassBase(irModule), options(options)
     {
     }
 
@@ -48,7 +87,8 @@ struct ShortStringReplacementPass : InstPassBase
 
     void processInst(IRInst* inst)
     {
-        if (auto strLitType = as<IRShortStringType>(inst))
+        if (auto strLitType = as<IRShortStringType>(inst);
+            !options.targetSupportsStringLiterals && strLitType)
         {
             IRBuilder builder(module);
             IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -58,7 +98,8 @@ struct ShortStringReplacementPass : InstPassBase
             inst->removeAndDeallocate();
             changed = true;
         }
-        else if (auto strLit = as<IRStringLit>(inst))
+        else if (auto strLit = as<IRStringLit>(inst);
+                 !options.targetSupportsStringLiterals && strLit)
         {
             if (as<IRShortStringType>(strLit->getDataType()) ||
                 as<IRArrayType>(strLit->getDataType()))
@@ -72,6 +113,29 @@ struct ShortStringReplacementPass : InstPassBase
                 changed = true;
             }
         }
+        else if (auto getAsArray = as<IRGetShortStringAsArray>(inst))
+        {
+            auto str = getAsArray->getOperand(0);
+            IRInst* replacement = nullptr;
+            if (options.targetSupportsStringLiterals)
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                replacement = getShortStringAsArray(
+                    builder,
+                    str,
+                    as<IRBasicType>(as<IRArrayType>(inst->getDataType())->getElementType()),
+                    options.targetSupportsStringLiterals);
+            }
+            else
+            {
+                replacement = str;
+            }
+            getAsArray->replaceUsesWith(replacement);
+            getAsArray->removeAndDeallocate();
+            changed = true;
+        }
     }
 
     void processModule()
@@ -80,19 +144,16 @@ struct ShortStringReplacementPass : InstPassBase
     }
 };
 
-bool replaceShortStringReturnChanged(
+bool lowerShortStringReturnChanged(
     TargetProgram* target,
     IRModule* module,
     ShortStringsOptions options)
 {
     SLANG_UNUSED(target);
     bool res = false;
-    if (options.replaceShortStringsWithArray)
-    {
-        ShortStringReplacementPass pass(module);
-        pass.processModule();
-        res |= pass.changed;
-    }
+    ShortStringLoweringPass pass(module, options);
+    pass.processModule();
+    res |= pass.changed;
     return res;
 }
 } // namespace Slang

@@ -17,15 +17,16 @@ IRArrayType* getShortStringArrayType(
 // if charType is null, then uint is used by default
 IRInst* getShortStringAsArray(
     IRBuilder& builder,
-    IRStringLit* strLit,
-    IRBasicType* charType = nullptr);
+    IRInst* src,
+    IRBasicType* charType = nullptr,
+    bool supportStringLiteral = false);
 
 struct ShortStringsOptions
 {
-    bool replaceShortStringsWithArray = false;
+    bool targetSupportsStringLiterals = false;
 };
 
-bool replaceShortStringReturnChanged(
+bool lowerShortStringReturnChanged(
     TargetProgram* target,
     IRModule* module,
     ShortStringsOptions options);

@@ -2272,11 +2272,23 @@ struct IRFieldAddress : IRInst
 };
 
 FIDDLE()
-struct IRGetElement : IRInst
+struct IRGetElementBase : IRInst
 {
-    FIDDLE(leafInst())
+    FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
+};
+
+FIDDLE()
+struct IRGetElement : IRGetElementBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRGetElementFromString : IRGetElementBase
+{
+    FIDDLE(leafInst())
 };
 
 FIDDLE()

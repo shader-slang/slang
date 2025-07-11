@@ -1732,7 +1732,7 @@ struct Array : IRWArray<T>
 __generic<int N>
 __magic_type(ShortStringType)
 __intrinsic_type($(kIROp_ShortStringType))
-struct ShortString : IArray<uint>
+struct ShortString : IArray<uint8_t>
 {
     __intrinsic_op($(kIROp_GetArrayLength))
     [__unsafeForceInlineEarly]
@@ -1745,11 +1745,29 @@ struct ShortString : IArray<uint>
 
     __intrinsic_op($(kIROp_GetShortStringAsArray))
     [__unsafeForceInlineEarly]
-    Array<uint, N> getArray();
+    Array<uint8_t, N> getArray();
 
-    __subscript(uint i) -> uint
+    [__unsafeForceInlineEarly] 
+    __intrinsic_op($(kIROp_GetElement))
+    internal uint8_t getElement(uint i);
+
+    [__unsafeForceInlineEarly] 
+    __intrinsic_op($(kIROp_GetElementFromString))
+    internal uint8_t getElementFromNativeString(uint i);
+
+    __subscript(uint i) -> uint8_t
     {
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetElement)) get;
+        [__unsafeForceInlineEarly] get
+        {
+            uint8_t res;
+            __target_switch
+            {
+                case cpp: res = getElementFromNativeString(i);
+                case cuda: res = getElementFromNativeString(i);
+                default: res = getElement(i);
+            }
+            return res;
+        }
     }
 };
 

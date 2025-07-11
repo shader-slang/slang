@@ -440,6 +440,9 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_ShortStringType:
+        result.shortString = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1902,14 +1905,14 @@ Result linkAndOptimizeIR(
         }
     }
 
-    const bool targetSupportsStringLiterals =
-        (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
-         target == CodeGenTarget::CSource);
-    if (!targetSupportsStringLiterals)
+    if (requiredLoweringPassSet.shortString)
     {
+        const bool targetSupportsStringLiterals =
+            (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+             target == CodeGenTarget::CSource);
         ShortStringsOptions strLitOptions = {};
-        strLitOptions.replaceShortStringsWithArray = true;
-        replaceShortStringReturnChanged(targetProgram, irModule, strLitOptions);
+        strLitOptions.targetSupportsStringLiterals = targetSupportsStringLiterals;
+        lowerShortStringReturnChanged(targetProgram, irModule, strLitOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)

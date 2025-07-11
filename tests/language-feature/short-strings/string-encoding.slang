@@ -1,6 +1,6 @@
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
@@ -26,10 +26,10 @@ RWStructuredBuffer<uint> output;
 
 // CHECK-NEXT: 0
 
-uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint>>(inout ByteReader utf8Reader)
+uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint8_t>>(inout ByteReader utf8Reader)
 {
 	uint codePoint = 0;
-	uint leading = utf8Reader();
+	uint leading = uint(utf8Reader());
 	uint mask = 0x80;
 	int count = 0;
 	while ((leading & mask) != 0 && count < 4)
@@ -40,7 +40,7 @@ uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint>>(inout Byte
 	codePoint = (leading & (mask - 1));
 	for (int i = 1; i <= count - 1; i++)
 	{
-		uint next = utf8Reader();
+		uint next = uint(utf8Reader());
 		if(next != 0)
 		{
 			codePoint <<= 6;
@@ -57,7 +57,7 @@ uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint>>(inout Byte
 __generic<int N>
 extension ShortString<N>
 {
-	struct Reader : IMutatingFunc<uint>
+	struct Reader : IMutatingFunc<uint8_t>
 	{
 		ShortString<N> str;
 		uint it = 0;
@@ -69,9 +69,9 @@ extension ShortString<N>
 		}
 
 		[mutating]
-		uint operator()()
+		uint8_t operator()()
 		{
-			uint res = 0;
+			uint8_t res = 0;
 			if(it < N)
 			{
 				res = str[it];

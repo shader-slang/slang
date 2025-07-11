@@ -480,6 +480,7 @@ struct PeepholeContext : InstPassBase
                 changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
+        case kIROp_GetElementFromString:
         case kIROp_GetElement:
             if (inst->getOperand(0)->getOp() == kIROp_MakeArray)
             {
@@ -551,20 +552,35 @@ struct PeepholeContext : InstPassBase
             }
             else if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
             {
-                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
-                if (!index)
-                    break;
+                auto index = as<IRIntLit>(as<IRGetElementBase>(inst)->getIndex());
+                if (index)
+                {
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+                    auto sv = strLit->getStringSlice();
+                    uint32_t c = 0;
+                    if (index->getValue() < sv.getLength())
+                    {
+                        c = sv[index->getValue()];
+                    }
+                    // else diagnose an out of bound error
+                    inst->replaceUsesWith(builder.getIntValue(inst->getDataType(), c));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            else if (inst->getOp() == kIROp_GetElementFromString)
+            {
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto sv = strLit->getStringSlice();
-                uint32_t c = 0;
-                if (index->getValue() < sv.getLength())
-                {
-                    c = sv[index->getValue()];
-                }
-                // else diagnose an out of bound error
-                inst->replaceUsesWith(builder.getIntValue(inst->getDataType(), c));
+                auto getElement = builder.emitElementExtract(
+                    builder.getCharType(),
+                    inst->getOperand(0),
+                    inst->getOperand(1));
+                auto casted = builder.emitCast(inst->getDataType(), getElement);
+                inst->replaceUsesWith(casted);
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
