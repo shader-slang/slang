@@ -118,6 +118,16 @@ struct DebugValueStoreContext
                 isRefParam = true;
                 paramType = outType->getValueType();
             }
+            else if (
+                paramType->getOp() == kIROp_ConstRefType || paramType->getOp() == kIROp_RefType)
+            {
+                isRefParam = true;
+                if (paramType->getOperandCount() > 0)
+                {
+                    if (auto valueType = as<IRType>(paramType->getOperand(0)))
+                        paramType = valueType;
+                }
+            }
             if (!isDebuggableType(paramType))
                 continue;
             auto debugVar = builder.emitDebugVar(
