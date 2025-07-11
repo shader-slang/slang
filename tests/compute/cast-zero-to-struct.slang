@@ -4,6 +4,7 @@
 // to a `struct` type works.
 
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 
 struct S

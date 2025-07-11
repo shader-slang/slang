@@ -1,5 +1,6 @@
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 
 //TEST_INPUT:type AssocImpl
 
