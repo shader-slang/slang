@@ -846,30 +846,6 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
     return pairStructType;
 }
 
-// Helper function to normalize matrix types for caching purposes.
-// Matrix layout should not affect the differential pair type structure,
-// so we normalize all matrix types to use layout mode 0 for cache keys.
-static IRType* normalizeMatrixTypeForCaching(IRBuilder* builder, IRType* type)
-{
-    if (auto matrixType = as<IRMatrixType>(type))
-    {
-        // Check if this matrix has a non-zero layout mode
-        if (auto layoutInst = as<IRIntLit>(matrixType->getLayout()))
-        {
-            if (layoutInst->getValue() != 0)
-            {
-                // Create a normalized version with layout mode 0
-                auto zeroLayout = builder->getIntValue(builder->getIntType(), 0);
-                return builder->getMatrixType(
-                    matrixType->getElementType(),
-                    matrixType->getRowCount(),
-                    matrixType->getColumnCount(),
-                    zeroLayout);
-            }
-        }
-    }
-    return type;
-}
 
 IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRType* originalPairType)
 {
@@ -955,9 +931,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             auto type = (IRType*)typePack->getOperand(i);
             auto diffType = (IRType*)typePack->getOperand(i);
 
-            // Normalize matrix types for caching consistency
-            auto normalizedType = normalizeMatrixTypeForCaching(builder, type);
-            if (pairTypeCache.tryGetValue(normalizedType, result))
+            if (pairTypeCache.tryGetValue(type, result))
             {
                 args.add((IRType*)result);
                 continue;
@@ -966,7 +940,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             // Lower the diff pair type.
             auto loweredPairType = (IRType*)_createDiffPairType(type, diffType);
 
-            pairTypeCache.add(normalizedType, loweredPairType);
+            pairTypeCache.add(type, loweredPairType);
             args.add(loweredPairType);
         }
 
@@ -978,10 +952,8 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
     }
     else
     {
-        // Normalize matrix types for caching to ensure row_major and column_major
-        // matrices of the same dimensions use the same DiffPair struct
-        auto cacheKey = normalizeMatrixTypeForCaching(builder, primalType);
-        if (pairTypeCache.tryGetValue(cacheKey, result))
+        auto cacheKey = primalType;
+        if (pairTypeCache.tryGetValue(primalType, result))
             return result;
 
         if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(primalType))

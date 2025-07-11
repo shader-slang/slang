@@ -1,3 +1,5 @@
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+
 // This test verifies that row_major and column_major matrices don't create
 // duplicate DiffPair structs when used together in autodiff code.
 // Before the fix, this would generate compilation errors due to mismatched
@@ -16,9 +18,5 @@ void computeMain(int3 dispathThreadID: SV_DispatchThreadID) {
 
     DifferentialPair<row_major float3x3> dpW = diffPair(w);
     bwd_diff(matmul33)(v, dpW, float3(1));
-
-    printf("R: %f %f %f %f %f %f %f %f %f\n", 
-           dpW.d[0][0], dpW.d[0][1], dpW.d[0][2],
-           dpW.d[1][0], dpW.d[1][1], dpW.d[1][2],
-           dpW.d[2][0], dpW.d[2][1], dpW.d[2][2]);
+    // CHECK: computeMain
 }
