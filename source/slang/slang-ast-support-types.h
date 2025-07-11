@@ -232,7 +232,6 @@ FIDDLE() namespace Slang
         saturated_cooperation_using,
         IDifferentiable,
         IDifferentiablePtr,
-        IDifferentiablePtrType,
         NullDifferential,
         COUNT
     };

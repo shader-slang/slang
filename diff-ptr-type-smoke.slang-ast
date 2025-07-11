@@ -1,0 +1,649 @@
+ModuleDecl:0 {
+    loc : SourceLoc(4460438) tests/autodiff/diff-ptr-type-smoke.slang:5
+    modifiers :  { 
+    }
+    parentDecl : null
+    nameAndLoc : NameLoc{"diff-ptr-type-smoke", SourceLoc(0) }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        VarDecl:1,
+        StructDecl:2,
+        FuncDecl:3,
+        FuncDecl:4,
+        FuncDecl:5,
+        FuncDecl:6}
+    mapDeclToAssociatedDecls :  { 
+    }
+    languageVersion : 2018
+    defaultVisibility : internal
+    mapTypeToCandidateExtensions :  { 
+    }
+}
+VarDecl:1 {
+    loc : SourceLoc(4460464) tests/autodiff/diff-ptr-type-smoke.slang:5
+    modifiers :  { 
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"outputBuffer", SourceLoc(4460464) tests/autodiff/diff-ptr-type-smoke.slang:5 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        GenericAppExpr:7,
+        null
+    }
+    initExpr : null
+    val : null
+}
+StructDecl:2 {
+    loc : SourceLoc(4460486) tests/autodiff/diff-ptr-type-smoke.slang:7
+    modifiers :  { 
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"MyPtrType", SourceLoc(4460486) tests/autodiff/diff-ptr-type-smoke.slang:7 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        InheritanceDecl:8,
+        TypeAliasDecl:9,
+        VarDecl:10,
+        VarDecl:11,
+        FuncDecl:12,
+        FuncDecl:13}
+    typeTags : 0
+}
+FuncDecl:3 {
+    loc : SourceLoc(4460796) tests/autodiff/diff-ptr-type-smoke.slang:19
+    modifiers :  { 
+        UncheckedAttribute:14
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"load", SourceLoc(4460796) tests/autodiff/diff-ptr-type-smoke.slang:19 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:15,
+        ParamDecl:16}
+    returnType :  { 
+        VarExpr:17,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:18
+}
+FuncDecl:4 {
+    loc : SourceLoc(4460858) tests/autodiff/diff-ptr-type-smoke.slang:24
+    modifiers :  { 
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"load_bwd", SourceLoc(4460858) tests/autodiff/diff-ptr-type-smoke.slang:24 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:19,
+        ParamDecl:20,
+        ParamDecl:21}
+    returnType :  { 
+        VarExpr:22,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:23
+}
+FuncDecl:5 {
+    loc : SourceLoc(4460990) tests/autodiff/diff-ptr-type-smoke.slang:30
+    modifiers :  { 
+        UncheckedAttribute:24
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"test", SourceLoc(4460990) tests/autodiff/diff-ptr-type-smoke.slang:30 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:25,
+        ParamDecl:26}
+    returnType :  { 
+        VarExpr:27,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:28
+}
+FuncDecl:6 {
+    loc : SourceLoc(4461094) tests/autodiff/diff-ptr-type-smoke.slang:36
+    modifiers :  { 
+        UncheckedAttribute:29
+    }
+    parentDecl : ModuleDecl:0
+    nameAndLoc : NameLoc{"computeMain", SourceLoc(4461094) tests/autodiff/diff-ptr-type-smoke.slang:36 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:30}
+    returnType :  { 
+        VarExpr:31,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:32
+}
+GenericAppExpr:7 {
+    loc : SourceLoc(4460438) tests/autodiff/diff-ptr-type-smoke.slang:5
+    type : rvalue null
+    arguments :  { 
+        VarExpr:33
+    }
+    functionExpr : VarExpr:34
+}
+InheritanceDecl:8 {
+    loc : SourceLoc(4460498) tests/autodiff/diff-ptr-type-smoke.slang:7
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"$inheritance", SourceLoc(0) }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    base :  { 
+        VarExpr:35,
+        null
+    }
+    witnessTable : null
+}
+TypeAliasDecl:9 {
+    loc : SourceLoc(4460537) tests/autodiff/diff-ptr-type-smoke.slang:9
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"Differential", SourceLoc(4460537) tests/autodiff/diff-ptr-type-smoke.slang:9 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:36,
+        null
+    }
+}
+VarDecl:10 {
+    loc : SourceLoc(4460594) tests/autodiff/diff-ptr-type-smoke.slang:11
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"buffer", SourceLoc(4460594) tests/autodiff/diff-ptr-type-smoke.slang:11 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        GenericAppExpr:37,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarDecl:11 {
+    loc : SourceLoc(4460611) tests/autodiff/diff-ptr-type-smoke.slang:12
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"offset", SourceLoc(4460611) tests/autodiff/diff-ptr-type-smoke.slang:12 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:38,
+        null
+    }
+    initExpr : null
+    val : null
+}
+FuncDecl:12 {
+    loc : SourceLoc(4460630) tests/autodiff/diff-ptr-type-smoke.slang:14
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"load", SourceLoc(4460630) tests/autodiff/diff-ptr-type-smoke.slang:14 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:39}
+    returnType :  { 
+        VarExpr:40,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:41
+}
+FuncDecl:13 {
+    loc : SourceLoc(4460687) tests/autodiff/diff-ptr-type-smoke.slang:15
+    modifiers :  { 
+    }
+    parentDecl : StructDecl:2
+    nameAndLoc : NameLoc{"accumulate", SourceLoc(4460687) tests/autodiff/diff-ptr-type-smoke.slang:15 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    _directMemberDecls :  { 
+        ParamDecl:42,
+        ParamDecl:43}
+    returnType :  { 
+        VarExpr:44,
+        null
+    }
+    errorType :  { 
+        null,
+        null
+    }
+    primaryDecl : null
+    nextDecl : null
+    body : UnparsedStmt:45
+}
+UncheckedAttribute:14 {
+    loc : SourceLoc(4460760) tests/autodiff/diff-ptr-type-smoke.slang:18
+    keywordName : "BackwardDerivative"
+    attributeDecl : null
+    args :  { 
+        VarExpr:46
+    }
+}
+ParamDecl:15 {
+    loc : SourceLoc(4460811) tests/autodiff/diff-ptr-type-smoke.slang:19
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:3
+    nameAndLoc : NameLoc{"b", SourceLoc(4460811) tests/autodiff/diff-ptr-type-smoke.slang:19 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:47,
+        null
+    }
+    initExpr : null
+    val : null
+}
+ParamDecl:16 {
+    loc : SourceLoc(4460819) tests/autodiff/diff-ptr-type-smoke.slang:19
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:3
+    nameAndLoc : NameLoc{"idx", SourceLoc(4460819) tests/autodiff/diff-ptr-type-smoke.slang:19 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:48,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:17 {
+    loc : SourceLoc(4460790) tests/autodiff/diff-ptr-type-smoke.slang:19
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:18 {
+    loc : SourceLoc(4460824) tests/autodiff/diff-ptr-type-smoke.slang:20
+    modifiers :  { 
+    }
+}
+ParamDecl:19 {
+    loc : SourceLoc(4460898) tests/autodiff/diff-ptr-type-smoke.slang:24
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:4
+    nameAndLoc : NameLoc{"b", SourceLoc(4460898) tests/autodiff/diff-ptr-type-smoke.slang:24 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        GenericAppExpr:49,
+        null
+    }
+    initExpr : null
+    val : null
+}
+ParamDecl:20 {
+    loc : SourceLoc(4460906) tests/autodiff/diff-ptr-type-smoke.slang:24
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:4
+    nameAndLoc : NameLoc{"idx", SourceLoc(4460906) tests/autodiff/diff-ptr-type-smoke.slang:24 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:50,
+        null
+    }
+    initExpr : null
+    val : null
+}
+ParamDecl:21 {
+    loc : SourceLoc(4460917) tests/autodiff/diff-ptr-type-smoke.slang:24
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:4
+    nameAndLoc : NameLoc{"grad", SourceLoc(4460917) tests/autodiff/diff-ptr-type-smoke.slang:24 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:51,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:22 {
+    loc : SourceLoc(4460853) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:23 {
+    loc : SourceLoc(4460923) tests/autodiff/diff-ptr-type-smoke.slang:25
+    modifiers :  { 
+    }
+}
+UncheckedAttribute:24 {
+    loc : SourceLoc(4460960) tests/autodiff/diff-ptr-type-smoke.slang:29
+    keywordName : "BackwardDifferentiable"
+    attributeDecl : null
+    args :  { 
+    }
+}
+ParamDecl:25 {
+    loc : SourceLoc(4461005) tests/autodiff/diff-ptr-type-smoke.slang:30
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:5
+    nameAndLoc : NameLoc{"b", SourceLoc(4461005) tests/autodiff/diff-ptr-type-smoke.slang:30 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:52,
+        null
+    }
+    initExpr : null
+    val : null
+}
+ParamDecl:26 {
+    loc : SourceLoc(4461013) tests/autodiff/diff-ptr-type-smoke.slang:30
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:5
+    nameAndLoc : NameLoc{"idx", SourceLoc(4461013) tests/autodiff/diff-ptr-type-smoke.slang:30 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:53,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:27 {
+    loc : SourceLoc(4460984) tests/autodiff/diff-ptr-type-smoke.slang:30
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:28 {
+    loc : SourceLoc(4461018) tests/autodiff/diff-ptr-type-smoke.slang:31
+    modifiers :  { 
+    }
+}
+UncheckedAttribute:29 {
+    loc : SourceLoc(4461068) tests/autodiff/diff-ptr-type-smoke.slang:35
+    keywordName : "numthreads"
+    attributeDecl : null
+    args :  { 
+        IntegerLiteralExpr:54,
+        IntegerLiteralExpr:55,
+        IntegerLiteralExpr:56
+    }
+}
+ParamDecl:30 {
+    loc : SourceLoc(4461111) tests/autodiff/diff-ptr-type-smoke.slang:36
+    modifiers :  { 
+        HLSLSimpleSemantic:57
+    }
+    parentDecl : FuncDecl:6
+    nameAndLoc : NameLoc{"id", SourceLoc(4461111) tests/autodiff/diff-ptr-type-smoke.slang:36 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:58,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:31 {
+    loc : SourceLoc(4461089) tests/autodiff/diff-ptr-type-smoke.slang:36
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:32 {
+    loc : SourceLoc(4461137) tests/autodiff/diff-ptr-type-smoke.slang:37
+    modifiers :  { 
+    }
+}
+VarExpr:33 {
+    loc : SourceLoc(4460457) tests/autodiff/diff-ptr-type-smoke.slang:5
+    type : rvalue null
+    declRef : 
+}
+VarExpr:34 {
+    loc : SourceLoc(4460438) tests/autodiff/diff-ptr-type-smoke.slang:5
+    type : rvalue null
+    declRef : 
+}
+VarExpr:35 {
+    loc : SourceLoc(4460498) tests/autodiff/diff-ptr-type-smoke.slang:7
+    type : rvalue null
+    declRef : 
+}
+VarExpr:36 {
+    loc : SourceLoc(4460552) tests/autodiff/diff-ptr-type-smoke.slang:9
+    type : rvalue null
+    declRef : 
+}
+GenericAppExpr:37 {
+    loc : SourceLoc(4460568) tests/autodiff/diff-ptr-type-smoke.slang:11
+    type : rvalue null
+    arguments :  { 
+        VarExpr:59
+    }
+    functionExpr : VarExpr:60
+}
+VarExpr:38 {
+    loc : SourceLoc(4460606) tests/autodiff/diff-ptr-type-smoke.slang:12
+    type : rvalue null
+    declRef : 
+}
+ParamDecl:39 {
+    loc : SourceLoc(4460640) tests/autodiff/diff-ptr-type-smoke.slang:14
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:12
+    nameAndLoc : NameLoc{"idx", SourceLoc(4460640) tests/autodiff/diff-ptr-type-smoke.slang:14 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:61,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:40 {
+    loc : SourceLoc(4460624) tests/autodiff/diff-ptr-type-smoke.slang:14
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:41 {
+    loc : SourceLoc(4460645) tests/autodiff/diff-ptr-type-smoke.slang:14
+    modifiers :  { 
+    }
+}
+ParamDecl:42 {
+    loc : SourceLoc(4460703) tests/autodiff/diff-ptr-type-smoke.slang:15
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:13
+    nameAndLoc : NameLoc{"idx", SourceLoc(4460703) tests/autodiff/diff-ptr-type-smoke.slang:15 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:62,
+        null
+    }
+    initExpr : null
+    val : null
+}
+ParamDecl:43 {
+    loc : SourceLoc(4460714) tests/autodiff/diff-ptr-type-smoke.slang:15
+    modifiers :  { 
+    }
+    parentDecl : FuncDecl:13
+    nameAndLoc : NameLoc{"value", SourceLoc(4460714) tests/autodiff/diff-ptr-type-smoke.slang:15 }
+    inferredCapabilityRequirements : capability_set()
+    _prevInContainerWithSameName : null
+    type :  { 
+        VarExpr:63,
+        null
+    }
+    initExpr : null
+    val : null
+}
+VarExpr:44 {
+    loc : SourceLoc(4460682) tests/autodiff/diff-ptr-type-smoke.slang:15
+    type : rvalue null
+    declRef : 
+}
+UnparsedStmt:45 {
+    loc : SourceLoc(4460721) tests/autodiff/diff-ptr-type-smoke.slang:15
+    modifiers :  { 
+    }
+}
+VarExpr:46 {
+    loc : SourceLoc(4460779) tests/autodiff/diff-ptr-type-smoke.slang:18
+    type : rvalue null
+    declRef : 
+}
+VarExpr:47 {
+    loc : SourceLoc(4460801) tests/autodiff/diff-ptr-type-smoke.slang:19
+    type : rvalue null
+    declRef : 
+}
+VarExpr:48 {
+    loc : SourceLoc(4460814) tests/autodiff/diff-ptr-type-smoke.slang:19
+    type : rvalue null
+    declRef : 
+}
+GenericAppExpr:49 {
+    loc : SourceLoc(4460867) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    arguments :  { 
+        VarExpr:64
+    }
+    functionExpr : VarExpr:65
+}
+VarExpr:50 {
+    loc : SourceLoc(4460901) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    declRef : 
+}
+VarExpr:51 {
+    loc : SourceLoc(4460911) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    declRef : 
+}
+VarExpr:52 {
+    loc : SourceLoc(4460995) tests/autodiff/diff-ptr-type-smoke.slang:30
+    type : rvalue null
+    declRef : 
+}
+VarExpr:53 {
+    loc : SourceLoc(4461008) tests/autodiff/diff-ptr-type-smoke.slang:30
+    type : rvalue null
+    declRef : 
+}
+IntegerLiteralExpr:54 {
+    loc : SourceLoc(4461079) tests/autodiff/diff-ptr-type-smoke.slang:35
+    type : rvalue null
+    suffixType : int
+    value : 1
+}
+IntegerLiteralExpr:55 {
+    loc : SourceLoc(4461082) tests/autodiff/diff-ptr-type-smoke.slang:35
+    type : rvalue null
+    suffixType : int
+    value : 1
+}
+IntegerLiteralExpr:56 {
+    loc : SourceLoc(4461085) tests/autodiff/diff-ptr-type-smoke.slang:35
+    type : rvalue null
+    suffixType : int
+    value : 1
+}
+HLSLSimpleSemantic:57 {
+    loc : SourceLoc(4461116) tests/autodiff/diff-ptr-type-smoke.slang:36
+    keywordName : null
+    name :  { identifier, SourceLoc(4461116) tests/autodiff/diff-ptr-type-smoke.slang:36, "SV_DispatchThreadID" }
+}
+VarExpr:58 {
+    loc : SourceLoc(4461106) tests/autodiff/diff-ptr-type-smoke.slang:36
+    type : rvalue null
+    declRef : 
+}
+VarExpr:59 {
+    loc : SourceLoc(4460587) tests/autodiff/diff-ptr-type-smoke.slang:11
+    type : rvalue null
+    declRef : 
+}
+VarExpr:60 {
+    loc : SourceLoc(4460568) tests/autodiff/diff-ptr-type-smoke.slang:11
+    type : rvalue null
+    declRef : 
+}
+VarExpr:61 {
+    loc : SourceLoc(4460635) tests/autodiff/diff-ptr-type-smoke.slang:14
+    type : rvalue null
+    declRef : 
+}
+VarExpr:62 {
+    loc : SourceLoc(4460698) tests/autodiff/diff-ptr-type-smoke.slang:15
+    type : rvalue null
+    declRef : 
+}
+VarExpr:63 {
+    loc : SourceLoc(4460708) tests/autodiff/diff-ptr-type-smoke.slang:15
+    type : rvalue null
+    declRef : 
+}
+VarExpr:64 {
+    loc : SourceLoc(4460887) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    declRef : 
+}
+VarExpr:65 {
+    loc : SourceLoc(4460867) tests/autodiff/diff-ptr-type-smoke.slang:24
+    type : rvalue null
+    declRef : 
+}

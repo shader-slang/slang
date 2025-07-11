@@ -114,8 +114,6 @@ KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
         return KnownBuiltinDeclName::IDifferentiable;
     else if (name == "IDifferentiablePtr")
         return KnownBuiltinDeclName::IDifferentiablePtr;
-    else if (name == "IDifferentiablePtrType")
-        return KnownBuiltinDeclName::IDifferentiablePtrType;
     else if (name == "NullDifferential")
         return KnownBuiltinDeclName::NullDifferential;
     else

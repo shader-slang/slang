@@ -1795,8 +1795,6 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IDifferentiable");
     case KnownBuiltinDeclName::IDifferentiablePtr:
         return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
-    case KnownBuiltinDeclName::IDifferentiablePtrType:
-        return UnownedStringSlice::fromLiteral("IDifferentiablePtrType");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
     default:
