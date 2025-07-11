@@ -4,7 +4,7 @@
 RWStructuredBuffer<float> outputBuffer;
 
 // Test that KnownBuiltin attribute works with enum-based system
-[KnownBuiltin("GeometryStreamAppend")]
+[KnownBuiltin(0)]
 void testKnownBuiltin()
 {
     // This function just needs to exist to test attribute processing
