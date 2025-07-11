@@ -43,7 +43,7 @@ jobs:
       - name: Generate command line reference
         run: |
           mkdir -p temp
-          "$bin_dir/slangc" -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
+          "$bin_dir/slangc" -help-style markdown -h > temp/command-line-slangc-reference.md
 
       - name: Compare with existing reference
         id: compare
@@ -51,6 +51,6 @@ jobs:
           if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
             echo "Command line reference is out of date. Diff:"
             diff -u docs/command-line-slangc-reference.md temp/command-line-slangc-reference.md
-            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1' or comment '/regenerate-cmdline-ref' on your PR."
+            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
             exit 1
           fi
