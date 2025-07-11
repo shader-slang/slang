@@ -6111,7 +6111,7 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
-    [KnownBuiltin(0)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6122,7 +6122,7 @@ struct PointStream
         }
     }
 
-    [KnownBuiltin(1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6141,7 +6141,7 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
-    [KnownBuiltin(0)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6152,7 +6152,7 @@ struct LineStream
         }
     }
 
-    [KnownBuiltin(1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6171,7 +6171,7 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
-    [KnownBuiltin(0)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6182,7 +6182,7 @@ struct TriangleStream
         }
     }
 
-    [KnownBuiltin(1)]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -10239,7 +10239,7 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-[KnownBuiltin(2)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::GetAttributeAtVertex))]
 [__unsafeForceInlineEarly]
 T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
@@ -18275,7 +18275,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 /// and provide the values for per-mesh payload parameters.
 /// @return This function doesn't return.
 /// @category meshshading
-[KnownBuiltin(3)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::DispatchMesh))]
 [require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
@@ -21562,7 +21562,7 @@ uint3 cudaBlockDim()
 // the signature or behavior of this function should be adjusted for there).
 //
 //@hidden:
-[KnownBuiltin(4)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation))]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -21593,7 +21593,7 @@ func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
 // waveMatch: a function to return a mask of lanes with the same input as this one
 // broadcast: a function which returns the value passed into it on the specified lane
 //
-[KnownBuiltin(5)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation_using))]
 func saturated_cooperation_using<A, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,

@@ -603,7 +603,7 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///
 /// 
 __magic_type(DifferentiableType)
-[KnownBuiltin(6)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiable))]
 interface IDifferentiable
 {
     // Note: the compiler implementation requires the `Differential` associated type to be defined
@@ -646,7 +646,7 @@ interface IDifferentiable
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
 __magic_type(DifferentiablePtrType)
-[KnownBuiltin(7)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiablePtrType))]
 interface IDifferentiablePtrType
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
