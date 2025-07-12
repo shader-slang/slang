@@ -2,10 +2,10 @@
 #version 450
 
 [vk::constant_id(1)]
-const int constValue1 = 0;
+static const int constValue1 = 0;
 
 [vk::constant_id(2)]
-const int constValue3 = 5;
+static const int constValue3 = 5;
 
 // CHECK-DAG: OpExecutionModeId %main LocalSizeId %[[C0:[0-9A-Za-z_]+]] %[[C1:[0-9A-Za-z_]+]] %[[C2:[0-9A-Za-z_]+]]
 // CHECK-DAG: OpDecorate %[[C0]] SpecId 1

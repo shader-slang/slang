@@ -32,7 +32,7 @@ layout(set = SET_BASE + SET_STRIDE, binding = BINDING_BASE * BINDING_STRIDE * 2)
 layout(input_attachment_index = (INPUT_ATT_BASE + 4) / 2, set = SET_BASE + 5, binding = BINDING_BASE) uniform subpassInput inputAttachment0;
 
 // CHECK_GLSL: constant_id = 27
-layout(constant_id = 3 * 9) const float specConst = 0.2;
+layout(constant_id = 3 * 9) static const float specConst = 0.2;
 
 // CHECK_GLSL: location = 6
 [vk_location(BASE_OUT_LOC + 4)]
