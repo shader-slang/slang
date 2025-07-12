@@ -1,4 +1,4 @@
-# CLAUDE.md
++# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -38,6 +38,16 @@ slang-test must run from repository root
 # Run unit tests
 ./build/Release/bin/slang-test slang-unit-test-tool/
 ```
+
+Many of the Slang tests requires a GPU to run. However your local environment may not have a GPU. Prefer crafting the
+test that runs on the CPU with `//TEST:COMPARE_COMPUTE(filecheck=CHECK): -cpu -output-using-type`, or with
+`//TEST:INTERPRET(filecheck=CHECK):`. Prefer creating executable tests over compile-only tests, unless the test is to
+check for a specific form of downstream code or diagnostics output.
+
+When using `slangc` to produce SPIRV, you should set the `SLANG_RUN_SPIRV_VALIDATION` environment variable to `1` to ensure
+that slangc runs SPIRV validation on the generated SPIRV. If you don't see any errors you are good.
+Don't use the system's `spirv-val` tool to validate the SPIRV because it is not up-to-date.
+
 
 ### Slang Command Line Usage
 **IMPORTANT:** Slang uses single dashes for multi-character options (not double dashes like most tools):
@@ -121,6 +131,14 @@ Since it dumps many lines, it will be good to store the result into a file for a
 The dump prints multiple sections which of each is separated by `### ` header.
 Each section visualizes the IR state on multiple steps during the compilation.
 It is necessary to differentiate the information on one section from one section, because the issue might be observed at a specific section.
+
+You can also modify Slang code and insert a call to `dumpIRToString()` at any point of interest to dump any part of the IR
+to string. You can then write that string to a temp file with `File::writeAllText()` to analyze what is going on.
+
+When checking the IR dump, look for type consistency or logical errors in the IR to locate the potential transformation
+pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
+type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
+
 
 #### slangc with `-target spirv-asm`
 slangc with `-target spirv-asm` is the most common way to see how the given slang shader is compiled into spirv code.
