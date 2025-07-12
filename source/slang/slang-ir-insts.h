@@ -2286,7 +2286,7 @@ struct IRGetElement : IRGetElementBase
 };
 
 FIDDLE()
-struct IRGetElementFromString : IRGetElementBase
+struct IRGetCharFromString : IRGetElementBase
 {
     FIDDLE(leafInst())
 };

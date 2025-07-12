@@ -1732,42 +1732,22 @@ struct Array : IRWArray<T>
 __generic<int N>
 __magic_type(ShortStringType)
 __intrinsic_type($(kIROp_ShortStringType))
-struct ShortString : IArray<uint8_t>
+struct ShortString : IArray<uint>
 {
-    __intrinsic_op($(kIROp_GetArrayLength))
     [__unsafeForceInlineEarly]
-    int getCount();
+    int getCount()
+    {
+        return N;
+    }
 
     property uint length
     {
         [__unsafeForceInlineEarly] get { return (uint)getCount(); }
     }
 
-    __intrinsic_op($(kIROp_GetShortStringAsArray))
-    [__unsafeForceInlineEarly]
-    Array<uint8_t, N> getArray();
-
-    [__unsafeForceInlineEarly] 
-    __intrinsic_op($(kIROp_GetElement))
-    internal uint8_t getElement(uint i);
-
-    [__unsafeForceInlineEarly] 
-    __intrinsic_op($(kIROp_GetElementFromString))
-    internal uint8_t getElementFromNativeString(uint i);
-
-    __subscript(uint i) -> uint8_t
+    __subscript(uint i) -> uint
     {
-        [__unsafeForceInlineEarly] get
-        {
-            uint8_t res;
-            __target_switch
-            {
-                case cpp: res = getElementFromNativeString(i);
-                case cuda: res = getElementFromNativeString(i);
-                default: res = getElement(i);
-            }
-            return res;
-        }
+        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetCharFromString)) get;
     }
 };
 
@@ -3066,10 +3046,6 @@ void unmodified(out T){}
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
-[__unsafeForceInlineEarly]
-__intrinsic_op($(kIROp_GetStringHash))
-uint32_t getStringHash<int N>(ShortString<N> string);
-
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_GetStringHash))
 uint32_t getStringHash(String string);

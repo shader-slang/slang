@@ -17,11 +17,31 @@ IRArrayType* getShortStringArrayType(
     return builder.getArrayType(charType, strLitType->getLength());
 }
 
-IRInst* getShortStringAsArray(
+IRArrayType* getShortStringPackedArray32Type(
     IRBuilder& builder,
-    IRInst* src,
-    IRBasicType* charType,
-    bool supportStringLiteral)
+    IRShortStringType* strLitType,
+    IRInst* count)
+{
+    auto l = strLitType->getLength();
+    if (!count)
+    {
+        if (auto intLit = as<IRIntLit>(l))
+        {
+            count = builder.getIntValue((intLit->getValue() + 3) / 4);
+        }
+        else
+        {
+            count = builder.emitShr(
+                builder.getIntType(),
+                builder.emitAdd(builder.getIntType(), l, builder.getIntValue(3)),
+                builder.getIntValue(2));
+        }
+    }
+    IRArrayType* res = builder.getArrayType(builder.getUIntType(), count);
+    return res;
+}
+
+IRInst* getShortStringAsArray(IRBuilder& builder, IRStringLit* src, IRBasicType* charType)
 {
     UInt n = 0;
     auto type = src->getDataType();
@@ -44,33 +64,49 @@ IRInst* getShortStringAsArray(
     {
         charType = builder.getUInt8Type();
     }
-    if (auto strLit = as<IRStringLit>(src))
+    auto sv = src->getStringSlice();
+    for (UInt i = 0; i < n; ++i)
     {
-        auto sv = strLit->getStringSlice();
-        for (UInt i = 0; i < n; ++i)
-        {
-            IRIntegerValue c = IRIntegerValue(uint8_t(sv[i]));
-            chars[i] = builder.getIntValue(charType, c);
-        }
-    }
-    else
-    {
-        // C/C++ string literals are typed with 'char', but charType might be uint8_t
-        // To avoid any error / warning, we need to explicitely cast 'char' to charType
-        IRBasicType* strCharType = charType;
-        if (supportStringLiteral && srcStrType)
-        {
-            strCharType = builder.getCharType();
-        }
-        for (UInt i = 0; i < n; ++i)
-        {
-            auto getElement = builder.emitGetElement(strCharType, src, i);
-            auto casted = builder.emitCast(charType, getElement, false);
-            chars[i] = casted;
-        }
+        IRIntegerValue c = IRIntegerValue(uint8_t(sv[i]));
+        chars[i] = builder.getIntValue(charType, c);
     }
     auto arrayType = builder.getArrayType(charType, builder.getIntValue(chars.getCount()));
     auto asArray = builder.emitMakeArray(arrayType, chars.getCount(), chars.getBuffer());
+    return asArray;
+}
+
+IRInst* getShortStringAsPackedArray32(IRBuilder& builder, IRStringLit* src)
+{
+    UInt len = 0;
+    auto type = src->getDataType();
+    auto srcStrType = as<IRShortStringType>(type);
+    auto sv = src->getStringSlice();
+    if (srcStrType)
+    {
+        len = static_cast<UInt>(as<IRIntLit>(srcStrType->getLength())->value.intVal);
+    }
+    else
+    {
+        len = static_cast<UInt>(sv.getLength());
+    }
+    UInt capacity = (len + 3) / 4;
+    List<IRInst*> chunks;
+    chunks.setCount(capacity);
+    IRBasicType* chunkType = builder.getUIntType();
+    for (UInt i = 0; i < capacity; ++i)
+    {
+        uint32_t chunk = 0;
+        for (uint32_t j = 0; j < 4; ++j)
+        {
+            if ((4 * i + j) < static_cast<UInt>(sv.getLength()))
+            {
+                chunk |= (uint32_t(uint8_t(sv[4 * i + j])) << (8 * j));
+            }
+        }
+        chunks[i] = builder.getIntValue(chunkType, chunk);
+    }
+    auto arrayType = builder.getArrayType(chunkType, builder.getIntValue(capacity));
+    auto asArray = builder.emitMakeArray(arrayType, capacity, chunks.getBuffer());
     return asArray;
 }
 
@@ -93,7 +129,15 @@ struct ShortStringLoweringPass : InstPassBase
             IRBuilder builder(module);
             IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
             builder.setInsertBefore(inst);
-            auto arrayType = getShortStringArrayType(builder, strLitType);
+            IRArrayType* arrayType;
+            if (options.targetSupports8BitsIntegrals)
+            {
+                arrayType = getShortStringArrayType(builder, strLitType);
+            }
+            else
+            {
+                arrayType = getShortStringPackedArray32Type(builder, strLitType);
+            }
             inst->replaceUsesWith(arrayType);
             inst->removeAndDeallocate();
             changed = true;
@@ -107,33 +151,77 @@ struct ShortStringLoweringPass : InstPassBase
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                auto asArray = getShortStringAsArray(builder, strLit);
+                IRInst* asArray = nullptr;
+                if (options.targetSupports8BitsIntegrals)
+                {
+                    asArray = getShortStringAsArray(builder, strLit);
+                }
+                else
+                {
+                    asArray = getShortStringAsPackedArray32(builder, strLit);
+                }
                 inst->replaceUsesWith(asArray);
                 inst->removeAndDeallocate();
                 changed = true;
             }
         }
-        else if (auto getAsArray = as<IRGetShortStringAsArray>(inst))
+        else if (auto getChar = as<IRGetCharFromString>(inst))
         {
-            auto str = getAsArray->getOperand(0);
-            IRInst* replacement = nullptr;
-            if (options.targetSupportsStringLiterals)
+            IRBuilder builder(module);
+            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+            builder.setInsertBefore(inst);
+            IRInst* substitute = nullptr;
+            if (options.targetSupportsStringLiterals || options.targetSupports8BitsIntegrals)
             {
-                IRBuilder builder(module);
-                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-                builder.setInsertBefore(inst);
-                replacement = getShortStringAsArray(
-                    builder,
-                    str,
-                    as<IRBasicType>(as<IRArrayType>(inst->getDataType())->getElementType()),
-                    options.targetSupportsStringLiterals);
+                // The ShortString is/will be lowered to a string literal (const char[N+1]), or an
+                // Array<uint8_t, N> So we need to cast the result of getElement
+                IRBasicType* getElementType = options.targetSupportsStringLiterals
+                                                  ? builder.getCharType()
+                                                  : builder.getUInt8Type();
+                IRInst* getElement = builder.emitElementExtract(
+                    getElementType,
+                    getChar->getBase(),
+                    getChar->getIndex());
+                if (options.targetSupportsStringLiterals)
+                {
+                    // In C++, char is usualy signed, so a simple cast uint32_t(char(c)) would lead
+                    // to a sign bit extension We prefer to keep char values in [0, 255], so we need
+                    // a second cast: uint32_t(uint8_t(char(c)))
+                    getElement = builder.emitCast(builder.getUInt8Type(), getElement);
+                }
+                auto casted = builder.emitCast(inst->getDataType(), getElement);
+                substitute = casted;
             }
             else
             {
-                replacement = str;
+                // The short string is stored as a packed u32 array
+                // str[i] := bitfieldExtract(str_u32_packed_array[i / 4], (i % 4) * 8, 8);
+                // i / 4 := i >> 2
+                auto u32Index = builder.emitShr(
+                    builder.getUIntType(),
+                    getChar->getIndex(),
+                    builder.getIntValue(builder.getUIntType(), 2));
+                // i % 4 != i & 0b11
+                auto indexInU32 = builder.emitBitAnd(
+                    builder.getUIntType(),
+                    getChar->getIndex(),
+                    builder.getIntValue(builder.getUIntType(), 0b11));
+                // (i % 4) * 8 := (i % 4) << 3
+                auto bitIndex = builder.emitShl(
+                    builder.getUIntType(),
+                    indexInU32,
+                    builder.getIntValue(builder.getUIntType(), 3));
+                auto getElement =
+                    builder.emitElementExtract(builder.getUIntType(), getChar->getBase(), u32Index);
+                auto extractedChar = builder.emitBitfieldExtract(
+                    inst->getDataType(),
+                    getElement,
+                    bitIndex,
+                    builder.getIntValue(builder.getUIntType(), 8));
+                substitute = extractedChar;
             }
-            getAsArray->replaceUsesWith(replacement);
-            getAsArray->removeAndDeallocate();
+            inst->replaceUsesWith(substitute);
+            inst->removeAndDeallocate();
             changed = true;
         }
     }

@@ -1,7 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj
-//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name output
 RWStructuredBuffer<uint> output;
@@ -26,10 +24,10 @@ RWStructuredBuffer<uint> output;
 
 // CHECK-NEXT: 0
 
-uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint8_t>>(inout ByteReader utf8Reader)
+uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint>>(inout ByteReader utf8Reader)
 {
 	uint codePoint = 0;
-	uint leading = uint(utf8Reader());
+	uint leading = utf8Reader();
 	uint mask = 0x80;
 	int count = 0;
 	while ((leading & mask) != 0 && count < 4)
@@ -40,7 +38,7 @@ uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint8_t>>(inout B
 	codePoint = (leading & (mask - 1));
 	for (int i = 1; i <= count - 1; i++)
 	{
-		uint next = uint(utf8Reader());
+		uint next = utf8Reader();
 		if(next != 0)
 		{
 			codePoint <<= 6;
@@ -57,7 +55,7 @@ uint decodeNextUnicodePointFromUTF8<ByteReader : IMutatingFunc<uint8_t>>(inout B
 __generic<int N>
 extension ShortString<N>
 {
-	struct Reader : IMutatingFunc<uint8_t>
+	struct Reader : IMutatingFunc<uint>
 	{
 		ShortString<N> str;
 		uint it = 0;
@@ -69,9 +67,9 @@ extension ShortString<N>
 		}
 
 		[mutating]
-		uint8_t operator()()
+		uint operator()()
 		{
-			uint8_t res = 0;
+			uint res = 0;
 			if(it < N)
 			{
 				res = str[it];
@@ -94,6 +92,14 @@ uint test<int N, int M>(const in ShortString<M> str, Array<uint, N> ref, uint of
 	{
 		output[offset + i] = decodeNextUnicodePointFromUTF8(it) - ref[i];
 	}
+	// uint n;
+	// uint i = 0;
+	// do
+	// {
+	// 	n = it();
+	// 	output[offset + i] = n;
+	// 	++i;
+	// } while(n != 0);
 	return offset + N;
 }
 

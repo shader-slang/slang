@@ -743,6 +743,13 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
+    ShortStringsOptions shortStrOptions = {};
+    shortStrOptions.targetSupportsStringLiterals =
+        (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+         target == CodeGenTarget::CSource);
+    shortStrOptions.targetSupports8BitsIntegrals =
+        (target != CodeGenTarget::WGSL && target != CodeGenTarget::HLSL);
+
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
     // opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
@@ -1019,6 +1026,11 @@ Result linkAndOptimizeIR(
                 changed |= processAutodiffCalls(targetProgram, irModule, sink);
             }
             dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
+        }
+
+        if (requiredLoweringPassSet.shortString)
+        {
+            changed |= lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
         }
 
         if (!changed)
@@ -1907,12 +1919,7 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.shortString)
     {
-        const bool targetSupportsStringLiterals =
-            (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
-             target == CodeGenTarget::CSource);
-        ShortStringsOptions strLitOptions = {};
-        strLitOptions.targetSupportsStringLiterals = targetSupportsStringLiterals;
-        lowerShortStringReturnChanged(targetProgram, irModule, strLitOptions);
+        lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)

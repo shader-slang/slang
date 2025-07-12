@@ -14,6 +14,16 @@ interface IPrintable
     int getHash();
 };
 
+uint32_t getStringHash<int N>(ShortString<N> string)
+{
+    uint32_t hash = 0;
+    for(uint i = 0; i < N; ++i)
+    {
+        hash = uint32_t(string[i]) + (hash << 6) + (hash << 16) - hash;
+    }
+    return hash;
+}
+
 __generic<int N>
 extension ShortString<N> : IPrintable
 {

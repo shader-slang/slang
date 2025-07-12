@@ -4140,7 +4140,10 @@ String CLikeSourceEmitter::_emitLiteralOneWithType(int bitWidth)
         one = "uint16_t(1)";
         break;
     case 32:
-        one = "uint32_t(1)";
+        if (getTarget() == CodeGenTarget::HLSL)
+            one = "uint(1)";
+        else
+            one = "uint32_t(1)";
         break;
     case 64:
         one = "uint64_t(1)";
