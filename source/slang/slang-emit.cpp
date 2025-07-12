@@ -210,7 +210,7 @@ static void dumpIRIfEnabled(
 {
     if (codeGenContext->shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(codeGenContext->getSink());
+        FileWriter writer(stdout, WriterFlag::IsUnowned);
         // FILE* f = nullptr;
         // fopen_s(&f, (String("dump-") + label + ".txt").getBuffer(), "wt");
         // FileWriter writer(f, 0);

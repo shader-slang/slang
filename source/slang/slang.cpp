@@ -3936,7 +3936,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 
                 if (frontEndReq->optionSet.shouldDumpIR())
                 {
-                    DiagnosticSinkWriter writer(frontEndReq->getSink());
+                    FileWriter writer(stdout, WriterFlag::IsUnowned);
 
                     dumpIR(
                         translationUnit->getModule()->getIRModule(),
