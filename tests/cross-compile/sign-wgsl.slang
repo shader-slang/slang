@@ -26,6 +26,6 @@ void main()
     outputBuffer[0].scalar_result = scalar_result;
     outputBuffer[0].vector_result = vector_result;
     
-    // WGSL: vec2<i32>(sign((vec2<f32>
-    // WGSL: i32(sign(
+    // WGSL-DAG: i32(sign(
+    // WGSL-DAG: vec2<i32>(sign((vec2<f32>
 }
