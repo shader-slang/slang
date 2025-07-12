@@ -37,10 +37,12 @@ public:
     virtual void emitOperandImpl(IRInst* operand, EmitOpInfo const& outerPrec) SLANG_OVERRIDE;
     virtual void emitStructDeclarationSeparatorImpl() SLANG_OVERRIDE;
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncParamsImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, const String& name) SLANG_OVERRIDE;
     virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSemanticsPrefixImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitStructFieldAttributes(
         IRStructType* structType,
@@ -82,9 +84,23 @@ private:
 
     void _requireExtension(const UnownedStringSlice& name);
 
+    void emitFilteredStorageBufferGlobals();
+
     bool m_f16ExtensionEnabled = false;
 
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
+
+    // Track filtered storage buffer parameters that need global variables
+    List<IRParam*> m_filteredStorageBufferParams;
+
+    // Track already emitted global variable names to avoid duplicates
+    HashSet<String> m_emittedGlobalBuffers;
+
+    // Map field types to their canonical global variable names for deduplication
+    Dictionary<IRType*, String> m_bufferTypeToGlobalName;
+
+    // Track whether we've already emitted the filtered globals
+    bool m_hasEmittedFilteredGlobals = false;
 };
 
 } // namespace Slang
