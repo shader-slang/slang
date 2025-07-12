@@ -9147,6 +9147,43 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
+
+                // For debug builds, still create debug information for let variables
+                // even though we're not creating an actual variable
+                if (context->includeDebugInfo)
+                {
+                    // Create a debug variable for this let declaration
+                    auto builder = context->irBuilder;
+                    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
+                        decl->loc,
+                        SourceLocType::Emit);
+
+                    // Find the debug source for this file
+                    auto sourceView =
+                        context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
+                    if (sourceView)
+                    {
+                        auto source = sourceView->getSourceFile();
+                        IRInst* debugSourceInst = nullptr;
+                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                                source,
+                                debugSourceInst))
+                        {
+                            auto debugVar = builder->emitDebugVar(
+                                varType,
+                                debugSourceInst,
+                                builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                                builder->getIntValue(builder->getUIntType(), humaneLoc.column));
+
+                            // Copy name hint from the declaration
+                            addNameHint(context, debugVar, decl);
+
+                            // Emit debug value to associate the constant with the debug variable
+                            builder->emitDebugValue(debugVar, getSimpleVal(context, initVal));
+                        }
+                    }
+                }
+
                 context->setGlobalValue(decl, initVal);
                 return initVal;
             }
