@@ -992,10 +992,12 @@ struct DiffTensorView
 
     [BackwardDerivative(__load_backward)]
     [ForwardDerivative(__load_forward)]
+    [NoDiffThis]
     T load(uint i) { return primal.load(i); }
 
     [BackwardDerivative(__load_backward)]
     [ForwardDerivative(__load_forward)]
+    [NoDiffThis]
     __generic<let N : int>
     T load(vector<uint, N> i) { return primal.load(i); }
 
@@ -1026,10 +1028,12 @@ struct DiffTensorView
 
     [BackwardDerivative(__store_backward)]
     [ForwardDerivative(__store_forward)]
+    [NoDiffThis]
     void store(uint x, T val) { primal.store(x, val); }
 
     [BackwardDerivative(__store_backward)]
     [ForwardDerivative(__store_forward)]
+    [NoDiffThis]
     __generic<let N : int>
     void store(vector<uint, N> x, T val) { primal.store(x, val); }
 
@@ -1135,10 +1139,12 @@ struct DiffTensorView
 
     [BackwardDerivative(__loadOnce_backward)]
     [ForwardDerivative(__loadOnce_forward)]
+    [NoDiffThis]
     T loadOnce(uint i) { return primal.load(i); }
 
     [BackwardDerivative(__loadOnce_backward)]
     [ForwardDerivative(__loadOnce_forward)]
+    [NoDiffThis]
     __generic<let N : int>
     T loadOnce(vector<uint, N> i) { return primal.load(i); }
 
@@ -1168,10 +1174,12 @@ struct DiffTensorView
 
     [BackwardDerivative(__storeOnce_backward)]
     [ForwardDerivative(__storeOnce_forward)]
+    [NoDiffThis]
     void storeOnce(uint x, T val) { primal.store(x, val); }
 
     [BackwardDerivative(__storeOnce_backward)]
     [ForwardDerivative(__storeOnce_forward)]
+    [NoDiffThis]
     __generic<let N : int>
     void storeOnce(vector<uint, N> x, T val) { primal.store(x, val); }
 

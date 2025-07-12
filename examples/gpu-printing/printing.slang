@@ -184,6 +184,16 @@ void println<T : IPrintable>(T value)
 // We can therefore making the exisint Slang `uint` type be
 // printable.
 
+uint32_t getStringHash<int N>(ShortString<N> string)
+{
+    uint32_t hash = 0;
+    for(uint i = 0; i < N; ++i)
+    {
+        hash = uint32_t(string[i]) + (hash << 6) + (hash << 16) - hash;
+    }
+    return hash;
+}
+
 extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrintable here`
 {
     // Printing a `uint` uses up two words in the buffer

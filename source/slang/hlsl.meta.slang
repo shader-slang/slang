@@ -645,7 +645,7 @@ extension vector<int64_t,2>:ITexelElement
 /// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
 /// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
 /// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
-/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit normalized unsigned integer texture |
 /// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
 /// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
 /// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
@@ -6619,8 +6619,25 @@ void AllMemoryBarrierWithGroupSync()
 
 // Returns the workgroup size of the calling entry point.
 [require(compute)]
+[require(meshshading)]
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
+
+// Returns number of workgroups that have been dispatched to a GLSL or SPIR-V compute shader
+[require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+[require(glsl_spirv, meshshading)]
+uint3 WorkgroupCount()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumWorkGroups)";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+        };
+    }
+}
 
 // Test if any components is non-zero.
 
@@ -18947,7 +18964,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
             };
         }
     }

@@ -2,6 +2,7 @@
 #include "slang-ir-inline.h"
 
 #include "../core/slang-performance-profiler.h"
+#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 
@@ -727,6 +728,16 @@ struct InliningPassBase
 
         auto debugInlineInfo = emitCalleeDebugInlinedAt(call, callee, *builder);
 
+        // Collect all arguments that are pointers, so we can propagate their address
+        // spaces to the cloned instructions after inlining.
+        List<IRInst*> ptrArgList;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (as<IRPtrTypeBase>(arg->getDataType()))
+                ptrArgList.add(arg);
+        }
+
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
         // to inlining that is compatible with any call site (including those
@@ -742,16 +753,20 @@ struct InliningPassBase
                 builder,
                 debugInlineInfo.newDebugInlinedAt,
                 debugInlineInfo.calleeDebugFunc);
-            return;
+        }
+        else
+        {
+            // If the callee has multiple blocks, use the more complex inlining approach
+            inlineMultipleBlockFuncBody(
+                callSite,
+                env,
+                builder,
+                debugInlineInfo.newDebugInlinedAt,
+                debugInlineInfo.calleeDebugFunc);
         }
 
-        // If the callee has multiple blocks, use the more complex inlining approach
-        inlineMultipleBlockFuncBody(
-            callSite,
-            env,
-            builder,
-            debugInlineInfo.newDebugInlinedAt,
-            debugInlineInfo.calleeDebugFunc);
+        // Propagate the address space from the argument to the cloned instructions.
+        propagateAddressSpaceFromInsts(_Move(ptrArgList));
     }
 
     // Inline the body of the callee for `callSite`, for a callee that has multiple basic blocks.

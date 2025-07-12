@@ -106,8 +106,10 @@ public:
     }
 
     static inline int IsNaN(float x) { return std::isnan(x); }
+    static inline int IsNaN(double x) { return std::isnan(x); }
 
     static inline int IsInf(float x) { return std::isinf(x); }
+    static inline int IsInf(double x) { return std::isinf(x); }
 
     static inline unsigned int Ones32(unsigned int x)
     {

@@ -1034,6 +1034,9 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
+        GetModuleInfo,              // Print serialized module version and name
+        GetSupportedModuleVersions, // Print the min and max module versions this compiler supports
+
         EmitSeparateDebug, // bool
 
         // Floating point denormal handling modes
@@ -4167,6 +4170,16 @@ struct ISession : public ISlangUnknown
         slang::TypeReflection* interfaceType,
         uint32_t* outRTTIDataBuffer,
         uint32_t bufferSizeInBytes) = 0;
+
+    /** Read module info (name and version) from a module blob
+     *
+     * The returned pointers are valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

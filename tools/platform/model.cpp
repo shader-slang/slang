@@ -22,7 +22,7 @@
 namespace platform
 {
 
-using namespace gfx;
+using namespace rhi;
 using namespace Slang;
 
 // TinyObj provides a tuple type that bundles up indices, but doesn't
@@ -101,7 +101,7 @@ struct hash<platform::SmoothingGroupVertexID>
 namespace platform
 {
 
-ComPtr<ITextureResource> loadTextureImage(IDevice* device, char const* path)
+ComPtr<ITexture> loadTextureImage(IDevice* device, char const* path)
 {
     int extentX = 0;
     int extentY = 0;
@@ -121,20 +121,20 @@ ComPtr<ITextureResource> loadTextureImage(IDevice* device, char const* path)
         return nullptr;
 
     case 4:
-        format = Format::R8G8B8A8_UNORM;
+        format = Format::RGBA8Unorm;
 
         // TODO: handle other cases here if/when we stop forcing 4-component
         // results when loading the image with stb_image.
     }
 
-    std::vector<ITextureResource::SubresourceData> subresourceInitData;
+    std::vector<SubresourceData> subresourceInitData;
 
     ptrdiff_t stride = extentX * channelCount * sizeof(stbi_uc);
 
-    ITextureResource::SubresourceData baseInitData;
+    SubresourceData baseInitData;
     baseInitData.data = data;
-    baseInitData.strideY = stride;
-    baseInitData.strideZ = 0;
+    baseInitData.rowPitch = stride;
+    baseInitData.slicePitch = 0;
 
     subresourceInitData.push_back(baseInitData);
 
@@ -178,10 +178,10 @@ ComPtr<ITextureResource> loadTextureImage(IDevice* device, char const* path)
                 STBIR_FLAG_ALPHA_PREMULTIPLIED);
 
 
-            ITextureResource::SubresourceData mipInitData;
+            SubresourceData mipInitData;
             mipInitData.data = newData;
-            mipInitData.strideY = newStride;
-            mipInitData.strideZ = 0;
+            mipInitData.rowPitch = newStride;
+            mipInitData.slicePitch = 0;
 
             subresourceInitData.push_back(mipInitData);
 
@@ -194,16 +194,15 @@ ComPtr<ITextureResource> loadTextureImage(IDevice* device, char const* path)
 
     int mipCount = (int)subresourceInitData.size();
 
-    ITextureResource::Desc desc = {};
-    desc.type = IResource::Type::Texture2D;
-    desc.defaultState = ResourceState::ShaderResource;
-    desc.allowedStates = ResourceStateSet(ResourceState::ShaderResource);
+    TextureDesc desc = {};
+    desc.type = TextureType::Texture2D;
+    desc.usage = TextureUsage::ShaderResource;
     desc.format = format;
     desc.size.width = extentX;
     desc.size.height = extentY;
     desc.size.depth = 1;
-    desc.numMipLevels = mipCount;
-    auto texture = device->createTextureResource(desc, subresourceInitData.data());
+    desc.mipCount = mipCount;
+    auto texture = device->createTexture(desc, subresourceInitData.data());
     free(data);
 
     return texture;
@@ -541,29 +540,26 @@ SlangResult ModelLoader::load(char const* inputPath, void** outModel)
 
     modelData.vertexCount = (int)flatVertices.size();
     modelData.indexCount = (int)flatIndices.size();
+    modelData.primitiveTopology = PrimitiveTopology::TriangleList;
 
     modelData.meshCount = int(meshes.size());
     modelData.meshes = meshes.data();
 
-    IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.type = IResource::Type::Buffer;
-    vertexBufferDesc.sizeInBytes = modelData.vertexCount * sizeof(Vertex);
-    vertexBufferDesc.allowedStates =
-        ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
-    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+    BufferDesc vertexBufferDesc;
+    vertexBufferDesc.size = modelData.vertexCount * sizeof(Vertex);
+    vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+    vertexBufferDesc.elementSize = sizeof(Vertex);
 
-    modelData.vertexBuffer = device->createBufferResource(vertexBufferDesc, flatVertices.data());
+    modelData.vertexBuffer = device->createBuffer(vertexBufferDesc, flatVertices.data());
     if (!modelData.vertexBuffer)
         return SLANG_FAIL;
 
-    IBufferResource::Desc indexBufferDesc;
-    indexBufferDesc.type = IResource::Type::Buffer;
-    indexBufferDesc.sizeInBytes = modelData.indexCount * sizeof(Index);
-    indexBufferDesc.allowedStates =
-        ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
-    indexBufferDesc.defaultState = ResourceState::IndexBuffer;
+    BufferDesc indexBufferDesc;
+    indexBufferDesc.size = modelData.indexCount * sizeof(Index);
+    indexBufferDesc.usage = BufferUsage::IndexBuffer;
+    indexBufferDesc.elementSize = sizeof(Index);
 
-    modelData.indexBuffer = device->createBufferResource(indexBufferDesc, flatIndices.data());
+    modelData.indexBuffer = device->createBuffer(indexBufferDesc, flatIndices.data());
     if (!modelData.indexBuffer)
         return SLANG_FAIL;
 

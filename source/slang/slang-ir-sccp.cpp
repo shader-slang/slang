@@ -511,7 +511,7 @@ struct SCCPContext
 
     template<typename TIntFunc, typename TFloatFunc>
     LatticeVal evalComparisonImpl(
-        IRType* type,
+        IRType*,
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
@@ -522,29 +522,31 @@ struct SCCPContext
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v1)
         auto c1 = as<IRConstant>(v1.value);
         IRInst* resultVal = nullptr;
-        switch (type->getOp())
+
+        // Check the operand types, not the result type (which is always bool for comparisons)
+        // For mixed-type comparisons, use floating-point path if either operand is floating-point
+        IRType* operandType0 = c0->getDataType();
+        IRType* operandType1 = c1->getDataType();
+
+        // Helper function to check if a type is floating-point
+        auto isFloatingPointType = [](IROp op) -> bool
+        { return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType; };
+
+        IROp op0 = operandType0->getOp();
+        IROp op1 = operandType1->getOp();
+
+        // Use floating-point path if either operand is floating-point
+        // Otherwise use integer path
+        if (isFloatingPointType(op0) || isFloatingPointType(op1))
         {
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_IntPtrType:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_UIntPtrType:
-        case kIROp_BoolType:
-            resultVal = getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
-            break;
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        case kIROp_HalfType:
+            // Floating-point path - C++ operators follow IEEE 754 automatically
             resultVal =
                 getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
-            break;
-        default:
-            break;
+        }
+        else
+        {
+            // Integer path - all integer types
+            resultVal = getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
         }
         if (!resultVal)
             return LatticeVal::getAny();

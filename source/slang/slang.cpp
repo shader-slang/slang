@@ -763,7 +763,7 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, this, sourceLocReader));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, this, sourceLocReader, irModule));
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);
@@ -1368,6 +1368,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_sourceManager(&m_defaultSourceManager)
     , m_astBuilder(astBuilder)
     , m_cmdLineContext(new CommandLineContext())
+    , m_stringSlicePool(StringSlicePool::Style::Default)
 {
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
@@ -1496,13 +1497,29 @@ static void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    try
+    {
+        sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Internal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 static void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    try
+    {
+        sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Fatal severity to prevent exception leak from loadModule
+    }
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
@@ -1645,6 +1662,47 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
     slang::IBlob** outDiagnostics)
 {
     return loadModuleFromBlob(moduleName, path, source, ModuleBlobType::IR, outDiagnostics);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::loadModuleInfoFromIRBlob(
+    slang::IBlob* source,
+    SlangInt& outModuleVersion,
+    const char*& outModuleCompilerVersion,
+    const char*& outModuleName)
+{
+    // We start by reading the content of the file as
+    // an in-memory RIFF container.
+    //
+    auto rootChunk = RIFF::RootChunk::getFromBlob(source);
+    if (!rootChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto moduleChunk = ModuleChunk::find(rootChunk);
+    if (!moduleChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    auto irChunk = moduleChunk->findIR();
+    if (!irChunk)
+    {
+        return SLANG_FAIL;
+    }
+
+    RefPtr<IRModule> irModule;
+    String compilerVersion;
+    UInt version;
+    String name;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, compilerVersion, version, name));
+    const auto compilerVersionSlice = m_stringSlicePool.addAndGetSlice(compilerVersion);
+    const auto nameSlice = m_stringSlicePool.addAndGetSlice(name);
+    outModuleCompilerVersion = compilerVersionSlice.begin();
+    outModuleName = nameSlice.begin();
+    outModuleVersion = SlangInt(version);
+
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
@@ -6785,7 +6843,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, session, sourceLocReader));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of
