@@ -2229,21 +2229,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->removeAndDeallocate();
 
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
-        List<IRInst*> textureFootprintTypes;
+        List<IRHLSLStructuredBufferTypeBase*> buffersToLower;
+        List<IRMatrixType*> matricesToLower;
+        List<IRInst*> textureFootprintTypesToLower;
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
-                instsToProcess.add(t);
+                buffersToLower.add(t);
+            }
+            else if (auto matrixType = as<IRMatrixType>(globalInst))
+            {
+                auto elementType = matrixType->getElementType();
+                if (as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
+                    as<IRIntType>(elementType))
+                {
+                    matricesToLower.add(matrixType);
+                }
             }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
-                textureFootprintTypes.add(globalInst);
+                textureFootprintTypesToLower.add(globalInst);
             }
         }
-        for (auto t : instsToProcess)
+
+        // Lowering buffers
+        for (auto t : buffersToLower)
         {
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
@@ -2253,7 +2265,28 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 lowered.structType,
                 getStorageBufferAddressSpace()));
         }
-        for (auto t : textureFootprintTypes)
+
+        // Lowering matrices
+        for (auto t : matricesToLower)
+        {
+            auto matrixType = t;
+
+            auto elementType = matrixType->getElementType();
+            auto rowCount = matrixType->getRowCount();
+            auto columnCount = matrixType->getColumnCount();
+
+            IRBuilder array_builder(matrixType);
+            array_builder.setInsertBefore(matrixType);
+            auto vectorType = array_builder.getVectorType(elementType, columnCount);
+            auto arrayType = array_builder.getArrayType(vectorType, rowCount);
+
+            IRBuilder builder(t);
+            builder.setInsertBefore(t);
+            t->replaceUsesWith(arrayType);
+        }
+
+        // Lowering texture footprints
+        for (auto t : textureFootprintTypesToLower)
         {
             auto lowered = lowerTextureFootprintType(t);
             IRBuilder builder(t);
