@@ -2193,6 +2193,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitMeshOutputType(MeshOutputType* type) { return lowerSimpleIntrinsicType(type); }
 
+    IRType* visitSomeTypeWithContextType(SomeTypeWithContextType* type)
+    {
+        auto declRef = type->getDeclRef();
+        auto loweredType = lowerType(context, getType(context->astBuilder, declRef));
+        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, loweredType));
+        return getBuilder()->emitExtractExistentialType(existentialVal);
+    }
+
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->getDeclRef();
@@ -2509,6 +2517,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             break;
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
+    }
+
+    if (auto vardeclBase = as<VarDeclBase>(decl))
+    {
+        // SomeType var's must be tagged accordingly
+        if (isDeclRefTypeOf<SomeTypeDecl>(vardeclBase->getType()))
+            builder->addDecoration(inst, kIROp_SomeTypeDecoration);
     }
 }
 
@@ -3427,7 +3442,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -3961,6 +3975,7 @@ struct ExprLoweringContext
         List<OutArgumentFixup> argFixups;
 
         auto funcExpr = expr->functionExpr;
+
         ResolvedCallInfo resolvedInfo;
         if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
         {
@@ -4146,6 +4161,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     IRBuilder* getBuilder() { return context->irBuilder; }
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
     LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
+
+    LoweredValInfo visitPrefixWithTypeExpr(PrefixWithTypeExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an PrefixWithTypeExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
@@ -5389,6 +5410,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         if (auto declRefType = as<DeclRefType>(expr->type))
         {
             auto declRef = declRefType->getDeclRef();
+
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
                 // We have an expression that is "up-casting" some concrete value
@@ -5409,6 +5431,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // we should probably extend the AST and IR mechanism here to accept
                 // a sequence of witness tables.
                 //
+                // TODO: Redesign `some` in the backend so that `some` does not rely
+                // on the Slang existential-type system.
                 auto concreteValue = getSimpleVal(context, value);
                 auto existentialValue =
                     getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
@@ -5615,6 +5639,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'some' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitDynTypeExpr(DynTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("dyn' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -8315,6 +8351,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
+    }
+
+    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
+    {
+        auto interfaceType = getInterfaceType(context->astBuilder, decl);
+        SLANG_ASSERT(interfaceType);
+        auto loweredType = lowerType(this->context, interfaceType);
+        if (!loweredType->findDecoration<IRSomeTypeDecoration>())
+            context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
+        return loweredType;
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
@@ -12305,7 +12351,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
         }
     }
-
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so

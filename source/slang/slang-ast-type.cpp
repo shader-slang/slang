@@ -805,19 +805,14 @@ Val* ConcreteTypePack::_substituteImplOverride(
     return getCurrentASTBuilder()->getTypePack(substElementTypes.getArrayView().arrayView);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! InterfaceWithContext !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void ExtractExistentialType::_toTextOverride(StringBuilder& out)
+void InterfaceWithContext::_toTextOverride(StringBuilder& out)
 {
     out << getDeclRef() << toSlice(".This");
 }
 
-Type* ExtractExistentialType::_createCanonicalTypeOverride()
-{
-    return this;
-}
-
-Val* ExtractExistentialType::_substituteImplOverride(
+Val* InterfaceWithContext::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -833,14 +828,21 @@ Val* ExtractExistentialType::_substituteImplOverride(
 
     (*ioDiff)++;
 
-    ExtractExistentialType* substValue = astBuilder->getOrCreate<ExtractExistentialType>(
-        substDeclRef,
-        as<Type>(substOriginalInterfaceType),
-        substOriginalInterfaceDeclRef);
+    InterfaceWithContext* substValue = nullptr;
+    if (as<ExtractExistentialType>(this))
+        substValue = astBuilder->getOrCreate<ExtractExistentialType>(
+            substDeclRef,
+            as<Type>(substOriginalInterfaceType),
+            substOriginalInterfaceDeclRef);
+    else if (as<SomeTypeWithContextType>(this))
+        substValue = astBuilder->getOrCreate<SomeTypeWithContextType>(
+            substDeclRef,
+            as<Type>(substOriginalInterfaceType),
+            substOriginalInterfaceDeclRef);
     return substValue;
 }
 
-SubtypeWitness* ExtractExistentialType::getSubtypeWitness()
+SubtypeWitness* InterfaceWithContext::getSubtypeWitness()
 {
     if (auto cachedValue = this->cachedSubtypeWitness)
         return cachedValue;
@@ -854,7 +856,7 @@ SubtypeWitness* ExtractExistentialType::getSubtypeWitness()
     return openedWitness;
 }
 
-DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
+DeclRef<ThisTypeDecl> InterfaceWithContext::getThisTypeDeclRef()
 {
     if (auto cachedValue = this->cachedThisTypeDeclRef)
         return cachedValue;
@@ -871,6 +873,45 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
 
     this->cachedThisTypeDeclRef = specialiedInterfaceDeclRef;
     return specialiedInterfaceDeclRef;
+}
+
+Type* InterfaceWithContext::_createCanonicalTypeOverride()
+{
+    return this;
+}
+
+Type* InterfaceWithContext::getOriginalInterfaceType()
+{
+    if (as<ExtractExistentialType>(this))
+    {
+        return as<Type>(getOperand(1));
+    }
+    else if (as<SomeTypeWithContextType>(this))
+    {
+        // We do not subsitute the interfaceType here on purpose.
+        return isDeclRefTypeOf<SomeTypeDecl>(as<Type>(getOperand(1))).getDecl()->interfaceType;
+    }
+    else
+    {
+        SLANG_ASSERT(false);
+    }
+}
+
+DeclRef<InterfaceDecl> InterfaceWithContext::getOriginalInterfaceDeclRef()
+{
+    if (as<ExtractExistentialType>(this))
+    {
+        return as<DeclRefBase>(getOperand(2));
+    }
+    else if (as<SomeTypeWithContextType>(this))
+    {
+        return isDeclRefTypeOf<InterfaceDecl>(
+            as<SomeTypeDecl>(as<DeclRefBase>(getOperand(2))->getDecl())->interfaceType);
+    }
+    else
+    {
+        SLANG_ASSERT(false);
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialSpecializedType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
