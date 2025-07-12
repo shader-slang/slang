@@ -1,0 +1,14 @@
+{
+    "parameters": [
+
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "mesh",
+            "bindings": [
+
+            ]
+        }
+    ]
+}
