@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHK): -target hlsl -entry main
 
 // Test for diagnostic 31224: global const/uniform variables with initializers must be static
+// Exception: specialization constants are allowed to have initializers without static
 
 // These should trigger error 31224
 //CHK-DAG: ([[# @LINE + 1]]): error 31224: global const variable with initializer must be declared static: 'globalConstWithInit'
@@ -13,6 +14,13 @@ uniform float uniformWithInit = 2.0f;
 static const float staticConstWithInit = 3.0f;        // OK - static const with init
 const float globalConstNoInit;                        // OK - const without init
 uniform float uniformNoInit;                          // OK - uniform without init
+
+// Specialization constants with initializers are allowed without static
+[SpecializationConstant]
+const int specConstInt = 42;                          // OK - specialization constant with init
+
+[vk::constant_id(5)]
+const float specConstFloat = 3.14f;                   // OK - vk constant id with init
 
 void functionScope()
 {

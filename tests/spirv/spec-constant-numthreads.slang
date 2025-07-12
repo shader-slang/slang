@@ -18,10 +18,10 @@
 // GLSL-DAG: layout(local_size_x_id = 1, local_size_y_id = 0, local_size_z = 4) in;
 
 [vk::specialization_constant]
-static const int constValue0 = 0;
+const int constValue0 = 0;
 
 [vk::constant_id(0)]
-static const int constValue1 = 0;
+const int constValue1 = 0;
 
 RWStructuredBuffer<int> outputBuffer;
 

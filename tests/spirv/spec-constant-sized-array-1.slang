@@ -13,7 +13,7 @@
 
 
 [SpecializationConstant]
-static const int constValue0 = 5;
+const int constValue0 = 5;
 
 groupshared float buffer[constValue0 * 2 + constValue0 % 3];
 

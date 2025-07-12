@@ -22,11 +22,11 @@ RWStructuredBuffer<float> outputBuffer;
 // CHECK-NOT: OpSpecConstantOp {{.*}} SpvOpConvertFToU
 
 [[SpecializationConstant]]
-static const float X = 1.0;
+const float X = 1.0;
 [[SpecializationConstant]]
-static const uint64_t Y = 256;
+const uint64_t Y = 256;
 [[SpecializationConstant]]
-static const float Z = 100.0;
+const float Z = 100.0;
 
 int func1()
 {

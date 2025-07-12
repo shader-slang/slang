@@ -215,6 +215,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         bool hasUniform = false;
         bool hasExportOrExtern = false;
         bool hasStatic = false;
+        bool hasSpecializationConstant = false;
         for (auto m : decl->modifiers)
         {
             if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
@@ -225,6 +226,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 hasUniform = true;
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
+            else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
+                hasSpecializationConstant = true;
         }
         if (hasExportOrExtern && hasConst != hasStatic)
             getSink()->diagnose(
@@ -235,7 +238,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // Global const or uniform variables with initializers must be static
         // In HLSL, const global variables without static are uniform parameters
         // that cannot have default values
-        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic && decl->initExpr)
+        // Exception: specialization constants are allowed to have initializers
+        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic && !hasSpecializationConstant && decl->initExpr)
         {
             getSink()->diagnose(
                 decl,
