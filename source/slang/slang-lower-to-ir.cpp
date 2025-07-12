@@ -9173,7 +9173,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                 varType,
                                 debugSourceInst,
                                 builder->getIntValue(builder->getUIntType(), humaneLoc.line),
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.column));
+                                builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                                nullptr);
 
                             // Copy name hint from the declaration
                             addNameHint(context, debugVar, decl);
