@@ -43,5 +43,5 @@ void computeMain()
     );
 
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }
