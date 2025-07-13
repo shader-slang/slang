@@ -1,0 +1,1895 @@
+### LOWER-TO-IR:
+undefined
+let  %1	: Void	= no_diff
+let  %2	: CapabilitySet	= capabilityDisjunction(%3, %4, %5, %6, %7, %8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105, %106, %107, %108, %109, %110, %111, %112, %113, %114, %115, %116, %117, %118, %119, %120, %121, %122, %123, %124, %125, %126, %127, %128, %129, %130, %131, %132, %133, %134, %135, %136, %137)
+let  %137	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 82 : Int)
+let  %136	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 81 : Int)
+let  %135	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 80 : Int)
+let  %134	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 79 : Int)
+let  %133	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 78 : Int)
+let  %132	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 77 : Int)
+let  %131	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 76 : Int)
+let  %130	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 75 : Int)
+let  %129	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 74 : Int)
+let  %128	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 73 : Int)
+let  %127	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 72 : Int)
+let  %126	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 71 : Int)
+let  %125	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 70 : Int)
+let  %124	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 69 : Int)
+let  %123	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 68 : Int)
+let  %122	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 82 : Int)
+let  %121	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 81 : Int)
+let  %120	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 80 : Int)
+let  %119	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 79 : Int)
+let  %118	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 78 : Int)
+let  %117	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 77 : Int)
+let  %116	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 76 : Int)
+let  %115	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 75 : Int)
+let  %114	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 74 : Int)
+let  %113	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 73 : Int)
+let  %112	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 72 : Int)
+let  %111	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 71 : Int)
+let  %110	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 70 : Int)
+let  %109	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 69 : Int)
+let  %108	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 68 : Int)
+let  %107	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 82 : Int)
+let  %106	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 81 : Int)
+let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 80 : Int)
+let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 79 : Int)
+let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 78 : Int)
+let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 77 : Int)
+let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 76 : Int)
+let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 75 : Int)
+let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
+let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
+let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
+let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
+let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
+let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
+let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
+let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 82 : Int)
+let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 81 : Int)
+let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 80 : Int)
+let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 79 : Int)
+let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 78 : Int)
+let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 77 : Int)
+let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 76 : Int)
+let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 75 : Int)
+let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
+let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
+let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
+let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
+let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
+let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
+let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
+let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 82 : Int)
+let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 81 : Int)
+let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 80 : Int)
+let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 79 : Int)
+let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 78 : Int)
+let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 77 : Int)
+let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 76 : Int)
+let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 75 : Int)
+let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
+let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
+let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
+let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
+let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
+let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
+let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
+let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 82 : Int)
+let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 81 : Int)
+let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 80 : Int)
+let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 79 : Int)
+let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 78 : Int)
+let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 77 : Int)
+let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 76 : Int)
+let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 75 : Int)
+let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
+let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
+let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
+let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
+let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
+let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
+let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
+let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 82 : Int)
+let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 81 : Int)
+let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 80 : Int)
+let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 79 : Int)
+let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 78 : Int)
+let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 77 : Int)
+let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 76 : Int)
+let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 75 : Int)
+let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
+let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
+let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
+let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
+let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
+let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
+let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
+let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 82 : Int)
+let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 81 : Int)
+let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 80 : Int)
+let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 79 : Int)
+let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 78 : Int)
+let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 77 : Int)
+let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 76 : Int)
+let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 75 : Int)
+let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
+let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
+let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
+let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
+let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
+let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
+let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
+let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 82 : Int)
+let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 81 : Int)
+let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 80 : Int)
+let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 79 : Int)
+let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 78 : Int)
+let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 77 : Int)
+let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 76 : Int)
+let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 75 : Int)
+let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
+let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
+let  %7	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
+let  %6	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
+let  %5	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
+let  %4	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
+let  %3	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, specialize(%138, UInt))
+}
+
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_ST16buffer_load_test6Bufferg1T")]
+generic %138	: Type
+{
+block %139(
+		[nameHint("T")]
+		param %T	: type_t):
+	[nameHint("Buffer")]
+	struct %Buffer	: Type
+	{
+		field(%handle, %RenderResourceHandle)
+	}
+
+	return_val(%Buffer)
+}
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+generic %140	: Generic
+{
+block %141(
+		[nameHint("T")]
+		param %T1	: type_t):
+	return_val(Func(%T1, specialize(%138, %T1), UInt))
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %142(
+		[nameHint("this")]
+		param %this	: %RenderResourceHandle):
+	let  %143	: UInt	= get_field(%this, %x5Findex)
+	return_val(%143)
+}
+generic %144	: Generic
+{
+block %145(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT	: type_t):
+	return_val(Func(%RWByteAddressBufferx5FT, RWByteAddressBuffer, UInt))
+}
+[import("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0")]
+generic %146	: %144
+{
+block %147(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT1	: type_t):
+	[ForceInline]
+	[noSideEffect]
+	[nameHint("RWByteAddressBuffer.Load")]
+		func %RWByteAddressBufferx5FLoad	: Func(%RWByteAddressBufferx5FT1, RWByteAddressBuffer, UInt);
+
+	return_val(%RWByteAddressBufferx5FLoad)
+}
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0")]
+generic %148	: %140
+{
+block %149(
+		[nameHint("T")]
+		param %T2	: type_t):
+	[nameHint("Buffer.operator[].get")]
+		func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(%T2, specialize(%138, %T2), UInt)
+	{
+block %150(
+			[nameHint("this")]
+			param %this1	: specialize(%138, %T2),
+			[nameHint("i")]
+			param %i	: UInt):
+		let  %151	: %RenderResourceHandle	= get_field(%this1, %handle)
+		let  %152	: UInt	= call %RenderResourceHandlex5Findex(%151)
+		let  %153	: RWByteAddressBuffer	= getElement(%bufferHandles, %152)
+		let  %154	: Int	= sizeOf(%T2)
+		let  %155	: UInt	= intCast(%154)
+		let  %156	: UInt	= mul(%155, %i)
+		let  %157	: %T2	= call specialize(%146, %T2)(%153, %156)
+		return_val(%157)
+}
+	return_val(%Bufferx5Foperatorx5Bx5Dx5Fget)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[ForceInline]
+[method]
+[import("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt);
+
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %158(
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %159	: Ptr(specialize(%138, UInt))	= get_field_addr(%bindings, %indices)
+	let  %160	: Ptr(%RenderResourceHandle)	= get_field_addr(%159, %handle)
+	let  %161	: Ptr(UInt)	= get_field_addr(%160, %x5Findex)
+	store(%161, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%162, %163, %164, 0 : Int, 0 : UInt)
+
+block %162(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %165	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%165, %166, %163, %166)
+
+block %166:
+	let  %167	: Ptr(specialize(%138, UInt))	= get_field_addr(%bindings, %indices)
+	let  %168	: UInt	= intCast(%j)
+	let  %169	: specialize(%138, UInt)	= load(%167)
+	[nameHint("value")]
+	let  %value	: UInt	= call specialize(%148, UInt)(%169, %168)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value)
+	unconditionalBranch(%164)
+
+block %164:
+	let  %170	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%162, %170, %sum1)
+
+block %163:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+[treatAsDifferentiableDecoration]
+[constructor(true)]
+[method]
+[public]
+[export("_S16buffer_load_test20RenderResourceHandleR8_24xinitp1pi_u")]
+[nameHint("RenderResourceHandle.$init")]
+func %RenderResourceHandlex5Fx24init	: Func(%RenderResourceHandle, Attributed(UInt, %1))
+{
+block %171(
+		[nameHint("_index")]
+		param %x5Findex1	: Attributed(UInt, %1)):
+	let  %172	: Ptr(%RenderResourceHandle)	= var
+	let  %173	: Ptr(UInt)	= get_field_addr(%172, %x5Findex)
+	store(%173, %x5Findex1)
+	let  %174	: %RenderResourceHandle	= load(%172)
+	return_val(%174)
+}
+generic %175	: Generic
+{
+block %176(
+		[nameHint("T")]
+		param %T3	: type_t):
+	return_val(Func(Void, InOut(specialize(%138, %T3)), UInt, %T3))
+}
+generic %177	: Generic
+{
+block %178(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT2	: type_t):
+	return_val(Func(Void, RWByteAddressBuffer, UInt, %RWByteAddressBufferx5FT2))
+}
+[import("_S4core19RWByteAddressBuffer5Storeg1Tp2pi_ui_GP0V")]
+generic %179	: %177
+{
+block %180(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT3	: type_t):
+	[ForceInline]
+	[nameHint("RWByteAddressBuffer.Store")]
+		func %RWByteAddressBufferx5FStore1	: Func(Void, RWByteAddressBuffer, UInt, %RWByteAddressBufferx5FT3);
+
+	return_val(%RWByteAddressBufferx5FStore1)
+}
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03setAsp1pi_GP0V")]
+generic %181	: %175
+{
+block %182(
+		[nameHint("T")]
+		param %T4	: type_t):
+	[ForceInline]
+	[nameHint("Buffer.operator[].set")]
+		func %Bufferx5Foperatorx5Bx5Dx5Fset	: Func(Void, InOut(specialize(%138, %T4)), UInt, %T4)
+	{
+block %183(
+			[nameHint("this")]
+			param %this2	: InOut(specialize(%138, %T4)),
+			[nameHint("i")]
+			param %i1	: UInt,
+			[nameHint("newValue")]
+			param %newValue	: %T4):
+		let  %184	: Ptr(%RenderResourceHandle)	= get_field_addr(%this2, %handle)
+		let  %185	: %RenderResourceHandle	= load(%184)
+		let  %186	: UInt	= call %RenderResourceHandlex5Findex(%185)
+		let  %187	: RWByteAddressBuffer	= getElement(%bufferHandles, %186)
+		let  %188	: Int	= sizeOf(%T4)
+		let  %189	: UInt	= intCast(%188)
+		let  %190	: UInt	= mul(%189, %i1)
+		call specialize(%179, %T4)(%187, %190, %newValue)
+		return_val(void_constant)
+}
+	return_val(%Bufferx5Foperatorx5Bx5Dx5Fset)
+}
+generic %191	: Generic
+{
+block %192(
+		[nameHint("T")]
+		param %T5	: type_t):
+	return_val(Func(specialize(%138, %T5), Attributed(%RenderResourceHandle, %1)))
+}
+[public]
+[export("_S16buffer_load_test6Bufferg1TR8_24xinitp1pi_16buffer_load_test20RenderResourceHandle")]
+generic %193	: %191
+{
+block %194(
+		[nameHint("T")]
+		param %T6	: type_t):
+	[treatAsDifferentiableDecoration]
+	[constructor(true)]
+	[method]
+	[nameHint("Buffer.$init")]
+		func %Bufferx5Fx24init	: Func(specialize(%138, %T6), Attributed(%RenderResourceHandle, %1))
+	{
+block %195(
+			[nameHint("handle")]
+			param %handle1	: Attributed(%RenderResourceHandle, %1)):
+		let  %196	: Ptr(specialize(%138, %T6))	= var
+		let  %197	: Ptr(%RenderResourceHandle)	= get_field_addr(%196, %handle)
+		store(%197, %handle1)
+		let  %198	: specialize(%138, %T6)	= load(%196)
+		return_val(%198)
+}
+	return_val(%Bufferx5Fx24init)
+}
+[treatAsDifferentiableDecoration]
+[constructor(true)]
+[method]
+[public]
+[export("_S16buffer_load_test8BindingsR8_24xinitp1pi_16buffer_load_test6BufferG1u")]
+[nameHint("Bindings.$init")]
+func %Bindingsx5Fx24init	: Func(%Bindings, Attributed(specialize(%138, UInt), %1))
+{
+block %199(
+		[nameHint("indices")]
+		param %indices1	: Attributed(specialize(%138, UInt), %1)):
+	let  %200	: Ptr(%Bindings)	= var
+	let  %201	: Ptr(specialize(%138, UInt))	= get_field_addr(%200, %indices)
+	store(%201, %indices1)
+	let  %202	: %Bindings	= load(%200)
+	return_val(%202)
+}
+###
+### POST IR VALIDATION:
+undefined
+varLayout(%1)
+let  %1	: Void	= structTypeLayout(%2, %3)
+let  %3	: Void	= structFieldLayout(%outputBuffer, %4)
+let  %2	: Void	= structFieldLayout(%bufferHandles, %5)
+let  %4	: Void	= varLayout(%6, %7)
+let  %7	: Void	= offset(9 : Int, 1 : Int)
+let  %5	: Void	= varLayout(%8, %9)
+let  %9	: Void	= offset(9 : Int, 0 : Int)
+let  %8	: Void	= arrayTypeLayout(%6, %10)
+let  %6	: Void	= typeLayout(%10)
+let  %10	: Void	= size(9 : Int, 1 : Int)
+let  %11	: Void	= EntryPointLayout(%12, %13)
+let  %13	: Void	= varLayout(%14)
+let  %12	: Void	= varLayout(%15)
+let  %15	: Void	= structTypeLayout(%16)
+let  %16	: Void	= structFieldLayout(%17, %18)
+let  %18	: Void	= varLayout(%14, %19, %20)
+let  %20	: Void	= stage(6 : Int)
+let  %19	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %14	: Void	= typeLayout
+let  %17	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[export("_ST16buffer_load_test6Bufferg1T")]
+generic %21	: Type
+{
+block %22(
+		[nameHint("T")]
+		param %T	: type_t):
+	[nameHint("Buffer")]
+	struct %Buffer	: Type
+	{
+		field(%handle, %RenderResourceHandle)
+	}
+
+	return_val(%Buffer)
+}
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, specialize(%21, UInt))
+}
+
+generic %23	: Generic
+{
+block %24(
+		[nameHint("T")]
+		param %T1	: type_t):
+	return_val(Func(%T1, specialize(%21, %T1), UInt))
+}
+generic %25	: Generic
+{
+block %26(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT	: type_t):
+	return_val(Func(%RWByteAddressBufferx5FT, RWByteAddressBuffer, UInt))
+}
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0")]
+generic %27	: %25
+{
+block %28(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT1	: type_t):
+	[ForceInline]
+	[noSideEffect]
+	[nameHint("RWByteAddressBuffer.Load")]
+		func %RWByteAddressBufferx5FLoad	: Func(%RWByteAddressBufferx5FT1, RWByteAddressBuffer, UInt)
+	{
+block %29(
+			[nameHint("this")]
+			param %this	: RWByteAddressBuffer,
+			[nameHint("location")]
+			param %location	: UInt):
+		let  %30	: %RWByteAddressBufferx5FT1	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+		return_val(%30)
+}
+	return_val(%RWByteAddressBufferx5FLoad)
+}
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %31(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %32	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%32)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%5)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0")]
+generic %33	: %23
+{
+block %34(
+		[nameHint("T")]
+		param %T2	: type_t):
+	[nameHint("Buffer.operator[].get")]
+		func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(%T2, specialize(%21, %T2), UInt)
+	{
+block %35(
+			[nameHint("this")]
+			param %this2	: specialize(%21, %T2),
+			[nameHint("i")]
+			param %i	: UInt):
+		let  %36	: %RenderResourceHandle	= get_field(%this2, %handle)
+		let  %37	: UInt	= call %RenderResourceHandlex5Findex(%36)
+		let  %38	: RWByteAddressBuffer	= getElement(%bufferHandles, %37)
+		let  %39	: Int	= sizeOf(%T2)
+		let  %40	: UInt	= intCast(%39)
+		let  %41	: UInt	= mul(%40, %i)
+		let  %42	: %T2	= call specialize(%27, %T2)(%38, %41)
+		return_val(%42)
+}
+	return_val(%Bufferx5Foperatorx5Bx5Dx5Fget)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %43(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	unconditionalBranch(%44)
+
+block %44:
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	unconditionalBranch(%45)
+
+block %45:
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%4)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%11)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %46(
+		[layout(%18)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %47	: Ptr(specialize(%21, UInt))	= get_field_addr(%bindings, %indices)
+	let  %48	: Ptr(%RenderResourceHandle)	= get_field_addr(%47, %handle)
+	let  %49	: Ptr(UInt)	= get_field_addr(%48, %x5Findex)
+	store(%49, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%50, %51, %52, 0 : Int, 0 : UInt)
+
+block %50(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %53	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%53, %54, %51, %54)
+
+block %54:
+	let  %55	: Ptr(specialize(%21, UInt))	= get_field_addr(%bindings, %indices)
+	let  %56	: UInt	= intCast(%j)
+	let  %57	: specialize(%21, UInt)	= load(%55)
+	[nameHint("value")]
+	let  %value1	: UInt	= call specialize(%33, UInt)(%57, %56)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%52)
+
+block %52:
+	let  %58	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%50, %58, %sum1)
+
+block %51:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+generic %18	: Generic
+{
+block %19(
+		[nameHint("T")]
+		param %T	: type_t):
+	return_val(Func(%T, %Buffer, UInt))
+}
+generic %20	: Generic
+{
+block %21(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT	: type_t):
+	return_val(Func(%RWByteAddressBufferx5FT, RWByteAddressBuffer, UInt))
+}
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0")]
+generic %22	: %20
+{
+block %23(
+		[nameHint("RWByteAddressBuffer.T")]
+		param %RWByteAddressBufferx5FT1	: type_t):
+	[ForceInline]
+	[noSideEffect]
+	[nameHint("RWByteAddressBuffer.Load")]
+		func %RWByteAddressBufferx5FLoad	: Func(%RWByteAddressBufferx5FT1, RWByteAddressBuffer, UInt)
+	{
+block %24(
+			[nameHint("this")]
+			param %this	: RWByteAddressBuffer,
+			[nameHint("location")]
+			param %location	: UInt):
+		let  %25	: %RWByteAddressBufferx5FT1	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+		return_val(%25)
+}
+	return_val(%RWByteAddressBufferx5FLoad)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %26(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %27	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%27)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0")]
+generic %28	: %18
+{
+block %29(
+		[nameHint("T")]
+		param %T1	: type_t):
+	[nameHint("Buffer.operator[].get")]
+		func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(%T1, %Buffer, UInt)
+	{
+block %30(
+			[nameHint("this")]
+			param %this2	: %Buffer,
+			[nameHint("i")]
+			param %i	: UInt):
+		let  %31	: %RenderResourceHandle	= get_field(%this2, %handle)
+		let  %32	: UInt	= call %RenderResourceHandlex5Findex(%31)
+		let  %33	: RWByteAddressBuffer	= getElement(%bufferHandles, %32)
+		let  %34	: Int	= sizeOf(%T1)
+		let  %35	: UInt	= intCast(%34)
+		let  %36	: UInt	= mul(%35, %i)
+		let  %37	: %T1	= call specialize(%22, %T1)(%33, %36)
+		return_val(%37)
+}
+	return_val(%Bufferx5Foperatorx5Bx5Dx5Fget)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %38(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %39(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %40	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %41	: Ptr(%RenderResourceHandle)	= get_field_addr(%40, %handle)
+	let  %42	: Ptr(UInt)	= get_field_addr(%41, %x5Findex)
+	store(%42, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%43, %44, %45, 0 : Int, 0 : UInt)
+
+block %43(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %46	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%46, %47, %44, %47)
+
+block %47:
+	let  %48	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %49	: UInt	= intCast(%j)
+	let  %50	: %Buffer	= load(%48)
+	[nameHint("value")]
+	let  %value1	: UInt	= call specialize(%28, UInt)(%50, %49)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%45)
+
+block %45:
+	let  %51	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%43, %51, %sum1)
+
+block %44:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[ForceInline]
+[noSideEffect]
+[nameHint("RWByteAddressBuffer.Load")]
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0G04uint")]
+func %RWByteAddressBufferx5FLoad	: Func(UInt, RWByteAddressBuffer, UInt)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: RWByteAddressBuffer,
+		[nameHint("location")]
+		param %location	: UInt):
+	let  %19	: UInt	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+	return_val(%19)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %21	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%21)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %22(
+		[nameHint("this")]
+		param %this2	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %23	: %RenderResourceHandle	= get_field(%this2, %handle)
+	let  %24	: UInt	= call %RenderResourceHandlex5Findex(%23)
+	let  %25	: RWByteAddressBuffer	= getElement(%bufferHandles, %24)
+	let  %26	: UInt	= mul(4 : UInt, %i)
+	let  %27	: UInt	= call %RWByteAddressBufferx5FLoad(%25, %26)
+	return_val(%27)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %28(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %29(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %30	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %31	: Ptr(%RenderResourceHandle)	= get_field_addr(%30, %handle)
+	let  %32	: Ptr(UInt)	= get_field_addr(%31, %x5Findex)
+	store(%32, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%33, %34, %35, 0 : Int, 0 : UInt)
+
+block %33(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %36	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%36, %37, %34, %37)
+
+block %37:
+	let  %38	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %39	: UInt	= intCast(%j)
+	let  %40	: %Buffer	= load(%38)
+	[nameHint("value")]
+	let  %value1	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%35)
+
+block %35:
+	let  %41	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%33, %41, %sum1)
+
+block %34:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[ForceInline]
+[noSideEffect]
+[nameHint("RWByteAddressBuffer.Load")]
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0G04uint")]
+func %RWByteAddressBufferx5FLoad	: Func(UInt, RWByteAddressBuffer, UInt)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: RWByteAddressBuffer,
+		[nameHint("location")]
+		param %location	: UInt):
+	let  %19	: UInt	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+	return_val(%19)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %21	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%21)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %22(
+		[nameHint("this")]
+		param %this2	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %23	: %RenderResourceHandle	= get_field(%this2, %handle)
+	let  %24	: UInt	= call %RenderResourceHandlex5Findex(%23)
+	let  %25	: RWByteAddressBuffer	= getElement(%bufferHandles, %24)
+	let  %26	: UInt	= mul(4 : UInt, %i)
+	let  %27	: UInt	= call %RWByteAddressBufferx5FLoad(%25, %26)
+	return_val(%27)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %28(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %29(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %30	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %31	: Ptr(%RenderResourceHandle)	= get_field_addr(%30, %handle)
+	let  %32	: Ptr(UInt)	= get_field_addr(%31, %x5Findex)
+	store(%32, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%33, %34, %35, 0 : Int, 0 : UInt)
+
+block %33(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %36	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%36, %37, %34, %37)
+
+block %37:
+	let  %38	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %39	: UInt	= intCast(%j)
+	let  %40	: %Buffer	= load(%38)
+	[nameHint("value")]
+	let  %value1	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%35)
+
+block %35:
+	let  %41	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%33, %41, %sum1)
+
+block %34:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[ForceInline]
+[noSideEffect]
+[nameHint("RWByteAddressBuffer.Load")]
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0G04uint")]
+func %RWByteAddressBufferx5FLoad	: Func(UInt, RWByteAddressBuffer, UInt)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: RWByteAddressBuffer,
+		[nameHint("location")]
+		param %location	: UInt):
+	let  %19	: UInt	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+	return_val(%19)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %21	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%21)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %22(
+		[nameHint("this")]
+		param %this2	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %23	: %RenderResourceHandle	= get_field(%this2, %handle)
+	let  %24	: UInt	= call %RenderResourceHandlex5Findex(%23)
+	let  %25	: RWByteAddressBuffer	= getElement(%bufferHandles, %24)
+	let  %26	: UInt	= mul(4 : UInt, %i)
+	let  %27	: UInt	= call %RWByteAddressBufferx5FLoad(%25, %26)
+	return_val(%27)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %28(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %29(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %30	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %31	: Ptr(%RenderResourceHandle)	= get_field_addr(%30, %handle)
+	let  %32	: Ptr(UInt)	= get_field_addr(%31, %x5Findex)
+	store(%32, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%33, %34, %35, 0 : Int, 0 : UInt)
+
+block %33(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %36	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%36, %37, %34, %37)
+
+block %37:
+	let  %38	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %39	: UInt	= intCast(%j)
+	let  %40	: %Buffer	= load(%38)
+	[nameHint("value")]
+	let  %value1	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%35)
+
+block %35:
+	let  %41	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%33, %41, %sum1)
+
+block %34:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-LOWER-GENERICS:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[ForceInline]
+[noSideEffect]
+[nameHint("RWByteAddressBuffer.Load")]
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0G04uint")]
+func %RWByteAddressBufferx5FLoad	: Func(UInt, RWByteAddressBuffer, UInt)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: RWByteAddressBuffer,
+		[nameHint("location")]
+		param %location	: UInt):
+	let  %19	: UInt	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+	return_val(%19)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %21	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%21)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[noSideEffect]
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %22(
+		[nameHint("this")]
+		param %this2	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %23	: %RenderResourceHandle	= get_field(%this2, %handle)
+	let  %24	: UInt	= call %RenderResourceHandlex5Findex(%23)
+	let  %25	: RWByteAddressBuffer	= getElement(%bufferHandles, %24)
+	let  %26	: UInt	= mul(4 : UInt, %i)
+	let  %27	: UInt	= call %RWByteAddressBufferx5FLoad(%25, %26)
+	return_val(%27)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %28(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %29(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %30	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %31	: Ptr(%RenderResourceHandle)	= get_field_addr(%30, %handle)
+	let  %32	: Ptr(UInt)	= get_field_addr(%31, %x5Findex)
+	store(%32, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%33, %34, %35, 0 : Int, 0 : UInt)
+
+block %33(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %36	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%36, %37, %34, %37)
+
+block %37:
+	let  %38	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %39	: UInt	= intCast(%j)
+	let  %40	: %Buffer	= load(%38)
+	[nameHint("value")]
+	let  %value1	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%35)
+
+block %35:
+	let  %41	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%33, %41, %sum1)
+
+block %34:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+###
+### AFTER-LOWER-GENERICS:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[ForceInline]
+[noSideEffect]
+[nameHint("RWByteAddressBuffer.Load")]
+[export("_S4core19RWByteAddressBuffer4Loadg1Tp1pi_uGP0G04uint")]
+func %RWByteAddressBufferx5FLoad	: Func(UInt, RWByteAddressBuffer, UInt)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: RWByteAddressBuffer,
+		[nameHint("location")]
+		param %location	: UInt):
+	let  %19	: UInt	= byteAddressBufferLoad(%this, %location, 0 : UInt)
+	return_val(%19)
+}
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %RenderResourceHandle):
+	let  %21	: UInt	= get_field(%this1, %x5Findex)
+	return_val(%21)
+}
+[nameHint("bufferHandles")]
+[export("_SV16buffer_load_test13bufferHandles")]
+[layout(%4)]
+let  %bufferHandles	: UnsizedArray(RWByteAddressBuffer)	= global_param
+[noSideEffect]
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %22(
+		[nameHint("this")]
+		param %this2	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %23	: %RenderResourceHandle	= get_field(%this2, %handle)
+	let  %24	: UInt	= call %RenderResourceHandlex5Findex(%23)
+	let  %25	: RWByteAddressBuffer	= getElement(%bufferHandles, %24)
+	let  %26	: UInt	= mul(4 : UInt, %i)
+	let  %27	: UInt	= call %RWByteAddressBufferx5FLoad(%25, %26)
+	return_val(%27)
+}
+[ForceInline]
+[method]
+[export("_S4core19RWByteAddressBuffer5Storep2pi_ui_uV")]
+[nameHint("RWByteAddressBuffer.Store")]
+func %RWByteAddressBufferx5FStore	: Func(Void, RWByteAddressBuffer, UInt, UInt)
+{
+block %28(
+		[nameHint("this")]
+		param %this3	: RWByteAddressBuffer,
+		[nameHint("address")]
+		param %address	: UInt,
+		[nameHint("value")]
+		param %value	: UInt):
+	byteAddressBufferStore(%this3, %address, 0 : UInt, %value)
+	return_val(void_constant)
+}
+[nameHint("outputBuffer")]
+[export("_SV16buffer_load_test12outputBuffer")]
+[layout(%1)]
+let  %outputBuffer	: RWByteAddressBuffer	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void, ConstRef(Vec(UInt, 3 : Int)))
+{
+block %29(
+		[layout(%15)]
+		[nameHint("dispatchThreadID")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %dispatchThreadID	: ConstRef(Vec(UInt, 3 : Int))):
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %30	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %31	: Ptr(%RenderResourceHandle)	= get_field_addr(%30, %handle)
+	let  %32	: Ptr(UInt)	= get_field_addr(%31, %x5Findex)
+	store(%32, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%33, %34, %35, 0 : Int, 0 : UInt)
+
+block %33(
+		[nameHint("j")]
+		param %j	: Int,
+		[nameHint("sum")]
+		param %sum	: UInt):
+	let  %36	: Bool	= cmpLT(%j, 10 : Int)
+	ifElse(%36, %37, %34, %37)
+
+block %37:
+	let  %38	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %39	: UInt	= intCast(%j)
+	let  %40	: %Buffer	= load(%38)
+	[nameHint("value")]
+	let  %value1	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%sum, %value1)
+	unconditionalBranch(%35)
+
+block %35:
+	let  %41	: Int	= add(%j, 1 : Int)
+	unconditionalBranch(%33, %41, %sum1)
+
+block %34:
+	call %RWByteAddressBufferx5FStore(%outputBuffer, 0 : UInt, %sum)
+	return_val(void_constant)
+}
+###
+### POST LINK AND OPTIMIZE:
+undefined
+let  %1	: Void	= varLayout(%2, %3)
+let  %3	: Void	= offset(9 : Int, 1 : Int)
+let  %4	: Void	= varLayout(%5, %6)
+let  %6	: Void	= offset(9 : Int, 0 : Int)
+let  %5	: Void	= arrayTypeLayout(%2, %7)
+let  %2	: Void	= typeLayout(%7)
+let  %7	: Void	= size(9 : Int, 1 : Int)
+let  %8	: Void	= EntryPointLayout(%9, %10)
+let  %10	: Void	= varLayout(%11)
+let  %9	: Void	= varLayout(%12)
+let  %12	: Void	= structTypeLayout(%13)
+let  %13	: Void	= structFieldLayout(%14, %15)
+let  %15	: Void	= varLayout(%11, %16, %17)
+let  %17	: Void	= stage(6 : Int)
+let  %16	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %11	: Void	= typeLayout
+let  %14	: _	= key
+[export("_SV16buffer_load_test8Bindings7indices")]
+[nameHint("indices")]
+let  %indices	: _	= key
+[export("_SV16buffer_load_test6Bufferg1T6handle")]
+[nameHint("handle")]
+let  %handle	: _	= key
+[export("_SV16buffer_load_test20RenderResourceHandle6_index")]
+[nameHint("_index")]
+let  %x5Findex	: _	= key
+[export("_ST16buffer_load_test20RenderResourceHandle")]
+[nameHint("RenderResourceHandle")]
+struct %RenderResourceHandle	: Type
+{
+	field(%x5Findex, UInt)
+}
+
+[nameHint("Buffer")]
+struct %Buffer	: Type
+{
+	field(%handle, %RenderResourceHandle)
+}
+
+[export("_ST16buffer_load_test8Bindings")]
+[nameHint("Bindings")]
+struct %Bindings	: Type
+{
+	field(%indices, %Buffer)
+}
+
+[readNone]
+[method]
+[export("_S16buffer_load_test20RenderResourceHandle5indexp0pu")]
+[nameHint("RenderResourceHandle.index")]
+func %RenderResourceHandlex5Findex	: Func(UInt, %RenderResourceHandle)
+{
+block %18(
+		[nameHint("this")]
+		param %this	: %RenderResourceHandle):
+	let  %19	: UInt	= get_field(%this, %x5Findex)
+	return_val(%19)
+}
+[layout(%4)]
+[nameHint("bufferHandles")]
+let  %bufferHandles	: UnsizedArray(RWStructuredBuffer(UInt, DefaultLayout))	= global_param
+[noSideEffect]
+[export("_S16buffer_load_test6Bufferg1TR16operator_5Bx_5Dxp1pi_uGP03getAgp0pGP0G04uint")]
+[nameHint("Buffer.operator[].get")]
+func %Bufferx5Foperatorx5Bx5Dx5Fget	: Func(UInt, %Buffer, UInt)
+{
+block %20(
+		[nameHint("this")]
+		param %this1	: %Buffer,
+		[nameHint("i")]
+		param %i	: UInt):
+	let  %21	: %RenderResourceHandle	= get_field(%this1, %handle)
+	let  %22	: UInt	= call %RenderResourceHandlex5Findex(%21)
+	let  %23	: UInt	= mul(4 : UInt, %i)
+	let  %24	: RWStructuredBuffer(UInt, DefaultLayout)	= getElement(%bufferHandles, %22)
+	let  %25	: UInt	= div(%23, 4 : UInt)
+	let  %26	: UInt	= structuredBufferLoad(%24, %25)
+	return_val(%26)
+}
+[layout(%1)]
+[nameHint("outputBuffer")]
+let  %outputBuffer	: RWStructuredBuffer(UInt, DefaultLayout)	= global_param
+[entryPoint(6 : Int, "main", "buffer_load_test")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_S16buffer_load_test4mainp1pi_v3uV")]
+[nameHint("main")]
+[layout(%8)]
+func %main	: Func(Void)
+{
+block %27:
+	[nameHint("bindings")]
+	let  %bindings	: Ptr(%Bindings)	= var
+	let  %28	: Ptr(%Buffer)	= get_field_addr(%bindings, %indices)
+	let  %29	: Ptr(%RenderResourceHandle)	= get_field_addr(%28, %handle)
+	let  %30	: Ptr(UInt)	= get_field_addr(%29, %x5Findex)
+	store(%30, 0 : UInt)
+	[nameHint("j")]
+	let  %j	: Ptr(Int)	= var
+	[nameHint("sum")]
+	let  %sum	: Ptr(UInt)	= var
+	store(%j, 0 : Int)
+	store(%sum, 0 : UInt)
+	[loopMaxIters(10 : Int)]
+	loop(%31, %32, %33)
+
+block %31:
+	let  %34	: Int	= load(%j)
+	let  %35	: Bool	= cmpLT(%34, 10 : Int)
+	ifElse(%35, %36, %37, %36)
+
+block %37:
+	unconditionalBranch(%32)
+
+block %36:
+	let  %38	: Int	= load(%j)
+	let  %39	: UInt	= intCast(%38)
+	let  %40	: %Buffer	= load(%28)
+	[nameHint("value")]
+	let  %value	: UInt	= call %Bufferx5Foperatorx5Bx5Dx5Fget(%40, %39)
+	let  %41	: UInt	= load(%sum)
+	[nameHint("sum")]
+	let  %sum1	: UInt	= add(%41, %value)
+	unconditionalBranch(%33)
+
+block %33:
+	let  %42	: Int	= load(%j)
+	let  %43	: Int	= add(%42, 1 : Int)
+	store(%j, %43)
+	store(%sum, %sum1)
+	unconditionalBranch(%31)
+
+block %32:
+	let  %44	: UInt	= load(%sum)
+	let  %45	: UInt	= rwstructuredBufferStore(%outputBuffer, 0 : UInt, %44)
+	return_val(void_constant)
+}
+###
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 106
+; Schema: 0
+OpCapability RuntimeDescriptorArray
+OpCapability Shader
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main" %bufferHandles %outputBuffer
+OpExecutionMode %main LocalSize 1 1 1
+
+; Debug Information
+OpSource Slang 1
+OpName %j "j"                                       ; id %13
+OpName %j "j"                                       ; id %13
+OpName %sum "sum"                                   ; id %15
+OpName %sum "sum"                                   ; id %15
+OpName %RWStructuredBuffer "RWStructuredBuffer"     ; id %45
+OpName %outputBuffer "outputBuffer"                 ; id %48
+OpName %bufferHandles "bufferHandles"               ; id %72
+OpName %sum_0 "sum"                                 ; id %79
+OpName %main "main"                                 ; id %2
+
+; Annotations
+OpDecorate %_runtimearr_uint ArrayStride 4
+OpDecorate %RWStructuredBuffer Block
+OpMemberDecorate %RWStructuredBuffer 0 Offset 0
+OpDecorate %outputBuffer Binding 1
+OpDecorate %outputBuffer DescriptorSet 0
+OpDecorate %bufferHandles Binding 0
+OpDecorate %bufferHandles DescriptorSet 0
+
+; Types, variables and constants
+%void = OpTypeVoid
+%3 = OpTypeFunction %void
+%uint = OpTypeInt 32 0
+%int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+%_ptr_Function_uint = OpTypePointer Function %uint
+%int_0 = OpConstant %int 0
+%uint_0 = OpConstant %uint 0
+%bool = OpTypeBool
+%int_10 = OpConstant %int 10
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+%_runtimearr_uint = OpTypeRuntimeArray %uint        ; ArrayStride 4
+%RWStructuredBuffer = OpTypeStruct %_runtimearr_uint    ; Block
+%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+%uint_4 = OpConstant %uint 4
+%_runtimearr_RWStructuredBuffer = OpTypeRuntimeArray %RWStructuredBuffer
+%_ptr_StorageBuffer__runtimearr_RWStructuredBuffer = OpTypePointer StorageBuffer %_runtimearr_RWStructuredBuffer
+%int_1 = OpConstant %int 1
+%outputBuffer = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer     ; Binding 1, DescriptorSet 0
+%bufferHandles = OpVariable %_ptr_StorageBuffer__runtimearr_RWStructuredBuffer StorageBuffer    ; Binding 0, DescriptorSet 0
+
+; Function main
+%main = OpFunction %void None %3
+%4 = OpLabel
+%104 = OpVariable %_ptr_Function_uint Function
+%j = OpVariable %_ptr_Function_int Function
+%sum = OpVariable %_ptr_Function_uint Function
+OpStore %104 %uint_0
+OpStore %j %int_0
+OpStore %sum %uint_0
+OpBranch %16
+%16 = OpLabel
+OpLoopMerge %21 %25 None
+OpBranch %17
+%17 = OpLabel
+OpBranch %18
+%18 = OpLabel
+OpBranch %19
+%19 = OpLabel
+%36 = OpLoad %int %j
+%38 = OpSLessThan %bool %36 %int_10
+OpSelectionMerge %22 None
+OpBranchConditional %38 %22 %20
+%20 = OpLabel
+OpBranch %21
+%22 = OpLabel
+%51 = OpLoad %int %j
+%52 = OpBitcast %uint %51
+%105 = OpLoad %uint %104
+%92 = OpIMul %uint %uint_4 %52
+%93 = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %bufferHandles %105
+%94 = OpUDiv %uint %92 %uint_4
+%95 = OpAccessChain %_ptr_StorageBuffer_uint %93 %int_0 %94
+%96 = OpLoad %uint %95
+%78 = OpLoad %uint %sum
+%sum_0 = OpIAdd %uint %78 %96
+OpBranch %23
+%23 = OpLabel
+OpBranch %24
+%24 = OpLabel
+%82 = OpLoad %int %j
+%83 = OpIAdd %int %82 %int_1
+OpStore %j %83
+OpStore %sum %sum_0
+OpBranch %25
+%25 = OpLabel
+OpBranch %16
+%21 = OpLabel
+%42 = OpLoad %uint %sum
+%44 = OpAccessChain %_ptr_StorageBuffer_uint %outputBuffer %int_0 %uint_0
+OpStore %44 %42
+OpReturn
+OpFunctionEnd
