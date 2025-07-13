@@ -23,5 +23,5 @@ void computeMain()
     vec.store(temp);
     let result = coopVecLoadGroupshared<5>(temp);
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

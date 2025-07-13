@@ -24,5 +24,5 @@ void computeMain()
     CoopVec<float, 4> result = clamp(vec, minVal, maxVal);
 
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }
