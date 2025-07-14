@@ -229,12 +229,4 @@ function(set_default_compile_options target)
             -fsanitize=address
         )
     endif()
-
-    set_target_properties(
-        ${target}
-        PROPERTIES
-            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
-            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
-            INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE
-    )
 endfunction()

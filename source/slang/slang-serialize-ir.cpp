@@ -2,35 +2,30 @@
 #include "slang-serialize-ir.h"
 
 #include "core/slang-blob-builder.h"
-<<<<<<< Conflict 1 of 6
-+++++++ Contents of side #1
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
-%%%%%%% Changes from base to side #2
-+#include "slang-ir-insts-stable-names.h"
->>>>>>> Conflict 1 of 6 ends
+#include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
-<<<<<<< Conflict 2 of 6
-%%%%%%% Changes from base to side #1
- 
-+//
-+#include "slang-serialize-ir.cpp.fiddle"
-+
-+FIDDLE()
-+++++++ Contents of side #2
 #include "slang-tag-version.h"
 #include "slang.h"
 
 //
 #include "slang-serialize-ir.cpp.fiddle"
 
+// If USE_RIFF is set, then we serialize using the RIFF backend, it's the
+// slowest option
+#define USE_RIFF 0
+// If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
+// we unflatten directly from the fossilized representation rather than
+// deserializing everything first. It is the fastest option
+#define DIRECT_FROM_FOSSIL 1
+
 FIDDLE()
->>>>>>> Conflict 2 of 6 ends
 namespace Slang
 {
 
@@ -38,6 +33,9 @@ namespace Slang
 // We wrap everything up in an IRModuleInfo, to prepare for the case in which
 // we want to serialize some sidecar information to help with on-demand loading
 // or backwards compat
+//
+// For all the aggregate structs here we'll use Fiddle to generate the
+// deserialization code.
 //
 FIDDLE()
 struct IRModuleInfo
@@ -50,35 +48,72 @@ struct IRModuleInfo
     // things and maintain backwards compat we can increment this value, for
     // example if we introduce more instructions with weird payloads like
     // IRModuleInst or IRConstants.
-    const static UInt kSupportedSerializationVersion = 0;
+    // If we want to support back compat we'll need to change this to a list of
+    // accepted values, and branch on that later down.
+    const static UInt kSupportedSerializationVersion = 1;
     FIDDLE() UInt serializationVersion = kSupportedSerializationVersion;
     FIDDLE() RefPtr<IRModule> module;
+};
+
+//
+// All the information necessary to allocate an ordinary instruction, if it's a
+// string constant we need to get the length of the string from another list
+// later on.
+//
+FIDDLE()
+struct InstAllocInfo
+{
+    FIDDLE(...)
+    FIDDLE() IROp op;
+    FIDDLE() uint32_t operandCount;
 };
 
 FIDDLE()
 struct FlatInstTable
 {
     FIDDLE(...)
-    struct InstAllocInfo
-    {
-        IROp op;
-        uint32_t operandCount;
-    };
-    struct StringInfo
-    {
-        Index instIndex;
-        String string;
-    };
-    struct LitInfo
-    {
-        Index instIndex;
-        UInt64 bits;
-    };
 
+    // Each IR instruction has:
+    //
+    // * An opcode
+    // * A result type
+    // * Zero or more operands
+    // * Zero or more children
+    //
+    // Most instructions are entirely defined by those properties.
+    //
+    // The instructions that represent simple constants (integers, strings, etc.) are
+    // unique in that they have "payload" data that holds their value, instead of having
+    // any operands.
+    //
+    // The deserialization logic doesn't interact with any
+    // systems for deduplication or simplification of instructions.
+
+    // All these lists are a flattened representation of these properties of
+    // instructions as traversed in preorder.
+
+    // These are the same length, the number of instructions in the module
+    // The instAllocInfo list is all that's necessary to allocate an instruction
     FIDDLE() List<InstAllocInfo> instAllocInfo;
+    FIDDLE() List<Index> childCounts;
+    FIDDLE() List<SourceLoc> sourceLocs;
+
+    // The length of operandIndices is the number of instructions in the module
+    // (for typeUse) + the number of operands in the module
+    //
+    // a nullptr operand is encoded as -1
     FIDDLE() List<Index> operandIndices;
-    FIDDLE() List<StringInfo> strings;
-    FIDDLE() List<LitInfo> literals;
+
+    // The length is equal to the number of strings in the module
+    FIDDLE() List<Index> stringLengths;
+
+    // The length is the sum of all stringLengths
+    // It would probably be more appropriate to use List<char> here, but the
+    // serializer doesn't support chars at the moment
+    FIDDLE() String stringChars;
+
+    // The number of integer/floating constants in the module
+    FIDDLE() List<UInt64> literals;
 };
 
 //
@@ -86,18 +121,14 @@ struct FlatInstTable
 //
 struct IRSerialReadContext;
 struct IRSerialWriteContext;
-// using IRSerializer = Serializer_<ISerializerImpl, IRSerialContext>;
 
+#if USE_RIFF
 using IRWriteSerializer = Serializer_<RIFFSerialWriter, IRSerialWriteContext>;
 using IRReadSerializer = Serializer_<RIFFSerialReader, IRSerialReadContext>;
-
-// template<typename S>
-// struct IRSerialContext : SourceLocSerialContext
-// {
-// public:
-//     virtual void handleIRModule(S const& serializer, IRModule*& value) = 0;
-//     virtual void handleName(S const& serializer, Name*& value) = 0;
-// };
+#else
+using IRWriteSerializer = Serializer_<Fossil::SerialWriter, IRSerialWriteContext>;
+using IRReadSerializer = Serializer_<Fossil::SerialReader, IRSerialReadContext>;
+#endif
 
 struct IRSerialWriteContext : SourceLocSerialContext
 {
@@ -131,6 +162,9 @@ struct IRSerialReadContext : SourceLocSerialContext, RefObject
 
     // The module in which we will allocate our instructions
     RefPtr<IRModule> _module;
+
+    //
+    bool _foundUnrecognizedInstructions = false;
 };
 
 SLANG_DECLARE_FOSSILIZED_AS(Name, String);
@@ -147,76 +181,12 @@ struct Fossilized_IRModule : public FossilizedRecordVal
     Fossilized<decltype(IRModule::m_version)> m_version;
 };
 
-//
-// This splice handles any aggregate types, a similar splice is well documented
-// in slang-serialize-ast.cpp
-//
-#if 0 // FIDDLE TEMPLATE:
-% irStructTypes = {
-%   Slang.IRModuleInfo,
-% }
-%
-% for _,T in ipairs(irStructTypes) do
-
-/// Fossilized representation of a `$T`
-struct Fossilized_$T;
-
-SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
-
-/// Serialize a `$T`
-void serialize(IRSerializer const& serializer, $T& value);
-%end
-%for _,T in ipairs(irStructTypes) do
-/// Fossilized representation of a value of type `$T`
-struct Fossilized_$T
-%   if T.directSuperClass then
-    : public Fossilized<$(T.directSuperClass)>
-%   else
-    : public FossilizedRecordVal
-%   end
-{
-%   for _,f in ipairs(T.directFields) do
-    Fossilized<decltype($T::$f)> $f;
-%   end
-};
-
-/// Serialize a `value` of type `$T`
-void serialize(IRSerializer const& serializer, $T& value)
-{
-    SLANG_UNUSED(value);
-    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-%   if T.directSuperClass then
-    serialize(serializer, static_cast<$(T.directSuperClass)&>(value));
-%   end
-%   for _,f in ipairs(T.directFields) do
-    serialize(serializer, value.$f);
-%   end
-}
-% end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 0
-#include "slang-serialize-ir.cpp.fiddle"
-#endif // FIDDLE END
-
-
 // IROps are serialized as integers, and given a stable name
 SLANG_DECLARE_FOSSILIZED_AS(IROp, FossilUInt);
-void serialize(Serializer const& serializer, IROp& value)
+
+template<typename S>
+void serialize(S const& serializer, IROp& value)
 {
-<<<<<<< Conflict 3 of 6
-%%%%%%% Changes from base to side #1
-     serializeEnum(serializer, value);
- }
- 
- /// Serialize a `value` of type `IRModuleInfo`, currently no extra information
- /// besides the IRModule
- SLANG_DECLARE_FOSSILIZED_AS_MEMBER(IRModuleInfo, module);
--void serialize(IRSerializer const& serializer, IRModuleInfo& value)
-+template<typename S>
-+void serialize(S const& serializer, IRModuleInfo& value)
- {
-     serialize(serializer, value.module);
-+++++++ Contents of side #2
     auto stableName = isWriting(serializer) ? getOpcodeStableName(value) : kInvalidStableName;
     serializeEnum(serializer, stableName);
     if (isReading(serializer))
@@ -226,295 +196,15 @@ void serialize(Serializer const& serializer, IROp& value)
         // Slang with as-yet unknown instructions.
         // if this is the case, return IRUnrecognized and we can handle it later
         if (value == kIROp_Invalid)
+        {
             value = kIROp_Unrecognized;
-    }
->>>>>>> Conflict 3 of 6 ends
-}
 
-//
-// Serialized linked list of child instructions as regular lists, we can fix up
-// the pointers on deserialization
-//
-SLANG_DECLARE_FOSSILIZED_AS(IRInstListBase, List<IRInst*>);
-
-template<typename S>
-void serialize(S const& serializer, IRInstListBase& value)
-{
-    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
-
-    if constexpr (std::is_same_v<S, IRWriteSerializer>)
-    {
-        for (auto inst : value)
-        {
-            serialize(serializer, inst);
-        }
-    }
-    else
-    {
-        IRInst* first = nullptr;
-        IRInst* prev = nullptr;
-
-        while (hasElements(serializer))
-        {
-            IRInst* inst = nullptr;
-            serialize(serializer, inst);
-            first = first ? first : inst;
-
-            if (prev) [[likely]]
+            if constexpr (std::is_same_v<S, IRReadSerializer>)
             {
-                prev->next = inst;
+                serializer.getContext()->_foundUnrecognizedInstructions = true;
             }
-
-            inst->prev = prev;
-            prev = inst;
-        }
-        if (prev) [[likely]]
-        {
-            prev->next = nullptr;
-        }
-        value = IRInstListBase(first, prev);
-    }
-}
-
-//
-// Initializing an IRUse requires a small bit of special setup, handle that
-// here
-//
-template<typename S>
-void serializeUse(S const& serializer, IRInst* user, IRUse& use)
-{
-    SLANG_ASSERT(user);
-    IRInst* used = std::is_same_v<S, IRWriteSerializer> ? use.get() : nullptr;
-    serialize(serializer, used);
-    if constexpr (std::is_same_v<S, IRReadSerializer>)
-    {
-        use.init(user, used);
-    }
-}
-
-template<typename T, typename S>
-void serializeObject(S const& serializer, T*& inst, IRInst*)
-{
-    // Each IR instruction has:
-    //
-    // * An opcode
-    // * Zero or more operands
-    // * Zero or more children
-    //
-    // Most instructions are entirely defined by those properties.
-    //
-    // The instructions that represent simple constants (integers, strings, etc.) are
-    // unique in that they have "payload" data that holds their value, instead of having
-    // any operands.
-    //
-    // Note that as a result of the serialization strategy used by fossil, it
-    // is not possible for the deserialization logic to interact with any
-    // systems for deduplication or simplification of instructions.
-
-    SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
-
-    //
-    // Since we're calling deferSerializeObjectContents at the end of this
-    // function we need only serialize/deserialize enough to allocate the
-    // instruction itself,
-    //
-    // For most instructions this is simply the operand count, however for a
-    // couple of exceptions (IRModuleInst and anything under IRConstant) we
-    // may need to allocate more space, so first find out what sort of
-    // instruction it is.
-    //
-    IROp op = std::is_same_v<S, IRWriteSerializer> ? inst->m_op : kIROp_Invalid;
-    uint32_t operandCount = std::is_same_v<S, IRWriteSerializer> ? inst->operandCount : ~0;
-    serialize(serializer, op);
-    serialize(serializer, operandCount);
-
-    //
-    // If it's a string literal, the data is stored inline, so we need to know
-    // the length of the string in order to allocate, handle that here, and we
-    // may as well just read the whole string for convenience.
-    //
-    String stringLitString;
-    if (op == kIROp_StringLit || op == kIROp_BlobLit) [[unlikely]]
-    {
-        if constexpr (std::is_same_v<S, IRWriteSerializer>)
-        {
-            stringLitString = cast<IRConstant>(inst)->getStringSlice();
-        }
-        serialize(serializer, stringLitString);
-    }
-
-    //
-    // Now we have read/written everything we need in order to allocate the inst, do so
-    // This will involve calculating the allocation size for constants also
-    //
-    // if (isReading(serializer)) [[likely]]
-    if constexpr (std::is_same_v<S, IRReadSerializer>)
-    {
-        const auto readContext = serializer.getContext();
-
-        // We need to handle the special case instructions which aren't just defined by operands and
-        // children, IRModuleInst and IRConstants
-        size_t minSizeInBytes = 0;
-        switch (op)
-        {
-        [[unlikely]]
-        case kIROp_ModuleInst:
-            minSizeInBytes = offsetof(IRModuleInst, module) +
-                             sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
-            break;
-        [[unlikely]]
-        case kIROp_BoolLit:
-        [[unlikely]]
-        case kIROp_IntLit:
-        [[unlikely]]
-        case kIROp_FloatLit:
-        [[unlikely]]
-        case kIROp_PtrLit:
-        [[unlikely]]
-        case kIROp_VoidLit:
-            minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
-            break;
-        [[unlikely]]
-        case kIROp_StringLit:
-        [[unlikely]]
-        case kIROp_BlobLit:
-            minSizeInBytes = offsetof(IRConstant, value) +
-                             offsetof(IRConstant::StringValue, chars) + stringLitString.getLength();
-            break;
-        }
-        inst = cast<T>(readContext->_module->_allocateInst(op, operandCount, minSizeInBytes));
-        if (op == kIROp_StringLit || op == kIROp_BlobLit) [[unlikely]]
-        {
-            const auto c = cast<IRConstant>(inst);
-            char* dstChars = c->value.stringVal.chars;
-            c->value.stringVal.numChars = uint32_t(stringLitString.getLength());
-            memcpy(dstChars, stringLitString.getBuffer(), stringLitString.getLength());
         }
     }
-
-    //     // We've allocated the object, we can leave the rest for later
-    //     deferSerializeObjectContents(serializer, inst);
-    // }
-    //
-    // template<typename T, typename S>
-    // void serializeObjectContents(S const& serializer, T*& inst, IRInst*)
-    // {
-    //
-    // This is all that's necessary for normal instructions
-    // We serialize the source location, type, operands and children
-    //
-
-    // There's an overload for this call further up in this file
-    serialize(serializer, inst->m_decorationsAndChildren);
-
-    serialize(serializer, inst->sourceLoc);
-    serializeUse(serializer, inst, inst->typeUse);
-    for (Index i = 0; i < inst->operandCount; ++i)
-    {
-        serializeUse(serializer, inst, inst->getOperands()[i]);
-    }
-
-    //
-    // IRConstants require a little special handling
-    // IRModuleInst also has some extra information, but it's just a pointer to
-    // the IRModule value, and this is handled at the top level
-    //
-    if (const auto constant = as<IRConstant>(inst)) [[unlikely]]
-    {
-        switch (inst->m_op)
-        {
-        case kIROp_BoolLit:
-        case kIROp_IntLit:
-            {
-                serialize(serializer, constant->value.intVal);
-            }
-            break;
-        case kIROp_FloatLit:
-            {
-                serialize(serializer, constant->value.floatVal);
-            }
-            break;
-        case kIROp_PtrLit:
-            {
-                // Clang gets upset using intptr_t here, due to long and long
-                // long being distinct types
-                auto i = reinterpret_cast<UInt64>(constant->value.ptrVal);
-                serialize(serializer, i);
-                constant->value.ptrVal = reinterpret_cast<void*>(i);
-            }
-            break;
-        case kIROp_StringLit:
-        case kIROp_BlobLit:
-            // Since we had to read the string anyway to get the length in
-            // serializeObject for this instruction, the string contents
-            // have already been filled in, nothing more to do here.
-            break;
-        case kIROp_VoidLit:
-            break;
-        default:
-            SLANG_UNREACHABLE("unhandled constant");
-        }
-    }
-}
-
-//
-// Handlers for IRModule, there is a little extra setup to do once top level
-// entries are deserialized to set up m_mapMangledNameToGlobalInst, this is
-// done at the end of readSerializedModuleIR
-//
-template<typename S>
-void serializeObject(S const& serializer, IRModule*& value, IRModule*)
-{
-    serializer.getContext()->handleIRModule(serializer, value);
-}
-
-void serializeFlatInsts(
-    IRWriteSerializer const& serializer,
-    Dictionary<IRInst*, Index>& instMap,
-    IRInst* inst)
-{
-    IROp op = inst->m_op;
-    uint32_t operandCount = inst->operandCount;
-    serialize(serializer, op);
-    serialize(serializer, operandCount);
-
-    String strjngLitString;
-    if (op == kIROp_StringLit || op == kIROp_BlobLit) [[unlikely]]
-    {
-        String stringLitString = cast<IRConstant>(inst)->getStringSlice();
-        serialize(serializer, stringLitString);
-    }
-}
-
-void IRSerialWriteContext::handleIRModule(IRWriteSerializer const& serializer, IRModule*& value)
-{
-    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value->m_moduleInst);
-    serialize(serializer, value->m_name);
-<<<<<<< Conflict 4 of 6
-+++++++ Contents of side #1
-    serialize(serializer, value->m_moduleInst);
-
-    Dictionary<IRInst*, Index> instMap;
-    // Serialize out the instruction tree in preorder
-    {
-    }
-%%%%%%% Changes from base to side #2
--    serialize(serializer, value->m_moduleInst);
-+    serialize(serializer, value->m_version);
->>>>>>> Conflict 4 of 6 ends
-}
-
-void IRSerialReadContext::handleIRModule(IRReadSerializer const& serializer, IRModule*& value)
-{
-    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    value = new IRModule{_session};
-    SLANG_ASSERT(!_module);
-    _module = value;
-    serialize(serializer, value->m_moduleInst);
-    serialize(serializer, value->m_name);
-    serialize(serializer, value->m_version);
-    value->m_moduleInst->module = value;
 }
 
 //
@@ -540,16 +230,401 @@ void IRSerialReadContext::handleName(IRReadSerializer const& serializer, Name*& 
 }
 
 //
+// This splice handles any aggregate types, a similar splice is well documented
+// in slang-serialize-ast.cpp
+//
+#if 0 // FIDDLE TEMPLATE:
+% irStructTypes = {
+%   Slang.IRModuleInfo,
+%   Slang.FlatInstTable,
+%   Slang.InstAllocInfo,
+% }
+%
+% for _,T in ipairs(irStructTypes) do
+
+/// Fossilized representation of a `$T`
+struct Fossilized_$T;
+
+SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
+
+/// Serialize a `$T`
+template<typename S>
+void serialize(S const& serializer, $T& value);
+%end
+%for _,T in ipairs(irStructTypes) do
+/// Fossilized representation of a value of type `$T`
+struct Fossilized_$T
+%   if T.directSuperClass then
+    : public Fossilized<$(T.directSuperClass)>
+%   else
+    : public FossilizedRecordVal
+%   end
+{
+%   for i,f in ipairs(T.directFields) do
+    Fossilized<decltype($T::$f)> $f;
+    const static Index $(f)_FieldIndex = $(i-1);
+%   end
+};
+
+namespace Fossil{
+template<>
+struct ValRef<Fossilized_$T> : ValRefBase<Fossilized_$T>
+{
+public:
+    using ValRefBase<Fossilized_$T>::ValRefBase;
+
+%   for i,f in ipairs(T.directFields) do
+    AnyValRef get$(tostring(f):gsub("^%l", string.upper))() const
+    {
+        return as<FossilizedRecordVal>(getAddress(*this))->getField($(i-1));
+    }
+%   end
+};
+}
+%end
+
+% for _,T in ipairs(irStructTypes) do
+/// Serialize a `value` of type `$T`
+template<typename S>
+void serialize(S const& serializer, $T& value)
+{
+    SLANG_UNUSED(value);
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+%   if T.directSuperClass then
+    serialize(serializer, static_cast<$(T.directSuperClass)&>(value));
+%   end
+%   for _,f in ipairs(T.directFields) do
+    serialize(serializer, value.$f);
+%   end
+}
+% end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-serialize-ir.cpp.fiddle"
+#endif // FIDDLE END
+
+
+////
+//
+// After that preamble, this is the interesting stuff now
+//
+////
+
+//
+// Handlers for IRModule, there is a little extra setup to do once top level
+// entries are deserialized to set up m_mapMangledNameToGlobalInst, this is
+// done at the end of readSerializedModuleIR
+//
+template<typename S>
+void serializeObject(S const& serializer, IRModule*& value, IRModule*)
+{
+    serializer.getContext()->handleIRModule(serializer, value);
+}
+
+static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
+{
+    Dictionary<IRInst*, Index> instMap;
+    instMap.add(nullptr, -1);
+    List<IRInst*> insts;
+    {
+        const auto go = [&](auto& go, IRInst* inst) -> void
+        {
+            const auto thisInstIndex = flat.instAllocInfo.getCount();
+            instMap.add(inst, thisInstIndex);
+            insts.add(inst);
+            flat.instAllocInfo.add(InstAllocInfo{
+                .op = inst->m_op,
+                .operandCount = inst->operandCount,
+            });
+            flat.childCounts.add(0);
+            flat.sourceLocs.add(inst->sourceLoc);
+
+            //
+            // Process the children
+            //
+            // To make things slightly easier for the branch predictor, if this
+            // is the top level instruction move all the special case
+            // instructions (bool/int/float literals and string literals)
+            // to the end. It is semantically the same, but it means that
+            // the control flow when reading will be easier to predict.
+            //
+            if (inst == moduleInst) [[unlikely]]
+            {
+                List<IRInst*> lits;
+                List<IRInst*> strings;
+                for (const auto c : inst->m_decorationsAndChildren)
+                {
+                    flat.childCounts[thisInstIndex]++;
+
+                    if (c->m_op == kIROp_BoolLit || c->m_op == kIROp_IntLit ||
+                        c->m_op == kIROp_FloatLit || c->m_op == kIROp_PtrLit ||
+                        c->m_op == kIROp_VoidLit)
+                    {
+                        lits.add(c);
+                    }
+                    else if (c->m_op == kIROp_StringLit || c->m_op == kIROp_BlobLit)
+                    {
+                        strings.add(c);
+                    }
+                    else
+                    {
+                        go(go, c);
+                    }
+                }
+                for (const auto c : lits)
+                {
+                    go(go, c);
+                }
+                for (const auto c : strings)
+                {
+                    go(go, c);
+                }
+            }
+            else
+            {
+                for (const auto c : inst->m_decorationsAndChildren)
+                {
+                    flat.childCounts[thisInstIndex]++;
+                    go(go, c);
+                }
+            }
+        };
+        go(go, moduleInst);
+    }
+    {
+        //
+        // Go through all the instructions we serialized and fill
+        // in the rest of the table in order
+        //
+        for (const auto inst : insts)
+        {
+            flat.operandIndices.add(instMap.getValue(inst->typeUse.get()));
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+            {
+                const auto& operand = inst->getOperand(i);
+                flat.operandIndices.add(instMap.getValue(operand));
+            }
+
+            if (const auto& c = as<IRConstant>(inst))
+            {
+                switch (inst->m_op)
+                {
+                case kIROp_BoolLit:
+                case kIROp_IntLit:
+                    flat.literals.add(std::bit_cast<UInt64>(c->value.intVal));
+                    break;
+                case kIROp_FloatLit:
+                    flat.literals.add(std::bit_cast<UInt64>(c->value.floatVal));
+                    break;
+                case kIROp_PtrLit:
+                    flat.literals.add(std::bit_cast<UInt64>(c->value.ptrVal));
+                    break;
+                case kIROp_StringLit:
+                case kIROp_BlobLit:
+                    const auto slice = c->getStringSlice();
+                    const auto len = slice.getLength();
+                    flat.stringLengths.add(len);
+                    flat.stringChars.append(slice.begin(), len);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+template<typename T>
+static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRef r)
+{
+    T t;
+    Fossil::ReadContext context;
+    Fossil::SerialReader reader(
+        context,
+        Fossil::getAddress(r),
+        Fossil::SerialReader::InitialStateType::PseudoPtr);
+    IRReadSerializer serializer_(&reader, serializer.getContext());
+    serialize(serializer_, t);
+    return t;
+}
+
+static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRModule* module)
+{
+    SLANG_PROFILE;
+
+    IRSerialReadContext& readContext = *serializer.getContext();
+#if DIRECT_FROM_FOSSIL
+    const auto flatPtr = as<Fossilized<FlatInstTable>>(serializer.getImpl()->readValPtr());
+    Fossilized<FlatInstTable>& flat = flatPtr->getDataRef();
+    // Read just the sourceLocs using normal deserialization
+    const auto sourceLocs = deserialize1<List<SourceLoc>>(serializer, flatPtr->getSourceLocs());
+#else
+    FlatInstTable flat;
+    serialize(serializer, flat);
+    const List<SourceLoc>& sourceLocs = flat.sourceLocs;
+#endif
+
+    Index stringLengthIndex = 0;
+    List<IRInst*> instsList;
+
+#if DIRECT_FROM_FOSSIL
+    instsList.setCount(flat.instAllocInfo.getElementCount() + 1);
+#else
+    instsList.setCount(flat.instAllocInfo.getCount() + 1);
+#endif
+    // nullptr instructions are represented as `-1`. We can save ourselves a
+    // branch by just making that index valid.
+    IRInst** const insts = &instsList[1];
+    insts[-1] = nullptr;
+
+#if DIRECT_FROM_FOSSIL
+    for (Index instIndex = 0; instIndex < flat.instAllocInfo.getElementCount(); ++instIndex)
+#else
+    for (Index instIndex = 0; instIndex < flat.instAllocInfo.getCount(); ++instIndex)
+#endif
+    {
+        const auto& a = flat.instAllocInfo[instIndex];
+        IROp op = getStableNameOpcode(a.op);
+        if (op == kIROp_Invalid) [[unlikely]]
+        {
+            readContext._foundUnrecognizedInstructions = true;
+            op = kIROp_Unrecognized;
+        }
+        size_t minSizeInBytes = 0;
+        switch (op)
+        {
+        [[unlikely]] case kIROp_ModuleInst:
+            minSizeInBytes = offsetof(IRModuleInst, module) +
+                             sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
+            break;
+        case kIROp_BoolLit:
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+        case kIROp_PtrLit:
+        case kIROp_VoidLit:
+            minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
+            break;
+        // About 5% of instructions in the core module are strings!
+        case kIROp_StringLit:
+        case kIROp_BlobLit:
+            minSizeInBytes = offsetof(IRConstant, value) +
+                             offsetof(IRConstant::StringValue, chars) +
+                             flat.stringLengths[stringLengthIndex++];
+            break;
+        }
+        insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
+    }
+
+    Index litIndex = 0;
+    Index operandIndex = 0;
+    Index instIndex = 0;
+    stringLengthIndex = 0;
+    Index stringDataIndex = 0;
+    const auto go = [&](auto& go, IRInst* parent) -> IRInst*
+    {
+        const auto thisInstIndex = instIndex++;
+        IRInst* inst = insts[thisInstIndex];
+
+        // operands and sourcelocs
+        inst->sourceLoc = sourceLocs[thisInstIndex];
+        inst->typeUse.init(inst, insts[flat.operandIndices[operandIndex++]]);
+        for (Index o = 0; o < inst->operandCount; ++o)
+            inst->getOperands()[o].init(inst, insts[flat.operandIndices[operandIndex++]]);
+
+        // Handle special instructions
+        switch (inst->m_op)
+        {
+        [[unlikely]] case kIROp_ModuleInst:
+            cast<IRModuleInst>(inst)->module = module;
+            break;
+        case kIROp_BoolLit:
+        case kIROp_IntLit:
+            cast<IRConstant>(inst)->value.intVal =
+                std::bit_cast<IRIntegerValue>(flat.literals[litIndex++]);
+            break;
+        case kIROp_FloatLit:
+            cast<IRConstant>(inst)->value.floatVal =
+                std::bit_cast<double>(flat.literals[litIndex++]);
+            break;
+        case kIROp_PtrLit:
+            cast<IRConstant>(inst)->value.ptrVal = std::bit_cast<void*>(flat.literals[litIndex++]);
+            break;
+        case kIROp_StringLit:
+        case kIROp_BlobLit:
+            const auto c = cast<IRConstant>(inst);
+            const auto len = flat.stringLengths[stringLengthIndex++];
+            char* const dstChars = c->value.stringVal.chars;
+            c->value.stringVal.numChars = uint32_t(len);
+#if DIRECT_FROM_FOSSIL
+            memcpy(dstChars, flat.stringChars.get().begin() + stringDataIndex, len);
+#else
+            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
+#endif
+            stringDataIndex += len;
+            break;
+        }
+
+        // Read in children, and fix up pointers
+        inst->parent = parent;
+        IRInst* prev = nullptr;
+        IRInst* first = nullptr;
+        IRInst* last = nullptr;
+        for (Index i = 0; i < flat.childCounts[thisInstIndex]; ++i)
+        {
+            auto c = go(go, inst);
+            if (i == 0)
+                first = c;
+            last = c;
+            c->prev = prev;
+            if (prev)
+                prev->next = c;
+            prev = c;
+        }
+        if (last)
+            last->next = nullptr;
+        inst->m_decorationsAndChildren.first = first;
+        inst->m_decorationsAndChildren.last = last;
+
+        return inst;
+    };
+    const auto moduleInst = go(go, nullptr);
+    return cast<IRModuleInst>(moduleInst);
+}
+
+void IRSerialWriteContext::handleIRModule(IRWriteSerializer const& serializer, IRModule*& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value->m_name);
+    serialize(serializer, value->m_version);
+    FlatInstTable flat;
+    moduleToFlatModule(value->m_moduleInst, flat);
+
+#if DIRECT_FROM_FOSSIL
+    // serialize(serializer, flat.sourceLocs);
+#endif
+    serialize(serializer, flat);
+}
+
+void IRSerialReadContext::handleIRModule(IRReadSerializer const& serializer, IRModule*& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    value = new IRModule{_session};
+    SLANG_ASSERT(!_module);
+    _module = value;
+    serialize(serializer, value->m_name);
+    serialize(serializer, value->m_version);
+
+    value->m_moduleInst = flatModuleToModule(serializer, value);
+}
+
+//
 // {write,read}SerializedModuleIR()
 //
-
-#define USE_RIFF 1
 
 void writeSerializedModuleIR(
     RIFF::BuildCursor& cursor,
     IRModule* irModule,
     SerialSourceLocWriter* sourceLocWriter)
 {
+    SLANG_PROFILE;
     // The flow here is very similar to writeSerializedModuleAST which is very
     // well documented.
 
@@ -571,7 +646,7 @@ void writeSerializedModuleIR(
     {
         Fossil::SerialWriter writer(blobBuilder);
         IRSerialWriteContext context{sourceLocWriter};
-        IRSerializer serializer(&writer, &context);
+        IRWriteSerializer serializer(&writer, &context);
         serialize(serializer, moduleInfo);
     }
 
@@ -590,6 +665,8 @@ Result readSerializedModuleInfo(
     UInt& version,
     String& name)
 {
+    static_assert(!USE_RIFF);
+
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -611,16 +688,10 @@ Result readSerializedModuleInfo(
     return SLANG_OK;
 }
 
-//
-// Read a module, this currently does not do any on-demand loading
-//
-<<<<<<< Conflict 5 of 6
-%%%%%%% Changes from base to side #1
--void readSerializedModuleIR(
-+void readSerializedModuleIR_(
-+++++++ Contents of side #2
-Result readSerializedModuleIR(
->>>>>>> Conflict 5 of 6 ends
+// A helper to make profiling the actual deserialization work
+// easier.
+[[nodiscard]]
+static Result readSerializedModuleIR_(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
@@ -635,21 +706,9 @@ Result readSerializedModuleIR(
         SLANG_UNEXPECTED("invalid format for serialized module IR");
     }
 
-    // Fossil::AnyValPtr rootValPtr =
-    //     Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
-    // if (!rootValPtr)
-    // {
-    //     SLANG_UNEXPECTED("invalid format for serialized module IR");
-    // }
-
     IRModuleInfo info;
+    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
     {
-        auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
-        // Fossil::ReadContext readContext;
-        // Fossil::SerialReader reader(
-        //     readContext,
-        //     rootValPtr,
-        //     Fossil::SerialReader::InitialStateType::Root);
         RIFFSerialReader reader(dataChunk);
 
         IRReadSerializer serializer(&reader, sharedDecodingContext);
@@ -677,23 +736,26 @@ Result readSerializedModuleIR(
         return SLANG_FAIL;
 
     IRModuleInfo info;
+    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
     {
-        auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
         Fossil::ReadContext readContext;
         Fossil::SerialReader reader(
             readContext,
             rootValPtr,
             Fossil::SerialReader::InitialStateType::Root);
 
-        IRSerializer serializer(&reader, sharedDecodingContext);
+        IRReadSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
     }
 #endif
     SLANG_ASSERT(info.module);
     outIRModule = info.module;
+    if (sharedDecodingContext->_foundUnrecognizedInstructions)
+        return SLANG_FAIL;
+    return SLANG_OK;
 }
 
-void readSerializedModuleIR(
+Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
@@ -701,42 +763,14 @@ void readSerializedModuleIR(
 {
     SLANG_PROFILE;
 
-    readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule);
-
-    //
-    // Now that everything is loaded, we can traverse the module and fix up the
-    // parents which we didn't do before because due to deferred
-    // deserialization we didn't necessarily have this information handy at the
-    // time.
-    //
-    bool hasUnrecognizedInsts = false;
-    auto go = [&](auto&& go, IRInst* parent, IRInst* inst) -> void
-    {
-        if (inst->getOp() == kIROp_Unrecognized)
-            hasUnrecognizedInsts = true;
-
-        inst->parent = parent;
-        for (const auto child : inst->getDecorationsAndChildren())
-            go(go, inst, child);
-    };
-    go(go, nullptr, outIRModule->getModuleInst());
-
-    if (hasUnrecognizedInsts)
-        return SLANG_FAIL;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
 
     //
     // Module is finally valid (or at least as much as it was going it) and
     // ready to be used
     //
-<<<<<<< Conflict 6 of 6
-+++++++ Contents of side #1
     outIRModule->buildMangledNameToGlobalInstMap();
-    outIRModule = outIRModule;
-%%%%%%% Changes from base to side #2
-     info.module->buildMangledNameToGlobalInstMap();
-     outIRModule = info.module;
-+    return SLANG_OK;
->>>>>>> Conflict 6 of 6 ends
+    return SLANG_OK;
 }
 
 

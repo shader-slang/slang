@@ -5,6 +5,7 @@
 #include "../core/slang-math.h"
 #include "../core/slang-stream.h"
 #include "../core/slang-text-io.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-mangled-lexer.h"
@@ -129,6 +130,7 @@ public:
 
     SlangResult encode(TargetProgram* targetProgram, DiagnosticSink* sink)
     {
+        SLANG_PROFILE;
         // TODO:
         // Serialization of target component IR is causing the embedded precompiled binary
         // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
@@ -184,6 +186,7 @@ public:
 
     SlangResult encode(Module* module)
     {
+        SLANG_PROFILE;
         SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleFourCC);
 
         // The first piece that we write for a module is its header.

@@ -1,7 +1,8 @@
 #pragma once
 
-
 #include "core/slang-smart-pointer.h"
+#include "slang-com-helper.h"
+
 namespace Slang
 {
 
@@ -9,6 +10,7 @@ struct IRModule;
 class Session;
 class SerialSourceLocReader;
 class SerialSourceLocWriter;
+class String;
 namespace RIFF
 {
 struct BuildCursor;
