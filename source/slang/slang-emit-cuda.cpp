@@ -206,6 +206,20 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             {
                 return SLANG_FAIL;
             }
+            
+            // PTX doesn't support 3-element vectors, so we use a struct representation
+            if (vecCount == 3)
+            {
+                out << "struct { ";
+                UnownedStringSlice elementTypeName = getBuiltinTypeName(elemType);
+                if (elementTypeName.getLength() <= 0)
+                {
+                    return SLANG_FAIL;
+                }
+                out << elementTypeName << " x, y, z; }";
+                return SLANG_OK;
+            }
+            
             out << prefix << vecCount;
             return SLANG_OK;
         }
@@ -725,6 +739,50 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
         {
+            // Check if this is a 3-element vector (which we emit as struct)
+            if (auto vecType = as<IRVectorType>(inst->getDataType()))
+            {
+                auto vecCount = int(getIntVal(vecType->getElementCount()));
+                if (vecCount == 3)
+                {
+                    // For 3-element vectors, emit struct initializer syntax
+                    m_writer->emit("{");
+                    bool isFirst = true;
+                    char xyzwNames[] = "xyzw";
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        auto arg = inst->getOperand(i);
+                        if (auto argVectorType = as<IRVectorType>(arg->getDataType()))
+                        {
+                            for (int j = 0; j < cast<IRIntLit>(argVectorType->getElementCount())->getValue();
+                                 j++)
+                            {
+                                if (isFirst)
+                                    isFirst = false;
+                                else
+                                    m_writer->emit(", ");
+                                auto outerPrec = getInfo(EmitOp::General);
+                                auto prec = getInfo(EmitOp::Postfix);
+                                emitOperand(arg, leftSide(outerPrec, prec));
+                                m_writer->emit(".");
+                                m_writer->emitChar(xyzwNames[j]);
+                            }
+                        }
+                        else
+                        {
+                            if (isFirst)
+                                isFirst = false;
+                            else
+                                m_writer->emit(", ");
+                            emitOperand(arg, getInfo(EmitOp::General));
+                        }
+                    }
+                    m_writer->emit("}");
+                    return true;
+                }
+            }
+            
+            // For non-3-element vectors, use the original make_ syntax
             m_writer->emit("make_");
             emitType(inst->getDataType());
             m_writer->emit("(");
@@ -768,6 +826,55 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             if (auto dstVectorType = as<IRVectorType>(inst->getDataType()))
             {
+                auto vecCount = int(getIntVal(dstVectorType->getElementCount()));
+                
+                // Check if this is a 3-element vector (which we emit as struct)
+                if (vecCount == 3)
+                {
+                    // For 3-element vectors, emit struct initializer syntax
+                    m_writer->emit("{");
+                    bool isFirst = true;
+                    char xyzwNames[] = "xyzw";
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        auto arg = inst->getOperand(i);
+                        if (auto vectorType = as<IRVectorType>(arg->getDataType()))
+                        {
+                            for (int j = 0;
+                                 j < cast<IRIntLit>(vectorType->getElementCount())->getValue();
+                                 j++)
+                            {
+                                if (isFirst)
+                                    isFirst = false;
+                                else
+                                    m_writer->emit(", ");
+                                m_writer->emit("(");
+                                emitType(dstVectorType->getElementType());
+                                m_writer->emit(")");
+                                auto outerPrec = getInfo(EmitOp::General);
+                                auto prec = getInfo(EmitOp::Postfix);
+                                emitOperand(arg, leftSide(outerPrec, prec));
+                                m_writer->emit(".");
+                                m_writer->emitChar(xyzwNames[j]);
+                            }
+                        }
+                        else
+                        {
+                            if (isFirst)
+                                isFirst = false;
+                            else
+                                m_writer->emit(", ");
+                            m_writer->emit("(");
+                            emitType(dstVectorType->getElementType());
+                            m_writer->emit(")");
+                            emitOperand(arg, getInfo(EmitOp::General));
+                        }
+                    }
+                    m_writer->emit("}");
+                    return true;
+                }
+                
+                // For non-3-element vectors, use the original make_ syntax
                 m_writer->emit("make_");
                 emitType(inst->getDataType());
                 m_writer->emit("(");
