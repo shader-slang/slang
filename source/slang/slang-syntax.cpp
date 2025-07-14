@@ -914,7 +914,7 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
     auto resultType = getResultType(astBuilder, declRef);
 
     if (!resultType)
-        return astBuilder->getFuncType(ArrayView<Type*>(), astBuilder->getErrorType());
+        resultType = astBuilder->getErrorType();
 
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
