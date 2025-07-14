@@ -1182,6 +1182,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit(" object_data");
                 m_writer->emit("*");
                 break;
+            default:
+                // For unrecognized address spaces, default to constant for uniform parameters
+                m_writer->emit(" constant");
+                m_writer->emit("*");
+                break;
             }
             return;
         }
