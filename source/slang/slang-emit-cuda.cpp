@@ -761,6 +761,31 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeStruct:
+        {
+            // For CUDA, we need to handle vector types (like uint3) specially
+            // to use make_* constructor functions instead of struct initialization
+            auto structType = inst->getDataType();
+            if (as<IRVectorType>(structType))
+            {
+                // This is a vector type, use make_* constructor
+                m_writer->emit("make_");
+                emitType(structType);
+                m_writer->emit("(");
+                bool isFirst = true;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (!isFirst)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                    isFirst = false;
+                }
+                m_writer->emit(")");
+                return true;
+            }
+            // For non-vector structs, fall back to default behavior
+            break;
+        }
     case kIROp_FloatCast:
     case kIROp_CastIntToFloat:
     case kIROp_IntCast:

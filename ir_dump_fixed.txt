@@ -1,0 +1,4416 @@
+### LOWER-TO-IR:
+undefined
+let  %1	: witness_table_t(%x5Fx5FITextureShape)	= lookupWitness(%2, %3)
+let  %4	: CapabilitySet	= capabilityDisjunction(%5, %6, %7, %8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105, %106, %107, %108, %109, %110, %111, %112, %113, %114, %115, %116, %117, %118, %119, %120, %121, %122, %123, %124, %125, %126, %127, %128, %129, %130, %131, %132, %133, %134, %135, %136, %137, %138, %139)
+let  %139	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 82 : Int)
+let  %138	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 81 : Int)
+let  %137	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 80 : Int)
+let  %136	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 79 : Int)
+let  %135	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 78 : Int)
+let  %134	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 77 : Int)
+let  %133	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 76 : Int)
+let  %132	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 75 : Int)
+let  %131	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 74 : Int)
+let  %130	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 73 : Int)
+let  %129	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 72 : Int)
+let  %128	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 71 : Int)
+let  %127	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 70 : Int)
+let  %126	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 69 : Int)
+let  %125	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 68 : Int)
+let  %124	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 82 : Int)
+let  %123	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 81 : Int)
+let  %122	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 80 : Int)
+let  %121	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 79 : Int)
+let  %120	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 78 : Int)
+let  %119	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 77 : Int)
+let  %118	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 76 : Int)
+let  %117	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 75 : Int)
+let  %116	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 74 : Int)
+let  %115	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 73 : Int)
+let  %114	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 72 : Int)
+let  %113	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 71 : Int)
+let  %112	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 70 : Int)
+let  %111	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 69 : Int)
+let  %110	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 68 : Int)
+let  %109	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 82 : Int)
+let  %108	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 81 : Int)
+let  %107	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 80 : Int)
+let  %106	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 79 : Int)
+let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 78 : Int)
+let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 77 : Int)
+let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 76 : Int)
+let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 75 : Int)
+let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
+let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
+let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
+let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
+let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
+let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
+let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
+let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 82 : Int)
+let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 81 : Int)
+let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 80 : Int)
+let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 79 : Int)
+let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 78 : Int)
+let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 77 : Int)
+let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 76 : Int)
+let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 75 : Int)
+let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
+let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
+let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
+let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
+let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
+let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
+let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
+let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 82 : Int)
+let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 81 : Int)
+let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 80 : Int)
+let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 79 : Int)
+let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 78 : Int)
+let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 77 : Int)
+let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 76 : Int)
+let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 75 : Int)
+let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
+let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
+let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
+let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
+let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
+let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
+let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
+let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 82 : Int)
+let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 81 : Int)
+let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 80 : Int)
+let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 79 : Int)
+let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 78 : Int)
+let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 77 : Int)
+let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 76 : Int)
+let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 75 : Int)
+let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
+let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
+let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
+let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
+let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
+let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
+let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
+let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 82 : Int)
+let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 81 : Int)
+let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 80 : Int)
+let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 79 : Int)
+let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 78 : Int)
+let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 77 : Int)
+let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 76 : Int)
+let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 75 : Int)
+let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
+let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
+let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
+let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
+let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
+let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
+let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
+let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 82 : Int)
+let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 81 : Int)
+let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 80 : Int)
+let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 79 : Int)
+let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 78 : Int)
+let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 77 : Int)
+let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 76 : Int)
+let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 75 : Int)
+let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
+let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
+let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
+let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
+let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
+let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
+let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
+let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 82 : Int)
+let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 81 : Int)
+let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 80 : Int)
+let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 79 : Int)
+let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 78 : Int)
+let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 77 : Int)
+let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 76 : Int)
+let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 75 : Int)
+let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
+let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
+let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
+let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
+let  %7	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
+let  %6	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
+let  %5	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
+let  %140	: _	= interface_req_entry(%141, associated_type(%x5Fx5FBuiltinArithmeticType))
+let  %142	: _	= interface_req_entry(%143, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+let  %144	: _	= interface_req_entry(%145, Int)
+let  %146	: _	= interface_req_entry(%147, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[import("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%140, %142, %144, %146)
+let  %148	: _	= interface_req_entry(%149, witness_table_t(%x5Fx5FBuiltinType))
+let  %150	: _	= interface_req_entry(%151, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[import("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%148, %150)
+[import("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %149	: _	= key
+[BuiltinDecoration]
+[import("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+[import("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %151	: _	= key
+let  %152	: _	= interface_req_entry(%153, witness_table_t(%IComparable))
+let  %154	: _	= interface_req_entry(%155, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %156	: _	= interface_req_entry(%157, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %158	: _	= interface_req_entry(%159, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %160	: _	= interface_req_entry(%161, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %162	: _	= interface_req_entry(%163, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %164	: _	= interface_req_entry(%165, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %166	: _	= interface_req_entry(%167, Func(this_type(%IArithmetic), Int))
+let  %168	: _	= interface_req_entry(%169, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[import("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%152, %154, %156, %158, %160, %162, %164, %166, %168)
+[import("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %153	: _	= key
+let  %170	: _	= interface_req_entry(%171, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %172	: _	= interface_req_entry(%173, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %174	: _	= interface_req_entry(%175, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[import("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%170, %172, %174)
+[import("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %171	: _	= key
+[import("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %173	: _	= key
+[import("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %175	: _	= key
+[import("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %155	: _	= key
+[import("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %157	: _	= key
+[import("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %159	: _	= key
+[import("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %161	: _	= key
+[import("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %163	: _	= key
+[import("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %165	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %167	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %169	: _	= key
+[import("_ST4core13ITexelElement7Element")]
+let  %141	: _	= key
+[import("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %143	: _	= key
+[StaticRequirementDecoration]
+[import("_SV4core13ITexelElement12elementCount")]
+let  %145	: _	= key
+[import("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %147	: _	= key
+[import("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElement")]
+generic %176	: witness_table_t(%ITexelElement)
+{
+block %177(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinArithmeticType)]
+		[nameHint("T")]
+		param %T	: type_t,
+		param %178	: witness_table_t(%x5Fx5FBuiltinArithmeticType)):
+	witness_table %179	: witness_table_t(%ITexelElement)(%T);
+
+	return_val(%179)
+}
+[import("_SWu4core23__BuiltinArithmeticType")]
+witness_table %180	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(UInt);
+
+let  %181	: _	= interface_req_entry(%3, witness_table_t(%x5Fx5FITextureShape))
+[BuiltinDecoration]
+[import("_ST4core21__ITextureShape1D2D3D")]
+[nameHint("__ITextureShape1D2D3D")]
+let  %x5Fx5FITextureShape1D2D3D	: Type	= interface(%181)
+[import("_S4core21__ITextureShape1D2D3DI4core15__ITextureShapeR15_24xinheritance")]
+let  %3	: _	= key
+let  %182	: _	= interface_req_entry(%183, Int)
+let  %184	: _	= interface_req_entry(%185, Int)
+let  %186	: _	= interface_req_entry(%187, Int)
+[BuiltinDecoration]
+[import("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%182, %184, %186)
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape6flavor")]
+let  %183	: _	= key
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape10dimensions")]
+let  %185	: _	= key
+[StaticRequirementDecoration]
+[import("_SV4core15__ITextureShape15planeDimensions")]
+let  %187	: _	= key
+[import("_SW4core9__Shape3D4core21__ITextureShape1D2D3D")]
+witness_table %2	: witness_table_t(%x5Fx5FITextureShape1D2D3D)(TextureShape3DType);
+
+generic %188	: Generic
+{
+block %189(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T1	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount	: Int,
+		[nameHint("access")]
+		param %access	: Int,
+		[nameHint("isShadow")]
+		param %isShadow	: Int,
+		[nameHint("isCombined")]
+		param %isCombined	: Int,
+		[nameHint("format")]
+		param %format	: Int,
+		param %190	: witness_table_t(%ITexelElement)):
+	return_val(Func(Void, TextureType(%T1, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount, %access, %isShadow, %isCombined, %format, %190, %1), Out(UInt), Out(UInt), Out(UInt)))
+}
+[import("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uV")]
+generic %191	: %188
+{
+block %192(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T2	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount1	: Int,
+		[nameHint("access")]
+		param %access1	: Int,
+		[nameHint("isShadow")]
+		param %isShadow1	: Int,
+		[nameHint("isCombined")]
+		param %isCombined1	: Int,
+		[nameHint("format")]
+		param %format1	: Int,
+		param %193	: witness_table_t(%ITexelElement)):
+	[ForceInline]
+	[readNone]
+	[requireGLSLVersion(450 : Int)]
+	[requireGLSLVersion(450 : Int)]
+	[nameHint("GetDimensions")]
+		func %GetDimensions	: Func(Void, TextureType(%T2, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount1, %access1, %isShadow1, %isCombined1, %format1, %193, %1), Out(UInt), Out(UInt), Out(UInt));
+
+	return_val(%GetDimensions)
+}
+generic %194	: Generic
+{
+block %195(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T3	: type_t,
+		[nameHint("N")]
+		param %N	: Int,
+		param %196	: witness_table_t(%x5Fx5FBuiltinType)):
+	return_val(Func(Bool, Vec(%T3, %N)))
+}
+[import("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0b")]
+generic %197	: %194
+{
+block %198(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T4	: type_t,
+		[nameHint("N")]
+		param %N1	: Int,
+		param %199	: witness_table_t(%x5Fx5FBuiltinType)):
+	[readNone]
+	[nameHint("any")]
+		func %any	: Func(Bool, Vec(%T4, %N1));
+
+	return_val(%any)
+}
+[import("_SWb4core13__BuiltinType")]
+witness_table %200	: witness_table_t(%x5Fx5FBuiltinType)(Bool);
+
+generic %201	: Generic
+{
+block %202(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T5	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape	: type_t,
+		[nameHint("isArray")]
+		param %isArray	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount2	: Int,
+		[nameHint("isShadow")]
+		param %isShadow2	: Int,
+		[nameHint("isCombined")]
+		param %isCombined2	: Int,
+		[nameHint("format")]
+		param %format2	: Int,
+		param %203	: witness_table_t(%ITexelElement),
+		param %204	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %205	: Int	= lookupWitness(%204, %185)
+	let  %206	: Int	= add(%isArray, %205)
+	return_val(Func(%T5, TextureType(%T5, %Shape, %isArray, 0 : Int, %sampleCount2, 0 : Int, %isShadow2, %isCombined2, %format2, %203, %204), Vec(UInt, %206)))
+}
+[import("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0")]
+generic %207	: %201
+{
+block %208(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T6	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape1	: type_t,
+		[nameHint("isArray")]
+		param %isArray1	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount3	: Int,
+		[nameHint("isShadow")]
+		param %isShadow3	: Int,
+		[nameHint("isCombined")]
+		param %isCombined3	: Int,
+		[nameHint("format")]
+		param %format3	: Int,
+		param %209	: witness_table_t(%ITexelElement),
+		param %210	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %211	: Int	= lookupWitness(%210, %185)
+	let  %212	: Int	= add(%isArray1, %211)
+	[ForceInline]
+	[readNone]
+	[nameHint("operator[].get")]
+		func %operatorx5Bx5Dx5Fget	: Func(%T6, TextureType(%T6, %Shape1, %isArray1, 0 : Int, %sampleCount3, 0 : Int, %isShadow3, %isCombined3, %format3, %209, %210), Vec(UInt, %212));
+
+	return_val(%operatorx5Bx5Dx5Fget)
+}
+generic %213	: Generic
+{
+block %214(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T7	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape2	: type_t,
+		[nameHint("isArray")]
+		param %isArray2	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount4	: Int,
+		[nameHint("isShadow")]
+		param %isShadow4	: Int,
+		[nameHint("format")]
+		param %format4	: Int,
+		param %215	: witness_table_t(%ITexelElement),
+		param %216	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %217	: Int	= lookupWitness(%216, %185)
+	let  %218	: Int	= add(%isArray2, %217)
+	return_val(Func(Void, TextureType(%T7, %Shape2, %isArray2, 0 : Int, %sampleCount4, 1 : Int, %isShadow4, 0 : Int, %format4, %215, %216), Vec(UInt, %218), %T7))
+}
+[import("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0V")]
+generic %219	: %213
+{
+block %220(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T8	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape3	: type_t,
+		[nameHint("isArray")]
+		param %isArray3	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount5	: Int,
+		[nameHint("isShadow")]
+		param %isShadow5	: Int,
+		[nameHint("format")]
+		param %format5	: Int,
+		param %221	: witness_table_t(%ITexelElement),
+		param %222	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %223	: Int	= lookupWitness(%222, %185)
+	let  %224	: Int	= add(%isArray3, %223)
+	[ForceInline]
+	[nameHint("operator[].set")]
+		func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(%T8, %Shape3, %isArray3, 0 : Int, %sampleCount5, 1 : Int, %isShadow5, 0 : Int, %format5, %221, %222), Vec(UInt, %224), %T8);
+
+	return_val(%operatorx5Bx5Dx5Fset)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1))
+{
+block %225(
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1),
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1)):
+	let  %226	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %227	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %228	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %229	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call specialize(%191, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180))(%srcTexture, %227, %228, %229)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %230	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %231	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %232	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call specialize(%191, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180))(%srcTexture, %230, %231, %232)
+	let  %233	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %234	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %235	: Vec(Bool, 3 : Int)	= cmpNE(%233, %234)
+	let  %236	: Bool	= call specialize(%197, Bool, 3 : Int, %200)(%235)
+	ifElse(%236, %237, %238, %238)
+
+block %237:
+	return_val(void_constant)
+
+block %238:
+	let  %239	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %240	: Vec(Bool, 3 : Int)	= cmpGE(%226, %239)
+	let  %241	: Bool	= call specialize(%197, Bool, 3 : Int, %200)(%240)
+	ifElse(%241, %242, %243, %243)
+
+block %242:
+	return_val(void_constant)
+
+block %243:
+	let  %244	: UInt	= call specialize(%207, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1)(%srcTexture, %226)
+	call specialize(%219, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%176, UInt, %180), %1)(%dstTexture, %226, %244)
+	return_val(void_constant)
+}
+###
+### POST IR VALIDATION:
+undefined
+varLayout(%1)
+let  %1	: Void	= parameterGroupTypeLayout(%2, %3, %4, %5)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= structTypeLayout
+let  %6	: Void	= EntryPointLayout(%7, %8)
+let  %8	: Void	= varLayout(%9)
+let  %7	: Void	= varLayout(%10, %11)
+let  %10	: Void	= parameterGroupTypeLayout(%2, %12, %13, %5)
+let  %12	: Void	= varLayout(%13)
+let  %13	: Void	= structTypeLayout(%14, %15, %16, %17)
+let  %17	: Void	= structFieldLayout(%18, %19)
+let  %19	: Void	= varLayout(%20, %21, %22)
+let  %21	: Void	= offset(8 : Int, 8 : Int)
+let  %16	: Void	= structFieldLayout(%23, %24)
+let  %24	: Void	= varLayout(%20, %11, %22)
+let  %15	: Void	= structFieldLayout(%25, %26)
+let  %26	: Void	= varLayout(%9, %27, %22)
+let  %22	: Void	= stage(6 : Int)
+let  %27	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %9	: Void	= typeLayout
+let  %14	: Void	= size(8 : Int, 16 : Int)
+let  %2	: Void	= varLayout(%20, %11)
+let  %11	: Void	= offset(8 : Int, 0 : Int)
+let  %20	: Void	= typeLayout(%5)
+let  %5	: Void	= size(8 : Int, 8 : Int)
+let  %28	: witness_table_t(%x5Fx5FITextureShape)	= lookupWitness(%29, %30)
+[export("_ST4core13ITexelElement7Element")]
+let  %31	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %32	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %33	: _	= interface_req_entry(%32, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %34	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %35	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %36	: _	= key
+let  %37	: _	= interface_req_entry(%36, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %38	: _	= key
+let  %39	: _	= interface_req_entry(%38, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %40	: _	= key
+let  %41	: _	= interface_req_entry(%40, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%37, %39, %41)
+let  %42	: _	= interface_req_entry(%35, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %53	: _	= key
+let  %54	: _	= interface_req_entry(%53, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%42, %44, %46, %48, %50, %52, %54, %56, %58)
+let  %59	: _	= interface_req_entry(%34, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%33, %59)
+let  %60	: _	= interface_req_entry(%31, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %61	: _	= key
+let  %62	: _	= interface_req_entry(%61, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %63	: _	= key
+let  %64	: _	= interface_req_entry(%63, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %65	: _	= key
+let  %66	: _	= interface_req_entry(%65, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%60, %62, %64, %66)
+generic %67	: Generic
+{
+block %68(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinArithmeticType)]
+		[nameHint("T")]
+		param %T	: type_t,
+		param %69	: witness_table_t(%x5Fx5FBuiltinArithmeticType)):
+	return_val(Func(%T, %T))
+}
+[export("_S4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticTypeR8_24xinitp1pi_GP0")]
+generic %70	: %67
+{
+block %71(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinArithmeticType)]
+		[nameHint("T")]
+		param %T1	: type_t,
+		param %72	: witness_table_t(%x5Fx5FBuiltinArithmeticType)):
+	[intrinsicOp(0 : Int)]
+	[nameHint("$init")]
+		func %x24init	: Func(%T1, %T1);
+
+	return_val(%x24init)
+}
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElement")]
+generic %73	: witness_table_t(%ITexelElement)
+{
+block %74(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinArithmeticType)]
+		[nameHint("T")]
+		param %T2	: type_t,
+		param %75	: witness_table_t(%x5Fx5FBuiltinArithmeticType)):
+	witness_table %76	: witness_table_t(%ITexelElement)(%T2);
+
+	return_val(%76)
+}
+[export("_SWu4core23__BuiltinArithmeticType")]
+[export("_SWu4core23__BuiltinArithmeticType")]
+witness_table %77	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(UInt);
+
+[export("_S4core21__ITextureShape1D2D3DI4core15__ITextureShapeR15_24xinheritance")]
+let  %30	: _	= key
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %78	: _	= key
+let  %79	: _	= interface_req_entry(%78, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %80	: _	= key
+let  %81	: _	= interface_req_entry(%80, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %82	: _	= key
+let  %83	: _	= interface_req_entry(%82, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%79, %81, %83)
+let  %84	: _	= interface_req_entry(%30, witness_table_t(%x5Fx5FITextureShape))
+[BuiltinDecoration]
+[export("_ST4core21__ITextureShape1D2D3D")]
+[nameHint("__ITextureShape1D2D3D")]
+let  %x5Fx5FITextureShape1D2D3D	: Type	= interface(%84)
+[export("_SW4core9__Shape3D4core21__ITextureShape1D2D3D")]
+[export("_SW4core9__Shape3D4core21__ITextureShape1D2D3D")]
+witness_table %29	: witness_table_t(%x5Fx5FITextureShape1D2D3D)(TextureShape3DType)
+{
+	witness_table_entry(%30,%85)
+
+}
+
+let  %25	: _	= key
+let  %23	: _	= key
+let  %18	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %85	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%78,3 : Int)
+
+	witness_table_entry(%80,3 : Int)
+
+}
+
+generic %86	: Generic
+{
+block %87(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T3	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount	: Int,
+		[nameHint("access")]
+		param %access	: Int,
+		[nameHint("isShadow")]
+		param %isShadow	: Int,
+		[nameHint("isCombined")]
+		param %isCombined	: Int,
+		[nameHint("format")]
+		param %format	: Int,
+		param %88	: witness_table_t(%ITexelElement)):
+	return_val(Func(Void, TextureType(%T3, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount, %access, %isShadow, %isCombined, %format, %88, %85), Out(UInt), Out(UInt), Out(UInt)))
+}
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uV")]
+generic %89	: %86
+{
+block %90(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T4	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount1	: Int,
+		[nameHint("access")]
+		param %access1	: Int,
+		[nameHint("isShadow")]
+		param %isShadow1	: Int,
+		[nameHint("isCombined")]
+		param %isCombined1	: Int,
+		[nameHint("format")]
+		param %format1	: Int,
+		param %91	: witness_table_t(%ITexelElement)):
+	[ForceInline]
+	[readNone]
+	[requireGLSLVersion(450 : Int)]
+	[requireGLSLVersion(450 : Int)]
+	[nameHint("GetDimensions")]
+		func %GetDimensions	: Func(Void, TextureType(%T4, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount1, %access1, %isShadow1, %isCombined1, %format1, %91, %85), Out(UInt), Out(UInt), Out(UInt))
+	{
+block %92(
+			[nameHint("this")]
+			param %this	: TextureType(%T4, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount1, %access1, %isShadow1, %isCombined1, %format1, %91, %85),
+			[nameHint("width")]
+			[output]
+			param %width	: Out(UInt),
+			[nameHint("height")]
+			[output]
+			param %height	: Out(UInt),
+			[nameHint("depth")]
+			[output]
+			param %depth	: Out(UInt)):
+		unconditionalBranch(%93)
+
+block %93:
+		GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+	return_val(%GetDimensions)
+}
+generic %94	: Generic
+{
+block %95(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T5	: type_t,
+		[nameHint("N")]
+		param %N	: Int,
+		param %96	: witness_table_t(%x5Fx5FBuiltinType)):
+	return_val(Func(Bool, Vec(%T5, %N)))
+}
+generic %97	: Generic
+{
+block %98(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T6	: type_t,
+		param %99	: witness_table_t(%x5Fx5FBuiltinType)):
+	return_val(Func(Bool, %T6))
+}
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0b")]
+generic %100	: %97
+{
+block %101(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T7	: type_t,
+		param %102	: witness_table_t(%x5Fx5FBuiltinType)):
+	[readNone]
+	[nameHint("any")]
+		func %any	: Func(Bool, %T7)
+	{
+block %103(
+			[nameHint("x")]
+			param %x	: %T7):
+		unconditionalBranch(%104)
+
+block %104:
+		GenericAsm("bool($0)")
+}
+	return_val(%any)
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0b")]
+generic %105	: %94
+{
+block %106(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T8	: type_t,
+		[nameHint("N")]
+		param %N1	: Int,
+		param %107	: witness_table_t(%x5Fx5FBuiltinType)):
+	[readNone]
+	[nameHint("any")]
+		func %any1	: Func(Bool, Vec(%T8, %N1))
+	{
+block %108(
+			[nameHint("x")]
+			param %x1	: Vec(%T8, %N1)):
+		let  %109	: Bool	= cmpEQ(%N1, 1 : Int)
+		ifElse(%109, %110, %111, %111)
+
+block %110:
+		let  %112	: %T8	= getElement(%x1, 0 : Int)
+		let  %113	: Bool	= call specialize(%100, %T8, %107)(%112)
+		return_val(%113)
+
+block %111:
+		unconditionalBranch(%114)
+
+block %114:
+		loop(%115, %116, %117, false, 0 : Int)
+
+block %115(
+			[nameHint("result")]
+			param %result	: Bool,
+			[nameHint("i")]
+			param %i	: Int):
+		let  %118	: Bool	= cmpLT(%i, %N1)
+		ifElse(%118, %119, %116, %119)
+
+block %119:
+		ifElse(%result, %120, %121, %122)
+
+block %120:
+		unconditionalBranch(%122, true)
+
+block %121:
+		let  %123	: %T8	= getElement(%x1, %i)
+		let  %124	: Bool	= call specialize(%100, %T8, %107)(%123)
+		unconditionalBranch(%122, %124)
+
+block %122(
+			param %125	: Bool):
+		unconditionalBranch(%117)
+
+block %117:
+		[nameHint("i")]
+		let  %i1	: Int	= add(%i, 1 : Int)
+		unconditionalBranch(%115, %125, %i1)
+
+block %116:
+		return_val(%result)
+}
+	return_val(%any1)
+}
+[export("_SWb4core13__BuiltinType")]
+[export("_SWb4core13__BuiltinType")]
+witness_table %126	: witness_table_t(%x5Fx5FBuiltinType)(Bool);
+
+generic %127	: Generic
+{
+block %128(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T9	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape	: type_t,
+		[nameHint("isArray")]
+		param %isArray	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount2	: Int,
+		[nameHint("isShadow")]
+		param %isShadow2	: Int,
+		[nameHint("isCombined")]
+		param %isCombined2	: Int,
+		[nameHint("format")]
+		param %format2	: Int,
+		param %129	: witness_table_t(%ITexelElement),
+		param %130	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %131	: Int	= lookupWitness(%130, %80)
+	let  %132	: Int	= add(%isArray, %131)
+	return_val(Func(%T9, TextureType(%T9, %Shape, %isArray, 0 : Int, %sampleCount2, 0 : Int, %isShadow2, %isCombined2, %format2, %129, %130), Vec(UInt, %132)))
+}
+generic %133	: Generic
+{
+block %134(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T10	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape1	: type_t,
+		[nameHint("isArray")]
+		param %isArray1	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount3	: Int,
+		[nameHint("isShadow")]
+		param %isShadow3	: Int,
+		[nameHint("isCombined")]
+		param %isCombined3	: Int,
+		[nameHint("format")]
+		param %format3	: Int,
+		param %135	: witness_table_t(%ITexelElement),
+		param %136	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %137	: Int	= lookupWitness(%136, %80)
+	let  %138	: Int	= add(1 : Int, %isArray1)
+	let  %139	: Int	= add(%138, %137)
+	return_val(Func(%T10, TextureType(%T10, %Shape1, %isArray1, 0 : Int, %sampleCount3, 0 : Int, %isShadow3, %isCombined3, %format3, %135, %136), Vec(Int, %139)))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0")]
+generic %140	: %133
+{
+block %141(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T11	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape2	: type_t,
+		[nameHint("isArray")]
+		param %isArray2	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount4	: Int,
+		[nameHint("isShadow")]
+		param %isShadow4	: Int,
+		[nameHint("isCombined")]
+		param %isCombined4	: Int,
+		[nameHint("format")]
+		param %format4	: Int,
+		param %142	: witness_table_t(%ITexelElement),
+		param %143	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %144	: Int	= lookupWitness(%143, %80)
+	let  %145	: Int	= lookupWitness(%143, %78)
+	let  %146	: Int	= add(1 : Int, %isArray2)
+	let  %147	: Int	= add(%146, %144)
+	[ForceInline]
+	[readNone]
+	[nameHint("Load")]
+		func %Load	: Func(%T11, TextureType(%T11, %Shape2, %isArray2, 0 : Int, %sampleCount4, 0 : Int, %isShadow4, %isCombined4, %format4, %142, %143), Vec(Int, %147))
+	{
+block %148(
+			[nameHint("this")]
+			param %this1	: TextureType(%T11, %Shape2, %isArray2, 0 : Int, %sampleCount4, 0 : Int, %isShadow4, %isCombined4, %format4, %142, %143),
+			[nameHint("location")]
+			param %location	: Vec(Int, %147)):
+		unconditionalBranch(%149)
+
+block %149:
+		let  %150	: Bool	= cmpNE(%isArray2, 0 : Int)
+		ifElse(%150, %151, %152, %153)
+
+block %151:
+		let  %154	: Bool	= cmpEQ(%145, 2 : Int)
+		ifElse(%154, %155, %156, %157)
+
+block %155:
+		unconditionalBranch(%157, true)
+
+block %156:
+		let  %158	: Bool	= cmpEQ(%145, 3 : Int)
+		unconditionalBranch(%157, %158)
+
+block %157(
+			param %159	: Bool):
+		StaticAssert(%159, "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.")
+		let  %160	: Bool	= cmpEQ(%145, 2 : Int)
+		ifElse(%160, %161, %162, %163)
+
+block %161:
+		GenericAsm("tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %162:
+		GenericAsm("<invalid intrinsic>")
+
+block %163:
+		unreachable
+
+block %152:
+		switch(%145, %164, %165, 2 : Int, %166, 3 : Int, %167, 4 : Int, %165)
+
+block %166:
+		GenericAsm("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)")
+
+block %167:
+		GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %165:
+		GenericAsm("<invalid intrinsic>")
+
+block %164:
+		unreachable
+
+block %153:
+		unreachable
+}
+	return_val(%Load)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0")]
+generic %168	: %127
+{
+block %169(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T12	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape3	: type_t,
+		[nameHint("isArray")]
+		param %isArray3	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount5	: Int,
+		[nameHint("isShadow")]
+		param %isShadow5	: Int,
+		[nameHint("isCombined")]
+		param %isCombined5	: Int,
+		[nameHint("format")]
+		param %format5	: Int,
+		param %170	: witness_table_t(%ITexelElement),
+		param %171	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %172	: Int	= lookupWitness(%171, %80)
+	let  %173	: Int	= add(%isArray3, %172)
+	[ForceInline]
+	[readNone]
+	[nameHint("operator[].get")]
+		func %operatorx5Bx5Dx5Fget	: Func(%T12, TextureType(%T12, %Shape3, %isArray3, 0 : Int, %sampleCount5, 0 : Int, %isShadow5, %isCombined5, %format5, %170, %171), Vec(UInt, %173))
+	{
+block %174(
+			[nameHint("this")]
+			param %this2	: TextureType(%T12, %Shape3, %isArray3, 0 : Int, %sampleCount5, 0 : Int, %isShadow5, %isCombined5, %format5, %170, %171),
+			[nameHint("location")]
+			param %location1	: Vec(UInt, %173)):
+		unconditionalBranch(%175)
+
+block %175:
+		let  %176	: Int	= add(1 : Int, %isArray3)
+		let  %177	: Int	= add(%176, %172)
+		let  %178	: Int	= add(1 : Int, %isArray3)
+		let  %179	: Int	= add(%178, %172)
+		let  %180	: Int	= add(1 : Int, %isArray3)
+		let  %181	: Int	= add(%180, %172)
+		let  %182	: Vec(UInt, %181)	= makeVector(%location1, 0 : UInt)
+		let  %183	: Vec(Int, %179)	= intCast(%182)
+		let  %184	: %T12	= call specialize(%140, %T12, %Shape3, %isArray3, %sampleCount5, %isShadow5, %isCombined5, %format5, %170, %171)(%this2, %183)
+		return_val(%184)
+}
+	return_val(%operatorx5Bx5Dx5Fget)
+}
+generic %185	: Generic
+{
+block %186(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T13	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape4	: type_t,
+		[nameHint("isArray")]
+		param %isArray4	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount6	: Int,
+		[nameHint("isShadow")]
+		param %isShadow6	: Int,
+		[nameHint("format")]
+		param %format6	: Int,
+		param %187	: witness_table_t(%ITexelElement),
+		param %188	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %189	: Int	= lookupWitness(%188, %80)
+	let  %190	: Int	= add(%isArray4, %189)
+	return_val(Func(Void, TextureType(%T13, %Shape4, %isArray4, 0 : Int, %sampleCount6, 1 : Int, %isShadow6, 0 : Int, %format6, %187, %188), Vec(UInt, %190), %T13))
+}
+generic %191	: Generic
+{
+block %192(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T14	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape5	: type_t,
+		[nameHint("isArray")]
+		param %isArray5	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount7	: Int,
+		[nameHint("isShadow")]
+		param %isShadow7	: Int,
+		[nameHint("format")]
+		param %format7	: Int,
+		param %193	: witness_table_t(%ITexelElement),
+		param %194	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %195	: Int	= lookupWitness(%194, %80)
+	let  %196	: Int	= add(%isArray5, %195)
+	return_val(Func(Void, TextureType(%T14, %Shape5, %isArray5, 0 : Int, %sampleCount7, 1 : Int, %isShadow7, 0 : Int, %format7, %193, %194), Vec(UInt, %196), %T14))
+}
+generic %197	: Generic
+{
+block %198(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T15	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape6	: type_t,
+		[nameHint("isArray")]
+		param %isArray6	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount8	: Int,
+		[nameHint("isShadow")]
+		param %isShadow8	: Int,
+		[nameHint("format")]
+		param %format8	: Int,
+		param %199	: witness_table_t(%ITexelElement),
+		param %200	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %201	: Int	= lookupWitness(%200, %80)
+	let  %202	: Int	= add(%isArray6, %201)
+	return_val(Func(Void, TextureType(%T15, %Shape6, %isArray6, 0 : Int, %sampleCount8, 1 : Int, %isShadow8, 0 : Int, %format8, %199, %200), Vec(Int, %202), %T15))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement16__glslImageStorep2pi_vKX0211K7isArray111KL10dimensions1ii_GP0V")]
+generic %203	: %197
+{
+block %204(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T16	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape7	: type_t,
+		[nameHint("isArray")]
+		param %isArray7	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount9	: Int,
+		[nameHint("isShadow")]
+		param %isShadow9	: Int,
+		[nameHint("format")]
+		param %format9	: Int,
+		param %205	: witness_table_t(%ITexelElement),
+		param %206	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %207	: Int	= lookupWitness(%206, %80)
+	let  %208	: Int	= add(%isArray7, %207)
+	[nameHint("__glslImageStore")]
+		func %x5Fx5FglslImageStore	: Func(Void, TextureType(%T16, %Shape7, %isArray7, 0 : Int, %sampleCount9, 1 : Int, %isShadow9, 0 : Int, %format9, %205, %206), Vec(Int, %208), %T16)
+	{
+block %209(
+			[nameHint("this")]
+			param %this3	: TextureType(%T16, %Shape7, %isArray7, 0 : Int, %sampleCount9, 1 : Int, %isShadow9, 0 : Int, %format9, %205, %206),
+			[nameHint("location")]
+			param %location2	: Vec(Int, %208),
+			[nameHint("value")]
+			param %value	: %T16):
+		GenericAsm("imageStore($0, $1, $V2)")
+}
+	return_val(%x5Fx5FglslImageStore)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0V")]
+generic %210	: %191
+{
+block %211(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T17	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape8	: type_t,
+		[nameHint("isArray")]
+		param %isArray8	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount10	: Int,
+		[nameHint("isShadow")]
+		param %isShadow10	: Int,
+		[nameHint("format")]
+		param %format10	: Int,
+		param %212	: witness_table_t(%ITexelElement),
+		param %213	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %214	: Int	= lookupWitness(%213, %80)
+	let  %215	: Int	= lookupWitness(%213, %78)
+	let  %216	: Int	= add(%isArray8, %214)
+	[ForceInline]
+	[nameHint("Store")]
+		func %Store	: Func(Void, TextureType(%T17, %Shape8, %isArray8, 0 : Int, %sampleCount10, 1 : Int, %isShadow10, 0 : Int, %format10, %212, %213), Vec(UInt, %216), %T17)
+	{
+block %217(
+			[nameHint("this")]
+			param %this4	: TextureType(%T17, %Shape8, %isArray8, 0 : Int, %sampleCount10, 1 : Int, %isShadow10, 0 : Int, %format10, %212, %213),
+			[nameHint("location")]
+			param %location3	: Vec(UInt, %216),
+			[nameHint("newValue")]
+			param %newValue	: %T17):
+		unconditionalBranch(%218)
+
+block %218:
+		let  %219	: Bool	= cmpNE(%isArray8, 0 : Int)
+		ifElse(%219, %220, %221, %222)
+
+block %220:
+		switch(%215, %223, %224, 1 : Int, %225, 2 : Int, %226, 3 : Int, %227)
+
+block %225:
+		GenericAsm("surf1DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %226:
+		GenericAsm("surf2DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %227:
+		GenericAsm("surf3DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %224:
+		GenericAsm("<invalid intrinsic>")
+
+block %223:
+		unreachable
+
+block %221:
+		switch(%215, %228, %229, 1 : Int, %230, 2 : Int, %231, 3 : Int, %232)
+
+block %230:
+		GenericAsm("surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %231:
+		GenericAsm("surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %232:
+		GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %229:
+		GenericAsm("<invalid intrinsic>")
+
+block %228:
+		unreachable
+
+block %222:
+		unreachable
+}
+	return_val(%Store)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0V")]
+generic %233	: %185
+{
+block %234(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T18	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape9	: type_t,
+		[nameHint("isArray")]
+		param %isArray9	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount11	: Int,
+		[nameHint("isShadow")]
+		param %isShadow11	: Int,
+		[nameHint("format")]
+		param %format11	: Int,
+		param %235	: witness_table_t(%ITexelElement),
+		param %236	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %237	: Int	= lookupWitness(%236, %80)
+	let  %238	: Int	= add(%isArray9, %237)
+	[ForceInline]
+	[nameHint("operator[].set")]
+		func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(%T18, %Shape9, %isArray9, 0 : Int, %sampleCount11, 1 : Int, %isShadow11, 0 : Int, %format11, %235, %236), Vec(UInt, %238), %T18)
+	{
+block %239(
+			[nameHint("this")]
+			param %this5	: TextureType(%T18, %Shape9, %isArray9, 0 : Int, %sampleCount11, 1 : Int, %isShadow11, 0 : Int, %format11, %235, %236),
+			[nameHint("location")]
+			param %location4	: Vec(UInt, %238),
+			[nameHint("newValue")]
+			param %newValue1	: %T18):
+		let  %240	: Int	= add(%isArray9, %237)
+		call specialize(%210, %T18, %Shape9, %isArray9, %sampleCount11, %isShadow11, %format11, %235, %236)(%this5, %location4, %newValue1)
+		return_val(void_constant)
+}
+	return_val(%operatorx5Bx5Dx5Fset)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%6)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28))
+{
+block %241(
+		[layout(%26)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%24)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28),
+		[layout(%19)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28)):
+	let  %242	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %243	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %244	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %245	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call specialize(%89, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77))(%srcTexture, %243, %244, %245)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %246	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %247	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %248	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call specialize(%89, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77))(%srcTexture, %246, %247, %248)
+	let  %249	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %250	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %251	: Vec(Bool, 3 : Int)	= cmpNE(%249, %250)
+	let  %252	: Bool	= call specialize(%105, Bool, 3 : Int, %126)(%251)
+	ifElse(%252, %253, %254, %254)
+
+block %253:
+	return_val(void_constant)
+
+block %254:
+	let  %255	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %256	: Vec(Bool, 3 : Int)	= cmpGE(%242, %255)
+	let  %257	: Bool	= call specialize(%105, Bool, 3 : Int, %126)(%256)
+	ifElse(%257, %258, %259, %259)
+
+block %258:
+	return_val(void_constant)
+
+block %259:
+	let  %260	: UInt	= call specialize(%168, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28)(%srcTexture, %242)
+	call specialize(%233, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%73, UInt, %77), %28)(%dstTexture, %242, %260)
+	return_val(void_constant)
+}
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElement")]
+generic %61	: witness_table_t(%ITexelElement)
+{
+block %62(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinArithmeticType)]
+		[nameHint("T")]
+		param %T	: type_t,
+		param %63	: witness_table_t(%x5Fx5FBuiltinArithmeticType)):
+	witness_table %64	: witness_table_t(%ITexelElement)(%T);
+
+	return_val(%64)
+}
+[export("_SWu4core23__BuiltinArithmeticType")]
+[export("_SWu4core23__BuiltinArithmeticType")]
+witness_table %65	: witness_table_t(%x5Fx5FBuiltinArithmeticType)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %68	: _	= key
+let  %69	: _	= interface_req_entry(%68, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %70	: _	= key
+let  %71	: _	= interface_req_entry(%70, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%67, %69, %71)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %72	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%66,3 : Int)
+
+	witness_table_entry(%68,3 : Int)
+
+}
+
+generic %73	: Generic
+{
+block %74(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T1	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount	: Int,
+		[nameHint("access")]
+		param %access	: Int,
+		[nameHint("isShadow")]
+		param %isShadow	: Int,
+		[nameHint("isCombined")]
+		param %isCombined	: Int,
+		[nameHint("format")]
+		param %format	: Int,
+		param %75	: witness_table_t(%ITexelElement)):
+	return_val(Func(Void, TextureType(%T1, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount, %access, %isShadow, %isCombined, %format, %75, %72), Out(UInt), Out(UInt), Out(UInt)))
+}
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uV")]
+generic %76	: %73
+{
+block %77(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T2	: type_t,
+		[nameHint("sampleCount")]
+		param %sampleCount1	: Int,
+		[nameHint("access")]
+		param %access1	: Int,
+		[nameHint("isShadow")]
+		param %isShadow1	: Int,
+		[nameHint("isCombined")]
+		param %isCombined1	: Int,
+		[nameHint("format")]
+		param %format1	: Int,
+		param %78	: witness_table_t(%ITexelElement)):
+	[ForceInline]
+	[readNone]
+	[requireGLSLVersion(450 : Int)]
+	[requireGLSLVersion(450 : Int)]
+	[nameHint("GetDimensions")]
+		func %GetDimensions	: Func(Void, TextureType(%T2, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount1, %access1, %isShadow1, %isCombined1, %format1, %78, %72), Out(UInt), Out(UInt), Out(UInt))
+	{
+block %79(
+			[nameHint("this")]
+			param %this	: TextureType(%T2, TextureShape3DType, 0 : Int, 0 : Int, %sampleCount1, %access1, %isShadow1, %isCombined1, %format1, %78, %72),
+			[nameHint("width")]
+			[output]
+			param %width	: Out(UInt),
+			[nameHint("height")]
+			[output]
+			param %height	: Out(UInt),
+			[nameHint("depth")]
+			[output]
+			param %depth	: Out(UInt)):
+		GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+	return_val(%GetDimensions)
+}
+generic %80	: Generic
+{
+block %81(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T3	: type_t,
+		[nameHint("N")]
+		param %N	: Int,
+		param %82	: witness_table_t(%x5Fx5FBuiltinType)):
+	return_val(Func(Bool, Vec(%T3, %N)))
+}
+generic %83	: Generic
+{
+block %84(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T4	: type_t,
+		param %85	: witness_table_t(%x5Fx5FBuiltinType)):
+	return_val(Func(Bool, %T4))
+}
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0b")]
+generic %86	: %83
+{
+block %87(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T5	: type_t,
+		param %88	: witness_table_t(%x5Fx5FBuiltinType)):
+	[readNone]
+	[nameHint("any")]
+		func %any	: Func(Bool, %T5)
+	{
+block %89(
+			[nameHint("x")]
+			param %x	: %T5):
+		GenericAsm("bool($0)")
+}
+	return_val(%any)
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0b")]
+generic %90	: %80
+{
+block %91(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinType)]
+		[nameHint("T")]
+		param %T6	: type_t,
+		[nameHint("N")]
+		param %N1	: Int,
+		param %92	: witness_table_t(%x5Fx5FBuiltinType)):
+	[readNone]
+	[nameHint("any")]
+		func %any1	: Func(Bool, Vec(%T6, %N1))
+	{
+block %93(
+			[nameHint("x")]
+			param %x1	: Vec(%T6, %N1)):
+		let  %94	: Bool	= cmpEQ(%N1, 1 : Int)
+		ifElse(%94, %95, %96, %96)
+
+block %95:
+		let  %97	: %T6	= getElement(%x1, 0 : Int)
+		let  %98	: Bool	= call specialize(%86, %T6, %92)(%97)
+		return_val(%98)
+
+block %96:
+		unconditionalBranch(%99)
+
+block %99:
+		loop(%100, %101, %102, false, 0 : Int)
+
+block %100(
+			[nameHint("result")]
+			param %result	: Bool,
+			[nameHint("i")]
+			param %i	: Int):
+		let  %103	: Bool	= cmpLT(%i, %N1)
+		ifElse(%103, %104, %101, %104)
+
+block %104:
+		ifElse(%result, %105, %106, %107)
+
+block %105:
+		unconditionalBranch(%107, true)
+
+block %106:
+		let  %108	: %T6	= getElement(%x1, %i)
+		let  %109	: Bool	= call specialize(%86, %T6, %92)(%108)
+		unconditionalBranch(%107, %109)
+
+block %107(
+			param %110	: Bool):
+		unconditionalBranch(%102)
+
+block %102:
+		[nameHint("i")]
+		let  %i1	: Int	= add(%i, 1 : Int)
+		unconditionalBranch(%100, %110, %i1)
+
+block %101:
+		return_val(%result)
+}
+	return_val(%any1)
+}
+[export("_SWb4core13__BuiltinType")]
+[export("_SWb4core13__BuiltinType")]
+witness_table %111	: witness_table_t(%x5Fx5FBuiltinType)(Bool);
+
+generic %112	: Generic
+{
+block %113(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T7	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape	: type_t,
+		[nameHint("isArray")]
+		param %isArray	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount2	: Int,
+		[nameHint("isShadow")]
+		param %isShadow2	: Int,
+		[nameHint("isCombined")]
+		param %isCombined2	: Int,
+		[nameHint("format")]
+		param %format2	: Int,
+		param %114	: witness_table_t(%ITexelElement),
+		param %115	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %116	: Int	= lookupWitness(%115, %68)
+	let  %117	: Int	= add(%isArray, %116)
+	return_val(Func(%T7, TextureType(%T7, %Shape, %isArray, 0 : Int, %sampleCount2, 0 : Int, %isShadow2, %isCombined2, %format2, %114, %115), Vec(UInt, %117)))
+}
+generic %118	: Generic
+{
+block %119(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T8	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape1	: type_t,
+		[nameHint("isArray")]
+		param %isArray1	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount3	: Int,
+		[nameHint("isShadow")]
+		param %isShadow3	: Int,
+		[nameHint("isCombined")]
+		param %isCombined3	: Int,
+		[nameHint("format")]
+		param %format3	: Int,
+		param %120	: witness_table_t(%ITexelElement),
+		param %121	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %122	: Int	= lookupWitness(%121, %68)
+	let  %123	: Int	= add(1 : Int, %isArray1)
+	let  %124	: Int	= add(%123, %122)
+	return_val(Func(%T8, TextureType(%T8, %Shape1, %isArray1, 0 : Int, %sampleCount3, 0 : Int, %isShadow3, %isCombined3, %format3, %120, %121), Vec(Int, %124)))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0")]
+generic %125	: %118
+{
+block %126(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T9	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape2	: type_t,
+		[nameHint("isArray")]
+		param %isArray2	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount4	: Int,
+		[nameHint("isShadow")]
+		param %isShadow4	: Int,
+		[nameHint("isCombined")]
+		param %isCombined4	: Int,
+		[nameHint("format")]
+		param %format4	: Int,
+		param %127	: witness_table_t(%ITexelElement),
+		param %128	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %129	: Int	= lookupWitness(%128, %68)
+	let  %130	: Int	= lookupWitness(%128, %66)
+	let  %131	: Int	= add(1 : Int, %isArray2)
+	let  %132	: Int	= add(%131, %129)
+	[ForceInline]
+	[readNone]
+	[nameHint("Load")]
+		func %Load	: Func(%T9, TextureType(%T9, %Shape2, %isArray2, 0 : Int, %sampleCount4, 0 : Int, %isShadow4, %isCombined4, %format4, %127, %128), Vec(Int, %132))
+	{
+block %133(
+			[nameHint("this")]
+			param %this1	: TextureType(%T9, %Shape2, %isArray2, 0 : Int, %sampleCount4, 0 : Int, %isShadow4, %isCombined4, %format4, %127, %128),
+			[nameHint("location")]
+			param %location	: Vec(Int, %132)):
+		let  %134	: Bool	= cmpNE(%isArray2, 0 : Int)
+		ifElse(%134, %135, %136, %137)
+
+block %135:
+		let  %138	: Bool	= cmpEQ(%130, 2 : Int)
+		ifElse(%138, %139, %140, %141)
+
+block %139:
+		unconditionalBranch(%141, true)
+
+block %140:
+		let  %142	: Bool	= cmpEQ(%130, 3 : Int)
+		unconditionalBranch(%141, %142)
+
+block %141(
+			param %143	: Bool):
+		StaticAssert(%143, "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.")
+		let  %144	: Bool	= cmpEQ(%130, 2 : Int)
+		ifElse(%144, %145, %146, %147)
+
+block %145:
+		GenericAsm("tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %146:
+		GenericAsm("<invalid intrinsic>")
+
+block %147:
+		unreachable
+
+block %136:
+		switch(%130, %148, %149, 2 : Int, %150, 3 : Int, %151, 4 : Int, %149)
+
+block %150:
+		GenericAsm("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)")
+
+block %151:
+		GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %149:
+		GenericAsm("<invalid intrinsic>")
+
+block %148:
+		unreachable
+
+block %137:
+		unreachable
+}
+	return_val(%Load)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0")]
+generic %152	: %112
+{
+block %153(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T10	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape3	: type_t,
+		[nameHint("isArray")]
+		param %isArray3	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount5	: Int,
+		[nameHint("isShadow")]
+		param %isShadow5	: Int,
+		[nameHint("isCombined")]
+		param %isCombined5	: Int,
+		[nameHint("format")]
+		param %format5	: Int,
+		param %154	: witness_table_t(%ITexelElement),
+		param %155	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %156	: Int	= lookupWitness(%155, %68)
+	let  %157	: Int	= add(%isArray3, %156)
+	[ForceInline]
+	[readNone]
+	[nameHint("operator[].get")]
+		func %operatorx5Bx5Dx5Fget	: Func(%T10, TextureType(%T10, %Shape3, %isArray3, 0 : Int, %sampleCount5, 0 : Int, %isShadow5, %isCombined5, %format5, %154, %155), Vec(UInt, %157))
+	{
+block %158(
+			[nameHint("this")]
+			param %this2	: TextureType(%T10, %Shape3, %isArray3, 0 : Int, %sampleCount5, 0 : Int, %isShadow5, %isCombined5, %format5, %154, %155),
+			[nameHint("location")]
+			param %location1	: Vec(UInt, %157)):
+		let  %159	: Int	= add(1 : Int, %isArray3)
+		let  %160	: Int	= add(%159, %156)
+		let  %161	: Int	= add(1 : Int, %isArray3)
+		let  %162	: Int	= add(%161, %156)
+		let  %163	: Int	= add(1 : Int, %isArray3)
+		let  %164	: Int	= add(%163, %156)
+		let  %165	: Vec(UInt, %164)	= makeVector(%location1, 0 : UInt)
+		let  %166	: Vec(Int, %162)	= intCast(%165)
+		let  %167	: %T10	= call specialize(%125, %T10, %Shape3, %isArray3, %sampleCount5, %isShadow5, %isCombined5, %format5, %154, %155)(%this2, %166)
+		return_val(%167)
+}
+	return_val(%operatorx5Bx5Dx5Fget)
+}
+generic %168	: Generic
+{
+block %169(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T11	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape4	: type_t,
+		[nameHint("isArray")]
+		param %isArray4	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount6	: Int,
+		[nameHint("isShadow")]
+		param %isShadow6	: Int,
+		[nameHint("format")]
+		param %format6	: Int,
+		param %170	: witness_table_t(%ITexelElement),
+		param %171	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %172	: Int	= lookupWitness(%171, %68)
+	let  %173	: Int	= add(%isArray4, %172)
+	return_val(Func(Void, TextureType(%T11, %Shape4, %isArray4, 0 : Int, %sampleCount6, 1 : Int, %isShadow6, 0 : Int, %format6, %170, %171), Vec(UInt, %173), %T11))
+}
+generic %174	: Generic
+{
+block %175(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T12	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape5	: type_t,
+		[nameHint("isArray")]
+		param %isArray5	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount7	: Int,
+		[nameHint("isShadow")]
+		param %isShadow7	: Int,
+		[nameHint("format")]
+		param %format7	: Int,
+		param %176	: witness_table_t(%ITexelElement),
+		param %177	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %178	: Int	= lookupWitness(%177, %68)
+	let  %179	: Int	= add(%isArray5, %178)
+	return_val(Func(Void, TextureType(%T12, %Shape5, %isArray5, 0 : Int, %sampleCount7, 1 : Int, %isShadow7, 0 : Int, %format7, %176, %177), Vec(UInt, %179), %T12))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0V")]
+generic %180	: %174
+{
+block %181(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T13	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape6	: type_t,
+		[nameHint("isArray")]
+		param %isArray6	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount8	: Int,
+		[nameHint("isShadow")]
+		param %isShadow8	: Int,
+		[nameHint("format")]
+		param %format8	: Int,
+		param %182	: witness_table_t(%ITexelElement),
+		param %183	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %184	: Int	= lookupWitness(%183, %68)
+	let  %185	: Int	= lookupWitness(%183, %66)
+	let  %186	: Int	= add(%isArray6, %184)
+	[ForceInline]
+	[nameHint("Store")]
+		func %Store	: Func(Void, TextureType(%T13, %Shape6, %isArray6, 0 : Int, %sampleCount8, 1 : Int, %isShadow8, 0 : Int, %format8, %182, %183), Vec(UInt, %186), %T13)
+	{
+block %187(
+			[nameHint("this")]
+			param %this3	: TextureType(%T13, %Shape6, %isArray6, 0 : Int, %sampleCount8, 1 : Int, %isShadow8, 0 : Int, %format8, %182, %183),
+			[nameHint("location")]
+			param %location2	: Vec(UInt, %186),
+			[nameHint("newValue")]
+			param %newValue	: %T13):
+		let  %188	: Bool	= cmpNE(%isArray6, 0 : Int)
+		ifElse(%188, %189, %190, %191)
+
+block %189:
+		switch(%185, %192, %193, 1 : Int, %194, 2 : Int, %195, 3 : Int, %196)
+
+block %194:
+		GenericAsm("surf1DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %195:
+		GenericAsm("surf2DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %196:
+		GenericAsm("surf3DLayeredwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %193:
+		GenericAsm("<invalid intrinsic>")
+
+block %192:
+		unreachable
+
+block %190:
+		switch(%185, %197, %198, 1 : Int, %199, 2 : Int, %200, 3 : Int, %201)
+
+block %199:
+		GenericAsm("surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %200:
+		GenericAsm("surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %201:
+		GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %198:
+		GenericAsm("<invalid intrinsic>")
+
+block %197:
+		unreachable
+
+block %191:
+		unreachable
+}
+	return_val(%Store)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0V")]
+generic %202	: %168
+{
+block %203(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T14	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape7	: type_t,
+		[nameHint("isArray")]
+		param %isArray7	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount9	: Int,
+		[nameHint("isShadow")]
+		param %isShadow9	: Int,
+		[nameHint("format")]
+		param %format9	: Int,
+		param %204	: witness_table_t(%ITexelElement),
+		param %205	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %206	: Int	= lookupWitness(%205, %68)
+	let  %207	: Int	= add(%isArray7, %206)
+	[ForceInline]
+	[nameHint("operator[].set")]
+		func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(%T14, %Shape7, %isArray7, 0 : Int, %sampleCount9, 1 : Int, %isShadow9, 0 : Int, %format9, %204, %205), Vec(UInt, %207), %T14)
+	{
+block %208(
+			[nameHint("this")]
+			param %this4	: TextureType(%T14, %Shape7, %isArray7, 0 : Int, %sampleCount9, 1 : Int, %isShadow9, 0 : Int, %format9, %204, %205),
+			[nameHint("location")]
+			param %location3	: Vec(UInt, %207),
+			[nameHint("newValue")]
+			param %newValue1	: %T14):
+		let  %209	: Int	= add(%isArray7, %206)
+		call specialize(%180, %T14, %Shape7, %isArray7, %sampleCount9, %isShadow9, %format9, %204, %205)(%this4, %location3, %newValue1)
+		return_val(void_constant)
+}
+	return_val(%operatorx5Bx5Dx5Fset)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72))
+{
+block %210(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72)):
+	let  %211	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %212	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %213	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %214	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call specialize(%76, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65))(%srcTexture, %212, %213, %214)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %215	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %216	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %217	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call specialize(%76, UInt, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65))(%srcTexture, %215, %216, %217)
+	let  %218	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %219	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %220	: Vec(Bool, 3 : Int)	= cmpNE(%218, %219)
+	let  %221	: Bool	= call specialize(%90, Bool, 3 : Int, %111)(%220)
+	ifElse(%221, %222, %223, %223)
+
+block %222:
+	return_val(void_constant)
+
+block %223:
+	let  %224	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %225	: Vec(Bool, 3 : Int)	= cmpGE(%211, %224)
+	let  %226	: Bool	= call specialize(%90, Bool, 3 : Int, %111)(%225)
+	ifElse(%226, %227, %228, %228)
+
+block %227:
+	return_val(void_constant)
+
+block %228:
+	let  %229	: UInt	= call specialize(%152, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72)(%srcTexture, %211)
+	call specialize(%202, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, specialize(%61, UInt, %65), %72)(%dstTexture, %211, %229)
+	return_val(void_constant)
+}
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+generic %83	: Generic
+{
+block %84(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape	: type_t,
+		[nameHint("isArray")]
+		param %isArray	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount	: Int,
+		[nameHint("isShadow")]
+		param %isShadow	: Int,
+		[nameHint("isCombined")]
+		param %isCombined	: Int,
+		[nameHint("format")]
+		param %format	: Int,
+		param %85	: witness_table_t(%ITexelElement),
+		param %86	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %87	: Int	= lookupWitness(%86, %64)
+	let  %88	: Int	= add(1 : Int, %isArray)
+	let  %89	: Int	= add(%88, %87)
+	return_val(Func(%T, TextureType(%T, %Shape, %isArray, 0 : Int, %sampleCount, 0 : Int, %isShadow, %isCombined, %format, %85, %86), Vec(Int, %89)))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0")]
+generic %90	: %83
+{
+block %91(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T1	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape1	: type_t,
+		[nameHint("isArray")]
+		param %isArray1	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount1	: Int,
+		[nameHint("isShadow")]
+		param %isShadow1	: Int,
+		[nameHint("isCombined")]
+		param %isCombined1	: Int,
+		[nameHint("format")]
+		param %format1	: Int,
+		param %92	: witness_table_t(%ITexelElement),
+		param %93	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %94	: Int	= lookupWitness(%93, %64)
+	let  %95	: Int	= lookupWitness(%93, %62)
+	let  %96	: Int	= add(1 : Int, %isArray1)
+	let  %97	: Int	= add(%96, %94)
+	[ForceInline]
+	[readNone]
+	[nameHint("Load")]
+		func %Load	: Func(%T1, TextureType(%T1, %Shape1, %isArray1, 0 : Int, %sampleCount1, 0 : Int, %isShadow1, %isCombined1, %format1, %92, %93), Vec(Int, %97))
+	{
+block %98(
+			[nameHint("this")]
+			param %this1	: TextureType(%T1, %Shape1, %isArray1, 0 : Int, %sampleCount1, 0 : Int, %isShadow1, %isCombined1, %format1, %92, %93),
+			[nameHint("location")]
+			param %location	: Vec(Int, %97)):
+		let  %99	: Bool	= cmpNE(%isArray1, 0 : Int)
+		ifElse(%99, %100, %101, %102)
+
+block %100:
+		let  %103	: Bool	= cmpEQ(%95, 2 : Int)
+		ifElse(%103, %104, %105, %106)
+
+block %104:
+		unconditionalBranch(%106, true)
+
+block %105:
+		let  %107	: Bool	= cmpEQ(%95, 3 : Int)
+		unconditionalBranch(%106, %107)
+
+block %106(
+			param %108	: Bool):
+		StaticAssert(%108, "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.")
+		let  %109	: Bool	= cmpEQ(%95, 2 : Int)
+		ifElse(%109, %110, %111, %112)
+
+block %110:
+		GenericAsm("tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %111:
+		GenericAsm("<invalid intrinsic>")
+
+block %112:
+		unreachable
+
+block %101:
+		switch(%95, %113, %114, 2 : Int, %115, 3 : Int, %116, 4 : Int, %114)
+
+block %115:
+		GenericAsm("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)")
+
+block %116:
+		GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %114:
+		GenericAsm("<invalid intrinsic>")
+
+block %113:
+		unreachable
+
+block %102:
+		unreachable
+}
+	return_val(%Load)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %117(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %118	: Int	= add(1 : Int, 3 : Int)
+	let  %119	: Vec(UInt, %118)	= makeVector(%location1, 0 : UInt)
+	let  %120	: Vec(Int, %118)	= intCast(%119)
+	let  %121	: UInt	= call specialize(%90, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)(%this2, %120)
+	return_val(%121)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %122(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	switch(3 : Int, %123, %124, 1 : Int, %125, 2 : Int, %126, 3 : Int, %127)
+
+block %125:
+	GenericAsm("surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %126:
+	GenericAsm("surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %127:
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+
+block %124:
+	GenericAsm("<invalid intrinsic>")
+
+block %123:
+	unreachable
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %128(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %129(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %130	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %131	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %132	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %133	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %131, %132, %133)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %134	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %135	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %136	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %134, %135, %136)
+	let  %137	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %138	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %139	: Vec(Bool, 3 : Int)	= cmpNE(%137, %138)
+	let  %140	: Bool	= call %any1(%139)
+	ifElse(%140, %141, %142, %142)
+
+block %141:
+	return_val(void_constant)
+
+block %142:
+	let  %143	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %144	: Vec(Bool, 3 : Int)	= cmpGE(%130, %143)
+	let  %145	: Bool	= call %any1(%144)
+	ifElse(%145, %146, %147, %147)
+
+block %146:
+	return_val(void_constant)
+
+block %147:
+	let  %148	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %130)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %130, %148)
+	return_val(void_constant)
+}
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+generic %83	: Generic
+{
+block %84(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape	: type_t,
+		[nameHint("isArray")]
+		param %isArray	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount	: Int,
+		[nameHint("isShadow")]
+		param %isShadow	: Int,
+		[nameHint("isCombined")]
+		param %isCombined	: Int,
+		[nameHint("format")]
+		param %format	: Int,
+		param %85	: witness_table_t(%ITexelElement),
+		param %86	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %87	: Int	= lookupWitness(%86, %64)
+	let  %88	: Int	= add(1 : Int, %isArray)
+	let  %89	: Int	= add(%88, %87)
+	return_val(Func(%T, TextureType(%T, %Shape, %isArray, 0 : Int, %sampleCount, 0 : Int, %isShadow, %isCombined, %format, %85, %86), Vec(Int, %89)))
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0")]
+generic %90	: %83
+{
+block %91(
+		[TypeConstraintDecoration(%ITexelElement)]
+		[nameHint("T")]
+		param %T1	: type_t,
+		[TypeConstraintDecoration(%x5Fx5FITextureShape)]
+		[nameHint("Shape")]
+		param %Shape1	: type_t,
+		[nameHint("isArray")]
+		param %isArray1	: Int,
+		[nameHint("sampleCount")]
+		param %sampleCount1	: Int,
+		[nameHint("isShadow")]
+		param %isShadow1	: Int,
+		[nameHint("isCombined")]
+		param %isCombined1	: Int,
+		[nameHint("format")]
+		param %format1	: Int,
+		param %92	: witness_table_t(%ITexelElement),
+		param %93	: witness_table_t(%x5Fx5FITextureShape)):
+	let  %94	: Int	= lookupWitness(%93, %64)
+	let  %95	: Int	= lookupWitness(%93, %62)
+	let  %96	: Int	= add(1 : Int, %isArray1)
+	let  %97	: Int	= add(%96, %94)
+	[ForceInline]
+	[readNone]
+	[nameHint("Load")]
+		func %Load	: Func(%T1, TextureType(%T1, %Shape1, %isArray1, 0 : Int, %sampleCount1, 0 : Int, %isShadow1, %isCombined1, %format1, %92, %93), Vec(Int, %97))
+	{
+block %98(
+			[nameHint("this")]
+			param %this1	: TextureType(%T1, %Shape1, %isArray1, 0 : Int, %sampleCount1, 0 : Int, %isShadow1, %isCombined1, %format1, %92, %93),
+			[nameHint("location")]
+			param %location	: Vec(Int, %97)):
+		let  %99	: Bool	= cmpNE(%isArray1, 0 : Int)
+		ifElse(%99, %100, %101, %102)
+
+block %100:
+		let  %103	: Bool	= cmpEQ(%95, 2 : Int)
+		ifElse(%103, %104, %105, %106)
+
+block %104:
+		unconditionalBranch(%106, true)
+
+block %105:
+		let  %107	: Bool	= cmpEQ(%95, 3 : Int)
+		unconditionalBranch(%106, %107)
+
+block %106(
+			param %108	: Bool):
+		StaticAssert(%108, "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.")
+		let  %109	: Bool	= cmpEQ(%95, 2 : Int)
+		ifElse(%109, %110, %111, %112)
+
+block %110:
+		GenericAsm("tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %111:
+		GenericAsm("<invalid intrinsic>")
+
+block %112:
+		unreachable
+
+block %101:
+		switch(%95, %113, %114, 2 : Int, %115, 3 : Int, %116, 4 : Int, %114)
+
+block %115:
+		GenericAsm("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)")
+
+block %116:
+		GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %114:
+		GenericAsm("<invalid intrinsic>")
+
+block %113:
+		unreachable
+
+block %102:
+		unreachable
+}
+	return_val(%Load)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %117(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %118	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %119	: Vec(Int, 4 : Int)	= intCast(%118)
+	let  %120	: UInt	= call specialize(%90, UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)(%this2, %119)
+	return_val(%120)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %121(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	unconditionalBranch(%122)
+
+block %122:
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %123(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %124(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %125	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %126	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %127	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %128	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %126, %127, %128)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %129	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %130	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %131	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %129, %130, %131)
+	let  %132	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %133	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %134	: Vec(Bool, 3 : Int)	= cmpNE(%132, %133)
+	let  %135	: Bool	= call %any1(%134)
+	ifElse(%135, %136, %137, %137)
+
+block %136:
+	return_val(void_constant)
+
+block %137:
+	let  %138	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %139	: Vec(Bool, 3 : Int)	= cmpGE(%125, %138)
+	let  %140	: Bool	= call %any1(%139)
+	ifElse(%140, %141, %142, %142)
+
+block %141:
+	return_val(void_constant)
+
+block %142:
+	let  %143	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %125)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %125, %143)
+	return_val(void_constant)
+}
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("Load")]
+func %Load	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(Int, 4 : Int))
+{
+block %83(
+		[nameHint("this")]
+		param %this1	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location	: Vec(Int, 4 : Int)):
+	switch(3 : Int, %84, %85, 2 : Int, %86, 3 : Int, %87, 4 : Int, %85)
+
+block %86:
+	GenericAsm("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)")
+
+block %87:
+	GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+
+block %85:
+	GenericAsm("<invalid intrinsic>")
+
+block %84:
+	unreachable
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %88(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %89	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %90	: Vec(Int, 4 : Int)	= intCast(%89)
+	let  %91	: UInt	= call %Load(%this2, %90)
+	return_val(%91)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %92(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	unconditionalBranch(%93)
+
+block %93:
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %94(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %95(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %96	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %97	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %98	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %99	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %97, %98, %99)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %100	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %101	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %102	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %100, %101, %102)
+	let  %103	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %104	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %105	: Vec(Bool, 3 : Int)	= cmpNE(%103, %104)
+	let  %106	: Bool	= call %any1(%105)
+	ifElse(%106, %107, %108, %108)
+
+block %107:
+	return_val(void_constant)
+
+block %108:
+	let  %109	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %110	: Vec(Bool, 3 : Int)	= cmpGE(%96, %109)
+	let  %111	: Bool	= call %any1(%110)
+	ifElse(%111, %112, %113, %113)
+
+block %112:
+	return_val(void_constant)
+
+block %113:
+	let  %114	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %96)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %96, %114)
+	return_val(void_constant)
+}
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("Load")]
+func %Load	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(Int, 4 : Int))
+{
+block %83(
+		[nameHint("this")]
+		param %this1	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location	: Vec(Int, 4 : Int)):
+	unconditionalBranch(%84)
+
+block %84:
+	GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %85(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %86	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %87	: Vec(Int, 4 : Int)	= intCast(%86)
+	let  %88	: UInt	= call %Load(%this2, %87)
+	return_val(%88)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %89(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	unconditionalBranch(%90)
+
+block %90:
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %91(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %92(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %93	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %94	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %95	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %96	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %94, %95, %96)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %97	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %98	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %99	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %97, %98, %99)
+	let  %100	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %101	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %102	: Vec(Bool, 3 : Int)	= cmpNE(%100, %101)
+	let  %103	: Bool	= call %any1(%102)
+	ifElse(%103, %104, %105, %105)
+
+block %104:
+	return_val(void_constant)
+
+block %105:
+	let  %106	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %107	: Vec(Bool, 3 : Int)	= cmpGE(%93, %106)
+	let  %108	: Bool	= call %any1(%107)
+	ifElse(%108, %109, %110, %110)
+
+block %109:
+	return_val(void_constant)
+
+block %110:
+	let  %111	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %93)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %93, %111)
+	return_val(void_constant)
+}
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("Load")]
+func %Load	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(Int, 4 : Int))
+{
+block %83(
+		[nameHint("this")]
+		param %this1	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location	: Vec(Int, 4 : Int)):
+	unconditionalBranch(%84)
+
+block %84:
+	GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %85(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %86	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %87	: Vec(Int, 4 : Int)	= intCast(%86)
+	let  %88	: UInt	= call %Load(%this2, %87)
+	return_val(%88)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %89(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	unconditionalBranch(%90)
+
+block %90:
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %91(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %92(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %93	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %94	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %95	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %96	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %94, %95, %96)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %97	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %98	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %99	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %97, %98, %99)
+	let  %100	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %101	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %102	: Vec(Bool, 3 : Int)	= cmpNE(%100, %101)
+	let  %103	: Bool	= call %any1(%102)
+	ifElse(%103, %104, %105, %105)
+
+block %104:
+	return_val(void_constant)
+
+block %105:
+	let  %106	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %107	: Vec(Bool, 3 : Int)	= cmpGE(%93, %106)
+	let  %108	: Bool	= call %any1(%107)
+	ifElse(%108, %109, %110, %110)
+
+block %109:
+	return_val(void_constant)
+
+block %110:
+	let  %111	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %93)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %93, %111)
+	return_val(void_constant)
+}
+ExistentialTypeSpecializationDictionary
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-LOWER-GENERICS:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+[export("_ST4core13ITexelElement7Element")]
+let  %25	: _	= key
+[export("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %26	: _	= key
+[BuiltinDecoration]
+[export("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+let  %27	: _	= interface_req_entry(%26, witness_table_t(%x5Fx5FBuiltinType))
+[export("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %28	: _	= key
+[export("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %29	: _	= key
+[export("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %30	: _	= key
+let  %31	: _	= interface_req_entry(%30, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %32	: _	= key
+let  %33	: _	= interface_req_entry(%32, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %34	: _	= key
+let  %35	: _	= interface_req_entry(%34, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[export("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%31, %33, %35)
+let  %36	: _	= interface_req_entry(%29, witness_table_t(%IComparable))
+[export("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %37	: _	= key
+let  %38	: _	= interface_req_entry(%37, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %39	: _	= key
+let  %40	: _	= interface_req_entry(%39, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %41	: _	= key
+let  %42	: _	= interface_req_entry(%41, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %43	: _	= key
+let  %44	: _	= interface_req_entry(%43, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %45	: _	= key
+let  %46	: _	= interface_req_entry(%45, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %47	: _	= key
+let  %48	: _	= interface_req_entry(%47, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %49	: _	= key
+let  %50	: _	= interface_req_entry(%49, Func(this_type(%IArithmetic), Int))
+[export("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %51	: _	= key
+let  %52	: _	= interface_req_entry(%51, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[export("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%36, %38, %40, %42, %44, %46, %48, %50, %52)
+let  %53	: _	= interface_req_entry(%28, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[export("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%27, %53)
+let  %54	: _	= interface_req_entry(%25, associated_type(%x5Fx5FBuiltinArithmeticType))
+[export("_S4core13ITexelElement7ElementI4core23__BuiltinArithmeticType0")]
+let  %55	: _	= key
+let  %56	: _	= interface_req_entry(%55, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[StaticRequirementDecoration]
+[export("_SV4core13ITexelElement12elementCount")]
+let  %57	: _	= key
+let  %58	: _	= interface_req_entry(%57, Int)
+[export("_S4core13ITexelElementR8_24xinitp1pi_4core13ITexelElement7Element")]
+let  %59	: _	= key
+let  %60	: _	= interface_req_entry(%59, Func(this_type(%ITexelElement), associated_type(%x5Fx5FBuiltinArithmeticType)))
+[BuiltinDecoration]
+[export("_ST4core13ITexelElement")]
+[nameHint("ITexelElement")]
+let  %ITexelElement	: Type	= interface(%54, %56, %58, %60)
+[export("_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+witness_table %61	: witness_table_t(%ITexelElement)(UInt);
+
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape6flavor")]
+let  %62	: _	= key
+let  %63	: _	= interface_req_entry(%62, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape10dimensions")]
+let  %64	: _	= key
+let  %65	: _	= interface_req_entry(%64, Int)
+[StaticRequirementDecoration]
+[export("_SV4core15__ITextureShape15planeDimensions")]
+let  %66	: _	= key
+let  %67	: _	= interface_req_entry(%66, Int)
+[BuiltinDecoration]
+[export("_ST4core15__ITextureShape")]
+[nameHint("__ITextureShape")]
+let  %x5Fx5FITextureShape	: Type	= interface(%63, %65, %67)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+[export("_SW4core9__Shape3D4core15__ITextureShape")]
+witness_table %68	: witness_table_t(%x5Fx5FITextureShape)(TextureShape3DType)
+{
+	witness_table_entry(%62,3 : Int)
+
+	witness_table_entry(%64,3 : Int)
+
+}
+
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Out(UInt), Out(UInt), Out(UInt))
+{
+block %69(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %70(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %71(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%72, %73, %74, false, 0 : Int)
+
+block %72(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %75	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%75, %76, %73, %76)
+
+block %76:
+	ifElse(%result, %77, %78, %79)
+
+block %77:
+	unconditionalBranch(%79, true)
+
+block %78:
+	let  %80	: Bool	= getElement(%x1, %i)
+	let  %81	: Bool	= call %any(%80)
+	unconditionalBranch(%79, %81)
+
+block %79(
+		param %82	: Bool):
+	unconditionalBranch(%74)
+
+block %74:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%72, %82, %i1)
+
+block %73:
+	return_val(%result)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("Load")]
+func %Load	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(Int, 4 : Int))
+{
+block %83(
+		[nameHint("this")]
+		param %this1	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location	: Vec(Int, 4 : Int)):
+	GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int))
+{
+block %84(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %85	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %86	: Vec(Int, 4 : Int)	= intCast(%85)
+	let  %87	: UInt	= call %Load(%this2, %86)
+	return_val(%87)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %88(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), Vec(UInt, 3 : Int), UInt)
+{
+block %89(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68))
+{
+block %90(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %61, %68)):
+	let  %91	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %92	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %93	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %94	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %92, %93, %94)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %95	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %96	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %97	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %95, %96, %97)
+	let  %98	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %99	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %100	: Vec(Bool, 3 : Int)	= cmpNE(%98, %99)
+	let  %101	: Bool	= call %any1(%100)
+	ifElse(%101, %102, %103, %103)
+
+block %102:
+	return_val(void_constant)
+
+block %103:
+	let  %104	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %105	: Vec(Bool, 3 : Int)	= cmpGE(%91, %104)
+	let  %106	: Bool	= call %any1(%105)
+	ifElse(%106, %107, %108, %108)
+
+block %107:
+	return_val(void_constant)
+
+block %108:
+	let  %109	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %91)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %91, %109)
+	return_val(void_constant)
+}
+###
+### AFTER-LOWER-GENERICS:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %2	: Void	= varLayout(%5, %6)
+let  %5	: Void	= parameterGroupTypeLayout(%7, %8, %9, %10)
+let  %8	: Void	= varLayout(%9)
+let  %9	: Void	= structTypeLayout(%11, %12, %13, %14)
+let  %14	: Void	= structFieldLayout(%15, %16)
+let  %16	: Void	= varLayout(%17, %18, %19)
+let  %18	: Void	= offset(8 : Int, 8 : Int)
+let  %13	: Void	= structFieldLayout(%20, %21)
+let  %21	: Void	= varLayout(%17, %6, %19)
+let  %12	: Void	= structFieldLayout(%22, %23)
+let  %23	: Void	= varLayout(%4, %24, %19)
+let  %19	: Void	= stage(6 : Int)
+let  %24	: Void	= systemValueSemantic("SV_DispatchThreadID", 0 : Int)
+let  %4	: Void	= typeLayout
+let  %11	: Void	= size(8 : Int, 16 : Int)
+let  %7	: Void	= varLayout(%17, %6)
+let  %6	: Void	= offset(8 : Int, 0 : Int)
+let  %17	: Void	= typeLayout(%10)
+let  %10	: Void	= size(8 : Int, 8 : Int)
+let  %25	: Vec(UInt, 2 : Int)	= makeVector(0 : UInt, 0 : UInt)
+let  %26	: Vec(UInt, 2 : Int)	= makeVector(0 : UInt, 0 : UInt)
+let  %27	: Vec(UInt, 2 : Int)	= makeVector(0 : UInt, 0 : UInt)
+let  %28	: Vec(UInt, 2 : Int)	= makeVector(0 : UInt, 0 : UInt)
+let  %22	: _	= key
+let  %20	: _	= key
+let  %15	: _	= key
+[export("_S4coreX4core8_TextureG11GP04core9__Shape3Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp3po_uo_uo_uVG04uint1102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType")]
+[ForceInline]
+[readNone]
+[requireGLSLVersion(450 : Int)]
+[requireGLSLVersion(450 : Int)]
+[nameHint("GetDimensions")]
+func %GetDimensions	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28), Out(UInt), Out(UInt), Out(UInt))
+{
+block %29(
+		[nameHint("this")]
+		param %this	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28),
+		[nameHint("width")]
+		[output]
+		param %width	: Out(UInt),
+		[nameHint("height")]
+		[output]
+		param %height	: Out(UInt),
+		[nameHint("depth")]
+		[output]
+		param %depth	: Out(UInt)):
+	GenericAsm("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), \"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}")
+}
+[readNone]
+[nameHint("any")]
+[export("_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bG001_SWb4core13__BuiltinType")]
+func %any	: Func(Bool, Bool)
+{
+block %30(
+		[nameHint("x")]
+		param %x	: Bool):
+	GenericAsm("bool($0)")
+}
+[export("_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG001132_SWb4core13__BuiltinType")]
+[readNone]
+[nameHint("any")]
+func %any1	: Func(Bool, Vec(Bool, 3 : Int))
+{
+block %31(
+		[nameHint("x")]
+		param %x1	: Vec(Bool, 3 : Int)):
+	loop(%32, %33, %34, false, 0 : Int)
+
+block %32(
+		[nameHint("result")]
+		param %result	: Bool,
+		[nameHint("i")]
+		param %i	: Int):
+	let  %35	: Bool	= cmpLT(%i, 3 : Int)
+	ifElse(%35, %36, %33, %36)
+
+block %36:
+	ifElse(%result, %37, %38, %39)
+
+block %37:
+	unconditionalBranch(%39, true)
+
+block %38:
+	let  %40	: Bool	= getElement(%x1, %i)
+	let  %41	: Bool	= call %any(%40)
+	unconditionalBranch(%39, %41)
+
+block %39(
+		param %42	: Bool):
+	unconditionalBranch(%34)
+
+block %34:
+	[nameHint("i")]
+	let  %i1	: Int	= add(%i, 1 : Int)
+	unconditionalBranch(%32, %42, %i1)
+
+block %33:
+	return_val(%result)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("Load")]
+func %Load	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28), Vec(Int, 4 : Int))
+{
+block %43(
+		[nameHint("this")]
+		param %this1	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28),
+		[nameHint("location")]
+		param %location	: Vec(Int, 4 : Int)):
+	GenericAsm("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03getAgp0pGP0G04uint102103104105106107_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType8_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[readNone]
+[nameHint("operator[].get")]
+func %operatorx5Bx5Dx5Fget	: Func(UInt, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28), Vec(UInt, 3 : Int))
+{
+block %44(
+		[nameHint("this")]
+		param %this2	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28),
+		[nameHint("location")]
+		param %location1	: Vec(UInt, 3 : Int)):
+	let  %45	: Vec(UInt, 4 : Int)	= makeVector(%location1, 0 : UInt)
+	let  %46	: Vec(Int, 4 : Int)	= intCast(%45)
+	let  %47	: UInt	= call %Load(%this2, %46)
+	return_val(%47)
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement5Storep2pi_vKX0211K7isArray111KL10dimensions1ui_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("Store")]
+func %Store	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26), Vec(UInt, 3 : Int), UInt)
+{
+block %48(
+		[nameHint("this")]
+		param %this3	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26),
+		[nameHint("location")]
+		param %location2	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue	: UInt):
+	GenericAsm("surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)")
+}
+[export("_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk1K8isShadowk0K6formatg8TTviviviviCGP14core15__ITextureShapeCGP04core13ITexelElementR16operator_5Bx_5Dxp1pi_vKX0211K7isArray111KL10dimensions1uGP03setAsp1pi_GP0VG04uint102103104105106_SW4coreXGP0I4core13ITexelElementg2TCGP04core23__BuiltinArithmeticType4core13ITexelElementG04uint1_SWu4core23__BuiltinArithmeticType7_SW4core9__Shape3D4core15__ITextureShape")]
+[ForceInline]
+[nameHint("operator[].set")]
+func %operatorx5Bx5Dx5Fset	: Func(Void, TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26), Vec(UInt, 3 : Int), UInt)
+{
+block %49(
+		[nameHint("this")]
+		param %this4	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26),
+		[nameHint("location")]
+		param %location3	: Vec(UInt, 3 : Int),
+		[nameHint("newValue")]
+		param %newValue1	: UInt):
+	call %Store(%this4, %location3, %newValue1)
+	return_val(void_constant)
+}
+[entryPoint(6 : Int, "copyTexture", "test-texture-types")]
+[keepAlive]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
+[export("_SR24test_2Dxtexture_2Dxtypes11copyTexturep3pi_v3ui_4core8_TextureG11u4core9__Shape3Dk0k0k0k0k0k0k0i_4core8_TextureG11u4core9__Shape3Dk0k0k0k1k0k0k0V")]
+[nameHint("copyTexture")]
+[layout(%1)]
+func %copyTexture	: Func(Void, ConstRef(Vec(UInt, 3 : Int)), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28), TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26))
+{
+block %50(
+		[layout(%23)]
+		[nameHint("tid")]
+		[semantic("SV_DispatchThreadID", 0 : Int)]
+		param %tid	: ConstRef(Vec(UInt, 3 : Int)),
+		[layout(%21)]
+		[nameHint("srcTexture")]
+		[format(37 : Int)]
+		param %srcTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, 0 : Int, %27, %28),
+		[layout(%16)]
+		[nameHint("dstTexture")]
+		[format(39 : Int)]
+		param %dstTexture	: TextureType(UInt, TextureShape3DType, 0 : Int, 0 : Int, 0 : Int, 1 : Int, 0 : Int, 0 : Int, 0 : Int, %25, %26)):
+	let  %51	: Vec(UInt, 3 : Int)	= load(%tid)
+	[nameHint("srcDims")]
+	let  %srcDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %52	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 0 : Int)
+	let  %53	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 1 : Int)
+	let  %54	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%srcDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %52, %53, %54)
+	[nameHint("dstDims")]
+	let  %dstDims	: Ptr(Vec(UInt, 3 : Int))	= var
+	let  %55	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 0 : Int)
+	let  %56	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 1 : Int)
+	let  %57	: Ptr(UInt, 2147483647 : UInt64)	= getElementPtr(%dstDims, 2 : Int)
+	call %GetDimensions(%srcTexture, %55, %56, %57)
+	let  %58	: Vec(UInt, 3 : Int)	= load(%srcDims)
+	let  %59	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %60	: Vec(Bool, 3 : Int)	= cmpNE(%58, %59)
+	let  %61	: Bool	= call %any1(%60)
+	ifElse(%61, %62, %63, %63)
+
+block %62:
+	return_val(void_constant)
+
+block %63:
+	let  %64	: Vec(UInt, 3 : Int)	= load(%dstDims)
+	let  %65	: Vec(Bool, 3 : Int)	= cmpGE(%51, %64)
+	let  %66	: Bool	= call %any1(%65)
+	ifElse(%66, %67, %68, %68)
+
+block %67:
+	return_val(void_constant)
+
+block %68:
+	let  %69	: UInt	= call %operatorx5Bx5Dx5Fget(%srcTexture, %51)
+	call %operatorx5Bx5Dx5Fset(%dstTexture, %51, %69)
+	return_val(void_constant)
+}
+###
