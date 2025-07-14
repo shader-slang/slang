@@ -165,9 +165,9 @@ struct EliminateMultiLevelBreakContext
                     [&](BreakableRegionInfo* region)
                     {
                         if (!isUnreachableRootBlock(region->getBreakBlock()))
-                            mapBreakBlockToRegion.add(region->getBreakBlock(), region);
+                            mapBreakBlockToRegion.addIfNotExists(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
-                            mapBlockToRegion.add(block, region);
+                            mapBlockToRegion.addIfNotExists(block, region);
                     });
             }
 
@@ -289,16 +289,16 @@ struct EliminateMultiLevelBreakContext
                                 newBreakBlock->insertAfter(region->getBreakBlock());
                                 builder.setInsertInto(newBreakBlock);
                                 builder.emitUnreachable();
-                                mapBreakBlocksToRegion.add(newBreakBlock, region);
+                                mapBreakBlocksToRegion.addIfNotExists(newBreakBlock, region);
                                 region->replaceBreakBlock(&builder, newBreakBlock);
                                 return;
                             }
                         }
                         else
-                            mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
+                            mapBreakBlocksToRegion.addIfNotExists(region->getBreakBlock(), region);
                     }
                     else
-                        mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
+                        mapBreakBlocksToRegion.addIfNotExists(region->getBreakBlock(), region);
                 });
         }
     }

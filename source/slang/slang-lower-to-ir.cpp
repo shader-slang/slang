@@ -1550,7 +1550,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
 
-    context->shared->interfaceRequirementKeys.addIfNotExists(requirementDecl, requirementKey);
+    context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
     return requirementKey;
 }
@@ -6354,8 +6354,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
-        context->shared->continueLabels.addIfNotExists(stmt->uniqueID, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6437,10 +6437,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
-        
-        // Clean up the break and continue label entries
-        context->shared->breakLabels.remove(stmt->uniqueID);
-        context->shared->continueLabels.remove(stmt->uniqueID);
     }
 
     void visitWhileStmt(WhileStmt* stmt)
@@ -6465,8 +6461,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
-        context->shared->continueLabels.addIfNotExists(stmt->uniqueID, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6500,10 +6496,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
-        
-        // Clean up the break and continue label entries
-        context->shared->breakLabels.remove(stmt->uniqueID);
-        context->shared->continueLabels.remove(stmt->uniqueID);
     }
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
@@ -6528,8 +6520,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
-        context->shared->continueLabels.addIfNotExists(stmt->uniqueID, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6586,10 +6578,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
-        
-        // Clean up the break and continue label entries
-        context->shared->breakLabels.remove(stmt->uniqueID);
-        context->shared->continueLabels.remove(stmt->uniqueID);
     }
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt)
@@ -7166,7 +7154,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -7184,7 +7172,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             {
                 caseBlock = builder->emitBlock();
                 lowerStmt(context, targetCase->body);
-                mapCaseStmtToBlock.addIfNotExists(targetCase->body, caseBlock);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
             }
@@ -7249,7 +7237,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
         auto initialBlock = builder->getBlock();
         auto breakLabel = builder->createBlock();
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
         builder->setInsertInto(initialBlock->getParent());
         List<IRInst*> args;
         args.add(breakLabel);
@@ -7261,7 +7249,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             {
                 caseBlock = builder->emitBlock();
                 lowerStmt(context, targetCase->body);
-                mapCaseStmtToBlock.addIfNotExists(targetCase->body, caseBlock);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
             }
@@ -7368,7 +7356,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.addIfNotExists(stmt->uniqueID, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -12041,7 +12029,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
                 source->getContent());
-            context->shared->mapSourceFileToDebugSourceInst.addIfNotExists(source, debugSource);
+            context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
     }
 
@@ -12681,7 +12669,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
                     // of these keys will be local to a single `IREntryPointLayout`,
                     // and we don't support combination at a finer granularity than that.
 
-                    context->mapEntryPointParamToKey.addIfNotExists(paramDecl.getDecl(), irFieldKey);
+                    context->mapEntryPointParamToKey.add(paramDecl.getDecl(), irFieldKey);
                 }
             }
             else if (fieldDecl.getDecl())

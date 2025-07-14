@@ -1,38 +1,41 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry compute_main -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
 
-// Regression test for issue #7748: Dictionary key collision in loop processing
-// This test ensures that for-loops with dynamic bounds can be compiled without
-// internal dictionary key collision errors.
+// Regression test for issue #7748: Dictionary key collision in multi-level break processing
+// This test ensures that code with multi-level breaks compiles successfully and doesn't cause
+// internal compiler errors due to dictionary key collisions.
 
-struct TestData {
-    int primitives[10];
-};
-
-void processLoop(int start, int end, out int result) {
-    result = 0;
-    for (int i = start; i < end; ++i) {
-        result += i;
-        // nested control flow to test break/continue labels
-        if (i == 3) {
-            continue;
-        }
-        if (i > 7) {
-            break;
+int testMultiLevelBreak(int value) {
+    int result = 0;
+outer:
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            result++;
+            if (value == 0) {
+                break outer; // Multi-level break that triggers EliminateMultiLevelBreak pass
+            }
+            if (result > 10) {
+                break outer;
+            }
         }
     }
+    return result;
 }
 
-int testScene(int value) {
-    int result1, result2;
-    processLoop(0, 5, result1);
-    processLoop(2, 8, result2); 
-    return result1 + result2;
+int processValues() {
+    int sum = 0;
+    sum += testMultiLevelBreak(0);
+    sum += testMultiLevelBreak(1);
+    sum += testMultiLevelBreak(2);
+    return sum;
 }
+
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]  
-void compute_main() {
-    int result = testScene(42);
-    //CHECK: result: 25
-    printf("result: %d\n", result);
+void computeMain() {
+    int result = processValues();
+    outputBuffer[0] = result;
+    //CHECK: 19
 }
