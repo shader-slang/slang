@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // Confirm that generics syntax can be used in user
 // code and generates valid output.

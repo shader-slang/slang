@@ -1,6 +1,7 @@
 // init-list-defaults.slang
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // Confirm that initializer lists correctly default-initialize elements past those specified.
 

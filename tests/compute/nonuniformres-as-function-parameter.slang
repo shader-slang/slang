@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry main -stage compute
 RWStructuredBuffer<uint> globalBuffer[] : register(u0, space1);
 RWStructuredBuffer<uint3> outputBuffer;
 
@@ -81,6 +82,7 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
     // CHECK_HLSL: func_0(globalBuffer_0[NonUniformResourceIndex({{.*}})])
+    // CHECK_CUDA: func_0
     MyStruct myStruct = func(buffer);
 
     int bufferIdx2 = pixelIndex.y;

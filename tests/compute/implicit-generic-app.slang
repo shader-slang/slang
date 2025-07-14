@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // Testing that we can implicitly specialize a generic
 // that has a constrained type parameter.

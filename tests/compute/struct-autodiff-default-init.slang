@@ -1,4 +1,4 @@
-// struct-default-init.slang
+// struct-autodiff-default-init.slang
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute

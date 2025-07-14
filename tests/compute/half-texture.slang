@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-directly
 //TEST:CROSS_COMPILE: -target dxil-assembly -entry computeMain -profile cs_6_2
+//TEST(compute):COMPARE_COMPUTE:-cuda -compute -render-features half -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
 RWStructuredBuffer<int> outputBuffer;

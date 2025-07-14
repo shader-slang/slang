@@ -6,7 +6,7 @@
 //
 
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-
+//TEST(compute, cuda):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_5_0
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 

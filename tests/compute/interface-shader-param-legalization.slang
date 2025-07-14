@@ -4,6 +4,7 @@
 // an interface has resource-type fields nested in it.
 
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute, cuda):COMPARE_COMPUTE_EX:-slang -compute -cuda -profile sm_5_0
 
 interface IModifier
 {
