@@ -371,15 +371,16 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
-// Represents the type of `some Type` for `some Type varName;`.
+// Represents the type of `some Type` for `some Type varName`.
 // This decl of `some Type` is not assignable since it already
 // has a given value.
-// The wrapped type is a concrete interface named `interfaceType`.
+// The interface type is stored as a member.
 FIDDLE()
-class SomeTypeDecl : public Decl
+class SomeTypeDecl : public ContainerDecl
 {
     FIDDLE(...)
-    FIDDLE() TypeExp interfaceType;
+
+    InheritanceDecl* getBase();
 };
 
 // Represents the type of `some Type` for `some Type varName`

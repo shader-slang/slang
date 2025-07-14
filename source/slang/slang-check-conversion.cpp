@@ -1212,10 +1212,7 @@ bool SemanticsVisitor::_coerce(
     // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
     if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        // We do not immediatly error since conversions may still happen
-        // later on
-        if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
-            return true;
+        validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink);
     }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
@@ -1891,14 +1888,12 @@ static bool isDynType(Type* type)
     return isDeclRefTypeOf<InterfaceDecl>(type);
 }
 
-bool SemanticsVisitor::tryCoerceSomeType(
+void SemanticsVisitor::validateSomeTypeCoerce(
     CoercionSite site,
     Type* toType,
-    Expr** outToExpr,
     QualType fromType,
     Expr* fromExpr,
-    DiagnosticSink* sink,
-    ConversionCost* outCost)
+    DiagnosticSink* sink)
 {
     // Restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
@@ -1915,41 +1910,20 @@ bool SemanticsVisitor::tryCoerceSomeType(
                 sink->diagnose(
                     fromExpr->loc,
                     Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
-                return false;
+                return;
             }
         }
         // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
         else if (isDynType(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
-            return false;
+            return;
         }
-
-        // implicit unwrap
-        return _coerce(
-            site,
-            getInterfaceType(m_astBuilder, someTypeDecl),
-            outToExpr,
-            fromType,
-            fromExpr,
-            sink,
-            outCost);
     }
 
-    // If we have a SomeType on RHS, we are only allowed to copy if LHS is `dyn`
-    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
-    {
-        if (isDynType(toType))
-            return _coerce(
-                site,
-                toType,
-                outToExpr,
-                getInterfaceType(m_astBuilder, someTypeDeclRef),
-                fromExpr,
-                sink,
-                outCost);
-    }
-    return false;
+    // If we have a `some T` on RHS, we are only allowed to copy if LHS is `dyn T`, 
+    // we do not need explicit validation for this since `dyn` should be within
+    // `some T` InheritanceInfo (implicitly covering this case)
 }
 
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(

@@ -228,7 +228,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
             leftWitness,
             rightWitness);
     }
-    else if (auto interfaceWithContext = as<InterfaceWithContext>(subType))
+    else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
     {
         // An ExtractExistentialType from an existential value of type I
         // is a subtype of I.
@@ -238,10 +238,10 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // TODO(tfoley): We could add support for `ExtractExistentialType` to
         // the inheritance linearization logic, and eliminate this case.
         //
-        auto interfaceDeclRef = interfaceWithContext->getOriginalInterfaceDeclRef();
+        auto interfaceDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
         if (interfaceDeclRef.equals(superTypeDeclRef))
         {
-            auto witness = interfaceWithContext->getSubtypeWitness();
+            auto witness = extractExistentialType->getSubtypeWitness();
             return witness;
         }
         return nullptr;

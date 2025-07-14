@@ -260,11 +260,6 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
 }
 
-inline Type* getInterfaceType(ASTBuilder* astBuilder, DeclRef<SomeTypeDecl> declRef)
-{
-    return declRef.substitute(astBuilder, declRef.getDecl()->interfaceType.type);
-}
-
 inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
 {
     if (declRef.getDecl()->errorType.type)

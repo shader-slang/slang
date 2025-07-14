@@ -403,14 +403,21 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 if (shouldImplicitlySetInterfacesToSome(this))
                 {
+                    // Logic mirroring `visitSomeTypeExpr` 
                     SomeTypeDecl* decl;
                     if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
-                        decl = astBuilder->create<UnboundSomeTypeDecl>();
+                        decl = m_astBuilder->create<UnboundSomeTypeDecl>();
                     else
-                        decl = astBuilder->create<SomeTypeDecl>();
+                        decl = m_astBuilder->create<SomeTypeDecl>();
                     decl->loc = expr->loc;
-                    decl->interfaceType = typeExp;
-                    decl->parentDecl = this->getOuterScope()->containerDecl;
+                    decl->parentDecl = getOuterScope()->containerDecl;
+                    result = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, decl));
+
+                    auto inheritanceDecl = m_astBuilder->create<InheritanceDecl>();
+                    inheritanceDecl->base = typeExp;
+                    inheritanceDecl->loc = decl->loc;
+                    decl->addMember(inheritanceDecl);
+
                     result = DeclRefType::create(astBuilder, decl);
                 }
                 // we do not tag types as 'dyn'

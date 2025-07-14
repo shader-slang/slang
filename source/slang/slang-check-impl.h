@@ -1339,8 +1339,6 @@ public:
     ///
     Expr* openExistential(Expr* expr, DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    Expr* createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef);
-
     /// If `expr` has existential type, then open it.
     ///
     /// Returns an expression that opens `expr` if it had existential type.
@@ -1529,14 +1527,12 @@ public:
         Expr* fromExpr,
         Expr** outExpr);
 
-    bool tryCoerceSomeType(
+    void validateSomeTypeCoerce(
         CoercionSite site,
         Type* toType,
-        Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
-        DiagnosticSink* sink,
-        ConversionCost* outCost);
+        DiagnosticSink* sink);
 
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic

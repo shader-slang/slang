@@ -525,4 +525,13 @@ void AggTypeDecl::unionTagsWith(TypeTag other)
     addTag(other);
 }
 
+InheritanceDecl* SomeTypeDecl::getBase()
+{
+    auto inheritanceDecl = findFirstDirectMemberDeclOfType<InheritanceDecl>();
+    if (!inheritanceDecl)
+        SLANG_UNEXPECTED("SomeType is missing it's InheritanceDecl");
+    return inheritanceDecl;
+}
+
+
 } // namespace Slang

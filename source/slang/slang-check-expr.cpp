@@ -194,66 +194,6 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         });
 }
 
-// Create a SomeType with context required for resolving the base concrete type
-Expr* SemanticsVisitor::createSomeTypeWithContext(Expr* expr, DeclRef<SomeTypeDecl> declRef)
-{
-    /*
-    Why we are temporarily using existential logic for a non existential object:
-    * Until we add backend support for legalizing `some`, we will need to use
-      `ExistentialType` with `some` for the backend to specialize our interfaces.
-      This gives us 3 options:
-    * hack in support for `ExistentialType` at lower-to-ir.
-        * This will be non-trivial since we need to fetch a look-up to our function-calls, and
-    call's may need specialization, this causing other transitive issues once lowering to ir. *To
-    generate these look-ups we also need a type use-site for a witness-table (to specialize the
-          function-calls in IR). To do this logic without bugs we need to create
-    `ExtractExistentialType` around the same time as `OpenExistential` so that we have the correct
-    `expr` to generate with. This means this approach is redundant.
-        * If we modify, add, or change the Existentials system in any significant way, we will
-          break the `some` logic added since it will be significantly hacked together.
-    * generate a `ExtractExistentialType` with `OpenExistential` logic
-        * By far the easiest solution to get something that will flawlessly work is to just
-    duplicate `OpenExistential` and put logic needed to handle `SomeType` there. This hack can be
-    removed by replacing a single return value.
-        * Problem is that we then explicitly need to unwrap `some` type before creating an
-    existential which should never be enforced. We should only sparingly treat the `some` as an
-    existential since `some` should be its own legal type. The end goal is to decouple `some` from
-    the existential system fully, this means we need to minimize areas where we treat `some` as its
-    underlying interface.
-    * Create new AST nodes mimicing `ExistentialType`s is the middle ground of these options.
-      We are implementing this approach.
-        * New AST nodes will mimic how Existential's are currently handled, but will provide thin
-         "overloads" so that we are more selective about where our hacks are used.
-        * This change is in-hopes that we do not need to hack the actual Existential type system
-    when changing `some` before we fully decouple `some` from the existential system.
-        * The added benifit is that by sharing logic with ExtractExistentialType we won't break
-    `some` every time we add a new existential type system feature.
-        */
-    return maybeMoveTemp(
-        expr,
-        [&](DeclRef<VarDeclBase> varDeclRef)
-        {
-            SomeTypeWithContextType* openedType =
-                m_astBuilder->getOrCreate<SomeTypeWithContextType>(
-                    varDeclRef,
-                    expr->type.type,
-                    declRef);
-
-            ExtractExistentialValueExpr* openedValue =
-                m_astBuilder->create<ExtractExistentialValueExpr>();
-            openedValue->declRef = varDeclRef;
-            openedValue->type = QualType(openedType);
-            openedValue->originalExpr = expr;
-            openedValue->checked = true;
-            if (expr->type.isLeftValue)
-            {
-                openedValue->type.isLeftValue = true;
-            }
-
-            return openedValue;
-        });
-}
-
 /// Returns an expression that opens `expr` if it has an existential type;
 /// else creates an expression to indirectly point to a concrete (`some`) type;
 /// otherwise return `expr` itself.
@@ -270,10 +210,6 @@ Expr* SemanticsVisitor::maybeCreateIndirectValToInterface(Expr* expr)
         if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
         {
             return openExistential(expr, interfaceDeclRef);
-        }
-        else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
-        {
-            return createSomeTypeWithContext(expr, someTypeDeclRef);
         }
     }
 
@@ -5755,9 +5691,13 @@ Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
             else
                 decl = m_astBuilder->create<SomeTypeDecl>();
             decl->loc = expr->loc;
-            decl->interfaceType = typeExp;
             decl->parentDecl = getOuterScope()->containerDecl;
             result = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, decl));
+
+            auto inheritanceDecl = m_astBuilder->create<InheritanceDecl>();
+            inheritanceDecl->base = typeExp;
+            inheritanceDecl->loc = decl->loc;
+            decl->addMember(inheritanceDecl);
         }
     }
     return expr;

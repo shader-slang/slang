@@ -2193,14 +2193,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitMeshOutputType(MeshOutputType* type) { return lowerSimpleIntrinsicType(type); }
 
-    IRType* visitSomeTypeWithContextType(SomeTypeWithContextType* type)
-    {
-        auto declRef = type->getDeclRef();
-        auto loweredType = lowerType(context, getType(context->astBuilder, declRef));
-        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, loweredType));
-        return getBuilder()->emitExtractExistentialType(existentialVal);
-    }
-
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->getDeclRef();
@@ -2517,13 +2509,6 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             break;
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
-    }
-
-    if (auto vardeclBase = as<VarDeclBase>(decl))
-    {
-        // SomeType var's must be tagged accordingly
-        if (isDeclRefTypeOf<SomeTypeDecl>(vardeclBase->getType()))
-            builder->addDecoration(inst, kIROp_SomeTypeDecoration);
     }
 }
 
@@ -8353,14 +8338,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
+    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl*)
     {
-        auto interfaceType = getInterfaceType(context->astBuilder, decl);
-        SLANG_ASSERT(interfaceType);
-        auto loweredType = lowerType(this->context, interfaceType);
-        if (!loweredType->findDecoration<IRSomeTypeDecoration>())
-            context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
-        return loweredType;
+        SLANG_UNEXPECTED("Some Type Decl should have already been manually be translated to a valid type(currently existential)");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)

@@ -1056,11 +1056,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
     }
-    else if (auto interfaceWithContext = as<InterfaceWithContext>(type))
+    else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
         return _getInheritanceInfo(
-            interfaceWithContext->getThisTypeDeclRef(),
-            interfaceWithContext,
+            extractExistentialType->getThisTypeDeclRef(),
+            extractExistentialType,
             circularityInfo);
     }
     else if (auto conjunctionType = as<AndType>(type))

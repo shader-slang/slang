@@ -668,14 +668,14 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
-    else if (auto interfaceWithContext = as<InterfaceWithContext>(superType))
+    else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
         // We want lookup to be performed on the underlying interface type of the existential,
         // but we need to have a this-type substitution applied to ensure that the result of
         // lookup will have a comparable substitution applied (allowing things like associated
         // types, etc. used in the signature of a method to resolve correctly).
         //
-        auto thisTypeDeclRef = interfaceWithContext->getThisTypeDeclRef();
+        auto thisTypeDeclRef = extractExistentialType->getThisTypeDeclRef();
         _lookUpMembersInSuperTypeDeclImpl(
             astBuilder,
             name,

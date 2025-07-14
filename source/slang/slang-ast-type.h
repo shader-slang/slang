@@ -904,10 +904,10 @@ class NamespaceType : public Type
     Type* _createCanonicalTypeOverride();
 };
 
-// The concrete type for a value wrapped in an interface, only accessible
-// given context.
-FIDDLE(abstract)
-class InterfaceWithContext : public Type
+// The concrete type for a value wrapped in an existential, accessible
+// when the existential is "opened" in some context.
+FIDDLE()
+class ExtractExistentialType : public Type
 {
     FIDDLE(...)
     DeclRef<VarDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
@@ -915,8 +915,16 @@ class InterfaceWithContext : public Type
     // A reference to the original interface this type is known
     // to be a subtype of.
     //
-    Type* getOriginalInterfaceType();
-    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef();
+    Type* getOriginalInterfaceType() { return as<Type>(getOperand(1)); }
+    DeclRef<InterfaceDecl> getOriginalInterfaceDeclRef() { return as<DeclRefBase>(getOperand(2)); }
+
+    ExtractExistentialType(
+        DeclRef<VarDeclBase> inDeclRef,
+        Type* inOriginalInterfaceType,
+        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
+    {
+        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
+    }
 
     // A cached decl-ref to the original interface's ThisType Decl, with
     // a witness that refers to the type extracted here.
@@ -949,35 +957,6 @@ class InterfaceWithContext : public Type
     /// This operation may create the decl-ref on demand and cache it.
     ///
     DeclRef<ThisTypeDecl> getThisTypeDeclRef();
-};
-
-// The concrete type for a value wrapped in an existential, accessible
-// when the existential is "opened" in some context.
-FIDDLE()
-class ExtractExistentialType : public InterfaceWithContext
-{
-    FIDDLE(...)
-    ExtractExistentialType(
-        DeclRef<VarDeclBase> inDeclRef,
-        Type* inOriginalInterfaceType,
-        DeclRef<InterfaceDecl> inOriginalInterfaceDeclRef)
-    {
-        setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
-    }
-};
-
-// Concrete type for a `SomeType` associated with context for witnesses.
-FIDDLE()
-class SomeTypeWithContextType : public InterfaceWithContext
-{
-    FIDDLE(...)
-    SomeTypeWithContextType(
-        DeclRef<VarDeclBase> inDeclRef,
-        Type* inOriginalType,
-        DeclRef<SomeTypeDecl> inOriginalDeclRef)
-    {
-        setOperands(inDeclRef, inOriginalType, inOriginalDeclRef);
-    }
 };
 
 FIDDLE()

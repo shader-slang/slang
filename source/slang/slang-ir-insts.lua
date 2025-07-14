@@ -1728,7 +1728,7 @@ local insts = {
 				},
 			},
 			{ 
-				SomeTypeDecoration = {
+				someTypeDecoration = {
 					-- Marks the variable as `some T`
 				},
 			},
