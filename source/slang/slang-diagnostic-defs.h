@@ -2169,12 +2169,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
 DIAGNOSTIC(
-    38202,
-    Error,
-    matrixWithDisallowedElementTypeEncountered,
-    "matrix with disallowed element type '$0' encountered")
-
-DIAGNOSTIC(
     38203,
     Error,
     vectorWithDisallowedElementTypeEncountered,

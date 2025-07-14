@@ -1,17 +1,23 @@
 // -O0 is to make sure that slang doesn't perform constant folding and make this test trivial
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -O0 -emit-spirv-directly
 
+//TEST_INPUT:ubuffer(data=[1 0], stride=4):in,name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
+// Global bool constants to avoid constant folding
+static bool trueVal;
+static bool falseVal;
+
 struct matrixWrapper {
-    bool2x2 mat1 = bool2x2(false, false, false, false);
-    bool2x3 mat2 = bool2x3(true, true, false, false, false, true);
+    bool2x2 mat1 = bool2x2(falseVal, falseVal, falseVal, falseVal);
+    bool2x3 mat2 = bool2x3(trueVal, trueVal, falseVal, falseVal, falseVal, trueVal);
 }
 
 bool elementAnd(bool2x2 matrix)
 {
-    return true
+    return trueVal
         && matrix[0][0]
         && matrix[0][1]
         && matrix[1][0]
@@ -21,16 +27,20 @@ bool elementAnd(bool2x2 matrix)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // Load true/false values from input buffer to avoid constant folding
+    trueVal = inputBuffer[0] != 0;
+    falseVal = inputBuffer[1] != 0;
+    
     // Test bool matrix construction
-    bool2x2 mat1 = bool2x2(true, false, false, true);
+    bool2x2 mat1 = bool2x2(trueVal, falseVal, falseVal, trueVal);
     bool3x3 mat2 = bool3x3(
-        true, false, true,
-        false, true, false,
-        true, false, true
+        trueVal, falseVal, trueVal,
+        falseVal, trueVal, falseVal,
+        trueVal, falseVal, trueVal
     );
     bool2x4 mat3 = bool2x4(
-        true, false, true, false,
-        true, false, true, false
+        trueVal, falseVal, trueVal, falseVal,
+        trueVal, falseVal, trueVal, falseVal
     );
     
     // Test bool matrix element access
@@ -43,11 +53,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     // Test logical operations
     bool2x2 not_mat = !mat1;
-    bool2x2 and_mat = mat1 && bool2x2(true, true, false, false);
+    bool2x2 and_mat = mat1 && bool2x2(trueVal, trueVal, falseVal, falseVal);
     
     // Test element assignment
-    mat1[0][1] = true;
-    mat2[1][2] = false;
+    mat1[0][1] = trueVal;
+    mat2[1][2] = falseVal;
 
     // Test passing bool matrices to functions
     bool anded = elementAnd(mat1);
