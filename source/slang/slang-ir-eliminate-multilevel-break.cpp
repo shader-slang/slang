@@ -63,6 +63,14 @@ struct EliminateMultiLevelBreakContext
             for (auto child : childRegions)
                 child->forEach(f);
         }
+
+        template<typename Func>
+        void forEachBottomUp(const Func& f)
+        {
+            for (auto child : childRegions)
+                child->forEachBottomUp(f);
+            f(this);
+        }
     };
 
     struct MultiLevelBreakInfo
@@ -161,13 +169,21 @@ struct EliminateMultiLevelBreakContext
             }
             for (auto& l : regions)
             {
-                l->forEach(
+                l->forEachBottomUp(
                     [&](BreakableRegionInfo* region)
                     {
                         if (!isUnreachableRootBlock(region->getBreakBlock()))
-                            mapBreakBlockToRegion.addIfNotExists(region->getBreakBlock(), region);
+                        {
+                            // Only add if not already mapped (inner regions take precedence)
+                            if (!mapBreakBlockToRegion.containsKey(region->getBreakBlock()))
+                                mapBreakBlockToRegion.add(region->getBreakBlock(), region);
+                        }
                         for (auto block : region->blocks)
-                            mapBlockToRegion.addIfNotExists(block, region);
+                        {
+                            // Only add if not already mapped (inner regions take precedence)
+                            if (!mapBlockToRegion.containsKey(block))
+                                mapBlockToRegion.add(block, region);
+                        }
                     });
             }
 
@@ -289,16 +305,16 @@ struct EliminateMultiLevelBreakContext
                                 newBreakBlock->insertAfter(region->getBreakBlock());
                                 builder.setInsertInto(newBreakBlock);
                                 builder.emitUnreachable();
-                                mapBreakBlocksToRegion.addIfNotExists(newBreakBlock, region);
+                                mapBreakBlocksToRegion.add(newBreakBlock, region);
                                 region->replaceBreakBlock(&builder, newBreakBlock);
                                 return;
                             }
                         }
                         else
-                            mapBreakBlocksToRegion.addIfNotExists(region->getBreakBlock(), region);
+                            mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
                     }
                     else
-                        mapBreakBlocksToRegion.addIfNotExists(region->getBreakBlock(), region);
+                        mapBreakBlocksToRegion.add(region->getBreakBlock(), region);
                 });
         }
     }
