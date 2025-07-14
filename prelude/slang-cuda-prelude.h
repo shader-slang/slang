@@ -1324,10 +1324,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float>(
     cudaSurfaceBoundaryMode boundaryMode)
 {
     asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "f"(v));
 }
 
@@ -1376,11 +1377,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float2>(
 {
     const float vx = v.x, vy = v.y;
     asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "f"(vx),
         "f"(vy));
 }
@@ -1435,11 +1437,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float4>(
 {
     const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
     asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5,%6,%7};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "f"(vx),
         "f"(vy),
         "f"(vz),
@@ -1482,10 +1485,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint>(
     cudaSurfaceBoundaryMode boundaryMode)
 {
     asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(v));
 }
 
@@ -1530,11 +1534,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint2>(
 {
     const uint vx = v.x, vy = v.y;
     asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(vx),
         "r"(vy));
 }
@@ -1586,11 +1591,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint4>(
 {
     const uint vx = v.x, vy = v.y, vz = v.z, vw = v.w;
     asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5,%6,%7};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(vx),
         "r"(vy),
         "r"(vz),
@@ -1694,7 +1700,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<int4>(
         "r"(vz),
         "r"(vw));
 }
-// Int
+
 template<>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int>(
     int v,
@@ -1705,10 +1711,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int>(
     cudaSurfaceBoundaryMode boundaryMode)
 {
     asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(v));
 }
 // Int2
@@ -1723,11 +1730,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int2>(
 {
     const int vx = v.x, vy = v.y;
     asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(vx),
         "r"(vy));
 }
@@ -1743,11 +1751,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int4>(
 {
     const int vx = v.x, vy = v.y, vz = v.z, vw = v.w;
     asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3}], {%4,%5,%6,%7};}\n\t" ::"l"(surfObj),
+        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
+        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
         "r"(x),
         "r"(y),
         "r"(z),
+        "r"(0),
         "r"(vx),
         "r"(vy),
         "r"(vz),
