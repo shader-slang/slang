@@ -921,6 +921,10 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
     {
         auto paramDecl = paramDeclRef.getDecl();
         auto paramType = getParamType(astBuilder, paramDeclRef);
+        if (!paramType)
+        {
+            paramType = astBuilder->getErrorType();
+        }
         if (paramDecl->findModifier<RefModifier>())
         {
             paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
