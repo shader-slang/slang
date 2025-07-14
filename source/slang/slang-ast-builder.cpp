@@ -351,7 +351,7 @@ RefType* ASTBuilder::getRefType(
 }
 
 ConstRefType* ASTBuilder::getConstRefType(
-    Type* valueType
+    Type* valueType,
     AddressSpace addrSpace,
     AccessQualifier accessQualifier,
     CoherentScope coherentScope)

@@ -528,7 +528,7 @@ public:
 
     // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(
-        Type* valueType
+        Type* valueType,
         AddressSpace addrSpace,
         AccessQualifier accessQualifier,
         CoherentScope coherentScope);
