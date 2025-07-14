@@ -1729,22 +1729,29 @@ struct Array : IRWArray<T>
 }
 
 //@public:
+/// Represents a static UTF-8 string literal.
 __generic<int N>
 __magic_type(ShortStringType)
 __intrinsic_type($(kIROp_ShortStringType))
 struct ShortString : IArray<uint>
 {
+    /// Get the number of characters in the string.
+    /// Does not count the null terminator.
     [__unsafeForceInlineEarly]
     int getCount()
     {
         return N;
     }
 
+    /// Get the number of characters in the string.
+    /// Does not count the null terminator.
     property uint length
     {
         [__unsafeForceInlineEarly] get { return (uint)getCount(); }
     }
 
+    /// Get the i-th caracter of the string.
+    /// The unsigned character is in the lower 8 bits, and the 24 high bits are guaranteed to be zero.
     __subscript(uint i) -> uint
     {
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetCharFromString)) get;
