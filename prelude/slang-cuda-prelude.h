@@ -3769,8 +3769,6 @@ struct TensorView
 // These are used for read-only texture access with integer coordinates
 // See #6781 for details.
 
-// 1D is not supported via PTX. Keeping this placeholder in case it ever gets
-// supported.
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x)
 {
@@ -3780,6 +3778,59 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x)
         : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
         : "l"(texObj), "r"(x));
     return result;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    float result_x, result_y;
+    float stub;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=f"(result_x), "=f"(result_y), "=f"(stub), "=f"(stub)
+        : "l"(texObj), "r"(x));
+    return make_float2(result_x, result_y);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    float result_x, result_y, result_z, result_w;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=f"(result_x), "=f"(result_y), "=f"(result_z), "=f"(result_w)
+        : "l"(texObj), "r"(x));
+    return make_float4(result_x, result_y, result_z, result_w);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    uint result;
+    uint stub;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x));
+    return result;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2 tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    uint result_x, result_y;
+    uint stub;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x));
+    return make_uint2(result_x, result_y);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    uint result_x, result_y, result_z, result_w;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
+        : "l"(texObj), "r"(x));
+    return make_uint4(result_x, result_y, result_z, result_w);
 }
 
 template<typename T>
