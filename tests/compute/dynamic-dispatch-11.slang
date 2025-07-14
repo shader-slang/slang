@@ -7,7 +7,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization -shaderobj
 
 [anyValueSize(8)]
 interface IInterface

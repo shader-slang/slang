@@ -1,5 +1,6 @@
 //TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
 //TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(smoke,compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // This is a basic test for Slang compute shader.
 

@@ -9,7 +9,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -dx12 -shaderobj
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 // This data is in column major layout order.... 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 10.0  0.0 1.0 0.0 20.0  0.0 0.0 1.0 30.0  0.0 0.0 0.0 1.0]):name matrixBuffer

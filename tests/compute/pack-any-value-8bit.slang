@@ -1,6 +1,6 @@
 // Test anyvalue packing of 8bit types.
 
-//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature int16
 //TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -use-dxil -output-using-type
 
