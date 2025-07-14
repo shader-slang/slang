@@ -749,6 +749,10 @@ Result linkAndOptimizeIR(
          target == CodeGenTarget::CSource);
     shortStrOptions.targetSupports8BitsIntegrals =
         (target != CodeGenTarget::WGSL && target != CodeGenTarget::HLSL);
+    if (requiredLoweringPassSet.shortString)
+    {
+        lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
+    }
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
     // opt out of debug info.
@@ -1026,11 +1030,6 @@ Result linkAndOptimizeIR(
                 changed |= processAutodiffCalls(targetProgram, irModule, sink);
             }
             dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
-        }
-
-        if (requiredLoweringPassSet.shortString)
-        {
-            changed |= lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
         }
 
         if (!changed)
@@ -1915,11 +1914,6 @@ Result linkAndOptimizeIR(
         {
             applyGLSLLiveness(irModule);
         }
-    }
-
-    if (requiredLoweringPassSet.shortString)
-    {
-        lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
