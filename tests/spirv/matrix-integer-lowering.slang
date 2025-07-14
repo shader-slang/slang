@@ -65,27 +65,25 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     // Store results
     outputBuffer[0] = val1;
+    // CHECK: 1
     outputBuffer[1] = val2;
+    // CHECK-NEXT: 8
     outputBuffer[2] = row.x;
+    // CHECK-NEXT: 3
     outputBuffer[3] = row.y;
+    // CHECK-NEXT: 4
     outputBuffer[4] = row3.y;
+    // CHECK-NEXT: 2
     outputBuffer[5] = mat_scalar[0][0];
+    // CHECK-NEXT: 2
     outputBuffer[6] = mat_add[0][0];
+    // CHECK-NEXT: 3
     outputBuffer[7] = mat_sub[0][0];
+    // CHECK-NEXT: 1
     outputBuffer[8] = mat_mul[1][1];
+    // CHECK-NEXT: 28
     outputBuffer[9] = added;
+    // CHECK-NEXT: 10
     outputBuffer[10] = wrapper.mat1[0][0] * wrapper.mat2[0][0];
+    // CHECK-NEXT: 5
 }
-
-// Expected results for both int and uint tests
-// CHECK: 1
-// CHECK-NEXT: 8
-// CHECK-NEXT: 3
-// CHECK-NEXT: 4
-// CHECK-NEXT: 2
-// CHECK-NEXT: 2
-// CHECK-NEXT: 3
-// CHECK-NEXT: 1
-// CHECK-NEXT: 28
-// CHECK-NEXT: 10
-// CHECK-NEXT: 5

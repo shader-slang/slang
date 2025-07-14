@@ -1,5 +1,4 @@
-// -O0 is to make sure that slang doesn't perform constant folding and make this test trivial
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -O0 -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -emit-spirv-directly
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):in,name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -67,26 +66,25 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Store results
     outputBuffer[0] = val1;
+    // CHECK: 1
     outputBuffer[1] = val2;
+    // CHECK-NEXT: 0
     outputBuffer[2] = row.x;
+    // CHECK-NEXT: 0
     outputBuffer[3] = row.y;
+    // CHECK-NEXT: 1
     outputBuffer[4] = row3.y;
+    // CHECK-NEXT: 0
     outputBuffer[5] = not_mat[0][0];
+    // CHECK-NEXT: 0
     outputBuffer[6] = and_mat[0][0];
+    // CHECK-NEXT: 1
     outputBuffer[7] = mat1[0][1];
+    // CHECK-NEXT: 1 
     outputBuffer[8] = mat3[0][1];
+    // CHECK-NEXT: 0 
     outputBuffer[9] = anded;
+    // CHECK-NEXT: 0 
     outputBuffer[10] = wrapper.mat1[0][0] || wrapper.mat2[0][0];
+    // CHECK-NEXT: 1
 }
-
-// CHECK: 1
-// CHECK-NEXT: 0
-// CHECK-NEXT: 0
-// CHECK-NEXT: 1
-// CHECK-NEXT: 0
-// CHECK-NEXT: 0
-// CHECK-NEXT: 1
-// CHECK-NEXT: 1 
-// CHECK-NEXT: 0 
-// CHECK-NEXT: 0 
-// CHECK-NEXT: 1
