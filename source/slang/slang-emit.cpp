@@ -1708,7 +1708,7 @@ Result linkAndOptimizeIR(
         // pointers
         undoParameterCopy(irModule);
         // Transform struct parameters to use ConstRef for better performance
-        if (target == CodeGenTarget::CUDASource)
+        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
         {
             transformStructParamsToConstRef(irModule, codeGenContext->getSink());
         }
