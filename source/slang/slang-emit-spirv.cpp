@@ -2044,12 +2044,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // SPIR-V only supports floating-point matrices
                 // bool/int matrices should be lowered to
                 // arrays of vectors before reaching here
-                if (as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-                    as<IRIntType>(elementType))
-                {
-                    SLANG_UNEXPECTED("bool/int/uint matrices should be lowered to structs before "
-                                     "SPIR-V emission");
-                }
+                SLANG_ASSERT(!as<IRBoolType>(elementType));
+                SLANG_ASSERT(!as<IRIntType>(elementType));
+                SLANG_ASSERT(!as<IRUIntType>(elementType));
 
                 auto vectorSpvType = ensureVectorType(
                     static_cast<IRBasicType*>(elementType)->getBaseType(),
@@ -7954,6 +7951,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
+    // Helper method to handle composite arithmetic operations for matrices and arrays
+    SpvInst* emitCompositeArithmetic(
+        SpvInstParent* parent,
+        IRInst* inst,
+        IRIntegerValue rowCount,
+        IRIntegerValue colCount,
+        IRType* elementType,
+        IRType* resultType,
+        bool isMatrixType)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto rowVectorType = builder.getVectorType(elementType, colCount);
+        List<SpvInst*> rows;
+        
+        for (IRIntegerValue i = 0; i < rowCount; i++)
+        {
+            List<IRInst*> operands;
+            for (UInt j = 0; j < inst->getOperandCount(); j++)
+            {
+                auto originalOperand = inst->getOperand(j);
+                bool shouldExtract = isMatrixType ? 
+                    as<IRMatrixType>(originalOperand->getDataType()) != nullptr :
+                    as<IRArrayType>(originalOperand->getDataType()) != nullptr;
+                    
+                if (shouldExtract)
+                {
+                    auto operand = builder.emitElementExtract(originalOperand, i);
+                    emitLocalInst(parent, operand);
+                    operands.add(operand);
+                }
+                else
+                {
+                    operands.add(originalOperand);
+                }
+            }
+            rows.add(emitVectorOrScalarArithmetic(
+                parent,
+                nullptr,
+                rowVectorType,
+                inst->getOp(),
+                inst->getOperandCount(),
+                operands.getArrayView()));
+        }
+        return emitCompositeConstruct(parent, inst, resultType, rows);
+    }
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
@@ -7961,37 +8004,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
             auto colCount = getIntVal(matrixType->getColumnCount());
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            // TODO: template matrix vs. array
-            auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
-            List<SpvInst*> rows;
-            for (IRIntegerValue i = 0; i < rowCount; i++)
-            {
-                List<IRInst*> operands;
-                for (UInt j = 0; j < inst->getOperandCount(); j++)
-                {
-                    auto originalOperand = inst->getOperand(j);
-                    if (as<IRMatrixType>(originalOperand->getDataType()))
-                    {
-                        auto operand = builder.emitElementExtract(originalOperand, i);
-                        emitLocalInst(parent, operand);
-                        operands.add(operand);
-                    }
-                    else
-                    {
-                        operands.add(originalOperand);
-                    }
-                }
-                rows.add(emitVectorOrScalarArithmetic(
-                    parent,
-                    nullptr,
-                    rowVectorType,
-                    inst->getOp(),
-                    inst->getOperandCount(),
-                    operands.getArrayView()));
-            }
-            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
+            return emitCompositeArithmetic(
+                parent,
+                inst,
+                rowCount,
+                colCount,
+                matrixType->getElementType(),
+                inst->getDataType(),
+                true);
         }
         else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
         {
@@ -8008,36 +8028,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto rowCount = getIntVal(arrayType->getElementCount());
             auto colCount = getIntVal(vectorType->getElementCount());
 
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto rowVectorType = builder.getVectorType(elementType, colCount);
-            List<SpvInst*> rows;
-            for (IRIntegerValue i = 0; i < rowCount; i++)
-            {
-                List<IRInst*> operands;
-                for (UInt j = 0; j < inst->getOperandCount(); j++)
-                {
-                    auto originalOperand = inst->getOperand(j);
-                    if (as<IRArrayType>(originalOperand->getDataType()))
-                    {
-                        auto operand = builder.emitElementExtract(originalOperand, i);
-                        emitLocalInst(parent, operand);
-                        operands.add(operand);
-                    }
-                    else
-                    {
-                        operands.add(originalOperand);
-                    }
-                }
-                rows.add(emitVectorOrScalarArithmetic(
-                    parent,
-                    nullptr,
-                    rowVectorType,
-                    inst->getOp(),
-                    inst->getOperandCount(),
-                    operands.getArrayView()));
-            }
-            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
+            return emitCompositeArithmetic(
+                parent,
+                inst,
+                rowCount,
+                colCount,
+                elementType,
+                inst->getDataType(),
+                false);
         }
 
         Array<IRInst*, 4> operands;
