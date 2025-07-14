@@ -141,25 +141,18 @@ public property int gl_DeviceIndex
 public property uint3 gl_NumWorkGroups
 {
     [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(glsl_spirv, meshshading)]
     get 
     {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_NumWorkGroups)";
-        case spirv:
-            return spirv_asm {
-                    result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
-                };
-        }
+        return WorkgroupCount();
     }
 }
 
-[require(compute)]
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
     [require(compute)]
+    [require(meshshading)]
     get
     {
         return WorkgroupSize();

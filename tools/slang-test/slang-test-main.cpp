@@ -4997,8 +4997,13 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangi", &SlangITool::innerMain);
     }
 
-    SLANG_RETURN_ON_FAIL(
-        Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
+    SLANG_RETURN_ON_FAIL(Options::parse(
+        argc,
+        argv,
+        &categorySet,
+        StdWriters::getOut(),
+        StdWriters::getError(),
+        &context.options));
 
     Options& options = context.options;
 
