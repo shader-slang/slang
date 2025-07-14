@@ -7965,17 +7965,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         builder.setInsertBefore(inst);
         auto rowVectorType = builder.getVectorType(elementType, colCount);
         List<SpvInst*> rows;
-        
+
         for (IRIntegerValue i = 0; i < rowCount; i++)
         {
             List<IRInst*> operands;
             for (UInt j = 0; j < inst->getOperandCount(); j++)
             {
                 auto originalOperand = inst->getOperand(j);
-                bool shouldExtract = isMatrixType ? 
-                    as<IRMatrixType>(originalOperand->getDataType()) != nullptr :
-                    as<IRArrayType>(originalOperand->getDataType()) != nullptr;
-                    
+                bool shouldExtract =
+                    isMatrixType ? as<IRMatrixType>(originalOperand->getDataType()) != nullptr
+                                 : as<IRArrayType>(originalOperand->getDataType()) != nullptr;
+
                 if (shouldExtract)
                 {
                     auto operand = builder.emitElementExtract(originalOperand, i);
