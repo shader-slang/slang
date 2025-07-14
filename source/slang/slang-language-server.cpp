@@ -255,6 +255,47 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
         return SLANG_FAIL;
     }
 
+    // Additional validation for module integrity in language server mode
+    // to prevent crashes when processing malformed code
+    try
+    {
+        // Attempt to access the module declaration to verify the module is in a valid state
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return SLANG_FAIL;
+        }
+        
+        // Check if the module has a severe parse error count that suggests corruption
+        // We allow some errors but protect against severely malformed modules
+        auto diagnosticList = version->diagnostics.tryGetValue(canonicalPath);
+        if (diagnosticList)
+        {
+            int severeErrorCount = 0;
+            for (const auto& diagnostic : diagnosticList->messages)
+            {
+                // Count fatal parsing errors that might indicate AST corruption
+                if (diagnostic.severity == LanguageServerProtocol::kDiagnosticsSeverityError)
+                {
+                    severeErrorCount++;
+                }
+            }
+            
+            // If there are too many errors, the module may be in an unsafe state
+            // This threshold prevents crashes while still allowing error reporting
+            if (severeErrorCount > 50)
+            {
+                return SLANG_FAIL;
+            }
+        }
+    }
+    catch (...)
+    {
+        // If accessing the module causes any exception, treat it as a failure
+        // This prevents the language server from crashing on corrupted modules
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
@@ -630,6 +671,21 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     {
         return LanguageServerResult<LanguageServerProtocol::Hover>();
     }
+    
+    // Add protection against corrupted modules to prevent crashes during hover operations
+    try
+    {
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return LanguageServerResult<LanguageServerProtocol::Hover>();
+        }
+    }
+    catch (...)
+    {
+        return LanguageServerResult<LanguageServerProtocol::Hover>();
+    }
+    
     auto findResult = findASTNodesAt(
         doc.Ptr(),
         version->linkage->getSourceManager(),
@@ -1011,6 +1067,21 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
     {
         return std::nullopt;
     }
+    
+    // Add protection against corrupted modules to prevent crashes during goto definition operations
+    try
+    {
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return std::nullopt;
+        }
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+    
     auto findResult = findASTNodesAt(
         doc.Ptr(),
         version->linkage->getSourceManager(),
@@ -1289,6 +1360,20 @@ LanguageServerResult<CompletionResult> LanguageServerCore::completion(
 
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
+    {
+        return std::nullopt;
+    }
+
+    // Add protection against corrupted modules to prevent crashes during completion operations
+    try
+    {
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return std::nullopt;
+        }
+    }
+    catch (...)
     {
         return std::nullopt;
     }
@@ -1631,6 +1716,20 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
 
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
+    {
+        return std::nullopt;
+    }
+
+    // Add protection against corrupted modules to prevent crashes during signature help operations
+    try
+    {
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return std::nullopt;
+        }
+    }
+    catch (...)
     {
         return std::nullopt;
     }
@@ -2768,6 +2867,20 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     auto version = m_workspace->getCurrentVersion();
     Module* parsedModule = version->getOrLoadModule(canonicalPath);
     if (!parsedModule)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Add protection against corrupted modules to prevent crashes during text change operations
+    try
+    {
+        auto moduleDecl = parsedModule->getModuleDecl();
+        if (!moduleDecl)
+        {
+            return SLANG_FAIL;
+        }
+    }
+    catch (...)
     {
         return SLANG_FAIL;
     }
