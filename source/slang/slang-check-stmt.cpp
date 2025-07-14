@@ -41,6 +41,19 @@ void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
     checkModifiers(stmt);
 }
 
+CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
+{
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    {
+        if (auto catchStmt = as<CatchStmt>(outerStmtInfo->stmt))
+        {
+            if (!catchStmt->errorVar || catchStmt->errorVar->getType()->equals(errorType))
+                return catchStmt;
+        }
+    }
+    return nullptr;
+}
+
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
     // When we encounter a declaration during statement checking,
@@ -63,10 +76,9 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
     // Make sure to fully check all nested agg type decls first.
     if (stmt->scopeDecl)
     {
-        for (auto decl : stmt->scopeDecl->members)
+        for (auto aggDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<AggTypeDeclBase>())
         {
-            if (as<AggTypeDeclBase>(decl))
-                ensureAllDeclsRec(decl, DeclCheckState::DefinitionChecked);
+            ensureAllDeclsRec(aggDecl, DeclCheckState::DefinitionChecked);
         }
 
         // Consider this code:
@@ -116,20 +128,6 @@ void SemanticsStmtVisitor::visitLabelStmt(LabelStmt* stmt)
 void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
 {
     SemanticsVisitor::checkStmt(stmt, *this);
-}
-
-template<typename T>
-T* SemanticsStmtVisitor::FindOuterStmt(Stmt* searchUntil)
-{
-    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
-         outerStmtInfo = outerStmtInfo->next)
-    {
-        auto outerStmt = outerStmtInfo->stmt;
-        auto found = as<T>(outerStmt);
-        if (found)
-            return found;
-    }
-    return nullptr;
 }
 
 Stmt* SemanticsStmtVisitor::findOuterStmtWithLabel(Name* label)
@@ -255,7 +253,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e);
+    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
 
@@ -408,7 +406,7 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
-    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr);
+    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr, getSink());
 
     // coerce to type being switch on, and ensure that value is a compile-time constant
     // The Vals in the AST are pointer-unique, making them easy to check for duplicates
@@ -524,9 +522,10 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
 {
+    WithOuterStmt subContext(this, stmt);
     stmt->predicate = checkPredicateExpr(stmt->predicate);
-    checkStmt(stmt->positiveStatement);
-    checkStmt(stmt->negativeStatement);
+    subContext.checkStmt(stmt->positiveStatement);
+    subContext.checkStmt(stmt->negativeStatement);
 }
 
 void SemanticsStmtVisitor::visitUnparsedStmt(UnparsedStmt*)
@@ -547,9 +546,19 @@ void SemanticsStmtVisitor::visitDiscardStmt(DiscardStmt*)
 void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
 {
     auto function = getParentFunc();
+    Type* returnType = nullptr;
+    Type* expectedReturnType = nullptr;
+    if (m_parentLambdaDecl)
+    {
+        expectedReturnType = m_parentLambdaDecl->funcDecl->returnType.type;
+    }
+    else if (function)
+    {
+        expectedReturnType = function->returnType.type;
+    }
     if (!stmt->expression)
     {
-        if (function && !function->returnType.equals(m_astBuilder->getVoidType()) &&
+        if (expectedReturnType && !expectedReturnType->equals(m_astBuilder->getVoidType()) &&
             !as<ConstructorDecl>(function))
         {
             getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
@@ -558,22 +567,29 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     else
     {
         stmt->expression = CheckTerm(stmt->expression);
+        returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
-            if (function)
+            if (!m_parentLambdaExpr && expectedReturnType)
             {
                 stmt->expression =
-                    coerce(CoercionSite::Return, function->returnType.Ptr(), stmt->expression);
+                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
             }
-            else
-            {
-                // TODO(tfoley): this case currently gets triggered for member functions,
-                // which aren't being checked consistently (because of the whole symbol
-                // table idea getting in the way).
-
-                //							getSink()->diagnose(stmt,
-                // Diagnostics::unimplemented, "case for return stmt");
-            }
+        }
+    }
+    if (m_parentLambdaDecl)
+    {
+        if (!returnType)
+            returnType = m_astBuilder->getVoidType();
+        if (!m_parentLambdaDecl->funcDecl->returnType.type)
+            m_parentLambdaDecl->funcDecl->returnType.type = returnType;
+        if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
+        {
+            getSink()->diagnose(
+                stmt,
+                Diagnostics::returnTypeMismatchInsideLambda,
+                returnType,
+                m_parentLambdaDecl->funcDecl->returnType.type);
         }
     }
 
@@ -597,6 +613,55 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
     subContext.checkStmt(stmt->statement);
+}
+
+void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
+{
+    stmt->expression = CheckTerm(stmt->expression);
+    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
+
+    auto parentFunc = getParentFunc();
+    if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
+    {
+        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInNonThrowFunc);
+        return;
+    }
+
+    if (!catchStmt && !stmt->expression->type->equals(m_astBuilder->getErrorType()))
+    {
+        if (!parentFunc->errorType->equals(stmt->expression->type))
+        {
+            getSink()->diagnose(
+                stmt->expression,
+                Diagnostics::throwTypeIncompatibleWithErrorType,
+                stmt->expression->type,
+                parentFunc->errorType);
+        }
+    }
+
+    if (FindOuterStmt<DeferStmt>(catchStmt))
+    {
+        // Allowing 'throw' to escape a defer statement gets quite complex, for
+        // similar reasons as 'return' - if you have two (or more) defers,
+        // both of which exit the outer scope, it's unclear which one gets
+        // called and when. Both can't fully run. That kind of goes against the
+        // point of 'defer', which is to _always_ run some code when exiting
+        // scopes.
+        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInsideDefer);
+    }
+}
+
+void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
+{
+    if (stmt->errorVar)
+    {
+        ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
+        stmt->errorVar->hiddenFromLookup = false;
+    }
+
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->tryBody);
+    subContext.checkStmt(stmt->handleBody);
 }
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
@@ -880,7 +945,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     // if the loop body modifies the induction variable.
     //
     auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
-    auto litExpr = m_astBuilder->create<LiteralExpr>();
+    auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
     litExpr->type.type = m_astBuilder->getIntType();
     litExpr->token.setName(getNamePool()->getName(String(iterations)));
     maxItersAttr->args.add(litExpr);

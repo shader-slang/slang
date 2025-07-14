@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
@@ -211,11 +212,14 @@ public:
     Stmt* parseIfLetStatement();
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
-    DoWhileStmt* ParseDoWhileStatement();
+    DoWhileStmt* ParseDoWhileStatement(Stmt* body);
+    CatchStmt* ParseDoCatchStatement(Stmt* body);
+    Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
+    ThrowStmt* ParseThrowStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -1182,6 +1186,14 @@ bool tryParseUsingSyntaxDecl(
     return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
 }
 
+static void maybeUpgradeLanguageVersionFromLegacy(SlangLanguageVersion& ver)
+{
+    if (ver == SLANG_LANGUAGE_VERSION_LEGACY)
+    {
+        ver = SLANG_LANGUAGE_VERSION_2025;
+    }
+}
+
 static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = LookupMask::Default)
 {
     Modifiers modifiers;
@@ -1213,7 +1225,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     if (as<VisibilityModifier>(parsedModifier))
                     {
                         if (auto currentModule = parser->getCurrentModuleDecl())
-                            currentModule->isInLegacyLanguage = false;
+                            maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
                     }
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
@@ -1318,7 +1330,7 @@ static NodeBase* parseIncludeDecl(Parser* parser, void* /*userData*/)
     auto decl = parser->astBuilder->create<IncludeDecl>();
     parseFileReferenceDeclBase(parser, decl);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -1358,7 +1370,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     }
     parser->ReadToken(TokenType::Semicolon);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -1431,8 +1443,7 @@ static NameLoc ParseDeclName(Parser* parser)
     }
     else
     {
-        nameToken = parser->ReadToken(TokenType::Identifier);
-        return NameLoc(nameToken);
+        return expectIdentifier(parser);
     }
 }
 
@@ -1681,6 +1692,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
+        bool optional = AdvanceIf(parser, "optional", &whereToken);
+
         auto subType = parser->ParseTypeExp();
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1691,6 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 parser->FillPosition(constraint);
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
+                if (optional)
+                {
+                    addModifier(
+                        constraint,
+                        parser->astBuilder->create<OptionalConstraintModifier>());
+                }
                 AddMember(genericParent, constraint);
                 if (!AdvanceIf(parser, TokenType::Comma))
                     break;
@@ -1704,6 +1723,10 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->FillPosition(constraint);
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
             AddMember(genericParent, constraint);
         }
         else if (AdvanceIf(parser, TokenType::LParent))
@@ -2025,6 +2048,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
     switch (parser->tokenReader.peekTokenType())
     {
     case TokenType::Identifier:
+    case TokenType::CompletionRequest:
         {
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
@@ -2423,8 +2447,8 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             for (auto candidate : overloadedExpr->lookupResult2)
             {
                 if (candidate.declRef.is<GenericDecl>() ||
-                    declRefExpr->declRef.is<FunctionDeclBase>() ||
-                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                    candidate.declRef.is<FunctionDeclBase>() ||
+                    candidate.declRef.is<AggTypeDeclBase>())
                 {
                     baseKind = BaseGenericKind::Generic;
                     break;
@@ -3625,7 +3649,7 @@ static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
 
             // substitution needs to be filled during check
             Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl))
+            if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl))
             {
                 paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
@@ -3774,9 +3798,6 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // function `foo` has been defined), and direct member
             // lookup will only give us the first.
             //
-            Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
-            //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
             //
@@ -3786,7 +3807,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // as possible in the parser, and we'd rather be
             // as permissive as possible right now.
             //
-            for (Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+            for (auto d : parentDecl->getDirectMemberDeclsOfName(nameAndLoc.name))
             {
                 namespaceDecl = as<NamespaceDecl>(d);
                 if (namespaceDecl)
@@ -4099,6 +4120,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
+                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
@@ -4965,8 +4987,9 @@ static DeclBase* ParseDeclWithModifiers(
                 };
                 if (AdvanceIf(parser, "buffer"))
                 {
-                    decl = as<Decl>(
-                        parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                    decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
+                        parser,
+                        getLayoutArg("DefaultDataLayout")));
                     break;
                 }
                 else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
@@ -5035,6 +5058,20 @@ static DeclBase* ParseDeclWithModifiers(
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
+        }
+        break;
+    case TokenType::CompletionRequest:
+        {
+            if (modifiers.hasModifier<OverrideModifier>())
+            {
+                auto resultDecl = parser->astBuilder->create<EmptyDecl>();
+                resultDecl->nameAndLoc = expectIdentifier(parser);
+                decl = resultDecl;
+            }
+            else
+            {
+                decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
+            }
         }
         break;
     // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
@@ -5113,9 +5150,103 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
+static void parseInterfaceDefaultMethodAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* interfaceDecl)
+{
+    // If we parsed an interface method with a body,
+    // parse it again as an explicit generic decl on ThisType.
+    auto astBuilder = parser->astBuilder;
+    InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
+    parser->PushScope(genericDecl);
+
+    // Create GenericTypeParamDecl for `This`.
+    auto thisTypeDecl = astBuilder->create<GenericTypeParamDecl>();
+    thisTypeDecl->nameAndLoc.name = getName(parser, "This");
+    thisTypeDecl->parameterIndex = 0;
+    genericDecl->thisTypeDecl = thisTypeDecl;
+    AddMember(genericDecl, thisTypeDecl);
+
+    // Create GenericTypeConstraintDecl for `This:IFoo`.
+    auto thisTypeConstraint = astBuilder->create<GenericTypeConstraintDecl>();
+    auto thisTypeVarExpr = astBuilder->create<VarExpr>();
+    thisTypeVarExpr->name = getName(parser, "This");
+    thisTypeVarExpr->scope = parser->currentScope;
+    thisTypeConstraint->sub.exp = thisTypeVarExpr;
+
+    // Since we can't form a DeclRef to the parent interface decl yet (because we are still parsing
+    // it), we will use a `ThisInterfaceExpr` here to represent the interface type.
+    auto thisInterfaceExpr = astBuilder->create<ThisInterfaceExpr>();
+    thisInterfaceExpr->scope = parser->currentScope;
+    thisTypeConstraint->sup.exp = thisInterfaceExpr;
+    genericDecl->thisTypeConstraintDecl = thisTypeConstraint;
+    AddMember(genericDecl, thisTypeConstraint);
+
+    parser->FillPosition(genericDecl);
+    parser->genericDepth++;
+    auto newInnerDecl = as<Decl>(ParseDecl(parser, genericDecl));
+    genericDecl->inner = newInnerDecl;
+    newInnerDecl->parentDecl = genericDecl;
+    parser->genericDepth--;
+    parser->PopScope();
+    AddMember(interfaceDecl, genericDecl);
+
+    // Mark the requirement decl with `HasInterfaceDefaultImplModifier`.
+    auto hasDefaultImplModifier = astBuilder->create<HasInterfaceDefaultImplModifier>();
+    hasDefaultImplModifier->defaultImplDecl = genericDecl;
+    addModifier(parsedDecl, hasDefaultImplModifier);
+
+    // Update the name of the generic and newly parsed func, to ensure
+    // the mangled name of the default impl func doesn't clash with the
+    // requirement.
+    StringBuilder sb;
+    sb << getText(newInnerDecl->getName()) << "$defaultImpl";
+    genericDecl->nameAndLoc.name = getName(parser, sb.produceString());
+
+    newInnerDecl->nameAndLoc.name = genericDecl->getName();
+    if (auto newInnerGenDecl = as<GenericDecl>(newInnerDecl))
+    {
+        // If the method itself is generic, continue to update the inner function's name.
+        if (newInnerGenDecl->inner)
+        {
+            newInnerGenDecl->inner->nameAndLoc.name = genericDecl->getName();
+        }
+    }
+
+    // Remove the body from the requirement decl.
+    auto requirementFunc = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementFunc))
+        funcDecl->body = nullptr;
+}
+
+static void maybeReparseInterfaceFuncAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* containerDecl,
+    TokenReader tokenReader)
+{
+    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
+    if (!funcDecl || !funcDecl->body)
+        return;
+
+    auto interfaceDecl = as<InterfaceDecl>(containerDecl);
+    if (!interfaceDecl)
+        return;
+
+    if (parser->sink->getErrorCount() != 0)
+        return;
+
+    Parser newParser(*parser);
+    newParser.tokenReader = tokenReader;
+    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+}
+
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
 {
+    TokenReader tokenReader;
     Token closingBraceToken;
+    bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
         if (parser->options.allowGLSLInput)
@@ -5123,7 +5254,58 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
         }
-        ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+            tokenReader = parser->tokenReader;
+        auto decl = ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+        {
+            // If we parsed an interface method with a body (for the default implementation),
+            // we will create a duplicate decl where it is nested inside an explicit generic
+            // decl, such that `ThisType` is a generic type parameter.
+            // For an example, if the user writes:
+            // ```
+            // interface IFoo {
+            //  int getVal();
+            //  int getGreaterVal() { return getVal() + 1; }
+            // }
+            // ```
+            // We will represent `IFoo` as:
+            // ```
+            // interface IFoo {
+            //     int getVal();
+            //
+            //     [HasInterfaceDefaultImplModifier(getGreaterVal_defaultImpl)]
+            //     int getGreaterVal();
+            //
+            //     __interface_default_impl_generic<This:IFoo>
+            //     int getGreaterVal_defaultImpl() {
+            //        // `this` here will have type `This` (generic param).
+            //        return this.getVal() + 1;
+            //     }
+            // }
+            // ```
+            // Where `__interface_default_impl_generic` is a sub-class of `__generic`, and
+            // acts exactly like a generic. The sub-class is just to make it easy to
+            // identify a default impl. An interface default impl decl will not be treated
+            // as an interface requirement and lowered as an entry in the witness table,
+            // instead it is just an ordinary member decl that will be lowered into an
+            // `IRGeneric`.
+            //
+            // Ideally we would achieve the same result by parsing the function once, and
+            // then clone the AST nodes to represent `getGreaterVal_defaultImpl`, but we
+            // don't have the infrastructure to do that just yet. So we will play a dirty
+            // trick to achieve the same effect by re-parsing the method body as an
+            // explicit generic decl. Fortunately, this redundant parsing won't actually
+            // cause too much redundant work, because the function bodies are only parsed
+            // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
+            // process. Once we have the functionality to systematically clone AST nodes,
+            // we can eliminate this reparsing hack.
+            maybeReparseInterfaceFuncAsExplicitGeneric(
+                parser,
+                as<Decl>(decl),
+                containerDecl,
+                tokenReader);
+        }
     }
     containerDecl->closingSourceLoc = closingBraceToken.loc;
 }
@@ -5150,7 +5332,20 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    // If the program already has a scope, then reuse it instead of overwriting it!
+    // Verify that the language version is valid.
+    if (sourceLanguage == SourceLanguage::Slang)
+    {
+        if (!isValidSlangLanguageVersion(currentModule->languageVersion))
+        {
+            sink->diagnose(
+                program->loc,
+                Diagnostics::unknownLanguageVersion,
+                currentModule->languageVersion);
+        }
+    }
+
+    // If the program already has a scope, then
+    // reuse it instead of overwriting it!
     if (program->ownedScope)
         PushScope(program->ownedScope);
     else
@@ -5604,7 +5799,7 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
 
             auto lookupResult = lookUpDirectAndTransparentMembers(
                 parser->astBuilder,
-                nullptr, // no semantics visitor available yet
+                parser->semanticsVisitor,
                 staticMemberExpr->name,
                 aggTypeDecl,
                 declRef);
@@ -5624,7 +5819,7 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
         // Do the lookup in the current scope
         auto lookupResult = lookUp(
             parser->astBuilder,
-            nullptr, // no semantics visitor available yet
+            parser->semanticsVisitor,
             varExpr->name,
             parser->currentScope);
         if (!lookupResult.isValid() || lookupResult.isOverloaded())
@@ -5638,11 +5833,8 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
 
 static bool isTypeName(Parser* parser, Name* name)
 {
-    auto lookupResult = lookUp(
-        parser->astBuilder,
-        nullptr, // no semantics visitor available yet
-        name,
-        parser->currentScope);
+    auto lookupResult =
+        lookUp(parser->astBuilder, parser->semanticsVisitor, name, parser->currentScope);
     if (!lookupResult.isValid() || lookupResult.isOverloaded())
         return false;
 
@@ -5741,7 +5933,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("while"))
         statement = ParseWhileStatement();
     else if (LookAheadToken("do"))
-        statement = ParseDoWhileStatement();
+        statement = ParseDoStatement();
     else if (LookAheadToken("break"))
         statement = ParseBreakStatement();
     else if (LookAheadToken("continue"))
@@ -5780,6 +5972,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("try"))
     {
         statement = ParseExpressionStatement();
+    }
+    else if (LookAheadToken("throw"))
+    {
+        statement = ParseThrowStatement();
     }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
@@ -5941,7 +6137,6 @@ Stmt* Parser::parseBlockStatement()
 
     Stmt* body = nullptr;
 
-
     if (!tokenReader.isAtEnd())
     {
         FillPosition(blockStatement);
@@ -6098,11 +6293,6 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
-    if (semanticsVisitor)
-        semanticsVisitor->ensureDecl(
-            (Decl*)tempVarDecl,
-            DeclCheckState::DefinitionChecked,
-            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
@@ -6259,18 +6449,73 @@ WhileStmt* Parser::ParseWhileStatement()
     return whileStatement;
 }
 
-DoWhileStmt* Parser::ParseDoWhileStatement()
+DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
 {
     DoWhileStmt* doWhileStatement = astBuilder->create<DoWhileStmt>();
     FillPosition(doWhileStatement);
-    ReadToken("do");
-    doWhileStatement->statement = ParseStatement();
+    doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
     doWhileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     return doWhileStatement;
+}
+
+CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
+{
+    for (;;)
+    {
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(scopeDecl);
+
+        CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
+        FillPosition(catchStatement);
+        ReadToken("catch");
+
+        // Optional error parameter. If not given, the catch catches all error
+        // types.
+        if (AdvanceIf(this, TokenType::LParent))
+        {
+            ParamDecl* errorVar = parseModernParamDecl(this);
+            catchStatement->errorVar = errorVar;
+            AddMember(scopeDecl, errorVar);
+            ReadToken(TokenType::RParent);
+        }
+
+        catchStatement->tryBody = body;
+        catchStatement->handleBody = ParseStatement();
+
+        PopScope();
+
+        if (!LookAheadToken("catch"))
+            return catchStatement;
+
+        // Use this catch as the body for the next one, if multiple are chained.
+        body = catchStatement;
+    }
+}
+
+Stmt* Parser::ParseDoStatement()
+{
+    SourceLoc position = tokenReader.peekLoc();
+    ReadToken("do");
+    Stmt* statement = ParseStatement();
+    if (LookAheadToken("while"))
+    {
+        Stmt* whileStatement = ParseDoWhileStatement(statement);
+        whileStatement->loc = position;
+        return whileStatement;
+    }
+    else if (LookAheadToken("catch"))
+    {
+        return ParseDoCatchStatement(statement);
+    }
+    else
+    {
+        Unexpected(this, "while' or 'catch");
+        return statement;
+    }
 }
 
 BreakStmt* Parser::ParseBreakStatement()
@@ -6313,6 +6558,15 @@ DeferStmt* Parser::ParseDeferStatement()
     ReadToken("defer");
     deferStatement->statement = ParseStatement();
     return deferStatement;
+}
+
+ThrowStmt* Parser::ParseThrowStatement()
+{
+    ThrowStmt* throwStatement = astBuilder->create<ThrowStmt>();
+    FillPosition(throwStatement);
+    ReadToken("throw");
+    throwStatement->expression = ParseExpression();
+    return throwStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()
@@ -7131,22 +7385,58 @@ static bool _isCast(Parser* parser, Expr* expr)
     return false;
 }
 
-static bool tryParseExpression(Parser* parser, Expr*& outExpr, TokenType tokenTypeAfter)
+template<typename FIsValidFollowToken>
+static bool tryParseExpression(
+    Parser* parser,
+    Expr*& outExpr,
+    Precedence exprLevel,
+    const FIsValidFollowToken& isValidFollowToken)
 {
     auto cursor = parser->tokenReader.getCursor();
     auto isRecovering = parser->isRecovering;
     auto oldSink = parser->sink;
     DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
     parser->sink = &newSink;
-    outExpr = parser->ParseExpression();
+    outExpr = parser->ParseExpression(exprLevel);
     parser->sink = oldSink;
     parser->isRecovering = isRecovering;
-    if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
+    if (outExpr && newSink.getErrorCount() == 0 &&
+        isValidFollowToken(parser->tokenReader.peekTokenType()))
     {
         return true;
     }
     parser->tokenReader.setCursor(cursor);
     return false;
+}
+
+static Expr* parseLambdaExpr(Parser* parser)
+{
+    auto lambdaExpr = parser->astBuilder->create<LambdaExpr>();
+    parser->ReadToken(TokenType::LParent);
+    lambdaExpr->paramScopeDecl = parser->astBuilder->create<ScopeDecl>();
+    parser->pushScopeAndSetParent(lambdaExpr->paramScopeDecl);
+    while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+    {
+        AddMember(lambdaExpr->paramScopeDecl, parser->ParseParameter());
+        if (AdvanceIf(parser, TokenType::RParent))
+            break;
+        parser->ReadToken(TokenType::Comma);
+    }
+    parser->FillPosition(lambdaExpr);
+    parser->ReadToken(TokenType::DoubleRightArrow);
+    if (parser->LookAheadToken(TokenType::LBrace))
+    {
+        lambdaExpr->bodyStmt = parser->parseBlockStatement();
+    }
+    else
+    {
+        auto returnStmt = parser->astBuilder->create<ReturnStmt>();
+        parser->FillPosition(returnStmt);
+        returnStmt->expression = parser->ParseArgExpr();
+        lambdaExpr->bodyStmt = returnStmt;
+    }
+    parser->PopScope();
+    return lambdaExpr;
 }
 
 static Expr* parseAtomicExpr(Parser* parser)
@@ -7161,12 +7451,22 @@ static Expr* parseAtomicExpr(Parser* parser)
     // Either:
     // - parenthesized expression `(exp)`
     // - cast `(type) exp`
+    // - lambda expressions (paramList)=>x
     //
     // Proper disambiguation requires mixing up parsing
     // and semantic checking (which we should do eventually)
     // but for now we will follow some heuristics.
     case TokenType::LParent:
         {
+            // Disambiguate between a lambda expression and other cases.
+            auto tokenReader = parser->tokenReader;
+            SkipBalancedToken(&tokenReader);
+            auto nextTokenAfterParent = tokenReader.peekTokenType();
+            if (nextTokenAfterParent == TokenType::DoubleRightArrow)
+            {
+                return parseLambdaExpr(parser);
+            }
+
             Token openParen = parser->ReadToken(TokenType::LParent);
 
             // Only handles cases of `(type)`, where type is a single identifier,
@@ -7187,9 +7487,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 tcexpr->loc = openParen.loc;
 
                 tcexpr->functionExpr = varExpr;
-
-                auto arg = parsePrefixExpr(parser);
-                tcexpr->arguments.add(arg);
+                tcexpr->arguments.add(parsePrefixExpr(parser));
 
                 return tcexpr;
             }
@@ -7203,45 +7501,99 @@ static Expr* parseAtomicExpr(Parser* parser)
                 Expr* base = nullptr;
                 if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    // We don't support empty parentheses `()` as a valid expression.
-                    parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
-                    base = parser->astBuilder->create<IncompleteExpr>();
-                    base->type = parser->astBuilder->getErrorType();
+                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        // We support empty parentheses `()` as a valid expression to construct an
+                        // empty tuple in Slang 2026.
+                        base = parser->astBuilder->create<TupleExpr>();
+                        base->loc = openParen.loc;
+                    }
+                    else
+                    {
+                        // We don't support empty parentheses `()` as a valid expression prior to
+                        // Slang 2026.
+                        parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                        base = parser->astBuilder->create<IncompleteExpr>();
+                        base->type = parser->astBuilder->getErrorType();
+                    }
                 }
                 else
                 {
-                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    // When language version is 2026 or later, we no longer parse comma as a
+                    // C/C++-style comma operator when it is inside a paranthesis,
+                    // but rather as a tuple element separator.
+                    //
+                    Precedence exprLevel = Precedence::Comma;
+                    if (parser->sourceLanguage == SourceLanguage::Slang &&
+                        parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        // Setting exprLevel to Assignment here will allow the following
+                        // tryParseExpression call to parse the expression until the next `)` or
+                        // `,`, instead of consuming any ',' as a comma operator.
+                        exprLevel = Precedence::Assignment;
+                    }
+                    auto isValidFollowToken = [=](TokenType tokenType)
+                    {
+                        if (tokenType == TokenType::RParent)
+                            return true;
+                        if (exprLevel == Precedence::Assignment && tokenType == TokenType::Comma)
+                            return true;
+                        return false;
+                    };
+                    if (!tryParseExpression(parser, base, exprLevel, isValidFollowToken))
                     {
                         base = parser->ParseType();
                     }
                 }
 
-                parser->ReadToken(TokenType::RParent);
-
-                // We now try and determine by what base is, if this is actually a cast or an
-                // expression in parentheses
-                if (_isCast(parser, base))
+                if (parser->LookAheadToken(TokenType::Comma))
                 {
-                    // Parse as a cast
-
-                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    tcexpr->loc = openParen.loc;
-
-                    tcexpr->functionExpr = base;
-
-                    auto arg = parsePrefixExpr(parser);
-                    tcexpr->arguments.add(arg);
-
-                    return tcexpr;
+                    // We have a comma, so we are not done yet.
+                    // If we reach here, the language version must be 2026 or later,
+                    // where we allow (a,b,c,...) syntax as a tuple, otherwise we would have
+                    // parsed it into `base`.
+                    //
+                    List<Expr*> elementExprs;
+                    elementExprs.add(base);
+                    while (AdvanceIf(parser, TokenType::Comma))
+                    {
+                        if (parser->LookAheadToken(TokenType::RParent))
+                            break;
+                        auto elementExpr = parser->ParseArgExpr();
+                        elementExprs.add(elementExpr);
+                    }
+                    parser->ReadToken(TokenType::RParent);
+                    TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
+                    tupleExpr->loc = openParen.loc;
+                    tupleExpr->elements = _Move(elementExprs);
+                    return tupleExpr;
                 }
                 else
                 {
-                    // Pass as an expression in parentheses
+                    // We parsed an expression in the form of (expr), without
+                    // any commas in `expr`.
+                    // We now try and determine by what base is, if this is actually a cast or an
+                    // expression in parentheses.
+                    //
+                    parser->ReadToken(TokenType::RParent);
+                    if (_isCast(parser, base))
+                    {
+                        // Parse as a cast
+                        TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                        tcexpr->loc = openParen.loc;
 
-                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                    parenExpr->loc = openParen.loc;
-                    parenExpr->base = base;
-                    return parenExpr;
+                        tcexpr->functionExpr = base;
+                        tcexpr->arguments.add(parsePrefixExpr(parser));
+
+                        return tcexpr;
+                    }
+                    else
+                    {
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
+                    }
                 }
             }
         }
@@ -7544,6 +7896,21 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             return constExpr;
         }
+
+    case TokenType::CharLiteral:
+        {
+            IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+            parser->FillPosition(constExpr);
+
+            auto token = parser->tokenReader.advanceToken();
+            constExpr->token = token;
+
+            IntegerLiteralValue value = getCharLiteralValue(token);
+            constExpr->value = value;
+            constExpr->suffixType = BaseType::UInt;
+            return constExpr;
+        }
+
     case TokenType::CompletionRequest:
         {
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
@@ -8394,7 +8761,7 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = translationUnit->sourceLanguage;
+    parser.sourceLanguage = sourceLanguage;
 
     return parser.parseSourceFile(parentDecl);
 }
@@ -9104,6 +9471,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
     _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
 
+    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
+
     _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
     _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
 
@@ -9124,6 +9493,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("writeonly", parseWriteonlyModifier),
     _makeParseModifier("export", getSyntaxClass<HLSLExportModifier>()),
     _makeParseModifier("dynamic_uniform", getSyntaxClass<DynamicUniformModifier>()),
+    _makeParseModifier("override", getSyntaxClass<OverrideModifier>()),
 
     // Modifiers for geometry shader input
     _makeParseModifier("point", getSyntaxClass<HLSLPointModifier>()),

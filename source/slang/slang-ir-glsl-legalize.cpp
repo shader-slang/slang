@@ -11,12 +11,7 @@
 #include "slang-ir.h"
 
 #include <functional>
-
-#ifdef SLANG_USE_SYSTEM_SPIRV_HEADER
 #include <spirv/unified1/spirv.h>
-#else
-#include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
-#endif
 
 namespace Slang
 {
@@ -630,6 +625,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
     }
+    else if (semanticName == "sv_vulkaninstanceid")
+    {
+        // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-input-assembler-stage-using#instanceid
+        // uint in hlsl, int in glsl
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_InstanceIndex";
+    }
     else if (semanticName == "sv_isfrontface")
     {
         // bool in hlsl & glsl
@@ -663,6 +665,12 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         name = "gl_DrawID";
         requiredType = builder->getBasicType(BaseType::Int);
+    }
+    else if (semanticName == "sv_deviceindex")
+    {
+        name = "gl_DeviceIndex";
+        requiredType = builder->getBasicType(BaseType::Int);
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_device_group"));
     }
     else if (semanticName == "sv_primitiveid")
     {
@@ -774,6 +782,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_vertexid")
+    {
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_VertexIndex";
+        targetVarName = IRTargetBuiltinVarName::HlslVertexID;
+        context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+        context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+    }
+    else if (semanticName == "sv_vulkanvertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
         requiredType = builder->getBasicType(BaseType::Int);
@@ -1251,6 +1269,12 @@ void invokePathConstantFuncInHullShader(
     fixUpFuncType(constantFunc);
 }
 
+static bool targetBuiltinRequiresLegalization(IRTargetBuiltinVarName builtinVarName)
+{
+    return (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID) ||
+           (builtinVarName == IRTargetBuiltinVarName::HlslVertexID);
+}
+
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -1284,7 +1308,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // Validate the system value, convert to a regular parameter if this is not a valid system
         // value for a given target.
         if (systemSemantic && systemValueInfo && isSPIRV(codeGenContext->getTargetFormat()) &&
-            systemValueInfo->targetVarName == IRTargetBuiltinVarName::HlslInstanceID &&
+            targetBuiltinRequiresLegalization(systemValueInfo->targetVarName) &&
             ((stage == Stage::Fragment) ||
              (stage == Stage::Vertex &&
               inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
@@ -2810,6 +2834,16 @@ static void legalizeMeshOutputParam(
                     builder->setInsertAfter(c);
                     assign(builder, d, ScalarizedVal::value(builder->emitLoad(tmp)));
                 }
+                else if (const auto load = as<IRLoad>(s))
+                {
+                    // Handles the case where a `this` points to a IRMeshOutputRef.
+                    auto t = as<IRPtrType>(load->getPtr()->getDataType())->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    assign(builder, ScalarizedVal::address(tmp), d);
+
+                    s->replaceUsesWith(builder->emitLoad(tmp));
+                    s->removeAndDeallocate();
+                }
                 else if (const auto swiz = as<IRSwizzledStore>(s))
                 {
                     SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
@@ -3542,28 +3576,40 @@ void legalizeEntryPointParameterForGLSL(
 
                 auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-                if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-                    continue;
-                if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+
+                // When we relate a "global variable" to a "global parameter" using
+                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
+                // is dependent on the global parameter's type. Struct types for example will relate
+                // to the tuple flavor, while vector types will be related to the address flavor.
+                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
                 {
-                    for (auto elem : tupleVal->elements)
+                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
                     {
-                        if (elem.key == key)
+                        for (auto elem : tupleVal->elements)
                         {
-                            realGlobalVar = elem.val.irValue;
-                            if (!realGlobalVar &&
-                                ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
+                            if (elem.key == key)
                             {
-                                if (auto typeAdapterVal =
-                                        as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                realGlobalVar = elem.val.irValue;
+                                if (!realGlobalVar &&
+                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
                                 {
-                                    realGlobalVar = typeAdapterVal->val.irValue;
+                                    if (auto typeAdapterVal =
+                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                    {
+                                        realGlobalVar = typeAdapterVal->val.irValue;
+                                    }
                                 }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
+                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                {
+                    realGlobalVar = globalValue.irValue;
+                }
+                else
+                    continue;
                 SLANG_ASSERT(realGlobalVar);
 
                 // Remove all stores into the global var introduced during
@@ -3908,12 +3954,13 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     return result;
 }
 
+
 void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
 {
     List<KeyValuePair<IRTargetBuiltinVarName, IRInst*>> workItems;
     for (auto [builtinVarName, varInst] : context.builtinVarMap)
     {
-        if (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID)
+        if (targetBuiltinRequiresLegalization(builtinVarName))
         {
             workItems.add(KeyValuePair(builtinVarName, varInst));
         }
@@ -3959,6 +4006,44 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(
+                varInst,
+                IRTargetBuiltinVarName::SpvInstanceIndex);
+        }
+        // Repalce SV_VertexID with gl_VertexIndex - gl_BaseVertex.
+        else if (builtinVarName == IRTargetBuiltinVarName::HlslVertexID)
+        {
+            auto vertexIndex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvVertexIndex,
+                varInst->getDataType());
+            auto baseVertex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvBaseVertex,
+                varInst->getDataType());
+            traverseUses(
+                varInst,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        IRBuilder builder(use->getUser());
+                        builder.setInsertBefore(use->getUser());
+                        auto sub = builder.emitSub(
+                            tryGetPointedToType(&builder, varInst->getDataType()),
+                            builder.emitLoad(vertexIndex),
+                            builder.emitLoad(baseVertex));
+                        user->replaceUsesWith(sub);
+                    }
+                });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(varInst, IRTargetBuiltinVarName::SpvVertexIndex);
         }
     }
 }

@@ -4,6 +4,8 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
 
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry rayGenerationMain -stage raygeneration
+
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_6 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 
@@ -29,6 +31,11 @@ uint calcValue(HitObject hit)
         uint instanceID = hit.GetInstanceID();
         uint geometryIndex = hit.GetGeometryIndex();
         uint primitiveIndex = hit.GetPrimitiveIndex();
+        int clusterID = hit.GetClusterID();
+        float4 posRadius = hit.GetSpherePositionAndRadius();
+        float2x4 positionsRadii = hit.GetLssPositionsAndRadii();
+        uint isSphereHit = uint(hit.IsSphereHit());
+        uint isLssHit = uint(hit.IsLssHit());
 
         SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
         
@@ -37,6 +44,20 @@ uint calcValue(HitObject hit)
         r += geometryIndex;
         r += primitiveIndex;
         r += objSomeValues.a;
+        r += clusterID;
+
+        r += int(posRadius.x);
+        r += int(posRadius.y);
+        r += int(posRadius.z);
+        r += int(posRadius.w);
+        
+        r += int(positionsRadii[0].x);
+        r += int(positionsRadii[0].y);
+        r += int(positionsRadii[0].z);
+        r += int(positionsRadii[0].w);
+        
+        r += isSphereHit;
+        r += isLssHit;
     }
     
     return r;
@@ -63,6 +84,7 @@ void rayGenerationMain()
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
     // SPIRV: OpHitObjectTraceRayNV
+    // CHECK: optixTraverse
     HitObject hit = HitObject::TraceRay(scene, 
         rayFlags, 
         instanceInclusionMask, 

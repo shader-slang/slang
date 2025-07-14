@@ -1065,7 +1065,7 @@ struct GenerateCtor1 : GenerateCtorInner1
 GenerateCtor1 val[2] = { { 3 }, { 2 } };
 ```
 
-In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
+In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-Lists) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Structs)
 
 A struct is considered a C-style struct if:
 1. User never defines a custom constructor with **more than** 0 parameters

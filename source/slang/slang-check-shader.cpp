@@ -156,7 +156,7 @@ void EntryPoint::_collectGenericSpecializationParamsRec(Decl* decl)
     if (!genericDecl)
         return;
 
-    for (auto m : genericDecl->members)
+    for (auto m : genericDecl->getDirectMemberDecls())
     {
         if (auto genericTypeParam = as<GenericTypeParamDecl>(m))
         {
@@ -448,6 +448,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     bool canHaveVaryingInput = false;
+    bool shouldWarnOnNonUniformParam = true;
     switch (stage)
     {
     case Stage::Vertex:
@@ -461,6 +462,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Hull:
     case Stage::Domain:
         canHaveVaryingInput = true;
+        break;
+    case Stage::Dispatch:
+        shouldWarnOnNonUniformParam = false;
         break;
     default:
         break;
@@ -499,10 +503,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // support varying input/output. We will automatically convert it to a 'uniform' parameter,
         // and diagnose a warning.
         addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
-        sink->diagnose(
-            param,
-            Diagnostics::nonUniformEntryPointParameterTreatedAsUniform,
-            param->getName());
+        if (shouldWarnOnNonUniformParam)
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::nonUniformEntryPointParameterTreatedAsUniform,
+                param->getName());
+        }
     }
 
     for (auto target : linkage->targets)
@@ -546,6 +553,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 targetOptionSet.hasOption(CompilerOptionName::Capability) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
                  SLANG_CAPABILITY_UNKNOWN);
+
+            if (auto declaredCapsMod =
+                    entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
+            {
+                // If the entry point has an explicitly declared capability, then we
+                // will merge that with the target capability set before checking if
+                // there is an implicit upgrade.
+                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
+            }
+
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
@@ -720,6 +737,27 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+{
+    auto result = getParamType(astBuilder, paramDeclRef);
+    auto direction = getParameterDirection(paramDeclRef.getDecl());
+    switch (direction)
+    {
+    case kParameterDirection_In:
+        return result;
+    case kParameterDirection_ConstRef:
+        return astBuilder->getConstRefType(result);
+    case kParameterDirection_Out:
+        return astBuilder->getOutType(result);
+    case kParameterDirection_InOut:
+        return astBuilder->getInOutType(result);
+    case kParameterDirection_Ref:
+        return astBuilder->getRefType(result, AddressSpace::Generic);
+    default:
+        return result;
+    }
+}
+
 void Module::_collectShaderParams()
 {
     // We are going to walk the global declarations in the body of the
@@ -746,7 +784,7 @@ void Module::_collectShaderParams()
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto moduleDecl = workList[i];
-        for (auto globalDecl : moduleDecl->members)
+        for (auto globalDecl : moduleDecl->getDirectMemberDecls())
         {
             if (auto globalVar = as<VarDecl>(globalDecl))
             {
@@ -887,6 +925,51 @@ RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType)
     return componentType;
 }
 
+bool parseTypeConformanceArgString(
+    UnownedStringSlice optionString,
+    UnownedStringSlice& outTypeName,
+    UnownedStringSlice& outInterfaceName,
+    Index& outSequentialId)
+{
+    // The expected format for the type conformance argument is:
+    // `TypeName:InterfaceName[=SequentialId]`
+    //
+    // Where `TypeName` is the name of a concrete type, `InterfaceName`
+    // is the name of an interface type, and `SequentialId` is an optional
+    // integer that specifies a sequential ID for the conformance.
+    //
+    // If the string does not match this format, we will return false.
+
+    outTypeName = UnownedStringSlice();
+    outInterfaceName = UnownedStringSlice();
+    outSequentialId = -1;
+    auto colonPos = optionString.indexOf(':');
+    if (colonPos < 0)
+    {
+        // If there is no colon, then the string is invalid.
+        return false;
+    }
+    outTypeName = optionString.head(colonPos);
+    auto interfaceNameStart = colonPos + 1;
+    auto equalsPos = optionString.indexOf('=');
+    if (equalsPos < interfaceNameStart)
+    {
+        // If there is no equals sign, then the interface name goes to the end of the string.
+        outInterfaceName = optionString.tail(interfaceNameStart);
+    }
+    else
+    {
+        // If there is an equals sign, then the interface name goes up to that point.
+        outInterfaceName =
+            optionString.subString(interfaceNameStart, equalsPos - interfaceNameStart);
+        // The sequential ID is the part after the equals sign.
+        auto sequentialIdString = optionString.tail(equalsPos + 1);
+        if (SLANG_FAILED(StringUtil::parseInt(sequentialIdString, outSequentialId)))
+            return false;
+    }
+    return true;
+}
+
 /// Create a component type to represent the "global scope" of a compile request.
 ///
 /// This component type will include all the modules and their global
@@ -935,6 +1018,85 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
 
         globalComponentType =
             CompositeComponentType::create(linkage, translationUnitComponentTypes);
+    }
+
+    List<RefPtr<ComponentType>> conformanceComponents;
+
+    // Find and include all type conformances specified through compiler options.
+    for (auto conformances :
+         compileRequest->optionSet.getArray(CompilerOptionName::TypeConformance))
+    {
+        auto stringValue = conformances.stringValue.getUnownedSlice();
+        UnownedStringSlice typeName, interfaceName;
+        Index sequentialId = -1;
+        if (!parseTypeConformanceArgString(stringValue, typeName, interfaceName, sequentialId))
+        {
+            compileRequest->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::invalidTypeConformanceOptionString,
+                stringValue);
+            continue;
+        }
+        auto concreteType = globalComponentType->getTypeFromString(
+            String(typeName).getBuffer(),
+            compileRequest->getSink());
+        if (!concreteType)
+        {
+            compileRequest->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::invalidTypeConformanceOptionNoType,
+                stringValue,
+                typeName);
+            continue;
+        }
+        auto interfaceType = globalComponentType->getTypeFromString(
+            String(interfaceName).getBuffer(),
+            compileRequest->getSink());
+        if (!interfaceType)
+        {
+            compileRequest->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::invalidTypeConformanceOptionNoType,
+                stringValue,
+                interfaceName);
+            continue;
+        }
+        ComPtr<slang::ITypeConformance> conformanceComponent;
+        ComPtr<ISlangBlob> diagnostics;
+        compileRequest->getLinkage()->createTypeConformanceComponentType(
+            (slang::TypeReflection*)concreteType,
+            (slang::TypeReflection*)interfaceType,
+            conformanceComponent.writeRef(),
+            sequentialId,
+            diagnostics.writeRef());
+        if (!conformanceComponent)
+        {
+            // If we failed to create the conformance component, then
+            // we should report the diagnostics that were generated.
+            //
+            compileRequest->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::cannotCreateTypeConformance,
+                stringValue);
+            if (diagnostics)
+            {
+                compileRequest->getSink()->diagnoseRaw(
+                    Severity::Error,
+                    UnownedStringSlice((char*)diagnostics->getBufferPointer()));
+            }
+            continue;
+        }
+        conformanceComponents.add(static_cast<TypeConformance*>(conformanceComponent.get()));
+    }
+
+    if (conformanceComponents.getCount() > 0)
+    {
+        // If we found any type conformances, then we will
+        // create a composite component type that includes
+        // the global component type and the conformance components.
+        //
+        conformanceComponents.add(globalComponentType);
+        globalComponentType = CompositeComponentType::create(linkage, conformanceComponents);
     }
 
     return fillRequirements(globalComponentType);

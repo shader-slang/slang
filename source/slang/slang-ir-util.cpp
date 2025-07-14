@@ -106,6 +106,7 @@ IROp getTypeStyle(IROp op)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
+    case kIROp_EnumType:
         {
             return op;
         }
@@ -220,6 +221,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
+    case kIROp_EnumType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -271,6 +273,12 @@ bool isSimpleDataType(IRType* type)
     case kIROp_AnyValueType:
     case kIROp_PtrType:
         return true;
+    case kIROp_EnumType:
+        {
+            auto enumType = as<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return isSimpleDataType(tagType);
+        }
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
         return isSimpleDataType((IRType*)type->getOperand(0));
@@ -863,8 +871,8 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
         }
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         {
             auto branch = as<IRUnconditionalBranch>(inst);
             // If any pointer typed argument of the branch inst may overlap addr, return true.
@@ -914,7 +922,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -2230,6 +2238,187 @@ UnownedStringSlice getMangledName(IRInst* inst)
             return linkageDecor->getMangledName();
     }
     return UnownedStringSlice();
+}
+
+bool isFirstBlock(IRInst* inst)
+{
+    auto block = as<IRBlock>(inst);
+    if (!block)
+        return false;
+    if (!block->getParent())
+        return false;
+    return block->getParent()->getFirstBlock() == block;
+}
+
+bool isSpecConstRateType(IRType* type)
+{
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(type))
+    {
+        if (as<IRSpecConstRate>(rateQualifiedType->getRate()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType)
+{
+    if (as<IRRateQualifiedType>(oldType))
+    {
+        return oldType;
+    }
+
+    if (isSpecConstRateType(rateQulifiedType))
+    {
+        return builder->getRateQualifiedType(builder->getSpecConstRate(), oldType);
+    }
+    return oldType;
+}
+
+bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedArgs, IRUse* operands)
+{
+    // Returns true for ops that can be declared as an operation under `OpSpecConstantOp`.
+    //
+    // Integer arithmetic and comparison operations can be `OpSpecConstantOp` with the `Shader`
+    // capability, while floating-point arithmetic and comparison operations require the `Kernel`
+    // capability. We only support `Shader` capability for now, return false when floating-point
+    // arithmetic/comparison is encountered.
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+        return !isFloatingType(resultType);
+
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Leq:
+    case kIROp_Geq:
+    case kIROp_Less:
+    case kIROp_Greater:
+        {
+            IRInst* operand1;
+            IRInst* operand2;
+            if (fixedArgs)
+            {
+                operand1 = fixedArgs[0];
+                operand2 = fixedArgs[1];
+            }
+            else
+            {
+                operand1 = operands[0].get();
+                operand2 = operands[1].get();
+            }
+            return !isFloatingType(operand1->getDataType()) &&
+                   !isFloatingType(operand2->getDataType());
+        }
+
+    case kIROp_Not:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_Select:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+{
+    auto rateType = as<IRRateQualifiedType>(type);
+    return rateType && as<IRSpecConstRate>(rateType->getRate()) &&
+           canOperationBeSpecConst(op, rateType->getValueType(), fixedArgs, nullptr);
+}
+
+
+bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+{
+    return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
+           isSpecConstOpHoistable(op, type, fixedArgs);
+}
+
+IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
+{
+    SLANG_RELEASE_ASSERT(isSignedType(type));
+
+    auto elementType = getVectorOrCoopMatrixElementType(type);
+
+    IROp op = type->getOp();
+    switch (op)
+    {
+    case kIROp_MatrixType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto matType = as<IRMatrixType>(type);
+            SLANG_RELEASE_ASSERT(matType);
+            return builder->getMatrixType(
+                builder->getType(unsignedTypeOp),
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+        }
+    case kIROp_VectorType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto vecType = as<IRVectorType>(type);
+            SLANG_RELEASE_ASSERT(vecType);
+            return builder->getVectorType(
+                builder->getType(unsignedTypeOp),
+                vecType->getElementCount());
+        }
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return builder->getType(getOppositeSignIntTypeOp(elementType->getOp()));
+    default:
+        return type;
+    }
+}
+
+bool isSignedType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_FloatType:
+    case kIROp_DoubleType:
+        return true;
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return true;
+    case kIROp_VectorType:
+        return isSignedType(as<IRVectorType>(type)->getElementType());
+    case kIROp_MatrixType:
+        return isSignedType(as<IRMatrixType>(type)->getElementType());
+    default:
+        return false;
+    }
+}
+
+bool isIROpaqueType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_TextureType:
+    case kIROp_SamplerStateType:
+    case kIROp_SamplerComparisonStateType:
+        return true;
+    default:
+        return false;
+    }
 }
 
 } // namespace Slang

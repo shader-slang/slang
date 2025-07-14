@@ -3,6 +3,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-modifier.h.fiddle"
+#include "slang-ir-insts-enum.h"
 
 FIDDLE()
 namespace Slang
@@ -67,6 +68,21 @@ class InternalModifier : public VisibilityModifier
 };
 
 FIDDLE()
+class OverrideModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks that a decl is verified to be overriding another decl defined in a base type.
+FIDDLE()
+class IsOverridingModifier : public Modifier
+{
+    FIDDLE(...)
+
+    FIDDLE() Decl* overridedDecl = nullptr;
+};
+
+FIDDLE()
 class RequireModifier : public Modifier
 {
     FIDDLE(...)
@@ -80,6 +96,12 @@ class ParamModifier : public Modifier
 
 FIDDLE()
 class ExternModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class DynModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -158,6 +180,21 @@ class SynthesizedModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks that the definition of a func decl is synthesized static invoke func for
+// a lambda that doesn't capture anything.
+FIDDLE()
+class SynthesizedStaticLambdaFuncModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySet declaredCapabilityRequirements;
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
@@ -186,6 +223,13 @@ class ActualGlobalModifier : public Modifier
 /// checks).
 FIDDLE()
 class IgnoreForLookupModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+/// A modifier that indicates an `TypeConstraintDecl` is optional.
+FIDDLE()
+class OptionalConstraintModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -717,6 +761,14 @@ class HLSLVolatileModifier : public Modifier
     FIDDLE(...)
 };
 
+// Indicate that an interface method requirement has a default impl.
+FIDDLE()
+class HasInterfaceDefaultImplModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() Decl* defaultImplDecl = nullptr;
+};
 
 FIDDLE()
 class AttributeTargetModifier : public Modifier
@@ -746,7 +798,7 @@ FIDDLE()
 class UncheckedAttribute : public AttributeBase
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -755,7 +807,6 @@ FIDDLE()
 class UncheckedGLSLLayoutAttribute : public AttributeBase
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 // GLSL `binding` layout qualifier, does not include `set`.
@@ -763,7 +814,6 @@ FIDDLE()
 class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 // GLSL `set` layout qualifier, does not include `binding`.
@@ -771,7 +821,6 @@ FIDDLE()
 class UncheckedGLSLSetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 // GLSL `offset` layout qualifier.
@@ -779,70 +828,60 @@ FIDDLE()
 class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLInputAttachmentIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLLocationLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLConstantIdAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLRayPayloadAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLRayPayloadInAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLHitObjectAttributesAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLCallablePayloadAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
 class UncheckedGLSLCallablePayloadInAttribute : public UncheckedGLSLLayoutAttribute
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 // A `[name(arg0, ...)]` style attribute that has been validated.
@@ -1037,7 +1076,6 @@ FIDDLE()
 class GLSLImplicitOffsetLayoutAttribute : public AttributeBase
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
 };
 
 FIDDLE()
@@ -1568,7 +1606,7 @@ class DifferentiableAttribute : public Attribute
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
     const OrderedDictionary<Type*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
 
-    SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
+    ValSet m_typeRegistrationWorkingSet;
 
 private:
     OrderedDictionary<Type*, SubtypeWitness*> m_mapToIDifferentiableWitness;
@@ -1879,16 +1917,6 @@ class RequireFullQuadsAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[payload]` attribute indicates that a `struct` type will be used as
-/// a ray payload for `TraceRay()` calls, and thus also as input/output
-/// for shaders in the ray tracing pipeline that might be invoked for
-/// such a ray.
-///
-FIDDLE()
-class PayloadAttribute : public Attribute
-{
-    FIDDLE(...)
-};
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output

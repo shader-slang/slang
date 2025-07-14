@@ -181,7 +181,7 @@ struct RttiInfo
         Enum,
         List,
         Dictionary,
-
+        Optional,
         CountOf,
     };
 
@@ -199,7 +199,7 @@ struct RttiInfo
     template<typename T>
     void init(Kind kind)
     {
-        init(kind, SLANG_ALIGN_OF(T), sizeof(T));
+        init(kind, alignof(T), sizeof(T));
     }
 
     /// Allocate memory for RttiInfo types.
@@ -295,6 +295,12 @@ SLANG_FORCE_INLINE StructRttiInfo::Flags combine(
 {
     return StructRttiInfo::Flags(defaultValue) | flags;
 }
+
+struct OptionalRttiInfo : public RttiInfo
+{
+    const RttiInfo* m_elementType;
+    uint32_t m_valueOffset;
+};
 
 struct ListRttiInfo : public RttiInfo
 {
@@ -469,7 +475,7 @@ struct GetRttiInfo<T[COUNT]>
     {
         FixedArrayRttiInfo info;
         info.m_kind = RttiInfo::Kind::FixedArray;
-        info.m_alignment = RttiInfo::AlignmentType(SLANG_ALIGN_OF(T));
+        info.m_alignment = RttiInfo::AlignmentType(alignof(T));
         info.m_size = RttiInfo::SizeType(sizeof(T) * COUNT);
         info.m_elementType = GetRttiInfo<T>::get();
         info.m_elementCount = COUNT;

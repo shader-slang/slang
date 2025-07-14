@@ -2,10 +2,12 @@
 
 #pragma once
 
-#include "slang-ast-base.h.fiddle"
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-support-types.h"
 #include "slang-capability.h"
+
+//
+#include "slang-ast-base.h.fiddle"
 
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
@@ -41,10 +43,10 @@ class NodeBase
     /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
     /// correctly constructed (through ASTBuilder) NodeBase derived class.
     /// The actual type is set when constructed on the ASTBuilder.
-    FIDDLE() ASTNodeType astNodeType = ASTNodeType(-1);
+    ASTNodeType astNodeType = ASTNodeType(-1);
 
 #ifdef _DEBUG
-    SLANG_UNREFLECTED int32_t _debugUID = 0;
+    int32_t _debugUID = 0;
 #endif
 };
 
@@ -112,7 +114,6 @@ class Scope : public NodeBase
     // The parent of this scope (where lookup should go if nothing is found locally)
     Scope* parent = nullptr;
 
-    SLANG_UNREFLECTED
     // The next sibling of this scope (a peer for lookup)
     Scope* nextSibling = nullptr;
 };
@@ -145,6 +146,24 @@ struct ValNodeOperand
     } values;
 
     ValNodeOperand() { values.intOperand = 0; }
+
+    int64_t getIntConstant() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ConstantValue);
+        return values.intOperand;
+    }
+
+    Val* getVal() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ValNode);
+        return (Val*)values.nodeOperand;
+    }
+
+    Decl* getDecl() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ASTNode);
+        return (Decl*)values.nodeOperand;
+    }
 
     explicit ValNodeOperand(NodeBase* node)
     {
@@ -424,23 +443,11 @@ class Val : public NodeBase
     Val* resolveImpl();
     Val* resolve();
 
-    Val* getOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ValNode);
-        return (Val*)m_operands[index].values.nodeOperand;
-    }
+    Val* getOperand(Index index) const { return m_operands[index].getVal(); }
 
-    Decl* getDeclOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ASTNode);
-        return (Decl*)(m_operands[index].values.nodeOperand);
-    }
+    Decl* getDeclOperand(Index index) const { return m_operands[index].getDecl(); }
 
-    int64_t getIntConstOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ConstantValue);
-        return m_operands[index].values.intOperand;
-    }
+    int64_t getIntConstOperand(Index index) const { return m_operands[index].getIntConstant(); }
 
     Index getOperandCount() const { return m_operands.getCount(); }
 
@@ -473,7 +480,7 @@ protected:
 
 private:
     mutable Val* m_resolvedVal = nullptr;
-    SLANG_UNREFLECTED mutable Index m_resolvedValEpoch = 0;
+    mutable Index m_resolvedValEpoch = 0;
 };
 
 template<int N, typename T, typename... Ts>
@@ -579,7 +586,7 @@ protected:
     // semantic checking, since Val deduplication requires the entire semantic checking process to
     // stick with one ASTBuilder.
     // Call getCurrentASTBuilder() to obtain the right ASTBuilder for semantic checking.
-    SLANG_UNREFLECTED ASTBuilder* m_astBuilderForReflection;
+    ASTBuilder* m_astBuilderForReflection;
 };
 
 template<typename T>
@@ -746,7 +753,7 @@ public:
     FIDDLE() NameLoc nameAndLoc;
     FIDDLE() CapabilitySet inferredCapabilityRequirements;
 
-    FIDDLE() RefPtr<MarkupEntry> markup;
+    RefPtr<MarkupEntry> markup;
 
     Name* getName() const { return nameAndLoc.name; }
     SourceLoc getNameLoc() const { return nameAndLoc.loc; }
@@ -754,8 +761,15 @@ public:
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 
-    // The next declaration defined in the same container with the same name
-    Decl* nextInContainerWithSameName = nullptr;
+    /// The previous declaration defined in the same `ContainerDecl`
+    /// that has the same name as this declaration.
+    ///
+    /// Note: it is not recommended to ever access this member directly;
+    /// instead, code should use the `ContainerDecl::getPrevDeclWithSameName()`
+    /// method, which ensures that the `_prevInContainerWithSameName` fields
+    /// have been properly set for all declarations in that container.
+    ///
+    FIDDLE() Decl* _prevInContainerWithSameName = nullptr;
 
     bool isChecked(DeclCheckState state) const { return checkState >= state; }
     void setCheckState(DeclCheckState state)
@@ -766,12 +780,12 @@ public:
     bool isChildOf(Decl* other) const;
 
     // Track the decl reference that caused the requirement of a capability atom.
-    SLANG_UNREFLECTED List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
+    List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
 
-    SLANG_UNREFLECTED bool hiddenFromLookup = false;
+    bool hiddenFromLookup = false;
 
 private:
-    SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
+    DeclRefBase* m_defaultDeclRef = nullptr;
 };
 
 FIDDLE(abstract)

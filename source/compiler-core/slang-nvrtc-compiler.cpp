@@ -127,7 +127,7 @@ protected:
         nvrtcProgram m_program;
     };
 
-    SlangResult _findCUDAIncludePath(String& outIncludePath);
+    SlangResult _findCUDAIncludePath(String& outPath);
     SlangResult _getCUDAIncludePath(String& outIncludePath);
 
     SlangResult _findOptixIncludePath(String& outIncludePath);
@@ -140,14 +140,16 @@ protected:
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
 
-    // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT* include cuda_fp16.h.
+    // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
+    // include cuda_fp16.h.
     List<String> m_cudaFp16FoundPaths;
 
     bool m_cudaIncludeSearched = false;
     // Holds location of where include (for cuda_fp16.h) is found.
     String m_cudaIncludePath;
 
-    // Holds list of paths passed in where optix.h is found. Does *NOT* include optix.h.
+    // Holds list of paths passed in where optix.h is found. Does *NOT* include
+    // optix.h.
     List<String> m_optixFoundPaths;
 
     bool m_optixIncludeSearched = false;
@@ -234,7 +236,8 @@ static SlangResult _parseNVRTCLine(
     List<UnownedStringSlice> split;
     if (_hasDriveLetter(line))
     {
-        // The drive letter has :, which confuses things, so skip that and then fix up first entry
+        // The drive letter has :, which confuses things, so skip that and then fix
+        // up first entry
         UnownedStringSlice lineWithoutDrive(line.begin() + 2, line.end());
         StringUtil::split(lineWithoutDrive, ':', split);
         split[0] = UnownedStringSlice(line.begin(), split[0].end());
@@ -246,7 +249,8 @@ static SlangResult _parseNVRTCLine(
 
     if (split.getCount() >= 3)
     {
-        // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its value is set
+        // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its
+        // value is set
         const auto split1 = split[1].trim();
 
         Severity severity = Severity::Unknown;
@@ -267,8 +271,8 @@ static SlangResult _parseNVRTCLine(
             //
             // Anything ending with " warning:" or " error:" in effect.
 
-            // We can expand to include character after as this is split1, as must be followed by at
-            // a minimum : (as the split has at least 3 parts).
+            // We can expand to include character after as this is split1, as must be
+            // followed by at a minimum : (as the split has at least 3 parts).
             const UnownedStringSlice expandSplit1(split1.begin(), split1.end() + 1);
 
             if (expandSplit1.endsWith(toSlice(" error:")))
@@ -297,12 +301,12 @@ static SlangResult _parseNVRTCLine(
             return SLANG_OK;
         }
 
-        // TODO(JS): Note here if it's not possible to determine a line as being the main
-        // diagnostics we fall through to it potentially being a note.
+        // TODO(JS): Note here if it's not possible to determine a line as being the
+        // main diagnostics we fall through to it potentially being a note.
         //
-        // That could mean a valid diagnostic (from NVRTCs point of view) is ignored/noted, because
-        // this code can't parse it. Ideally that situation would lead to an error such that we can
-        // detect and things will fail.
+        // That could mean a valid diagnostic (from NVRTCs point of view) is
+        // ignored/noted, because this code can't parse it. Ideally that situation
+        // would lead to an error such that we can detect and things will fail.
         //
         // So we might want to revisit this determination in the future.
     }
@@ -320,8 +324,8 @@ static SlangResult _parseNVRTCLine(
     return SLANG_OK;
 }
 
-/* An implementation of Path::Visitor that can be used for finding NVRTC shared library
- * installations. */
+/* An implementation of Path::Visitor that can be used for finding NVRTC shared
+ * library installations. */
 struct NVRTCPathVisitor : Path::Visitor
 {
     struct Candidate
@@ -364,7 +368,6 @@ struct NVRTCPathVisitor : Path::Visitor
     }
     void sortCandidates() { m_candidates.sort(_orderCandiate); }
 
-
 #if SLANG_WINDOWS_FAMILY
     SlangResult getVersion(const UnownedStringSlice& filename, SemanticVersion& outVersion)
     {
@@ -392,7 +395,8 @@ struct NVRTCPathVisitor : Path::Visitor
             StringUtil::split(versionSlice, '_', slices);
             if (slices.getCount() >= 2)
             {
-                // We don't bother checking for error here, if it's not parsable, it will be 0
+                // We don't bother checking for error here, if it's not parsable, it
+                // will be 0
                 StringUtil::parseInt(slices[1], patch);
             }
             majorMinorSlice = slices[0];
@@ -420,8 +424,8 @@ struct NVRTCPathVisitor : Path::Visitor
 #else
     // How the path is constructed depends on platform
     // https://docs.nvidia.com/cuda/nvrtc/index.html
-    // TODO(JS): Handle version number depending on the platform - it's different for
-    // Windows/OSX/Linux
+    // TODO(JS): Handle version number depending on the platform - it's different
+    // for Windows/OSX/Linux
     SlangResult getVersion(const UnownedStringSlice& filename, SemanticVersion& outVersion)
     {
         SLANG_UNUSED(filename);
@@ -448,7 +452,6 @@ struct NVRTCPathVisitor : Path::Visitor
                 }
             }
 
-
             if (filename.getLength() >= m_prefix.getLength() &&
                 filename.subString(0, m_prefix.getLength())
                     .caseInsensitiveEquals(m_prefix.getUnownedSlice()))
@@ -460,9 +463,9 @@ struct NVRTCPathVisitor : Path::Visitor
                     version = SemanticVersion();
                 }
 
-                // We may want to add multiple versions, if they are in different locations - as
-                // there may be multiple entries in the PATH, and only one works. We'll only know
-                // which works by loading
+                // We may want to add multiple versions, if they are in different
+                // locations - as there may be multiple entries in the PATH, and only
+                // one works. We'll only know which works by loading
 
 #if 0
                 // We already found this version, so let's not add it again
@@ -538,8 +541,8 @@ static UnownedStringSlice _getNVRTCBaseName()
 #endif
 }
 
-// Candidates are in m_candidates list. Will be ordered from the oldest to newest (in version
-// number)
+// Candidates are in m_candidates list. Will be ordered from the oldest to
+// newest (in version number)
 static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
 {
     // First try the instance path (if supported on platform)
@@ -583,16 +586,17 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
             // We are going to search the paths in order
             for (const auto& path : paths)
             {
-                // PATH can have the same path multiple times. If we have already searched this
-                // path, we don't need to again
+                // PATH can have the same path multiple times. If we have already
+                // searched this path, we don't need to again
                 if (!pool.has(path))
                 {
                     pool.add(path);
 
                     Path::split(path, splitPath);
 
-                    // We could search every path, but here we restrict to paths that look like CUDA
-                    // installations. It's a path that contains a CUDA directory and has bin
+                    // We could search every path, but here we restrict to paths that look
+                    // like CUDA installations. It's a path that contains a CUDA directory
+                    // and has bin
                     if (splitPath.indexOf("CUDA") >= 0 &&
                         splitPath[splitPath.getCount() - 1].caseInsensitiveEquals(
                             UnownedStringSlice::fromLiteral("bin")))
@@ -613,7 +617,6 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
 
 static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
 static const UnownedStringSlice g_optixHeaderName = UnownedStringSlice::fromLiteral("optix.h");
-
 
 SlangResult _findFileInIncludePath(
     const String& path,
@@ -651,8 +654,8 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
 {
     outPath = String();
 
-    // Try looking up from a symbol. This will work as long as the nvrtc is loaded somehow from a
-    // dll/sharedlibrary And the header is included from there
+    // Try looking up from a symbol. This will work as long as the nvrtc is loaded
+    // somehow from a dll/sharedlibrary And the header is included from there
     {
         String libPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
         if (libPath.getLength())
@@ -664,9 +667,11 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
                 return SLANG_OK;
             }
 
-            // See if the shared library is in the SDK, as if so we know how to find the includes
+            // See if the shared library is in the SDK, as if so we know how to find
+            // the includes
             // TODO(JS):
-            // This directory structure is correct for windows perhaps could be different elsewhere.
+            // This directory structure is correct for windows perhaps could be
+            // different elsewhere.
             {
                 List<UnownedStringSlice> pathSlices;
                 Path::split(parentPath.getUnownedSlice(), pathSlices);
@@ -706,10 +711,13 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
     }
 
 #if SLANG_LINUX_FAMILY
-    // Try /usr/include
-    {
-        String includePath = "/usr/include";
+    List<String> candidatePaths;
+    candidatePaths.add("/usr/local/include");
+    candidatePaths.add("/usr/local/cuda/include");
+    candidatePaths.add("/usr/include");
 
+    for (const String& includePath : candidatePaths)
+    {
         if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
         {
             outPath = includePath;
@@ -717,7 +725,6 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
         }
     }
 #endif
-
     return SLANG_E_NOT_FOUND;
 }
 
@@ -740,6 +747,32 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
 {
     outPath = String();
 
+    // First try to find OptiX headers in the local external/optix-dev/include
+    // directory relative to the executable path
+    {
+        StringBuilder instancePathBuilder;
+        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
+        {
+            // Get executable path, then go up to project root
+            // instancePathBuilder already contains the bin directory path
+            // Executable is in build/Debug/bin or build/Release/bin
+            // Go up 3 levels: bin -> Debug/Release -> build -> project root
+            String binPath = instancePathBuilder;
+            String buildTypeDir = Path::getParentDirectory(binPath);
+            String buildDir = Path::getParentDirectory(buildTypeDir);
+            String projectRoot = Path::getParentDirectory(buildDir);
+
+            String localOptixPath =
+                Path::combine(Path::combine(projectRoot, "external/optix-dev"), "include");
+            String optixHeader = Path::combine(localOptixPath, g_optixHeaderName);
+
+            if (File::exists(optixHeader))
+            {
+                outPath = localOptixPath;
+                return SLANG_OK;
+            }
+        }
+    }
     List<String> rootPaths;
 
 #if SLANG_WINDOWS_FAMILY
@@ -1038,9 +1071,9 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg("-std=c++17");
 
         // Disable all warnings
-        // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off
-        // individual warnings. I tried the -Xcudafe mechanism but that does not appear to work for
-        // nvrtc
+        // This is arguably too much - but nvrtc does not appear to have a mechanism
+        // to switch off individual warnings. I tried the -Xcudafe mechanism but
+        // that does not appear to work for nvrtc
         cmdLine.addArg("-w");
     }
 
@@ -1051,10 +1084,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
         SemanticVersion version(3);
 
         // Newer releases of NVRTC only support newer CUDA architectures.
-        if (m_desc.version.m_major >= 12)
+        if (m_desc.version.m_major > 12 ||
+            (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
-            // NVRTC in CUDA 12 only supports `compute_50` and up
-            // (with everything before `compute_52` being deprecated).
+            // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
+            // The exact warning message is:
+            //   nvrtc 12.8: nvrtc: warning : Architectures prior to '<compute/sm>_75' are
+            //   deprecated and may be removed in a future release
+            version = SemanticVersion(7, 5);
+        }
+        else if (m_desc.version.m_major == 12)
+        {
+            // NVRTC 12.0 supports `compute_50` and up
             version = SemanticVersion(5, 0);
         }
         else if (m_desc.version.m_major == 11)
@@ -1093,7 +1134,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If compiling for OptiX, we need to add the appropriate search paths to the command line.
+    // If compiling for OptiX, we need to add the appropriate search paths to the
+    // command line.
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
@@ -1101,8 +1143,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     // Add any compiler specific options
-    // NOTE! If these clash with any previously set options (as set via other flags)
-    // compilation might fail.
+    // NOTE! If these clash with any previously set options (as set via other
+    // flags) compilation might fail.
     if (options.compilerSpecificArguments.count > 0)
     {
         for (auto compilerSpecificArg : options.compilerSpecificArguments)
@@ -1191,8 +1233,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
         Index lastIndex = lines.getCount();
 
         // Look for the first blank line after this point.
-        // We'll assume any information after that blank line to the end of the diagnostic
-        // is compilation summary information.
+        // We'll assume any information after that blank line to the end of the
+        // diagnostic is compilation summary information.
         for (Index i = lastIndex - 1; i >= 0; --i)
         {
             if (lines[i].getLength() == 0)
@@ -1222,7 +1264,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
             else if (lineRes != SLANG_E_NOT_FOUND)
             {
                 // If there is an error exit
-                // But if SLANG_E_NOT_FOUND that just means this line couldn't be parsed, so ignore.
+                // But if SLANG_E_NOT_FOUND that just means this line couldn't be
+                // parsed, so ignore.
                 return lineRes;
             }
         }
@@ -1271,8 +1314,8 @@ SlangResult NVRTCDownstreamCompiler::convert(
 
     // PTX is 'binary like' and 'assembly like' so we allow conversion either way
     // We do it by just getting as a blob and sharing that blob.
-    // A more sophisticated implementation could proxy to the original artifact, but this
-    // is simpler, and probably fine in most scenarios.
+    // A more sophisticated implementation could proxy to the original artifact,
+    // but this is simpler, and probably fine in most scenarios.
     ComPtr<ISlangBlob> blob;
     SLANG_RETURN_ON_FAIL(from->loadBlob(ArtifactKeep::Yes, blob.writeRef()));
 
@@ -1342,9 +1385,9 @@ static SlangResult _findAndLoadNVRTC(
         // a library simply named `nvrtc` (well, `libnvrtc`) which
         // is expected to match whatever the user has installed.
         //
-        // On Windows an installation could place the version of nvrtc it uses in the same directory
-        // as the slang binary, such that it's loaded.
-        // Using this name also allows a ISlangSharedLibraryLoader to easily identify what is
+        // On Windows an installation could place the version of nvrtc it uses in
+        // the same directory as the slang binary, such that it's loaded. Using this
+        // name also allows a ISlangSharedLibraryLoader to easily identify what is
         // required and perhaps load a specific version
         if (SLANG_FAILED(loader->loadSharedLibrary("nvrtc", library.writeRef())))
         {

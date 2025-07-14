@@ -97,7 +97,7 @@ NOTE! That this behavior is the same as previously in that....
 1) calcRelativePath, just returns the path as processed by the Path:: methods
 2) getUniqueIdentity behavior depends on the UniqueIdentityMode.
 */
-class CacheFileSystem : public ISlangFileSystemExt, public ComBaseObject
+class CacheFileSystem : public ComBaseObject, public ISlangFileSystemExt
 {
 public:
     SLANG_CLASS_GUID(0x2f4d1d03, 0xa0d1, 0x434b, {0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b})
@@ -268,7 +268,7 @@ protected:
     OSPathKind m_osPathKind = OSPathKind::None; ///< OS path kind
 };
 
-class RelativeFileSystem : public ISlangMutableFileSystem, public ComBaseObject
+class RelativeFileSystem : public ComBaseObject, public ISlangMutableFileSystem
 {
 public:
     SLANG_COM_BASE_IUNKNOWN_ALL

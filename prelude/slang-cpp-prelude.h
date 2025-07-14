@@ -22,6 +22,13 @@
 #include <string.h>
 #endif // SLANG_LLVM
 
+// Is intptr_t not equal to equal-width sized integer type?
+#if defined(__APPLE__)
+#define SLANG_INTPTR_TYPE_IS_DISTINCT 1
+#else
+#define SLANG_INTPTR_TYPE_IS_DISTINCT 0
+#endif
+
 #if defined(_MSC_VER)
 #define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
 #else
@@ -216,7 +223,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-#define SLANG_ALIGN_OF(T) __alignof__(T)
 
 #define SLANG_BREAKPOINT(id) __builtin_trap()
 
@@ -227,7 +233,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // Microsoft VC specific
 #if SLANG_VC
-#define SLANG_ALIGN_OF(T) __alignof(T)
 
 #define SLANG_BREAKPOINT(id) __debugbreak();
 

@@ -2933,7 +2933,7 @@ extern "C"
 
     /// Enables debug layer. The debug layer will check all `gfx` calls and verify that uses are
     /// valid.
-    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer();
+    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer(bool enable);
 
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }

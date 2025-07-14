@@ -101,7 +101,13 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
-            return true;
+            {
+                if (isSpecConstRateType(inst->getFullType()))
+                {
+                    return false;
+                }
+                return true;
+            }
         default:
             return false;
         }
@@ -124,7 +130,7 @@ struct SpecializationContext
         switch (inst->getOp())
         {
         case kIROp_GlobalGenericParam:
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
         case kIROp_GetTupleElement:
             return false;
         case kIROp_Specialize:
@@ -591,7 +597,7 @@ struct SpecializationContext
             //
             return maybeSpecializeGeneric(cast<IRSpecialize>(inst));
 
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             // The remaining case we need to consider here for generics
             // is when we have a `lookup_witness_method` instruction
             // that is being applied to a concrete witness table,
@@ -935,7 +941,7 @@ struct SpecializationContext
                     shouldSkip = true;
                     break;
                 }
-                if (item->getOperand(i)->getOp() == kIROp_undefined)
+                if (item->getOperand(i)->getOp() == kIROp_Undefined)
                 {
                     shouldSkip = true;
                     break;
@@ -1089,7 +1095,7 @@ struct SpecializationContext
                     workList.removeLast();
                     workListSet.remove(inst);
 
-                    if (!inst->getParent() && inst->getOp() != kIROp_Module)
+                    if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
                         continue;
 
                     // For each instruction we process, we want to perform

@@ -33,7 +33,6 @@ class DeclRefExpr : public Expr
     // The original expr before DeclRef resolution.
     Expr* originalExpr = nullptr;
 
-    SLANG_UNREFLECTED
     // The scope in which to perform lookup
     Scope* scope = nullptr;
 };
@@ -137,6 +136,12 @@ class StringLiteralExpr : public LiteralExpr
     //      "first" "second" "third"
     //
     FIDDLE() String value;
+};
+
+FIDDLE()
+class MakeArrayFromElementExpr : public Expr
+{
+    FIDDLE(...)
 };
 
 // An initializer list, e.g. `{ 1, 2, 3 }`
@@ -304,13 +309,17 @@ class StaticMemberExpr : public DeclRefExpr
     SourceLoc memberOperatorLoc;
 };
 
+FIDDLE()
 struct MatrixCoord
 {
+    FIDDLE(...)
+
     bool operator==(const MatrixCoord& rhs) const { return row == rhs.row && col == rhs.col; };
     bool operator!=(const MatrixCoord& rhs) const { return !(*this == rhs); };
+
     // Rows and columns are zero indexed
-    int row;
-    int col;
+    FIDDLE() Int32 row;
+    FIDDLE() Int32 col;
 };
 
 FIDDLE()
@@ -570,13 +579,23 @@ class ParenExpr : public Expr
     Expr* base = nullptr;
 };
 
+// An expression that constructs a tuple `(arg1, arg2, ...)`
+//
+FIDDLE()
+class TupleExpr : public Expr
+{
+    FIDDLE(...)
+    List<Expr*> elements;
+};
+
+
 // An object-oriented `this` expression, used to
 // refer to the current instance of an enclosing type.
 FIDDLE()
 class ThisExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -586,7 +605,7 @@ FIDDLE()
 class ReturnValExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -673,6 +692,14 @@ class DispatchKernelExpr : public HigherOrderInvokeExpr
     FIDDLE() Expr* dispatchSize;
 };
 
+FIDDLE()
+class LambdaExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() ScopeDecl* paramScopeDecl;
+    FIDDLE() Stmt* bodyStmt;
+};
+
 /// An express to mark its inner expression as an intended non-differential call.
 FIDDLE()
 class TreatAsDifferentiableExpr : public Expr
@@ -707,8 +734,19 @@ FIDDLE()
 class ThisTypeExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
+};
+
+
+/// A type expression of the form `ThisInterface`
+///
+/// Refers to the interface type itself, not the conforming type from an interface decl.
+///
+FIDDLE()
+class ThisInterfaceExpr : public VarExpr
+{
+    FIDDLE(...)
 };
 
 /// A type expression of the form `Left & Right`.
@@ -817,40 +855,41 @@ public:
     };
 
     // The flavour and token describes how this was parsed
-    Flavor flavor;
+    FIDDLE() Flavor flavor;
     // The single token this came from
     Token token;
 
     // If this was a SlangValue or SlangValueAddr or SlangType, then we also
     // store the expression, which should be a single VarExpr because we only
     // parse single idents at the moment
-    Expr* expr = nullptr;
+    FIDDLE() Expr* expr = nullptr;
 
     // If this is part of a bitwise or expression, this will point to the
     // remaining operands values in such an expression must be of flavour
     // Literal or NamedValue
-    List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
+    FIDDLE() List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
 
     // If this is a named value then we calculate the value here during
     // checking. If this is an opcode, then the parser will populate this too
     // (or set it to 0xffffffff);
-    SpvWord knownValue = 0xffffffff;
+    FIDDLE() SpvWord knownValue = 0xffffffff;
     // Although this might be a constant in the source we should actually pass
     // it as an id created with OpConstant
-    bool wrapInId = false;
+    FIDDLE() bool wrapInId = false;
 
     // Once we've checked things, the SlangType and BuiltinVar flavour operands
     // will have this type populated.
-    TypeExp type = TypeExp();
+    FIDDLE() TypeExp type = TypeExp();
 };
 
 FIDDLE()
 struct SPIRVAsmInst
 {
     FIDDLE(...)
+
 public:
-    SPIRVAsmOperand opcode;
-    List<SPIRVAsmOperand> operands;
+    FIDDLE() SPIRVAsmOperand opcode;
+    FIDDLE() List<SPIRVAsmOperand> operands;
 };
 
 FIDDLE()

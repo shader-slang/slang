@@ -2,4 +2,4 @@
 
 
 #define MAKE_LIB 1
-#include "../external/lua/onelua.c"
+#include "lua/onelua.c"

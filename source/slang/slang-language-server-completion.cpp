@@ -5,6 +5,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-file-system.h"
 #include "slang-ast-all.h"
+#include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-language-server-ast-lookup.h"
 #include "slang-language-server.h"
@@ -22,7 +23,7 @@ static const char* kDeclKeywords[] = {
     "protected",  "typedef",        "typealias", "uniform",  "export",  "groupshared",
     "extension",  "associatedtype", "namespace", "This",     "using",   "__generic",
     "__exported", "import",         "enum",      "cbuffer",  "tbuffer", "func",
-    "functype",   "typename",       "each",      "expand",   "where"};
+    "functype",   "typename",       "each",      "expand",   "where",   "override"};
 static const char* kStmtKeywords[] = {
     "if",
     "else",
@@ -96,6 +97,8 @@ static const char* hlslSemanticNames[] = {
     "packoffset",
     "read",
     "write",
+    "SV_BaseInstanceID",
+    "SV_BaryCentrics",
     "SV_ClipDistance",
     "SV_CullDistance",
     "SV_Coverage",
@@ -118,6 +121,7 @@ static const char* hlslSemanticNames[] = {
     "SV_PointCoord",
     "SV_PrimitiveID",
     "SV_DrawIndex",
+    "SV_DeviceIndex",
     "SV_RenderTargetArrayIndex",
     "SV_SampleIndex",
     "SV_StencilRef",
@@ -126,6 +130,8 @@ static const char* hlslSemanticNames[] = {
     "SV_VertexID",
     "SV_ViewID",
     "SV_ViewportArrayIndex",
+    "SV_VulkanVertexID",
+    "SV_VulkanInstanceID",
     "SV_ShadingRate",
     "SV_StartVertexLocation",
     "SV_StartInstanceLocation",
@@ -511,10 +517,283 @@ LanguageServerResult<CompletionResult> CompletionContext::tryCompleteMemberAndSy
     return collectMembersAndSymbols();
 }
 
+String CompletionContext::formatDeclForCompletion(
+    DeclRef<Decl> declRef,
+    ASTBuilder* astBuilder,
+    CompletionSuggestions::FormatMode formatMode,
+    int& outNameStart)
+{
+    outNameStart = 0;
+    switch (formatMode)
+    {
+    case CompletionSuggestions::FormatMode::Name:
+        return getText(declRef.getDecl()->getName());
+    default:
+        break;
+    }
+
+    ASTPrinter printer(astBuilder, ASTPrinter::OptionFlag::ParamNames);
+    if (auto genDecl = as<GenericDecl>(declRef))
+        declRef = astBuilder->getMemberDeclRef(genDecl, genDecl.getDecl()->inner);
+    auto callableDecl = as<CallableDecl>(declRef);
+    if (!callableDecl)
+        return String();
+    if (formatMode == CompletionSuggestions::FormatMode::FullSignature)
+    {
+        printer.addType(callableDecl.getDecl()->returnType.type);
+        printer.getStringBuilder() << " ";
+    }
+    outNameStart = (int)printer.getStringBuilder().getLength();
+    printer.getStringBuilder() << getText(declRef.getDecl()->getName());
+    auto outerGeneric = as<GenericDecl>(declRef.getParent());
+    if (outerGeneric)
+    {
+        printer.addGenericParams(outerGeneric);
+    }
+    printer.addDeclParams(declRef);
+    if (callableDecl.getDecl()->errorType.type != astBuilder->getBottomType() &&
+        callableDecl.getDecl()->errorType.type != astBuilder->getErrorType())
+    {
+        printer.getStringBuilder() << " throws ";
+        printer.addType(callableDecl.getDecl()->errorType);
+    }
+    if (outerGeneric)
+    {
+        for (auto constraint :
+             outerGeneric.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+        {
+            printer.getStringBuilder() << "\n";
+            bool indentUsingTab = indent.startsWith("\t");
+            if (indentUsingTab)
+                printer.getStringBuilder() << "\t";
+            else
+                printer.getStringBuilder() << "    ";
+            printer.getStringBuilder() << "where ";
+            printer.addType(constraint->sub.type);
+            if (constraint->isEqualityConstraint)
+                printer.getStringBuilder() << " == ";
+            else
+                printer.getStringBuilder() << " : ";
+            printer.addType(constraint->sup.type);
+        }
+    }
+    return printer.getString();
+}
+
+// Returns true if `exprNode` is the same as `targetExpr`, or if the original expr node
+// of `exprNode` before any checking/transformation is the same as `targetExpr`.
+bool matchExpr(Expr* exprNode, SyntaxNode* targetExpr)
+{
+    if (!exprNode)
+        return false;
+    if (exprNode == targetExpr)
+        return true;
+    if (auto invokeExpr = as<AppExprBase>(exprNode))
+        return matchExpr(invokeExpr->originalFunctionExpr, targetExpr);
+    if (auto overloadedExpr = as<OverloadedExpr>(exprNode))
+        return matchExpr(overloadedExpr->originalExpr, targetExpr);
+    if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(exprNode))
+        return matchExpr(partiallyAppliedExpr->originalExpr, targetExpr);
+    if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(exprNode))
+        return matchExpr(extractExistentialExpr->originalExpr, targetExpr);
+    if (auto declRefExpr = as<DeclRefExpr>(exprNode))
+        return matchExpr(declRefExpr->originalExpr, targetExpr);
+    return false;
+}
+
+// Infer the accepted types at the completion position based on the AST nodes.
+//
+List<Type*> CompletionContext::getExpectedTypesAtCompletion(const List<ASTLookupResult>& astNodes)
+{
+    List<Type*> expectedType;
+    if (astNodes.getCount() == 0)
+        return expectedType;
+    auto& path = astNodes.getFirst().path;
+    if (path.getCount() < 2)
+        return expectedType;
+    auto completionExprNode = path.getLast();
+    auto parentNode = path[path.getCount() - 2];
+    auto collectArgumentType = [&](AppExprBase* appExpr, Index argIndex)
+    {
+        if (!appExpr)
+            return;
+        auto functionExpr = appExpr->functionExpr;
+        if (!functionExpr)
+            return;
+        if (as<InvokeExpr>(appExpr))
+        {
+            // If we are in an invoke expr, we will use the parameter type of the
+            // callee as the expected type.
+            auto processDeclRefCallee = [&](DeclRef<Decl> calleeDeclRef)
+            {
+                auto decl = calleeDeclRef.getDecl();
+                auto callableDecl = as<CallableDecl>(decl);
+                if (!callableDecl)
+                    return;
+                Index paramIndex = 0;
+                for (auto paramDeclRef :
+                     getMembersOfType<ParamDecl>(version->linkage->getASTBuilder(), callableDecl))
+                {
+                    if (paramIndex == argIndex)
+                    {
+                        expectedType.add(getType(version->linkage->getASTBuilder(), paramDeclRef));
+                        return;
+                    }
+                    paramIndex++;
+                }
+            };
+            if (auto declRefExpr = as<DeclRefExpr>(functionExpr))
+                processDeclRefCallee(declRefExpr->declRef);
+            else if (auto overloadedExpr = as<OverloadedExpr>(functionExpr))
+            {
+                for (auto& lookupResult : overloadedExpr->lookupResult2)
+                    processDeclRefCallee(lookupResult.declRef);
+            }
+        }
+        else if (as<GenericAppExpr>(appExpr))
+        {
+            auto declRefExpr = as<DeclRefExpr>(functionExpr);
+            if (!declRefExpr)
+                return;
+            auto genericDecl = as<GenericDecl>(declRefExpr->declRef.getDecl());
+            if (!genericDecl)
+                return;
+
+            for (auto member : genericDecl->getMembers())
+            {
+                if (auto valParamDecl = as<GenericValueParamDecl>(member))
+                {
+                    if (valParamDecl->parameterIndex == argIndex)
+                    {
+                        expectedType.add(valParamDecl->type.type);
+                        return;
+                    }
+                }
+            }
+        }
+    };
+
+    if (auto implicitCastExpr = as<ImplicitCastExpr>(parentNode))
+    {
+        // If the completion request is in (SomeType)(!completionRequest), then we should prefer any
+        // candidates that has `SomeType`.
+        if (implicitCastExpr->arguments.getCount() == 1 &&
+            matchExpr(implicitCastExpr->arguments[0], completionExprNode))
+        {
+            if (as<DeclRefType>(implicitCastExpr->type.type))
+                expectedType.add(implicitCastExpr->type.type);
+        }
+        return expectedType;
+    }
+    if (auto invokeExpr = as<AppExprBase>(parentNode))
+    {
+        // If parent node is an invoke expr, check if we are in an argument position.
+        for (Index i = 0; i < invokeExpr->arguments.getCount(); i++)
+        {
+            if (matchExpr(invokeExpr->arguments[i], completionExprNode))
+            {
+                // If we are in an argument position, we will use the expected type of the
+                // argument.
+                collectArgumentType(invokeExpr, i);
+                break;
+            }
+        }
+        return expectedType;
+    }
+    if (auto varDecl = as<VarDeclBase>(parentNode))
+    {
+        if (!varDecl)
+            return expectedType;
+        if (!matchExpr(varDecl->initExpr, completionExprNode))
+            return expectedType;
+        if (as<DeclRefType>(varDecl->type.type))
+        {
+            expectedType.add(varDecl->type.type);
+        }
+        return expectedType;
+    }
+    return expectedType;
+}
+
+Index CompletionContext::determineCompletionItemSortOrder(
+    Decl* item,
+    const List<Type*>& expectedTypes)
+{
+    if (expectedTypes.getCount() == 0)
+        return -1;
+
+    // Test if `itemType` matches `expectedType`, and return the relevance of the match.
+    // -1 means no match, a positive number means a match.
+    // The smaller the number, the more relevant the match is, and the item will be listed
+    // earlier in the completion list.
+    auto matchType = [&](Type* itemType, DeclRefType* expectedType) -> Index
+    {
+        if (itemType == expectedType)
+            return 1; // Exact match
+
+        auto declRef = isDeclRefTypeOf<Decl>(itemType);
+        if (!declRef)
+            return -1; // No match
+
+        if (declRef.getDecl() == expectedType->getDeclRef().getDecl())
+            return 2; // Match by decl
+
+        // We may also want to extend the matching logic to include subtyping or other
+        // coercion relationships. But for now, we will just check for simple matches
+        // to avoid performance problems.
+        //
+        return -1;
+    };
+
+    Index result = -1;
+
+    // If we have any expected types, we will sort the completion candiate items by their relevance
+    // to the expected types.
+    // If the item has expected type, we will assign a sort order to make it appear at the top
+    // of the completion list.
+    for (auto et : expectedTypes)
+    {
+        Index currentSortOrder = -1;
+        auto etDeclRefType = as<DeclRefType>(et);
+        if (!etDeclRefType)
+            continue;
+        if (item == etDeclRefType->getDeclRef().getDecl())
+        {
+            if (as<EnumDecl>(item))
+                currentSortOrder = 0;
+            else if (!as<InterfaceDecl>(item))
+                currentSortOrder = 1;
+        }
+        else if (auto varItem = as<VarDeclBase>(item))
+        {
+            currentSortOrder = matchType(varItem->type.type, etDeclRefType);
+        }
+        else if (auto callableItem = as<CallableDecl>(item))
+        {
+            // If the item is a callable decl, we will check if the return type matches the expected
+            // type.
+            currentSortOrder = matchType(callableItem->returnType.type, etDeclRefType);
+        }
+        if (result == -1 || (currentSortOrder != -1 && currentSortOrder < result))
+        {
+            // If we have a better match, we will update the result.
+            result = currentSortOrder;
+        }
+    }
+    // Always list decls within the same module first.
+    // Note if result == 0, it means the item is representing the expected enum type itself,
+    // so we always want to list it first by not increasing `result`.
+    if (result > 0 && getModule(item) != parsedModule)
+        result++;
+    // List core module decls last.
+    if (result > 0 && isFromCoreModule(item))
+        result++;
+    return result;
+}
+
 CompletionResult CompletionContext::collectMembersAndSymbols()
 {
     List<LanguageServerProtocol::CompletionItem> result;
-
     auto linkage = version->linkage;
     if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
         CompletionSuggestions::ScopeKind::Swizzle)
@@ -549,6 +828,24 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
     default:
         return result;
     }
+
+    // If we are completing an override function signature, don't add keywords to the result.
+    switch (linkage->contentAssistInfo.completionSuggestions.formatMode)
+    {
+    case CompletionSuggestions::FormatMode::FullSignature:
+    case CompletionSuggestions::FormatMode::FuncSignatureWithoutReturnType:
+        addKeywords = false;
+        break;
+    }
+    auto lookupResults = findASTNodesAt(
+        doc,
+        version->linkage->getSourceManager(),
+        parsedModule->getModuleDecl(),
+        ASTLookupType::CompletionRequest,
+        canonicalPath,
+        line,
+        col);
+    auto expectedTypes = getExpectedTypesAtCompletion(lookupResults);
     HashSet<String> deduplicateSet;
     for (Index i = 0;
          i < linkage->contentAssistInfo.completionSuggestions.candidateItems.getCount();
@@ -563,7 +860,36 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
         if (!member->getName())
             continue;
         LanguageServerProtocol::CompletionItem item;
-        item.label = member->getName()->text;
+        int nameStart = 0;
+        item.label = formatDeclForCompletion(
+            suggestedItem.declRef,
+            linkage->m_astBuilder,
+            linkage->contentAssistInfo.completionSuggestions.formatMode,
+            nameStart);
+        if (item.label.getLength() == 0)
+            continue;
+        if (linkage->contentAssistInfo.completionSuggestions.formatMode ==
+            CompletionSuggestions::FormatMode::FullSignature)
+        {
+            // If the completion item is a `static` function, but there is no `static` keyword
+            // on the current incomplete decl, then we will add `static` keyword to the completion
+            // result.
+            if (suggestedItem.declRef.getDecl() &&
+                suggestedItem.declRef.getDecl()->findModifier<HLSLStaticModifier>() &&
+                linkage->contentAssistInfo.completionSuggestions.currentPartialDecl &&
+                !linkage->contentAssistInfo.completionSuggestions.currentPartialDecl
+                     ->findModifier<HLSLStaticModifier>())
+            {
+                item.label = "static " + item.label;
+                nameStart += 7;
+                // Add an item for 'static' keyword.
+                LanguageServerProtocol::CompletionItem staticItem;
+                staticItem.label = "static";
+                staticItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+                staticItem.data = "-1"; // Use -1 to indicate this is a keyword.
+                result.add(staticItem);
+            }
+        }
         item.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
         if (as<TypeConstraintDecl>(member))
         {
@@ -627,7 +953,27 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
             item.kind = LanguageServerProtocol::kCompletionItemKindClass;
         }
         item.data = String(i);
+
+        Index sortOrder = determineCompletionItemSortOrder(member, expectedTypes);
+        if (sortOrder != -1)
+        {
+            item.sortText =
+                (StringBuilder() << sortOrder << ":" << getText(member->getName())).produceString();
+        }
         result.add(item);
+        if (nameStart > 1)
+        {
+            // If the completion item is for a full function signature, add the return type part too
+            // as a separate item.
+            item.label = item.label.getUnownedSlice().head(nameStart - 1);
+            item.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+            item.sortText =
+                (StringBuilder()
+                 << linkage->contentAssistInfo.completionSuggestions.candidateItems.getCount()
+                 << ":" << item.label)
+                    .produceString();
+            result.add(item);
+        }
     }
     if (addKeywords)
     {

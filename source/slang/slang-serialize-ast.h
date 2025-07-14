@@ -11,8 +11,10 @@
 
 namespace Slang
 {
+class Linkage;
+
 void writeSerializedModuleAST(
-    Encoder* encoder,
+    RIFF::BuildCursor& cursor,
     ModuleDecl* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
@@ -20,7 +22,8 @@ ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
-    RiffContainer::Chunk* chunk,
+    ISlangBlob* blobHoldingSerializedData,
+    RIFF::Chunk const* chunk,
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc);
 

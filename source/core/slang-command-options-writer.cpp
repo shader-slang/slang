@@ -157,7 +157,7 @@ void MarkdownCommandOptionsWriter::_appendQuickLinks()
     const auto& categories = m_commandOptions->getCategories();
     const auto count = categories.getCount();
 
-    m_builder << "## Quick Links\n\n";
+    m_builder << "### Quick Links\n\n";
 
     for (Index categoryIndex = 0; categoryIndex < count; ++categoryIndex)
     {
@@ -317,7 +317,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                       << "\"></a>\n";
         }
 
-        m_builder << "# " << category.name << "\n\n";
+        m_builder << "## " << category.name << "\n\n";
 
         // If there is a description output, making \n split paragraphs
         if (category.description.getLength() > 0)
@@ -351,7 +351,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                               << "\"></a>\n";
                 }
 
-                m_builder << "## ";
+                m_builder << "### ";
                 StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
                 m_builder << "\n";
 
@@ -502,8 +502,30 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     const auto& categories = m_commandOptions->getCategories();
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
-        _appendDescriptionForCategory(categoryIndex);
+        const auto& category = categories[categoryIndex];
+
+        // Omit the value categories
+        if (category.kind != CategoryKind::Value)
+        {
+            _appendDescriptionForCategory(categoryIndex);
+        }
     }
+
+    // Add instructions for getting help for specific categories
+    m_builder << "Getting Help for Specific Categories\n";
+    m_builder << "=====================================\n\n";
+    m_builder << "To get help for a specific category of options or values, use: slangc -h "
+                 "<help-category>\n";
+    m_builder << m_options.indent << "<help-category> can be: ";
+
+    List<UnownedStringSlice> categoryNames;
+    for (const auto& category : categories)
+    {
+        categoryNames.add(category.name);
+    }
+
+    _appendWrappedIndented(1, categoryNames, toSlice(", "));
+    m_builder << "\n\n";
 }
 
 void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex)

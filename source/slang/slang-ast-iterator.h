@@ -76,6 +76,13 @@ struct ASTIterator
             dispatchIfNotNull(expr->base);
         }
 
+        void visitTupleExpr(TupleExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (auto element : expr->elements)
+                dispatchIfNotNull(element);
+        }
+
         void visitAssignExpr(AssignExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -126,6 +133,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
 
             dispatchIfNotNull(expr->functionExpr);
+            dispatchIfNotNull(expr->originalFunctionExpr);
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }
@@ -238,6 +246,10 @@ struct ASTIterator
 
         void visitThisExpr(ThisExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitThisTypeExpr(ThisTypeExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitThisInterfaceExpr(ThisInterfaceExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+        }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
@@ -438,6 +450,20 @@ struct ASTIterator
             dispatchIfNotNull(stmt->statement);
         }
 
+        void visitThrowStmt(ThrowStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            iterator->visitExpr(stmt->expression);
+        }
+
+        void visitCatchStmt(CatchStmt* stmt)
+        {
+            if (stmt->errorVar)
+                iterator->visitDecl(stmt->errorVar);
+            dispatchIfNotNull(stmt->tryBody);
+            dispatchIfNotNull(stmt->handleBody);
+        }
+
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
@@ -511,7 +537,7 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
     }
     if (auto container = as<ContainerDecl>(decl))
     {
-        for (auto member : container->members)
+        for (auto member : container->getDirectMemberDecls())
         {
             visitDecl(member);
         }
@@ -568,6 +594,8 @@ void iterateASTWithLanguageServerFilter(
 {
     auto filter = [&](DeclBase* decl)
     {
+        if (as<ConstructorDecl>(decl) && decl->findModifier<SynthesizedModifier>())
+            return false;
         return as<NamespaceDeclBase>(decl) ||
                sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
                    .pathInfo.foundPath.getUnownedSlice()

@@ -83,6 +83,9 @@ struct LanguageServerStartupOptions
     // Are we working with Visual Studio client?
     bool isVisualStudio = false;
 
+    // A flag to control periodic diagnostic update. Defaults to true.
+    bool periodicDiagnosticUpdate = true;
+
     SLANG_API void parse(int argc, const char* const* argv);
 };
 
@@ -247,6 +250,7 @@ private:
     void updateSearchInWorkspace(const JSONValue& value);
     void updateCommitCharacters(const JSONValue& value);
     void updateFormattingOptions(
+        const JSONValue& enableFormatOnType,
         const JSONValue& clangFormatLoc,
         const JSONValue& clangFormatStyle,
         const JSONValue& clangFormatFallbackStyle,
@@ -271,4 +275,7 @@ inline bool _isIdentifierChar(char ch)
 }
 
 SLANG_API SlangResult runLanguageServer(LanguageServerStartupOptions options);
+SLANG_API SlangResult
+getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob);
+
 } // namespace Slang

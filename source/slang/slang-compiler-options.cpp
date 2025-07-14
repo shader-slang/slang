@@ -155,6 +155,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DisableDynamicDispatch:
         case CompilerOptionName::DisableSpecialization:
         case CompilerOptionName::DumpIntermediates:
+        case CompilerOptionName::SkipSPIRVValidation:
             if (option.value.getCount() && option.value[0].intValue != 0)
                 sb << " " << name;
             break;
@@ -197,6 +198,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
+    case CompilerOptionName::TypeConformance:
         return true;
     }
     return false;
@@ -207,6 +209,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     {
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
+    case CompilerOptionName::LanguageVersion:
+        return CompilerOptionValue::fromEnum(SLANG_LANGAUGE_VERSION_DEFAULT);
     default:
         return CompilerOptionValue();
     }

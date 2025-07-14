@@ -824,7 +824,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, I
 {
     switch (origBaseType->getOp())
     {
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_Specialize:
     case kIROp_Param:
         return nullptr;
@@ -965,7 +965,9 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
         if (as<IRThisType>(primalType) || as<IRAssociatedType>(primalType))
         {
             List<IRInterfaceType*> constraintTypes;
-            constraintTypes.add(this->commonDiffPairInterface);
+            auto diffPairInterfaceType =
+                cast<IRInterfaceType>(getOrCreateCommonDiffPairInterface(builder));
+            constraintTypes.add(diffPairInterfaceType);
             return builder->getAssociatedType(constraintTypes.getArrayView());
         }
 
@@ -1752,7 +1754,19 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
                     (UInt)diffTypeList.getCount(),
                     diffTypeList.getBuffer());
         }
-
+    case kIROp_OptionalType:
+        {
+            auto primalOptionalType = as<IROptionalType>(primalType);
+            if (auto diffElementType =
+                    differentiateType(builder, primalOptionalType->getValueType()))
+            {
+                return builder->getOptionalType(diffElementType);
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
     default:
         return (IRType*)getDifferentialForType(builder, (IRType*)primalType);
     }
@@ -2947,7 +2961,7 @@ struct AutoDiffPass : public InstPassBase
                 // For generics/struct types, we will generate a new generic/struct type
                 // representing the differntial.
 
-                SLANG_RELEASE_ASSERT(t->getParent() && t->getParent()->getOp() == kIROp_Module);
+                SLANG_RELEASE_ASSERT(t->getParent() && t->getParent()->getOp() == kIROp_ModuleInst);
                 builder.setInsertBefore(t);
                 auto diffInfo = fillDifferentialTypeImplementation(&ctx, diffTypes, t);
                 diffTypes[t] = diffInfo;
@@ -3249,6 +3263,9 @@ struct AutoDiffPass : public InstPassBase
                     }
                 }
 
+                // Destroy the old witness table
+                innerResult.diffWitness->replaceUsesWith(newWitnessTable);
+                innerResult.diffWitness->removeAndDeallocate();
                 result.diffWitness =
                     hoistValueFromGeneric(builder, newWitnessTable, specInst, true);
             }
@@ -3356,7 +3373,7 @@ struct AutoDiffPass : public InstPassBase
                         {
                         case kIROp_Func:
                         case kIROp_Specialize:
-                        case kIROp_LookupWitness:
+                        case kIROp_LookupWitnessMethod:
                         case kIROp_Generic:
                             if (auto innerFunc =
                                     as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
@@ -3812,14 +3829,14 @@ UIndex addPhiOutputArg(
     builder->setInsertInto(block);
     switch (branchInst->getOp())
     {
-    case kIROp_unconditionalBranch:
+    case kIROp_UnconditionalBranch:
         inoutTerminatorInst = builder->emitBranch(
             branchInst->getTargetBlock(),
             phiArgs.getCount(),
             phiArgs.getBuffer());
         break;
 
-    case kIROp_loop:
+    case kIROp_Loop:
         {
             auto newLoop = builder->emitLoop(
                 as<IRLoop>(branchInst)->getTargetBlock(),

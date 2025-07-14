@@ -3,6 +3,8 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-out-parameters.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 
@@ -571,6 +573,8 @@ protected:
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         auto localVar = builder.emitVar(valueType);
+        // Add TempCallArgVar decoration to mark this variable as a temporary for parameter passing
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
         if (const auto inOutType = as<IRInOutType>(paramPtrType))
@@ -1270,13 +1274,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return LegalizedVaryingVal::makeValue(blockIdxGlobalParam);
+            return createLegalizedVal(info, blockIdxGlobalParam);
         case SystemValueSemanticName::GroupThreadID:
-            return LegalizedVaryingVal::makeValue(threadIdxGlobalParam);
+            return createLegalizedVal(info, threadIdxGlobalParam);
         case SystemValueSemanticName::GroupIndex:
-            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+            return createLegalizedVal(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return LegalizedVaryingVal::makeValue(dispatchThreadID);
+            return createLegalizedVal(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -1330,6 +1334,62 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         default:
             return diagnoseUnsupportedUserVal(info);
         }
+    }
+
+    LegalizedVaryingVal createLegalizedVal(VaryingParamInfo const& info, IRInst* id)
+    {
+        // If the parameter type is not uint3, we need to extract components as needed
+        auto paramType = info.type->getOperand(0);
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+
+        if (as<IRBasicType>(paramType))
+        {
+            auto uintType = builder.getBasicType(BaseType::UInt);
+            UInt swizzleIndex = 0;
+            auto xComponent = builder.emitSwizzle(uintType, id, 1, &swizzleIndex);
+
+            if (auto basicType = as<IRBasicType>(paramType))
+            {
+                if (basicType->getBaseType() != BaseType::UInt)
+                {
+                    xComponent = builder.emitBitCast(basicType, xComponent);
+                }
+            }
+            return LegalizedVaryingVal::makeValue(xComponent);
+        }
+        // For vector types, use a swizzle to extract the needed components
+        else if (auto vectorType = as<IRVectorType>(paramType))
+        {
+            auto elementCount = getIntVal(vectorType->getElementCount());
+
+            if (elementCount > 0 && elementCount <= 3)
+            {
+                // Setup indices for the swizzle (0 for x, 1 for y, 2 for z)
+                UInt swizzleIndices[3] = {0, 1, 2};
+                auto uintType = builder.getBasicType(BaseType::UInt);
+
+                // Use a swizzle to extract all needed components at once
+                auto extractedVector = builder.emitSwizzle(
+                    builder.getVectorType(uintType, elementCount),
+                    id,
+                    elementCount,
+                    swizzleIndices);
+
+                // Cast if the element type is not uint
+                auto elementType = vectorType->getElementType();
+                if (auto basicElementType = as<IRBasicType>(elementType))
+                {
+                    if (basicElementType->getBaseType() != BaseType::UInt)
+                    {
+                        extractedVector = builder.emitBitCast(vectorType, extractedVector);
+                    }
+                }
+                return LegalizedVaryingVal::makeValue(extractedVector);
+            }
+        }
+        // Default to the full uint3 if the parameter type doesn't match our expectations
+        return LegalizedVaryingVal::makeValue(id);
     }
 };
 
@@ -1763,7 +1823,7 @@ private:
     void removeSemanticLayoutsFromLegalizedStructs()
     {
         // Metal and WGSL does not allow duplicate attributes to appear in the same shader.
-        // If we emit our own struct with `[[color(0)]`, all existing uses of `[[color(0)]]`
+        // If we emit our own struct with `[[color(0)]]`, all existing uses of `[[color(0)]]`
         // must be removed.
         for (auto field : semanticInfoToRemove)
         {
@@ -1822,6 +1882,7 @@ private:
             auto structType = as<IRStructType>(param->getDataType());
             builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
             auto varLayout = findVarLayout(param);
+            SLANG_ASSERT(varLayout);
 
             // If `param` already has a semantic, we don't want to hoist its fields out.
             if (varLayout->findSystemValueSemanticAttr() != nullptr ||
@@ -1833,6 +1894,10 @@ private:
                 structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
             Index fieldIndex = 0;
             List<IRInst*> fieldParams;
+            // TODO: We currently lose some decorations from the struct that should possibly be
+            // transfered
+            //       to the new params here, like
+            //       kIROp_GlobalVariableShadowingGlobalParameterDecoration.
             for (auto field : structType->getFields())
             {
                 auto fieldParam = builder.emitParam(field->getFieldType());
@@ -2180,6 +2245,7 @@ private:
                 index++;
                 continue;
             }
+            SLANG_ASSERT(typeLayout);
             typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
@@ -3131,6 +3197,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3194,6 +3261,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3797,6 +3865,7 @@ protected:
             break;
 
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
@@ -3850,6 +3919,7 @@ protected:
             }
 
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_index");
                 result.permittedTypes.add(builder.getUIntType());
@@ -3949,11 +4019,55 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
+void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+{
+    const auto oldFunc = entryPoint.entryPointFunc;
+
+    // We can avoid this lowering if it's a simple scalar return as it's
+    // handled further down the pipeline
+    const bool hasOutParameters = anyOf(
+        oldFunc->getParams(),
+        [](auto param) { return as<IROutTypeBase>(param->getFullType()); });
+
+    auto returnType = oldFunc->getResultType();
+    if (!as<IRStructType>(returnType) && !hasOutParameters)
+        return;
+
+    const bool alwaysUseReturnStruct = true;
+    entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink, alwaysUseReturnStruct);
+
+    if (oldFunc == entryPoint.entryPointFunc)
+        return;
+
+    // Since this will no longer be the entry point function, remove those decorations
+    List<IRDecoration*> ds;
+    for (auto decor : oldFunc->getDecorations())
+    {
+        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
+        {
+            ds.add(decor);
+        }
+    }
+
+    for (auto decor : ds)
+    {
+        decor->removeFromParent();
+    }
+}
+
+
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
+    for (auto& e : entryPoints)
+    {
+        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        {
+            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        }
+    }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
 }

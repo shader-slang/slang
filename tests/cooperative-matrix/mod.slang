@@ -16,7 +16,7 @@
 // CHECK-NEXT: 2
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-RWByteAddressBuffer outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[4 3 5 7], stride=4, count=256),name=input1
 ByteAddressBuffer input1;
@@ -24,18 +24,19 @@ ByteAddressBuffer input1;
 //TEST_INPUT:ubuffer(data=[2 3 4 5], stride=4, count=256),name=input2
 ByteAddressBuffer input2;
 
-typealias CoopMatIntType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
-typealias CoopMatUintType = CoopMat<uint32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
-typealias CoopMatFloatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+using namespace linalg;
+
+typealias CoopMatIntType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatUintType = CoopMat<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatFloatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
     let stride = 16;
-    let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let mat1 = CoopMatIntType.load(input1, 0, stride, matrixLayout);
-    let mat2 = CoopMatIntType.load(input2, 0, stride, matrixLayout);
+    let mat1 = CoopMatIntType.Load<CoopMatMatrixLayout::RowMajor>(input1, 0, stride);
+    let mat2 = CoopMatIntType.Load<CoopMatMatrixLayout::RowMajor>(input2, 0, stride);
 
     let mat3 = CoopMatFloatType(mat1);
     let mat4 = CoopMatFloatType(mat2);
@@ -47,7 +48,7 @@ void computeMain()
     let result2 = CoopMatIntType(mat3 % mat4);
     let result3 = CoopMatIntType(mat5 % mat6);
 
-    result.store(outputBuffer, 0, stride, matrixLayout);
-    result2.store(outputBuffer, 16, stride, matrixLayout);
-    result3.store(outputBuffer, 32, stride, matrixLayout);
+    result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
+    result2.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 16, stride);
+    result3.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 32, stride);
 }

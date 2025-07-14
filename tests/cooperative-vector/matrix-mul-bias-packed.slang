@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -use-dxil -output-using-type -profile cs_6_8 -Xslang... -Xdxc -Vd -X.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -use-dxil -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 // CHECK: type: int32_t
@@ -25,7 +25,7 @@ ByteAddressBuffer bias;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let vec = coopVecLoad<1, int32_t>(input);
+    let vec = coopVecLoad<1, uint32_t>(input);
     let result = coopVecMatMulAddPacked<int32_t, 4>(
         vec,
         CoopVecComponentType::SignedInt8Packed,

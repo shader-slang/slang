@@ -468,9 +468,54 @@ Stage getStageFromAtom(CapabilityAtom atom)
         return Stage::Miss;
     case CapabilityAtom::_callable:
         return Stage::Callable;
+    case CapabilityAtom::dispatch:
+        return Stage::Dispatch;
     default:
         SLANG_UNEXPECTED("unknown stage atom");
         UNREACHABLE_RETURN(Stage::Unknown);
+    }
+}
+
+CapabilityAtom getAtomFromStage(Stage stage)
+{
+    // Convert Slang::Stage to CapabilityAtom.
+    // Note that capabilities do not share the same values as Slang::Stage
+    // and must be explicitly converted.
+    switch (stage)
+    {
+    case Stage::Compute:
+        return CapabilityAtom::compute;
+    case Stage::Vertex:
+        return CapabilityAtom::vertex;
+    case Stage::Fragment:
+        return CapabilityAtom::fragment;
+    case Stage::Geometry:
+        return CapabilityAtom::geometry;
+    case Stage::Hull:
+        return CapabilityAtom::hull;
+    case Stage::Domain:
+        return CapabilityAtom::domain;
+    case Stage::Mesh:
+        return CapabilityAtom::_mesh;
+    case Stage::Amplification:
+        return CapabilityAtom::_amplification;
+    case Stage::RayGeneration:
+        return CapabilityAtom::_raygen;
+    case Stage::AnyHit:
+        return CapabilityAtom::_anyhit;
+    case Stage::ClosestHit:
+        return CapabilityAtom::_closesthit;
+    case Stage::Miss:
+        return CapabilityAtom::_miss;
+    case Stage::Intersection:
+        return CapabilityAtom::_intersection;
+    case Stage::Callable:
+        return CapabilityAtom::_callable;
+    case Stage::Dispatch:
+        return CapabilityAtom::dispatch;
+    default:
+        SLANG_UNEXPECTED("unknown stage");
+        UNREACHABLE_RETURN(CapabilityAtom::Invalid);
     }
 }
 
@@ -1173,6 +1218,46 @@ SlangResult passthroughDownstreamDiagnostics(
     return SLANG_OK;
 }
 
+bool isValidSlangLanguageVersion(SlangLanguageVersion version)
+{
+    switch (version)
+    {
+    case SLANG_LANGUAGE_VERSION_LEGACY:
+    case SLANG_LANGUAGE_VERSION_2025:
+    case SLANG_LANGUAGE_VERSION_2026:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isValidGLSLVersion(int version)
+{
+    switch (version)
+    {
+    case 100:
+    case 110:
+    case 120:
+    case 130:
+    case 140:
+    case 150:
+    case 300:
+    case 310:
+    case 320:
+    case 330:
+    case 400:
+    case 410:
+    case 420:
+    case 430:
+    case 440:
+    case 450:
+    case 460:
+        return true;
+    default:
+        return false;
+    }
+}
+
 SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
     outArtifact.setNull();
@@ -1416,6 +1501,39 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         }
     }
 
+    CapabilitySet targetCaps = getTargetCaps();
+    for (auto atomSets : targetCaps.getAtomSets())
+    {
+        for (auto atomVal : atomSets)
+        {
+            auto atom = CapabilityAtom(atomVal);
+            switch (atom)
+            {
+            default:
+                break;
+
+#define CASE(KIND, NAME, VERSION)                                                   \
+    case CapabilityAtom::NAME:                                                      \
+        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{ \
+            DownstreamCompileOptions::CapabilityVersion::Kind::KIND,                \
+            VERSION});                                                              \
+        break
+
+                CASE(CUDASM, _cuda_sm_1_0, SemanticVersion(1, 0));
+                CASE(CUDASM, _cuda_sm_2_0, SemanticVersion(2, 0));
+                CASE(CUDASM, _cuda_sm_3_0, SemanticVersion(3, 0));
+                CASE(CUDASM, _cuda_sm_4_0, SemanticVersion(4, 0));
+                CASE(CUDASM, _cuda_sm_5_0, SemanticVersion(5, 0));
+                CASE(CUDASM, _cuda_sm_6_0, SemanticVersion(6, 0));
+                CASE(CUDASM, _cuda_sm_7_0, SemanticVersion(7, 0));
+                CASE(CUDASM, _cuda_sm_8_0, SemanticVersion(8, 0));
+                CASE(CUDASM, _cuda_sm_9_0, SemanticVersion(9, 0));
+
+#undef CASE
+            }
+        }
+    }
+
     // Set the file sytem and source manager, as *may* be used by downstream compiler
     options.fileSystemExt = getFileSystemExt();
     options.sourceManager = getSourceManager();
@@ -1622,6 +1740,69 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             SLANG_ASSERT(!"Unhandled floating point mode");
         }
 
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp16))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp16))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp16 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp16 denormal handling mode");
+            }
+        }
+
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp32))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp32))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp32 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp32 denormal handling mode");
+            }
+        }
+
+        if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp64))
+        {
+            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
+                CompilerOptionName::DenormalModeFp64))
+            {
+            case FloatingPointDenormalMode::Any:
+                options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
+                break;
+            case FloatingPointDenormalMode::Preserve:
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::Preserve;
+                break;
+            case FloatingPointDenormalMode::FlushToZero:
+                options.denormalModeFp64 =
+                    DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero;
+                break;
+            default:
+                SLANG_ASSERT(!"Unhandled fp64 denormal handling mode");
+            }
+        }
+
         {
             // We need to look at the stage of the entry point(s) we are
             // being asked to compile, since this will determine the
@@ -1766,6 +1947,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1781,6 +1964,23 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     default:
         return CodeGenTarget::None;
     }
+}
+
+static IArtifact* _getSeparateDbgArtifact(IArtifact* artifact)
+{
+    if (!artifact)
+        return nullptr;
+
+    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug
+    // artifact.
+    for (auto* associated : artifact->getAssociated())
+    {
+        auto desc = associated->getDesc();
+        if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::SPIRV)
+            return associated;
+    }
+
+    return nullptr;
 }
 
 /// Function to simplify the logic around emitting, and dissassembling
@@ -1813,6 +2013,32 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
+            // Also disassemble the debug artifact if one exists.
+            auto debugArtifact = _getSeparateDbgArtifact(intermediateArtifact);
+            ComPtr<IArtifact> disassemblyDebugArtifact;
+            if (debugArtifact)
+            {
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(
+                    getSession(),
+                    debugArtifact,
+                    getSink(),
+                    disassemblyDebugArtifact.writeRef()));
+                disassemblyDebugArtifact->setName(debugArtifact->getName());
+
+                // The disassembly needs both the metadata for the debug build identifier
+                // and the debug spirv to be associated with is.
+                for (auto associated : intermediateArtifact->getAssociated())
+                {
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    {
+                        disassemblyArtifact->addAssociated(associated);
+                        break;
+                    }
+                }
+                disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
+            }
+
             outArtifact.swap(disassemblyArtifact);
             return SLANG_OK;
         }
@@ -1835,7 +2061,9 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
-
+    case CodeGenTarget::HostVM:
+        SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1887,6 +2115,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::HostVM:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
@@ -2033,6 +2262,46 @@ SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArt
     return SLANG_OK;
 }
 
+// These helper functions are used by the -separate-debug-info command line
+// arg to extract the associated artifact containing the debug SPIRV data
+// and save it to a file with a .dbg.spv extension.
+static String _getDebugSpvPath(const String& basePath)
+{
+    // Find the last occurrence of ".spv" at the end of the string.
+    static const char ext[] = ".spv";
+    static const char dbgExt[] = ".dbg.spv";
+    Index extLen = 4;
+    if (basePath.getLength() >= extLen && basePath.endsWith(ext))
+    {
+        // Replace the ".spv" extension with ".dbg.spv"
+        String prefix = String(basePath.subString(0, basePath.getLength() - extLen));
+        return prefix + dbgExt;
+    }
+    // If it doesn't end with .spv, just append .dbg.spv
+    return basePath + dbgExt;
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    {
+        const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
+        // The artifact's name may have been set to the debug build id hash, use
+        // it as the filename if it exists.
+        String dbgPath = dbgArtifact->getName();
+        if (dbgPath.getLength() == 0)
+            dbgPath = _getDebugSpvPath(path);
+        else
+            dbgPath.append(".dbg.spv");
+        return _maybeWriteArtifact(dbgPath, dbgArtifact);
+    }
+
+    return SLANG_OK;
+}
+
 IArtifact* TargetProgram::_createWholeProgramResult(
     DiagnosticSink* sink,
     EndToEndCompileRequest* endToEndReq)
@@ -2169,8 +2438,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     // If debug information is enabled, enable writing out source locs
     if (_shouldWriteSourceLocs(linkage))
     {
-        options.optionFlags |= SerialOptionFlag::SourceLocation;
-        options.sourceManager = linkage->getSourceManager();
+        options.sourceManagerToUseWhenSerializingSourceLocs = linkage->getSourceManager();
     }
 
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
@@ -2532,6 +2800,10 @@ void EndToEndCompileRequest::generateOutput()
                     const auto path = _getWholeProgramPath(targetReq);
 
                     _maybeWriteArtifact(path, artifact);
+
+                    // If we are compiling separate debug info, check for the additional
+                    // SPIRV artifact and write that if needed.
+                    _maybeWriteDebugArtifact(targetProgram, path, artifact);
                 }
             }
             else
@@ -2544,6 +2816,10 @@ void EndToEndCompileRequest::generateOutput()
                         const auto path = _getEntryPointPath(targetReq, ee);
 
                         _maybeWriteArtifact(path, artifact);
+
+                        // If we are compiling separate debug info, check for the additional
+                        // SPIRV artifact and write that if needed.
+                        _maybeWriteDebugArtifact(targetProgram, path, artifact);
                     }
                 }
             }
@@ -2705,7 +2981,6 @@ bool CodeGenContext::isSpecializationDisabled()
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     OwnedMemoryStream memoryStream(FileAccess::Write);
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
     *outSerializedBlob = RawBlob::create(
@@ -2718,7 +2993,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSeriali
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
 {
     SerialContainerUtil::WriteOptions writeOptions;
-    writeOptions.sourceManager = getLinkage()->getSourceManager();
     FileStream fileStream;
     SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));
     return SerialContainerUtil::write(this, writeOptions, &fileStream);
@@ -2771,7 +3045,7 @@ void Module::_discoverEntryPointsImpl(
     DiagnosticSink* sink,
     const List<RefPtr<TargetRequest>>& targets)
 {
-    for (auto globalDecl : containerDecl->members)
+    for (auto globalDecl : containerDecl->getDirectMemberDecls())
     {
         auto maybeFuncDecl = globalDecl;
         if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))

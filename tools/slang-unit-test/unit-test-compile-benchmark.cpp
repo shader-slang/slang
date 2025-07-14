@@ -88,11 +88,12 @@ void main(uint3 threadIdx : SV_DispatchThreadID)
         SLANG_CHECK(module != nullptr);
 
         ComPtr<slang::IEntryPoint> entryPoint;
-        module->findAndCheckEntryPoint(
+        SlangResult res = module->findAndCheckEntryPoint(
             "main",
-            SLANG_STAGE_VERTEX,
+            SLANG_STAGE_COMPUTE,
             entryPoint.writeRef(),
             diagnosticBlob.writeRef());
+        SLANG_CHECK(res == SLANG_OK);
 
         slang::IComponentType* componentTypes[2] = {module, entryPoint.get()};
         ComPtr<slang::IComponentType> composedProgram;

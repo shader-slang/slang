@@ -81,6 +81,11 @@ public:
     }
 };
 
+struct SourceWarningStateTrackerBase : public RefObject
+{
+    virtual Severity consumeWarningSeverity(SourceLoc loc, int id, Severity severity) = 0;
+};
+
 class Name;
 
 void printDiagnosticArg(StringBuilder& sb, char const* str);
@@ -249,6 +254,15 @@ public:
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
 
+    void setSourceWarningStateTracker(SourceWarningStateTrackerBase* ptr)
+    {
+        m_sourceWarningStateTracker = ptr;
+    }
+    RefPtr<SourceWarningStateTrackerBase> getSourceWarningStateTracker() const
+    {
+        return m_sourceWarningStateTracker;
+    }
+
     /// Reset state.
     /// Resets error counts. Resets the output buffer.
     void reset();
@@ -283,7 +297,7 @@ protected:
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
-    Severity getEffectiveMessageSeverity(DiagnosticInfo const& info);
+    Severity getEffectiveMessageSeverity(DiagnosticInfo const& info, SourceLoc const& location);
 
     /// If set all diagnostics (as formatted by *this* sink, will be routed to the parent).
     DiagnosticSink* m_parentSink = nullptr;
@@ -304,6 +318,8 @@ protected:
 
     // Configuration that allows the user to control the severity of certain diagnostic messages
     Dictionary<int, Severity> m_severityOverrides;
+
+    RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.

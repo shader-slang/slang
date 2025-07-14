@@ -43,7 +43,7 @@ void specializeRTTIObjectReferences(SharedGenericsLoweringContext* sharedContext
         for (auto use = rtti.value->firstUse; use; use = nextUse)
         {
             nextUse = use->nextUse;
-            if (use->getUser()->getOp() == kIROp_GetAddr)
+            if (use->getUser()->getOp() == kIROp_GetAddress)
             {
                 use->getUser()->replaceUsesWith(idOperand);
             }

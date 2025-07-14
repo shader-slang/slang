@@ -123,6 +123,18 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
 
+#if SLANG_PTR_IS_64
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("longlong");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("ulonglong");
+#else
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint");
+#endif
+
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
 
@@ -200,6 +212,11 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     case kIROp_TensorViewType:
         {
             out << "TensorView";
+            return SLANG_OK;
+        }
+    case kIROp_HitObjectType:
+        {
+            out << "OptixTraversableHandle";
             return SLANG_OK;
         }
     default:
@@ -865,9 +882,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_GetOptiXRayPayloadPtr:
         {
-            m_writer->emit("(");
+            m_writer->emit("((");
             emitType(inst->getDataType());
-            m_writer->emit(")getOptiXRayPayloadPtr()");
+            m_writer->emit(")getOptiXRayPayloadPtr())");
             return true;
         }
     case kIROp_GetOptiXHitAttribute:
@@ -935,8 +952,7 @@ void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     {
         if (auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
         {
-            SemanticVersion version;
-            version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
+            SemanticVersion version = smDecoration->getCUDASMVersion();
             m_extensionTracker->requireSMVersion(version);
         }
     }

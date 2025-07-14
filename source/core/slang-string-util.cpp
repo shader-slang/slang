@@ -390,6 +390,159 @@ UnownedStringSlice StringUtil::getAtInSplit(
     return builder;
 }
 
+template<typename T>
+static T readValue(ArrayView<const void*> ptrToArgs, Count& argIndex)
+{
+    if (argIndex < ptrToArgs.getCount())
+    {
+        T value;
+        memcpy(&value, ptrToArgs[argIndex], sizeof(T));
+        argIndex++;
+        return value;
+    }
+    return T();
+}
+
+String StringUtil::makeStringWithFormatFromArgArray(
+    const char* format,
+    ArrayView<const void*> ptrToArgs)
+{
+    if (!format)
+    {
+        return String();
+    }
+    StringBuilder builder;
+    const char* ptr = format;
+    Count argIndex = 0;
+    auto consumeString = [&]()
+    {
+        if (argIndex < ptrToArgs.getCount())
+        {
+            const char* strPtr = *(const char**)ptrToArgs[argIndex];
+            argIndex++;
+            if (strPtr)
+            {
+                // Append the string to the builder
+                builder.append(strPtr);
+            }
+        }
+    };
+#define ADVANCE_PTR                     \
+    ptr++;                              \
+    if (!*ptr)                          \
+    {                                   \
+        return builder.produceString(); \
+    }
+
+    while (*ptr)
+    {
+        if (*ptr == '%')
+        {
+            const char* formatStart = ptr;
+            ADVANCE_PTR;
+            if (*ptr == 's')
+            {
+                // If we have a %s, then we want to append the data
+                consumeString();
+                // Move past the 's'
+                ADVANCE_PTR;
+                continue;
+            }
+            if (*ptr == '-')
+            {
+                // If we have a %- then we want to continue parsing format string.
+                ADVANCE_PTR;
+            }
+            while (CharUtil::isDigit(*ptr))
+            {
+                // Skip the digits after the '.'
+                ADVANCE_PTR;
+            }
+            if (*ptr == '.')
+            {
+                ADVANCE_PTR;
+                while (CharUtil::isDigit(*ptr))
+                {
+                    // Skip the digits after the '.'
+                    ADVANCE_PTR;
+                }
+            }
+            int isLong = 0;
+            if (*ptr == 'l' || *ptr == 'L')
+            {
+                // If we have a 'l' or 'L', then we want to skip it.
+                ADVANCE_PTR;
+                isLong = 1;
+                if (*ptr == 'l' || *ptr == 'L')
+                {
+                    // If we have another 'l' or 'L', then we want to skip it too.
+                    ADVANCE_PTR;
+                    isLong = 2;
+                }
+            }
+            const char typeChar = *ptr;
+            ADVANCE_PTR;
+            String formatStr = UnownedStringSlice(formatStart, ptr);
+            switch (CharUtil::toLower(typeChar))
+            {
+            case 'd':
+            case 'x':
+            case 'i':
+            case 'u':
+            case 'o':
+            case 'c':
+                if (isLong == 2)
+                {
+                    StringUtil::appendFormat(
+                        builder,
+                        formatStr.getBuffer(),
+                        readValue<int64_t>(ptrToArgs, argIndex));
+                }
+                else
+                {
+                    StringUtil::appendFormat(
+                        builder,
+                        formatStr.getBuffer(),
+                        readValue<int>(ptrToArgs, argIndex));
+                }
+                break;
+            case 'e':
+            case 'f':
+            case 'g':
+                if (isLong != 0)
+                {
+                    StringUtil::appendFormat(
+                        builder,
+                        formatStr.getBuffer(),
+                        readValue<double>(ptrToArgs, argIndex));
+                }
+                else
+                {
+                    StringUtil::appendFormat(
+                        builder,
+                        formatStr.getBuffer(),
+                        readValue<float>(ptrToArgs, argIndex));
+                }
+                break;
+            case 'n':
+                break;
+            case '%':
+                // If we have a '%%' then we want to append a single '%'
+                builder.appendChar('%');
+                continue;
+            }
+        }
+        else
+        {
+            // Just append the character
+            builder.appendChar(*ptr);
+            ptr++;
+        }
+    }
+    return builder.produceString();
+}
+
+
 /* static */ UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
 {
     if (blob)

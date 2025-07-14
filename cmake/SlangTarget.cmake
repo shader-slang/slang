@@ -354,7 +354,22 @@ function(slang_add_target dir type)
                     COMMAND
                         ${CMAKE_OBJCOPY} --only-keep-debug
                         $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.dwarf
-                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+                # We may be building for Android on a Windows host, where chmod isn't available or needed.
+                if(NOT CMAKE_HOST_WIN32)
+                    add_custom_command(
+                        TARGET ${target}
+                        POST_BUILD
+                        COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                        WORKING_DIRECTORY ${output_dir}
+                        VERBATIM
+                    )
+                endif()
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
                     COMMAND
                         ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
                     COMMAND
@@ -399,7 +414,18 @@ function(slang_add_target dir type)
     #
     # Link and include from dependencies
     #
-    target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_LOCAL_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    else()
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    endif()
+
     target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -415,14 +441,14 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PRIVATE
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
     foreach(include_from ${ARG_INCLUDE_FROM_PUBLIC})
         target_include_directories(
             ${target}
             PUBLIC
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
 
@@ -433,15 +459,24 @@ function(slang_add_target dir type)
         get_filename_component(inc_abs ${inc} ABSOLUTE)
         target_include_directories(
             ${target}
-            PUBLIC "$<BUILD_INTERFACE:${inc_abs}>"
+            PUBLIC
+                "$<BUILD_INTERFACE:${inc_abs}>"
+                "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         )
     endforeach()
     foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
         get_filename_component(inc_abs ${inc} ABSOLUTE)
-        target_include_directories(
-            ${target}
-            PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_LOCAL_INTERFACE:${inc_abs}>"
+            )
+        else()
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
+            )
+        endif()
     endforeach()
 
     #

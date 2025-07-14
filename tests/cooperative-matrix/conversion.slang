@@ -12,6 +12,7 @@ RWStructuredBuffer<float> outputBuffer;
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=input
 ByteAddressBuffer input;
 
+using namespace linalg;
 
 [numthreads(32, 1, 1)]
 void computeMain()
@@ -19,12 +20,12 @@ void computeMain()
     let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let intMat = CoopMat<int, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>.load(input, 0, stride, matrixLayout);
-    let floatMat = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
-    let uintMat = CoopMat<uint, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
-    let halfMat = CoopMat<half, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(uintMat);
-    let floatMat2 = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(halfMat);
+    let intMat = CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>.Load<CoopMatMatrixLayout::RowMajor>(input, 0, stride);
+    let floatMat = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
+    let uintMat = CoopMat<uint, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
+    let halfMat = CoopMat<half, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(uintMat);
+    let floatMat2 = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(halfMat);
 
     let result = floatMat + floatMat2;
-    result.store(outputBuffer, 0, stride, matrixLayout);
+    result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
 }

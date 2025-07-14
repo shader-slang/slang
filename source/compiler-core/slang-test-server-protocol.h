@@ -17,6 +17,7 @@ struct ExecuteUnitTestArgs
     String moduleName;
     String testName;
     uint32_t enabledApis;
+    bool enableDebugLayers;
 
     static const UnownedStringSlice g_methodName;
     static const StructRttiInfo g_rttiInfo;

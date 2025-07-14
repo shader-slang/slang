@@ -29,7 +29,7 @@ As an example, consider a polynomial function
 
 $$ f(x, y) = x^3 + x^2 - y $$
 
-Here, $$f$$ here has 1 output and 2 inputs. $$Df$$ is therefore the row matrix:
+Here, $$f$$ has 1 output and 2 inputs. $$Df$$ is therefore the row matrix:
 
 $$ Df(x, y) = [\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}] = [3x^2 + 2x, -1] $$
 
@@ -56,7 +56,7 @@ There are two basic ways to compute this product:
  2. the vector-Jacobian product $$ \langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle $$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
 
 #### Propagating derivatives with forward-mode auto-diff
-The products described above allow the _propagation_ of derivatives forward and backward through the function $f$
+The products described above allow the _propagation_ of derivatives forward and backward through the function $$f$$
 
 The forward-mode derivative (Jacobian-vector product) can convert a derivative of the inputs to a derivative of the outputs. 
 For example, let's say inputs $$\mathbf{x}$$ depend on some scalar $$\theta$$, and $$\frac{\partial \mathbf{x}}{\partial \theta}$$ is a vector of partial derivatives describing that dependency.

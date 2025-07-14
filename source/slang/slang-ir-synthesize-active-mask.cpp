@@ -1049,7 +1049,7 @@ struct SynthesizeActiveMaskForFunctionContext
             // that unstructured branches can split the active mask,
             // without any option to reconverge it.
             //
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             //
             // Finally, we also don't handle any control-flow op we might not
             // have introduced at the time this pass was created.
@@ -1067,7 +1067,7 @@ struct SynthesizeActiveMaskForFunctionContext
         case kIROp_Unreachable:
             break;
 
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
             {
                 auto branch = cast<IRUnconditionalBranch>(terminator);
 
@@ -1131,7 +1131,7 @@ struct SynthesizeActiveMaskForFunctionContext
             }
             break;
 
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 // A structured `ifElse` instruction is a two-way branch on a
                 // Boolean coniditon, along with a specific block representing
@@ -1252,7 +1252,7 @@ struct SynthesizeActiveMaskForFunctionContext
             }
             break;
 
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 // At the most basic level, a `loop` instruction is just an uncondtional
                 // branch. What is stores above and beyond an `unconditionalBranch`

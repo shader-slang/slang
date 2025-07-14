@@ -1,256 +1,241 @@
 Serialization
 =============
 
-Slang has a collection of serialization components. This document will be used to discuss serialization around IR/AST and modules as it currently exists. A separate document will describe the future serialization plans.
+Slang's infrastructure for serialization is currently in flux, so there exist a mixture of different subsystems, using a mixture of different techniques.
 
-All of the serialization aspects here focus on binary serialization. 
+This document is curently minimal, and primarily serves to provide a replacement for an older draft that no longer reflects the state of the codebase.
 
-The major components are
+The Fossil Format
+=================
 
-* IR Serialization
-* AST/Generalized Serialization
-* SourceLoc Serialization
-* Riff container
-* C++ Extractor
+The "fossil" format is a memory-mappable binary format for general-purpose serialization.
 
-Generalized Serialization
-=========================
+Goals
+-----
 
-Generalized serialization is the mechanism used to save 'arbitrary' C++ structures. It is currently used for serializing the AST. Although not necessary, generalized serialization is typically helped out by the `C++ extractor`, which can rudimentary parse C++ source, and extract class-like types and their fields. The extraction then produces header files that contain macros that can then be used to drive serialization. 
+The main goals of the fossil format are:
 
-It's worth discussing briefly what the philosophy is behind the generalized serialization system. To talk about this design it is worth talking a little about serialization in general and the issues involved. Lets say we have a collection of C++ class instances that contain fields. Some of those fields might be pointers. Others of the fields might be a templated container type like a Dictionary<K,V>. We want to take all of these instances, write them to a file, such that when we read the file back we will have the equivalent objects with equivalent relationships. 
+* Data can be read from memory as-is.
 
-We could imagine a mechanism that saved off each instance, by writing off the address of the object, and then the in memory representation for all the instances that can be reached. When reading back the objects would be at different locations in memory. If we knew where the pointers were, we could use a map of old pointers to the new instances and fix them up. Problems with this simple mechanism occur because...
+  * Basic types are stored at offsets that are naturally aligned (e.g., a 4-byte integer is 4-byte aligned)
 
-* If we try to read back on a different machine, with a different pointer size, the object layout will be incompatible
-* If we try to read back on the same machine where the source is compiled by a different compiler, the object layout might be incompatible (say bool or enum are different size)
-* Endianness might be different
-* Knowing where all the pointers are and what they point to and therefore what to serialize is far from simple. 
-* The alignment of types might be different across different processors and different compilers 
+  * Pointers are encoded as relative offsets, and can be traversed without any "relocation" step after data is loaded.
 
-The implementation makes a distinction between the 'native' types, the regular C++ in memory types and 'serial' types. Each serializable C++ type has an associated 'serial' type - with the distinction that it can be written out and (with perhaps some other data) read back in to recreate the C++ type. The serial type can be a C++ type, but is such it can be written and read from disk and still represent the same data. 
+* Supports general-purpose data, including complicated object graphs.
 
-The approach taken in Slang is to have each 'native' type (ie the C++ type) that is being serialized have a serializable 'dual' type. The serial type can be an explicit C++ type, or it might implicit (ie not have a C++ type) and calculated at Slang startup. 
+* Data can include embedded layout information, allowing code to traverse it without statically knowing the structure.
 
-The important point here is that the Serial type must writable on one target/process and readable correctly on another. 
+  * Embedded layout information should support versioning; new code should be able to load old data by notcing what has/hasn't been encoded.
 
-The easy cases are types that have an alignment and representation that will work over all targets. These would be most built in types - integrals 8,16,32 and float32. Note that int64 and double are *not* so trivial, because on some targets that require 8 byte alignment - so they must be specially defined to have 8 byte alignment. 
+* Layout information is *optional*, and data can be traversed with minimal overhead by code that knows/assumes the layout
 
-Another odd case is bool - it has been on some compilers 32 bits, and on others 8 bits. Thus we need to potentially convert.
+Top-Level Structure
+-------------------
 
-For this and other types it is therefore necessary to have function that can convert to and from the serialized dual representation.
+A serialized blob in fossil format starts with a header (see `Slang::Fossil::Header`), which in turn points to the *root value*.
+All other data in the blob should be reachable from the root value, and an application can choose to make the root value whatever type they want (an array, structure, etc.).
 
-## Generalized Field Conversion
+Encoding
+--------
 
-For types that contain fields, it would be somewhat laborious to have to write all of the conversion functions by hand. To avoid this we use the macro output of the C++ extractor to automatically generate the appropriate functions. 
+### Endian
 
-Take DeclRefExpr from the AST hierarchy - the extractor produces a macro something like...
+All data is read/written in the endianness of the host machine.
+There is currently no automatic support for encoding endian-ness as part of the format; a byte-order mark should be added if we ever need to support big-endian platforms.
 
-```
-#define SLANG_FIELDS_ASTNode_DeclRefExpr(_x_, _param_)\
-    _x_(scope, (RefPtr<Scope>), _param_)\
-    _x_(declRef, (DeclRef<Decl>), _param_)\
-    _x_(name, (Name*), _param_)
-``` 
+### Fixed-Size Types
 
-DeclRefExpr derives from Expr and this might hold other fields and so forth. 
+#### Basic Types
 
-The macros can generate the appropriate conversion functions *if* we have the conversion functions for the field types. Field type conversions can be specified via a special macro that describes how the conversion to and from the type work. To make the association between the native and serial type, as well as provide the functions to convert, we use the template
+Basic types like fixed-width integers and floating-point numbers are encoded as-is.
+That is, an N-byte value is stored directly as N bytes of data with N-byte alignment.
 
-```
-template <typename T>
-struct SerialTypeInfo;
-```
-and specialize it for each native type. The specialization holds
+A Boolean value is encoded as an 8-bit unsigned integer holding either zero or one.
 
-* SerialType - The type that will be used to represent the native type
-* NativeType - The native type
-* SerialAlignment - A value that holds what kind of alignment the SerialType needs to be serializable (it may be different from SLANG_ALIGN_OF(SerialType)!)
-* toSerial - A function that with the help of SerialWriter convert the NativeType into the SerialType
-* toNative - A function that with the help of SerialReader convert the SerialType into the NativeType
+#### Pointers
 
-It is useful to have a structure that can hold the type information, so it can be stored. That is achieved with
+A pointer is encoded as a 4-byte signed integer, representing a relative offset.
 
-```
-template <typename T>
-struct SerialGetType;
-```
+If the relative offset value is zero, then the pointer is null.
+Otehrwise, the relative offset value should be added to the offset of the pointer itself, to get the offset of the target.
 
-This template can be specialized for a specific native types - but all it holds is just a function getType, which returns a `SerialType*`, which just holds the information held in the SerialTypeInfo template, but additionally including the size of the SerialType.
+#### Optionals
 
-So we need to define a specialized SerialTypeInfo for each type that can be a field in a NodeBase/RefObject derived type. We don't need to define anything explicitly for the NodeBase derived types, as we will just generate the layout from the fields. How do we know the fields? We just used the macros generated from the C++ extractor.
+An optional value of some type `T` (e.g., the equivalent of a `std::optional<T>`) is encoded as a pointer to a `T`.
+If the pointer is null, the optional has no value; otherwise the value is stored at the offset being pointed to.
 
-So first a few things to observe...
+Note that when encoding a pointer to an optional (`std::optional<T> *`) or an optional pointer (`std::optional<T*>`), there will be two indirections.
 
-1) Some types don't need any conversion to be serializable - int8_t, or float the bits can just be written out and read in (1)
-2) Some types need a conversion but it's very simple - for example an enum without explicit size, being written as an explicit size
-3) Some types can be written out but would not be directly readable or usable with different targets/processors, so need converting
-4) Some types require complex conversions that require programmer code - like Dictionary/List
+#### Records
 
-For types that need no conversion (1), we can just use the template SerialIdentityTypeInfo
+Things that are conceptually like a `struct` or tuple are encoded as *records*, which are simply a sequence of *fields*.
 
-```
-template <>
-struct SerialTypeInfo<SomeType> : public SerialIdentityTypeInfo<SomeType> {};
-```
+The alignment of a record is the maximum alignment of its fields.
 
-This specialization means that SomeType can be written out and read in across targets/compilers without problems.
+Fields in a record are laid out sequentially, where each field gets the next suitably-aligned offset after the preceding field.
+No effort is made to fill in "gaps" left by preceding fields.
 
-For (2) we have another template that will do the conversion for us
+Note: currently the size of a record is *not* rounded up to be a multiple of its alignment, so it is possible for one field to be laid out in the "tail padding" of the field before it.
+This behavior should probably be changed, so that the fossilized layout better matches what C/C++ compilers tend to do.
 
-```
-template <typename NATIVE_T, typename SERIAL_T>
-struct SerialConvertTypeInfo;
-```
+### Variable-Size Types
 
-That we can use as above, and specify the native and serial types.
+Types where different instances may consume a different number of bytes may be encoded either *inline* or *indirectly*.
 
-For (3) there are a few scenarios. For any field in a serial type we must store in the serialized type such that the representation will work across all processors/compilers. So one problematic type is `bool`. It's not specified how it's laid out in memory - and some compiles have stored it as a word. Most recently it's been stored as a byte. To make sure bool is ok for serialization therefore we store as a uint8_t.
+If a variable-size type `V` is being referred to by a pointer or optional (e.g., `V*` or `std::optional<V>`), then it will be encoded inline as the target address of that pointer/optional.
 
-Another example would be double. It's 64 bits, but on some arches/compilers it's SLANG_ALIGN_OF is 4 and on others it's 8. On some architectures a non aligned read will lead to a fault, on others it might be very slow. To work around this problem therefore we have to ensure double has the alignment that will work across all targets - and that alignment is 8. In that specific case that issue is handled via SerialBasicTypeInfo, which makes the SerialAlignment the sizeof the type.
+In all other contexts, including when a `V` is used as a field or a record, it will be encoded indirectly (conceptually, as if the field was actually a `V*`).
+When a variable-size type is encoded indirectly, a null pointer should be interpreted as an empty instance of the type `V`.
 
-For (4) there are a few things to say. First a type can always implement a custom version of how to do a conversion by specializing `SerialTypeInfo`. But there remains another nagging issue - types which allocate/use other memory that changes at runtime. Clearly we cannot define 'any size of memory' in a fixed SerialType defined in a specialization of SerialTypeInfo. The mechanism to work around this is to allow arbitrary arrays to be stored, that can be accessed via an SerialIndex. This will be discussed more once we discuss a little more about the file system, and SerialIndex. 
+#### Arrays
 
-## Struct value types
+An array of `T` is encoded as a sequence of `T` values, separated by the *stride* of `T` (the size of `T` rounded up to the alignment of `T`).
+The offset of the array is the offset of its first element.
 
-There is a mechanism to allow the simple serialization of 'value' struct types for this to work it requires
+The number of elements in the array is encoded as a 4-byte unsigned integer stored immediately *before* the offset of the array itself.
 
-* The fields of the struct are serializable and public
-* The super class (if there is one) is serializable
+#### Strings
 
-If this is the case, it is not necessary to write a `SerialTypeInfo<T>` specialization, the C++ extractor and it's reflection can generate the specialization for you. The steps needed
+A string is encoded in the same way that an array of 8-bit bytes would be (including the count stored before the first element).
+The only additional detail is that the serialized data *must* include an additional nul byte after the last element of the string.
 
-* Place SLANG_VALUE_CLASS(your type) in the definition of your struct 
-* Make sure that the header containing the struct definition is included in the ones C++ extractor examines
-* Instead of implementing SerialTypeInfo for your type use the macro SLANG_VALUE_TYPE_INFO(your type)
+The data of a string is assumed to be in UTF-8 encoding, but there is nothing about the format that validates or enforces this.
 
-If there are problems looking at the contents of `slang-generated-value.h` and `slang-generated-value-macro.h`.
+#### Dictionaries
 
-It should be noted that currently because of limitations in the C++ extractor, all of the types must be defined in the same scope.
+A dictionary with keys of type `K` and values of type `V` is encoded in the same way as an array of `P`, where `P` is a two-element tuple of a `K` and a `V`.
 
-Also because value types are always fields in generalized serialization, they do not need to be identified with a sub type, even though C++ extractor does generate a ValueType enum.
+There is currently no provision made for efficient lookup of elements of a fossilized dictionary.
 
-## Generalized Serialization Format
+#### Variants
 
-The serialization format used is 'stream-like' with each 'object' stored in order. Each object is given an index starting from 1. 0 is used to be in effect nullptr. The stream looks like
+A *variant* is a fossilized value that can describe its own layout.
 
-```
-SerialInfo::Entry (for index 1)
-Payload for type in entry
+The content of variant holding a value of type `T` is encoded exactly as a record with one field of type `T` would be, starting at the offset of the variant itself.
 
-SerialInfo::Entry (for index 2)
-Payload for type in entry
+The four bytes immediately preceding a variant store a relative pointer to the fossilized layout for the type `T` of the content.
 
-... 
-... 
-```
+### Layouts
 
-That when writing we have an array that maps each index to a pointer to the associated header. We also have a map that maps native pointers to their indices. The Payload *is* the SerialType for thing saved. The payload directly follows the Entry data. Each object in this list can only be a few types of things
+Every layout starts with a 4-byte unsigned integer that holds a tag representing the kind of layout (see `Slang::FossilizedValKind`).
+The value of the tag determines what, if any, information appears after the tag.
 
-* NodeBase derived type
-* RefObject derived type
-* String
-* Array
+In any place where a relative pointer to a layout is expected, a null pointer may be used to indicate that the relevant layout information is either unknown, or was elided from the fossilized data.
 
-The actual Entry followed by the payloads are allocated and stored when writing in a MemoryArena. When we want to write into a stream, we can just iterate over each entry in order and write it out.
+#### Pointer-Like Types
 
-You may have spotted a problem here - that some Entry types can be stored without alignment (for example a string - which stores the length VarInt encoded followed by the characters). Others require an alignment - for example an NodeBase derived type that contains a int64_t will *require* 8 byte alignment. That as a feature of the serialization format we want to be able to just map the data into memory, and be able to access all the SerialType as is on the CPU. For that to work we *require* that the payload for each entry has the right alignment for the associated SerialType.
+For pointers (`T*`) and optionals (`Optional<T>`), the tag is followed by a relative pointer to a layout for `T`.
 
-To achieve this we store in the Entry it's alignment requirement *AND* the next entries alignment. With this when we read, as we as stepping through the entries we can find where the next Entry starts. Because the payload comes directly after the Entry - the Entrys size must be a modulo of the largest alignment the payload can have.
+#### Container Types
 
-For the code that does the conversion between native and serial types it uses either the SerialWriter or SerialReader. This provides the mechanism to turn a pointer into a serializable `SerialIndex` and vice versa. There are some special functions for turning string like types to and forth.
+For arrays and dictionaries, the tag is followed by:
 
-The final mechanism is that of 'Arrays'. An array allows reading or writing a chunk of data associated with a `SerialIndex`. The chunk of data *must* hold data that is serializable. If the array holds pointers - then the serialized array must hold an array of `SerialIndex` values that represent those pointers. When reading back in `SerialIndex` is converted back to a pointer.
+* A relative pointer to a layout for the element type
 
-Arrays are the escape hatch that allows for more complex types to serialize. Dictionaries for example are saved as a serial type that is two SerialIndices one to a keys array and one to a values array.
+* A 4-byte unsigned integer holding the stride between elements
 
-Note that writing has two phases, serializing out into an SerialWriter, and then secondly writing out to a stream. 
+#### Record Types
 
-## Object/Reference Types
+For records, the tag is followed by:
 
-When talking about Object/Reference types this means types that can be referenced natively as pointers. Currently that means `NodeBase` and `SerialRefObject` derived types. 
+* A 4-byte unsigned integer holding the number of fields, `N`
 
-The SerialTypeInfo mechanism is generally for *fields* of object types. That for derived types we use the C++ extractors field list to work out the native fields offsets and types. With this we can then calculate the layout for NodeBase types such that they follow the requirements for serialization - such as alignment and so forth.
+* `N` 8-byte values representing the fields, each comprising:
 
-This information is held in the SerialClasses, which for a given TypeKind/SubType gives a SerialClassInfo, that specifies fields for just that type. 
+    * A relative pointer to the type of the field
 
-It is trivial to work out the SubType for a NodeBase derived class - its just the astTypeNode member in the `NodeBase` type. For a SerialRefObject it is determined by first calling 
+    * A 4-byte unsigned integer holding the offset of that field within the record
 
-```
-const ReflectClassInfo* getClassInfo() const;
-```
+The RIFF Support Code
+=====================
 
-Then the m_classID in the `ReflectClassInfo` is the subtype.
+There is code in `source/core/slang-riff.{h,cpp}` that implements abastractions for reading and writing RIFF-structured files.
 
-## Reading
+The current RIFF implementation is trying to be "correct" for the RIFF format as used elsewhere (e.g., for `.wav` files), but it is unclear if this choice is actually helping us rather than hurting us.
+It is likely that we will want to customize the format if we keep using (e.g., at the very least increase the minimum alignment of chunks).
 
-Due to the care in writing reading is relatively simple. We can just take the contents of the file and put in memory, as long as in memory it has an alignment of at least MAX_ALIGNMENT. Then we can build up an entries table by stepping through the data and writing the pointer.
+RIFF is a simple chunk-based file format that is used by things like WAV files, and has inspired many similar container formats used in media/games.
 
-The toNative functions take an SerialReader - this allows the implementation to ask for pointers and arrays from other parts of the serialized data. It also allows for types to be lazily reconstructed if necessary.
+The RIFF structures are currently being used for a few things:
 
-Lazy reconstruction may be useful in the future to partially reconstruct a sub part of the serialized data. In the current implementation, lazy evaluation is used on Strings. The m_objects array holds all of the recreated native 'objects'. Since the objects can be derived from different base classes the associated Entry will describe what it really is.
+* The top-level structure of serialized files for slang modules, "module libraries". This design choice is being utilized so that the compiler can navigate the relevant structures and extract the parts it needs (e.g., just the digest of a module, but not the AST or IR).
 
-For the String type, we initially store the object pointer as null. If a string is requested from that index, we see if the object pointer is null, if it is we have to construct the StringRepresentation that will be used. An extra wrinkle is that we allow accessing of a serialized String as a Name or a string or a UnownedSubString. Fortunately a Name just holds a string, and a Name remains in scope as long as it's NamePool does which is passed in.
+* Repro files are using a top-level RIFF container, but it is just to encapsulate a single blob of raw data (with internal offset-based pointers)
 
-### Serial type replacement
+* The structure of the IR and `SourceLoc` serialization formats uses RIFF chunks for their top-level structure, but doesn't really make use of the ability to navigate them in memory or perform random access.
 
-In generalized serialization systems such as with Java there is a mechanism for reference types to replace their representation on writing, and then on reading replace the read type with the actual type. Write replacement is already used when serializing out modules via the `SerialFilter` mechanism. The actual implementation is `ModuleSerialFilter`, if an object is referenced in a different module that is explicitly specified, it is replaced with `ImportExternalDecl`, that names the actual definition to use. 
+* The actual serialized AST format is currently a deep hierarchy of RIFF chunks.
 
-Currently when deserializing, the `ImportExternalDecl` is *not* turned back into the item it references. This means there are likely pointers which point to invalid objects. 
+* There is also code for a RIFF-based hierarchical virtual file-system format, and that format is being used for the serialized core module (seemingly just because it includes support for LZ4; the actual "file system" that gets serialized seems to only have a single file in it).
 
-If we wanted to do a replacement on reconstruction we could
+General-Purpose Hierarchical Data Serialization
+===============================================
 
-We could modify reading as follows.
+The code in `source/slang/slang-serialize.{h,cpp}` implements a framework for serialization that is intended to be lightweight for users to adopt, while also scaling to more complicated cases like our AST serialization.
 
-1) Don't construct anything at the start
-2) Find 'root's they must be created and deserialized first
-  . Any read/writeReplace is a root
-  . Any marked (like SourceLocData) is a root. (When deconstructed it also needs to add information to the Reader)
-  . The root of the objects (note we could just deserialize first to last if not already constructed)
-3) During deserialization pointer references and constructed on demand
-4) Extra code is needed to make sure there aren't cycles. Any object is either Pre/Created/Deserialized.
+In the simplest cases, all a programmer needs to know is that if they have declared a type like:
 
-### Other reading issues
+    struct MyThing
+    {
+        float f;
+        List<OtherThing> others;
+        SomeObject* obj;
+    };
 
-As touched on elsewhere SourceLoc information has to be carefully handled. Within the generalized serialization we have the additional problem that we probably don't want to attach SourceLoc or other types explicitly to the SerialReader/SerialWriter. The mechanism to work around this is via the `SerialExtraObjects` structure. This allows types to optionally be available to the Reader/Writer without it having to explicitly know anything about the type.
+then they can add serialization support for their type by writing a function like:
 
-For all types supporting this mechanism they *require* that they are added to the `SerialExtraType` enum, and that they embed a static kExtraType field in the type. This solution is not as flexible as perhaps using a string map or something of that sort, but it does make lookup very fast and simple which is likely significant as many types contain the SourceLoc type for example.
+    void serialize(Serializer const& serializer, MyThing& value)
+    {
+        SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+        serialize(serializer, value.f);
+        serialize(serializer, value.others);
+        serialize(serializer, value.obj);
+    }
 
-## Identifying Types
+If the `OtherThing` and `SomeObject` types were already set up with their own serialization support, then that should be all that's needed.
+Of course there's a lot more to it in once you get into the details and the difficult cases.
+For now, looking at `source/slang/slang-serialize.h` is probably the best way to learn more about the approach.
 
-How a NodeBase derived type identifies itself is not directly compatible with how a SerialRefObject represents itself. The NodeBase derived type uses `ASTNodeType` enum. The SerialRefObject uses a `RefObjectType` enum. Thus to uniquely identify a type we typically actually need two bits of information the `SerialTypeKind` as well as the `SerialSubType`. 
+One key goal of this serialization system is that it allows the serialized format to be swapped in and out without affecting the per-type `serialize` functions.
+Currently there are only a small number of implementations.
 
-```
-enum class SerialTypeKind : uint8_t
-{
-    Unknown,
+RIFF Serialization
+------------------
 
-    String,             ///< String                         
-    Array,              ///< Array
+The files `slang-serialize-riff.{h,cpp}` provide an implementation of the general-purpose serialization framework that reads/writes RIFF files with a particular kind of structure, based on what had previously been hard-coded for use in serializing the AST to RIFF.
 
-    NodeBase,           ///< NodeBase derived
-    RefObject,          ///< RefObject derived types
+In practice this representation is kind of like an encoding of JSON as RIFF chunks, with leaf/data chunks for what would be leaf values in JSON, and container chunks for arrays and dictionaries (plus other aggregates that would translate into arrays or dictionaries in JSON).
 
-    CountOf,
-};
-```
+Fossil Serialization
+--------------------
 
-String and Array are special cases described elsewhere. 
+The files `slang-serialize-fossil.{h,cpp}` provide an implementation of the generla-purpose serialization framwork that reads/writes the "fossil" format, which is described earlier in this document.
 
-If the `SerialTypeKind` is `NodeBase`, then the `SerialSubType` *is* the ASTNodeType. If the `SerialTypeKind` is `RefObject` then the `SerialSubType` *is* RefObjectType. 
+AST Serialization
+=================
 
-`SerialClasses` holds the information on how to serialize non-field Serial types. For each `SerialTypeKind`/`SerialSubType` it holds a `SerialClass`. The SerialClass holds the size of the type, the amount of fields, and the field information. The fields themselves contain a `SerialFieldType` - this holds the pointers to the functions to convert to and from `native` to `serial` types. 
+AST serialization is implementation as an application of the general-purpose framework described above.
+There is an `ASTSerializer` type that expands on `Serializer` to include the additional context that is needed for handling AST-related types like `SourceLoc`, `Name`, and the `NodeBase` hierarchy.
 
-In order to set up all types in a SerialClass without tying SerialClasses to an implementation the class `SerialClassesUtil` is used to set up Slang serialized types in a `SerialClasses` instance. 
+The Old Serialization System
+============================
+
+The old serialization system has largely been removed, but some vestiges of it are still noticeable.
+
+There was an older serialization system in place that made use of an extensive RTTI system that types had to be registered with, plus a set of boilerplate macros for interfacing with that system that were generated from the C++ declarations of the AST node types.
+That system was also predicated on the idea that to serialize a user C++ type `Foo`, one would also hand-author a matching C++ type `SerialFooData`, and then write code to translate a `Foo` to/from a `SerialFooData` plus code to read/write a `SerialFooData` from the actual serialized data format.
+
+The IR and `SourceLoc` serialization approaches are currently still heavily influenced by the old serialization system, and there are still vestigates of the RTTI infrastructure that was introduced to support it.
+The hope is that as more subsystems are ported to use newer approaches to serialization, this code can all be eliminated.
+
+The following sections are older text that describes some of the formats that have not yet been revisited.
 
 IR Serialization
-================
+----------------
 
-Currently IR serialization is handled via a separate mechanism to 'generalized' serialization.
+This mechanism is *much* simpler than generali serialization, because by design the IR types are very homogeneous in style. There are a few special cases, but in general an instruction consists of
 
-This mechanism is *much* simpler than generalized serialization, because by design the IR types are very homogeneous in style. There are a few special cases, but in general an instruction consists of
-
-* It's type
+* Its type
 * A SourceLoc
 * 0 or more operands.
 * 0 or more children. 
@@ -263,69 +248,11 @@ The actual serialization mechanism is similar to the generalized mechanism - ref
 
 IR serialization allows a simple compression mechanism, that works because much of the IR serialized data is UInt32 data, that can use a variable byte encoding.
 
-AST Serialization
-=================
-
-AST serialization uses the generalized serialization mechanism. 
-
-When serializing out an AST module it is typical to want to just serialize out the definitions within that module. Without this, the generalized serializer will crawl over the whole of the AST structure serializing every thing that can be reached - including the whole of the core module.
-
-The filter `ModuleSerialFilter` can be used when writing the AST module, it will replace any references to elements outside of the current module with a `ImportExternalDecl`. This contains a mangled name to the item being referenced in another module. 
-
-When serializing back in, it may be possible to turn these references into the actual element, if the module containing the definition has been loaded. This probably can't work in general though, as if we have two modules that reference items in the other, then it isn't possible to fix up on load. 
-
-A way around this would be to not replace on reading (or only replace items that can be found). Then go through the `ImportExternalDecl` elements doing the lookup, and potentially loading other modules. There are several issues here though 
-
-* On first loading pointers that have been replaced will claim to be a type they are typically *NOT*
-* Once we have determined what `ImportExternalDecl` should replaced with, how do we replace it?
-
-On the first point, this is perhaps undesirable (on a variety of levels - such as debugging), but isn't as terrible as it could be, as the actual type identification is managed by Slang via the `astTypeNode`. So there is a simple way of identifying what the type actually is.
-
-On the second point - this isn't so simple. If we had an indirection, we could do the replacement quickly and trivially, without having to to fix up all the pointers. We probably don't want to add such an indirection into the pointer based system so choices are
-
-* Store where all the pointers are, and fix them up
-* Traverse the hierarchy replacing pointers
-
-Within the current mechanism storing where all the pointers are is not so simple - it would require the setting of any pointer to record where that pointer is stored, and for that to remain the location. Doing so would require setting all pointers to go through some recording mechanism. Pointers held in containers - like the Dictionary may not be directly available. Moreover even if they *were* doing such a behavior may break the containers invariants - for example replacing a keys pointer, may change it's hash.
-
-Traversing the hierarchy would be something akin to the serialization process. It would require specially handling for field types to do the replacement. There would need to be special handling for struct value types. 
-
 SourceLoc Serialization
-=======================
+-----------------------
 
 SourceLoc serialization presents several problems. Firstly we have two distinct serialization mechanisms that need to use it - IR serialization and generalized serialization. That being the case it cannot be saved directly in either, even though it may be referenced by either. 
 
 To keep things simple for now we build up SourceLoc information for both IR and general serialization via their writers adding their information into a SerialSourceLocWriter. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.  
 
 When reading the SourceLoc information has to be located and deserialized before any AST or IR deserialization. The SourceLoc data can then be turned into a SerialSourceLocReader, which is then either set on the `SerialReaders` `SerialExtraObjects`. Or passed to the `IRSerialReader`.
-
-Riff Container
-==============
-
-[Riff](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) is used as a mechanism to store binary sections. The format allows for a hierarchy of `chunks` that hold binary data. How the data is interpreted depends on the [FOURCC](https://en.wikipedia.org/wiki/FourCC) associated with each chunk. 
-
-As previously touched on there are multiple different mechanisms used for serialization. IR serialization, generalized serialization, SourceLoc serialization - there are also other uses, such as serializing of entry point information. Riff is used to combine all of these incompatible binary parts together such that they can be stored together.
-
-The handling of these riff containers is held within the `SerialContainerUtil` class. 
-
-C++ Extractor
-=============
-
-The C++ Extractor is the tool `slang-cpp-extractor` that can be used to example C++ files to extract class definitions and associated fields. These files contain in the form of macros information about each class as well as reflected fields. These generated files can then be used to implement serialization without having to explicitly specify fields in C++ source code.
-
-Issues
-======
-
-* No support for forward/backward compatibility. 
-** Adding fields/classes will typically break compatibility
-* Binary files do not contain data to describe themselves
-** It is *not* possible to write a stand alone tool that can dump any serialized file - it's iterpretation depends on the version of Slang it was written from
-* The Riff mechanism use for container usage is somewhat ad-hoc
-* Re-referencing AST nodes from other modules does not happen automatically on deserialization
-* There are several mechanisms used for serialization that are not directly compatible
-
-## C++ extractor issues
-
-* All types (and typedefs) that are serialized must be defined in the same scope - child types don't work correctly 
-* When using value serialization serialization all the members that are serializable must be public
-* The types output in slang fields do not correctly take into account scope (this is a similar issue to the issue above)

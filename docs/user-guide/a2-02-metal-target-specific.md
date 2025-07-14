@@ -44,6 +44,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_ViewportArrayIndex`     | `[[viewport_array_index]]`                           |
 | `SV_StartVertexLocation`    | `[[base_vertex]]`                                    |
 | `SV_StartInstanceLocation`  | `[[base_instance]]`                                  |
+| `SV_VulkanInstanceID`       | `[[instance_id]]`                                    |
+| `SV_VulkanVertexID`         | `[[vertex_id]]`                                      |
 
 Custom semantics are mapped to user attributes:
 
@@ -107,7 +109,7 @@ Raster-ordered access resources receive the `[[raster_order_group(0)]]`
 attribute, for example `texture2d<float, access::read_write> tex
 [[raster_order_group(0)]]`.
 
-# Array Types
+## Array Types
 
 Array types in Metal are declared using the array template:
 
@@ -115,7 +117,7 @@ Array types in Metal are declared using the array template:
 | ------------------- | -------------------------- |
 | `ElementType[Size]` | `array<ElementType, Size>` |
 
-# Matrix Layout
+## Matrix Layout
 
 Metal exclusively uses column-major matrix layout. Slang automatically handles
 the translation of matrix operations to maintain correct semantics:
@@ -124,7 +126,7 @@ the translation of matrix operations to maintain correct semantics:
 - Matrix types are declared as `matrix<T, Columns, Rows>`, for example
   `float3x4` is represented as `matrix<float, 3, 4>`
 
-# Mesh Shader Support
+## Mesh Shader Support
 
 Mesh shaders can be targeted using the following types and syntax. The same as task/mesh shaders generally in Slang.
 

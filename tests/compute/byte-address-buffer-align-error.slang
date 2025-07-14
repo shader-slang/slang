@@ -17,7 +17,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     // CHECK: error 41300: invalid alignment `{{.*}}` specified for the byte address buffer resource with the element size of `{{.*}}`
     // CHECK: error 41300: invalid alignment `{{.*}}` specified for the byte address buffer resource with the element size of `{{.*}}`
-    buffer.Store<Block>(0, buffer.Load<Block>(1, 5));
+    buffer.Store<Block>(0, buffer.LoadAligned<Block>(1, 5));
     buffer.Store<Block>(1, buffer.Load<Block>(0), 3);
 
 }

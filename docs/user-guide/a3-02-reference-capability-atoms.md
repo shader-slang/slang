@@ -7,12 +7,12 @@ Capability Atoms
 
 ### Sections:
 
-1. [Targets](#Targets)
-2. [Stages](#Stages)
-3. [Versions](#Versions)
-4. [Extensions](#Extensions)
-5. [Compound Capabilities](#Compound-Capabilities)
-6. [Other](#Other)
+1. [Targets](#targets)
+2. [Stages](#stages)
+3. [Versions](#versions)
+4. [Extensions](#extensions)
+5. [Compound Capabilities](#compound-capabilities)
+6. [Other](#other)
 
 Targets
 ----------------------
@@ -45,6 +45,9 @@ Targets
 `wgsl`
 > Represents the WebGPU shading language code generation target.
 
+`slangvm`
+> Represents the Slang VM bytecode target.
+
 Stages
 ----------------------
 *Capabilities to specify code generation stages (`vertex`, `fragment`...)*
@@ -66,6 +69,9 @@ Stages
 
 `geometry`
 > Geometry shader stage
+
+`dispatch`
+> Dispatch shader stage
 
 `pixel`
 > Pixel shader stage
@@ -99,6 +105,9 @@ Stages
 
 `mesh`
 > Mesh shader stage & mesh shader capabilities
+
+`task`
+> Task shader stage & mesh shader capabilities
 
 `amplification`
 > Amplification shader stage & mesh shader capabilities
@@ -145,6 +154,12 @@ Versions
 
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
+
+`hlsl_2018`
+> Represent HLSL compatibility support.
+
+`hlsl_coopvec_poc`
+> Represent compatibility support for the deprecated POC DXC
 
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
@@ -391,6 +406,9 @@ Extensions
 `SPV_KHR_non_semantic_info`
 > Represents the SPIR-V extension for non-semantic information.
 
+`SPV_KHR_device_group`
+> Represents the SPIR-V extension for device-group information.
+
 `SPV_KHR_ray_tracing`
 > Represents the SPIR-V extension for ray tracing.
 
@@ -417,6 +435,12 @@ Extensions
 > Represents the SPIR-V extension for shader invocation reorder.
 > Requires SPV_KHR_ray_tracing.
 
+`SPV_NV_cluster_acceleration_structure`
+> Represents the SPIR-V extension for cluster acceleration structure.
+
+`SPV_NV_linear_swept_spheres`
+> Represents the SPIR-V extension for linear swept spheres.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -432,11 +456,23 @@ Extensions
 `SPV_EXT_replicated_composites`
 > Represents the SPIR-V extension for SPV_EXT_replicated_composites.
 
+`SPV_KHR_vulkan_memory_model`
+> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+
 `SPV_NV_cooperative_vector`
 > Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+
+`SPV_NV_tensor_addressing`
+> Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+
+`SPV_NV_cooperative_matrix2`
+> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
+
+`spvDeviceGroup`
+> Represents the SPIR-V capability for DeviceGroup.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
@@ -528,6 +564,12 @@ Extensions
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder.
 
+`spvRayTracingClusterAccelerationStructureNV`
+> Represents the SPIR-V capability for cluster acceleration structure.
+
+`spvRayTracingLinearSweptSpheresGeometryNV`
+> Represents the SPIR-V capability for linear swept spheres.
+
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
@@ -555,11 +597,35 @@ Extensions
 `spvCooperativeMatrixKHR`
 > Represents the SPIR-V capability for cooperative matrices
 
+`spvCooperativeMatrixReductionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixConversionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixPerElementOperationsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixTensorAddressingNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixBlockLoadsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvTensorAddressingNV`
+> Represents the SPIR-V capability for tensor addressing
+
 `spvMaximalReconvergenceKHR`
 > Represents the SPIR-V capability for maximal reconvergence.
 
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
+
+`spvVulkanMemoryModelKHR`
+> Represents the SPIR-V capability for vulkan memory model.
+
+`spvVulkanMemoryModelDeviceScopeKHR`
+> Represents the SPIR-V capability for vulkan memory model.
 
 `GL_EXT_buffer_reference`
 > Represents the GL_EXT_buffer_reference extension.
@@ -578,6 +644,9 @@ Extensions
 
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
+
+`GL_EXT_device_group`
+> Represents the GL_EXT_device_group extension.
 
 `GL_EXT_fragment_shader_barycentric`
 > Represents the GL_EXT_fragment_shader_barycentric extension.
@@ -617,6 +686,9 @@ Extensions
 
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
+
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
 
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
@@ -734,6 +806,9 @@ Extensions
 
 `GL_NV_shader_texture_footprint`
 > Represents the GL_NV_shader_texture_footprint extension.
+
+`GL_NV_cluster_acceleration_structure`
+> Represents the GL_NV_cluster_acceleration_structure extension.
 
 Compound Capabilities
 ----------------------
@@ -907,9 +982,6 @@ Compound Capabilities
 `shadermemorycontrol`
 > (gfx targets) Capabilities needed to use memory barriers
 
-`wave_multi_prefix`
-> Capabilities needed to use HLSL tier wave operations
-
 `bufferreference`
 > Capabilities needed to use GLSL buffer-reference's
 
@@ -923,6 +995,33 @@ Compound Capabilities
 
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
+
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
+
+`cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_conversion`
+> Capabilities needed to convert cooperative matrices
+
+`cooperative_matrix_map_element`
+> Capabilities needed to use MapElement operation with cooperative matrix
+
+`cooperative_matrix_tensor_addressing`
+> Capabilities needed to load or store with tensor_addressing extension
+
+`cooperative_matrix_block_load`
+> Capabilities needed to use decodeFunc with cooperative matrix load
+
+`tensor_addressing`
+> Capabilities needed to use tensor addressing
+
+`cooperative_matrix_2`
+> Capabilities needed to use tensor addressing
+
+`vk_mem_model`
+> Capabilities needed to use vulkan memory model
 
 `any_stage`
 > Collection of all shader stages
@@ -1183,6 +1282,14 @@ Compound Capabilities
 `raytracing_anyhit_closesthit`
 > Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 
+`raytracing_lss`
+> Collection of capabilities for linear swept spheres.
+
+`raytracing_lss_ho`
+> hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
+> capdef specifically for the hitobject variant.
+> Collection of capabilities for linear swept spheres.
+
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 
@@ -1232,8 +1339,8 @@ Other
 ----------------------
 *Capabilities which may be deprecated*
 
-`cooperative_matrix`
-> Capabilities needed to use cooperative matrices
+`optix_coopvec`
+> Represents capabilities required for optix cooperative vector support.
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

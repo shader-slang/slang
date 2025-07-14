@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -989,6 +991,18 @@ public:
         return result;
     }
 
+    SemanticsContext withParentLambdaExpr(
+        LambdaExpr* expr,
+        LambdaDecl* decl,
+        Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedLambdaDecl)
+    {
+        SemanticsContext result(*this);
+        result.m_parentLambdaExpr = expr;
+        result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
+        result.m_parentLambdaDecl = decl;
+        return result;
+    }
+
     /// Information for tracking one or more outer statements.
     ///
     /// During checking of statements, we need to track what
@@ -1014,6 +1028,20 @@ public:
         SemanticsContext result(*this);
         result.m_outerStmts = outerStmts;
         return result;
+    }
+
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
     }
 
     // Setup the flag to indicate disabling the short-circuiting evaluation
@@ -1161,6 +1189,13 @@ protected:
     ExpandExpr* m_parentExpandExpr = nullptr;
 
     OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+
+    // If we are checking inside a lambda expression, we need
+    // to track the referenced variables that should be captured
+    // by the lambda.
+    LambdaExpr* m_parentLambdaExpr = nullptr;
+    LambdaDecl* m_parentLambdaDecl = nullptr;
+    Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
 };
 
 struct OuterScopeContextRAII
@@ -1217,8 +1252,8 @@ public:
     TypeExp TranslateTypeNode(TypeExp const& typeExp);
     Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
     Type* getConstantBufferType(Type* elementType, Type* layoutType);
-
     DeclRefType* getExprDeclRefType(Expr* expr);
+    LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
@@ -1337,6 +1372,13 @@ public:
         SourceLoc loc,
         bool& outDiagnosed);
 
+    bool isWitnessUncheckedOptional(SubtypeWitness* witness);
+    LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
+    LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
+        const LookupResult& lookupResult,
+        SourceLoc loc,
+        bool& outDiagnosed);
+
     Val* resolveVal(Val* val)
     {
         if (!val)
@@ -1431,6 +1473,17 @@ public:
     /// on each declaration in the group.
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
+
+    void ensureOuterGenericConstraints(Decl* decl, DeclCheckState state);
+
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
 
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
@@ -1627,7 +1680,7 @@ public:
         InitializerListExpr* fromInitializerListExpr);
 
     /// Report that implicit type coercion is not possible.
-    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr);
+    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
     /// Central engine for implementing implicit coercion logic
     ///
@@ -1655,6 +1708,7 @@ public:
         Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
+        DiagnosticSink* sink,
         ConversionCost* outCost);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -1679,7 +1733,7 @@ public:
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr);
+    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -1792,6 +1846,8 @@ public:
         /// The type for which conformances are being checked
         Type* conformingType;
 
+        Witness* conformingWitness;
+
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
@@ -1844,6 +1900,11 @@ public:
         WitnessTable* witnessTable,
         DeclRef<CallableDecl> requirement,
         DeclRef<CallableDecl> method);
+
+    void markOverridingDecl(
+        ConformanceCheckingContext* context,
+        Decl* memberDecl,
+        DeclRef<Decl> requiredMemberDeclRef);
 
     /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
@@ -1982,6 +2043,15 @@ public:
     // Check and register a type if it is differentiable.
     void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
+    void maybeCheckMissingNoDiffThis(Expr* expr);
+
+    // Find the default implementation of an interface requirement,
+    // and insert it to the witness table, if it exists.
+    bool findDefaultInterfaceImpl(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
     // Find the appropriate member of a declared type to
     // satisfy a requirement of an interface the type
     // claims to conform to.
@@ -2041,6 +2111,11 @@ public:
 
     void checkExtensionConformance(ExtensionDecl* decl);
 
+    void calcOverridableCompletionCandidates(
+        Type* aggType,
+        ContainerDecl* aggTypeDecl,
+        Decl* memberDecl);
+
     void checkAggTypeConformance(AggTypeDecl* decl);
 
     bool isIntegerBaseType(BaseType baseType);
@@ -2091,6 +2166,7 @@ public:
     {
         CompileTime,
         LinkTime,
+        SpecializationConstant
     };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
@@ -2233,6 +2309,11 @@ public:
         // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
         // not optional.
         bool isOptional = false;
+
+        // Is this constraint an equality? This tells us that "joining" types is meaningless, we
+        // know the result will be the sub type. If it is not, we will error once we start
+        // substituting types.
+        bool isEquality = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
@@ -2585,6 +2666,8 @@ public:
     struct ValUnificationContext
     {
         Index indexInTypePack = 0;
+        bool optionalConstraint = false;
+        bool equalityConstraint = false;
     };
 
     // Try to find a unification for two values
@@ -2837,6 +2920,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -2874,6 +2959,8 @@ public:
 
     Expr* visitParenExpr(ParenExpr* expr);
 
+    Expr* visitTupleExpr(TupleExpr* expr);
+
     Expr* visitAssignExpr(AssignExpr* expr);
 
     Expr* visitGenericAppExpr(GenericAppExpr* genericAppExpr);
@@ -2900,8 +2987,11 @@ public:
 
     Expr* visitEachExpr(EachExpr* expr);
 
+    Expr* visitLambdaExpr(LambdaExpr* expr);
+
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to
@@ -2932,9 +3022,11 @@ public:
     Expr* visitMemberExpr(MemberExpr* expr);
 
     Expr* visitInitializerListExpr(InitializerListExpr* expr);
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr);
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
@@ -2976,9 +3068,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
     void checkStmt(Stmt* stmt);
-
-    template<typename T>
-    T* FindOuterStmt(Stmt* searchUntil = nullptr);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 
@@ -3024,6 +3113,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeferStmt(DeferStmt* stmt);
 
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
+
     void visitWhileStmt(WhileStmt* stmt);
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt);
@@ -3061,6 +3154,12 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+bool isImmutableBufferType(Type* type);
+
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

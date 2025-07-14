@@ -10,15 +10,8 @@
 #include "d3d12-query.h"
 #include "d3d12-transient-heap.h"
 
-#ifdef _DEBUG
-#define ENABLE_DEBUG_LAYER 1
-#else
-#define ENABLE_DEBUG_LAYER 0
-#endif
-
 namespace gfx
 {
-
 using namespace Slang;
 
 namespace d3d12

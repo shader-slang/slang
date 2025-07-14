@@ -1,5 +1,5 @@
-// TODO: There are issues running tests combined texture samplers in  DX12.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12
+// TODO: There are issues running tests combined texture samplers in DX12. (Github issue #6982)
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12 -Xslang -DTARGET_DX12
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device -xslang -DVK
 
@@ -37,7 +37,7 @@ Sampler1DArray<float4> st1DArray_f32v4;
 //TEST_INPUT: TextureSampler2D(size=4, content = one, arrayLength=2):name st2DArray_f32v4
 Sampler2DArray<float4> st2DArray_f32v4;
 
-//TEST_INPUT: TextureSampler2D(size=4, content = one):name st2DMS_f32v4
+//TEST_INPUT: TextureSampler2D(size=4, content = one, sampleCount = two, mipMaps=1, format=RGBA32Float):name st2DMS_f32v4
  Sampler2DMS<float4> st2DMS_f32v4;
 
 //
@@ -71,9 +71,9 @@ typealias CombinedDepth2d_array = _Texture<
 >;
 
 
-//TEST_INPUT: TextureSampler2D(size=4, content = zero):name cd2D
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, format=D32Float):name cd2D
 CombinedDepth2d<float> cd2D;
-//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2):name cd2DArray
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2, format=D32Float):name cd2DArray
 CombinedDepth2d_array<float> cd2DArray;
 
 uint getNotMapped()
@@ -220,7 +220,9 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
             st2DArray_f32v4,
             )
         && TEST_combinedDepth()
+#if !defined(TARGET_DX12) // HLSL doesn't support samplers for `Load` functions.
         && TEST_sparse(st2D_f32v4, st2DMS_f32v4)
+#endif
         ;
 
     //CHK:1

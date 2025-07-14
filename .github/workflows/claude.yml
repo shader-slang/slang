@@ -1,0 +1,326 @@
+name: ClaudeCode - Slang Assistant
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  id-token: write
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  claude:
+    name: Claude Code Assistant
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude')))
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    # Cancel previous runs on new pushes
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+
+    steps:
+      # Format setup and environment preparation
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: 2 # fetch minimal history for git context
+
+      - name: Format Setup and Environment Preparation
+        uses: ./.github/actions/format-setup
+
+      - name: Setup Environment Dependencies
+        run: |
+          set -euo pipefail
+          echo "🏗️ Setting up environment dependencies..."
+
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
+          # Configure and build the project
+          cmake --preset default --fresh
+          cmake --workflow --preset debug
+
+          echo "✅ Environment setup completed"
+
+      # Validate environment and dependencies
+      - name: Validate Environment
+        run: |
+          set -euo pipefail
+
+          # Check required secrets
+          if [ -z "${{ secrets.LLMGW_ID }}" ] || [ -z "${{ secrets.LLMGW_SECRET }}" ] || [ -z "${{ secrets.LLMGW_TOKEN_URL }}" ]; then
+            echo "::error::Missing required secrets: LLMGW_ID or LLMGW_SECRET or LLMGW_TOKEN_URL"
+            exit 1
+          fi
+
+          # Install required tools
+          command -v jq >/dev/null 2>&1 || { echo "::error::jq is required but not installed"; exit 1; }
+          command -v curl >/dev/null 2>&1 || { echo "::error::curl is required but not installed"; exit 1; }
+
+          echo "✅ Environment validation passed"
+
+      # Generate custom auth token and set as environment variable
+      - name: Generate Custom Auth Token
+        id: auth-token
+        env:
+          LLMGW_TOKEN_URL: ${{ secrets.LLMGW_TOKEN_URL }}
+        run: |
+          set -euo pipefail
+
+          echo "🔐 Generating authentication token..."
+
+          # Set up error handling
+          cleanup() {
+            local exit_code=$?
+            echo "🧹 Cleaning up temporary files..."
+            rm -f /tmp/token_response.json 2>/dev/null || true
+            if [ $exit_code -ne 0 ]; then
+              echo "::error::Authentication failed - check your credentials and endpoint"
+            fi
+            exit $exit_code
+          }
+          trap cleanup EXIT
+
+          # Generate token with comprehensive error handling
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/token_response.json --fail-with-body \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 2 \
+            --location "${{ env.LLMGW_TOKEN_URL }}" \
+            --header 'Content-Type: application/x-www-form-urlencoded' \
+            --header "Authorization: Basic $(echo -n ${{ secrets.LLMGW_ID }}:${{ secrets.LLMGW_SECRET }} | base64 -w0)" \
+            --data-urlencode 'grant_type=client_credentials' \
+            --data-urlencode 'scope=awsanthropic-readwrite azureopenai-readwrite' \
+            2>/dev/null)
+
+          # Check HTTP response code
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Authentication failed with HTTP code: $HTTP_CODE"
+            if [ -f /tmp/token_response.json ]; then
+              echo "::error::Response: $(cat /tmp/token_response.json | head -c 200)"
+            fi
+            exit 1
+          fi
+
+          # Extract and validate token
+          if [ ! -f /tmp/token_response.json ]; then
+            echo "::error::No response file generated"
+            exit 1
+          fi
+
+          ANTHROPIC_AUTH_TOKEN=$(jq -r '.access_token // empty' /tmp/token_response.json 2>/dev/null)
+
+          # Validate token format and length
+          if [ -z "$ANTHROPIC_AUTH_TOKEN" ] || [ "$ANTHROPIC_AUTH_TOKEN" = "null" ]; then
+            echo "::error::Failed to extract access token from response"
+            exit 1
+          fi
+
+          # Basic token validation
+          if [ ${#ANTHROPIC_AUTH_TOKEN} -lt 10 ]; then
+            echo "::error::Token appears to be too short (${#ANTHROPIC_AUTH_TOKEN} characters)"
+            exit 1
+          fi
+
+          # CRITICAL: Mask the token BEFORE any output
+          echo "::add-mask::$ANTHROPIC_AUTH_TOKEN"
+
+          # Set as environment variable for subsequent steps
+          echo "ANTHROPIC_AUTH_TOKEN=$ANTHROPIC_AUTH_TOKEN" >> $GITHUB_ENV
+
+          # Set token expiry if available
+          TOKEN_EXPIRES=$(jq -r '.expires_in // empty' /tmp/token_response.json 2>/dev/null)
+          if [ -n "$TOKEN_EXPIRES" ]; then
+            echo "::add-mask::$TOKEN_EXPIRES"
+            echo "token-expires=$TOKEN_EXPIRES" >> $GITHUB_OUTPUT
+          fi
+
+          echo "✅ Authentication token generated and masked successfully"
+
+          # Clean up response file
+          rm -f /tmp/token_response.json
+
+      # Generate GitHub App token for better GitHub API access
+      - name: Generate GitHub App Token
+        id: github-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        continue-on-error: true
+
+      # Set up fallback authentication
+      - name: Configure Authentication
+        id: auth-config
+        run: |
+          set -euo pipefail
+
+          # Use GitHub App token if available, otherwise use GITHUB_TOKEN
+          if [ -n "${{ steps.github-token.outputs.token }}" ]; then
+            echo "github-token=${{ steps.github-token.outputs.token }}" >> $GITHUB_OUTPUT
+            echo "✅ Using GitHub App authentication"
+          else
+            echo "github-token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "⚠️  Using fallback GITHUB_TOKEN authentication"
+          fi
+
+      # Run Claude Code Action with optimized environment variables
+      - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
+        id: claude-action
+        uses: anthropics/claude-code-action@v0.0.31
+        with:
+          # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
+          custom_instructions: |
+            # Build system information:
+            - OS: Ubuntu Linux
+            - Build commands: 
+              * Configure: `cmake --preset default`
+              * Build: `cmake --build --preset debug`
+              * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
+              * Format code: `./extras/formatting.sh`
+            - Project is pre-built and ready for development tasks
+            - Run formatting script before committing changes
+
+            # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
+
+              **How to use this tool effectively:**
+              - Use repoName: "shader-slang/slang" for all queries
+              - Ask specific technical questions about architecture, patterns, or implementation approaches
+              - Examples: "What does the type legalization pass do?" or "What's the pattern for adding new code generation targets?"
+              - Use responses to understand existing patterns before implementing changes
+
+              **Implementation Guidelines:**
+              - Always follow existing code patterns and architectural decisions discovered through deepwiki
+              - Consult the tool when you need context about unfamiliar parts of the codebase
+
+            # Debugging backend crashes or invalid downstream code:
+
+              Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
+              early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
+              of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
+              keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
+              in the IR passes.
+
+          mcp_config: |
+            {
+              "mcpServers": {
+                "deepwiki": {
+                  "type": "sse",
+                  "url": "https://mcp.deepwiki.com/sse"
+                }
+              }
+            }
+          allowed_tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
+          trigger_phrase: "@claude"
+          assignee_trigger: "claude"
+          timeout_minutes: "90"
+          github_token: ${{ steps.auth-config.outputs.github-token }}
+          use_bedrock: "true"
+          model: ${{ vars.ANTHROPIC_MODEL }}
+          max_turns: "500"
+          # Use claude_env for custom environment variables
+          claude_env: |
+            ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
+            ANTHROPIC_SMALL_FAST_MODEL: ${{ vars.ANTHROPIC_SMALL_FAST_MODEL }}
+            AWS_REGION: ${{ vars.AWS_REGION }}
+            GITHUB_REPOSITORY: ${{ github.repository }}
+            GITHUB_EVENT_NAME: ${{ github.event_name }}
+            GITHUB_ACTOR: ${{ github.actor }}
+            ANTHROPIC_AUTH_TOKEN: ${{ env.ANTHROPIC_AUTH_TOKEN }}
+            DISABLE_TELEMETRY: 1
+
+        # The ANTHROPIC_API_KEY environment variable is automatically picked up
+        continue-on-error: true
+
+      # Handle action results and errors
+      - name: Handle Action Results
+        if: always()
+        run: |
+          set -euo pipefail
+
+          # Check if Claude action succeeded
+          if [ "${{ steps.claude-action.outcome }}" = "success" ]; then
+            echo "✅ Claude Code action completed successfully"
+
+            # Optional: Add success comment to PR/issue
+            if [ -n "${{ github.event.issue.number || github.event.pull_request.number }}" ]; then
+              echo "Claude has successfully processed your request! 🎉" >> /tmp/comment.md
+              echo "<!-- Claude-success -->" >> /tmp/comment.md
+            fi
+
+          elif [ "${{ steps.claude-action.outcome }}" = "failure" ]; then
+            echo "❌ Claude Code action failed"
+
+            # Create error comment for debugging
+            cat > /tmp/error_comment.md << 'EOF'
+          ## Claude Code Action Failed ❌
+
+          The Claude Code action encountered an error. This could be due to:
+          - Network connectivity issues
+          - Authentication problems
+          - Model availability issues
+          - Rate limiting
+
+          Please check the workflow logs for more details and try again.
+
+          <!-- Claude-error -->
+          EOF
+
+          else
+            echo "⚠️  Claude Code action was cancelled or skipped"
+          fi
+
+      # Security cleanup
+      - name: Security Cleanup
+        if: always()
+        run: |
+          set -euo pipefail
+
+          echo "🧹 Performing security cleanup..."
+
+          # Clear any temporary files that might contain sensitive data
+          find /tmp -name "*token*" -type f -delete 2>/dev/null || true
+          find /tmp -name "*auth*" -type f -delete 2>/dev/null || true
+          find /tmp -name "*response*" -type f -delete 2>/dev/null || true
+
+          # Clear environment variables (belt and suspenders approach)
+          unset ANTHROPIC_API_KEY 2>/dev/null || true
+          unset ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
+
+          echo "✅ Security cleanup completed"
+
+      # Workflow summary
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "## Claude Code Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auth Token**: ✅ Generated" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Token**: ${{ steps.github-token.outcome == 'success' && '✅ GitHub App' || '⚠️ Fallback' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Claude Action**: ${{ steps.claude-action.outcome == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Model Used**: ${{ vars.ANTHROPIC_MODEL || 'default' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

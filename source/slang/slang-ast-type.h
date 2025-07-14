@@ -2,6 +2,9 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ast-decl.h"
+
+//
 #include "slang-ast-type.h.fiddle"
 
 FIDDLE()
@@ -132,6 +135,13 @@ class DefaultDataLayoutType : public DataLayoutType
 {
     FIDDLE(...)
 };
+
+FIDDLE()
+class DefaultPushConstantDataLayoutType : public DataLayoutType
+{
+    FIDDLE(...)
+};
+
 
 FIDDLE()
 class Std430DataLayoutType : public DataLayoutType
@@ -615,7 +625,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
     BasicExpressionType* _getScalarTypeOverride();
 
 private:
-    SLANG_UNREFLECTED Type* rowType = nullptr;
+    Type* rowType = nullptr;
 };
 
 FIDDLE()
@@ -915,9 +925,6 @@ class ExtractExistentialType : public Type
     {
         setOperands(inDeclRef, inOriginalInterfaceType, inOriginalInterfaceDeclRef);
     }
-
-    // Following fields will not be reflected (and thus won't be serialized, etc.)
-    SLANG_UNREFLECTED
 
     // A cached decl-ref to the original interface's ThisType Decl, with
     // a witness that refers to the type extracted here.

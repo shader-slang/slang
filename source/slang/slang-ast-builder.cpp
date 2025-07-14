@@ -289,6 +289,12 @@ Type* ASTBuilder::getDefaultLayoutType()
 {
     return getSpecializedBuiltinType({}, "DefaultDataLayoutType");
 }
+
+Type* ASTBuilder::getDefaultPushConstantLayoutType()
+{
+    return getSpecializedBuiltinType({}, "DefaultPushConstantDataLayoutType");
+}
+
 Type* ASTBuilder::getStd140LayoutType()
 {
     return getSpecializedBuiltinType({}, "Std140DataLayoutType");
@@ -347,6 +353,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
 {
     if (!elementCount)
         elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
+
     if (elementCount->getType() != getIntType())
     {
         // Canonicalize constant elementCount to int.

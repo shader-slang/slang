@@ -147,6 +147,10 @@ public:
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return raw == rhs.raw; }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(raw == rhs.raw); }
+    SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return raw < rhs.raw; }
+    SLANG_FORCE_INLINE bool operator>(const ThisType& rhs) const { return raw > rhs.raw; }
+    SLANG_FORCE_INLINE bool operator<=(const ThisType& rhs) const { return raw <= rhs.raw; }
+    SLANG_FORCE_INLINE bool operator>=(const ThisType& rhs) const { return raw >= rhs.raw; }
 
     RawValue getRaw() const { return raw; }
     void setRaw(RawValue value) { raw = value; }
@@ -177,7 +181,7 @@ struct SourceRange
         return rawLoc >= begin.getRaw() && rawLoc <= end.getRaw();
     }
     /// Get the total size
-    UInt getSize() const { return UInt(end.getRaw() - begin.getRaw()); }
+    SourceLoc::RawValue getSize() const { return end.getRaw() - begin.getRaw(); }
 
     /// Get the offset of a loc in this range
     int getOffset(SourceLoc loc) const
@@ -190,7 +194,7 @@ struct SourceRange
     SourceLoc getSourceLocFromOffset(uint32_t offset) const
     {
         SLANG_ASSERT(offset <= getSize());
-        return begin + Int(offset);
+        return begin + offset;
     }
 
     SourceRange() {}
@@ -327,6 +331,12 @@ public:
         m_sourceMapKind = sourceMapKind;
     }
 
+    /// Set the source file as an included file
+    void setIncludedFile() { m_included = true; }
+
+    /// Check if the source file is an included file
+    bool isIncludedFile() { return m_included; }
+
     /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
     /// Dtor
@@ -356,6 +366,9 @@ protected:
     ComPtr<IBoxValue<SourceMap>> m_sourceMap;
     // What kind of source map it is (if  there is one)
     SourceMapKind m_sourceMapKind = SourceMapKind::Normal;
+
+    // Indicate if the source file is an included file
+    bool m_included = false;
 };
 
 enum class SourceLocType
@@ -405,6 +418,48 @@ public:
         int32_t m_lineAdjust; ///< Adjustment to apply to source line numbers when printing presumed
                               ///< locations. Relative to the line number in the underlying file.
     };
+
+    // Represents a segment of a source.
+    // All SourceLoc in segment are linearly mapped relative to absoluteBegin
+    struct AbsoluteSegment
+    {
+        // SourceLoc in the file range.
+        SourceLoc begin = {};
+        // Location in the absolute mapping of locations ordered by includes.
+        SourceLoc::RawValue absoluteBegin = {};
+    };
+
+    // Set the base of the absolute location mapping for this SourceView.
+    void setAbsoluteLocationBase(SourceLoc::RawValue absLoc) { m_absoluteLocationBase = absLoc; }
+
+    AbsoluteSegment getLastSegment() const
+    {
+        AbsoluteSegment res;
+        if (m_absSegments.getCount())
+        {
+            res = m_absSegments.getLast();
+        }
+        else
+        {
+            res.begin = m_range.begin;
+            res.absoluteBegin = m_absoluteLocationBase;
+        }
+        return res;
+    }
+
+    // Add a segment of absolute mapping after the previous ones.
+    void addAbsoluteSegment(SourceLoc begin, SourceLoc::RawValue absoluteBegin)
+    {
+        SLANG_ASSERT(m_range.contains(begin));
+        SLANG_ASSERT(getLastSegment().begin < begin);
+        AbsoluteSegment seg;
+        seg.begin = begin;
+        seg.absoluteBegin = absoluteBegin;
+        m_absSegments.add(seg);
+    }
+
+    // Maps a SourceLoc inside this SourceView to a unique absolute location ordered by includes.
+    SourceLoc::RawValue getAbsoluteLocation(SourceLoc loc) const;
 
     /// Given a sourceLoc finds the entry associated with it. If returns -1 then no entry is
     /// associated with this location, and therefore the location should be interpreted as an offset
@@ -495,6 +550,8 @@ protected:
     SourceFile* m_sourceFile; ///< The source file. Can hold the line breaks
     List<Entry> m_entries;    ///< An array entries describing how we should interpret a range,
                               ///< starting from the start location.
+    SourceLoc::RawValue m_absoluteLocationBase = 0; ///< Base of the absolute location mapping.
+    List<AbsoluteSegment> m_absSegments;            ///< Segments of absolute location mapping.
 };
 
 struct SourceManager
@@ -563,6 +620,9 @@ struct SourceManager
     /// Add a source file, uniqueIdentity must be unique for this manager AND any parents
     void addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile);
     void addSourceFileIfNotExist(const String& uniqueIdentity, SourceFile* sourceFile);
+
+    // Maps a SourceLoc to an absolute location
+    SourceLoc::RawValue getAbsoluteLocation(SourceLoc location) const;
 
     /// Get the slice pool
     StringSlicePool& getStringSlicePool() { return m_slicePool; }

@@ -1152,8 +1152,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
             int elementCount = int(getIntVal(arrayType->getElementCount()));
-
-            m_writer->emit("FixedArray<");
+            auto nameHint = arrayType->findDecoration<IRNameHintDecoration>();
+            bool isCoopVec = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
+            if (isCoopVec && isOptixCoopVec)
+            {
+                m_writer->emit("OptixCoopVec<");
+            }
+            else
+            {
+                m_writer->emit("FixedArray<");
+            }
             _emitType(elementType, nullptr);
             m_writer->emit(", ");
             m_writer->emit(elementCount);
@@ -1547,12 +1555,13 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto base = inst->getOperand(0);
             auto outerPrec = getInfo(EmitOp::General);
             emitOperand(base, outerPrec);
+            m_writer->emit(")");
             m_writer->emit("[");
             emitOperand(inst->getOperand(1), EmitOpInfo());
-            m_writer->emit("]))");
+            m_writer->emit("])");
             return true;
         }
-    case kIROp_swizzle:
+    case kIROp_Swizzle:
         {
             // For C++ we don't need to emit a swizzle function
             // For C we need a construction function
@@ -1668,7 +1677,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // try doing automatically
             return false;
         }
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         {
             emitInstExpr(inst->getOperand(0), inOuterPrec);
             m_writer->emit("->");
@@ -1688,7 +1697,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(")");
             return true;
         }
-    case kIROp_GetAddr:
+    case kIROp_GetAddress:
         {
             // Once we clean up the pointer emitting logic, we can
             // just use GetElementAddress instruction in place of

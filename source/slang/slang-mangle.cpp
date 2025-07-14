@@ -323,7 +323,7 @@ void emitVal(ManglingContext* context, Val* val)
         // to mangle in the constraints even when
         // the whole thing is specialized...
     }
-    else if (auto genericParamIntVal = dynamicCast<GenericParamIntVal>(val))
+    else if (auto genericParamIntVal = dynamicCast<DeclRefIntVal>(val))
     {
         // TODO: we shouldn't be including the names of generic parameters
         // anywhere in mangled names, since changing parameter names
@@ -356,6 +356,21 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "KL");
         emitVal(context, lookupIntVal->getWitness());
         emitName(context, lookupIntVal->getKey()->getName());
+    }
+    else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
+    {
+        emitRaw(context, "KSO");
+        emitVal(context, sizeOfIntVal->getTypeArg());
+    }
+    else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
+    {
+        emitRaw(context, "KAO");
+        emitVal(context, alignOfIntVal->getTypeArg());
+    }
+    else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
+    {
+        emitRaw(context, "KCO");
+        emitVal(context, countOfIntVal->getTypeArg());
     }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
@@ -391,6 +406,7 @@ void emitVal(ManglingContext* context, Val* val)
 
 void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool includeModuleName)
 {
+    bool ignoreName = false;
     if (!includeModuleName)
     {
         if (as<ModuleDecl>(declRef))
@@ -445,19 +461,6 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         return;
     }
 
-    // Inheritance declarations don't have meaningful names,
-    // and so we should emit them based on the type
-    // that is doing the inheriting.
-    if (auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
-    {
-        emit(context, "I");
-        emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
-        return;
-    }
-
-    // Similarly, an extension doesn't have a name worth
-    // emitting, and we should base things on its target
-    // type instead.
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
         // TODO: as a special case, an "unconditional" extension
@@ -471,7 +474,25 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             emit(context, "I");
             emitType(context, getSup(context->astBuilder, inheritanceDecl));
         }
-        return;
+        // A non generic extension doesn't have a name worth
+        // emitting, and we should base things on its target
+        // type instead.
+        if (parentGenericDeclRef)
+        {
+            ignoreName = true;
+        }
+    }
+    // Inheritance declarations don't have meaningful names,
+    // and so we should emit them based on the type
+    // that is doing the inheriting.
+    else if (auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
+    {
+        emit(context, "I");
+        emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
+        if (parentGenericDeclRef)
+        {
+            ignoreName = true;
+        }
     }
 
     // TODO: we should special case GenericTypeParamDecl and GenericValueParamDecl nodes
@@ -480,7 +501,10 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     // For each generic parameter, we should assign it a unique ID (i, j), where i is the
     // nesting level of the generic, and j is the sequential order of the parameter within
     // its generic parent, and use this 2D ID to refer to such a parameter.
-    emitName(context, declRef.getName());
+    if (!ignoreName)
+    {
+        emitName(context, declRef.getName());
+    }
 
     // Special case: accessors need some way to distinguish themselves
     // so that a getter/setter/ref-er don't all compile to the same name.
@@ -576,14 +600,23 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             }
 
             auto canonicalizedConstraints =
-                getCanonicalGenericConstraints(context->astBuilder, parentGenericDeclRef);
+                getCanonicalGenericConstraints2(context->astBuilder, parentGenericDeclRef);
             for (auto& constraint : canonicalizedConstraints)
             {
-                for (auto type : constraint.value)
+                if (constraint.value.getCount() > 0)
                 {
                     emitRaw(context, "C");
-                    emitQualifiedName(context, makeDeclRef(constraint.key), true);
-                    emitType(context, type);
+                    emitType(context, constraint.key);
+                    int counter = 0;
+                    for (auto type : constraint.value)
+                    {
+                        if (counter > 0)
+                        {
+                            emitRaw(context, "_");
+                        }
+                        ++counter;
+                        emitType(context, type);
+                    }
                 }
             }
         }

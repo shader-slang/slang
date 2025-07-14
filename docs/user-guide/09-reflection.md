@@ -21,14 +21,14 @@ Compiling a Program
 -------------------
 
 The first step in reflecting a shader program is, unsurprisingly, to compile it.
-Currently reflection information cannot be queried from code compiled via the command-line `slangc` tool, so applications that want to perform reflection on Slang shader code should use the [compilation API](./compiling#using-the-compilation-api) to compile a program, and then use `getLayout()` to extract reflection information:
+Currently reflection information cannot be queried from code compiled via the command-line `slangc` tool, so applications that want to perform reflection on Slang shader code should use the [compilation API](08-compiling#using-the-compilation-api) to compile a program, and then use `getLayout()` to extract reflection information:
 
 ```c++
 slang::IComponentType* program = ...;
 slang::ProgramLayout* programLayout = program->getLayout(targetIndex);
 ```
 
-For more information, see the [relevant section](./compiling#layout-and-reflection) of the chapter on compilation.
+For more information, see the [relevant section](08-compiling#layout-and-reflection) of the chapter on compilation.
 
 Types and Variables
 -------------------

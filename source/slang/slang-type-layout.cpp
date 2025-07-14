@@ -463,7 +463,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // the compilation.
         // If we are emitting C++, then there is no way in general to know how that C++ will be
         // compiled it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -476,7 +476,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
             info.size = sizeof(void*) * 2;
-            info.alignment = SLANG_ALIGN_OF(void*);
+            info.alignment = alignof(void*);
 
             return info;
         }
@@ -539,7 +539,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
                 return SimpleLayoutInfo(
                     LayoutResourceKind::Uniform,
                     sizeof(uint8_t),
-                    SLANG_ALIGN_OF(uint8_t));
+                    alignof(uint8_t));
             }
 
         default:
@@ -1195,60 +1195,41 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::ConstantBuffer:
         case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::MutableTexture:
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
             // It's a pointer to a texture interface
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             // It's a ptr and a size of the amount of elements
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
             // It's a pointer and a size in bytes
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
                 return info;
             }
         case ShaderParameterKind::InputRenderTarget:
@@ -1570,6 +1551,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
@@ -1771,11 +1753,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -1829,19 +1811,19 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -2254,6 +2236,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
+    case CodeGenTarget::HostVM:
         {
             // For now lets use some fairly simple CPU binding rules
 
@@ -2335,7 +2318,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (const auto varRefVal = as<GenericParamIntVal>(val))
+    else if (const auto varRefVal = as<DeclRefIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -2348,6 +2331,10 @@ static LayoutSize GetElementCount(IntVal* val)
         return 0;
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    {
+        return 0;
+    }
+    else if (as<FuncCallIntVal>(val))
     {
         return 0;
     }
@@ -4581,7 +4568,7 @@ static TypeLayoutResult _updateLayout(
     if (layoutResultPtr)
     {
         // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        SLANG_ASSERT(layoutResultPtr->layout == result.layout);
         // Update the info
         layoutResultPtr->info = result.info;
     }
@@ -4940,6 +4927,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto optionalType = as<OptionalType>(type))
     {
         // OptionalType should be laid out the same way as Tuple<T, bool>.
+        if (isNullableType(optionalType->getValueType()))
+            return _createTypeLayout(context, optionalType->getValueType());
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
@@ -5753,7 +5742,7 @@ void TypeLayoutContext::buildExternTypeMap()
 
         if (auto scopeDecl = as<ScopeDecl>(decl))
         {
-            for (auto member : scopeDecl->members)
+            for (auto member : scopeDecl->getDirectMemberDecls())
             {
                 go(go, member);
             }
@@ -5763,7 +5752,7 @@ void TypeLayoutContext::buildExternTypeMap()
     for (const auto& m : linkage->loadedModulesList)
     {
         const auto& ast = m->getModuleDecl();
-        for (auto member : ast->members)
+        for (auto member : ast->getDirectMemberDecls())
         {
             processDecl(processDecl, member);
         }

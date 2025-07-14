@@ -1099,6 +1099,22 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
+/* static */ UnownedStringSlice StringEscapeUtil::maybeUnquoteCommandLineArg(
+    UnownedStringSlice slice)
+{
+    // If the slice is quoted, unquote it, else return as is
+    if (slice.startsWith("\'") || slice.startsWith("\""))
+    {
+        const Index len = slice.getLength();
+        if (len >= 2 && slice[len - 1] == slice[0])
+        {
+            // Unquote it
+            return UnownedStringSlice(slice.begin() + 1, len - 2);
+        }
+    }
+    return slice;
+}
+
 /* static */ bool StringEscapeUtil::isQuoted(char quoteChar, UnownedStringSlice& slice)
 {
     const Index len = slice.getLength();
@@ -1184,4 +1200,19 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return SLANG_OK;
 }
 
+String StringEscapeUtil::escapeString(UnownedStringSlice input, StringEscapeUtil::Style style)
+{
+    StringBuilder sb;
+    auto handler = StringEscapeUtil::getHandler(style);
+    StringEscapeUtil::appendQuoted(handler, input, sb);
+    return sb.produceString();
+}
+
+String StringEscapeUtil::unescapeString(UnownedStringSlice input, StringEscapeUtil::Style style)
+{
+    StringBuilder sb;
+    auto handler = StringEscapeUtil::getHandler(style);
+    StringEscapeUtil::appendUnquoted(handler, input, sb);
+    return sb.produceString();
+}
 } // namespace Slang

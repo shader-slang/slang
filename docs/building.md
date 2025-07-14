@@ -9,7 +9,7 @@ version of Slang.
 
 Please install:
 
-- CMake (3.25 preferred, but 3.22 works[^1])
+- CMake (3.26 preferred, but 3.22 works[^1])
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
 - A CMake compatible backend, for example Visual Studio or Ninja
 - Python3 (a dependency for building spirv-tools)
@@ -159,13 +159,14 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_ENABLE_GFX`                | `TRUE`                     | Enable gfx targets                                                                           |
 | `SLANG_ENABLE_SLANGD`             | `TRUE`                     | Enable language server target                                                                |
 | `SLANG_ENABLE_SLANGC`             | `TRUE`                     | Enable standalone compiler target                                                            |
+| `SLANG_ENABLE_SLANGI`             | `TRUE`                     | Enable Slang interpreter target                                                              |
 | `SLANG_ENABLE_SLANGRT`            | `TRUE`                     | Enable runtime target                                                                        |
 | `SLANG_ENABLE_SLANG_GLSLANG`      | `TRUE`                     | Enable glslang dependency and slang-glslang wrapper target                                   |
 | `SLANG_ENABLE_TESTS`              | `TRUE`                     | Enable test targets, requires SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD and SLANG_ENABLE_SLANGRT |
 | `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                            |
 | `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                               |
 | `SLANG_ENABLE_RELEASE_DEBUG_INFO` | `TRUE`                     | Enable generating debug info for Release configs                                             |
-| `SLANG_ENABLE_RELEASE_LTO`        | `TRUE`                     | Enable LTO for Release builds                                                                |
+| `SLANG_ENABLE_RELEASE_LTO`        | `FALSE`                    | Enable LTO for Release builds                                                                |
 | `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                      |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
@@ -334,6 +335,21 @@ CMakePresets, you'll have to do without the presets. Something like the followin
 cmake -B build -G Ninja
 cmake --build build -j
 ```
+
+## Specific supported compiler versions
+
+<!---
+Please keep the exact formatting '_Foo_ xx.yy is tested in CI' as there is a
+script which checks that this is still up to date.
+-->
+
+_GCC_ 11.4 and 13.3 are tested in CI and is the recommended minimum version. GCC 10 is
+supported on a best-effort basis, i.e. PRs supporting this version are
+encouraged but it isn't a continuously maintained setup.
+
+_MSVC_ 19 is tested in CI and is the recommended minimum version.
+
+_Clang_ 15.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang
 

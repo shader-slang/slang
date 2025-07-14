@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPV): -target spirv -bindless-space-index 101
 
-// SPV: OpDecorate %__slang_resource_heap{{.*}} Binding 0
+// SPV: OpDecorate %__slang_resource_heap{{.*}} Binding 1
 // SPV: OpDecorate %__slang_resource_heap{{.*}} DescriptorSet 101
 // SPV: OpImageSample
 

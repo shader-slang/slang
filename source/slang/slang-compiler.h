@@ -34,7 +34,7 @@ namespace Slang
 struct PathInfo;
 struct IncludeHandler;
 struct SharedSemanticsContext;
-struct ModuleChunkRef;
+struct ModuleChunk;
 
 class ProgramLayout;
 class PtrType;
@@ -92,6 +92,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSL = SLANG_WGSL,
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
+    HostVM = SLANG_HOST_VM,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 
@@ -284,6 +285,7 @@ class ComponentTypeVisitor;
 ///
 class ComponentType : public RefObject,
                       public slang::IComponentType,
+                      public slang::IComponentType2,
                       public slang::IModulePrecompileService_Experimental
 {
 public:
@@ -358,6 +360,19 @@ public:
         slang::CompilerOptionEntry* entries,
         ISlangBlob** outDiagnostics) override;
 
+    //
+    // slang::IComponentType2 interface
+    //
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics = nullptr) SLANG_OVERRIDE;
 
     //
     // slang::IModulePrecompileService interface
@@ -973,6 +988,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -1252,6 +1288,27 @@ public:
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -1492,7 +1549,7 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
         ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
         if ((!entryPoint))
             return SLANG_FAIL;
@@ -1511,7 +1568,6 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
         ComPtr<slang::IEntryPoint> entryPoint(
             findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
         if ((!entryPoint))
@@ -1579,6 +1635,27 @@ public:
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE
     {
         return Super::getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getEntryPointCompileResult(
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetCompileResult(targetIndex, outCompileResult, outDiagnostics);
     }
 
     /// Get a serialized representation of the checked module.
@@ -1717,7 +1794,16 @@ public:
 
     /// Given a mangled name finds the exported NodeBase associated with this module.
     /// If not found returns nullptr.
-    NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
+    Decl* findExportedDeclByMangledName(const UnownedStringSlice& mangledName);
+
+    /// Ensure that the any accelerator(s) used for `findExportedDeclByMangledName`
+    /// have already been built.
+    ///
+    void ensureExportLookupAcceleratorBuilt();
+
+    Count getExportedDeclCount();
+    Decl* getExportedDecl(Index index);
+    UnownedStringSlice getExportedDeclMangledName(Index index);
 
     /// Get the ASTBuilder
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
@@ -1829,7 +1915,7 @@ private:
     // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
     // and m_mangledExportSymbols holds the NodeBase* values for each index.
     StringSlicePool m_mangledExportPool;
-    List<NodeBase*> m_mangledExportSymbols;
+    List<Decl*> m_mangledExportSymbols;
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
@@ -1880,6 +1966,7 @@ public:
     {
         m_sourceArtifacts.clear();
         m_sourceFiles.clear();
+        m_includedFileSet.clear();
     }
 
     /// Add a source artifact
@@ -1887,6 +1974,8 @@ public:
 
     /// Add both the artifact and the sourceFile.
     void addSource(IArtifact* sourceArtifact, SourceFile* sourceFile);
+
+    void addIncludedSourceFileIfNotExist(SourceFile* sourceFile);
 
     // The entry points associated with this translation unit
     List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }
@@ -1936,6 +2025,9 @@ protected:
     // NOTE! This member is generated lazily from m_sourceArtifacts
     // it is *necessary* to call requireSourceFiles to ensure it's in sync.
     List<SourceFile*> m_sourceFiles;
+
+    // Track all the included source files added in m_sourceFiles
+    HashSet<SourceFile*> m_includedFileSet;
 };
 
 enum class FloatingPointMode : SlangFloatingPointModeIntegral
@@ -1943,6 +2035,13 @@ enum class FloatingPointMode : SlangFloatingPointModeIntegral
     Default = SLANG_FLOATING_POINT_MODE_DEFAULT,
     Fast = SLANG_FLOATING_POINT_MODE_FAST,
     Precise = SLANG_FLOATING_POINT_MODE_PRECISE,
+};
+
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
+{
+    Any = SLANG_FP_DENORM_MODE_ANY,
+    Preserve = SLANG_FP_DENORM_MODE_PRESERVE,
+    FlushToZero = SLANG_FP_DENORM_MODE_FTZ,
 };
 
 enum class WriterChannel : SlangWriterChannelIntegral
@@ -2152,6 +2251,11 @@ public:
         const char* path,
         slang::IBlob* source,
         slang::IBlob** outDiagnostics = nullptr) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) override;
     SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
         const char* path,
@@ -2192,6 +2296,11 @@ public:
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
         uint32_t* outId) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outBytes,
+        uint32_t bufferSize) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
@@ -2239,6 +2348,9 @@ public:
     SourceManager m_defaultSourceManager;
     SourceManager* m_sourceManager = nullptr;
     RefPtr<CommandLineContext> m_cmdLineContext;
+
+    // Used to store strings returned by the api as const char*
+    StringSlicePool m_stringSlicePool;
 
     // Name pool for looking up names
     NamePool namePool;
@@ -2363,20 +2475,26 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
-        ModuleChunkRef moduleChunk,
+        ISlangBlob* blobHoldingSerializedData,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
 
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ISlangBlob* blobHoldingSerializedData,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink);
 
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ISlangBlob* blobHoldingSerializedData,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);
@@ -2387,8 +2505,7 @@ public:
         Name* name,
         PathInfo const& pathInfo);
 
-    bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
-    bool isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk);
+    bool isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk);
 
     RefPtr<Module> findOrImportModule(
         Name* name,
@@ -2556,10 +2673,6 @@ public:
     {
         return translationUnits[index];
     }
-
-    // If true then generateIR will serialize out IR, and serialize back in again. Making
-    // serialization a bottleneck or firewall between the front end and the backend
-    bool useSerialIRBottleneck = false;
 
     // If true will serialize and de-serialize with debug information
     bool verifyDebugSerialization = false;
@@ -2842,6 +2955,34 @@ class ExtensionTracker : public RefObject
 public:
 };
 
+struct RequiredLoweringPassSet
+{
+    bool debugInfo;
+    bool resultType;
+    bool optionalType;
+    bool enumType;
+    bool combinedTextureSamplers;
+    bool reinterpret;
+    bool generics;
+    bool bindExistential;
+    bool autodiff;
+    bool derivativePyBindWrapper;
+    bool bitcast;
+    bool existentialTypeLayout;
+    bool bindingQuery;
+    bool meshOutput;
+    bool higherOrderFunc;
+    bool globalVaryingVar;
+    bool glslSSBO;
+    bool byteAddressBuffer;
+    bool dynamicResource;
+    bool dynamicResourceHeap;
+    bool resolveVaryingInputRef;
+    bool specializeStageSwitch;
+    bool missingReturn;
+    bool nonVectorCompositeSelect;
+};
+
 /// A context for code generation in the compiler back-end
 struct CodeGenContext
 {
@@ -2971,10 +3112,23 @@ public:
     // This is a no-op if modules are not precompiled.
     bool shouldSkipDownstreamLinking();
 
+    RequiredLoweringPassSet& getRequiredLoweringPassSet() { return m_requiredLoweringPassSet; }
+
 protected:
     CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
     Profile m_targetProfile;
     ExtensionTracker* m_extensionTracker = nullptr;
+
+    // To improve the performance of our backend, we will try to avoid running
+    // passes related to features not used in the user code.
+    // To do so, we will scan the IR module once, and determine which passes are needed
+    // based on the instructions used in the IR module.
+    // This will allow us to skip running passes that are not needed, without having to
+    // run all the passes only to find out that no work is needed.
+    // This is especially important for the performance of the backend, as some passes
+    // have an initialization cost (such as building reference graphs or DOM trees) that
+    // can be expensive.
+    RequiredLoweringPassSet m_requiredLoweringPassSet;
 
     /// Will output assembly as well as the artifact if appropriate for the artifact type for
     /// assembly output and conversion is possible
@@ -3343,6 +3497,10 @@ private:
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+    SlangResult _maybeWriteDebugArtifact(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest
@@ -3614,6 +3772,8 @@ public:
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
+    void getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName);
+
     RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
     SPIRVCoreGrammarInfo& getSPIRVCoreGrammarInfo()
@@ -3884,6 +4044,9 @@ bool maybeDiagnoseWarningOrError(
         return maybeDiagnose(sink, optionSet, errorType, pos, warningInfo, args...);
     }
 }
+
+bool isValidSlangLanguageVersion(SlangLanguageVersion version);
+bool isValidGLSLVersion(int version);
 
 } // namespace Slang
 

@@ -628,45 +628,13 @@ SLANG_FORCE_INLINE double F64_calcSafeRadians(double radians)
     return (a * (SLANG_PRELUDE_PI * 2));
 }
 
-// ----------------------------- I32 -----------------------------------------
-
-SLANG_FORCE_INLINE int32_t I32_abs(int32_t f)
-{
-    return (f < 0) ? -f : f;
-}
-
-SLANG_FORCE_INLINE int32_t I32_min(int32_t a, int32_t b)
-{
-    return a < b ? a : b;
-}
-SLANG_FORCE_INLINE int32_t I32_max(int32_t a, int32_t b)
-{
-    return a > b ? a : b;
-}
-
-SLANG_FORCE_INLINE float I32_asfloat(int32_t x)
-{
-    Union32 u;
-    u.i = x;
-    return u.f;
-}
-SLANG_FORCE_INLINE uint32_t I32_asuint(int32_t x)
-{
-    return uint32_t(x);
-}
-SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi)
-{
-    Union64 u;
-    u.u = (uint64_t(hi) << 32) | uint32_t(low);
-    return u.d;
-}
-
-SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
+// ----------------------------- U16 -----------------------------------------
+SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     return __builtin_popcount(uint32_t(v));
 #elif SLANG_PROCESSOR_X86_64 && SLANG_VC
-    return __popcnt(uint32_t(v));
+    return __popcnt16(v);
 #else
     uint32_t c = 0;
     while (v)
@@ -676,6 +644,25 @@ SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
     }
     return c;
 #endif
+}
+
+// ----------------------------- I16 -----------------------------------------
+SLANG_FORCE_INLINE uint32_t I16_countbits(int16_t v)
+{
+    return U16_countbits(uint16_t(v));
+}
+
+// ----------------------------- U8 -----------------------------------------
+SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
+{
+    // No native 8bit __popcnt yet, just cast and use 16bit variant
+    return U16_countbits(uint16_t(v));
+}
+
+// ----------------------------- I8 -----------------------------------------
+SLANG_FORCE_INLINE uint32_t I8_countbits(int16_t v)
+{
+    return U8_countbits(uint8_t(v));
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -730,6 +717,44 @@ SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 #endif
 }
 
+// ----------------------------- I32 -----------------------------------------
+
+SLANG_FORCE_INLINE int32_t I32_abs(int32_t f)
+{
+    return (f < 0) ? -f : f;
+}
+
+SLANG_FORCE_INLINE int32_t I32_min(int32_t a, int32_t b)
+{
+    return a < b ? a : b;
+}
+SLANG_FORCE_INLINE int32_t I32_max(int32_t a, int32_t b)
+{
+    return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE float I32_asfloat(int32_t x)
+{
+    Union32 u;
+    u.i = x;
+    return u.f;
+}
+SLANG_FORCE_INLINE uint32_t I32_asuint(int32_t x)
+{
+    return uint32_t(x);
+}
+SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi)
+{
+    Union64 u;
+    u.u = (uint64_t(hi) << 32) | uint32_t(low);
+    return u.d;
+}
+
+SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
+{
+    return U32_countbits(uint32_t(v));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE uint64_t U64_abs(uint64_t f)
@@ -749,7 +774,7 @@ SLANG_FORCE_INLINE uint64_t U64_max(uint64_t a, uint64_t b)
 SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
-    return uint32_t(__builtin_popcountl(v));
+    return uint32_t(__builtin_popcountll(v));
 #elif SLANG_PROCESSOR_X86_64 && SLANG_VC
     return uint32_t(__popcnt64(v));
 #else

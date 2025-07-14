@@ -71,7 +71,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericDecl> genericRef)
 {
     ParamCounts counts = {0, 0};
-    for (auto m : genericRef.getDecl()->members)
+    for (auto m : genericRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDecl>(m))
         {
@@ -481,7 +481,11 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             }
             else
             {
-                arg = coerce(CoercionSite::Argument, getType(m_astBuilder, valParamRef), arg);
+                arg = coerce(
+                    CoercionSite::Argument,
+                    getType(m_astBuilder, valParamRef),
+                    arg,
+                    getSink());
             }
 
             // If we have an argument to work with, then we will
@@ -712,7 +716,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
+            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
@@ -990,9 +994,17 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
         auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
-        if (subTypeWitness)
+
+        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
         {
             newArgs.add(subTypeWitness);
+        }
+        else if (!subTypeWitness && constraintIsOptional)
+        {
+            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
         }
         else
         {
@@ -1165,9 +1177,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     const auto& decl = subscriptDeclRef.getDecl();
-                    for (auto member : decl->members)
+                    for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                        if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
                         {
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
@@ -1182,7 +1194,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // Otherwise, if the accessor is [nonmutating], we can
                             // also consider the result of the subscript call as l-value
                             // regardless of the base.
-                            if (member->findModifier<NonmutatingAttribute>())
+                            if (accessorDecl->findModifier<NonmutatingAttribute>())
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;
@@ -1317,6 +1329,48 @@ int SemanticsVisitor::CompareLookupResultItems(
     LookupResultItem const& left,
     LookupResultItem const& right)
 {
+    auto leftDeclRefParent = getParentDeclRef(left.declRef);
+    auto rightDeclRefParent = getParentDeclRef(right.declRef);
+
+    bool leftIsExtension = false;
+    bool rightIsExtension = false;
+    bool leftIsFreeFormExtension = false;
+    bool rightIsFreeFormExtension = false;
+    bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
+    bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
+
+    // Prefer declarations that are not in free-form generic extensions, i.e.
+    // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
+    if (auto leftExt = as<ExtensionDecl>(leftDeclRefParent.getDecl()))
+    {
+        leftIsExtension = true;
+        if (isDeclRefTypeOf<GenericTypeParamDeclBase>(leftExt->targetType))
+            leftIsFreeFormExtension = true;
+    }
+    if (auto rightExt = as<ExtensionDecl>(rightDeclRefParent.getDecl()))
+    {
+        rightIsExtension = true;
+        if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
+            rightIsFreeFormExtension = true;
+    }
+
+    // If one of the candidates is a free-form extension, it is always worse than
+    // a non-free-form extension.
+    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
+
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
     // We always want to favor a concrete method over an interface
@@ -1330,16 +1384,12 @@ int SemanticsVisitor::CompareLookupResultItems(
     // directly (it is only visible through the requirement witness
     // information for inheritance declarations).
     //
-    auto leftDeclRefParent = getParentDeclRef(left.declRef);
-    auto rightDeclRefParent = getParentDeclRef(right.declRef);
     bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
         return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
     // Prefer non-extension declarations over extension declarations.
-    bool leftIsExtension = as<ExtensionDecl>(leftDeclRefParent.getDecl()) != nullptr;
-    bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
     if (leftIsExtension != rightIsExtension)
     {
         // Add a special case for constructors, where we prefer the one that is not synthesized,
@@ -2199,6 +2249,24 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     return trySolveConstraintSystem(&constraints, genericDeclRef, knownGenericArgs, outBaseCost);
 }
 
+LookupResult SemanticsVisitor::lookupConstructorsInType(Type* type, Scope* sourceScope)
+{
+    // Look up all the initializers on `type` by looking up
+    // its members named `$init`. All `__init` declarations are stored
+    // with the name `$init` internally to avoid potential conflicts
+    // if a user decided to name a field/method `__init`.
+    LookupOptions options =
+        LookupOptions(uint8_t(LookupOptions::IgnoreInheritance) | uint8_t(LookupOptions::NoDeref));
+    return lookUpMember(
+        m_astBuilder,
+        this,
+        getName("$init"),
+        type,
+        sourceScope,
+        LookupMask::Default,
+        options);
+}
+
 void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context)
 {
     // The code being checked is trying to apply `type` like a function.
@@ -2222,16 +2290,7 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-    LookupOptions options =
-        LookupOptions(uint8_t(LookupOptions::IgnoreInheritance) | uint8_t(LookupOptions::NoDeref));
-    LookupResult initializers = lookUpMember(
-        m_astBuilder,
-        this,
-        getName("$init"),
-        type,
-        context.sourceScope,
-        LookupMask::Default,
-        options);
+    LookupResult initializers = lookupConstructorsInType(type, context.sourceScope);
     AddOverloadCandidates(initializers, context);
 }
 
@@ -2650,7 +2709,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
+                                            &tempSink,
                                             &conversionCost);
+                if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
+                {
+                    resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
+                    resultInvokeExpr->argumentDelimeterLocs = expr->argumentDelimeterLocs;
+                    resultInvokeExpr->loc = expr->loc;
+                }
                 if (coerceResult)
                     return resultExpr;
                 typeOverloadChecked = true;

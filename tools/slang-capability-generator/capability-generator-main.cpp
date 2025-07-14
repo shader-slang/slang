@@ -1027,7 +1027,7 @@ void addHyperLink(StringBuilder& sbDoc, UnownedStringSlice suffix)
         }
         suffixReformatted.appendChar(i);
     }
-    sbDoc << "[" << suffix << "](#" << suffixReformatted << ")";
+    sbDoc << "[" << suffix << "](#" << suffixReformatted.toLower() << ")";
 }
 
 void setupDocumentationHeader(StringBuilder& sbDoc, const String& outPath)

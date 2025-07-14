@@ -26,7 +26,13 @@ Result SLANG_MCALL getCUDAAdapters(List<AdapterInfo>& outAdapters);
 
 Result SLANG_MCALL reportD3DLiveObjects();
 
+// Enable debug layer (validation layer) by default for DEBUG build
+#if _DEBUG
+static bool debugLayerEnabled = true;
+#else
 static bool debugLayerEnabled = false;
+#endif
+
 bool isGfxDebugLayerEnabled()
 {
     return debugLayerEnabled;
@@ -276,7 +282,7 @@ extern "C"
             return SLANG_E_NOT_IMPLEMENTED;
 #endif
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
-        // Assume no Vulkan or CUDA on MacOS or Cygwin
+            // Assume no Vulkan or CUDA on MacOS or Cygwin
         case DeviceType::Vulkan:
             SLANG_RETURN_ON_FAIL(getVKAdapters(adapters));
             break;
@@ -428,9 +434,9 @@ extern "C"
         return SLANG_OK;
     }
 
-    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer()
+    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer(bool enable)
     {
-        debugLayerEnabled = true;
+        debugLayerEnabled = enable;
     }
 
     const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type)

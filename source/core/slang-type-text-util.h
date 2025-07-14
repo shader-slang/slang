@@ -33,6 +33,8 @@ struct TypeTextUtil
 
     /// Get the language infos
     static ConstArrayView<NamesDescriptionValue> getLanguageInfos();
+    /// Get the language version infos
+    static ConstArrayView<NamesDescriptionValue> getLanguageVersionInfos();
     /// Get the compiler infos
     static ConstArrayView<NamesDescriptionValue> getCompilerInfos();
     /// Get the archive type infos
@@ -43,6 +45,8 @@ struct TypeTextUtil
     static ConstArrayView<NamesDescriptionValue> getDebugLevelInfos();
     /// Get the floating point modes
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
+    /// Get the floating point denormal handling modes
+    static ConstArrayView<NamesDescriptionValue> getFpDenormalModeInfos();
     // Get the line directive infos
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
     /// Get the optimization level info
@@ -70,6 +74,9 @@ struct TypeTextUtil
 
     /// Given a source language name returns a source language. Name here is distinct from extension
     static SlangSourceLanguage findSourceLanguage(const UnownedStringSlice& text);
+
+    /// Given a language version name returns a language revision.
+    static SlangLanguageVersion findLanguageVersion(const UnownedStringSlice& text);
 
     /// Given a name returns the pass through
     static SlangPassThrough findPassThrough(const UnownedStringSlice& slice);
