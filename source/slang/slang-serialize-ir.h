@@ -20,10 +20,16 @@ void writeSerializedModuleIR(
     IRModule* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
-void readSerializedModuleIR(
+[[nodiscard]] Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
+
+[[nodiscard]] Result readSerializedModuleInfo(
+    RIFF::Chunk const* chunk,
+    String& compilerVersion,
+    UInt& version,
+    String& name);
 
 } // namespace Slang

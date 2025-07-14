@@ -2041,6 +2041,8 @@ public:
     // Check and register a type if it is differentiable.
     void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
+    void maybeCheckMissingNoDiffThis(Expr* expr);
+
     // Find the default implementation of an interface requirement,
     // and insert it to the witness table, if it exists.
     bool findDefaultInterfaceImpl(
@@ -2305,6 +2307,11 @@ public:
         // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
         // not optional.
         bool isOptional = false;
+
+        // Is this constraint an equality? This tells us that "joining" types is meaningless, we
+        // know the result will be the sub type. If it is not, we will error once we start
+        // substituting types.
+        bool isEquality = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
@@ -2658,6 +2665,7 @@ public:
     {
         Index indexInTypePack = 0;
         bool optionalConstraint = false;
+        bool equalityConstraint = false;
     };
 
     // Try to find a unification for two values

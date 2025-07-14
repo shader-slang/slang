@@ -1,3 +1,8 @@
+#if 0
+// Duplicated: this is identical to slang-rhi\tests\test-shader-cache.cpp
+// This file uses gfx-specific shader cache functionality (IShaderCache) 
+// that has been replaced with a different caching system (IPersistentCache) in slang-rhi.
+
 #include "core/slang-basic.h"
 #include "core/slang-file-system.h"
 #include "core/slang-io.h"
@@ -5,8 +10,8 @@
 #include "core/slang-string-util.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
@@ -1128,3 +1133,5 @@ SLANG_UNIT_TEST(shaderCacheGraphicsSplitVulkan)
     runTest<ShaderCacheTestGraphicsSplit>(unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 } // namespace gfx_test
+
+#endif

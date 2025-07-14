@@ -697,7 +697,8 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
                 return SLANG_FAIL;
             }
 
-            readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule);
+            SLANG_RETURN_ON_FAIL(
+                readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule));
         }
     }
 

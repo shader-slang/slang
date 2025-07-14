@@ -1,13 +1,20 @@
 ## Configure CMake and Build
 
-To configure cmake, run `cmake --preset default --fresh`.
-To build, run `cmake --workflow --preset debug` or `cmake --workflow --preset release`.
-Build instructions can be found in docs/building.md
+Slang is already built in debug configuration, so you should be able to run targets
+like `slangc`, `slang-test`, `slangi` etc. right away.
+
+If you made some changes and need to rebuild Slang, follow these steps:
+
+1. Configure cmake with `cmake --preset default`.
+2. Run `cmake --workflow --preset debug` to build.
+
+Detailed build instructions can be found in docs/building.md
 
 ## Formatting
 
+DO THIS BEFORE COMMITING YOUR CHANGES:
+    RUN `./extras/formatting.sh` to format your changes first!!
 Your PR needs to be formatted according to our coding style.
-Run `./extras/formatting.sh` script to format your changes before submitting them.
 
 ## Labeling your PR
 

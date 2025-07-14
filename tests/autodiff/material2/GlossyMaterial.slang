@@ -30,6 +30,7 @@ public struct GlossyMaterial : IMaterial
     }
 
     [BackwardDifferentiable]
+    [NoDiffThis]
     public GlossyMaterialInstance setupMaterialInstance(out MaterialInstanceData miData)
     {
         float3 albedo = getAlbedo(baseColor);
