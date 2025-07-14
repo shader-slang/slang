@@ -275,7 +275,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
         if (outProperType)
         {
-            *outProperType = nullptr;
+            *outProperType = m_astBuilder->getErrorType();
         }
         return false;
     }
