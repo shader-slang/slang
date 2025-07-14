@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
 
-// Tests pointer casting rules covering all combinations:
+// Tests pointer casting rules: Only explicit casting is allowed between pointer types.
+// All implicit conversions between pointer types should fail.
 RWStructuredBuffer<int> processMemory;
 RWStructuredBuffer<int> output;
 
@@ -37,9 +38,11 @@ void computeMain(int id : SV_DispatchThreadID)
     // SECTION 1: ReadWrite -> Read Conversions
     // ===========================================
     
-    // 1.1: ReadWrite -> Read, Same Type, Same CoherentScope (SHOULD PASS - implicit conversion)
-    NonCoherentReadPtrInt pass_rw_to_r_same_type_same_scope = &processMemory[id.x];
-    DeviceCoherentReadPtrInt pass_rw_to_r_same_type_same_scope_2 = DeviceCoherentReadWritePtrInt(&processMemory[id.x]);
+    // 1.1: ReadWrite -> Read, Same Type, Same CoherentScope (SHOULD FAIL - implicit conversion)
+    // CHECK: ([[# @LINE+1]]): error 30019
+    NonCoherentReadPtrInt fail_rw_to_r_same_type_same_scope = &processMemory[id.x];
+    // CHECK: ([[# @LINE+1]]): error 30019
+    DeviceCoherentReadPtrInt fail_rw_to_r_same_type_same_scope_2 = DeviceCoherentReadWritePtrInt(&processMemory[id.x]);
     
     // 1.2: ReadWrite -> Read, Different Type, Same CoherentScope (SHOULD FAIL - implicit conversion)
     // CHECK: ([[# @LINE+1]]): error 30019
@@ -60,6 +63,8 @@ void computeMain(int id : SV_DispatchThreadID)
     WorkgroupCoherentReadPtrFloat fail_rw_to_r_diff_type_diff_scope_2 = &processMemory[id.x];
     
     // 1.5: ReadWrite -> Read, Explicit casts (SHOULD PASS - explicit conversion)
+    NonCoherentReadPtrInt pass_rw_to_r_explicit_same_type_same_scope = NonCoherentReadPtrInt(&processMemory[id.x]);
+    DeviceCoherentReadPtrInt pass_rw_to_r_explicit_same_type_same_scope_2 = DeviceCoherentReadPtrInt(DeviceCoherentReadWritePtrInt(&processMemory[id.x]));
     NonCoherentReadPtrFloat pass_rw_to_r_explicit_diff_type = NonCoherentReadPtrFloat(&processMemory[id.x]);
     DeviceCoherentReadPtrInt pass_rw_to_r_explicit_diff_scope = DeviceCoherentReadPtrInt(&processMemory[id.x]);
     DeviceCoherentReadPtrFloat pass_rw_to_r_explicit_diff_type_diff_scope = DeviceCoherentReadPtrFloat(&processMemory[id.x]);

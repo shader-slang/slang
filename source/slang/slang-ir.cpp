@@ -2908,9 +2908,13 @@ IRRefType* IRBuilder::getRefType(
         IRRefType*)getPtrType(kIROp_RefType, valueType, addrSpace, accessQualifier, coherentScope);
 }
 
-IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
+IRConstRefType* IRBuilder::getConstRefType(
+    IRType* valueType,
+    AddressSpace addrSpace,
+    AccessQualifier accessQualifier,
+    CoherentScope coherentScope)
 {
-    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
+    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, addrSpace, accessQualifier, coherentScope);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)

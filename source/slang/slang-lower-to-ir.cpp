@@ -3470,7 +3470,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
-            irParamType = builder->getConstRefType(irParamType);
+            irParamType = builder->getConstRefType(irParamType, AddressSpace::Generic);
             break;
         default:
             SLANG_UNEXPECTED("unknown parameter direction");

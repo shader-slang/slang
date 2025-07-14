@@ -1345,16 +1345,15 @@ enum Access : uint64_t
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, uint64_t addrSpace = AddressSpace::UserPointer, Access access = Access::ReadWrite, CoherentScope coherentScope = CoherentScope::NotCoherent>
+__generic<T, AddressSpace addrSpace = AddressSpace::UserPointer, Access access = Access::ReadWrite, CoherentScope coherentScope = CoherentScope::NotCoherent>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
 {
-    // Can always allow casting to a different coherent scope if same access-qualifier.
-    // This cast is explicit.
-    __generic<U, CoherentScope otherCoherentScope>
+    // A user is allowed to explicitly cast between any pointer type.
+    __generic<U, addrSpaceOther, Access accessOther, CoherentScope coherentScopeOther>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U, addrSpace, access, otherCoherentScope> ptr);
+    __init(Ptr<U, addrSpaceOther, accessOther, coherentScopeOther> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -1371,21 +1370,6 @@ struct Ptr
         ref;
     }
 };
-
-__generic<T, uint64_t addrSpace, Access access = Access::Read, CoherentScope coherentScope>
-extension Ptr<T, addrSpace, access, coherentScope>
-{
-    // `ReadWrite` Ptr can be cast to `Read` Ptr as a narrowing operation implicitly
-    // if the only difference is the access-qualifier
-    __intrinsic_op($(kIROp_BitCast))
-    __implicit_conversion(1)
-    __init(Ptr<T, addrSpace, Access::ReadWrite, coherentScope> ptr);
-
-    // Cast must be explicit if type is potentially different.
-    __generic<U, CoherentScope otherCoherentScope>
-    __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U, addrSpace, Access::ReadWrite, otherCoherentScope> ptr);
-}
 
 typealias CoherentPtr<T, Access access = Access::ReadWrite> = Ptr<T, AddressSpace::UserPointer, access, CoherentScope::Device>;
 
@@ -1431,9 +1415,9 @@ void storeAligned<int alignment, T>(T* ptr, T value)
 }
 
 ${{{
-    StringBuilder ptrArgListDefBuilder;
-    ptrArgListDefBuilder << "T, uint64_t addrSpace, Access access, CoherentScope coherentScope";
-    String ptrArgListDef = ptrArgListDefBuilder.toString();
+    StringBuilder ptrTypeParameterList;
+    ptrTypeParameterList << "T, AddressSpace addrSpace, Access access, CoherentScope coherentScope";
+    String ptrArgListDef = ptrTypeParameterList.toString();
 
     StringBuilder ptrArgListBuilder;
     ptrArgListBuilder << "T, addrSpace, access, coherentScope";
@@ -2703,10 +2687,10 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*($(fullPtrType) value);
 
-__generic<T>
+__generic<T, AddressSpace addrSpace, Access accessQualifier, CoherentScope coherentScope>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__prefix Ptr<T, AddressSpace::UserPointer, Access::ReadWrite, CoherentScope::NotCoherent> operator&(__ref T value);
+__prefix Ptr<T, addrSpace, accessQualifier, coherentScope> operator&(__ref T value);
 
 __generic<T>
 __intrinsic_op(0)

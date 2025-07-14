@@ -350,9 +350,14 @@ RefType* ASTBuilder::getRefType(
         getPtrType(valueType, addrSpace, accessQualifier, coherentScope, "RefType"));
 }
 
-ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
+ConstRefType* ASTBuilder::getConstRefType(
+    Type* valueType
+    AddressSpace addrSpace,
+    AccessQualifier accessQualifier,
+    CoherentScope coherentScope)
 {
-    return dynamicCast<ConstRefType>(getPtrType(valueType, "ConstRefType"));
+    return dynamicCast<ConstRefType>(
+        getPtrType(valueType, addrSpace, accessQualifier, coherentScope, "ConstRefType"));
 }
 
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
@@ -375,7 +380,9 @@ PtrTypeBase* ASTBuilder::getPtrType(
 {
     Val* args[] = {
         valueType,
-        getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace),
+        getIntVal(
+            DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("AddressSpace")),
+            (IntegerLiteralValue)addrSpace),
         getIntVal(
             DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("Access")),
             (IntegerLiteralValue)accessQualifier),

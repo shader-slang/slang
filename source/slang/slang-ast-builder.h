@@ -527,7 +527,11 @@ public:
         CoherentScope coherentScope);
 
     // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    ConstRefType* getConstRefType(
+        Type* valueType
+        AddressSpace addrSpace,
+        AccessQualifier accessQualifier,
+        CoherentScope coherentScope);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);

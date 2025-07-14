@@ -3731,7 +3731,11 @@ public:
         AddressSpace addrSpace,
         AccessQualifier accessQualifier = AccessQualifier::ReadWrite,
         CoherentScope coherentScope = CoherentScope::NotCoherent);
-    IRConstRefType* getConstRefType(IRType* valueType);
+    IRConstRefType* getConstRefType(
+        IRType* valueType,
+        AddressSpace addrSpace,
+        AccessQualifier accessQualifier = AccessQualifier::ReadWrite,
+        CoherentScope coherentScope = CoherentScope::NotCoherent);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(
         IROp op,
