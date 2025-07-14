@@ -371,29 +371,6 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
-// Represents the type of `some Type` for `some Type varName`.
-// This decl of `some Type` is not assignable since it already
-// has a given value.
-// The interface type is stored as a member.
-FIDDLE()
-class SomeTypeDecl : public ContainerDecl
-{
-    FIDDLE(...)
-
-    InheritanceDecl* getBase();
-};
-
-// Represents the type of `some Type` for `some Type varName`
-// when `varName` is unassigned/unbound. This decl simmilarly
-// represents the `out some Type` type.
-// This variant of `some Type` is assignable since it is either
-// a new variable without value or equivlent.
-FIDDLE()
-class UnboundSomeTypeDecl : public SomeTypeDecl
-{
-    FIDDLE(...)
-};
-
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
 // declarations:
@@ -415,6 +392,31 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE(...)
     FIDDLE() TypeExp targetType;
 };
+
+
+// Represents the type of `some Type` for `some Type varName`.
+// This decl of `some Type` is not assignable since it already
+// has a given value.
+// The interface type is stored as a member.
+FIDDLE()
+class SomeTypeDecl : public AggTypeDeclBase
+{
+    FIDDLE(...)
+
+    InheritanceDecl* getBase();
+};
+
+// Represents the type of `some Type` for `some Type varName`
+// when `varName` is unassigned/unbound. This decl simmilarly
+// represents the `out some Type` type.
+// This variant of `some Type` is assignable since it is either
+// a new variable without value or equivlent.
+FIDDLE()
+class UnboundSomeTypeDecl : public SomeTypeDecl
+{
+    FIDDLE(...)
+};
+
 
 enum class TypeTag
 {

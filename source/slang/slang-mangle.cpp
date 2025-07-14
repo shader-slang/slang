@@ -442,16 +442,20 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         emit(context, genValParamDecl->parameterIndex);
         return;
     }
-    if (auto unboundSomeType = as<UnboundSomeTypeDecl>(declRef.getDecl()))
+    if (auto unboundSomeType = as<UnboundSomeTypeDecl>(declRef))
     {
         emit(context, "USome");
-        emitType(context, unboundSomeType->getBase()->base.type);
+        emitType(
+            context,
+            getInterfaceType(getCurrentASTBuilder(), unboundSomeType));
         return;
     }
-    else if (auto someType = as<SomeTypeDecl>(declRef.getDecl()))
+    else if (auto someType = as<SomeTypeDecl>(declRef))
     {
         emit(context, "Some");
-        emitType(context, someType->getBase()->base.type);
+        emitType(
+            context, 
+            getInterfaceType(getCurrentASTBuilder(), unboundSomeType));
         return;
     }
 

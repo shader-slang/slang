@@ -366,20 +366,27 @@ void DeclRefBase::toText(StringBuilder& out)
 
     declRefs.reverse();
 
+    bool first = true;
     for (auto declRef : declRefs)
     {
         auto decl = declRef->getDecl();
-        if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
+        if (!first)
         {
-            out << "unbound_some<" << unboundSomeTypeDecl->getBase()->base.type << ">";
+            out << ".";
+            if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
+            {
+                out << "unbound_some<" << getInterfaceType(getCurrentASTBuilder(), unboundSomeTypeDecl)
+                    << ">";
+            }
+            else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+            {
+                // output `some` type as `parentDecl.some<type>` instead of `parentDecl.some type`
+                // for clarity reasons.
+                out << "some<" << getInterfaceType(getCurrentASTBuilder(), someTypeDecl) << ">";
+            }
         }
-        else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
-        {
-            // output `some` type as `parentDecl.some<type>` instead of `parentDecl.some type`
-            // for clarity reasons.
-            out << "some<" << someTypeDecl->getBase()->base.type << ">";
-        }
-        
+        first = false;
+
         if (auto name = decl->getName())
         {
             out << name->text;

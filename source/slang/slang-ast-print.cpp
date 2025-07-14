@@ -1569,7 +1569,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
     {
-        m_builder << "some " << someTypeDecl->getBase()->base.type;
+        m_builder << "some " << getInterfaceType(getCurrentASTBuilder(), someTypeDecl);
     }
     else if (as<ClassDecl>(decl))
     {

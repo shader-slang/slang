@@ -124,6 +124,9 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
     SubtypeWitness* failureWitness = nullptr;
 
+    // Pre-calc if we have a `some` type.
+    auto superSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(superType);
+
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
     //
@@ -146,7 +149,18 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // to `superType`, or fail to find such a facet.
         //
         if (!facetType->equals(superType))
-            continue;
+        {
+            // if we have a `some` type we need to check if the base matches up
+            if (superSomeTypeDeclRef)
+            {
+                if (!facetType->equals(getInterfaceType(m_astBuilder, superSomeTypeDeclRef)))
+                    continue;
+            }
+            else
+            {
+                continue;
+            }
+        }
 
         // If the `superType` appears in the flattened inheritance list
         // for the `subType`, then we know that the subtype relationship

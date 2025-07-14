@@ -196,6 +196,11 @@ inline Type* getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> declRe
     return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
 }
 
+inline Type* getInterfaceType(ASTBuilder* astBuilder, DeclRef<SomeTypeDecl> declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->getBase()->base.Ptr());
+}
+
 inline FilteredMemberRefList<VarDecl> getFields(
     ASTBuilder* astBuilder,
     DeclRef<StructDecl> declRef,
