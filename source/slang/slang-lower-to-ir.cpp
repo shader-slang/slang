@@ -9338,6 +9338,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
 
+                // Remove linkage decorations from the requirement value to prevent
+                // duplicate mangled names and allow DCE to clean up unused functions.
+                // Interface requirements only need the type information, not the linkage.
+                if (auto func = as<IRGlobalValueWithCode>(requirementVal))
+                {
+                    removeLinkageDecorations(func);
+                }
+
                 switch (requirementVal->getOp())
                 {
                 default:
