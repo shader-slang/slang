@@ -1474,6 +1474,8 @@ public:
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
+    void ensureOuterGenericConstraints(Decl* decl, DeclCheckState state);
+
     // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
     // expression in `outExpr`. The coercion is only valid if the lambda struct
     // does not contain any captures.

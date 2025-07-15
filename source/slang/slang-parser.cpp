@@ -1859,53 +1859,46 @@ static Stmt* parseOptBody(Parser* parser)
         }
     }
 
-    if (parser->getStage() == ParsingStage::Decl)
+    // If we are at the initial parsing stage, just collect the tokens
+    // without actually parsing them.
+    if (peekTokenType(parser) != TokenType::LBrace)
     {
-        // If we are at the initial parsing stage, just collect the tokens
-        // without actually parsing them.
-        if (peekTokenType(parser) != TokenType::LBrace)
-        {
-            return parser->parseBlockStatement();
-        }
-        auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
-        unparsedStmt->currentScope = parser->currentScope;
-        unparsedStmt->outerScope = parser->outerScope;
-        unparsedStmt->sourceLanguage = parser->getSourceLanguage();
-        unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
-        parser->FillPosition(unparsedStmt);
-        List<Token>& tokens = unparsedStmt->tokens;
-        int braceDepth = 0;
-        for (;;)
-        {
-            auto token = parser->ReadToken();
-            if (token.type == TokenType::EndOfFile)
-            {
-                break;
-            }
-            if (token.type == TokenType::LBrace)
-            {
-                braceDepth++;
-            }
-            else if (token.type == TokenType::RBrace)
-            {
-                braceDepth--;
-            }
-            tokens.add(token);
-            if (braceDepth == 0)
-            {
-                break;
-            }
-        }
-        Token eofToken;
-        eofToken.type = TokenType::EndOfFile;
-        eofToken.loc = parser->tokenReader.peekLoc();
-        tokens.add(eofToken);
-        return unparsedStmt;
+        return parser->parseBlockStatement();
     }
-
-    // If we are in the second stage of parsing, then we need to actually
-    // parse the block statement for real.
-    return parser->parseBlockStatement();
+    auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
+    unparsedStmt->currentScope = parser->currentScope;
+    unparsedStmt->outerScope = parser->outerScope;
+    unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+    unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
+    parser->FillPosition(unparsedStmt);
+    List<Token>& tokens = unparsedStmt->tokens;
+    int braceDepth = 0;
+    for (;;)
+    {
+        auto token = parser->ReadToken();
+        if (token.type == TokenType::EndOfFile)
+        {
+            break;
+        }
+        if (token.type == TokenType::LBrace)
+        {
+            braceDepth++;
+        }
+        else if (token.type == TokenType::RBrace)
+        {
+            braceDepth--;
+        }
+        tokens.add(token);
+        if (braceDepth == 0)
+        {
+            break;
+        }
+    }
+    Token eofToken;
+    eofToken.type = TokenType::EndOfFile;
+    eofToken.loc = parser->tokenReader.peekLoc();
+    tokens.add(eofToken);
+    return unparsedStmt;
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -3649,7 +3642,7 @@ static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
 
             // substitution needs to be filled during check
             Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl))
+            if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl))
             {
                 paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
@@ -5500,7 +5493,6 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 static Decl* parseEnumDecl(Parser* parser)
 {
     EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
-
     parser->ReadToken("enum");
 
     // HACK: allow the user to write `enum class` in case

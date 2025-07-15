@@ -3215,6 +3215,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (layout)
             emitVarLayout(param, varInst, layout);
         emitDecorations(param, getID(varInst));
+        maybeEmitDebugGlobalVariable(param, varInst);
         return varInst;
     }
 
@@ -3237,6 +3238,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (layout)
             emitVarLayout(globalVar, varInst, layout);
         emitDecorations(globalVar, getID(varInst));
+        maybeEmitDebugGlobalVariable(globalVar, varInst);
         return varInst;
     }
 
@@ -3891,6 +3893,39 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return actualHelperVar;
         }
         return nullptr;
+    }
+
+    void maybeEmitDebugGlobalVariable(IRInst* globalInst, SpvInst* spvVar)
+    {
+        auto scope = findDebugScope(globalInst->getModule()->getModuleInst());
+        if (!scope)
+            return;
+
+        auto name = getName(globalInst);
+        IRBuilder builder(globalInst);
+        auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
+        auto debugType = emitDebugType(varType);
+
+        // Use default debug source and line info similar to struct debug type emission
+        auto loc = globalInst->findDecoration<IRDebugLocationDecoration>();
+        IRInst* source = loc ? loc->getSource() : m_defaultDebugSource;
+        IRInst* line = loc ? loc->getLine() : builder.getIntValue(builder.getUIntType(), 0);
+        IRInst* col = loc ? loc->getCol() : line;
+
+        emitOpDebugGlobalVariable(
+            getSection(SpvLogicalSectionID::GlobalVariables),
+            nullptr, // Don't associate with IR inst to avoid duplicate registration
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            name,
+            debugType,
+            source,
+            line,
+            col,
+            scope,
+            name, // linkageName same as name
+            spvVar,
+            builder.getIntValue(builder.getUIntType(), 0)); // flags
     }
 
     SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
@@ -6813,15 +6848,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             baseStructType = as<IRStructType>(ptrType->getValueType());
             baseId = getID(ensureInst(base));
+            SLANG_ASSERT(
+                as<IRPtrTypeBase>(fieldAddress->getFullType())->getAddressSpace() ==
+                    ptrType->getAddressSpace() &&
+                "field_address requires base and result to have same address space.");
         }
         else
         {
-            baseStructType = as<IRStructType>(base->getDataType());
-
-            auto structPtrType = builder.getPtrType(baseStructType);
-            auto varInst = emitOpVariable(parent, nullptr, structPtrType, SpvStorageClassFunction);
-            emitOpStore(parent, nullptr, varInst, base);
-            baseId = getID(varInst);
+            SLANG_UNEXPECTED("field_address requires base to be an address.");
         }
         SLANG_ASSERT(baseStructType && "field_address requires base to be a struct.");
         auto fieldId = emitIntConstant(
@@ -8524,7 +8558,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugBaseType,
                 builder.getIntValue(builder.getUIntType(), kDebugTypeAtomicQualifier));
         }
-        return ensureInst(m_voidType);
+
+        // Fallback for texture types, raytracing types, and other composite types
+        // Declare variables for debug location like struct handling does
+        IRInst* source = m_defaultDebugSource;
+        IRInst* line = builder.getIntValue(builder.getUIntType(), 0);
+        IRInst* col = line;
+
+        // Emit a composite debug type (struct-like for most types)
+        return emitOpDebugTypeComposite(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            name,
+            builder.getIntValue(builder.getUIntType(), 0),
+            source,
+            line,
+            col,
+            scope,
+            name,
+            builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
+            builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
+            List<SpvInst*>()); // No members
     }
 
     SpvInst* emitDebugType(IRType* type)

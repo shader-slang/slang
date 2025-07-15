@@ -111,6 +111,7 @@ static bool _isSubCommand(const char* arg)
     int argc,
     char** argv,
     TestCategorySet* categorySet,
+    Slang::WriterHelper stdOut,
     Slang::WriterHelper stdError,
     Options* optionsOut)
 {
@@ -147,7 +148,7 @@ static bool _isSubCommand(const char* arg)
     {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
-            showHelp(stdError);
+            showHelp(stdOut);
             return SLANG_FAIL;
         }
     }

@@ -6619,8 +6619,25 @@ void AllMemoryBarrierWithGroupSync()
 
 // Returns the workgroup size of the calling entry point.
 [require(compute)]
+[require(meshshading)]
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
+
+// Returns number of workgroups that have been dispatched to a GLSL or SPIR-V compute shader
+[require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+[require(glsl_spirv, meshshading)]
+uint3 WorkgroupCount()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumWorkGroups)";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+        };
+    }
+}
 
 // Test if any components is non-zero.
 

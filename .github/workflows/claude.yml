@@ -189,11 +189,11 @@ jobs:
       # Run Claude Code Action with optimized environment variables
       - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v0.0.31
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
-            Build system information:
+            # Build system information:
             - OS: Ubuntu Linux
             - Build commands: 
               * Configure: `cmake --preset default`
@@ -203,17 +203,26 @@ jobs:
             - Project is pre-built and ready for development tasks
             - Run formatting script before committing changes
 
-            CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
+            # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
-            **How to use this tool effectively:**
-            - Use repoName: "shader-slang/slang" for all queries
-            - Ask specific technical questions about architecture, patterns, or implementation approaches
-            - Examples: "How does the IR optimization system work?" or "What's the pattern for adding new code generation targets?"
-            - Use responses to understand existing patterns before implementing changes
+              **How to use this tool effectively:**
+              - Use repoName: "shader-slang/slang" for all queries
+              - Ask specific technical questions about architecture, patterns, or implementation approaches
+              - Examples: "What does the type legalization pass do?" or "What's the pattern for adding new code generation targets?"
+              - Use responses to understand existing patterns before implementing changes
 
-            **Implementation Guidelines:**
-            - Always follow existing code patterns and architectural decisions discovered through deepwiki
-            - Consult the tool when you need context about unfamiliar parts of the codebase
+              **Implementation Guidelines:**
+              - Always follow existing code patterns and architectural decisions discovered through deepwiki
+              - Consult the tool when you need context about unfamiliar parts of the codebase
+
+            # Debugging backend crashes or invalid downstream code:
+
+              Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
+              early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
+              of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
+              keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
+              in the IR passes.
+
           mcp_config: |
             {
               "mcpServers": {
@@ -226,11 +235,11 @@ jobs:
           allowed_tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
           trigger_phrase: "@claude"
           assignee_trigger: "claude"
-          timeout_minutes: "25"
+          timeout_minutes: "90"
           github_token: ${{ steps.auth-config.outputs.github-token }}
           use_bedrock: "true"
           model: ${{ vars.ANTHROPIC_MODEL }}
-          max_turns: "100"
+          max_turns: "500"
           # Use claude_env for custom environment variables
           claude_env: |
             ANTHROPIC_BEDROCK_BASE_URL: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
