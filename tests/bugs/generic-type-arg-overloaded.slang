@@ -1,6 +1,6 @@
 // generic-type-arg-overloaded.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 // Regression test to confirm that type checker
 // doesn't crash when an overloaded identifier
@@ -11,6 +11,7 @@ interface IThing { int getVal(); }
 struct Stuff : IThing { int getVal() { return 1; } }
 
 // Conflicting declaration:
+//CHECK: ([[# @LINE+1]]): error 30200:
 struct Stuff {}
 
 int util<T : IThing>() { return 1; }
