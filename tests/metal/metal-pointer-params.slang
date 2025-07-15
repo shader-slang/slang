@@ -4,11 +4,11 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=8):out,name=outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 
-//CHECK: ulong{{.*}}constant{{ *\*}} a
-//CHECK-NEXT: long{{.*}}constant{{ *\*}} b
-//CHECK-NEXT: uint{{.*}}constant{{ *\*}} c
-//CHECK-NEXT: int{{.*}}constant{{ *\*}} d
-//CHECK-NEXT: float{{.*}}constant{{ *\*}} e
+//CHECK: ulong{{.*}}device{{ *\*}} a
+//CHECK-NEXT: long{{.*}}device{{ *\*}} b
+//CHECK-NEXT: uint{{.*}}device{{ *\*}} c
+//CHECK-NEXT: int{{.*}}device{{ *\*}} d
+//CHECK-NEXT: float{{.*}}device{{ *\*}} e
 
 // "indirect_argument" means a pointer
 //CHK_AIR: !"ulong", !"a{{[^"]*}}", !"air.indirect_argument"
