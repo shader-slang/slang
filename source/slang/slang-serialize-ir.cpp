@@ -28,6 +28,8 @@ FIDDLE()
 namespace Slang
 {
 
+// The oldest compilers we support don't have std::bit_cast, so implement it
+// here
 template<typename To, typename From>
     requires(sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<From> &&
             std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>
@@ -116,10 +118,12 @@ struct FlatInstTable
     // The length is equal to the number of strings and blobs in the module
     FIDDLE() List<Index> stringLengths;
 
-    // The length is the sum of all stringLengths
+    // The length is the sum of all stringLengths, the contents is the
+    // concatenation of all their data
     FIDDLE() List<uint8_t> stringChars;
 
-    // The number of integer/floating constants in the module
+    // The length is number of integer/floating constants in the module, and
+    // the contents are the bits of those constants
     FIDDLE() List<UInt64> literals;
 };
 
@@ -129,6 +133,8 @@ struct FlatInstTable
 struct IRSerialReadContext;
 struct IRSerialWriteContext;
 
+// Specialize to the reader/writer for the specific backend we're targeting
+// instead of ISerializerImpl to avoid some virtual function calls
 #if USE_RIFF
 using IRWriteSerializer = Serializer_<RIFFSerialWriter, IRSerialWriteContext>;
 using IRReadSerializer = Serializer_<RIFFSerialReader, IRSerialReadContext>;
@@ -189,7 +195,8 @@ void serialize(S const& serializer, IROp& value)
 {
     auto stableName = isWriting(serializer) ? getOpcodeStableName(value) : kInvalidStableName;
     serializeEnum(serializer, stableName);
-    if (isReading(serializer))
+    // if we're reading
+    if constexpr (std::is_same_v<S, IRReadSerializer>)
     {
         value = getStableNameOpcode(stableName);
         // It's possible we're reading a module serialized by a future version of
@@ -198,11 +205,7 @@ void serialize(S const& serializer, IROp& value)
         if (value == kIROp_Invalid)
         {
             value = kIROp_Unrecognized;
-
-            if constexpr (std::is_same_v<S, IRReadSerializer>)
-            {
-                serializer.getContext()->_foundUnrecognizedInstructions = true;
-            }
+            serializer.getContext()->_foundUnrecognizedInstructions = true;
         }
     }
 }
@@ -262,7 +265,7 @@ struct Fossilized_$T
 {
 %   for i,f in ipairs(T.directFields) do
     Fossilized<decltype($T::$f)> $f;
-    const static Index $(f)_FieldIndex = $(i-1);
+    const static Index $(f)_fieldIndex = $(i-1);
 %   end
 };
 
@@ -327,8 +330,9 @@ void serializeObject(S const& serializer, IRModule*& value, IRModule*)
     serializer.getContext()->handleIRModule(serializer, value);
 }
 
-static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
+static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleInst* moduleInst)
 {
+    FlatInstTable flat;
     Dictionary<IRInst*, Index> instMap;
     instMap.add(nullptr, -1);
     List<IRInst*> insts;
@@ -388,9 +392,10 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
             }
         }
     }
+    serialize(serializer, flat);
 }
 
-
+// A helper function to read one thing from a Fossil ref
 template<typename T>
 static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRef r)
 {
@@ -405,7 +410,7 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
     return t;
 }
 
-static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRModule* module)
+static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
 #if DIRECT_FROM_FOSSIL
@@ -423,20 +428,18 @@ static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRMo
     List<IRInst*> instsList;
 
 #if DIRECT_FROM_FOSSIL
-    instsList.setCount(flat.instAllocInfo.getElementCount() + 1);
+    const auto numInsts = flat.instAllocInfo.getElementCount();
 #else
-    instsList.setCount(flat.instAllocInfo.getCount() + 1);
+    const auto numInsts = flat.instAllocInfo.getCount();
 #endif
+
+    instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
     IRInst** const insts = &instsList[1];
     insts[-1] = nullptr;
 
-#if DIRECT_FROM_FOSSIL
-    for (Index instIndex = 0; instIndex < flat.instAllocInfo.getElementCount(); ++instIndex)
-#else
-    for (Index instIndex = 0; instIndex < flat.instAllocInfo.getCount(); ++instIndex)
-#endif
+    for (Index instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
         IROp op = getStableNameOpcode(a.op);
@@ -509,11 +512,7 @@ static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRMo
             const auto len = flat.stringLengths[stringLengthIndex++];
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
-#if DIRECT_FROM_FOSSIL
             memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
-#else
-            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
-#endif
             stringDataIndex += len;
             break;
         }
@@ -550,13 +549,7 @@ void IRSerialWriteContext::handleIRModule(IRWriteSerializer const& serializer, I
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
     serialize(serializer, value->m_name);
     serialize(serializer, value->m_version);
-    FlatInstTable flat;
-    moduleToFlatModule(value->m_moduleInst, flat);
-
-#if DIRECT_FROM_FOSSIL
-    // serialize(serializer, flat.sourceLocs);
-#endif
-    serialize(serializer, flat);
+    serializeAsFlatModule(serializer, value->m_moduleInst);
 }
 
 void IRSerialReadContext::handleIRModule(IRReadSerializer const& serializer, IRModule*& value)
@@ -567,8 +560,7 @@ void IRSerialReadContext::handleIRModule(IRReadSerializer const& serializer, IRM
     _module = value;
     serialize(serializer, value->m_name);
     serialize(serializer, value->m_version);
-
-    value->m_moduleInst = flatModuleToModule(serializer, value);
+    value->m_moduleInst = deserializeFromFlatModule(serializer, value);
 }
 
 //
@@ -620,7 +612,7 @@ Result readSerializedModuleInfo(
     UInt& version,
     String& name)
 {
-    static_assert(!USE_RIFF);
+    static_assert(!USE_RIFF); // unimplemented
 
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
