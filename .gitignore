@@ -97,9 +97,6 @@ vkd3d-proton.cache.write
 
 # Claude local settings
 /.claude/settings.local.json
-# Currently CLAUDE.local.md is added to the repo
-# and we cannot ignore it until we delete it.
-#/CLAUDE.local.md
 
 # Other temporary files
 /generators
