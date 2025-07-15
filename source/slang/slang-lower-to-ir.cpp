@@ -9150,7 +9150,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
-                if (context->includeDebugInfo)
+                if (context->includeDebugInfo && decl->loc.isValid())
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -9180,7 +9180,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             addNameHint(context, debugVar, decl);
 
                             // Emit debug value to associate the constant with the debug variable
-                            builder->emitDebugValue(debugVar, getSimpleVal(context, initVal));
+                            builder->emitDebugValue(debugVar, initVal.val);
                         }
                     }
                 }
