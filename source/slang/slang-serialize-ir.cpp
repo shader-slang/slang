@@ -690,8 +690,7 @@ Result readSerializedModuleInfo(
 
 // A helper to make profiling the actual deserialization work
 // easier.
-[[nodiscard]]
-static Result readSerializedModuleIR_(
+[[nodiscard]] static Result readSerializedModuleIR_(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
