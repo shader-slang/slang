@@ -134,7 +134,7 @@ struct StructParamToConstRefContext
         if (paramMap.getCount() == 0)
             return;
 
-        IRBuilder builder(module);
+        IRBuilder functionBuilder(module);
         List<IRInst*> workList;
 
         // Collect all instructions that need processing (similar to eliminateAddressInstsImpl)
@@ -156,9 +156,9 @@ struct StructParamToConstRefContext
                     inst->getOp() == kIROp_FieldExtract || inst->getOp() == kIROp_GetElement)
                 {
                     auto rootAddr = getRootAddr(inst);
-                    if (auto param = as<IRParam>(rootAddr))
+                    if (auto rootParam = as<IRParam>(rootAddr))
                     {
-                        if (paramMap.containsKey(param))
+                        if (paramMap.containsKey(rootParam))
                         {
                             workList.add(inst);
                         }
