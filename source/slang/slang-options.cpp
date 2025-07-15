@@ -831,7 +831,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DumpIntermediatePrefix,
          "-dump-intermediate-prefix",
          "-dump-intermediate-prefix <prefix>",
-         "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'"},
+         "File name prefix for -dump-intermediates outputs, default is no prefix"},
         {OptionKind::DumpIntermediates,
          "-dump-intermediates",
          nullptr,
