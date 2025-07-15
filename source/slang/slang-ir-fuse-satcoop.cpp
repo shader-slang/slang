@@ -475,7 +475,12 @@ IRCall* isKnownFunction(const char* n, IRInst* i)
         return nullptr;
 
     auto h = inner->findDecoration<IRKnownBuiltinDecoration>();
-    if (!h || h->getName() != n)
+    if (!h)
+        return nullptr;
+
+    // Convert string to enum for comparison
+    auto expectedEnum = getKnownBuiltinDeclNameFromString(UnownedStringSlice(n));
+    if (h->getName() != expectedEnum)
         return nullptr;
     return call;
 }
