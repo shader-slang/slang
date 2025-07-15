@@ -106,17 +106,17 @@ struct FlatInstTable
     // These are the same length, the number of instructions in the module
     // The instAllocInfo list is all that's necessary to allocate an instruction
     FIDDLE() List<InstAllocInfo> instAllocInfo;
-    FIDDLE() List<Index> childCounts;
+    FIDDLE() List<Int64> childCounts;
     FIDDLE() List<SourceLoc> sourceLocs;
 
     // The length of operandIndices is the number of instructions in the module
     // (for typeUse) + the number of operands in the module
     //
     // a nullptr operand is encoded as -1
-    FIDDLE() List<Index> operandIndices;
+    FIDDLE() List<Int64> operandIndices;
 
     // The length is equal to the number of strings and blobs in the module
-    FIDDLE() List<Index> stringLengths;
+    FIDDLE() List<Int64> stringLengths;
 
     // The length is the sum of all stringLengths, the contents is the
     // concatenation of all their data
@@ -333,7 +333,7 @@ void serializeObject(S const& serializer, IRModule*& value, IRModule*)
 static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleInst* moduleInst)
 {
     FlatInstTable flat;
-    Dictionary<IRInst*, Index> instMap;
+    Dictionary<IRInst*, Int64> instMap;
     instMap.add(nullptr, -1);
     List<IRInst*> insts;
 
@@ -425,7 +425,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
 #endif
 
-    Index stringLengthIndex = 0;
+    Int64 stringLengthIndex = 0;
     List<IRInst*> instsList;
 
 #if DIRECT_FROM_FOSSIL
@@ -440,7 +440,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRInst** const insts = &instsList[1];
     insts[-1] = nullptr;
 
-    for (Index instIndex = 0; instIndex < numInsts; ++instIndex)
+    for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
         IROp op = getStableNameOpcode(a.op);
@@ -474,11 +474,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
-    Index litIndex = 0;
-    Index operandIndex = 0;
-    Index instIndex = 0;
+    Int64 litIndex = 0;
+    Int64 operandIndex = 0;
+    Int64 instIndex = 0;
     stringLengthIndex = 0;
-    Index stringDataIndex = 0;
+    Int64 stringDataIndex = 0;
     const auto go = [&](auto& go, IRInst* parent) -> IRInst*
     {
         const auto thisInstIndex = instIndex++;
@@ -487,7 +487,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // operands and sourcelocs
         inst->sourceLoc = sourceLocs[thisInstIndex];
         inst->typeUse.init(inst, insts[flat.operandIndices[operandIndex++]]);
-        for (Index o = 0; o < inst->operandCount; ++o)
+        for (Int64 o = 0; o < inst->operandCount; ++o)
             inst->getOperands()[o].init(inst, insts[flat.operandIndices[operandIndex++]]);
 
         // Handle special instructions
@@ -524,7 +524,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         IRInst* prev = nullptr;
         IRInst* first = nullptr;
         IRInst* last = nullptr;
-        for (Index i = 0; i < flat.childCounts[thisInstIndex]; ++i)
+        for (Int64 i = 0; i < flat.childCounts[thisInstIndex]; ++i)
         {
             auto c = go(go, inst);
             if (i == 0)
