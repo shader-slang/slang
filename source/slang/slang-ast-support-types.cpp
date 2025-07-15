@@ -96,28 +96,4 @@ void printDiagnosticArg(StringBuilder& sb, ParameterDirection direction)
     }
 }
 
-KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
-{
-    if (name == "GeometryStreamAppend")
-        return KnownBuiltinDeclName::GeometryStreamAppend;
-    else if (name == "GeometryStreamRestart")
-        return KnownBuiltinDeclName::GeometryStreamRestart;
-    else if (name == "GetAttributeAtVertex")
-        return KnownBuiltinDeclName::GetAttributeAtVertex;
-    else if (name == "DispatchMesh")
-        return KnownBuiltinDeclName::DispatchMesh;
-    else if (name == "saturated_cooperation")
-        return KnownBuiltinDeclName::saturated_cooperation;
-    else if (name == "saturated_cooperation_using")
-        return KnownBuiltinDeclName::saturated_cooperation_using;
-    else if (name == "IDifferentiable")
-        return KnownBuiltinDeclName::IDifferentiable;
-    else if (name == "IDifferentiablePtr")
-        return KnownBuiltinDeclName::IDifferentiablePtr;
-    else if (name == "NullDifferential")
-        return KnownBuiltinDeclName::NullDifferential;
-    else
-        return KnownBuiltinDeclName::COUNT;
-}
-
 } // namespace Slang

@@ -2960,11 +2960,19 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (funcDeclRef)
                                 {
                                     auto knownBuiltinAttr = funcDeclRef.getDecl()->findModifier<KnownBuiltinAttribute>();
-                                    if (knownBuiltinAttr && knownBuiltinAttr->name == "OperatorAddressOf")
+                                    if (knownBuiltinAttr)
                                     {
-                                        getSink()->diagnose(
-                                            argExpr,
-                                            Diagnostics::cannotTakeConstantPointers);
+                                        if (auto constantIntVal =
+                                                as<ConstantIntVal>(knownBuiltinAttr->name))
+                                        {
+                                            if (constantIntVal->getValue() ==
+                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
+                                            {
+                                                getSink()->diagnose(
+                                                    argExpr,
+                                                    Diagnostics::cannotTakeConstantPointers);
+                                            }
+                                        }
                                     }
                                 }
 
