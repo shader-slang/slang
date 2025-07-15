@@ -172,13 +172,6 @@ struct Fossilized_IRModule;
 
 SLANG_DECLARE_FOSSILIZED_TYPE(IRModule, Fossilized_IRModule);
 
-struct Fossilized_IRModule : public FossilizedRecordVal
-{
-    Fossilized<decltype(IRModule::m_moduleInst)> m_moduleInst;
-    Fossilized<String> m_name;
-    Fossilized<decltype(IRModule::m_version)> m_version;
-};
-
 // IROps are serialized as integers, and given a stable name
 SLANG_DECLARE_FOSSILIZED_AS(IROp, FossilUInt);
 
@@ -301,6 +294,12 @@ void serialize(S const& serializer, $T& value)
 #include "slang-serialize-ir.cpp.fiddle"
 #endif // FIDDLE END
 
+struct Fossilized_IRModule : public FossilizedRecordVal
+{
+    Fossilized<String> m_name;
+    Fossilized<decltype(IRModule::m_version)> m_version;
+    Fossilized<FlatInstTable> m_moduleInst;
+};
 
 ////
 //
