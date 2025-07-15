@@ -235,6 +235,14 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
                 decl->getName());
 
+        // Static specialization constants are not allowed
+        if (hasStatic && hasSpecializationConstant)
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::pushOrSpecializationConstantCannotBeStatic);
+        }
+
         // Global const or uniform variables with initializers must be static
         // In HLSL, const global variables without static are uniform parameters
         // that cannot have default values
