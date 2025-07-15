@@ -9338,17 +9338,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
 
-                // Remove linkage decorations from the requirement value to prevent
-                // duplicate mangled names and allow DCE to clean up unused functions.
-                // Interface requirements only need the type information, not the linkage.
-                if (auto func = as<IRGlobalValueWithCode>(requirementVal))
-                {
-                    removeLinkageDecorations(func);
-                }
-
                 switch (requirementVal->getOp())
                 {
                 default:
+                    // Remove linkage decorations from the requirement value to prevent
+                    // duplicate mangled names and allow DCE to clean up unused functions.
+                    // Interface requirements only need the type information, not the linkage.
+                    if (auto func = as<IRGlobalValueWithCode>(requirementVal))
+                    {
+                        removeLinkageDecorations(func);
+                    }
+
                     // For the majority of requirements, we only care about its type in an
                     // interface definition, so we store only the type from the lowered IR
                     // in the interface entry.
