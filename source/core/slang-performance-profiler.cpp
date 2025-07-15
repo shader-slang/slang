@@ -35,12 +35,9 @@ public:
         char buffer[512];
         for (const auto& func : data)
         {
-            // Convert to microseconds for better precision
             auto microseconds =
                 std::chrono::duration_cast<std::chrono::microseconds>(func.value.duration);
             double milliseconds = microseconds.count() / 1000.0;
-
-            // Single snprintf with right-justified time
             snprintf(
                 buffer,
                 sizeof(buffer),

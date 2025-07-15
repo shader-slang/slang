@@ -29,7 +29,7 @@ end
 local leafInst = function(name, args)
 	args = args or {}
 	return args.noIsaImpl and ""
-		or [[static bool isaImpl(IROp op)
+			or [[static bool isaImpl(IROp op)
     {
         return (kIROpMask_OpMask & op) == kIROp_]]
 			.. name
@@ -44,7 +44,7 @@ end
 local baseInst = function(name, args)
 	args = args or {}
 	return args.noIsaImpl and ""
-		or [[static bool isaImpl(IROp opIn)
+			or [[static bool isaImpl(IROp opIn)
     {
         const int op = (kIROpMask_OpMask & opIn);
         return op >= kIROp_First]]
@@ -126,14 +126,14 @@ local function instInfoEntries()
 		if value.is_leaf then
 			RAW(
 				"{kIROp_"
-					.. struct_name
-					.. ', {"'
-					.. value.mnemonic
-					.. '", '
-					.. tostring(value.min_operands)
-					.. ", "
-					.. constructFlags(value)
-					.. "}},"
+				.. struct_name
+				.. ', {"'
+				.. value.mnemonic
+				.. '", '
+				.. tostring(value.min_operands)
+				.. ", "
+				.. constructFlags(value)
+				.. "}},"
 			)
 		end
 	end)
