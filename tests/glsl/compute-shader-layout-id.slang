@@ -2,7 +2,7 @@
 #version 450
 
 [vk::constant_id(1)]
-static const int constValue1 = 0;
+const int constValue1 = 0;
 
 [vk::constant_id(2)]
 static const int constValue3 = 5;
