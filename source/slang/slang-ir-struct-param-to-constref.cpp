@@ -57,35 +57,6 @@ struct StructParamToConstRefContext
         }
     }
 
-    // Check if an address points to immutable memory
-    bool isImmutableMemory(IRInst* addr)
-    {
-        auto rootAddr = getRootAddr(addr);
-        if (!rootAddr)
-            return false;
-
-        // Check if root is constant buffer, StructuredBuffer, or ByteAddressBuffer
-        if (auto globalParam = as<IRGlobalParam>(rootAddr))
-        {
-            auto type = globalParam->getDataType();
-            // Only read-only structured buffers are immutable, not RW buffers
-            if (type->getOp() == kIROp_HLSLStructuredBufferType)
-                return true;
-            if (as<IRUniformParameterGroupType>(type))
-                return true;
-            // Add more buffer types as needed
-        }
-
-        // Check if root is IRParam with ConstRef<T> type
-        if (auto param = as<IRParam>(rootAddr))
-        {
-            if (as<IRConstRefType>(param->getDataType()))
-                return true;
-        }
-
-        return false;
-    }
-
     // Transform a function parameter from struct to ConstRef<struct>
     IRParam* transformParam(IRParam* param)
     {
@@ -102,7 +73,7 @@ struct StructParamToConstRefContext
     }
 
     // Transform use of a ConstRef parameter in field extract
-    void transformFieldExtractUse(IRBuilder& transformBuilder, IRUse* use)
+    void transformFieldExtractUse(IRBuilder& transformBuilder, IRUse* use, List<IRInst*>& workList)
     {
         auto fieldExtract = as<IRFieldExtract>(use->getUser());
         auto param = as<IRParam>(use->get());
@@ -111,13 +82,17 @@ struct StructParamToConstRefContext
         auto fieldAddr = transformBuilder.emitFieldAddress(param, fieldExtract->getField());
         auto loadInst = transformBuilder.emitLoad(fieldAddr);
 
+        // Add newly created instructions to worklist for cascading transformations
+        workList.add(fieldAddr);
+        workList.add(loadInst);
+
         fieldExtract->replaceUsesWith(loadInst);
         fieldExtract->removeAndDeallocate();
         changed = true;
     }
 
     // Transform use of a ConstRef parameter in get element
-    void transformGetElementUse(IRBuilder& transformBuilder, IRUse* use)
+    void transformGetElementUse(IRBuilder& transformBuilder, IRUse* use, List<IRInst*>& workList)
     {
         auto getElement = as<IRGetElement>(use->getUser());
         auto param = as<IRParam>(use->get());
@@ -125,6 +100,10 @@ struct StructParamToConstRefContext
         transformBuilder.setInsertBefore(getElement);
         auto elemAddr = transformBuilder.emitElementAddress(param, getElement->getIndex());
         auto loadInst = transformBuilder.emitLoad(elemAddr);
+
+        // Add newly created instructions to worklist for cascading transformations
+        workList.add(elemAddr);
+        workList.add(loadInst);
 
         getElement->replaceUsesWith(loadInst);
         getElement->removeAndDeallocate();
@@ -149,27 +128,52 @@ struct StructParamToConstRefContext
         changed = true;
     }
 
-    // Update function body using worklist to handle cascading transformations
-    void updateFunctionBody(Dictionary<IRParam*, IRParam*>& paramMap)
+    // Update function body using robust worklist pattern from eliminateAddressInstsImpl
+    void updateFunctionBody(Dictionary<IRParam*, IRParam*>& paramMap, IRFunc* func)
     {
         if (paramMap.getCount() == 0)
             return;
 
+        IRBuilder builder(module);
+        List<IRInst*> workList;
 
-        // Build worklist of all parameters that need processing
-        List<IRParam*> workList;
-        for (auto pair : paramMap)
+        // Collect all instructions that need processing (similar to eliminateAddressInstsImpl)
+        for (auto block : func->getBlocks())
         {
-            workList.add(pair.first);
+            for (auto inst : block->getChildren())
+            {
+                // Add transformed parameters to worklist
+                if (auto param = as<IRParam>(inst))
+                {
+                    if (paramMap.containsKey(param))
+                    {
+                        workList.add(inst);
+                    }
+                }
+                // Add address-based instructions that might operate on transformed parameters
+                else if (
+                    inst->getOp() == kIROp_FieldAddress || inst->getOp() == kIROp_GetElementPtr ||
+                    inst->getOp() == kIROp_FieldExtract || inst->getOp() == kIROp_GetElement)
+                {
+                    auto rootAddr = getRootAddr(inst);
+                    if (auto param = as<IRParam>(rootAddr))
+                    {
+                        if (paramMap.containsKey(param))
+                        {
+                            workList.add(inst);
+                        }
+                    }
+                }
+            }
         }
 
-        // Process worklist using index-based iteration to handle cascading
+        // Process worklist with index-based iteration to handle cascading transformations
         for (Index workListIndex = 0; workListIndex < workList.getCount(); workListIndex++)
         {
-            auto param = workList[workListIndex];
+            auto inst = workList[workListIndex];
 
-            // Process all uses of this parameter with nextUse pattern
-            for (auto use = param->firstUse; use;)
+            // Process all uses of this instruction
+            for (auto use = inst->firstUse; use;)
             {
                 auto nextUse = use->nextUse;
                 auto user = use->getUser();
@@ -187,14 +191,32 @@ struct StructParamToConstRefContext
                 switch (user->getOp())
                 {
                 case kIROp_FieldExtract:
-                    transformFieldExtractUse(transformBuilder, use);
+                    if (auto param = as<IRParam>(use->get()))
+                    {
+                        if (paramMap.containsKey(param))
+                        {
+                            transformFieldExtractUse(transformBuilder, use, workList);
+                        }
+                    }
                     break;
                 case kIROp_GetElement:
-                    transformGetElementUse(transformBuilder, use);
+                    if (auto param = as<IRParam>(use->get()))
+                    {
+                        if (paramMap.containsKey(param))
+                        {
+                            transformGetElementUse(transformBuilder, use, workList);
+                        }
+                    }
                     break;
                 default:
-                    // For all other uses, insert a load
-                    transformDirectUse(transformBuilder, use);
+                    // For direct parameter uses, insert a load
+                    if (auto param = as<IRParam>(use->get()))
+                    {
+                        if (paramMap.containsKey(param))
+                        {
+                            transformDirectUse(transformBuilder, use);
+                        }
+                    }
                     break;
                 }
 
@@ -246,16 +268,8 @@ struct StructParamToConstRefContext
                         // This handles: f(load(addr)) -> f(addr)
                         auto sourceAddr = loadInst->getPtr();
 
-                        // Check if this is from immutable memory (optimization opportunity)
-                        if (isImmutableMemory(sourceAddr))
-                        {
-                            newArgs.add(sourceAddr);
-                        }
-                        else
-                        {
-                            // For mutable memory, we still pass the address
-                            newArgs.add(sourceAddr);
-                        }
+                        // Pass the address directly
+                        newArgs.add(sourceAddr);
                     }
                     else if (as<IRFieldExtract>(arg))
                     {
@@ -386,17 +400,16 @@ struct StructParamToConstRefContext
         }
 
         // Second pass: Update function body using worklist for cascading transformations
-        updateFunctionBody(paramMap);
+        updateFunctionBody(paramMap, func);
 
         // Third pass: Update call sites
         updateCallSites(func, func, paramMap);
     }
 
-    // Process the entire module using worklist approach
+    // Process the entire module using robust worklist approach
     SlangResult processModule()
     {
-
-        // First, collect all functions that need processing (avoid iterator invalidation)
+        // Collect all functions that need processing to avoid iterator invalidation
         List<IRFunc*> functionsToProcess;
 
         for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
@@ -410,8 +423,7 @@ struct StructParamToConstRefContext
             }
         }
 
-
-        // Process each function using worklist approach
+        // Process each function
         for (auto func : functionsToProcess)
         {
             processFunc(func);
