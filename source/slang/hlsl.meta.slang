@@ -20279,7 +20279,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case hlsl: __intrinsic_asm "MakeMiss";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20316,7 +20316,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
+        case hlsl: __intrinsic_asm "MakeMotionMiss";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20357,8 +20357,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            __intrinsic_asm "($0 = NvMakeNop())";
+        case hlsl: __intrinsic_asm "MakeNop";
         case glsl:
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "optixMakeNopHitObject";
@@ -20699,7 +20698,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+        case hlsl: __intrinsic_asm ".GetSpherePositionAndRadius";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
@@ -20724,7 +20723,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+        case hlsl: __intrinsic_asm ".GetLssPositionsAndRadii";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
@@ -20755,7 +20754,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+        case hlsl: __intrinsic_asm ".IsSphereHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
@@ -20777,7 +20776,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtIsLssHit";
+        case hlsl: __intrinsic_asm ".IsLssHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
@@ -20964,7 +20963,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "MakeHitWithRecordIndex";
         }
     }
 
@@ -20983,7 +20982,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl: __intrinsic_asm "MakeHit";
         }
     }
 
@@ -21002,7 +21001,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "TraceRayHitObject";
         }
     }
 
