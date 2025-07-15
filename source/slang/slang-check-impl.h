@@ -2278,7 +2278,7 @@ public:
 
     /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived
     /// from `this`.
-    void maybeDiagnoseThisNotLValue(Expr* expr);
+    void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type

@@ -2663,7 +2663,7 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
-void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
+void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
     //
@@ -2688,15 +2688,11 @@ void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
             break;
         }
     }
-    //
-    // Now we check to see if we have a `this` expression,
-    // and if it is immutable.
-    if (auto thisExpr = as<ThisExpr>(e))
+
+    // Check if we're trying to assign to a non-l-value (const variable, immutable member, etc.)
+    if (!expr->type.isLeftValue)
     {
-        if (!thisExpr->type.isLeftValue)
-        {
-            getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
-        }
+        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::attemptingToAssignToConstVariable);
     }
 }
 
@@ -2722,14 +2718,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         }
         else
         {
-            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+            // Provide a more helpful diagnostic about const variable assignment
+            maybeDiagnoseConstVariableAssignment(expr->left);
 
-            // As a special case, check if the LHS expression is derived
-            // from a `this` parameter (implicitly or explicitly), which
-            // is immutable. We can give the user a bit more context into
-            // what is going on.
-            //
-            maybeDiagnoseThisNotLValue(expr->left);
+            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
         }
     }
     expr->type = type;
@@ -2963,6 +2955,29 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
+                                // Emit additional diagnostic for invalid pointer taking operations
+                                auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+                                if (funcDeclRef)
+                                {
+                                    auto knownBuiltinAttr =
+                                        funcDeclRef.getDecl()
+                                            ->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr)
+                                    {
+                                        if (auto constantIntVal =
+                                                as<ConstantIntVal>(knownBuiltinAttr->name))
+                                        {
+                                            if (constantIntVal->getValue() ==
+                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
+                                            {
+                                                getSink()->diagnose(
+                                                    argExpr,
+                                                    Diagnostics::cannotTakeConstantPointers);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 getSink()->diagnose(
                                     argExpr,
                                     Diagnostics::argumentExpectedLValue,
@@ -3000,7 +3015,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                         implicitCastExpr->type);
                                 }
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                maybeDiagnoseConstVariableAssignment(argExpr);
                             }
                         }
                     }
