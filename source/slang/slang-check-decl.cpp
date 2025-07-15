@@ -239,7 +239,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // In HLSL, const global variables without static are uniform parameters
         // that cannot have default values
         // Exception: specialization constants are allowed to have initializers
-        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic && !hasSpecializationConstant && decl->initExpr)
+        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
+            !hasSpecializationConstant && decl->initExpr)
         {
             getSink()->diagnose(
                 decl,
