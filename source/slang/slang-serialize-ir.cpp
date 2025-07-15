@@ -29,6 +29,16 @@ FIDDLE()
 namespace Slang
 {
 
+template<typename To, typename From>
+    requires(sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<From> &&
+            std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>
+To bitCast(const From& src)
+{
+    To dst;
+    memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
+
 //
 // We wrap everything up in an IRModuleInfo, to prepare for the case in which
 // we want to serialize some sidecar information to help with on-demand loading

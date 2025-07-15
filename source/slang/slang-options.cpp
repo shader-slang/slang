@@ -2049,7 +2049,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         writer->appendDescriptionForCategory(m_cmdOptions, categoryIndex);
     }
 
-    m_sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+    // Write help text to stdout
+    FileWriter stdoutWriter(stdout, WriterFlag::IsUnowned);
+    stdoutWriter.write(buf.getBuffer(), buf.getLength());
 
     return SLANG_OK;
 }
