@@ -1,5 +1,5 @@
 ---
-name: Bug report
+name: Compiler Bug
 about: Report a bug or unexpected behavior of the Slang compiler / API.
 title: ''
 labels: ''
@@ -9,6 +9,7 @@ assignees: ''
 
 **Issue Description**
 A clear and concise description of what the bug is.
+Before filing the issue, please make sure the bug can be reproduced with the latest release of Slang.
 
 **Reproducer Code**
 If the issue can be reproduced with a simple code, include the **self-contained** Slang code along with a `slangc` commandline invocation, or the C++ code that calls the Slang API to compile the code.
