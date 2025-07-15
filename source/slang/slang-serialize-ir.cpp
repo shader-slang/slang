@@ -380,7 +380,8 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
                 flat.literals.add(bitCast<UInt64>(c->value.floatVal));
                 break;
             case kIROp_PtrLit:
-                flat.literals.add(bitCast<UInt64>(c->value.ptrVal));
+                // to avoid complaints on 32 bit wasm
+                flat.literals.add(UInt64(bitCast<uintptr_t>(c->value.ptrVal)));
                 break;
             case kIROp_StringLit:
             case kIROp_BlobLit:
@@ -504,7 +505,8 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
             break;
         case kIROp_PtrLit:
-            cast<IRConstant>(inst)->value.ptrVal = bitCast<void*>(flat.literals[litIndex++]);
+            // Keep the compiler happy on 32 bit builds
+            cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(flat.literals[litIndex++]));
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
