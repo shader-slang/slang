@@ -3,7 +3,6 @@
 
 #include "core/slang-blob-builder.h"
 #include "core/slang-dictionary.h"
-#include "core/slang-performance-profiler.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
@@ -408,8 +407,6 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 
 static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRModule* module)
 {
-    SLANG_PROFILE;
-
     IRSerialReadContext& readContext = *serializer.getContext();
 #if DIRECT_FROM_FOSSIL
     const auto flatPtr = as<Fossilized<FlatInstTable>>(serializer.getImpl()->readValPtr());
@@ -583,7 +580,6 @@ void writeSerializedModuleIR(
     IRModule* irModule,
     SerialSourceLocWriter* sourceLocWriter)
 {
-    SLANG_PROFILE;
     // The flow here is very similar to writeSerializedModuleAST which is very
     // well documented.
 
@@ -655,8 +651,6 @@ Result readSerializedModuleInfo(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
-    SLANG_PROFILE;
-
 #if USE_RIFF
     auto dataChunk = as<RIFF::ListChunk>(chunk);
     if (!dataChunk)
@@ -719,8 +713,6 @@ Result readSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
-    SLANG_PROFILE;
-
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
 
     //
