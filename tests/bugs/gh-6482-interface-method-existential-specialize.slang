@@ -77,8 +77,8 @@ namespace integrator {
 
 [[vk::binding(0, 0)]] RWTexture2D<float4> output;
 
-[vk::constant_id(0)] static const int WGS_X = 1;
-[vk::constant_id(1)] static const int WGS_Y = 1;
+[vk::constant_id(0)] const int WGS_X = 1;
+[vk::constant_id(1)] const int WGS_Y = 1;
 [shader("compute"), numthreads(WGS_X, WGS_Y, 1)]
 void main(
     uint3 id : SV_DispatchThreadID
