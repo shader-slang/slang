@@ -585,7 +585,6 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
 
     IRModuleInst* moduleInst = module->getModuleInst();
 
-    // Use the traversal function to visit all instructions
     traverseInstsInSerializationOrder(moduleInst, [&](IRInst* inst) { instsOut.add(inst); });
 }
 

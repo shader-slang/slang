@@ -104,13 +104,11 @@ struct FlatInstTable
     // a nullptr operand is encoded as -1
     FIDDLE() List<Index> operandIndices;
 
-    // The length is equal to the number of strings in the module
+    // The length is equal to the number of strings and blobs in the module
     FIDDLE() List<Index> stringLengths;
 
     // The length is the sum of all stringLengths
-    // It would probably be more appropriate to use List<char> here, but the
-    // serializer doesn't support chars at the moment
-    FIDDLE() String stringChars;
+    FIDDLE() List<uint8_t> stringChars;
 
     // The number of integer/floating constants in the module
     FIDDLE() List<UInt64> literals;
@@ -327,7 +325,6 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
     instMap.add(nullptr, -1);
     List<IRInst*> insts;
 
-    // First pass: traverse and build the instruction list
     traverseInstsInSerializationOrder(
         moduleInst,
         [&](IRInst* inst)
@@ -335,14 +332,13 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
             const auto thisInstIndex = flat.instAllocInfo.getCount();
             instMap.add(inst, thisInstIndex);
             insts.add(inst);
-            inst->scratchData = thisInstIndex; // Store index for child counting
-
             flat.instAllocInfo.add(InstAllocInfo{
                 .op = inst->m_op,
                 .operandCount = inst->operandCount,
             });
             flat.childCounts.add(0);
             flat.sourceLocs.add(inst->sourceLoc);
+            inst->scratchData = thisInstIndex; // Store index for child counting
 
             // Update parent's child count
             if (inst->parent)
@@ -351,7 +347,6 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
             }
         });
 
-    // Second pass: fill in operands and literals
     for (const auto inst : insts)
     {
         flat.operandIndices.add(instMap.getValue(inst->typeUse.get()));
@@ -380,7 +375,7 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
                 const auto slice = c->getStringSlice();
                 const auto len = slice.getLength();
                 flat.stringLengths.add(len);
-                flat.stringChars.append(slice.begin(), len);
+                flat.stringChars.addRange(reinterpret_cast<const uint8_t*>(slice.begin()), len);
                 break;
             }
         }
@@ -509,7 +504,7 @@ static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRMo
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
 #if DIRECT_FROM_FOSSIL
-            memcpy(dstChars, flat.stringChars.get().begin() + stringDataIndex, len);
+            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
 #else
             memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
 #endif
