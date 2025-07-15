@@ -15,6 +15,8 @@
 
 #if defined(_WIN32)
 #include <d3d12.h>
+#include <windows.h>
+#pragma comment(lib, "advapi32")
 #endif
 
 #include <slang-rhi.h>
@@ -28,6 +30,40 @@
 #include "external/renderdoc_app.h"
 
 #include <windows.h>
+#endif
+
+#if defined(_WIN32)
+// Check if Windows Developer mode is enabled
+// Developer mode is required for D3D12 experimental features
+static bool isWindowsDeveloperModeEnabled()
+{
+    HKEY key;
+    LONG ret = RegOpenKeyExA(
+        HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+        0,
+        KEY_READ | KEY_WOW64_32KEY,
+        &key);
+    
+    if (ret != ERROR_SUCCESS)
+    {
+        return false;
+    }
+
+    DWORD value = 0;
+    DWORD size = sizeof(DWORD);
+    DWORD type = REG_DWORD;
+
+    ret = RegQueryValueExA(key, "AllowDevelopmentWithoutDevLicense", nullptr, &type, (LPBYTE)&value, &size);
+    RegCloseKey(key);
+
+    if (ret != ERROR_SUCCESS || type != REG_DWORD)
+    {
+        return false;
+    }
+
+    return value == 1;
+}
 #endif
 
 namespace renderer_test
@@ -1426,7 +1462,21 @@ static SlangResult _innerMain(
         experimentalFD.configurationStructSizes = nullptr;
 
         if (options.dx12Experimental)
+        {
+            // Check if Windows Developer mode is enabled
+            if (!isWindowsDeveloperModeEnabled())
+            {
+                fprintf(stderr, "ERROR: D3D12 experimental features require Windows Developer mode to be enabled.\n");
+                fprintf(stderr, "To enable Developer mode:\n");
+                fprintf(stderr, "1. Open Windows Settings (Windows key + I)\n");
+                fprintf(stderr, "2. Go to 'Privacy & Security' or 'Update & Security'\n");
+                fprintf(stderr, "3. Select 'For developers'\n");
+                fprintf(stderr, "4. Turn on 'Developer Mode'\n");
+                fprintf(stderr, "5. Restart the application\n");
+                return SLANG_E_NOT_AVAILABLE;
+            }
             desc.next = &experimentalFD;
+        }
 #endif
 
         // Look for args going to slang
