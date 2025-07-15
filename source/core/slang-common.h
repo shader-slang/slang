@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <cstddef>
 #include <stdint.h>
+#include <type_traits>
 
 #define VARIADIC_TEMPLATE
 
@@ -167,6 +168,16 @@ typedef uint16_t Char16;
 
 // Can always hold a unicode code point.
 typedef uint32_t Char32;
+
+template<typename To, typename From>
+    requires(sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<From> &&
+            std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>
+To bitCast(const From& src)
+{
+    To dst;
+    memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
 
 template<typename T>
 inline T&& _Move(T& obj)

@@ -411,13 +411,13 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
                 {
                 case kIROp_BoolLit:
                 case kIROp_IntLit:
-                    flat.literals.add(std::bit_cast<UInt64>(c->value.intVal));
+                    flat.literals.add(bitCast<UInt64>(c->value.intVal));
                     break;
                 case kIROp_FloatLit:
-                    flat.literals.add(std::bit_cast<UInt64>(c->value.floatVal));
+                    flat.literals.add(bitCast<UInt64>(c->value.floatVal));
                     break;
                 case kIROp_PtrLit:
-                    flat.literals.add(std::bit_cast<UInt64>(c->value.ptrVal));
+                    flat.literals.add(bitCast<UInt64>(c->value.ptrVal));
                     break;
                 case kIROp_StringLit:
                 case kIROp_BlobLit:
@@ -538,14 +538,13 @@ static IRModuleInst* flatModuleToModule(const IRReadSerializer& serializer, IRMo
         case kIROp_BoolLit:
         case kIROp_IntLit:
             cast<IRConstant>(inst)->value.intVal =
-                std::bit_cast<IRIntegerValue>(flat.literals[litIndex++]);
+                bitCast<IRIntegerValue>(flat.literals[litIndex++]);
             break;
         case kIROp_FloatLit:
-            cast<IRConstant>(inst)->value.floatVal =
-                std::bit_cast<double>(flat.literals[litIndex++]);
+            cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
             break;
         case kIROp_PtrLit:
-            cast<IRConstant>(inst)->value.ptrVal = std::bit_cast<void*>(flat.literals[litIndex++]);
+            cast<IRConstant>(inst)->value.ptrVal = bitCast<void*>(flat.literals[litIndex++]);
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
