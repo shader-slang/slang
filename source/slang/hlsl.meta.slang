@@ -20373,18 +20373,6 @@ struct HitObject
         }
     }
 
-    [require(hlsl, ser)]
-    __generic<payload_t>
-    static void __InvokeHLSL(
-        HitObject HitOrMiss,
-        inout payload_t Payload)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "NvInvokeHitObject";
-        }
-    }
-
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
     [__requiresNVAPI]
@@ -20396,10 +20384,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            __InvokeHLSL(
-                HitOrMiss,
-                __forceVarIntoRayPayloadStructTemporarily(Payload));
+        case hlsl: __intrinsic_asm ".Invoke";
         case glsl:
             {
                 [__vulkanRayPayload]
@@ -20922,12 +20907,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            {
-                attr_t v;
-                __hlslGetAttributesFromHitObject(v);
-                return v;
-            }
+        case hlsl: __intrinsic_asm ".GetAttributes";
         case glsl:
             {
                 // Work out the location
@@ -20968,16 +20948,6 @@ struct HitObject
     /// 
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     /// 
-
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
-    void __hlslGetAttributesFromHitObject<T>(out T t)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
-        }
-    }
 
     [__requiresNVAPI]
     [require(hlsl, ser_raygen_closesthit_miss)]
