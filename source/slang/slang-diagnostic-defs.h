@@ -700,7 +700,11 @@ DIAGNOSTIC(
     Error,
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(30078, Error, cannotTakeConstantPointers, "Not allowed to take pointer of an immutable object")
+DIAGNOSTIC(
+    30078,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
 DIAGNOSTIC(
     30048,
     Error,
