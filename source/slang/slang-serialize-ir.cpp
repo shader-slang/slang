@@ -2,6 +2,7 @@
 #include "slang-serialize-ir.h"
 
 #include "core/slang-blob-builder.h"
+#include "core/slang-common.h"
 #include "core/slang-dictionary.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
@@ -22,7 +23,7 @@
 // If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
 // we unflatten directly from the fossilized representation rather than
 // deserializing everything first. It is the fastest option
-#define DIRECT_FROM_FOSSIL 1
+#define DIRECT_FROM_FOSSIL SLANG_64BIT
 
 FIDDLE()
 namespace Slang
@@ -126,6 +127,150 @@ struct FlatInstTable
     // the contents are the bits of those constants
     FIDDLE() List<UInt64> literals;
 };
+
+// For debugging
+[[maybe_unused]] static void dumpFlatInstTableStats(
+    const FlatInstTable& table,
+    const char* label = nullptr)
+{
+    if (label)
+    {
+        fprintf(stderr, "=== FlatInstTable Stats: %s ===\n", label);
+    }
+    else
+    {
+        fprintf(stderr, "=== FlatInstTable Stats ===\n");
+    }
+
+    // Basic instruction counts
+    auto instCount = table.instAllocInfo.getCount();
+    fprintf(stderr, "Instruction count: %zu\n", (size_t)instCount);
+
+    // Verify consistency
+    if (table.childCounts.getCount() != instCount)
+    {
+        fprintf(
+            stderr,
+            "WARNING: childCounts size (%zu) != instruction count (%zu)\n",
+            (size_t)table.childCounts.getCount(),
+            (size_t)instCount);
+    }
+    if (table.sourceLocs.getCount() != instCount)
+    {
+        fprintf(
+            stderr,
+            "WARNING: sourceLocs size (%zu) != instruction count (%zu)\n",
+            (size_t)table.sourceLocs.getCount(),
+            (size_t)instCount);
+    }
+
+    // Count string/blob instructions
+    Int64 stringBlobInstCount = 0;
+    for (const auto& allocInfo : table.instAllocInfo)
+    {
+        const IROp op = allocInfo.op;
+        if (op == kIROp_StringLit || op == kIROp_BlobLit)
+        {
+            stringBlobInstCount++;
+        }
+    }
+
+    fprintf(stderr, "String/blob instruction count: %zu\n", (size_t)stringBlobInstCount);
+    fprintf(stderr, "stringLengths array size: %zu\n", (size_t)table.stringLengths.getCount());
+
+    // Verify string/blob consistency
+    if (stringBlobInstCount != table.stringLengths.getCount())
+    {
+        fprintf(
+            stderr,
+            "ERROR: String/blob instruction count (%zu) != stringLengths size (%zu)\n",
+            (size_t)stringBlobInstCount,
+            (size_t)table.stringLengths.getCount());
+    }
+
+    // Verify string data consistency
+    Int64 expectedStringDataSize = 0;
+    for (auto len : table.stringLengths)
+    {
+        expectedStringDataSize += len;
+    }
+
+    fprintf(stderr, "Expected string data size: %zu bytes\n", (size_t)expectedStringDataSize);
+    fprintf(stderr, "Actual stringChars size: %zu bytes\n", (size_t)table.stringChars.getCount());
+
+    if (expectedStringDataSize != table.stringChars.getCount())
+    {
+        fprintf(
+            stderr,
+            "ERROR: Expected string data size (%zu) != actual stringChars size (%zu)\n",
+            (size_t)expectedStringDataSize,
+            (size_t)table.stringChars.getCount());
+    }
+
+    // Operand statistics
+    auto operandCount = table.operandIndices.getCount() - instCount;
+    fprintf(stderr, "Total operands: %zu\n", (size_t)operandCount);
+    if (instCount > 0)
+    {
+        fprintf(
+            stderr,
+            "Average operands per instruction: %.2f\n",
+            (double)operandCount / instCount);
+    }
+
+    // Count null operands
+    Int64 nullOperandCount = 0;
+    for (auto idx : table.operandIndices)
+    {
+        if (idx == -1)
+            nullOperandCount++;
+    }
+    fprintf(
+        stderr,
+        "Null operands: %zu (%.1f%%)\n",
+        (size_t)nullOperandCount,
+        table.operandIndices.getCount() > 0
+            ? 100.0 * nullOperandCount / table.operandIndices.getCount()
+            : 0.0);
+
+    // String/blob statistics
+    if (table.stringLengths.getCount() > 0)
+    {
+        Int64 maxLength = 0;
+        for (auto len : table.stringLengths)
+        {
+            if (len > maxLength)
+                maxLength = len;
+        }
+        fprintf(
+            stderr,
+            "Average string length: %.1f bytes\n",
+            (double)expectedStringDataSize / table.stringLengths.getCount());
+        fprintf(stderr, "Max string length: %zu bytes\n", (size_t)maxLength);
+    }
+
+    // Literal constants
+    fprintf(stderr, "Literal constants: %zu\n", (size_t)table.literals.getCount());
+
+    // Memory usage estimation
+    size_t totalMemory = 0;
+    totalMemory += table.instAllocInfo.getCount() * sizeof(InstAllocInfo);
+    totalMemory += table.childCounts.getCount() * sizeof(Int64);
+    totalMemory += table.sourceLocs.getCount() * sizeof(SourceLoc);
+    totalMemory += table.operandIndices.getCount() * sizeof(Int64);
+    totalMemory += table.stringLengths.getCount() * sizeof(Int64);
+    totalMemory += table.stringChars.getCount() * sizeof(uint8_t);
+    totalMemory += table.literals.getCount() * sizeof(UInt64);
+
+    fprintf(
+        stderr,
+        "Estimated memory usage: %zu bytes (%.2f MB)\n",
+        totalMemory,
+        totalMemory / (1024.0 * 1024.0));
+
+    fprintf(stderr, "===========================\n");
+}
+
 
 //
 // We need some small amount of additional context to serialize IR Modules, keep track of that here
@@ -393,6 +538,7 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
             }
         }
     }
+    // dumpFlatInstTableStats(flat, "serializing");
     serialize(serializer, flat);
 }
 
@@ -423,6 +569,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     FlatInstTable flat;
     serialize(serializer, flat);
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
+    // dumpFlatInstTableStats(flat, "deserializing");
 #endif
 
     Int64 stringLengthIndex = 0;
@@ -443,7 +590,13 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
+        // The opcode is serialized as the stable name, so if we're reading
+        // directly we need to destabilize that
+#if DIRECT_FROM_FOSSIL
         IROp op = getStableNameOpcode(a.op);
+#else
+        IROp op = a.op;
+#endif
         if (op == kIROp_Invalid) [[unlikely]]
         {
             readContext._foundUnrecognizedInstructions = true;
