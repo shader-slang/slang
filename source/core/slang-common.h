@@ -5,6 +5,7 @@
 
 #include <assert.h>
 #include <cstddef>
+#include <cstring>
 #include <stdint.h>
 #include <type_traits>
 

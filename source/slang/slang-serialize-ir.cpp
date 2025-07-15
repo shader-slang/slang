@@ -326,12 +326,17 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
     Dictionary<IRInst*, Index> instMap;
     instMap.add(nullptr, -1);
     List<IRInst*> insts;
-    {
-        const auto go = [&](auto& go, IRInst* inst) -> void
+
+    // First pass: traverse and build the instruction list
+    traverseInstsInSerializationOrder(
+        moduleInst,
+        [&](IRInst* inst)
         {
             const auto thisInstIndex = flat.instAllocInfo.getCount();
             instMap.add(inst, thisInstIndex);
             insts.add(inst);
+            inst->scratchData = thisInstIndex; // Store index for child counting
+
             flat.instAllocInfo.add(InstAllocInfo{
                 .op = inst->m_op,
                 .operandCount = inst->operandCount,
@@ -339,98 +344,49 @@ static void moduleToFlatModule(IRModuleInst* moduleInst, FlatInstTable& flat)
             flat.childCounts.add(0);
             flat.sourceLocs.add(inst->sourceLoc);
 
-            //
-            // Process the children
-            //
-            // To make things slightly easier for the branch predictor, if this
-            // is the top level instruction move all the special case
-            // instructions (bool/int/float literals and string literals)
-            // to the end. It is semantically the same, but it means that
-            // the control flow when reading will be easier to predict.
-            //
-            if (inst == moduleInst) [[unlikely]]
+            // Update parent's child count
+            if (inst->parent)
             {
-                List<IRInst*> lits;
-                List<IRInst*> strings;
-                for (const auto c : inst->m_decorationsAndChildren)
-                {
-                    flat.childCounts[thisInstIndex]++;
+                flat.childCounts[inst->parent->scratchData]++;
+            }
+        });
 
-                    if (c->m_op == kIROp_BoolLit || c->m_op == kIROp_IntLit ||
-                        c->m_op == kIROp_FloatLit || c->m_op == kIROp_PtrLit ||
-                        c->m_op == kIROp_VoidLit)
-                    {
-                        lits.add(c);
-                    }
-                    else if (c->m_op == kIROp_StringLit || c->m_op == kIROp_BlobLit)
-                    {
-                        strings.add(c);
-                    }
-                    else
-                    {
-                        go(go, c);
-                    }
-                }
-                for (const auto c : lits)
-                {
-                    go(go, c);
-                }
-                for (const auto c : strings)
-                {
-                    go(go, c);
-                }
-            }
-            else
-            {
-                for (const auto c : inst->m_decorationsAndChildren)
-                {
-                    flat.childCounts[thisInstIndex]++;
-                    go(go, c);
-                }
-            }
-        };
-        go(go, moduleInst);
-    }
+    // Second pass: fill in operands and literals
+    for (const auto inst : insts)
     {
-        //
-        // Go through all the instructions we serialized and fill
-        // in the rest of the table in order
-        //
-        for (const auto inst : insts)
+        flat.operandIndices.add(instMap.getValue(inst->typeUse.get()));
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
         {
-            flat.operandIndices.add(instMap.getValue(inst->typeUse.get()));
-            for (UInt i = 0; i < inst->getOperandCount(); ++i)
-            {
-                const auto& operand = inst->getOperand(i);
-                flat.operandIndices.add(instMap.getValue(operand));
-            }
+            const auto& operand = inst->getOperand(i);
+            flat.operandIndices.add(instMap.getValue(operand));
+        }
 
-            if (const auto& c = as<IRConstant>(inst))
+        if (const auto& c = as<IRConstant>(inst))
+        {
+            switch (inst->m_op)
             {
-                switch (inst->m_op)
-                {
-                case kIROp_BoolLit:
-                case kIROp_IntLit:
-                    flat.literals.add(bitCast<UInt64>(c->value.intVal));
-                    break;
-                case kIROp_FloatLit:
-                    flat.literals.add(bitCast<UInt64>(c->value.floatVal));
-                    break;
-                case kIROp_PtrLit:
-                    flat.literals.add(bitCast<UInt64>(c->value.ptrVal));
-                    break;
-                case kIROp_StringLit:
-                case kIROp_BlobLit:
-                    const auto slice = c->getStringSlice();
-                    const auto len = slice.getLength();
-                    flat.stringLengths.add(len);
-                    flat.stringChars.append(slice.begin(), len);
-                    break;
-                }
+            case kIROp_BoolLit:
+            case kIROp_IntLit:
+                flat.literals.add(bitCast<UInt64>(c->value.intVal));
+                break;
+            case kIROp_FloatLit:
+                flat.literals.add(bitCast<UInt64>(c->value.floatVal));
+                break;
+            case kIROp_PtrLit:
+                flat.literals.add(bitCast<UInt64>(c->value.ptrVal));
+                break;
+            case kIROp_StringLit:
+            case kIROp_BlobLit:
+                const auto slice = c->getStringSlice();
+                const auto len = slice.getLength();
+                flat.stringLengths.add(len);
+                flat.stringChars.append(slice.begin(), len);
+                break;
             }
         }
     }
 }
+
 
 template<typename T>
 static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRef r)
@@ -768,6 +724,7 @@ Result readSerializedModuleIR(
     // ready to be used
     //
     outIRModule->buildMangledNameToGlobalInstMap();
+
     return SLANG_OK;
 }
 

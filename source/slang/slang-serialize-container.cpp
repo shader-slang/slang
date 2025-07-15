@@ -583,31 +583,11 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
     instsOut.setCount(1);
     instsOut[0] = nullptr;
 
-    // Stack for parentInst
-    List<IRInst*> parentInstStack;
-
     IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.add(moduleInst);
 
-    // Add to list
-    instsOut.add(moduleInst);
-
-    // Traverse all of the instructions
-    while (parentInstStack.getCount())
-    {
-        // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.getLast();
-        parentInstStack.removeLast();
-
-        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
-        for (IRInst* child : childrenList)
-        {
-            instsOut.add(child);
-            parentInstStack.add(child);
-        }
-    }
+    // Use the traversal function to visit all instructions
+    traverseInstsInSerializationOrder(moduleInst, [&](IRInst* inst) { instsOut.add(inst); });
 }
-
 
 /* static */ SlangResult SerialContainerUtil::verifyIRSerialize(
     IRModule* module,
