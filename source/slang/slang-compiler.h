@@ -3619,7 +3619,7 @@ protected:
     Dictionary<Pair, PassThroughMode> m_map;
 };
 
-class Session : public RefObject, public slang::IGlobalSession
+class GlobalSession : public RefObject, public slang::IGlobalSession
 {
 public:
     SLANG_COM_INTERFACE(
