@@ -3619,7 +3619,7 @@ protected:
     Dictionary<Pair, PassThroughMode> m_map;
 };
 
-class Session : public RefObject, public slang::IGlobalSession
+class GlobalSession : public RefObject, public slang::IGlobalSession
 {
 public:
     SLANG_COM_INTERFACE(
@@ -3915,7 +3915,7 @@ SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
 
 SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
 {
-    Slang::Session* internalSession = nullptr;
+    Slang::GlobalSession* internalSession = nullptr;
     session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
     return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
 }
