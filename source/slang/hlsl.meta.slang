@@ -26742,7 +26742,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27193,7 +27192,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27370,6 +27368,10 @@ CoopVec<T, M> coopVecMatMulPacked(
         int operands = 0; // NoneKHR
         let zero = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27439,9 +27441,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let zero : int32_t = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
         let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }
