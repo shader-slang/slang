@@ -815,15 +815,41 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_ByteAddressBufferStore:
         {
-            // This only works for loads of 4-byte values.
+            // This only works for stores of 4-byte values.
             // Other element types should have been lowered by previous legalization passes.
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
+            auto value = inst->getOperand(inst->getOperandCount() - 1);
+
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
             m_writer->emit(")>>2] = as_type<uint32_t>(");
-            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+
+            // Check if the value is 64-bit and needs to be truncated to avoid
+            // invalid as_type casts between different-sized types in Metal
+            auto valueType = value->getDataType();
+            if (auto basicType = as<IRBasicType>(valueType))
+            {
+                switch (basicType->getBaseType())
+                {
+                case BaseType::Int64:
+                case BaseType::UInt64:
+                    // For 64-bit values, cast to uint32_t first to truncate
+                    m_writer->emit("uint32_t(");
+                    emitOperand(value, getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                    break;
+                default:
+                    emitOperand(value, getInfo(EmitOp::General));
+                    break;
+                }
+            }
+            else
+            {
+                emitOperand(value, getInfo(EmitOp::General));
+            }
+
             m_writer->emit(")");
             return true;
         }
