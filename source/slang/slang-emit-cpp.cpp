@@ -599,7 +599,14 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc)
 
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
-    emitType(type, name);
+    // Call the base class implementation to handle ConstRef types properly
+    // emitType(type, name);
+    Super::emitParamTypeImpl(type, name);
+}
+
+bool CPPSourceEmitter::shouldEmitConstForConstRef()
+{
+    return true; // C++ and CUDA support const pointers
 }
 
 void CPPSourceEmitter::emitGlobalRTTISymbolPrefix()
