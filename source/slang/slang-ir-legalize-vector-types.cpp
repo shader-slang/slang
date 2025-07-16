@@ -6,6 +6,7 @@
 
 namespace Slang
 {
+
 struct VectorTypeLoweringContext
 {
     IRModule* module;

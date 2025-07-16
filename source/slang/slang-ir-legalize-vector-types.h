@@ -2,6 +2,7 @@
 
 namespace Slang
 {
+
 struct IRModule;
 class DiagnosticSink;
 

@@ -64,6 +64,7 @@
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-link.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-loop-unroll.h"
@@ -1333,6 +1334,7 @@ Result linkAndOptimizeIR(
     }
 
     legalizeVectorTypes(irModule, sink);
+    legalizeMatrixTypes(targetProgram, irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

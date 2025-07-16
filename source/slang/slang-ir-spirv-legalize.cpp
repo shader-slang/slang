@@ -2230,7 +2230,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Translate types.
         List<IRHLSLStructuredBufferTypeBase*> buffersToLower;
-        List<IRMatrixType*> matricesToLower;
         List<IRInst*> textureFootprintTypesToLower;
 
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2238,15 +2237,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
                 buffersToLower.add(t);
-            }
-            else if (auto matrixType = as<IRMatrixType>(globalInst))
-            {
-                auto elementType = matrixType->getElementType();
-                if (as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-                    as<IRIntType>(elementType))
-                {
-                    matricesToLower.add(matrixType);
-                }
             }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
@@ -2264,25 +2254,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 kIROp_PtrType,
                 lowered.structType,
                 getStorageBufferAddressSpace()));
-        }
-
-        // Lowering matrices
-        for (auto t : matricesToLower)
-        {
-            auto matrixType = t;
-
-            auto elementType = matrixType->getElementType();
-            auto rowCount = matrixType->getRowCount();
-            auto columnCount = matrixType->getColumnCount();
-
-            IRBuilder array_builder(matrixType);
-            array_builder.setInsertBefore(matrixType);
-            auto vectorType = array_builder.getVectorType(elementType, columnCount);
-            auto arrayType = array_builder.getArrayType(vectorType, rowCount);
-
-            IRBuilder builder(t);
-            builder.setInsertBefore(t);
-            t->replaceUsesWith(arrayType);
         }
 
         // Lowering texture footprints
