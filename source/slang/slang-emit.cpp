@@ -2224,6 +2224,10 @@ SlangResult emitSPIRVFromIR(
 class SpirvInstructionHelper
 {
 public:
+    // The result id of the OpExtInstImport instruction, eg.g %2 below
+    // %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+    uint32_t m_nonSemanticDebugInfoExtSetId = 0;
+
     // The index of the SPIRV words in the blob.
     // The first 5 words are the header as defined by the SPIRV spec.
     enum SpvWordIndex
@@ -2366,6 +2370,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,
         NonSemanticShaderDebugInfo100DebugLocalVariable,
+        NonSemanticShaderDebugInfo100DebugGlobalVariable,
         NonSemanticShaderDebugInfo100DebugInlinedVariable,
         NonSemanticShaderDebugInfo100DebugDeclare,
         NonSemanticShaderDebugInfo100DebugValue,
@@ -2410,6 +2415,15 @@ static SlangResult stripDbgSpirvFromArtifact(
                     return;
                 }
             }
+            else if (inst.getOpCode() == SpvOpExtInstImport)
+            {
+                // looking for result id of "OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+                auto importName = inst.getStringFromInst();
+                if (importName == "NonSemantic.Shader.DebugInfo.100")
+                {
+                    spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId = inst.getOperand(0);
+                }
+            }
         });
 
     // Iterate over the instructions from the artifact and add them to the list
@@ -2430,14 +2444,19 @@ static SlangResult stripDbgSpirvFromArtifact(
                     foundDebugString = true;
                 }
                 if (!foundDebugString)
+                {
                     return;
+                }
             }
             // Also check if the instruction is an extended instruction containing DebugInfo.
             if (inst.getOpCode() == SpvOpExtInst)
             {
-                // Ignore this if the instruction contains DebugInfo.
-                if (debugExtInstNumbers.contains(inst.getOperand(3)))
+                // Ignore this if the instruction contains DebugInfo and is from the debug import
+                if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
+                    inst.getOperand(2) == spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId)
+                {
                     return;
+                }
             }
             // Otherwise this is a non-debug instruction and should be included.
             spirvWordsList.addRange(

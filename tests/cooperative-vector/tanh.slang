@@ -24,5 +24,5 @@ void computeMain()
     CoopVec<float, 4> result = tanh(vec);
 
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

@@ -1739,6 +1739,7 @@ void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 SLANG_API uint32_t _slangIRAllocBreak = 0xFFFFFFFF;
+static bool _slangIRAllocBreakFirst = true;
 uint32_t& _debugGetIRAllocCounter()
 {
     static uint32_t counter = 0;
@@ -1746,6 +1747,12 @@ uint32_t& _debugGetIRAllocCounter()
 }
 uint32_t _debugGetAndIncreaseInstCounter()
 {
+    if (_slangIRAllocBreakFirst)
+    {
+        // You can set a breakpoint here to break on the first allocation
+        _slangIRAllocBreakFirst = false;
+    }
+
     if (_slangIRAllocBreak != 0xFFFFFFFF && _debugGetIRAllocCounter() == _slangIRAllocBreak)
     {
 #if _WIN32 && defined(_MSC_VER)

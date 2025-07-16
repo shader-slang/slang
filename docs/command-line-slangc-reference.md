@@ -618,7 +618,7 @@ Dump the AST to a .slang-ast file next to the input.
 
 **-dump-intermediate-prefix &lt;prefix&gt;**
 
-File name prefix for [-dump-intermediates](#dump-intermediates) outputs, default is 'slang-dump-' 
+File name prefix for [-dump-intermediates](#dump-intermediates) outputs, default is no prefix 
 
 
 <a id="dump-intermediates"></a>

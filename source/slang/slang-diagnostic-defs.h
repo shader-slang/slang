@@ -701,6 +701,11 @@ DIAGNOSTIC(
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(
+    30078,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
+DIAGNOSTIC(
     30048,
     Error,
     argumentHasMoreMemoryQualifiersThanParam,
@@ -709,9 +714,10 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30049,
     Note,
-    thisIsImmutableByDefault,
-    "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` "
-    "attribute to the function declaration to opt in to a mutable `this`")
+    attemptingToAssignToConstVariable,
+    "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on "
+    "the containing method to allow modification")
+
 DIAGNOSTIC(
     30050,
     Error,
@@ -1502,6 +1508,12 @@ DIAGNOSTIC(
     ExternAndExportVarDeclMustBeConst,
     "extern and export variables must be static const: '$0'")
 
+DIAGNOSTIC(
+    31224,
+    Error,
+    constGlobalVarWithInitRequiresStatic,
+    "global const variable with initializer must be declared static: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -1698,6 +1710,11 @@ DIAGNOSTIC(
     Error,
     genericValueParameterMustHaveType,
     "a generic value parameter must be given an explicit type")
+DIAGNOSTIC(
+    30624,
+    Error,
+    genericValueParameterTypeNotSupported,
+    "generic value parameter type '$0' is not supported; only integer and enum types are allowed")
 
 // 307xx: parameters
 DIAGNOSTIC(

@@ -212,22 +212,42 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
         // causing errors.
         bool hasConst = false;
+        bool hasUniform = false;
         bool hasExportOrExtern = false;
         bool hasStatic = false;
+        bool hasSpecializationConstant = false;
         for (auto m : decl->modifiers)
         {
             if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
                 hasExportOrExtern = true;
             else if (as<ConstModifier>(m))
                 hasConst = true;
+            else if (as<HLSLUniformModifier>(m))
+                hasUniform = true;
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
+            else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
+                hasSpecializationConstant = true;
         }
         if (hasExportOrExtern && hasConst != hasStatic)
             getSink()->diagnose(
                 decl,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
                 decl->getName());
+
+
+        // Global const or uniform variables with initializers must be static
+        // In HLSL, const global variables without static are uniform parameters
+        // that cannot have default values
+        // Exception: specialization constants are allowed to have initializers
+        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
+            !hasSpecializationConstant && decl->initExpr)
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::constGlobalVarWithInitRequiresStatic,
+                decl->getName());
+        }
     }
 
     void visitDecl(Decl* decl) { checkModifiers(decl); }
@@ -3413,6 +3433,18 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
 void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDecl* decl)
 {
     checkVarDeclCommon(decl);
+
+    // Validate that the type is supported for generic value parameters
+    if (decl->type.type)
+    {
+        if (!isValidCompileTimeConstantType(decl->type.type))
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::genericValueParameterTypeNotSupported,
+                decl->type.type);
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
@@ -9672,9 +9704,8 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 
     // Sanity check: there should always be a parent declaration.
     //
-    SLANG_ASSERT(parentDecl);
     if (!parentDecl)
-        return;
+        SLANG_ABORT_COMPILATION("decl has no parent.");
 
     // If the declaration is the "inner" declaration of a generic,
     // then we actually want to look one level up, because the

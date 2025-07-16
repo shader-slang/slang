@@ -457,7 +457,7 @@ static IRCall* tryFuseCalls(IRBuilder& builder, IRCall* f, IRCall* g)
 //
 // Identify calls which we can fuse
 //
-IRCall* isKnownFunction(const char* n, IRInst* i)
+IRCall* isKnownFunction(KnownBuiltinDeclName expectedNameEnum, IRInst* i)
 {
     auto call = as<IRCall>(i);
     if (!call)
@@ -475,7 +475,10 @@ IRCall* isKnownFunction(const char* n, IRInst* i)
         return nullptr;
 
     auto h = inner->findDecoration<IRKnownBuiltinDecoration>();
-    if (!h || h->getName() != n)
+    if (!h)
+        return nullptr;
+
+    if (h->getName() != expectedNameEnum)
         return nullptr;
     return call;
 }
@@ -520,7 +523,7 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     List<IRCall*> toInline;
     for (auto inst : block->getChildren())
     {
-        if (auto sat_coop = isKnownFunction("saturated_cooperation", inst))
+        if (auto sat_coop = isKnownFunction(KnownBuiltinDeclName::saturated_cooperation, inst))
             toInline.add(sat_coop);
     }
     for (auto c : toInline)
@@ -536,7 +539,7 @@ static void fuseCallsInBlock(IRBuilder& builder, IRBlock* block)
     for (auto inst = block->getFirstInst(); inst != block->getTerminator();
          inst = inst->getNextInst())
     {
-        if (auto call = isKnownFunction("saturated_cooperation_using", inst))
+        if (auto call = isKnownFunction(KnownBuiltinDeclName::saturated_cooperation_using, inst))
         {
             if (lastCall)
             {

@@ -7348,6 +7348,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isIntegralType(fromType));
         SLANG_ASSERT(isIntegralType(toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         const auto fromInfo = getIntTypeInfo(fromType);
         const auto toInfo = getIntTypeInfo(toType);
@@ -7465,7 +7471,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
-        SLANG_ASSERT(!isTypeEqual(fromType, toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         if (isMatrixCast)
         {
