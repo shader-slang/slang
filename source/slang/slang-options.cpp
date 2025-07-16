@@ -3948,7 +3948,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
-    // Validate that separate debug info is only used with supported targets
+    // Warn about separate debug info being used with unsupported targets
     if (linkage->m_optionSet.getBoolOption(CompilerOptionName::EmitSeparateDebug))
     {
         // Check all targets to see if any use separate debug info with an unsupported target
@@ -3956,7 +3956,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         {
             if (rawTarget.format != CodeGenTarget::SPIRV)
             {
-                // Get the target name for the error message
+                // Get the target name for the warning message
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
                 m_sink->diagnose(
@@ -3971,7 +3971,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         {
             if (m_defaultTarget.format != CodeGenTarget::SPIRV)
             {
-                // Get the target name for the error message
+                // Get the target name for the warning message
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
                 m_sink->diagnose(

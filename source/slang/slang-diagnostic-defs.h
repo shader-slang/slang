@@ -140,7 +140,7 @@ DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
 DIAGNOSTIC(
     18,
-    Error,
+    Warning,
     separateDebugInfoUnsupportedForTarget,
     "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
     "SPIR-V binary targets.")
