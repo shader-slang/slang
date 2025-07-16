@@ -7,7 +7,7 @@
 
 uniform float a;
 
-static const uint4 b = uint4(0,1,2,3);
+const uint4 b = uint4(0,1,2,3);
 
 struct C { float x; int y; };
 C c;
