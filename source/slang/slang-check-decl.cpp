@@ -3413,6 +3413,18 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl*
 void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDecl* decl)
 {
     checkVarDeclCommon(decl);
+
+    // Validate that the type is supported for generic value parameters
+    if (decl->type.type)
+    {
+        if (!isValidCompileTimeConstantType(decl->type.type))
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::genericValueParameterTypeNotSupported,
+                decl->type.type);
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
@@ -9672,9 +9684,8 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 
     // Sanity check: there should always be a parent declaration.
     //
-    SLANG_ASSERT(parentDecl);
     if (!parentDecl)
-        return;
+        SLANG_ABORT_COMPILATION("decl has no parent.");
 
     // If the declaration is the "inner" declaration of a generic,
     // then we actually want to look one level up, because the

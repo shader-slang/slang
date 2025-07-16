@@ -6117,7 +6117,7 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6128,7 +6128,7 @@ struct PointStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6147,7 +6147,7 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6158,7 +6158,7 @@ struct LineStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6177,7 +6177,7 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6188,7 +6188,7 @@ struct TriangleStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -10262,7 +10262,7 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-[KnownBuiltin("GetAttributeAtVertex")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::GetAttributeAtVertex))]
 [__unsafeForceInlineEarly]
 T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
@@ -13113,7 +13113,7 @@ int sign(T x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "i32(sign($0))";
     }
 }
 
@@ -13137,7 +13137,7 @@ vector<int, N> sign(vector<T, N> x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -18298,7 +18298,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 /// and provide the values for per-mesh payload parameters.
 /// @return This function doesn't return.
 /// @category meshshading
-[KnownBuiltin("DispatchMesh")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::DispatchMesh))]
 [require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
@@ -21585,7 +21585,7 @@ uint3 cudaBlockDim()
 // the signature or behavior of this function should be adjusted for there).
 //
 //@hidden:
-[KnownBuiltin("saturated_cooperation")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation))]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -21616,7 +21616,7 @@ func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
 // waveMatch: a function to return a mask of lanes with the same input as this one
 // broadcast: a function which returns the value passed into it on the specified lane
 //
-[KnownBuiltin("saturated_cooperation_using")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation_using))]
 func saturated_cooperation_using<A, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -26748,7 +26748,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27199,7 +27198,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27376,6 +27374,10 @@ CoopVec<T, M> coopVecMatMulPacked(
         int operands = 0; // NoneKHR
         let zero = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27445,9 +27447,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let zero : int32_t = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
         let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

@@ -21,5 +21,5 @@ void computeMain()
     CoopVec<int32_t, 4> negVec = -vec1;
 
     for(int i = 0; i < negVec.getCount(); ++i)
-        outputBuffer[i] = negVec[i];;
+        outputBuffer[i] = negVec[i];
 }

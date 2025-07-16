@@ -16,5 +16,5 @@ void computeMain()
 {
     let result = CoopVec<float, 4>(int(1),half(2),uint(3),double(4));
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

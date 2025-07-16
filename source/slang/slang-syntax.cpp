@@ -912,11 +912,19 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
 {
     List<Type*> paramTypes;
     auto resultType = getResultType(astBuilder, declRef);
+
+    if (!resultType)
+        resultType = astBuilder->getErrorType();
+
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
         auto paramDecl = paramDeclRef.getDecl();
         auto paramType = getParamType(astBuilder, paramDeclRef);
+        if (!paramType)
+        {
+            paramType = astBuilder->getErrorType();
+        }
         if (paramDecl->findModifier<RefModifier>())
         {
             paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);

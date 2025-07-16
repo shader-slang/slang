@@ -31,5 +31,5 @@ void computeMain()
     vec.storeAny(temp);
     let result = CoopVec<uint32_t, 15>.loadAny(temp);
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

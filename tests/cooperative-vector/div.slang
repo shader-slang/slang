@@ -26,5 +26,5 @@ void computeMain()
     CoopVec<int, 4> result = vec1 / vec2;
 
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

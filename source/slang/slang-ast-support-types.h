@@ -221,6 +221,25 @@ FIDDLE() namespace Slang
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
 
+    /// Enum for known built-in function names to replace string-based comparisons
+    enum class KnownBuiltinDeclName : uint32_t
+    {
+        GeometryStreamAppend,
+        GeometryStreamRestart,
+        GetAttributeAtVertex,
+        DispatchMesh,
+        saturated_cooperation,
+        saturated_cooperation_using,
+        IDifferentiable,
+        IDifferentiablePtr,
+        NullDifferential,
+        OperatorAddressOf,
+        COUNT
+    };
+
+    /// Convert string name to KnownBuiltinDeclName enum
+    KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
+
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
     // types directly. The one major complication there
