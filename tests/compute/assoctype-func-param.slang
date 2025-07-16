@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // Test type checking of associatedtype and typedef
 
