@@ -2490,7 +2490,7 @@ private:
     FIDDLE() Name* m_name = nullptr;
 
     // The version of the module as it was loaded
-    FIDDLE() UInt m_version = k_maxSupportedModuleVersion;
+    FIDDLE() UInt64 m_version = k_maxSupportedModuleVersion;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.
