@@ -21,5 +21,5 @@ void computeMain()
     vec[3] = vec[2]+2;
 
     for(int i = 0; i < vec.getCount(); ++i)
-        outputBuffer[i] = vec[i];;
+        outputBuffer[i] = vec[i];
 }

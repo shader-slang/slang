@@ -3578,7 +3578,34 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
+    // Check for GLSL layout qualifiers when GLSL input is allowed
+    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    {
+        auto getLayoutArg = [&](const char* defaultLayout)
+        {
+            if (auto dataLayoutMod =
+                    parser->pendingModifiers->findModifier<GLSLBufferDataLayoutModifier>())
+            {
+                if (as<GLSLStd140Modifier>(dataLayoutMod))
+                    return "Std140DataLayout";
+                else if (as<GLSLStd430Modifier>(dataLayoutMod))
+                    return "Std430DataLayout";
+                else if (as<GLSLScalarModifier>(dataLayoutMod))
+                    return "ScalarDataLayout";
+            }
+            return defaultLayout;
+        };
+
+        String layoutType = getLayoutArg("Std140DataLayout");
+        return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
+    }
+
     return ParseBufferBlockDecl(parser, "ConstantBuffer");
+}
+
+static NodeBase* parseHLSLCBufferDeclWithLayout(Parser* parser, String layoutType)
+{
+    return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
 }
 
 static NodeBase* parseHLSLTBufferDecl(Parser* parser, void* /*userData*/)
@@ -4994,7 +5021,9 @@ static DeclBase* ParseDeclWithModifiers(
 
                     if (as<HLSLUniformModifier>(mod))
                     {
-                        decl = as<Decl>(parseHLSLCBufferDecl(parser, nullptr));
+                        decl = as<Decl>(parseHLSLCBufferDeclWithLayout(
+                            parser,
+                            getLayoutArg("Std140DataLayout")));
                         break;
                     }
                     else

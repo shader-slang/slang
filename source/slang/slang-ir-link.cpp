@@ -705,7 +705,8 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_KnownBuiltinDecoration:
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr"))
+                if (name == KnownBuiltinDeclName::IDifferentiable ||
+                    name == KnownBuiltinDeclName::IDifferentiablePtr)
                     return context->getShared()->useAutodiff;
                 break;
             }

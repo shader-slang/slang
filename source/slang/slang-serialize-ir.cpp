@@ -23,7 +23,7 @@
 // If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
 // we unflatten directly from the fossilized representation rather than
 // deserializing everything first. It is the fastest option
-#define DIRECT_FROM_FOSSIL SLANG_64BIT
+#define DIRECT_FROM_FOSSIL 0
 
 FIDDLE()
 namespace Slang
