@@ -1001,7 +1001,7 @@ void removeLinkageDecorations(IRInst* inst)
 {
     if (!inst)
         return;
-        
+
     List<IRInst*> toRemove;
     for (auto decoration : inst->getDecorations())
     {
