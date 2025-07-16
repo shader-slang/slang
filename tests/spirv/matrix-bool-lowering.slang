@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -emit-spirv-directly
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):in,name inputBuffer
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
@@ -63,6 +63,18 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Test structs with bool matrix fields
     matrixWrapper wrapper = {};
+    
+    // Test any/all operations
+    bool2x2 all_true = bool2x2(trueVal, trueVal, trueVal, trueVal);
+    bool2x2 all_false = bool2x2(falseVal, falseVal, falseVal, falseVal);
+    bool2x2 mixed = bool2x2(trueVal, falseVal, trueVal, falseVal);
+    
+    bool test_all_true = all(all_true);      // all elements true -> true
+    bool test_all_false = all(all_false);    // all elements false -> false
+    bool test_all_mixed = all(mixed);        // some elements false -> false
+    bool test_any_true = any(all_true);      // some elements true -> true
+    bool test_any_false = any(all_false);    // no elements true -> false
+    bool test_any_mixed = any(mixed);        // some elements true -> true
 
     // Store results
     outputBuffer[0] = val1;
@@ -86,5 +98,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[9] = anded;
     // CHECK-NEXT: 0 
     outputBuffer[10] = wrapper.mat1[0][0] || wrapper.mat2[0][0];
+    // CHECK-NEXT: 1
+    outputBuffer[11] = test_all_true;
+    // CHECK-NEXT: 1
+    outputBuffer[12] = test_all_false;
+    // CHECK-NEXT: 0
+    outputBuffer[13] = test_all_mixed;
+    // CHECK-NEXT: 0
+    outputBuffer[14] = test_any_true;
+    // CHECK-NEXT: 1
+    outputBuffer[15] = test_any_false;
+    // CHECK-NEXT: 0
+    outputBuffer[16] = test_any_mixed;
     // CHECK-NEXT: 1
 }
