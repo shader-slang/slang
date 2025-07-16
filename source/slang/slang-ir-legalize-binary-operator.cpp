@@ -248,8 +248,8 @@ void legalizeLogicalAndOr(IRInst* inst)
         else if (auto arrayType = as<IRArrayType>(dataType))
         {
             // Handle lowered matrices (arrays of vectors)
-            auto vecType = as<IRVectorType>(arrayType->getElementType());
-            SLANG_ASSERT(vecType);
+            auto arrayVecType = as<IRVectorType>(arrayType->getElementType());
+            SLANG_ASSERT(arrayVecType);
             
             // At this point, lhs and rhs should already be converted to bool arrays
             auto lhsArrayType = as<IRArrayType>(lhs->getDataType());
