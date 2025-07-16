@@ -3629,7 +3629,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 		case cuda:
             if (isArray != 0)
                 {
-                        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
+     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
                               "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
 
                     if (Shape.flavor == $(SLANG_TEXTURE_2D))
