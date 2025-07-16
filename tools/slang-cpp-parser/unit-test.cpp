@@ -25,13 +25,12 @@ struct TestState
 
         m_sink.init(&m_sourceManager, Lexer::sourceLocationLexer);
 
-        m_namePool.setRootNamePool(&m_rootNamePool);
+        // NamePool no longer needs separate initialization
 
         // We don't require marker
         m_options.m_requireMark = false;
     }
 
-    RootNamePool m_rootNamePool;
     Options m_options;
     SourceManager m_sourceManager;
     DiagnosticSink m_sink;

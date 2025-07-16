@@ -24,12 +24,12 @@ const char* getCstr(Name* name)
 Name* NamePool::getName(UnownedStringSlice text)
 {
     RefPtr<Name> name;
-    if (rootPool->names.tryGetValue(text, name))
+    if (names.tryGetValue(text, name))
         return name;
 
     name = new Name();
     name->text = text;
-    rootPool->names.add(text, name);
+    names.add(text, name);
     return name;
 }
 
@@ -41,7 +41,7 @@ Name* NamePool::getName(String const& text)
 Name* NamePool::tryGetName(String const& text)
 {
     RefPtr<Name> name;
-    if (rootPool->names.tryGetValue(text, name))
+    if (names.tryGetValue(text, name))
         return name;
     return nullptr;
 }
