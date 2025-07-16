@@ -204,12 +204,18 @@ enum
     kNodeReadFlag_AllowEscape = 1 << 0,
 };
 
+template<bool onlyReadFirstOpenChar>
 Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount, char closeChar)
 {
     while (peek(reader) == openChar)
     {
         get(reader);
         openCount++;
+
+        // This case allows parsing `myFunc($((int)val))` correctly, else we parse
+        // body as `int)val`, causing non obvious segfault.
+        if constexpr (onlyReadFirstOpenChar)
+            break;
     }
 
     Node* nodes = nullptr;
@@ -317,7 +323,7 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                     //
                     addTextSpan(link, spanBegin, spanEnd);
 
-                    Node* body = readBody(reader, 0, '(', 0, ')');
+                    Node* body = readBody<true>(reader, 0, '(', 0, ')');
 
                     addSpliceSpan(link, body);
 
@@ -331,7 +337,7 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
 
                     addTextSpan(link, spanBegin, lineBegin);
 
-                    Node* body = readBody(reader, 0, '{', 0, '}');
+                    Node* body = readBody<false>(reader, 0, '{', 0, '}');
 
                     addEscapeSpan(link, body);
 
@@ -419,7 +425,7 @@ Node* readInput(char const* inputBegin, char const* inputEnd)
     reader.cursor = inputBegin;
     reader.end = inputEnd;
 
-    return readBody(reader, kNodeReadFlag_AllowEscape, -2, 0, -2);
+    return readBody<false>(reader, kNodeReadFlag_AllowEscape, -2, 0, -2);
 }
 
 void emitRaw(FILE* stream, char const* begin, char const* end)
