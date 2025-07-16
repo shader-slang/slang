@@ -1474,6 +1474,8 @@ public:
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
+    void ensureOuterGenericConstraints(Decl* decl, DeclCheckState state);
+
     // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
     // expression in `outExpr`. The coercion is only valid if the lambda struct
     // does not contain any captures.
@@ -2276,7 +2278,7 @@ public:
 
     /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived
     /// from `this`.
-    void maybeDiagnoseThisNotLValue(Expr* expr);
+    void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type

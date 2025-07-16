@@ -12,8 +12,9 @@ Detailed build instructions can be found in docs/building.md
 
 ## Formatting
 
+DO THIS BEFORE COMMITING YOUR CHANGES:
+    RUN `./extras/formatting.sh` to format your changes first!!
 Your PR needs to be formatted according to our coding style.
-Run `./extras/formatting.sh` script to format your changes before submitting them.
 
 ## Labeling your PR
 

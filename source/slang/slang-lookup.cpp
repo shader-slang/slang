@@ -959,7 +959,23 @@ static void _lookUpInScopes(
                     }
                 }
 
-                _lookUpMembersInType(astBuilder, name, type, request, result, breadcrumbPtr);
+                // When looking up in an extension declaration, we should not automatically
+                // dereference pointer types, as the 'This' type should refer to the
+                // extension target type itself, not the pointed-to type.
+                LookupRequest modifiedRequest = request;
+                if (aggTypeDeclBaseRef.as<ExtensionDecl>())
+                {
+                    modifiedRequest.options = (LookupOptions)((uint32_t)modifiedRequest.options |
+                                                              (uint32_t)LookupOptions::NoDeref);
+                }
+
+                _lookUpMembersInType(
+                    astBuilder,
+                    name,
+                    type,
+                    modifiedRequest,
+                    result,
+                    breadcrumbPtr);
             }
             else
             {

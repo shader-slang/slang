@@ -32,10 +32,18 @@ void legalizeImageStoreValue(IRBuilder& builder, IRImageStore* imageStore)
             }
         }
         elementType = valueVectorType->getElementType();
-        auto vectorValue = as<IRMakeVector>(originalValue);
-        for (UInt i = 0; i < vectorValue->getOperandCount(); i++)
+
+        // Extract components using IRElementExtract to handle any vector instruction type
+        if (auto originalElementCount = as<IRIntLit>(valueVectorType->getElementCount()))
         {
-            components.add(vectorValue->getOperand(i));
+            for (UInt i = 0; i < (UInt)originalElementCount->getValue(); i++)
+            {
+                auto elementExtract = builder.emitElementExtract(
+                    elementType,
+                    originalValue,
+                    builder.getIntValue(builder.getIntType(), i));
+                components.add(elementExtract);
+            }
         }
     }
     else

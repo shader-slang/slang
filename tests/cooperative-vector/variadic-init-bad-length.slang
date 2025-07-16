@@ -10,5 +10,5 @@ void computeMain()
     // CHECK: error 41400: static assertion failed, number of arguments to CoopVec constructor must match number of elements
 
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

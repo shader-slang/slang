@@ -400,11 +400,6 @@ struct AnyValueMarshallingContext
             case kIROp_UInt64Type:
             case kIROp_Int64Type:
             case kIROp_DoubleType:
-            case kIROp_PtrType:
-#if SLANG_PTR_IS_64
-            case kIROp_UIntPtrType:
-            case kIROp_IntPtrType:
-#endif
                 ensureOffsetAt8ByteBoundary();
                 if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
@@ -416,6 +411,38 @@ struct AnyValueMarshallingContext
                         dstVal,
                         builder->getIntValue(builder->getIntType(), 32));
                     highBits = builder->emitCast(builder->getUIntType(), highBits);
+
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr, lowBits);
+                    fieldOffset++;
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr, highBits);
+                        fieldOffset++;
+                    }
+                }
+                break;
+            case kIROp_PtrType:
+#if SLANG_PTR_IS_64
+            case kIROp_UIntPtrType:
+            case kIROp_IntPtrType:
+#endif
+                ensureOffsetAt8ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    // Use uint2 instead of uint64 to avoid Int64 capability requirement
+                    auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                    auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
+                    auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
+                    auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
 
                     auto dstAddr = builder->emitFieldAddress(
                         uintPtrType,
@@ -449,13 +476,11 @@ struct AnyValueMarshallingContext
             if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
             {
                 auto srcVal = builder->emitLoad(concreteVar);
-                auto uint64Val = builder->emitBitCast(builder->getUInt64Type(), srcVal);
-                auto lowBits = builder->emitCast(builder->getUIntType(), uint64Val);
-                auto shiftedBits = builder->emitShr(
-                    builder->getUInt64Type(),
-                    uint64Val,
-                    builder->getIntValue(builder->getIntType(), 32));
-                auto highBits = builder->emitBitCast(builder->getUIntType(), shiftedBits);
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
+                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
+                auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
+                auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
                 auto dstAddr1 = builder->emitFieldAddress(
                     uintPtrType,
                     anyValueVar,
@@ -649,6 +674,30 @@ struct AnyValueMarshallingContext
             case kIROp_UInt64Type:
             case kIROp_Int64Type:
             case kIROp_DoubleType:
+                ensureOffsetAt8ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto lowBits = builder->emitLoad(srcAddr);
+                    fieldOffset++;
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcAddr1 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        fieldOffset++;
+                        auto highBits = builder->emitLoad(srcAddr1);
+                        auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
+                        if (dataType->getOp() != kIROp_UInt64Type)
+                            combinedBits = builder->emitBitCast(dataType, combinedBits);
+                        builder->emitStore(concreteVar, combinedBits);
+                    }
+                }
+                break;
             case kIROp_PtrType:
 #if SLANG_PTR_IS_64
             case kIROp_IntPtrType:
@@ -671,9 +720,11 @@ struct AnyValueMarshallingContext
                             anyValInfo->fieldKeys[fieldOffset]);
                         fieldOffset++;
                         auto highBits = builder->emitLoad(srcAddr1);
-                        auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
-                        if (dataType->getOp() != kIROp_UInt64Type)
-                            combinedBits = builder->emitBitCast(dataType, combinedBits);
+                        // Use uint2 instead of uint64 to avoid Int64 capability requirement
+                        auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                        IRInst* components[2] = {lowBits, highBits};
+                        auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
+                        auto combinedBits = builder->emitBitCast(dataType, uint2Val);
                         builder->emitStore(concreteVar, combinedBits);
                     }
                 }
@@ -703,8 +754,11 @@ struct AnyValueMarshallingContext
                     anyValInfo->fieldKeys[fieldOffset + 1]);
                 auto highBits = builder->emitLoad(srcAddr1);
 
-                auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
-                combinedBits = builder->emitBitCast(dataType, combinedBits);
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
+                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                IRInst* components[2] = {lowBits, highBits};
+                auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
+                auto combinedBits = builder->emitBitCast(dataType, uint2Val);
                 builder->emitStore(concreteVar, combinedBits);
                 advanceOffset(8);
             }
