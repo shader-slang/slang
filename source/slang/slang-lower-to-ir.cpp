@@ -530,6 +530,8 @@ struct SharedIRGenContext
     //   in the source code.
     //
     List<IRInst*> m_stringLiterals;
+
+    DebugValueStoreContext debugValueContext;
 };
 
 struct IRGenContext;
@@ -9150,7 +9152,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
-                if (context->includeDebugInfo && decl->loc.isValid())
+                if (context->includeDebugInfo && decl->loc.isValid() &&
+                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -12175,7 +12178,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // if debug symbols are enabled.
     if (context->includeDebugInfo)
     {
-        insertDebugValueStore(module);
+        insertDebugValueStore(context->shared->debugValueContext, module);
     }
 
 
