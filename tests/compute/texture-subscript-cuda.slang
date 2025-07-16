@@ -39,7 +39,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             int var = 0;
             float result = cudaT1D[0];
-            cudaOutputBuffer[idx] = result;
+            // This is not supported in PTX.
+            //cudaOutputBuffer[idx] = result;
         }    
     break;
     
