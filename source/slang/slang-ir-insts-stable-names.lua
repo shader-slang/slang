@@ -244,7 +244,7 @@ return {
 	["IsDifferentialNull"] = 240,
 	["get_field"] = 241,
 	["get_field_addr"] = 242,
-	
+	["getElement"] = 243,
 	["getElementPtr"] = 244,
 	["getOffsetPtr"] = 245,
 	["getAddr"] = 246,
@@ -670,6 +670,5 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.StringTypeBase.ShortString"] = 668,
-	["getElementBase.getElement"] = 669,
-	["getElementBase.getCharFromString"] = 670,
+	["getCharFromString"] = 669,
 }

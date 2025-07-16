@@ -459,7 +459,6 @@ struct PeepholeContext : InstPassBase
                 changed |= tryFoldElementExtractFromUpdateInst(inst);
             }
             break;
-        case kIROp_GetCharFromString:
         case kIROp_GetElement:
             if (inst->getOperand(0)->getOp() == kIROp_MakeArray)
             {
@@ -531,7 +530,7 @@ struct PeepholeContext : InstPassBase
             }
             else if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
             {
-                auto index = as<IRIntLit>(as<IRGetElementBase>(inst)->getIndex());
+                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
                 if (index)
                 {
                     IRBuilder builder(module);
