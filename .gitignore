@@ -94,5 +94,10 @@ vkd3d-proton.cache.write
 *~
 .*.swp
 .*.swo
+
+# Claude local settings
+/.claude/settings.local.json
+
+# Other temporary files
 /generators
 /tests/library/linked.spirv
