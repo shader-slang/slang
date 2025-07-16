@@ -437,18 +437,18 @@ public:
     /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */,
-        bool /* allowOffsetLayout */){};
+        bool /* allowOffsetLayout */) {};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(
         IRInst* /*varInst*/,
         IRType* /*valueType*/,
         IRPackOffsetDecoration* /*decoration*/
-    ){};
+    ) {};
 
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -625,6 +625,7 @@ protected:
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitParamTypeModifier(IRType* type) { SLANG_UNUSED(type); }
+    virtual bool shouldEmitConstForConstRef() { return false; }
     virtual void emitIntrinsicCallExprImpl(
         IRCall* inst,
         UnownedStringSlice intrinsicDefinition,
