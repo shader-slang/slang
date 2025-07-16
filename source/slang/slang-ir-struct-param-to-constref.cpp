@@ -41,6 +41,8 @@ struct StructParamToConstRefContext
     }
 
     // Check if a type should be transformed (struct, array, or other composite types)
+    // Note: We don't transform vector/matrix types as they are typically small (2-4 elements)
+    // and the overhead of passing by reference would outweigh the copy cost
     bool shouldTransformParamType(IRType* type)
     {
         if (!type)

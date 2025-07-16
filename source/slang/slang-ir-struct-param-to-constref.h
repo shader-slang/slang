@@ -16,7 +16,7 @@ class DiagnosticSink;
 //
 // Into:
 //   void f(ConstRef<S> structVal) { ... }
-//   f(&s);
+//   f(s);
 //
 // Within function bodies, it transforms:
 //   fieldExtract(param, field) -> load(fieldAddress(param, field))
