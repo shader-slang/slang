@@ -1997,7 +1997,7 @@ public:
     Module* getModule() { return module; }
     ModuleDecl* getModuleDecl() { return module->getModuleDecl(); }
 
-    Session* getSession();
+    GlobalSession* getSession();
     NamePool* getNamePool();
     SourceManager* getSourceManager();
 
@@ -2090,7 +2090,7 @@ public:
 
     Linkage* getLinkage() { return linkage; }
 
-    Session* getSession();
+    GlobalSession* getSession();
 
     CodeGenTarget getTarget()
     {
@@ -2324,7 +2324,7 @@ public:
     SlangResult addPreprocessorDefine(char const* name, char const* value);
     SlangResult setMatrixLayoutMode(SlangMatrixLayoutMode mode);
     /// Create an initially-empty linkage
-    Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
+    Linkage(GlobalSession* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
     /// Dtor
     ~Linkage();
@@ -2335,7 +2335,7 @@ public:
     }
 
     /// Get the parent session for this linkage
-    Session* getSessionImpl() { return m_session; }
+    GlobalSession* getSessionImpl() { return m_session; }
 
     // Information on the targets we are being asked to
     // generate code for.
@@ -2568,9 +2568,9 @@ public:
 
 private:
     /// The global Slang library session that this linkage is a child of
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
 
-    RefPtr<Session> m_retainedSession;
+    RefPtr<GlobalSession> m_retainedSession;
 
     /// Tracks state of modules currently being loaded.
     ///
@@ -2634,7 +2634,7 @@ class CompileRequestBase : public RefObject
     // both front-end and back-end requests can store.
 
 public:
-    Session* getSession();
+    GlobalSession* getSession();
     Linkage* getLinkage() { return m_linkage; }
     DiagnosticSink* getSink() { return m_sink; }
     SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
@@ -3052,7 +3052,7 @@ public:
 
     Linkage* getLinkage() { return getProgram()->getLinkage(); }
 
-    Session* getSession() { return getLinkage()->getSessionImpl(); }
+    GlobalSession* getSession() { return getLinkage()->getSessionImpl(); }
 
     /// Get the source manager
     SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
@@ -3352,7 +3352,7 @@ public:
 
     void setTrackLiveness(bool v);
 
-    EndToEndCompileRequest(Session* session);
+    EndToEndCompileRequest(GlobalSession* session);
 
     EndToEndCompileRequest(Linkage* linkage);
 
@@ -3459,7 +3459,7 @@ public:
     SlangResult executeActionsInner();
     SlangResult executeActions();
 
-    Session* getSession() { return m_session; }
+    GlobalSession* getSession() { return m_session; }
     DiagnosticSink* getSink() { return &m_sink; }
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
@@ -3513,7 +3513,7 @@ private:
 
     void init();
 
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
     RefPtr<Linkage> m_linkage;
     DiagnosticSink m_sink;
     RefPtr<FrontEndCompileRequest> m_frontEndReq;
@@ -3527,7 +3527,7 @@ private:
 };
 
 /* Returns SLANG_OK if pass through support is available */
-SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
+SlangResult checkExternalCompilerSupport(GlobalSession* session, PassThroughMode passThrough);
 /* Report an error appearing from external compiler to the diagnostic sink error to the diagnostic
 sink.
 @param compilerName The name of the compiler the error came for (or nullptr if not known)
@@ -3619,7 +3619,7 @@ protected:
     Dictionary<Pair, PassThroughMode> m_map;
 };
 
-class Session : public RefObject, public slang::IGlobalSession
+class GlobalSession : public RefObject, public slang::IGlobalSession
 {
 public:
     SLANG_COM_INTERFACE(
@@ -3815,7 +3815,7 @@ public:
         String const& path,
         ISlangBlob* sourceBlob,
         Module*& outModule);
-    ~Session();
+    ~GlobalSession();
 
     void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
     void addTotalCompileTime(double time) { m_totalCompileTime += time; }
@@ -3908,16 +3908,16 @@ SlangResult passthroughDownstreamDiagnostics(
 // abstract over the conversion required for each pair of types.
 //
 
-SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
+SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(GlobalSession* session)
 {
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE ComPtr<GlobalSession> asInternal(slang::IGlobalSession* session)
 {
-    Slang::Session* internalSession = nullptr;
+    Slang::GlobalSession* internalSession = nullptr;
     session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
-    return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
+    return ComPtr<GlobalSession>(INIT_ATTACH, static_cast<GlobalSession*>(internalSession));
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

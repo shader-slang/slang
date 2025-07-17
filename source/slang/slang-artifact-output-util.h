@@ -9,14 +9,14 @@
 namespace Slang
 {
 
-class Session;
+class GlobalSession;
 
 struct ArtifactOutputUtil
 {
     /// Attempts to disassembly artifact into outArtifact.
     /// Errors are output to sink if set. If not desired pass nullptr
     static SlangResult dissassembleWithDownstream(
-        Session* session,
+        GlobalSession* session,
         IArtifact* artifact,
         DiagnosticSink* sink,
         IArtifact** outArtifact);
@@ -24,7 +24,7 @@ struct ArtifactOutputUtil
     /// Disassembles if that is plausible
     /// Errors are output to sink if set. If not desired pass nullptr
     static SlangResult maybeDisassemble(
-        Session* session,
+        GlobalSession* session,
         IArtifact* artifact,
         DiagnosticSink* sink,
         ComPtr<IArtifact>& outArtifact);
@@ -33,7 +33,7 @@ struct ArtifactOutputUtil
     /// (if outputting to console for example). Errors are output to sink if set. If not desired
     /// pass nullptr
     static SlangResult maybeConvertAndWrite(
-        Session* session,
+        GlobalSession* session,
         IArtifact* artifact,
         DiagnosticSink* sink,
         const UnownedStringSlice& writerName,

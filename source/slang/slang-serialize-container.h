@@ -32,7 +32,7 @@ struct SerialContainerUtil
 
     struct ReadOptions
     {
-        Session* session = nullptr;
+        GlobalSession* session = nullptr;
         SourceManager* sourceManager = nullptr;
         NamePool* namePool = nullptr;
         SharedASTBuilder* sharedASTBuilder = nullptr;
@@ -47,7 +47,7 @@ struct SerialContainerUtil
     /// Verify IR serialization
     static SlangResult verifyIRSerialize(
         IRModule* module,
-        Session* session,
+        GlobalSession* session,
         const WriteOptions& options);
 
     /// Write the request to the stream

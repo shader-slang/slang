@@ -151,7 +151,7 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      kBaseTypeConversionRank_IntPtr},
 };
 
-void Session::finalizeSharedASTBuilder()
+void GlobalSession::finalizeSharedASTBuilder()
 {
     // Force creation of all builtin types so we can make sure
     // they are created by the builtin AST builder instead of
@@ -350,7 +350,7 @@ struct IntrinsicOpInfo
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__ + 1) << " \"" << path << "\"\n"
 
-ComPtr<ISlangBlob> Session::getCoreLibraryCode()
+ComPtr<ISlangBlob> GlobalSession::getCoreLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE
     if (!coreLibraryCode)
@@ -364,7 +364,7 @@ ComPtr<ISlangBlob> Session::getCoreLibraryCode()
     return coreLibraryCode;
 }
 
-ComPtr<ISlangBlob> Session::getHLSLLibraryCode()
+ComPtr<ISlangBlob> GlobalSession::getHLSLLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE
     if (!hlslLibraryCode)
@@ -378,7 +378,7 @@ ComPtr<ISlangBlob> Session::getHLSLLibraryCode()
     return hlslLibraryCode;
 }
 
-ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
+ComPtr<ISlangBlob> GlobalSession::getAutodiffLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE
     if (!autodiffLibraryCode)
@@ -392,7 +392,7 @@ ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
     return autodiffLibraryCode;
 }
 
-ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
+ComPtr<ISlangBlob> GlobalSession::getGLSLLibraryCode()
 {
     if (!glslLibraryCode)
     {
