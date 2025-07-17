@@ -2356,7 +2356,6 @@ struct IRPrelinkContext : IRSpecContext
             // If we are cloning a global value, we will use the module builder.
             builderForClone = &shared->builderStorage;
         }
-        IRInst* result = nullptr;
         IRInst* clonedInst = nullptr;
         switch (originalVal->getOp())
         {
