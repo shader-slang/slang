@@ -1608,7 +1608,6 @@ RefPtr<SourceUnit> parseSourceUnit(
     String outputFileName)
 {
     Lexer lexer;
-    // namePool is now passed in as a parameter
 
     // We suppress any diagnostics that might get emitted during lexing,
     // so that we can ignore any files we don't understand.
