@@ -1,4 +1,30 @@
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./extras/formatting.sh --no-version-check --since master"
+          },
+          {
+            "type": "command",
+            "command": "cmake --build --preset debug"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"LLM_STOP_HOOK\""
+          }
+        ]
+      }
+    ]
   }
 }

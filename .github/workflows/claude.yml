@@ -187,11 +187,10 @@ jobs:
           fi
 
       # Run Claude Code Action with optimized environment variables
-      - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
+      - name: Execute Claude Code Action
         id: claude-action
-        uses: anthropics/claude-code-action@v0.0.31
+        uses: anthropics/claude-code-action@beta
         with:
-          # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
             # Build system information:
             - OS: Ubuntu Linux
@@ -199,9 +198,8 @@ jobs:
               * Configure: `cmake --preset default`
               * Build: `cmake --build --preset debug`
               * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
-              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
-            - Run formatting script before committing changes
+              * Run `./build/Debug/bin/slang-test ./tests/library/library-test.slang` for testing setup is working
 
             # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
@@ -222,6 +220,41 @@ jobs:
               of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
               keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
               in the IR passes.
+
+            # Test-Driven Development (TDD) Requirements:
+
+              **CRITICAL: ALL development (Bugs/Feature) category MUST follow Test-Driven Development practices:**
+
+              1. **Write Tests FIRST**: Before implementing any feature or fix, always create tests that demonstrate the expected behavior
+                 - For language features: Create `.slang` files under `tests/` with appropriate test directives
+                 - For compiler bugs: Create minimal reproduction test cases first
+                 - For IR passes: Write tests that validate the transformation
+
+              2. **Test Types Based on Context**:
+                 - **Language features**: Use `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` for CPU execution
+                 - **Type checking**: Use `//TEST:SIMPLE(filecheck=CHECK):-target hlsl` to verify compile-time behavior
+                 - **Code generation**: Use `//TEST:COMPARE_COMPUTE_EX:-slang -compute` for GPU compute tests
+                 - **Error cases**: Use `//TEST(compile):SIMPLE(filecheck=CHECK):-target hlsl` with expected diagnostic messages
+
+              3. **TDD Workflow**:
+                 - Step 1: Write failing test that captures the desired behavior
+                 - Step 2: Run test to confirm it fails for the right reason: `./build/Debug/bin/slang-test tests/path/to/test.slang`
+                 - Step 3: Implement minimal code to make test pass
+                 - Step 4: Run test again to confirm it passes
+                 - Step 5: Refactor if needed while keeping tests green
+                 - Step 6: Add additional edge case tests
+
+              4. **Test Verification Requirements**:
+                 - ALWAYS run your new test before implementing to verify it fails correctly
+                 - Test failure messages must be meaningful and point to the actual issue
+                 - After implementation, verify the test passes and covers the feature completely
+
+              5. **No Implementation Without Tests**:
+                 - Do not write any production code without a corresponding failing test
+                 - Exception: Only when fixing obvious typos or updating documentation
+                 - All bug fixes must include regression tests
+
+              **Remember**: Ensure there are no Build and Test failures when executing user request. Think hard on the USER comment and request as you work on the problem.
 
           mcp_config: |
             {
@@ -250,6 +283,8 @@ jobs:
             GITHUB_ACTOR: ${{ github.actor }}
             ANTHROPIC_AUTH_TOKEN: ${{ env.ANTHROPIC_AUTH_TOKEN }}
             DISABLE_TELEMETRY: 1
+            BASH_DEFAULT_TIMEOUT_MS: 18000000
+            DEBUG: 1
 
         # The ANTHROPIC_API_KEY environment variable is automatically picked up
         continue-on-error: true

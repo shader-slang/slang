@@ -1,10 +1,8 @@
-+# CLAUDE.md
+# Quick Reference
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-Reference other instruction files as well:
-- `.github/copilot-instructions.md`
-- `.github/workflows/claude.yml`
+**Repository**: shader-slang/slang - A shading language for GPU programming
+**Primary Language**: C++ with custom Slang language
+**MCP Tool Available**: `mcp__deepwiki__ask_question` with repoName: "shader-slang/slang"
 
 ## Build System and Common Commands
 
@@ -22,7 +20,15 @@ cmake.exe --preset vs2022
 # It can take from 5 minutes to 20 minutes depending on the machine.
 cmake --build --preset debug # Debug binary
 cmake --build --preset release # Release binary
+
+# Build specific targets
+cmake --build --preset debug --target slangc
+cmake --build --preset debug --target slang-test
 ```
+
+### PR Workflow
+1. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+2. **Include tests**: Add regression tests as `.slang` files under `tests/`
 
 ### Testing
 slang-test must run from repository root
@@ -39,14 +45,14 @@ slang-test must run from repository root
 ./build/Release/bin/slang-test slang-unit-test-tool/
 ```
 
-Many of the Slang tests requires a GPU to run. However your local environment may not have a GPU. Prefer crafting the
-test that runs on the CPU with `//TEST:COMPARE_COMPUTE(filecheck=CHECK): -cpu -output-using-type`, or with
-`//TEST:INTERPRET(filecheck=CHECK):`. Prefer creating executable tests over compile-only tests, unless the test is to
-check for a specific form of downstream code or diagnostics output.
+**Writing Tests Without GPU**:
+- Use CPU compute: `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type`
+- Use interpreter: `//TEST:INTERPRET(filecheck=CHECK):`
+- Example test structure in `tests/language-feature/lambda/lambda-0.slang`
 
-When using `slangc` to produce SPIRV, you should set the `SLANG_RUN_SPIRV_VALIDATION` environment variable to `1` to ensure
-that slangc runs SPIRV validation on the generated SPIRV. If you don't see any errors you are good.
-Don't use the system's `spirv-val` tool to validate the SPIRV because it is not up-to-date.
+**SPIRV Validation**:
+- Set `SLANG_RUN_SPIRV_VALIDATION=1` when using `slangc -target spirv`
+- Don't use system's `spirv-val` tool (may be outdated)
 
 
 ### Slang Command Line Usage
@@ -60,12 +66,6 @@ Don't use the system's `spirv-val` tool to validate the SPIRV because it is not 
 **DO NOT USE** these options as they are unmaintained, unreliable or unnecessary:
 - slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`, `-dump-ir-ids`, `-serial-ir`, `-dump-repro`, `-load-repro` and `-extract-repro`.
 - slang-test with `-category` and `-api`
-
-### Code Formatting
-```bash
-# Format code before submitting PR
-./extras/formatting.sh --no-version-check --cpp --since HEAD
-```
 
 ## Architecture Overview
 
@@ -111,13 +111,18 @@ Don't use the system's `spirv-val` tool to validate the SPIRV because it is not 
 
 ## Development Workflow
 
-### Slang internal steps, as an example
-1. Update lexer for new tokens (slang-lexer.cpp)
-2. Extend parser for new syntax (slang-parser.cpp)
-3. Add semantic analysis (slang-check-*.cpp)
-4. Implement IR generation (slang-ir-*.cpp)
-5. Add code generation for each target backend
-6. Write comprehensive tests
+### Adding New Language Features
+1. Update lexer for new tokens (`source/compiler-core/slang-lexer.cpp`)
+2. Extend parser for new syntax (`source/slang/slang-parser.cpp`)
+3. Add semantic analysis (`source/slang/slang-check-*.cpp`)
+4. Implement IR generation (`source/slang/slang-ir-*.cpp`)
+5. Add code generation for each target backend (`source/slang/slang-emit-*.cpp`)
+6. Write comprehensive tests under `tests/`
+
+### Common Development Tasks
+- **Adding an IR instruction**: Update the Lua definition files, then regenerate
+- **Adding a built-in function**: Add to appropriate module in `prelude/`
+- **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
 ### Debugging tools
 
