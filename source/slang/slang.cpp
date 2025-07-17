@@ -791,16 +791,16 @@ SlangResult GlobalSession::_readBuiltinModule(
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
-GlobalGlobalSession::queryInterface(SlangUUID const& uuid, void** outObject)
+GlobalSession::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == GlobalGlobalSession::getTypeGuid())
+    if (uuid == GlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<GlobalSession*>(this);
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IGlobalGlobalSession::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == slang::IGlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::IGlobalSession*>(this);
@@ -1391,7 +1391,7 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || guid == IGlobalSession::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == slang::IGlobalSession::getTypeGuid())
         return asExternal(this);
 
     return nullptr;
@@ -2515,14 +2515,14 @@ Scope* TranslationUnitRequest::getLanguageScope()
     switch (sourceLanguage)
     {
     case SourceLanguage::HLSL:
-        languageScope = getSession()->hlslLanguageScope;
+        languageScope = getGlobalSession()->hlslLanguageScope;
         break;
     case SourceLanguage::GLSL:
-        languageScope = getSession()->glslLanguageScope;
+        languageScope = getGlobalSession()->glslLanguageScope;
         break;
     case SourceLanguage::Slang:
     default:
-        languageScope = getSession()->slangLanguageScope;
+        languageScope = getGlobalSession()->slangLanguageScope;
         break;
     }
     return languageScope;
@@ -3533,14 +3533,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         switch (sourceLanguage)
         {
         case SourceLanguage::HLSL:
-            languageScope = getSession()->hlslLanguageScope;
+            languageScope = getGlobalSession()->hlslLanguageScope;
             break;
         case SourceLanguage::GLSL:
-            languageScope = getSession()->glslLanguageScope;
+            languageScope = getGlobalSession()->glslLanguageScope;
             break;
         case SourceLanguage::Slang:
         default:
-            languageScope = getSession()->slangLanguageScope;
+            languageScope = getGlobalSession()->slangLanguageScope;
             break;
         }
 
@@ -3682,7 +3682,7 @@ void FrontEndCompileRequest::generateIR()
 
             // Verify debug information
             if (SLANG_FAILED(
-                    SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
+                    SerialContainerUtil::verifyIRSerialize(irModule, getGlobalSession(), options)))
             {
                 getSink()->diagnose(
                     irModule->getModuleInst()->sourceLoc,
@@ -6986,7 +6986,7 @@ void GlobalSession::addBuiltinSource(
     outModule = module;
 }
 
-GlobalSession::~Session()
+GlobalSession::~GlobalSession()
 {
     // This is necessary because this ASTBuilder uses the SharedASTBuilder also owned by the
     // session. If the SharedASTBuilder gets dtored before the globalASTBuilder it has a dangling
@@ -7663,7 +7663,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
-        getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        getGlobalSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
         PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
@@ -7732,7 +7732,7 @@ SlangResult EndToEndCompileRequest::compile()
     {
         double downstreamEndTime = 0;
         double totalEndTime = 0;
-        getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
+        getGlobalSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
@@ -7741,7 +7741,7 @@ SlangResult EndToEndCompileRequest::compile()
     {
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
-        perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
+        perfResult << "\nType Dictionary Size: " << getGlobalSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(
             SourceLoc(),
             Diagnostics::performanceBenchmarkResult,

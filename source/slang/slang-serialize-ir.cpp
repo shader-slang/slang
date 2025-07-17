@@ -844,7 +844,7 @@ Result readSerializedModuleInfo(
 
 Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
-    Session* session,
+    GlobalSession* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
