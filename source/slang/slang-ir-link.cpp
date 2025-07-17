@@ -1603,7 +1603,7 @@ void insertGlobalValueSymbols(IRSharedSpecContext* sharedContext, IRModule* orig
 
 void initializeSharedSpecContext(
     IRSharedSpecContext* sharedContext,
-    Session* session,
+    GlobalSession* session,
     IRModule* inModule,
     CodeGenTarget target,
     TargetRequest* targetReq)
@@ -2049,7 +2049,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
-    auto globalSession = static_cast<Session*>(linkage->getGlobalSession());
+    auto globalSession = static_cast<GlobalSession*>(linkage->getGlobalSession());
     List<IRModule*> builtinModules;
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());

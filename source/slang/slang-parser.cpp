@@ -8788,7 +8788,7 @@ void parseSourceFile(
 }
 
 static void addBuiltinSyntaxImpl(
-    Session* session,
+    GlobalSession* session,
     Scope* scope,
     char const* nameText,
     SyntaxParseCallback callback,
@@ -8810,7 +8810,7 @@ static void addBuiltinSyntaxImpl(
 
 template<typename T>
 static void addBuiltinSyntax(
-    Session* session,
+    GlobalSession* session,
     Scope* scope,
     char const* name,
     SyntaxParseCallback callback,
@@ -8820,7 +8820,7 @@ static void addBuiltinSyntax(
 }
 
 template<typename T>
-static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* name)
+static void addSimpleModifierSyntax(GlobalSession* session, Scope* scope, char const* name)
 {
     auto syntaxClass = getSyntaxClass<T>();
     addBuiltinSyntaxImpl(
@@ -9586,7 +9586,7 @@ ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
 
 ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope)
 {
-    Session* session = astBuilder->getGlobalSession();
+    GlobalSession* session = astBuilder->getGlobalSession();
 
     ModuleDecl* moduleDecl = astBuilder->create<ModuleDecl>();
     scope->containerDecl = moduleDecl;

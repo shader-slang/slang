@@ -2973,7 +2973,7 @@ getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob
 {
     ComPtr<slang::IGlobalSession> globalSession;
     slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef());
-    Slang::Session* session = static_cast<Slang::Session*>(globalSession.get());
+    Slang::GlobalSession* session = static_cast<Slang::GlobalSession*>(globalSession.get());
     StringBuilder sb;
     if (moduleName.startsWith("core"))
     {

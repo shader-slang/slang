@@ -38,7 +38,7 @@ void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries
     }
 }
 
-void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuilder& sb)
+void CompilerOptionSet::writeCommandLineArgs(GlobalSession* globalSession, StringBuilder& sb)
 {
     for (auto& option : options)
     {

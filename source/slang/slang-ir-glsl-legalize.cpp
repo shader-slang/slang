@@ -276,7 +276,7 @@ List<IRInst*> ScalarizedVal::leafAddresses()
 
 struct GLSLLegalizationContext
 {
-    Session* session;
+    GlobalSession* session;
     ShaderExtensionTracker* glslExtensionTracker;
     DiagnosticSink* sink;
     Stage stage;
@@ -4048,7 +4048,7 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
 }
 
 void legalizeEntryPointForGLSL(
-    Session* session,
+    GlobalSession* session,
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
@@ -4306,7 +4306,7 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
 }
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
+    GlobalSession* session,
     IRModule* module,
     const List<IRFunc*>& funcs,
     CodeGenContext* context,

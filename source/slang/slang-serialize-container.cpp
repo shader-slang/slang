@@ -608,7 +608,7 @@ static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
 
 /* static */ SlangResult SerialContainerUtil::verifyIRSerialize(
     IRModule* module,
-    Session* session,
+    GlobalSession* session,
     const WriteOptions& options)
 {
     // Verify if we can stream out with raw source locs

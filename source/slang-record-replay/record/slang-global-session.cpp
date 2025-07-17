@@ -39,7 +39,7 @@ GlobalSessionRecorder::GlobalSessionRecorder(
 SLANG_NO_THROW SlangResult SLANG_MCALL
 GlobalSessionRecorder::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == Session::getTypeGuid())
+    if (uuid == GlobalSession::getTypeGuid())
     {
         // no add-ref here, the query will cause the inner session to handle the add-ref.
         this->m_actualGlobalSession->queryInterface(uuid, outObject);
