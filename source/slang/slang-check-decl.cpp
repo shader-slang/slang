@@ -8870,6 +8870,8 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     auto parentEnumDecl = as<EnumDecl>(decl->parentDecl);
     SLANG_ASSERT(parentEnumDecl);
 
+    ensureDecl(parentEnumDecl, DeclCheckState::ReadyForLookup);
+
     decl->type.type = DeclRefType::create(m_astBuilder, makeDeclRef(parentEnumDecl));
 
     // The tag type should have already been set by

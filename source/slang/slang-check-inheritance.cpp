@@ -218,8 +218,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     TypeEqualityWitness* selfIsSelf =
         selfType ? visitor.createTypeEqualityWitness(selfType) : nullptr;
-    Facet selfFacet = new (arena)
-        Facet::Impl(selfFacetKind, Facet::Directness::Self, declRef, selfType, selfIsSelf);
+    Facet selfFacet = new (arena) Facet::Impl(
+        astBuilder,
+        selfFacetKind,
+        Facet::Directness::Self,
+        declRef,
+        selfType,
+        selfIsSelf);
     allFacets.add(selfFacet);
 
     // After the self facet will come a list of facets formed
@@ -253,8 +258,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // the base in the linearized inheritance list
         // we are building.
         //
-        baseInfo->facetImpl =
-            FacetImpl(kind, Facet::Directness::Direct, baseDeclRef, baseType, selfIsBaseWitness);
+        baseInfo->facetImpl = FacetImpl(
+            astBuilder,
+            kind,
+            Facet::Directness::Direct,
+            baseDeclRef,
+            baseType,
+            selfIsBaseWitness);
         Facet baseFacet(&baseInfo->facetImpl);
         //
         // Second, we have a list of the facets in the
@@ -852,7 +862,7 @@ void SharedSemanticsContext::_mergeFacetLists(
                 selfIsSubtypeOfBase,
                 baseIsSubtypeOfFacet);
 
-            indirectFacet->subtypeWitness = selfIsSubtypeOfFacet;
+            indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
 
             ioMergedFacets.add(indirectFacet);
         }
@@ -1105,6 +1115,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         DirectBaseInfo leftBaseInfo;
         leftBaseInfo.facetImpl = FacetImpl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Direct,
             DeclRef<Decl>(),
@@ -1114,6 +1125,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
         DirectBaseInfo rightBaseInfo;
         rightBaseInfo.facetImpl = FacetImpl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Direct,
             DeclRef<Decl>(),
@@ -1143,6 +1155,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             getInheritanceInfo(eachType->getElementType(), circularityInfo);
         SemanticsVisitor visitor(this);
         auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Self,
             DeclRef<Decl>(),
@@ -1154,6 +1167,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (facet->directness == Facet::Directness::Direct)
             {
                 auto eachFacet = new (arena) Facet::Impl(
+                    astBuilder,
                     Facet::Kind::Type,
                     Facet::Directness::Direct,
                     facet->origin.declRef,
@@ -1182,6 +1196,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         SemanticsVisitor visitor(this);
         auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Self,
             DeclRef<Decl>(),
