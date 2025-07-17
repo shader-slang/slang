@@ -25,6 +25,7 @@
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-check-recursion.h"
+#include "slang-check-out-of-bound-access.h"
 #include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-check-unsupported-inst.h"
 #include "slang-ir-cleanup-void.h"

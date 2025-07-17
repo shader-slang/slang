@@ -2,7 +2,7 @@
 
 // Test that out-of-bounds array access with constant indices generates an error
 
-//DIAGNOSTIC_TEST:SIMPLE: -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -19,8 +19,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[1] = a[2];
     
     // Invalid access - index 3 is out of bounds for array of size 3
+    //CHECK: error 30029: array index '3' is out of bounds for array of size '3'.
     outputBuffer[2] = a[3];
     
     // Invalid access - negative index
+    //CHECK: error 30029: array index '-1' is out of bounds for array of size '3'.
     outputBuffer[3] = a[-1];
 }

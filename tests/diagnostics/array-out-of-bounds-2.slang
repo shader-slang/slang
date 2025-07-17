@@ -2,7 +2,7 @@
 
 // Test the specific scenario from the issue (array of size 3, accessing index 3)
 
-//DIAGNOSTIC_TEST:SIMPLE: -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 
 struct SH3_t
 {
@@ -24,5 +24,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
     
     // This reproduces the issue - accessing index 3 in array of size 3
+    //CHECK: error 30029: array index '3' is out of bounds for array of size '3'.
     outputBuffer[3] = a[3].coeffs[0];
 }

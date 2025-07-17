@@ -10,6 +10,4 @@ void checkForRecursiveTypes(IRModule* module, DiagnosticSink* sink);
 
 void checkForRecursiveFunctions(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
 
-void checkForOutOfBoundAccess(IRModule* module, DiagnosticSink* sink);
-
 } // namespace Slang
