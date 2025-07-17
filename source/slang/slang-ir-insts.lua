@@ -8,20 +8,7 @@
 -- !! Slang::IRModule accordingly when modifying this file.
 -- !!
 --
--- The instructions struct name, i.e. something like "IRVoidType" can be specified with struct_name, otherwise it will be a PascalCase version of the instruction key
---
--- Flags, such as hoistable, global, parent, use_other are inherited from a parent abstract type
---
--- min_operands specifies the number of required operands for an instruction, it defaults to 0
---
--- operands specifies the required operands for an instruction in the format { "operand_name", "operand_type" }.
--- operand_type is optional and should not be specified when the type is IRInst.
---
--- Only one of min_operands or operands should be specified for an instruction.
--- If neither is specified, the instruction is defaulted to contain min_operands set to 0.
---
--- Instructions here will automatically be given a struct definition in slang-ir.h if it is not handwritten and if operands are specified,
--- the getters for said operands will be generated as part of the instruction's struct definition.
+-- For a detailed description of the schema, please see docs/design/ir-instruction-definition.md
 --
 local insts = {
 	{ nop = {} },
