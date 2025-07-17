@@ -2,8 +2,8 @@
 #include "slang-check-out-of-bound-access.h"
 
 #include "slang-ir-inst-pass-base.h"
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -17,27 +17,6 @@ struct OutOfBoundAccessChecker : public InstPassBase
     {
     }
 
-    void checkGetElementInst(IRGetElement* inst)
-    {
-        if (inst->getOperandCount() < 2)
-            return;
-
-        auto base = inst->getOperand(0);
-        auto index = inst->getOperand(1);
-
-        checkArrayAccess(inst, base, index);
-    }
-
-    void checkGetElementPtrInst(IRGetElementPtr* inst)
-    {
-        if (inst->getOperandCount() < 2)
-            return;
-
-        auto base = inst->getOperand(0);
-        auto index = inst->getOperand(1);
-
-        checkArrayAccess(inst, base, index);
-    }
 
     void checkArrayAccess(IRInst* inst, IRInst* base, IRInst* index)
     {
@@ -73,27 +52,31 @@ struct OutOfBoundAccessChecker : public InstPassBase
         // Check bounds: index should be >= 0 and < arraySize
         if (indexValue < 0 || indexValue >= arraySizeValue)
         {
-            sink->diagnose(
-                inst,
-                Diagnostics::arrayIndexOutOfBounds,
-                indexValue,
-                arraySizeValue);
+            sink->diagnose(inst, Diagnostics::arrayIndexOutOfBounds, indexValue, arraySizeValue);
         }
     }
 
     void processModule()
     {
-        // Process all GetElement instructions
-        processInstsOfType<IRGetElement>(kIROp_GetElement, [this](IRGetElement* inst)
-        {
-            checkGetElementInst(inst);
-        });
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_GetElement:
+                case kIROp_GetElementPtr:
+                    {
+                        if (inst->getOperandCount() < 2)
+                            return;
 
-        // Process all GetElementPtr instructions  
-        processInstsOfType<IRGetElementPtr>(kIROp_GetElementPtr, [this](IRGetElementPtr* inst)
-        {
-            checkGetElementPtrInst(inst);
-        });
+                        auto base = inst->getOperand(0);
+                        auto index = inst->getOperand(1);
+
+                        checkArrayAccess(inst, base, index);
+                    }
+                    break;
+                }
+            });
     }
 };
 

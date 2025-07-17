@@ -5,8 +5,8 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct DiagnosticSink;
+struct IRModule;
+struct DiagnosticSink;
 
-    void checkForOutOfBoundAccess(IRModule* module, DiagnosticSink* sink);
-}
+void checkForOutOfBoundAccess(IRModule* module, DiagnosticSink* sink);
+} // namespace Slang
