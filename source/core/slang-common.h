@@ -349,7 +349,7 @@ public:
 #define SLANG_ASSERT(VALUE)               \
     do                                    \
     {                                     \
-        if (!(VALUE))                     \
+        if (!(VALUE)) [[unlikely]]        \
             SLANG_ASSERT_FAILURE(#VALUE); \
     } while (0)
 #else
@@ -357,7 +357,7 @@ public:
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) \
-    if (VALUE)                      \
+    if (VALUE) [[likely]]           \
     {                               \
     }                               \
     else                            \

@@ -496,11 +496,11 @@ local insts = {
 			{
 				ptr_constant = { struct_name = "PtrLit" },
 			},
+			{ void_constant = { struct_name = "VoidLit" } },
 			{ string_constant = { struct_name = "StringLit" } },
 			{
 				blob_constant = { struct_name = "BlobLit" },
 			},
-			{ void_constant = { struct_name = "VoidLit" } },
 		},
 	},
 	{ CapabilitySet = { hoistable = true, { capabilityConjunction = {} }, { capabilityDisjunction = {} } } },
