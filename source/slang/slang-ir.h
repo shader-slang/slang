@@ -2458,8 +2458,8 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 0;
-    const static UInt k_maxSupportedModuleVersion = 0;
+    const static UInt k_minSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 1;
 
 private:
     friend struct IRSerialReadContext;
@@ -2490,7 +2490,7 @@ private:
     FIDDLE() Name* m_name = nullptr;
 
     // The version of the module as it was loaded
-    FIDDLE() UInt m_version = k_maxSupportedModuleVersion;
+    FIDDLE() UInt64 m_version = k_maxSupportedModuleVersion;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.

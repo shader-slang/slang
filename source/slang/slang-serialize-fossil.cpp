@@ -1610,6 +1610,7 @@ Fossil::AnyValPtr SerialReader::_readValPtr()
     {
     case State::Type::Root:
     case State::Type::Object:
+    case State::Type::PseudoPtr:
         SLANG_ASSERT(_state.elementCount == 1);
         SLANG_ASSERT(_state.elementIndex == 0);
         _state.elementIndex++;
