@@ -121,7 +121,7 @@ require_bin() {
 }
 
 require_bin "git" "1.8"
-((run_all || run_cmake)) && require_bin "gersemi" "0.17"
+((run_all || run_cmake)) && require_bin "gersemi" "0.21" "0.22"
 ((run_all || run_cpp)) && require_bin "xargs" "3"
 require_bin "diff" "2"
 ((run_all || run_cpp)) && require_bin "clang-format" "17" "18"
