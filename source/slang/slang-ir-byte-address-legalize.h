@@ -3,7 +3,7 @@
 
 namespace Slang
 {
-class Session;
+class GlobalSession;
 class TargetProgram;
 struct IRModule;
 class DiagnosticSink;

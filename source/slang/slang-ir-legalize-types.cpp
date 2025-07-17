@@ -98,7 +98,7 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(
 {
     targetProgram = target;
 
-    session = inModule->getSession();
+    session = inModule->getGlobalSession();
     module = inModule;
 
     builderStorage = IRBuilder(inModule);

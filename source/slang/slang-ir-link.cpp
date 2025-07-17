@@ -1603,7 +1603,7 @@ void insertGlobalValueSymbols(IRSharedSpecContext* sharedContext, IRModule* orig
 
 void initializeSharedSpecContext(
     IRSharedSpecContext* sharedContext,
-    Session* session,
+    GlobalSession* session,
     IRModule* inModule,
     CodeGenTarget target,
     TargetRequest* targetReq)
@@ -2023,7 +2023,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
-    auto session = codeGenContext->getSession();
+    auto session = codeGenContext->getGlobalSession();
     auto target = codeGenContext->getTargetFormat();
     auto targetProgram = codeGenContext->getTargetProgram();
     auto targetReq = codeGenContext->getTargetReq();

@@ -25,7 +25,7 @@ struct ByteAddressBufferLegalizationContext
     // We need access to the original session, as well as the options
     // that control what constructs we legalize, and how.
     //
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
     TargetProgram* m_targetProgram = nullptr;
     TargetRequest* m_target = nullptr;
     ByteAddressBufferLegalizationOptions m_options;
@@ -1499,7 +1499,7 @@ struct ByteAddressBufferLegalizationContext
 
 
 void legalizeByteAddressBufferOps(
-    Session* session,
+    GlobalSession* session,
     TargetProgram* program,
     IRModule* module,
     DiagnosticSink* sink,

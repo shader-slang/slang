@@ -3263,7 +3263,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         StringBuilder sb;
         sb << "-target spirv ";
         m_targetProgram->getOptionSet().writeCommandLineArgs(
-            m_targetProgram->getTargetReq()->getSession(),
+            m_targetProgram->getTargetReq()->getGlobalSession(),
             sb);
         sb << " -stage " << getStageName(entryPointDecor->getProfile().getStage());
         if (auto entryPointName = as<IRStringLit>(getName(entryPointDecor->getParent())))

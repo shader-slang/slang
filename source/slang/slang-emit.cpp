@@ -688,7 +688,7 @@ Result linkAndOptimizeIR(
     LinkedIR& outLinkedIR)
 {
     SLANG_PROFILE;
-    auto session = codeGenContext->getSession();
+    auto session = codeGenContext->getGlobalSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
@@ -1956,7 +1956,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     outArtifact.setNull();
 
-    auto session = getSession();
+    auto session = getGlobalSession();
     auto sink = getSink();
     auto sourceManager = getSourceManager();
     auto target = getTargetFormat();
@@ -2485,7 +2485,7 @@ static SlangResult createArtifactFromIR(
 
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-    IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+    IDownstreamCompiler* compiler = codeGenContext->getGlobalSession()->getOrLoadDownstreamCompiler(
         PassThroughMode::SpirvOpt,
         codeGenContext->getSink());
     if (compiler)
@@ -2621,7 +2621,7 @@ static SlangResult createArtifactFromIR(
         }
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+        codeGenContext->getGlobalSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
         SLANG_RETURN_ON_FAIL(
             passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
@@ -2692,7 +2692,7 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     slang::SessionDesc sessionDesc = {};
     ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(
-        codeGenContext->getSession()->createSession(sessionDesc, slangSession.writeRef()));
+        codeGenContext->getGlobalSession()->createSession(sessionDesc, slangSession.writeRef()));
     auto linkage = static_cast<Linkage*>(slangSession.get());
 
     ComPtr<ISlangBlob> diagnostics;

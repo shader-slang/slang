@@ -5,7 +5,7 @@ namespace Slang
 void IRDeduplicationContext::init(IRModule* module)
 {
     m_module = module;
-    m_session = module->getSession();
+    m_session = module->getGlobalSession();
 
     m_globalValueNumberingMap.clear();
     m_constantMap.clear();
