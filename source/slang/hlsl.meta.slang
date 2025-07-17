@@ -24515,6 +24515,10 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
              __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
             __intrinsic_asm ".Fill";
+        case glsl:
+            for(int i = 0; i < N; ++i)
+                this[i] = t;
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 this[i] = t;
@@ -24999,6 +25003,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             return ret;
         case optix_coopvec: 
             __intrinsic_asm "optixCoopVecAdd($0, $1)";
+        case glsl:
+            return __pureAdd(other);
         default: return __pureAdd(other);
         }
     }
@@ -25037,6 +25043,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             return ret;
         case optix_coopvec: 
             __intrinsic_asm "optixCoopVecSub($0, $1)";
+        case glsl:
+            return __pureSub(other);
         default: return __pureSub(other);
         }
     }
@@ -25075,6 +25083,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             return ret;
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecMul($0, $1)";
+        case glsl:
+            return __pureMul(other);
         default: return __pureMul(other);
         }
     }
@@ -25110,6 +25120,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             This ret = this;
             ret.__mutDiv(other);
             return ret;
+        case glsl:
+            return __pureDiv(other);
         default: return __pureDiv(other);
         }
     }
