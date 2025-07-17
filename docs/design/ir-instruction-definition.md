@@ -22,7 +22,8 @@ All IR instructions are defined in `source/slang/slang-ir-insts.lua`. This file 
 - Instruction names and their organization into categories
 - Struct names for the C++ representation (if different from the default)
 - Flags like `hoistable`, `parent`, `global`, etc.
-- Minimum operand counts
+- (Optionally) Minimum operand counts
+- (Optionally) The operands themselves
 - Parent-child relationships in the instruction hierarchy
 
 Here's a simplified example of how instructions are defined:
@@ -63,6 +64,9 @@ The Fiddle tool processes `slang-ir-insts.lua` and generates several outputs:
 
    - C++ struct definitions for instruction types not manually defined
    - `leafInst()` and `baseInst()` macros for RTTI support
+   - If operands of an IR are specified in `slang-ir-insts.lua` in the format `{ { "operand1_name", "operand1_type" }, {"operand2_name"} }` and so on,
+     Fiddle will generate getters for each of the operands as part of the IR's struct. Note that the order in which the operands are listed matters and
+     specification of the type of the operand is optional; defaulting to "IRInst" when the type is not specified.
 
 3. **Instruction Info Table** (`slang-ir-insts-info.cpp`):
 
