@@ -2353,7 +2353,7 @@ public:
     StringSlicePool m_stringSlicePool;
 
     // Name pool for looking up names
-    NamePool* namePool;
+    NamePool* namePool = nullptr;
 
     NamePool* getNamePool() { return namePool; }
 

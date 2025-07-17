@@ -167,8 +167,6 @@ void Session::init()
     DownstreamCompilerUtil::setDefaultLocators(m_downstreamCompilerLocators);
     m_downstreamCompilerSet = new DownstreamCompilerSet;
 
-    // Initialize name pool
-    // Note: name pool is now self-contained
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();

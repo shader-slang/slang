@@ -25,8 +25,6 @@ struct TestState
 
         m_sink.init(&m_sourceManager, Lexer::sourceLocationLexer);
 
-        // namePool is now self-contained
-
         // We don't require marker
         m_options.m_requireMark = false;
     }
