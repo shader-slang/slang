@@ -224,6 +224,12 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 // GCC Specific
 #if SLANG_GCC_FAMILY
 
+#if INTPTR_MAX == INT64_MAX
+#define SLANG_64BIT 1
+#else
+#define SLANG_64BIT 0
+#endif
+
 #define SLANG_BREAKPOINT(id) __builtin_trap()
 
 // Use this macro instead of offsetof, because gcc produces warning if offsetof is used on a
