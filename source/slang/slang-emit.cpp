@@ -1333,8 +1333,8 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
-    legalizeVectorTypes(irModule, sink);
     legalizeMatrixTypes(targetProgram, irModule, sink);
+    legalizeVectorTypes(irModule, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
