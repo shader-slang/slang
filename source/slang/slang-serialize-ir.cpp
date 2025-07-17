@@ -29,18 +29,6 @@ FIDDLE()
 namespace Slang
 {
 
-// The oldest compilers we support don't have std::bit_cast, so implement it
-// here
-template<typename To, typename From>
-    requires(sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<From> &&
-            std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>
-To bitCast(const From& src)
-{
-    To dst;
-    memcpy(&dst, &src, sizeof(To));
-    return dst;
-}
-
 //
 // We wrap everything up in an IRModuleInfo, to prepare for the case in which
 // we want to serialize some sidecar information to help with on-demand loading
@@ -59,8 +47,8 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 999000000000999;
-    FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
+    const static UInt64 kSupportedSerializationVersion = 1 FIDDLE() UInt64 serializationVersion =
+        kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
     FIDDLE() String fullVersion = SLANG_TAG_VERSION;
