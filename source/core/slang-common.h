@@ -202,17 +202,17 @@ inline bool isBitSet(T value, T bitToTest)
     return (T)((uint32_t)value & (uint32_t)bitToTest) == bitToTest;
 }
 
-#if __cplusplus >= 202002L
 template<typename To, typename From>
-    requires(sizeof(To) == sizeof(From)) && std::is_trivially_copyable_v<From> &&
-            std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>
-To bitCast(const From& src)
+typename std::enable_if_t<
+    sizeof(To) == sizeof(From) && std::is_trivially_copyable_v<From> &&
+        std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>,
+    To>
+bitCast(const From& src)
 {
     To dst;
-    memcpy(&dst, &src, sizeof(To));
+    std::memcpy(&dst, &src, sizeof(To));
     return dst;
 }
-#endif
 
 } // namespace Slang
 
