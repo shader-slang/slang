@@ -25,6 +25,16 @@ struct LinkedIR
 //
 LinkedIR linkIR(CodeGenContext* codeGenContext);
 
+// Prelinking is a step that happens immediately after visiting all AST nodes during IR lowering,
+// and before any IR validation steps. Prelinking copys all extern symbols that are
+// [unsafeForceInlineEarly] into the current module being lowered, so that we can perform necessary
+// inlining passes before any data-flow analysis.
+//
+void prelinkIR(
+    Module* module,
+    IRModule* irModule,
+    const Dictionary<String, IRInst*>& mapExternSymbolToOriginalSymbol);
+
 // Replace any global constants in the IR module with their
 // definitions, if possible.
 //
