@@ -47,8 +47,8 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 1 FIDDLE() UInt64 serializationVersion =
-        kSupportedSerializationVersion;
+    const static UInt64 kSupportedSerializationVersion = 1;
+    FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
     FIDDLE() String fullVersion = SLANG_TAG_VERSION;
