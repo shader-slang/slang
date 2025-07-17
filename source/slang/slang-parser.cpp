@@ -4861,6 +4861,31 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
         }
     }
 }
+
+static EnumDecl* isUnscopedEnum(Decl* decl)
+{
+    EnumDecl* enumDecl = as<EnumDecl>(decl);
+    if (!enumDecl)
+        return nullptr;
+    for (auto mod : enumDecl->modifiers)
+    {
+        if (as<UnscopedEnumAttribute>(mod))
+        {
+            return enumDecl;
+        }
+        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
+        {
+            // We have to perform an ugly string comparison here, because the attributes
+            // haven't been checked during parsing.
+            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
+            {
+                return enumDecl;
+            }
+        }
+    }
+    return nullptr;
+}
+
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
@@ -4936,6 +4961,24 @@ static void CompleteDecl(
         {
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
+
+            // As a special case, if we are adding an unscoped enum to container, we should also
+            // create static const decls for each enum case and add them to the container.
+            if (auto enumDecl = isUnscopedEnum(decl))
+            {
+                for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
+                {
+                    auto staticConstDecl = parser->astBuilder->create<LetDecl>();
+                    staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
+                    addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
+                    addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto valueExpr = parser->astBuilder->create<VarExpr>();
+                    valueExpr->declRef = DeclRef<Decl>(enumCase);
+                    staticConstDecl->initExpr = valueExpr;
+                    staticConstDecl->loc = enumCase->loc;
+                    AddMember(containerDecl, staticConstDecl);
+                }
+            }
         }
     }
 
@@ -5556,17 +5599,16 @@ static Decl* parseEnumDecl(Parser* parser)
         decl->nameAndLoc = expectIdentifier(parser);
     }
 
-    // If the type needs to be unscoped, insert modifiers to make it so.
-    if (isUnscoped)
-    {
-        addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
-        addModifier(decl, parser->astBuilder->create<TransparentModifier>());
-    }
 
     return parseOptGenericDecl(
         parser,
         [&](GenericDecl* genericParent)
         {
+            // If the type needs to be unscoped, insert modifiers to make it so.
+            if (isUnscoped && !genericParent)
+            {
+                addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
+            }
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);
