@@ -73,6 +73,7 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-dynamic-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-generics.h"
@@ -1040,9 +1041,11 @@ Result linkAndOptimizeIR(
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
-        specOptions.lowerWitnessLookups = true;
+        specOptions.lowerWitnessLookups = false;
         specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
     }
+
+    lowerDynamicInsts(irModule, sink);
 
     finalizeSpecialization(irModule);
 

@@ -1868,10 +1868,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             midToSup = lowerSimpleVal(context, val->getMidToSup());
         }
 
-        return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
-            getBuilder()->getWitnessTableType(lowerType(context, val->getSup())),
-            baseWitnessTable,
-            midToSup));
+        return LoweredValInfo::simple(
+            getBuilder()->emitLookupInterfaceMethodInst(
+                getBuilder()->getWitnessTableType(lowerType(context, val->getSup())),
+                baseWitnessTable,
+                midToSup));
     }
 
     LoweredValInfo visitForwardDifferentiateVal(ForwardDifferentiateVal* val)
@@ -3322,6 +3323,8 @@ void collectParameterLists(
             auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
             if (thisType)
             {
+                thisType = as<Type>(
+                    thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
                 if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
                 {
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
@@ -4186,18 +4189,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        return LoweredValInfo::simple(getBuilder()->emitForwardDifferentiateInst(
-            lowerType(context, expr->type),
-            baseVal.val));
+        return LoweredValInfo::simple(
+            getBuilder()->emitForwardDifferentiateInst(
+                lowerType(context, expr->type),
+                baseVal.val));
     }
 
     LoweredValInfo visitDetachExpr(DetachExpr* expr)
     {
         auto baseVal = lowerRValueExpr(context, expr->inner);
 
-        return LoweredValInfo::simple(getBuilder()->emitDetachDerivative(
-            lowerType(context, expr->type),
-            getSimpleVal(context, baseVal)));
+        return LoweredValInfo::simple(
+            getBuilder()->emitDetachDerivative(
+                lowerType(context, expr->type),
+                getSimpleVal(context, baseVal)));
     }
 
     LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
@@ -4283,9 +4288,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        return LoweredValInfo::simple(getBuilder()->emitBackwardDifferentiateInst(
-            lowerType(context, expr->type),
-            baseVal.val));
+        return LoweredValInfo::simple(
+            getBuilder()->emitBackwardDifferentiateInst(
+                lowerType(context, expr->type),
+                baseVal.val));
     }
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
@@ -4296,13 +4302,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto groupSize = lowerRValueExpr(context, expr->dispatchSize);
         // Actual arguments to be filled in when we lower the actual call expr.
         // This is handled in `emitCallToVal`.
-        return LoweredValInfo::simple(getBuilder()->emitDispatchKernelInst(
-            lowerType(context, expr->type),
-            baseVal.val,
-            getSimpleVal(context, threadSize),
-            getSimpleVal(context, groupSize),
-            0,
-            nullptr));
+        return LoweredValInfo::simple(
+            getBuilder()->emitDispatchKernelInst(
+                lowerType(context, expr->type),
+                baseVal.val,
+                getSimpleVal(context, threadSize),
+                getSimpleVal(context, groupSize),
+                0,
+                nullptr));
     }
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
