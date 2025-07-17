@@ -1,0 +1,1 @@
+command script import source/core/core_lldb.py

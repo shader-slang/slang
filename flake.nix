@@ -20,6 +20,7 @@
           buildInputs = [
             pkgs.cmake
             pkgs.gersemi
+            pkgs.lldb
             pkgs.llvm
             pkgs.llvmPackages_17.clang-tools
             pkgs.ninja
