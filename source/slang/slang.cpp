@@ -2274,7 +2274,7 @@ TargetRequest::TargetRequest(const TargetRequest& other)
 }
 
 
-Session* TargetRequest::getSession()
+Session* TargetRequest::getGlobalSession()
 {
     return linkage->getSessionImpl();
 }
@@ -2496,9 +2496,9 @@ TranslationUnitRequest::TranslationUnitRequest(FrontEndCompileRequest* compileRe
     moduleName = getNamePool()->getName(m->getName());
 }
 
-Session* TranslationUnitRequest::getSession()
+Session* TranslationUnitRequest::getGlobalSession()
 {
-    return compileRequest->getSession();
+    return compileRequest->getGlobalSession();
 }
 
 NamePool* TranslationUnitRequest::getNamePool()
@@ -6681,7 +6681,7 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
 
 //
 
-Session* CompileRequestBase::getSession()
+Session* CompileRequestBase::getGlobalSession()
 {
     return getLinkage()->getSessionImpl();
 }
@@ -6988,7 +6988,7 @@ void Session::addBuiltinSource(
     outModule = module;
 }
 
-Session::~Session()
+GlobalSession::~GlobalSession()
 {
     // This is necessary because this ASTBuilder uses the SharedASTBuilder also owned by the
     // session. If the SharedASTBuilder gets dtored before the globalASTBuilder it has a dangling

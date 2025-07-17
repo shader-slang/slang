@@ -1997,7 +1997,7 @@ public:
     Module* getModule() { return module; }
     ModuleDecl* getModuleDecl() { return module->getModuleDecl(); }
 
-    Session* getSession();
+    Session* getGlobalSession();
     NamePool* getNamePool();
     SourceManager* getSourceManager();
 
@@ -2090,7 +2090,7 @@ public:
 
     Linkage* getLinkage() { return linkage; }
 
-    Session* getSession();
+    Session* getGlobalSession();
 
     CodeGenTarget getTarget()
     {
@@ -2634,7 +2634,7 @@ class CompileRequestBase : public RefObject
     // both front-end and back-end requests can store.
 
 public:
-    Session* getSession();
+    Session* getGlobalSession();
     Linkage* getLinkage() { return m_linkage; }
     DiagnosticSink* getSink() { return m_sink; }
     SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
@@ -3052,7 +3052,7 @@ public:
 
     Linkage* getLinkage() { return getProgram()->getLinkage(); }
 
-    Session* getSession() { return getLinkage()->getSessionImpl(); }
+    Session* getGlobalSession() { return getLinkage()->getSessionImpl(); }
 
     /// Get the source manager
     SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
@@ -3459,7 +3459,7 @@ public:
     SlangResult executeActionsInner();
     SlangResult executeActions();
 
-    Session* getSession() { return m_session; }
+    Session* getGlobalSession() { return m_session; }
     DiagnosticSink* getSink() { return &m_sink; }
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }
 
@@ -3619,7 +3619,7 @@ protected:
     Dictionary<Pair, PassThroughMode> m_map;
 };
 
-class Session : public RefObject, public slang::IGlobalSession
+class GlobalSession : public RefObject, public slang::IGlobalSession
 {
 public:
     SLANG_COM_INTERFACE(
@@ -3815,7 +3815,7 @@ public:
         String const& path,
         ISlangBlob* sourceBlob,
         Module*& outModule);
-    ~Session();
+    ~GlobalSession();
 
     void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
     void addTotalCompileTime(double time) { m_totalCompileTime += time; }
@@ -3875,6 +3875,9 @@ private:
     double m_totalCompileTime = 0.0;
 };
 
+// For backwards compatibility with existing code
+using Session = GlobalSession;
+
 const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name);
 
 void checkTranslationUnit(
@@ -3908,16 +3911,16 @@ SlangResult passthroughDownstreamDiagnostics(
 // abstract over the conversion required for each pair of types.
 //
 
-SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(Session* session)
+SLANG_FORCE_INLINE slang::IGlobalSession* asExternal(GlobalSession* session)
 {
     return static_cast<slang::IGlobalSession*>(session);
 }
 
-SLANG_FORCE_INLINE ComPtr<Session> asInternal(slang::IGlobalSession* session)
+SLANG_FORCE_INLINE ComPtr<GlobalSession> asInternal(slang::IGlobalSession* session)
 {
-    Slang::Session* internalSession = nullptr;
+    Slang::GlobalSession* internalSession = nullptr;
     session->queryInterface(SLANG_IID_PPV_ARGS(&internalSession));
-    return ComPtr<Session>(INIT_ATTACH, static_cast<Session*>(internalSession));
+    return ComPtr<GlobalSession>(INIT_ATTACH, static_cast<GlobalSession*>(internalSession));
 }
 
 SLANG_FORCE_INLINE slang::ISession* asExternal(Linkage* linkage)

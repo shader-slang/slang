@@ -3961,7 +3961,7 @@ SlangResult OptionsParser::parse(
     // Set up useful members
     m_requestImpl = asInternal(compileRequest);
 
-    auto session = asInternal(m_requestImpl->getSession());
+    auto session = asInternal(m_requestImpl->getGlobalSession());
 
     m_session = session;
     m_frontEndReq = m_requestImpl->getFrontEndReq();

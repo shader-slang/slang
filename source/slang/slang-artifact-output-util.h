@@ -9,7 +9,8 @@
 namespace Slang
 {
 
-class Session;
+class GlobalSession;
+using Session = GlobalSession;
 
 struct ArtifactOutputUtil
 {

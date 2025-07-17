@@ -27,7 +27,7 @@ struct PropagateConstExprContext
 
     IRBuilder* getBuilder() { return &builder; }
 
-    Session* getSession() { return module->getSession(); }
+    Session* getGlobalSession() { return module->getGlobalSession(); }
 
     DiagnosticSink* getSink() { return sink; }
 };

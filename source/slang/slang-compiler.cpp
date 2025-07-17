@@ -1263,7 +1263,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     outArtifact.setNull();
 
     auto sink = getSink();
-    auto session = getSession();
+    auto session = getGlobalSession();
 
     CodeGenTarget sourceTarget = CodeGenTarget::None;
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
@@ -1925,7 +1925,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     SLANG_RETURN_ON_FAIL(compiler->compile(options, artifact.writeRef()));
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-    getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+    getGlobalSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
     SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
 
@@ -2008,7 +2008,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
             // Output the disassemble
             ComPtr<IArtifact> disassemblyArtifact;
             SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(
-                getSession(),
+                getGlobalSession(),
                 intermediateArtifact,
                 getSink(),
                 disassemblyArtifact.writeRef()));
@@ -2019,7 +2019,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
             if (debugArtifact)
             {
                 SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(
-                    getSession(),
+                    getGlobalSession(),
                     debugArtifact,
                     getSink(),
                     disassemblyDebugArtifact.writeRef()));
@@ -2094,7 +2094,7 @@ struct CompileTimerRAII
 // Do emit logic for a zero or more entry points
 SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
-    CompileTimerRAII recordCompileTime(getSession());
+    CompileTimerRAII recordCompileTime(getGlobalSession());
 
     auto target = getTargetFormat();
 
@@ -2172,7 +2172,7 @@ void EndToEndCompileRequest::writeArtifactToStandardOutput(
         return;
     }
 
-    auto session = getSession();
+    auto session = getGlobalSession();
     ArtifactOutputUtil::maybeConvertAndWrite(
         session,
         artifact,
@@ -2849,7 +2849,7 @@ void CodeGenContext::_dumpIntermediateMaybeWithAssembly(IArtifact* artifact)
     _dumpIntermediate(artifact);
 
     ComPtr<IArtifact> assembly;
-    ArtifactOutputUtil::maybeDisassemble(getSession(), artifact, nullptr, assembly);
+    ArtifactOutputUtil::maybeDisassemble(getGlobalSession(), artifact, nullptr, assembly);
 
     if (assembly)
     {

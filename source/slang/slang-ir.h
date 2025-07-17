@@ -30,7 +30,8 @@ class GenericDecl;
 class FuncType;
 class Layout;
 class Type;
-class Session;
+class GlobalSession;
+using Session = GlobalSession;
 class Name;
 struct IRBuilder;
 struct IRFunc;
@@ -2301,7 +2302,7 @@ public:
 
     IRModule* getModule() { return m_module; }
 
-    Session* getSession() { return m_session; }
+    Session* getGlobalSession() { return m_session; }
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
@@ -2369,7 +2370,7 @@ public:
 
     static RefPtr<IRModule> create(Session* session);
 
-    SLANG_FORCE_INLINE Session* getSession() const { return m_session; }
+    SLANG_FORCE_INLINE Session* getGlobalSession() const { return m_session; }
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst; }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 

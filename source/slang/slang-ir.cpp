@@ -7308,7 +7308,7 @@ static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
 
         // Get the compiler from the session through the module
         auto module = inst->getModule();
-        auto session = module->getSession();
+        auto session = module->getGlobalSession();
         IDownstreamCompiler* compiler =
             session->getOrLoadDownstreamCompiler(PassThroughMode::SpirvDis, nullptr);
 

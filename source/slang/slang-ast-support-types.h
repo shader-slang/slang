@@ -28,7 +28,8 @@ FIDDLE() namespace Slang
 
     class Module;
     class Name;
-    class Session;
+    class GlobalSession;
+    using Session = GlobalSession;
     class SyntaxVisitor;
     class FuncDecl;
     class Layout;

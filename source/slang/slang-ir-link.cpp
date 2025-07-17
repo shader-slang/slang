@@ -2023,7 +2023,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
-    auto session = codeGenContext->getSession();
+    auto globalSession = codeGenContext->getGlobalSession();
     auto target = codeGenContext->getTargetFormat();
     auto targetProgram = codeGenContext->getTargetProgram();
     auto targetReq = codeGenContext->getTargetReq();
@@ -2040,7 +2040,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     auto& irModules = stateStorage.contextStorage.irModules;
 
     auto sharedContext = state->getSharedContext();
-    initializeSharedSpecContext(sharedContext, session, nullptr, target, targetReq);
+    initializeSharedSpecContext(sharedContext, globalSession, nullptr, target, targetReq);
 
     state->irModule = sharedContext->module;
 
@@ -2049,7 +2049,6 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
-    auto globalSession = static_cast<Session*>(linkage->getGlobalSession());
     List<IRModule*> builtinModules;
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());

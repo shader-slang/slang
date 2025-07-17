@@ -6,7 +6,8 @@ namespace Slang
 {
 
 struct IRModule;
-class Session;
+class GlobalSession;
+using Session = GlobalSession;
 class SerialSourceLocReader;
 class SerialSourceLocWriter;
 

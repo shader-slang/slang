@@ -85,7 +85,8 @@ struct SerializedOptionsData
     List<String> stringPool;
 };
 
-class Session;
+class GlobalSession;
+using Session = GlobalSession;
 
 struct CompilerOptionSet
 {

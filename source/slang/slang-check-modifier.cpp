@@ -91,7 +91,7 @@ bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabi
     {
         if (!varExpr->name)
             return false;
-        if (varExpr->name == getSession()->getCompletionRequestTokenName())
+        if (varExpr->name == getGlobalSession()->getCompletionRequestTokenName())
         {
             auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
             suggestions.clear();
@@ -168,14 +168,14 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
         // Look up the name and see what attributes we find.
         //
         LookupMask lookupMask = LookupMask::Attribute;
-        if (attributeName == getSession()->getCompletionRequestTokenName())
+        if (attributeName == getGlobalSession()->getCompletionRequestTokenName())
         {
             lookupMask = LookupMask((uint32_t)LookupMask::Attribute | (uint32_t)LookupMask::type);
         }
 
         auto lookupResult = lookUp(m_astBuilder, this, attributeName, scope, lookupMask);
 
-        if (attributeName == getSession()->getCompletionRequestTokenName())
+        if (attributeName == getGlobalSession()->getCompletionRequestTokenName())
         {
             // If this is a completion request, add the lookup result to linkage.
             auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
@@ -1738,7 +1738,7 @@ Modifier* SemanticsVisitor::checkModifier(
 
     if (auto hlslSemantic = as<HLSLSimpleSemantic>(m))
     {
-        if (hlslSemantic->name.getName() == getSession()->getCompletionRequestTokenName())
+        if (hlslSemantic->name.getName() == getGlobalSession()->getCompletionRequestTokenName())
         {
             getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =
                 CompletionSuggestions::ScopeKind::HLSLSemantics;

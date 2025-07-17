@@ -632,7 +632,7 @@ struct IRGenContext
 
     void setValue(Decl* decl, LoweredValInfo value) { env->mapDeclToValue[decl] = value; }
 
-    Session* getSession() { return shared->m_session; }
+    Session* getGlobalSession() { return shared->m_session; }
 
     DiagnosticSink* getSink() { return shared->m_sink; }
 
@@ -11994,12 +11994,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    auto session = translationUnit->getSession();
+    auto globalSession = translationUnit->getGlobalSession();
     auto compileRequest = translationUnit->compileRequest;
     Linkage* linkage = compileRequest->getLinkage();
 
     SharedIRGenContext sharedContextStorage(
-        session,
+        globalSession,
         translationUnit->compileRequest->getSink(),
         translationUnit->compileRequest->optionSet.shouldObfuscateCode(),
         translationUnit->getModuleDecl(),

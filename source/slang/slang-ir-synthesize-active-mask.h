@@ -4,7 +4,8 @@
 namespace Slang
 {
 
-class Session;
+class GlobalSession;
+using Session = GlobalSession;
 struct IRModule;
 class DiagnosticSink;
 

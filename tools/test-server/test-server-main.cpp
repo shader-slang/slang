@@ -426,14 +426,14 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     testModule->setTestReporter(&testReporter);
 
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getOrCreateGlobalSession();
-    if (!session)
+    slang::IGlobalSession* globalSession = getOrCreateGlobalSession();
+    if (!globalSession)
     {
         return SLANG_FAIL;
     }
 
     UnitTestContext unitTestContext;
-    unitTestContext.slangGlobalSession = session;
+    unitTestContext.slangGlobalSession = globalSession;
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
@@ -487,8 +487,8 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     }
 
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getOrCreateGlobalSession();
-    if (!session)
+    slang::IGlobalSession* globalSession = getOrCreateGlobalSession();
+    if (!globalSession)
     {
         return SLANG_FAIL;
     }
@@ -523,7 +523,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     }
 
     const SlangResult funcRes =
-        func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+        func(&stdWriters, globalSession, int(toolArgs.getCount()), toolArgs.begin());
 
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;

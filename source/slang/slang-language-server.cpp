@@ -2973,15 +2973,15 @@ getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob
 {
     ComPtr<slang::IGlobalSession> globalSession;
     slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef());
-    Slang::Session* session = static_cast<Slang::Session*>(globalSession.get());
+    Slang::GlobalSession* globalSessionPtr = static_cast<Slang::GlobalSession*>(globalSession.get());
     StringBuilder sb;
     if (moduleName.startsWith("core"))
     {
-        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::Core);
+        globalSessionPtr->getBuiltinModuleSource(sb, slang::BuiltinModuleName::Core);
     }
     else if (moduleName.startsWith("glsl"))
     {
-        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::GLSL);
+        globalSessionPtr->getBuiltinModuleSource(sb, slang::BuiltinModuleName::GLSL);
     }
     *blob = StringBlob::moveCreate(sb.produceString()).detach();
     return SLANG_OK;
