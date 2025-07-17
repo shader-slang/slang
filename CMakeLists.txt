@@ -188,7 +188,7 @@ mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 # dependency name, rather than to the dependency directory itself, for example
 # SLANG_OVERRIDE_LZ4_PATH points to a directory containing a directory called
 # `lz4` containing the lz4 source.
-# 
+#
 advanced_option(
     SLANG_OVERRIDE_LZ4_PATH
     "Build using user defined path for LZ4"
@@ -494,7 +494,7 @@ configure_package_config_file(
 
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
-# export the slang targets. 
+# export the slang targets.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         install(
