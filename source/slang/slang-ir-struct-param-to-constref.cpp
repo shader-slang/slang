@@ -86,8 +86,7 @@ struct StructParamToConstRefContext
         auto fieldAddr = transformBuilder.emitFieldAddress(param, fieldExtract->getField());
         auto loadInst = transformBuilder.emitLoad(fieldAddr);
 
-        // Add newly created instructions to worklist for cascading transformations
-        workList.add(fieldAddr);
+        // Add newly created instruction to worklist for cascading transformations
         workList.add(loadInst);
 
         fieldExtract->replaceUsesWith(loadInst);
@@ -106,7 +105,6 @@ struct StructParamToConstRefContext
         auto loadInst = transformBuilder.emitLoad(elemAddr);
 
         // Add newly created instructions to worklist for cascading transformations
-        workList.add(elemAddr);
         workList.add(loadInst);
 
         getElement->replaceUsesWith(loadInst);
@@ -263,49 +261,11 @@ struct StructParamToConstRefContext
 
                 if (shouldTransformParamType(argType))
                 {
-                    // For ConstRef parameters, we need to pass address
-                    // Handle different argument patterns according to ConstRef semantics
-
-                    if (auto loadInst = as<IRLoad>(arg))
-                    {
-                        // If argument is a load, pass the address being loaded from
-                        // This handles: f(load(addr)) -> f(addr)
-                        auto sourceAddr = loadInst->getPtr();
-
-                        // Pass the address directly
-                        newArgs.add(sourceAddr);
-                    }
-                    else if (as<IRFieldExtract>(arg))
-                    {
-                        // For non-addressable field access, create temporary
-                        // This handles: f(s.field) -> { temp = s.field; f(&temp); }
-                        auto tempVar = builder.emitVar(arg->getFullType());
-                        builder.emitStore(tempVar, arg);
-                        newArgs.add(tempVar);
-                    }
-                    else if (as<IRGetElement>(arg))
-                    {
-                        // For non-addressable element access, create temporary
-                        // This handles: f(arr[i]) -> { temp = arr[i]; f(&temp); }
-                        auto tempVar = builder.emitVar(arg->getFullType());
-                        builder.emitStore(tempVar, arg);
-                        newArgs.add(tempVar);
-                    }
-                    else if (
-                        argType && (argType->getOp() == kIROp_PtrType ||
-                                    argType->getOp() == kIROp_ConstRefType))
-                    {
-                        // Already an address/reference, use directly
-                        newArgs.add(arg);
-                    }
-                    else
-                    {
-                        // For other cases (non-addressable values), create temporary
-                        // This handles: f(expr) -> { temp = expr; f(&temp); }
-                        auto tempVar = builder.emitVar(arg->getFullType());
-                        builder.emitStore(tempVar, arg);
-                        newArgs.add(tempVar);
-                    }
+                    // For ConstRef parameters, create temporary and pass address
+                    // This handles all cases: f(expr) -> { temp = expr; f(&temp); }
+                    auto tempVar = builder.emitVar(arg->getFullType());
+                    builder.emitStore(tempVar, arg);
+                    newArgs.add(tempVar);
                 }
                 else
                 {
