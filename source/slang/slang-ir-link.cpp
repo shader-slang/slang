@@ -2459,6 +2459,7 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     for (auto kv : pendingReplacements)
     {
         kv.key->replaceUsesWith(kv.value);
+        kv.key->removeAndDeallocate();
     }
 }
 
