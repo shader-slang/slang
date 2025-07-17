@@ -3896,21 +3896,6 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     }
     else if (auto constRefType = as<IRConstRefType>(type))
     {
-        // For C-like targets, ConstRef parameters should emit const pointer
-        // when the target supports it (C++/CUDA but not HLSL/GLSL)
-        if (shouldEmitConstForConstRef())
-        {
-            auto valueType = constRefType->getValueType();
-            m_writer->emit("const ");
-            emitType(valueType);
-            m_writer->emit(" *");
-            if (name.getLength() > 0)
-            {
-                m_writer->emit(" ");
-                m_writer->emit(name);
-            }
-            return;
-        }
         type = constRefType->getValueType();
     }
     emitParamTypeModifier(type);
