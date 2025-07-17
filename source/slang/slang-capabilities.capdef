@@ -1187,10 +1187,17 @@ alias bufferreference = GL_EXT_buffer_reference;
 /// [Compound]
 alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmetic_types_int64;
 /// Capabilities needed to use cooperative vectors
+/// [EXT]
+def _GL_NV_cooperative_matrix : _GLSL_450;
+
+/// Represents the GL_NV_cooperative_matrix extension for GLSL and SPIR-V cooperative vectors.
+/// [Compound]
+alias GL_NV_cooperative_matrix = _GL_NV_cooperative_matrix+GL_KHR_memory_scope_semantics | spvCooperativeVectorNV;
+
 /// Note that cpp and cuda are supported via a fallback non-cooperative implementation
 /// No HLSL shader model bound yet
 /// [Compound]
-alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | GL_NV_cooperative_matrix;
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;

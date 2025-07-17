@@ -24543,6 +24543,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
+        case glsl:
+            __intrinsic_asm "coopMatStoreNV($0, $1, $2, gl_ScopeSubgroup, 16)";
         case hlsl:
                 __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         case hlsl_coopvec_poc:
@@ -24568,6 +24570,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
+        case glsl:
+            __intrinsic_asm "coopMatStoreNV($0, $1, $2, gl_ScopeSubgroup, 16)";
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -24657,6 +24661,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
+        case glsl:
+            __intrinsic_asm "coopMatLoadNV(result, $0, $1, gl_ScopeSubgroup, 16)";
         case hlsl:
         case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
@@ -24687,6 +24693,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
+        case glsl:
+            __intrinsic_asm "coopMatLoadNV(result, $0, $1, gl_ScopeSubgroup, 16)";
         case hlsl:
         case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
@@ -26528,6 +26536,9 @@ CoopVec<T, M> coopVecMatMulPacked(
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
+    case glsl:
+        __intrinsic_asm "coopMatMulAddNV(result, $0, $1, $2, gl_ScopeSubgroup)";
+
     case hlsl:
         var ret = CoopVec<T, M>(0);
         let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
@@ -26751,6 +26762,9 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+
+    case glsl:
+        __intrinsic_asm "coopMatMulAddNV(result, $0, $1, $2, $3, gl_ScopeSubgroup)";
 
     case hlsl:
         var ret = CoopVec<T, M>(0);
