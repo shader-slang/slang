@@ -1109,6 +1109,7 @@ Result linkAndOptimizeIR(
     {
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
+        checkForOutOfBoundAccess(irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
             checkForMissingReturns(irModule, sink, target, false);

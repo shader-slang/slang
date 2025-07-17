@@ -658,6 +658,7 @@ DIAGNOSTIC(
     cannotConvertArrayOfSmallerToLargerSize,
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
+DIAGNOSTIC(30026, Error, arrayIndexOutOfBounds, "array index '$0' is out of bounds for array of size '$1'.")
 DIAGNOSTIC(
     30026,
     Error,
