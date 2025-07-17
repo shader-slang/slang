@@ -77,9 +77,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
     auto sourceFile = manager.createSourceFileWithString(PathInfo(), text);
     auto sourceView = manager.createSourceView(sourceFile, nullptr, SourceLoc());
     DiagnosticSink sink;
-    RootNamePool rootPool;
     NamePool namePool;
-    namePool.setRootNamePool(&rootPool);
     MemoryArena memory;
     memory.init(1 << 16);
     lexer.initialize(sourceView, &sink, &namePool, &memory);

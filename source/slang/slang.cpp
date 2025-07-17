@@ -167,8 +167,6 @@ void Session::init()
     DownstreamCompilerUtil::setDefaultLocators(m_downstreamCompilerLocators);
     m_downstreamCompilerSet = new DownstreamCompilerSet;
 
-    // Initialize name pool
-    getNamePool()->setRootNamePool(getRootNamePool());
     m_completionTokenName = getNamePool()->getName("#?");
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
@@ -1370,7 +1368,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_cmdLineContext(new CommandLineContext())
     , m_stringSlicePool(StringSlicePool::Style::Default)
 {
-    getNamePool()->setRootNamePool(session->getRootNamePool());
+    namePool = session->getNamePool();
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
 
@@ -3601,7 +3599,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 #if 0
             // Test serialization
             {
-                ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getRootNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
+                ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
             }
 #endif
     }

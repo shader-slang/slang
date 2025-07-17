@@ -350,7 +350,7 @@ T* findDecl(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
-    RootNamePool* rootNamePool,
+    NamePool* namePool,
     DiagnosticSink* sink,
     SourceManager* sourceManager,
     String outputFileName);
