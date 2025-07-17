@@ -455,7 +455,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         emit(context, "Some");
         emitType(
             context, 
-            getInterfaceType(getCurrentASTBuilder(), unboundSomeType));
+            getInterfaceType(getCurrentASTBuilder(), someType));
         return;
     }
 

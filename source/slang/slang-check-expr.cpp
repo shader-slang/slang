@@ -201,7 +201,7 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
 /// See `openExistential` for a discussion of what "opening" an
 /// existential-type value means.
 ///
-Expr* SemanticsVisitor::maybeCreateIndirectValToInterface(Expr* expr)
+Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
 {
     auto exprType = expr->type.type;
 
@@ -4238,7 +4238,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Otherwise, if the target type is a subtype of value->type, we need to grab the
     // subtype witness for runtime checks.
 
-    expr->value = maybeCreateIndirectValToInterface(originalVal);
+    expr->value = maybeOpenExistential(originalVal);
     expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
     if (expr->witnessArg)
     {
@@ -4293,7 +4293,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         {
             getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
         }
-        expr->value = maybeCreateIndirectValToInterface(expr->value);
+        expr->value = maybeOpenExistential(expr->value);
         return expr;
     }
 
@@ -5201,7 +5201,7 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     // can expose its structure.
     //
 
-    expr->baseExpression = maybeCreateIndirectValToInterface(expr->baseExpression);
+    expr->baseExpression = maybeOpenExistential(expr->baseExpression);
     // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
 }
@@ -5238,7 +5238,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     // and we should "open" the existential here so that we
     // can expose its structure.
     //
-    baseExpr = maybeCreateIndirectValToInterface(baseExpr);
+    baseExpr = maybeOpenExistential(baseExpr);
 
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.

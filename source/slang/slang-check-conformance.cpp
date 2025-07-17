@@ -124,7 +124,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
     SubtypeWitness* failureWitness = nullptr;
 
-    // Pre-calc if we have a `some` type.
     auto superSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(superType);
 
     // In the common case, we can use the pre-computed inheritance information for `subType`

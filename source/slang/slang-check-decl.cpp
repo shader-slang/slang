@@ -3562,6 +3562,14 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
     {
         checkExtensionConformance(extensionDecl);
     }
+
+    void visitSomeTypeDecl(SomeTypeDecl* decl)
+    {
+        // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
+        auto inheritanceDecl = decl->getDirectMemberDeclsOfType<InheritanceDecl>();
+        SLANG_ASSERT(inheritanceDecl.getFirst());
+        checkConformance(getInterfaceType(m_astBuilder, decl), inheritanceDecl.getFirst(), decl);
+    }
 };
 
 // Check that types used as `Differential` type use themselves as their own `Differential` type.
@@ -3584,9 +3592,9 @@ struct SemanticsDeclDifferentialConformanceVisitor
             getOptionSet(),
             inheritanceDecl);
 
-        if (as<InterfaceDecl>(inheritanceDecl->parentDecl))
+        if (as<InterfaceDecl>(inheritanceDecl->parentDecl) ||
+            as<SomeTypeDecl>(inheritanceDecl->parentDecl))
             return;
-
         if (!inheritanceDecl->witnessTable)
             return;
         auto baseType = as<DeclRefType>(inheritanceDecl->witnessTable->baseType);
@@ -7900,6 +7908,12 @@ bool SemanticsVisitor::checkConformance(
             // code to work.
             return true;
         }
+
+        // always conforms
+        if (as<SomeTypeDecl>(parentDecl))
+        {
+            return true;
+        }
     }
 
     // Look at the type being inherited from, and validate
@@ -10639,7 +10653,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
                 (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsAllowed);
 
         auto subVisitor =
-            (SemanticsDeclHeaderVisitor)withSemanticsContextState(semanticsContextState);
+            (SemanticsDeclHeaderVisitor)withSemanticsContextState(semanticsContextState).withModifierPropagationTarget(funcDecl);
         resultType = subVisitor.CheckProperType(resultType);
     }
     else if (!funcDecl->returnType.type)
