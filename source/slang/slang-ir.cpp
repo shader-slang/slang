@@ -3878,7 +3878,7 @@ IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
 
 IRInst* IRBuilder::emitUnpackAnyValue(IRType* type, IRInst* value)
 {
-    auto inst = createInst<IRPackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
+    auto inst = createInst<IRUnpackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
 
     addInst(inst);
     return inst;
