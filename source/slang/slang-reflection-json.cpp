@@ -161,6 +161,12 @@ static void emitReflectionVarBindingInfoJSON(
         case SLANG_STAGE_COMPUTE:
             stageName = "compute";
             break;
+        case SLANG_STAGE_MESH:
+            stageName = "mesh";
+            break;
+        case SLANG_STAGE_AMPLIFICATION:
+            stageName = "amplification";
+            break;
 
         default:
             break;
@@ -705,8 +711,26 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer.maybeComma();
         writer << "\"kind\": \"DynamicResource\"";
         break;
+    case slang::TypeReflection::Kind::OutputStream:
+        writer.maybeComma();
+        writer << "\"kind\": \"OutputStream\"";
+        break;
+    case slang::TypeReflection::Kind::MeshOutput:
+        writer.maybeComma();
+        writer << "\"kind\": \"MeshOutput\"";
+        break;
+    case slang::TypeReflection::Kind::Specialized:
+        writer.maybeComma();
+        writer << "\"kind\": \"Specialized\"";
+        break;
+    case slang::TypeReflection::Kind::None:
+        writer.maybeComma();
+        writer << "\"kind\": \"None\"";
+        break;
     default:
-        assert(!"unhandled case");
+        fprintf(stderr, "Unhandled type kind: %d\n", (int)kind);
+        writer.maybeComma();
+        writer << "\"kind\": \"Unknown\"";
         break;
     }
     emitUserAttributes(writer, type);
@@ -1099,6 +1123,12 @@ static void emitReflectionEntryPointJSON(
         break;
     case SLANG_STAGE_COMPUTE:
         writer << ",\n\"stage\": \"compute\"";
+        break;
+    case SLANG_STAGE_MESH:
+        writer << ",\n\"stage\": \"mesh\"";
+        break;
+    case SLANG_STAGE_AMPLIFICATION:
+        writer << ",\n\"stage\": \"amplification\"";
         break;
     default:
         break;
