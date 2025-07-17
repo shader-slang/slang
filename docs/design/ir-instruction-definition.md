@@ -87,11 +87,15 @@ To add a new IR instruction:
 
 2. **Run the build**: The build system will automatically regenerate the C++ files.
 
-3. **Update the stable names**: Run the validation script:
+3. **Update the stable names**: Either
 
-   ```bash
-   ./external/lua/lua extras/check-ir-stable-names.lua update
-   ```
+   - Run the validation script:
+
+     ```bash
+     ./external/lua/lua extras/check-ir-stable-names.lua update
+     ```
+
+   - Or add a new ID to the mapping in `source/slang/slang-ir-insts-stable-names.lua`, this is checked for consistency in CI so it's safe to add manually.
 
    This assigns a permanent ID to your new instruction.
 
