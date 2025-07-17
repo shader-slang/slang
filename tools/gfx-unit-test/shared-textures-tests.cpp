@@ -1,7 +1,10 @@
+#if 0
+// Duplicated: This is identical to slang-rhi\tests\test-texture-shared.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
 #include "slang-gfx.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace gfx;
@@ -259,3 +262,5 @@ SLANG_UNIT_TEST(sharedTextureVulkanToCUDA)
 }
 #endif
 } // namespace gfx_test
+
+#endif

@@ -1859,53 +1859,46 @@ static Stmt* parseOptBody(Parser* parser)
         }
     }
 
-    if (parser->getStage() == ParsingStage::Decl)
+    // If we are at the initial parsing stage, just collect the tokens
+    // without actually parsing them.
+    if (peekTokenType(parser) != TokenType::LBrace)
     {
-        // If we are at the initial parsing stage, just collect the tokens
-        // without actually parsing them.
-        if (peekTokenType(parser) != TokenType::LBrace)
-        {
-            return parser->parseBlockStatement();
-        }
-        auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
-        unparsedStmt->currentScope = parser->currentScope;
-        unparsedStmt->outerScope = parser->outerScope;
-        unparsedStmt->sourceLanguage = parser->getSourceLanguage();
-        unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
-        parser->FillPosition(unparsedStmt);
-        List<Token>& tokens = unparsedStmt->tokens;
-        int braceDepth = 0;
-        for (;;)
-        {
-            auto token = parser->ReadToken();
-            if (token.type == TokenType::EndOfFile)
-            {
-                break;
-            }
-            if (token.type == TokenType::LBrace)
-            {
-                braceDepth++;
-            }
-            else if (token.type == TokenType::RBrace)
-            {
-                braceDepth--;
-            }
-            tokens.add(token);
-            if (braceDepth == 0)
-            {
-                break;
-            }
-        }
-        Token eofToken;
-        eofToken.type = TokenType::EndOfFile;
-        eofToken.loc = parser->tokenReader.peekLoc();
-        tokens.add(eofToken);
-        return unparsedStmt;
+        return parser->parseBlockStatement();
     }
-
-    // If we are in the second stage of parsing, then we need to actually
-    // parse the block statement for real.
-    return parser->parseBlockStatement();
+    auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
+    unparsedStmt->currentScope = parser->currentScope;
+    unparsedStmt->outerScope = parser->outerScope;
+    unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+    unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
+    parser->FillPosition(unparsedStmt);
+    List<Token>& tokens = unparsedStmt->tokens;
+    int braceDepth = 0;
+    for (;;)
+    {
+        auto token = parser->ReadToken();
+        if (token.type == TokenType::EndOfFile)
+        {
+            break;
+        }
+        if (token.type == TokenType::LBrace)
+        {
+            braceDepth++;
+        }
+        else if (token.type == TokenType::RBrace)
+        {
+            braceDepth--;
+        }
+        tokens.add(token);
+        if (braceDepth == 0)
+        {
+            break;
+        }
+    }
+    Token eofToken;
+    eofToken.type = TokenType::EndOfFile;
+    eofToken.loc = parser->tokenReader.peekLoc();
+    tokens.add(eofToken);
+    return unparsedStmt;
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -3585,7 +3578,34 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
+    // Check for GLSL layout qualifiers when GLSL input is allowed
+    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    {
+        auto getLayoutArg = [&](const char* defaultLayout)
+        {
+            if (auto dataLayoutMod =
+                    parser->pendingModifiers->findModifier<GLSLBufferDataLayoutModifier>())
+            {
+                if (as<GLSLStd140Modifier>(dataLayoutMod))
+                    return "Std140DataLayout";
+                else if (as<GLSLStd430Modifier>(dataLayoutMod))
+                    return "Std430DataLayout";
+                else if (as<GLSLScalarModifier>(dataLayoutMod))
+                    return "ScalarDataLayout";
+            }
+            return defaultLayout;
+        };
+
+        String layoutType = getLayoutArg("Std140DataLayout");
+        return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
+    }
+
     return ParseBufferBlockDecl(parser, "ConstantBuffer");
+}
+
+static NodeBase* parseHLSLCBufferDeclWithLayout(Parser* parser, String layoutType)
+{
+    return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
 }
 
 static NodeBase* parseHLSLTBufferDecl(Parser* parser, void* /*userData*/)
@@ -3649,7 +3669,7 @@ static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
 
             // substitution needs to be filled during check
             Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl))
+            if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl))
             {
                 paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
@@ -5001,7 +5021,9 @@ static DeclBase* ParseDeclWithModifiers(
 
                     if (as<HLSLUniformModifier>(mod))
                     {
-                        decl = as<Decl>(parseHLSLCBufferDecl(parser, nullptr));
+                        decl = as<Decl>(parseHLSLCBufferDeclWithLayout(
+                            parser,
+                            getLayoutArg("Std140DataLayout")));
                         break;
                     }
                     else
@@ -5500,7 +5522,6 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 static Decl* parseEnumDecl(Parser* parser)
 {
     EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
-
     parser->ReadToken("enum");
 
     // HACK: allow the user to write `enum class` in case

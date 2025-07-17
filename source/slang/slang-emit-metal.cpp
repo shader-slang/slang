@@ -1163,6 +1163,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             switch (ptrType->getAddressSpace())
             {
             case AddressSpace::Global:
+            case AddressSpace::UserPointer:
                 m_writer->emit(" device");
                 m_writer->emit("*");
                 break;
@@ -1181,6 +1182,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case AddressSpace::MetalObjectData:
                 m_writer->emit(" object_data");
                 m_writer->emit("*");
+                break;
+            default:
+                SLANG_UNEXPECTED("Unknown addressspace encountered.");
                 break;
             }
             return;

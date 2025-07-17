@@ -10,7 +10,7 @@
 #include "stb_image.h"
 
 using namespace Slang;
-using namespace gfx;
+using namespace rhi;
 
 Slang::Result WindowedAppBase::initializeBase(
     const char* title,
@@ -18,32 +18,20 @@ Slang::Result WindowedAppBase::initializeBase(
     int height,
     DeviceType deviceType)
 {
-    // Initialize the rendering layer.
-#ifdef _DEBUG
-    // Enable debug layer in debug config.
-    gfxEnableDebugLayer(true);
-#endif
-    IDevice::Desc deviceDesc = {};
+    DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
-    gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
-    if (SLANG_FAILED(res))
-        return res;
+#ifdef _DEBUG
+    deviceDesc.enableValidation = true;
+#endif
+    gDevice = getRHI()->createDevice(deviceDesc);
+    if (!gDevice)
+    {
+        return SLANG_FAIL;
+    }
 
-    ICommandQueue::Desc queueDesc = {};
-    queueDesc.type = ICommandQueue::QueueType::Graphics;
-    gQueue = gDevice->createCommandQueue(queueDesc);
-
+    gQueue = gDevice->getQueue(QueueType::Graphics);
     windowWidth = width;
     windowHeight = height;
-
-    IFramebufferLayout::TargetLayout renderTargetLayout = {gfx::Format::R8G8B8A8_UNORM, 1};
-    IFramebufferLayout::TargetLayout depthLayout = {gfx::Format::D32_FLOAT, 1};
-    IFramebufferLayout::Desc framebufferLayoutDesc;
-    framebufferLayoutDesc.renderTargetCount = 1;
-    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
-    framebufferLayoutDesc.depthStencil = &depthLayout;
-    SLANG_RETURN_ON_FAIL(
-        gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
 
     // Do not create swapchain and windows in test mode, because there won't be any display.
     if (!isTestMode())
@@ -59,155 +47,39 @@ Slang::Result WindowedAppBase::initializeBase(
         gWindow->events.mainLoop = [this]() { mainLoop(); };
         gWindow->events.sizeChanged = Slang::Action<>(this, &WindowedAppBase::windowSizeChanged);
 
-        auto deviceInfo = gDevice->getDeviceInfo();
+
+        WindowHandle windowHandle = gWindow->getNativeHandle().convert<WindowHandle>();
+        gSurface = gDevice->createSurface(windowHandle);
+
+        auto deviceInfo = gDevice->getInfo();
         Slang::StringBuilder titleSb;
         titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
         gWindow->setText(titleSb.getBuffer());
 
-        // Create swapchain and framebuffers.
-        gfx::ISwapchain::Desc swapchainDesc = {};
-        swapchainDesc.format = gfx::Format::R8G8B8A8_UNORM;
-        swapchainDesc.width = width;
-        swapchainDesc.height = height;
-        swapchainDesc.imageCount = kSwapchainImageCount;
-        swapchainDesc.queue = gQueue;
-        gfx::WindowHandle windowHandle = gWindow->getNativeHandle().convert<gfx::WindowHandle>();
-        gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
-        createSwapchainFramebuffers();
+        rhi::SurfaceConfig surfaceConfig = {};
+
+        surfaceConfig.format = gSurface->getInfo().preferredFormat;
+        surfaceConfig.width = width;
+        surfaceConfig.height = height;
+        surfaceConfig.desiredImageCount = kSwapchainImageCount;
+        gSurface->configure(surfaceConfig);
     }
     else
     {
-        createOfflineFramebuffers();
+        createOfflineTextures();
     }
-
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
-    {
-        gfx::ITransientResourceHeap::Desc transientHeapDesc = {};
-        transientHeapDesc.constantBufferSize = 4096 * 1024;
-        auto transientHeap = gDevice->createTransientResourceHeap(transientHeapDesc);
-        gTransientHeaps.add(transientHeap);
-    }
-
-    gfx::IRenderPassLayout::Desc renderPassDesc = {};
-    renderPassDesc.framebufferLayout = gFramebufferLayout;
-    renderPassDesc.renderTargetCount = 1;
-    IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
-    IRenderPassLayout::TargetAccessDesc depthStencilAccess = {};
-    renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-    renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-    renderTargetAccess.initialState = ResourceState::Undefined;
-    renderTargetAccess.finalState = ResourceState::Present;
-    depthStencilAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-    depthStencilAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-    depthStencilAccess.initialState = ResourceState::DepthWrite;
-    depthStencilAccess.finalState = ResourceState::DepthWrite;
-    renderPassDesc.renderTargetAccess = &renderTargetAccess;
-    renderPassDesc.depthStencilAccess = &depthStencilAccess;
-    gRenderPass = gDevice->createRenderPassLayout(renderPassDesc);
 
     return SLANG_OK;
 }
 
 void WindowedAppBase::mainLoop()
 {
-    int frameBufferIndex = gSwapchain->acquireNextImage();
-
-    gTransientHeaps[frameBufferIndex]->synchronizeAndReset();
-    renderFrame(frameBufferIndex);
-    gTransientHeaps[frameBufferIndex]->finish();
+    auto texture = gSurface->acquireNextImage();
+    renderFrame(texture);
 }
 
-void WindowedAppBase::offlineRender()
-{
-    gTransientHeaps[0]->synchronizeAndReset();
-    renderFrame(0);
-    gTransientHeaps[0]->finish();
-}
 
-void WindowedAppBase::createFramebuffers(
-    uint32_t width,
-    uint32_t height,
-    gfx::Format colorFormat,
-    uint32_t frameBufferCount)
-{
-    for (uint32_t i = 0; i < frameBufferCount; i++)
-    {
-        gfx::ITextureResource::Desc depthBufferDesc;
-        depthBufferDesc.type = IResource::Type::Texture2D;
-        depthBufferDesc.size.width = width;
-        depthBufferDesc.size.height = height;
-        depthBufferDesc.size.depth = 1;
-        depthBufferDesc.format = gfx::Format::D32_FLOAT;
-        depthBufferDesc.defaultState = ResourceState::DepthWrite;
-        depthBufferDesc.allowedStates = ResourceStateSet(ResourceState::DepthWrite);
-        ClearValue depthClearValue = {};
-        depthBufferDesc.optimalClearValue = &depthClearValue;
-        ComPtr<gfx::ITextureResource> depthBufferResource =
-            gDevice->createTextureResource(depthBufferDesc, nullptr);
-
-        ComPtr<gfx::ITextureResource> colorBuffer;
-        if (isTestMode())
-        {
-            gfx::ITextureResource::Desc colorBufferDesc;
-            colorBufferDesc.type = IResource::Type::Texture2D;
-            colorBufferDesc.size.width = width;
-            colorBufferDesc.size.height = height;
-            colorBufferDesc.size.depth = 1;
-            colorBufferDesc.format = colorFormat;
-            colorBufferDesc.defaultState = ResourceState::RenderTarget;
-            colorBufferDesc.allowedStates =
-                ResourceStateSet(ResourceState::RenderTarget, ResourceState::CopyDestination);
-            colorBuffer = gDevice->createTextureResource(colorBufferDesc, nullptr);
-        }
-        else
-        {
-            gSwapchain->getImage(i, colorBuffer.writeRef());
-        }
-
-        gfx::IResourceView::Desc colorBufferViewDesc;
-        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-        colorBufferViewDesc.format = colorFormat;
-        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-        ComPtr<gfx::IResourceView> rtv =
-            gDevice->createTextureView(colorBuffer.get(), colorBufferViewDesc);
-
-        gfx::IResourceView::Desc depthBufferViewDesc;
-        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
-        depthBufferViewDesc.format = gfx::Format::D32_FLOAT;
-        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
-        ComPtr<gfx::IResourceView> dsv =
-            gDevice->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
-
-        gfx::IFramebuffer::Desc framebufferDesc;
-        framebufferDesc.renderTargetCount = 1;
-        framebufferDesc.depthStencilView = dsv.get();
-        framebufferDesc.renderTargetViews = rtv.readRef();
-        framebufferDesc.layout = gFramebufferLayout;
-        ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
-
-        gFramebuffers.add(frameBuffer);
-    }
-}
-
-void WindowedAppBase::createOfflineFramebuffers()
-{
-    gFramebuffers.clear();
-    createFramebuffers(windowWidth, windowHeight, gfx::Format::R8G8B8A8_UNORM, 1);
-}
-
-void WindowedAppBase::createSwapchainFramebuffers()
-{
-    gFramebuffers.clear();
-    createFramebuffers(
-        gSwapchain->getDesc().width,
-        gSwapchain->getDesc().height,
-        gSwapchain->getDesc().format,
-        kSwapchainImageCount);
-}
-
-ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
+ComPtr<ITextureView> WindowedAppBase::createTextureFromFile(
     String fileName,
     int& textureWidth,
     int& textureHeight)
@@ -215,24 +87,24 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
     int channelsInFile = 0;
     auto textureContent =
         stbi_load(fileName.getBuffer(), &textureWidth, &textureHeight, &channelsInFile, 4);
-    gfx::ITextureResource::Desc textureDesc = {};
-    textureDesc.allowedStates.add(ResourceState::ShaderResource);
-    textureDesc.format = gfx::Format::R8G8B8A8_UNORM;
-    textureDesc.numMipLevels = Math::Log2Ceil(Math::Min(textureWidth, textureHeight)) + 1;
-    textureDesc.type = gfx::IResource::Type::Texture2D;
+    TextureDesc textureDesc = {};
+    textureDesc.type = TextureType::Texture2D;
+    textureDesc.usage = TextureUsage::ShaderResource;
+    textureDesc.format = Format::RGBA8Unorm;
+    textureDesc.mipCount = Math::Log2Ceil(Math::Min(textureWidth, textureHeight)) + 1;
     textureDesc.size.width = textureWidth;
     textureDesc.size.height = textureHeight;
     textureDesc.size.depth = 1;
-    List<gfx::ITextureResource::SubresourceData> subresData;
+    List<SubresourceData> subresData;
     List<List<uint32_t>> mipMapData;
-    mipMapData.setCount(textureDesc.numMipLevels);
-    subresData.setCount(textureDesc.numMipLevels);
+    mipMapData.setCount(textureDesc.mipCount);
+    subresData.setCount(textureDesc.mipCount);
     mipMapData[0].setCount(textureWidth * textureHeight);
     memcpy(mipMapData[0].getBuffer(), textureContent, textureWidth * textureHeight * 4);
     stbi_image_free(textureContent);
     subresData[0].data = mipMapData[0].getBuffer();
-    subresData[0].strideY = textureWidth * 4;
-    subresData[0].strideZ = textureWidth * textureHeight * 4;
+    subresData[0].rowPitch = textureWidth * 4;
+    subresData[0].slicePitch = textureWidth * textureHeight * 4;
 
     // Build mipmaps.
     struct RGBA
@@ -254,15 +126,15 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
 
     int lastMipWidth = textureWidth;
     int lastMipHeight = textureHeight;
-    for (int m = 1; m < textureDesc.numMipLevels; m++)
+    for (uint32_t m = 1; m < textureDesc.mipCount; m++)
     {
         auto lastMipmapData = mipMapData[m - 1].getBuffer();
         int w = lastMipWidth / 2;
         int h = lastMipHeight / 2;
         mipMapData[m].setCount(w * h);
         subresData[m].data = mipMapData[m].getBuffer();
-        subresData[m].strideY = w * 4;
-        subresData[m].strideZ = h * w * 4;
+        subresData[m].rowPitch = w * 4;
+        subresData[m].slicePitch = h * w * 4;
         for (int x = 0; x < w; x++)
         {
             for (int y = 0; y < h; y++)
@@ -284,11 +156,31 @@ ComPtr<gfx::IResourceView> WindowedAppBase::createTextureFromFile(
         lastMipHeight = h;
     }
 
-    auto texture = gDevice->createTextureResource(textureDesc, subresData.getBuffer());
+    auto texture = gDevice->createTexture(textureDesc, subresData.getBuffer());
 
-    gfx::IResourceView::Desc viewDesc = {};
-    viewDesc.type = gfx::IResourceView::Type::ShaderResource;
+    TextureViewDesc viewDesc = {};
     return gDevice->createTextureView(texture.get(), viewDesc);
+}
+
+void WindowedAppBase::createOfflineTextures()
+{
+    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    {
+        TextureDesc textureDesc = {};
+        textureDesc.size.width = this->windowWidth;
+        textureDesc.size.height = this->windowHeight;
+        textureDesc.format = Format::RGBA8Unorm;
+        textureDesc.mipCount = 1;
+        textureDesc.usage = TextureUsage::UnorderedAccess | TextureUsage::CopySource;
+        auto texture = gDevice->createTexture(textureDesc);
+        gOfflineTextures.add(texture);
+    }
+}
+
+void WindowedAppBase::offlineRender()
+{
+    SLANG_ASSERT(gOfflineTextures.getCount() > 0);
+    renderFrame(gOfflineTextures[0]);
 }
 
 void WindowedAppBase::windowSizeChanged()
@@ -299,17 +191,12 @@ void WindowedAppBase::windowSizeChanged()
     auto clientRect = gWindow->getClientRect();
     if (clientRect.width > 0 && clientRect.height > 0)
     {
-        // Free all framebuffers before resizing swapchain.
-        gFramebuffers = decltype(gFramebuffers)();
-
-        // Resize swapchain.
-        if (gSwapchain->resize(clientRect.width, clientRect.height) == SLANG_OK)
-        {
-            // Recreate framebuffers for each swapchain back buffer image.
-            createSwapchainFramebuffers();
-            windowWidth = clientRect.width;
-            windowHeight = clientRect.height;
-        }
+        SurfaceConfig config = {};
+        config.format = gSurface->getInfo().preferredFormat;
+        config.width = clientRect.width;
+        config.height = clientRect.height;
+        config.vsync = false;
+        gSurface->configure(config);
     }
 }
 
@@ -363,12 +250,6 @@ public:
 #endif
     }
 };
-
-void initDebugCallback()
-{
-    static DebugCallback callback = {};
-    gfxSetDebugCallback(&callback);
-}
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str)

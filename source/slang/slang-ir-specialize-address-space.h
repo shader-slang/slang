@@ -1,6 +1,8 @@
 // slang-ir-specialize-address-space.h
 #pragma once
 
+#include "core/slang-basic.h"
+
 #include <cinttypes>
 
 namespace Slang
@@ -27,4 +29,10 @@ struct InitialAddressSpaceAssigner
 /// based on the address space of the arguments.
 ///
 void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner);
+
+/// Traverse the user graph of the initial insts and fix up address spaces to make sure they are
+/// consistent. This is needed after inlining a callee, the address space of the callee's
+/// instructions should be propagated from the arguments.
+void propagateAddressSpaceFromInsts(List<IRInst*>&& initialArgs);
+
 } // namespace Slang

@@ -32,6 +32,7 @@ struct Foo<T : IDifferentiable>
 extension<T : IDifferentiable> Foo<T>
 {
     [ForwardDerivativeOf(doThing)]
+    [NoDiffThis]
     DifferentialPair<T> diff_doThing()
     {
         return diffPair(value, T.dzero());

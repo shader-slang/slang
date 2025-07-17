@@ -89,7 +89,7 @@ syntax __extern_cpp : ExternCppModifier;
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
+    __builtin_requirement($((int)BuiltinRequirementKind::DefaultInitializableConstructor))
     __init();
 }
 
@@ -99,15 +99,15 @@ interface IDefaultInitializable
 interface IComparable
 {
     /// Returns true if two values of the conforming type are equal.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
+    __builtin_requirement($((int)BuiltinRequirementKind::Equals))
     bool equals(This other);
 
     /// Returns true if `this` is less than `other`.
-    __builtin_requirement($( (int)BuiltinRequirementKind::LessThan))
+    __builtin_requirement($((int)BuiltinRequirementKind::LessThan))
     bool lessThan(This other);
 
     /// Returns true if `this` is less than or equal to `other`.
-    __builtin_requirement($( (int)BuiltinRequirementKind::LessThanOrEquals))
+    __builtin_requirement($((int)BuiltinRequirementKind::LessThanOrEquals))
     bool lessThanOrEquals(This other);
 }
 
@@ -169,42 +169,42 @@ interface IArithmetic : IComparable
 interface ILogical : IComparable
 {
     /// Shifts the bits of this value to the left by the specified number of positions.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Shl))
     This shl(int value);
 
     /// Shifts the bits of this value to the right by the specified number of positions.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Shr) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Shr))
     This shr(int value);
 
     /// Performs a bitwise AND operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitAnd) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitAnd))
     This bitAnd(This other);
 
     /// Performs a bitwise OR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitOr) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitOr))
     This bitOr(This other);
 
     /// Performs a bitwise XOR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitXor) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitXor))
     This bitXor(This other);
 
     /// Performs a bitwise NOT operation on this value, flipping all bits.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitNot) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitNot))
     This bitNot();
 
     /// Performs a logical AND operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::And) )
+    __builtin_requirement($((int)BuiltinRequirementKind::And))
     This and(This other);
 
     /// Performs a logical OR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Or) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Or))
     This or(This other);
 
     /// Performs a logical NOT operation on this value, returning the logical negation.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Not) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Not))
     This not();
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
+    __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(int val);
 }
 
@@ -603,25 +603,25 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///
 /// 
 __magic_type(DifferentiableType)
-[KnownBuiltin("IDifferentiable")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiable))]
 interface IDifferentiable
 {
     // Note: the compiler implementation requires the `Differential` associated type to be defined
     // before anything else.
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialType) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialType))
     associatedtype Differential : IDifferentiable;
 
     /// Returns a zero-initialized value of the differential type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DZeroFunc))
     static Differential dzero();
 
     /// Adds two differential values and returns the result.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DAddFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DAddFunc))
     static Differential dadd(Differential, Differential);
 
     /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DMulFunc))
     __generic<T : __BuiltinRealType>
     static Differential dmul(T, Differential);
 };
@@ -646,10 +646,10 @@ interface IDifferentiable
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
 __magic_type(DifferentiablePtrType)
-[KnownBuiltin("IDifferentiablePtr")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiablePtr))]
 interface IDifferentiablePtrType
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialPtrType))
     associatedtype Differential : IDifferentiablePtrType;
 };
 
@@ -831,7 +831,7 @@ interface __EnumType : ILogical
     // conflict if a user had an `enum` case called `Tag`
     associatedtype __Tag : __BuiltinIntegerType;
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
+    __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(__Tag value);
 };
 
@@ -1256,7 +1256,7 @@ struct __none_t
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
+__generic<T, let addrSpace : uint64_t = $((uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
@@ -1444,7 +1444,7 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
+typealias __Addr<T> = Ptr<T, $((uint64_t)AddressSpace::Generic)ULL>;
 
 //@public:
 
@@ -2583,8 +2583,9 @@ __prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::OperatorAddressOf))]
 [require(cpp_cuda_spirv)]
-__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
+__prefix Ptr<T, $((uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
 __generic<T>
 __intrinsic_op(0)
@@ -4040,10 +4041,10 @@ attribute_syntax [__readNone] : ReadNoneAttribute;
 /// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {
-    Struct = $( (int) UserDefinedAttributeTargets::Struct), /// Struct types.
-    Var = $( (int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
-    Function = $( (int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
-    Param = $( (int) UserDefinedAttributeTargets::Param), /// Function parameters.
+    Struct = $((int) UserDefinedAttributeTargets::Struct), /// Struct types.
+    Var = $((int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
+    Function = $((int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
+    Param = $((int) UserDefinedAttributeTargets::Param), /// Function parameters.
 };
 
 /// Mark a struct type as a user defined attribute type.
@@ -4233,7 +4234,7 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 // @hidden:
 __attributeTarget(DeclBase)
-attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
+attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
@@ -4275,7 +4276,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
 __generic<T>
-typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+typealias NodePayloadPtr = Ptr<T, $((uint64_t)AddressSpace::NodePayloadAMDX)>;
 
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;

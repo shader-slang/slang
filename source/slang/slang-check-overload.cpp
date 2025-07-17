@@ -913,7 +913,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                         context.loc,
                         Diagnostics::mutatingMethodOnImmutableValue,
                         funcDeclRef.getName());
-                    maybeDiagnoseThisNotLValue(context.baseExpr);
+                    maybeDiagnoseConstVariableAssignment(context.baseExpr);
                 }
                 return false;
             }

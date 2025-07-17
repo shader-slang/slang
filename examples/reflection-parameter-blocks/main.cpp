@@ -21,15 +21,17 @@
 // with a certain amount of boilerplate that isn't especially
 // interesting to discuss.
 
-#include "slang-com-ptr.h"
-#include "slang.h"
-typedef SlangResult Result;
-
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
+#include "slang-com-ptr.h"
+#include "slang-rhi.h"
+#include "slang.h"
+
+typedef SlangResult Result;
 using Slang::ComPtr;
 using Slang::String;
 using Slang::List;
+using namespace rhi;
 
 // The example code currently only supports Vulkan, but the
 // code is factored with the intention that it could be extended
@@ -47,7 +49,7 @@ static const char* kSourceFileName = "shader.slang";
 
 struct PipelineLayoutReflectionContext
 {
-    gfx::IDevice* _gfxDevice = nullptr;
+    IDevice* _rhiDevice = nullptr;
     slang::ISession* _slangSession = nullptr;
     slang::ProgramLayout* _slangProgramLayout = nullptr;
     slang::IBlob* _slangCompiledProgramBlob = nullptr;
@@ -529,16 +531,16 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     Result createAndValidatePipelineLayout()
     {
         // Here we do a little bit of complicated interaction with
-        // the `gfx` library to allow us to call raw Vulkan API
-        // functions on the same device that `gfx` kindly set up
+        // the `slang-rhi` library to allow us to call raw Vulkan API
+        // functions on the same device that `slang-rhi` kindly set up
         // for us.
         //
-        gfx::IDevice::InteropHandles handles;
-        SLANG_RETURN_ON_FAIL(_gfxDevice->getNativeDeviceHandles(&handles));
+        DeviceNativeHandles handle;
+        SLANG_RETURN_ON_FAIL(_rhiDevice->getNativeDeviceHandles(&handle));
 
-        vkAPI.instance = (VkInstance)handles.handles[0].handleValue;
-        vkAPI.physicalDevice = (VkPhysicalDevice)handles.handles[1].handleValue;
-        vkAPI.device = (VkDevice)handles.handles[2].handleValue;
+        vkAPI.instance = (VkInstance)handle.handles[0].value;
+        vkAPI.physicalDevice = (VkPhysicalDevice)handle.handles[1].value;
+        vkAPI.device = (VkDevice)handle.handles[2].value;
 
         vkAPI.initGlobalProcs();
         vkAPI.initInstanceProcs();
@@ -575,25 +577,23 @@ struct ReflectionParameterBlocksExampleApp : public TestBase
     {
         parseOption(argc, argv);
 
-        // We start by initializing the `gfx` system, so that
+        // We start by initializing the `slang-rhi` system, so that
         // it can handle most of the details of getting a
         // Vulkan device up and running.
 
-#ifdef _DEBUG
-        gfx::gfxEnableDebugLayer(true);
-#endif
-        gfx::IDevice::Desc deviceDesc = {};
-        deviceDesc.deviceType = gfx::DeviceType::Vulkan;
+        DeviceDesc deviceDesc = {};
+        deviceDesc.deviceType = DeviceType::Vulkan;
 
-        ComPtr<gfx::IDevice> gfxDevice;
-        SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, gfxDevice.writeRef()));
+        ComPtr<IDevice> rhiDevice = getRHI()->createDevice(deviceDesc);
+        if (!rhiDevice)
+            return SLANG_FAIL;
 
-        // The `gfx` library also creates a Slang session as
+        // The `slang-rhi` library also creates a Slang session as
         // part of its startup, so we will use the session
         // it already created for the compilation in
         // this example.
         //
-        auto slangSession = gfxDevice->getSlangSession();
+        auto slangSession = rhiDevice->getSlangSession();
 
         // Next we go through the fairly routine steps needed to
         // compile a Slang program from source.
@@ -672,7 +672,7 @@ struct ReflectionParameterBlocksExampleApp : public TestBase
         //
         PipelineLayoutReflectionContext_Vulkan context;
 
-        context._gfxDevice = gfxDevice;
+        context._rhiDevice = rhiDevice;
         context._slangSession = slangSession;
         context._slangProgramLayout = programLayout;
         context._slangCompiledProgramBlob = programBinary;

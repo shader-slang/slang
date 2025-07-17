@@ -782,7 +782,7 @@ Result spawnAndWaitExe(
 
     const auto& options = context->options;
 
-    if (options.shouldBeVerbose)
+    if (options.verbosity == VerbosityLevel::Verbose)
     {
         String commandLine = cmdLine.toString();
         context->getTestReporter()->messageFormat(
@@ -815,7 +815,7 @@ Result spawnAndWaitSharedLibrary(
     const auto& options = context->options;
     String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
-    if (options.shouldBeVerbose)
+    if (options.verbosity == VerbosityLevel::Verbose)
     {
         CommandLine testCmdLine;
 
@@ -908,7 +908,7 @@ Result spawnAndWaitProxy(
     cmdLine.setExecutableLocation(ExecutableLocation(context->exeDirectoryPath, "test-proxy"));
 
     const auto& options = context->options;
-    if (options.shouldBeVerbose)
+    if (options.verbosity == VerbosityLevel::Verbose)
     {
         String commandLine = cmdLine.toString();
         context->getTestReporter()->messageFormat(
@@ -4624,7 +4624,10 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            printf("found test: '%s'\n", file.getBuffer());
+            if (context->options.verbosity >= VerbosityLevel::Info)
+            {
+                printf("found test: '%s'\n", file.getBuffer());
+            }
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
@@ -4994,8 +4997,13 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangi", &SlangITool::innerMain);
     }
 
-    SLANG_RETURN_ON_FAIL(
-        Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
+    SLANG_RETURN_ON_FAIL(Options::parse(
+        argc,
+        argv,
+        &categorySet,
+        StdWriters::getOut(),
+        StdWriters::getError(),
+        &context.options));
 
     Options& options = context.options;
 
@@ -5071,7 +5079,7 @@ SlangResult innerMain(int argc, char** argv)
         context.setTestReporter(&reporter);
 
         reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
-        reporter.m_isVerbose = options.shouldBeVerbose;
+        reporter.m_verbosity = options.verbosity;
         reporter.m_hideIgnored = options.hideIgnored;
 
         {

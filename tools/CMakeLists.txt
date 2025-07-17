@@ -127,30 +127,6 @@ endif()
 
 if(SLANG_ENABLE_GFX)
     #
-    # `platform` contains all the platform abstractions for a GUI application.
-    #
-    slang_add_target(
-        platform
-        ${SLANG_LIB_TYPE}
-        EXCLUDE_FROM_ALL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            imgui
-            stb
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
-            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
-            ${CMAKE_DL_LIBS}
-        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE gfx
-        INCLUDE_DIRECTORIES_PUBLIC . platform
-        EXPORT_MACRO_PREFIX SLANG_PLATFORM
-    )
-
-    #
     # GFX
     #
     slang_add_target(
@@ -210,48 +186,61 @@ if(SLANG_ENABLE_GFX)
         EXPORT_SET_NAME SlangTargets
         FOLDER gfx
     )
-    if(SLANG_ENABLE_TESTS)
-        set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
-        add_custom_target(
-            copy-gfx-slang-modules
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
-            COMMAND
-                ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
-                ${modules_dest_dir}/gfx.slang
-            COMMAND
-                ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
-                ${modules_dest_dir}/slang.slang
-            WORKING_DIRECTORY ${slang_SOURCE_DIR}
-            VERBATIM
-        )
-        set_target_properties(
-            copy-gfx-slang-modules
-            PROPERTIES FOLDER generators
-        )
-        install(
-            FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
-            DESTINATION ${runtime_subdir}
-        )
-        add_dependencies(gfx copy-gfx-slang-modules)
-    endif()
 
+    #
+    # `platform` contains all the platform abstractions for a GUI application.
+    #
     slang_add_target(
-        gfx-util
-        STATIC
-        LINK_WITH_PRIVATE core
-        INCLUDE_FROM_PRIVATE gfx
-        # The headers are included with 'include "gfx-util/blah.h"' which is found
-        # in the tools directory
-        INCLUDE_DIRECTORIES_PUBLIC .
-        FOLDER gfx
+        platform
+        ${SLANG_LIB_TYPE}
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            imgui
+            stb
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
+            ${CMAKE_DL_LIBS}
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
+        INCLUDE_FROM_PRIVATE
+            imgui
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
+            platform
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        EXPORT_MACRO_PREFIX SLANG_PLATFORM
+    )
+
+    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+    add_custom_target(
+        copy-gfx-slang-modules
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
+            ${modules_dest_dir}/gfx.slang
+        COMMAND
+            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+            ${modules_dest_dir}/slang.slang
+        WORKING_DIRECTORY ${slang_SOURCE_DIR}
+        VERBATIM
+    )
+    set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+    install(
+        FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
+        DESTINATION ${runtime_subdir}
     )
 endif()
-
-#
-# The test executables and runtime-loaded modules
-#
 if(SLANG_ENABLE_TESTS)
+    # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
         EXECUTABLE
@@ -292,7 +281,6 @@ if(SLANG_ENABLE_TESTS)
             test-server
             test-process
         OPTIONAL_REQUIRES
-            gfx
             slang-rt
             slang-glslang
             slang-llvm
@@ -307,6 +295,9 @@ if(SLANG_ENABLE_TESTS)
         DIRECTORY ${slang_SOURCE_DIR}
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
+
+    add_dependencies(slang-test copy-gfx-slang-modules)
+
     include(CTest)
     add_test(
         NAME slang-test
@@ -338,7 +329,21 @@ if(SLANG_ENABLE_TESTS)
             EXCLUDE_FROM_ALL
             EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
             USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE core slang unit-test gfx gfx-util platform stb
+            LINK_WITH_PRIVATE
+                core
+                slang
+                unit-test
+                stb
+                platform
+                $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            INCLUDE_DIRECTORIES_PUBLIC
+                .
+                platform
+                if
+                (not ${SLANG_OVERRIDE_GLM_PATH})
+            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
             OUTPUT_NAME gfx-unit-test-tool
             REQUIRED_BY slang-test
             FOLDER test/tools
