@@ -2229,23 +2229,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->removeAndDeallocate();
 
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> buffersToLower;
-        List<IRInst*> textureFootprintTypesToLower;
+        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRInst*> textureFootprintTypes;
 
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto t = as<IRHLSLStructuredBufferTypeBase>(globalInst))
             {
-                buffersToLower.add(t);
+                instsToProcess.add(t);
             }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
-                textureFootprintTypesToLower.add(globalInst);
+                textureFootprintTypes.add(globalInst);
             }
         }
-
-        // Lowering buffers
-        for (auto t : buffersToLower)
+        for (auto t : instsToProcess)
         {
             auto lowered = lowerStructuredBufferType(t);
             IRBuilder builder(t);
@@ -2255,9 +2253,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 lowered.structType,
                 getStorageBufferAddressSpace()));
         }
-
-        // Lowering texture footprints
-        for (auto t : textureFootprintTypesToLower)
+        for (auto t : textureFootprintTypes)
         {
             auto lowered = lowerTextureFootprintType(t);
             IRBuilder builder(t);

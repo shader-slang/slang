@@ -1,9 +1,9 @@
 #include "slang-ir-legalize-matrix-types.h"
 
+#include "slang-compiler.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -62,8 +62,7 @@ struct MatrixTypeLoweringContext
             return false;
 
         auto elementType = matrixType->getElementType();
-        return as<IRBoolType>(elementType) || 
-               as<IRUIntType>(elementType) || 
+        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                as<IRIntType>(elementType);
     }
 
@@ -85,13 +84,13 @@ struct MatrixTypeLoweringContext
 
                 IRBuilder builder(matrixType);
                 builder.setInsertBefore(matrixType);
-                
+
                 // Create vector type for columns: vector<T, C>
                 auto vectorType = builder.getVectorType(elementType, columnCount);
-                
+
                 // Create array type for rows: vector<T, C>[R]
                 auto arrayType = builder.getArrayType(vectorType, rowCount);
-                
+
                 newInst = arrayType;
             }
         }
@@ -139,4 +138,4 @@ void legalizeMatrixTypes(TargetProgram* targetProgram, IRModule* module, Diagnos
     context.processModule();
 }
 
-} // namespace Slang 
+} // namespace Slang
