@@ -85,7 +85,7 @@ struct SerializedOptionsData
     List<String> stringPool;
 };
 
-class Session;
+class GlobalSession;
 
 struct CompilerOptionSet
 {
@@ -95,7 +95,7 @@ struct CompilerOptionSet
 
     static bool allowDuplicate(CompilerOptionName name);
 
-    void writeCommandLineArgs(Session* globalSession, StringBuilder& sb);
+    void writeCommandLineArgs(GlobalSession* globalSession, StringBuilder& sb);
 
     OrderedDictionary<CompilerOptionName, List<CompilerOptionValue>> options;
 

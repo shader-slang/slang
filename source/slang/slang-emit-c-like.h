@@ -263,7 +263,7 @@ public:
 
     CodeGenContext* getCodeGenContext() { return m_codeGenContext; }
     TargetRequest* getTargetReq() { return m_codeGenContext->getTargetReq(); }
-    Session* getSession() { return m_codeGenContext->getSession(); }
+    GlobalSession* getGlobalSession() { return m_codeGenContext->getGlobalSession(); }
     Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
     ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
     TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }

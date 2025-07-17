@@ -17,7 +17,7 @@ namespace Slang
 {
 
 /* static */ SlangResult ArtifactOutputUtil::dissassembleWithDownstream(
-    Session* session,
+    GlobalSession* session,
     IArtifact* artifact,
     DiagnosticSink* sink,
     IArtifact** outArtifact)
@@ -75,7 +75,7 @@ namespace Slang
 }
 
 SlangResult ArtifactOutputUtil::maybeDisassemble(
-    Session* session,
+    GlobalSession* session,
     IArtifact* artifact,
     DiagnosticSink* sink,
     ComPtr<IArtifact>& outArtifact)
@@ -187,7 +187,7 @@ static SlangResult _requireBlob(
 }
 
 /* static */ SlangResult ArtifactOutputUtil::maybeConvertAndWrite(
-    Session* session,
+    GlobalSession* session,
     IArtifact* artifact,
     DiagnosticSink* sink,
     const UnownedStringSlice& writerName,

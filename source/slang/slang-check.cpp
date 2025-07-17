@@ -59,7 +59,7 @@ protected:
 } // namespace
 
 
-void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
+void GlobalSession::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 {
     if (m_sharedLibraryLoader != loader)
     {
@@ -77,14 +77,14 @@ void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     }
 }
 
-void Session::resetDownstreamCompiler(PassThroughMode type)
+void GlobalSession::resetDownstreamCompiler(PassThroughMode type)
 {
     // Mark as initialized
     m_downstreamCompilerInitialized &= ~(1 << int(type));
     m_downstreamCompilers[int(type)].setNull();
 }
 
-IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
+IDownstreamCompiler* GlobalSession::getOrLoadDownstreamCompiler(
     PassThroughMode type,
     DiagnosticSink* sink)
 {

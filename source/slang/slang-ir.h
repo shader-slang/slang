@@ -30,7 +30,7 @@ class GenericDecl;
 class FuncType;
 class Layout;
 class Type;
-class Session;
+class GlobalSession;
 class Name;
 struct IRBuilder;
 struct IRFunc;
@@ -2301,7 +2301,7 @@ public:
 
     IRModule* getModule() { return m_module; }
 
-    Session* getSession() { return m_session; }
+    GlobalSession* getGlobalSession() { return m_session; }
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
@@ -2338,7 +2338,7 @@ private:
     IRModule* m_module;
 
     // The parent compilation session
-    Session* m_session;
+    GlobalSession* m_session;
 
     GlobalValueNumberingMap m_globalValueNumberingMap;
 
@@ -2367,9 +2367,9 @@ public:
         kMemoryArenaBlockSize = 16 * 1024, ///< Use 16k block size for memory arena
     };
 
-    static RefPtr<IRModule> create(Session* session);
+    static RefPtr<IRModule> create(GlobalSession* session);
 
-    SLANG_FORCE_INLINE Session* getSession() const { return m_session; }
+    SLANG_FORCE_INLINE GlobalSession* getGlobalSession() const { return m_session; }
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst; }
     SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
@@ -2469,13 +2469,13 @@ private:
     IRModule() = delete;
 
     /// Ctor
-    IRModule(Session* session)
+    IRModule(GlobalSession* session)
         : m_session(session), m_memoryArena(kMemoryArenaBlockSize), m_deduplicationContext(this)
     {
     }
 
     // The compilation session in use.
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
 
     /// The root IR instruction for the module.
     ///

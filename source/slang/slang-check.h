@@ -9,6 +9,7 @@
 namespace Slang
 {
 class DiagnosticSink;
+class GlobalSession;
 class EntryPoint;
 class Linkage;
 class Module;
@@ -24,7 +25,7 @@ bool isFromCoreModule(Decl* decl);
 void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl);
 void registerBuiltinDecl(ASTBuilder* astBuilder, Decl* decl);
 
-void registerBuiltinDecls(Session* session, Decl* decl);
+void registerBuiltinDecls(GlobalSession* globalSession, Decl* decl);
 
 void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>& outDecls);
 

@@ -68,7 +68,7 @@ struct IRSerialWriteContext : IRSerialContext
 
 struct IRSerialReadContext : IRSerialContext, RefObject
 {
-    IRSerialReadContext(Session* session, SerialSourceLocReader* sourceLocReader)
+    IRSerialReadContext(GlobalSession* session, SerialSourceLocReader* sourceLocReader)
         : _session(session), _sourceLocReader(sourceLocReader)
     {
     }
@@ -77,7 +77,7 @@ struct IRSerialReadContext : IRSerialContext, RefObject
     virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
 
     // Used to allocate an IRModule
-    Session* _session;
+    GlobalSession* _session;
 
     //
     SerialSourceLocReader* _sourceLocReader;
@@ -497,7 +497,7 @@ Result readSerializedModuleInfo(
 //
 Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
-    Session* session,
+    GlobalSession* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {

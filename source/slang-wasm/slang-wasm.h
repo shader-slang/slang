@@ -138,7 +138,7 @@ public:
     Modifier* findModifier(Modifier::ID id);
     uint32_t getUserAttributeCount();
     slang::wgsl::UserAttribute* getUserAttributeByIndex(uint32_t index);
-    // slang::wgsl::UserAttribute* findUserAttributeByName(SlangSession* globalSession, std::string
+    // slang::wgsl::UserAttribute* findUserAttributeByName(SlangGlobalSession* globalSession, std::string
     // name);
     bool hasDefaultValue();
     // slang::wgsl::GenericReflection* getGenericContainer();
@@ -214,10 +214,10 @@ class ComponentType
 {
 public:
     IComponentType* m_interface;
-    Session* m_session;
+    GlobalSession* m_session;
 
 public:
-    ComponentType(slang::IComponentType* interface, Session* session)
+    ComponentType(slang::IComponentType* interface, GlobalSession* session)
         : m_interface(interface), m_session(session)
     {
     }
@@ -245,7 +245,7 @@ public:
 class EntryPoint : public ComponentType
 {
 public:
-    EntryPoint(slang::IComponentType* interface, Session* session)
+    EntryPoint(slang::IComponentType* interface, GlobalSession* session)
         : ComponentType(interface, session)
     {
     }
@@ -264,7 +264,7 @@ private:
 class Module : public ComponentType
 {
 public:
-    Module(slang::IComponentType* interface, Session* session)
+    Module(slang::IComponentType* interface, GlobalSession* session)
         : ComponentType(interface, session)
     {
     }
@@ -286,7 +286,7 @@ public:
 class Session
 {
 public:
-    Session(slang::ISession* interface)
+    Session(slang::IGlobalSession* interface)
         : m_interface(interface)
     {
     }
@@ -302,7 +302,7 @@ public:
     // Returns ComponentType or null.
     emscripten::val createCompositeComponentType(emscripten::val components);
 
-    slang::ISession* interface() const { return m_interface; }
+    slang::IGlobalSession* interface() const { return m_interface; }
 
     void addComponentType(slang::IComponentType* componentType)
     {
@@ -317,20 +317,20 @@ private:
 class GlobalSession
 {
 public:
-    GlobalSession(slang::IGlobalSession* interface)
+    GlobalSession(slang::IGlobalGlobalSession* interface)
         : m_interface(interface)
     {
     }
 
-    Session* createSession(int compileTarget);
+    GlobalSession* createSession(int compileTarget);
 
-    slang::IGlobalSession* interface() const { return m_interface; }
+    slang::IGlobalGlobalSession* interface() const { return m_interface; }
 
 private:
     Slang::ComPtr<slang::IGlobalSession> m_interface;
 };
 
-GlobalSession* createGlobalSession();
+GlobalGlobalSession* createGlobalSession();
 
 namespace lsp
 {

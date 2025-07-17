@@ -29,7 +29,7 @@ struct ByteAddressBufferLegalizationOptions
 /// scalar or vector types.
 ///
 void legalizeByteAddressBufferOps(
-    Session* session,
+    GlobalSession* session,
     TargetProgram* target,
     IRModule* module,
     DiagnosticSink* sink,

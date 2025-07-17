@@ -3693,9 +3693,9 @@ void registerBuiltinDecl(ASTBuilder* astBuilder, Decl* decl)
 ///
 /// This function should only be needed for declarations in the core module.
 ///
-static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
+static void _registerBuiltinDeclsRec(GlobalSession* globalSession, Decl* decl)
 {
-    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+    SharedASTBuilder* sharedASTBuilder = globalSession->m_sharedASTBuilder;
 
     registerBuiltinDecl(sharedASTBuilder, decl);
 
@@ -3706,18 +3706,18 @@ static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
             if (as<ScopeDecl>(childDecl))
                 continue;
 
-            _registerBuiltinDeclsRec(session, childDecl);
+            _registerBuiltinDeclsRec(globalSession, childDecl);
         }
     }
     if (auto genericDecl = as<GenericDecl>(decl))
     {
-        _registerBuiltinDeclsRec(session, genericDecl->inner);
+        _registerBuiltinDeclsRec(globalSession, genericDecl->inner);
     }
 }
 
-void registerBuiltinDecls(Session* session, Decl* decl)
+void registerBuiltinDecls(GlobalSession* globalSession, Decl* decl)
 {
-    _registerBuiltinDeclsRec(session, decl);
+    _registerBuiltinDeclsRec(globalSession, decl);
 }
 
 void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecls)
@@ -3812,7 +3812,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     //
     if (isFromCoreModule(moduleDecl))
     {
-        _registerBuiltinDeclsRec(getSession(), moduleDecl);
+        _registerBuiltinDeclsRec(getGlobalSession(), moduleDecl);
     }
 
     if (auto firstDeclInModule = moduleDecl->getFirstDirectMemberDecl())
@@ -4832,7 +4832,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     if (synGenericDecl->nameAndLoc.name)
     {
         synGenericDecl->nameAndLoc.name =
-            getSession()->getNameObj("$__syn_" + synGenericDecl->nameAndLoc.name->text);
+            getGlobalSession()->getNameObj("$__syn_" + synGenericDecl->nameAndLoc.name->text);
     }
 
     // Dictionary to map from the original type parameters to the synthesized ones.
@@ -5075,7 +5075,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             if (as<NoDiffModifier>(modifier))
             {
                 auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                noDiffModifier->keywordName = getGlobalSession()->getNameObj("no_diff");
                 addModifier(synParamDecl, noDiffModifier);
             }
             else if (
@@ -5174,7 +5174,7 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     if (synFuncDecl->nameAndLoc.name)
     {
         synFuncDecl->nameAndLoc.name =
-            getSession()->getNameObj("$__syn_" + synFuncDecl->nameAndLoc.name->text);
+            getGlobalSession()->getNameObj("$__syn_" + synFuncDecl->nameAndLoc.name->text);
     }
 
     // The result type of our synthesized method will be the expected
@@ -8029,7 +8029,7 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
                     innerMember);
 
                 if (getShared()->isInLanguageServer() &&
-                    member->getName() == getShared()->getSession()->getCompletionRequestTokenName())
+                    member->getName() == getShared()->getGlobalSession()->getCompletionRequestTokenName())
                 {
                     // If we encountered a completion request for a decl name where an 'override'
                     // keyword is specified, we should suggest all the base decls that can be
@@ -8738,7 +8738,7 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         witnessTable->witnessedType = enumTypeType;
         enumConformanceDecl->witnessTable = witnessTable;
 
-        Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
+        Name* tagAssociatedTypeName = getGlobalSession()->getNameObj("__Tag");
         Decl* tagAssociatedTypeDecl = nullptr;
         if (auto enumTypeTypeDeclRefType = dynamicCast<DeclRefType>(enumTypeType))
         {
@@ -10477,7 +10477,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 if (!paramDecl->hasModifier<NoDiffModifier>())
                 {
                     auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                    noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+                    noDiffModifier->keywordName = getGlobalSession()->getNameObj("no_diff");
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
@@ -11791,7 +11791,7 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
         // as parts of our core module are always visible,
         // even if they are not explicit `import`ed into user code.
         //
-        for (auto module : getSession()->coreModules)
+        for (auto module : getGlobalSession()->coreModules)
         {
             _addCandidateExtensionsFromModule(module->getModuleDecl());
         }
@@ -12047,7 +12047,7 @@ List<RefPtr<DeclAssociation>> const& SharedSemanticsContext::getAssociatedDeclsF
     {
         m_associatedDeclListsBuilt = true;
 
-        for (auto module : getSession()->coreModules)
+        for (auto module : getGlobalSession()->coreModules)
         {
             _addDeclAssociationsFromModule(module->getModuleDecl());
         }
