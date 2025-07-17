@@ -496,11 +496,8 @@ struct SharedIRGenContext
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
     // External (imported) unsafeForceInline functions that need to
-    // prelink after lowering.
-    // Key is the mangled name of the function, and value is the
-    // IRInst in the imported module that needs to be cloned into the
-    // current module.
-    Dictionary<String, IRInst*> externalSymbolsToPrelink;
+    // prelink into the current module after lowering.
+    List<IRInst*> externalSymbolsToPrelink;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -10665,7 +10662,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             String mangledName = getMangledName(context->astBuilder, decl);
             auto importedFunc = irModule->findSymbolByMangledName(mangledName);
             SLANG_ASSERT(importedFunc.getCount() > 0);
-            subContext->shared->externalSymbolsToPrelink.add(mangledName, importedFunc[0]);
+            subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
         }
 
         IRGeneric* outerGeneric = nullptr;

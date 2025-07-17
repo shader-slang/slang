@@ -2313,7 +2313,7 @@ struct IRPrelinkContext : IRSpecContext
         // exist in the current module, then we will clone a declaration of it and mark it
         // [Import].
         //
-        auto translateExportDecorToImport = [&](IRInst* inst)
+        auto completeClonedInst = [&](IRInst* inst)
         {
             String mangledName;
             ShortList<IRInst*> decorsToRemove;
@@ -2338,6 +2338,15 @@ struct IRPrelinkContext : IRSpecContext
             {
                 decor->removeFromParent();
             }
+            if (mangledName.getLength())
+            {
+                // Register the symbol in the shared context, so we don't
+                // clone any symbols with the same mangled name again.
+                RefPtr<IRSpecSymbol> symbol = new IRSpecSymbol();
+                symbol->nextWithSameName = nullptr;
+                symbol->irGlobalValue = inst;
+                shared->symbols[mangledName] = symbol;
+            }
             return inst;
         };
 
@@ -2347,7 +2356,7 @@ struct IRPrelinkContext : IRSpecContext
             // If we are cloning a global value, we will use the module builder.
             builderForClone = &shared->builderStorage;
         }
-
+        IRInst* result = nullptr;
         IRInst* clonedInst = nullptr;
         switch (originalVal->getOp())
         {
@@ -2359,7 +2368,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
         case kIROp_InterfaceType:
-            return translateExportDecorToImport(
+            return completeClonedInst(
                 cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
         case kIROp_WitnessTable:
             {
@@ -2373,7 +2382,7 @@ struct IRPrelinkContext : IRSpecContext
             // For functions, we will clone the full body only if it is [unsafeForceInlineEarly].
             if (originalVal->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
             {
-                return translateExportDecorToImport(
+                return completeClonedInst(
                     cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
             }
             else
@@ -2388,7 +2397,7 @@ struct IRPrelinkContext : IRSpecContext
             clonedInst = builderForClone->createClassType();
             break;
         default:
-            return translateExportDecorToImport(IRSpecContext::maybeCloneValue(originalVal));
+            return completeClonedInst(IRSpecContext::maybeCloneValue(originalVal));
         }
 
         // Clone without body.
@@ -2397,15 +2406,12 @@ struct IRPrelinkContext : IRSpecContext
 
         // Clone decorations
         cloneDecorations(this, clonedInst, originalVal);
-        translateExportDecorToImport(clonedInst);
+        completeClonedInst(clonedInst);
         return clonedInst;
     }
 };
 
-void prelinkIR(
-    Module* module,
-    IRModule* irModule,
-    const Dictionary<String, IRInst*>& mapExternSymbolToOriginalSymbol)
+void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& externalSymbolsToLink)
 {
     // Setup environment.
     IRSharedSpecContext sharedContext;
@@ -2432,15 +2438,21 @@ void prelinkIR(
     insertGlobalValueSymbols(&sharedContext, irModule);
 
     List<KeyValuePair<IRInst*, IRInst*>> pendingReplacements;
-    for (auto kv : mapExternSymbolToOriginalSymbol)
+    for (auto originalInst : externalSymbolsToLink)
     {
-        // kv.first is the mangledName of the function to clone.
-        // kv.second is the original symbol in the imported module that contains the full
-        // definition. We want to clone kv.second into the current module, and replace the existing
-        // inst with the cloned value.
-        auto existingInst = specContext.findSymbols(kv.first.getUnownedSlice())->irGlobalValue;
+        // originalInst is the function in the imported module to clone.
+        // We should lookup the inst in the current module with the same mangled name,
+        // that's the inst we want to remove and replace with the cloned inst.
+        auto mangledName = getMangledName(originalInst);
+        auto existingInst = specContext.findSymbols(mangledName)->irGlobalValue;
+        specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
-        auto cloned = cloneValue(&specContext, kv.second);
+
+        // Remove existing inst from the module before cloning so our duplication-check
+        // (`checkIRDuplicate`) doesn't complain.
+        existingInst->removeFromParent();
+
+        auto cloned = cloneValue(&specContext, originalInst);
         pendingReplacements.add(KeyValuePair<IRInst*, IRInst*>(existingInst, cloned));
     }
 
