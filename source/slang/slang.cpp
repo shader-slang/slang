@@ -13,6 +13,8 @@
 #include "../compiler-core/slang-artifact-container-util.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
+
+#include <cstdlib>  // for getenv
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-source-loc.h"
 #include "../core/slang-file-system.h"
@@ -39,6 +41,7 @@
 #include "slang-serialize-ir.h"
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
+#include "slang-ir.h"
 
 #include <sys/stat.h>
 
@@ -160,6 +163,20 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    // Read environment variable for IR debugging
+    const char* irBreakEnv = std::getenv("SLANG_DEBUG_IR_BREAK");
+    if (irBreakEnv)
+    {
+        char* endPtr;
+        long value = std::strtol(irBreakEnv, &endPtr, 10);
+        if (endPtr != irBreakEnv && *endPtr == '\0' && value >= 0 && value <= UINT32_MAX)
+        {
+            _slangIRAllocBreak = static_cast<uint32_t>(value);
+            _slangIRPrintStackAtBreak = true;
+        }
+    }
+#endif
 
     _initCodeGenTransitionMap();
 

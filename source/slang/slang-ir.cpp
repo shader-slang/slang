@@ -8,6 +8,11 @@
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
 
+#ifdef SLANG_LINUX_FAMILY
+#include <execinfo.h>
+#include <cstdio>
+#endif
+
 namespace Slang
 {
 struct IRSpecContext;
@@ -1739,6 +1744,7 @@ void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 SLANG_API uint32_t _slangIRAllocBreak = 0xFFFFFFFF;
+SLANG_API bool _slangIRPrintStackAtBreak = false;
 static bool _slangIRAllocBreakFirst = true;
 uint32_t& _debugGetIRAllocCounter()
 {
@@ -1757,6 +1763,17 @@ uint32_t _debugGetAndIncreaseInstCounter()
     {
 #if _WIN32 && defined(_MSC_VER)
         __debugbreak();
+#endif
+#ifdef SLANG_LINUX_FAMILY
+        if (_slangIRPrintStackAtBreak)
+        {
+            // Print stack trace for LLM debugging assistance
+            void* stackTrace[64];
+            int stackDepth = backtrace(stackTrace, 64);
+            fprintf(stderr, "IR instruction UID %u created at:\n", _slangIRAllocBreak);
+            backtrace_symbols_fd(stackTrace, stackDepth, STDERR_FILENO);
+            fprintf(stderr, "\n");
+        }
 #endif
     }
     return _debugGetIRAllocCounter()++;
