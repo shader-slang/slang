@@ -439,14 +439,14 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         bool isStage = isStageAtom((CapabilityName)caseStmt->capability, canonicalStage);
         if (as<StageSwitchStmt>(stmt))
         {
-            if (!isStage && caseStmt->capability != 0)
+            if (!isStage && caseStmt->capability != (int32_t)CapabilityName::Invalid)
             {
                 getSink()->diagnose(
                     caseStmt->capabilityToken.loc,
                     Diagnostics::unknownStageName,
                     caseStmt->capabilityToken);
             }
-            caseStmt->capability = (int)canonicalStage;
+            caseStmt->capability = (int32_t)canonicalStage;
         }
         else
         {
