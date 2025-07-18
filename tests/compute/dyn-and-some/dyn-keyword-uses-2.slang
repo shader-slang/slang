@@ -1,8 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// ensure visitSomeTypeExpr does not segfault with bad definition
+// Ensure visitSomeTypeExpr does not segfault with bad definition
 // and gets far enough to lint errors.
-
 
 // CHECK: ([[# @LINE+1]]): error 30015:
 struct DynStruct1 : DynInterface

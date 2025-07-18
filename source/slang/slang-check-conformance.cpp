@@ -149,7 +149,8 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         //
         if (!facetType->equals(superType))
         {
-            // if we have a `some` type we need to check if the base matches up
+            // if we have a `some` type we need to check if the concrete-interface matches up
+            // since `some T` is a placeholder for a concrete-interface.
             if (superSomeTypeDeclRef)
             {
                 if (!facetType->equals(getInterfaceType(m_astBuilder, superSomeTypeDeclRef)))

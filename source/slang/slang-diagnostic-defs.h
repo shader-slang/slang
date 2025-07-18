@@ -938,7 +938,7 @@ DIAGNOSTIC(
     Error,
     cannotHaveSomeTypeHere,
     "cannot have a 'some' type here; 'some' type must a non-complex-type and cannot be"
-    "a type parameter or return for a function inside a dyn interface")
+    " a type parameter or return for a function inside a dyn interface")
 DIAGNOSTIC(
     33086,
     Error,

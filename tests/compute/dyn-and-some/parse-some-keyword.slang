@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// ensure we have a positive test for `some` in parameters
+// Ensure we have a positive test for `some` in parameters
 
 // CHECK: OpEntryPoint
 // CHECK-NOT: error

@@ -382,7 +382,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
     }
 
-    // Regularly make a `some`/`dyn` type
+    // Implicitly make a `some`/`dyn` type
+    //validate if `some`/`dyn` are a proper-type
     {
         bool isDyn = false;
 
@@ -403,7 +404,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 if (shouldImplicitlySetInterfacesToSome(this))
                 {
-                    // Logic mirroring `visitSomeTypeExpr` 
+                    // Logic mirroring `visitSomeTypeExpr` to generate a SomeTypeDecl
                     SomeTypeDecl* decl;
                     if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
                         decl = m_astBuilder->create<UnboundSomeTypeDecl>();
@@ -420,9 +421,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
                     result = DeclRefType::create(astBuilder, decl);
                 }
-                // we do not tag types as 'dyn'
                 else if (modifierPropTarget)
                 {
+                    // Push a `dyn` modifier to the target decl
                     isDyn = true;
                     addModifier(modifierPropTarget, getASTBuilder()->create<DynModifier>());
                     result = type;

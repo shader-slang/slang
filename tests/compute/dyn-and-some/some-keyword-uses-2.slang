@@ -3,7 +3,6 @@
 // CHECK: OpEntryPoint
 // CHECK-NOT: error
 
-
 dyn interface IFooDyn
 {
     int getVal();

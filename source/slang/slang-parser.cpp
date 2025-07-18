@@ -1292,9 +1292,8 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     //    (erroring if multiple valid results are found).
                     //    [logic already implemented in `ArielG-NV`->`implement-SP024-some-support`
                     // 2. Fully reset state if we fail `tryParseUsingSyntaxDeclImpl`. This is
-                    // important
-                    //    because currently if we just implement #1, parser-context will still be
-                    //    changed, breaking parsing.
+                    //    important because currently if we just implement #1, parser-context 
+                    //    will still be changed, breaking parsing.
                     parsedModifier = parser->astBuilder->create<DynModifier>();
                     parsedModifier->loc = nameToken.loc;
                     AddModifier(&modifierLink, parsedModifier);
@@ -4902,7 +4901,7 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     // but, order (top down) mattter when parsing atomic_uint offset
     // more over, we can have patterns like: offset = 20, no offset [+4], offset = 16.
     // Therefore we must parse all in order. The issue then is we will struggle to
-    // substitute atomic_uint for storage buffers...
+    // subsitute atomic_uint for storage buffers...
     if (auto name = declRefExpr->name)
     {
         if (name->text.equals("atomic_uint"))

@@ -3603,7 +3603,7 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
 
     void visitSomeTypeDecl(SomeTypeDecl* decl)
     {
-        // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
+        // Fill in the minimal amount of conformance info needed
         auto inheritanceDecl = decl->getDirectMemberDeclsOfType<InheritanceDecl>();
         SLANG_ASSERT(inheritanceDecl.getFirst());
         checkConformance(getInterfaceType(m_astBuilder, decl), inheritanceDecl.getFirst(), decl);
@@ -10680,12 +10680,13 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     SemanticsContextState semanticsContextState = {};
     if (resultType.exp)
     {
-        // Allowed to return a `dyn`. This semantically means nothing though.
+        // Allowed to return a `dyn`. This semantically means nothing
+        // Result is an unbound-some-type if we allow a some-type
         semanticsContextState = SemanticsContextState(
             (UInt)SemanticsContextState::DynTypeIsAllowed |
             (UInt)SemanticsContextState::SomeTypeIsUnbound);
 
-        // not allowed `some` for return-type if we have a `dyn` type parent
+        // Not allowed `some` for return-type if we have a `dyn` type parent
         if (allowExperimentalDynamicDispatch(this, getOptionSet()) ||
             !funcDecl->parentDecl->hasModifier<DynModifier>())
             semanticsContextState = SemanticsContextState(

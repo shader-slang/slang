@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-//validate some uses of `some`.
+// Validate some uses of `some`.
 
 dyn interface IFoo
 {
@@ -34,8 +34,8 @@ struct StructForIFoo2 : IFoo
 
 void logic(inout some IFoo v1, in some IFoo v2)
 {
-    // cannot assign `some` to `some`
-    // CHECK_2026: error 33088
+    // Cannot assign `some` to `some`
+    // CHECK_2026: ([[# @LINE+1]]): error 33088
     v1 = v2;
     some IFoo data4 = v2;
 }
@@ -47,8 +47,8 @@ void computeMain()
     some IFoo data2 = StructForIFoo1(1);
     dyn IFoo data3 = StructForIFoo1(1);
 
-    // cannot assign `dyn` to `some`
-    // CHECK_2026: error 33087
+    // Cannot assign `dyn` to `some`
+    // CHECK_2026: ([[# @LINE+1]]): error 33087
     data1 = data3;
     logic(data1, data2);
     buffer[0] = data1.getVal() + data2.getVal();

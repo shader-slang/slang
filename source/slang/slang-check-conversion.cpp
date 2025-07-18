@@ -1209,7 +1209,6 @@ bool SemanticsVisitor::_coerce(
 
     // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
     // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
-    // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
     if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
         if (!validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink))
@@ -1888,11 +1887,6 @@ bool SemanticsVisitor::_coerce(
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }
 
-static bool isDynType(Type* type)
-{
-    return isDeclRefTypeOf<InterfaceDecl>(type);
-}
-
 bool SemanticsVisitor::validateSomeTypeCoerce(
     CoercionSite site,
     Type* toType,
@@ -1919,7 +1913,8 @@ bool SemanticsVisitor::validateSomeTypeCoerce(
             }
         }
         // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
-        else if (isDynType(fromType))
+        // A `dyn` is a simple `InterfaceDecl`
+        else if (isDeclRefTypeOf<InterfaceDecl>(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
             return false;

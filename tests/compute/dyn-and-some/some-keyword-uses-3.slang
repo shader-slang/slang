@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// validate some uses of `some`.
+// Validate some uses of `some`.
 
 dyn interface IFooDyn
 {
@@ -15,8 +15,7 @@ struct myS : IFoo
     int v2;
 }
 
-// not allowed `some` members
-//
+// Not allowed `some` members
 struct someStructMember1
 {
     // CHECK-DAG: ([[# @LINE+1]]): error 33085:
@@ -29,7 +28,7 @@ struct someStructMember3
     some IFoo v;
 };
 
-// not allowed `some` global
+// Not allowed `some` global
 // CHECK-DAG: ([[# @LINE+1]]): error 33085:
 static some IFoo globalSomeVariable;
 
@@ -38,11 +37,11 @@ void computeMain()
 {
 
 // Not allowed a `some` non-interface type
-// CHECK-DAG: error 33083
+// CHECK-DAG: ([[# @LINE+1]]): error 33083
     some myS bad1;
 
 // `dyn` and `some` is disallowed
-// CHECK-DAG: error 33086
+// CHECK-DAG: ([[# @LINE+1]]): error 33086
     dyn some IFooDyn bad6;     
 
     buffer[0] = 0;

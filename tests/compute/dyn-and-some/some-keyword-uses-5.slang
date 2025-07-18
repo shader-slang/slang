@@ -7,7 +7,6 @@
 #define QUALIFIER dyn
 #endif
 
-
 dyn interface IFoo
 {
     int getVal();
@@ -47,11 +46,10 @@ void computeMain()
     //
     // Can coerce `dyn` to a non `dyn` type.
 
-    // CHECK_SOME: error 30019
-
     // CHECK_DYN: OpEntryPoint
     // CHECK_DYN-NOT: error
     QUALIFIER IFoo data1 = StructForIFoo1(1);
+    // CHECK_SOME: ([[# @LINE+1]]): error 30019
     SomeStruct newStruct = data1;
 
     buffer[0] = newStruct.data;
