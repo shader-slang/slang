@@ -224,23 +224,23 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
 {
     // Test shader with extensions that have functions with same name but different signatures
     const char* userSourceBody = R"(
-        public interface IModel<T:IDifferentiable>
+        public interface IModel<float:IDifferentiable>
         {
-            public T forward(T x);
+            public float forward(float x);
         }
 
-        interface IScalarActivation<T:IDifferentiable> {}
+        interface IScalarActivation<float:IDifferentiable> {}
 
-        public extension<T:IDifferentiable, Act:IScalarActivation<T>> Act: IModel<T>
+        public extension<float:IDifferentiable, Act:IScalarActivation<float>> Act: IModel<float>
         {
-            public T forward(T x) { return x;}
+            public float forward(float x) { return x;}
         }
 
-        public struct MyStruct<T:IDifferentiable>: IScalarActivation<T> {}
+        public struct MyStruct<float:IDifferentiable>: IScalarActivation<float> {}
 
-        public extension<T:IDifferentiable> MyStruct<T>: IModel<T[2]>
+        public extension<float:IDifferentiable> MyStruct<float>: IModel<float[2]>
         {
-            public T[2] forward(T[2] x) { return x;}
+            public float[2] forward(float[2] x) { return x;}
         }
 
         [shader("compute")]
@@ -275,8 +275,8 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
 
     // Try to find the "forward" function in MyStruct
     // This should find functions with different signatures from both extensions:
-    // 1. T forward(T x) from the generic extension Act: IModel<T>
-    // 2. T[2] forward(T[2] x) from the MyStruct-specific extension MyStruct<T>: IModel<T[2]>
+    // 1. float forward(float x) from the generic extension Act: IModel<float>
+    // 2. float[2] forward(float[2] x) from the MyStruct-specific extension MyStruct<float>: IModel<float[2]>
     auto forwardFunc = module->getLayout()->findFunctionByNameInType(myStructType, "forward");
 
     // With the fix, this should find functions with different signatures
@@ -291,10 +291,10 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
         SLANG_CHECK(forwardFunc->getOverloadCount() >= 2);
 
         // We should be able to find both:
-        // - One with T parameter type (from generic extension)
-        // - One with T[2] parameter type (from MyStruct-specific extension)
-        bool foundTParam = false;
-        bool foundTArrayParam = false;
+        // - One with float parameter type (from generic extension)
+        // - One with float[2] parameter type (from MyStruct-specific extension)
+        bool foundFloatParam = false;
+        bool foundFloatArrayParam = false;
 
         for (int i = 0; i < forwardFunc->getOverloadCount(); i++)
         {
@@ -302,25 +302,25 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
             if (overload->getParameterCount() > 0)
             {
                 auto paramTypeName = overload->getParameterByIndex(0)->getType()->getName();
-                if (strstr(paramTypeName, "T[2]") || strstr(paramTypeName, "vector<T,2>"))
+                if (strstr(paramTypeName, "float[2]") || strstr(paramTypeName, "vector<float,2>"))
                 {
-                    foundTArrayParam = true;
+                    foundFloatArrayParam = true;
                 }
-                else if (strstr(paramTypeName, "T") && !strstr(paramTypeName, "["))
+                else if (strstr(paramTypeName, "float") && !strstr(paramTypeName, "["))
                 {
-                    foundTParam = true;
+                    foundFloatParam = true;
                 }
             }
         }
 
         // Both variants should be found
-        SLANG_CHECK(foundTParam);
-        SLANG_CHECK(foundTArrayParam);
+        SLANG_CHECK(foundFloatParam);
+        SLANG_CHECK(foundFloatArrayParam);
     }
     else
     {
-        // If not overloaded, at least one function should be found (better than before)
-        // This is still an improvement over the broken behavior
-        SLANG_CHECK(forwardFunc->getParameterCount() > 0);
+        // The function should be overloaded since there are multiple functions with different
+        // signatures. If it's not overloaded, the fix didn't work properly.
+        SLANG_CHECK_ABORT(false && "Expected function to be overloaded with multiple signatures");
     }
 }
