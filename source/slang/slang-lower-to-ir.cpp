@@ -3574,7 +3574,7 @@ static LoweredValInfo _emitCallToAccessor(
 
         auto thisParam = info.parameterLists.params[0];
         auto thisParamType = lowerType(context, thisParam.type);
-        
+
         addArg(
             context,
             &allArgs,
@@ -4005,13 +4005,12 @@ struct ExprLoweringContext
                 baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
 
                 // If we have an interface as our baseExpr, we normally
-                // would make an existential to never reach that point.
-                // SomeTypeDecl is a concrete type though and should never
-                // need the existentials system.
+                // would make an existential so that our `baseExpr` is of
+                // an existential.
                 // 
-                // Despite this, we temporarily must use the existential system
-                // while we are still missing the backend to determine the 
-                // concrete-type of `some` types.
+                // Due to this, we temporarily at the last-minute must use
+                // the existential system to change out SomeTypeDecl baseExpr's
+                // into an existential.
                 if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(baseExpr->type.type))
                 {
                     auto m_astBuilder = getASTBuilder();
@@ -5491,10 +5490,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (isLValueContext())
                 {
-                    // TODO: this requires a proper fix of issue #7788.
+                    // TODO: this requires a proper fix of issue #7788. L-value casting
+                    // a cast-to-super is currently not properly supported.
+                    //
                     // Logic for L-value casting super-type needs a rework, but at this
-                    // current point we can use the naive logic below since a some-type
-                    // should become a concrete type if only given the super-type info
+                    // current point we can use the naive logic below since if we need
+                    // an L-value, the valueArg is the L-value of a SomeTypeDecl (which
+                    // semantically isn't a type we lower to IR).
                     auto valueArgLValue = lowerLValueExpr(context, expr->valueArg);
                     return LoweredValInfo::ptr(valueArgLValue.val);
                 }
@@ -5507,11 +5509,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
 
             // If we have a sub-type SomeTypeDecl, we have no existential
-            // and should just return the valueArg since some-type is
+            // and should just return the lowered-valueArg since some-type is
             // a concrete type.
             if (auto witness = as<SubtypeWitness>(expr->witnessArg))
             {
-                if (isDeclRefTypeOf<SomeTypeDecl>(witness->getSub()))
+                if (!isLValueContext() && isDeclRefTypeOf<SomeTypeDecl>(witness->getSub()))
                 {
                     auto concreteValue = getSimpleVal(context, value);
                     return LoweredValInfo::simple(concreteValue);
@@ -12475,6 +12477,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             obfuscateModuleLocs(module, compileRequest->getSourceManager());
         }
     }
+
 
     // TODO: consider doing some more aggressive optimizations
     // (in particular specialization of generics) here, so
