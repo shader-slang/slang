@@ -525,10 +525,38 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     const SlangResult funcRes =
         func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
 
+    // Parse stderr to extract debug layer messages
+    StringBuilder cleanStdError;
+    StringBuilder debugLayer;
+    List<UnownedStringSlice> stderrLines;
+    StringUtil::split(stdError.getUnownedSlice(), '\n', stderrLines);
+
+    for (Index i = 0; i < stderrLines.getCount(); ++i)
+    {
+        const auto& line = stderrLines[i];
+        if (line.startsWith("[DEBUG_LAYER]"))
+        {
+            // Extract the message after the prefix (skip "[DEBUG_LAYER]")
+            UnownedStringSlice debugMessage = line.tail(line.getLength() - 13);
+            debugLayer.append(debugMessage);
+            debugLayer.append("\n");
+        }
+        else
+        {
+            cleanStdError.append(line);
+            // Only add newline if this isn't the last line or if the original had a trailing newline
+            if (i < stderrLines.getCount() - 1 || stdError.getUnownedSlice().endsWith("\n"))
+            {
+                cleanStdError.append("\n");
+            }
+        }
+    }
+
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;
-    result.stdError = stdError;
+    result.stdError = cleanStdError;
     result.stdOut = stdOut;
+    result.debugLayer = debugLayer;
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
     return m_connection->sendResult(&result, id);
