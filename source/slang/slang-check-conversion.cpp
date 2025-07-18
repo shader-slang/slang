@@ -1212,7 +1212,8 @@ bool SemanticsVisitor::_coerce(
     // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
     if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink);
+        if (!validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink))
+            return false;
     }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
@@ -1888,7 +1889,7 @@ static bool isDynType(Type* type)
     return isDeclRefTypeOf<InterfaceDecl>(type);
 }
 
-void SemanticsVisitor::validateSomeTypeCoerce(
+bool SemanticsVisitor::validateSomeTypeCoerce(
     CoercionSite site,
     Type* toType,
     QualType fromType,
@@ -1910,20 +1911,21 @@ void SemanticsVisitor::validateSomeTypeCoerce(
                 sink->diagnose(
                     fromExpr->loc,
                     Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
-                return;
+                return false;
             }
         }
         // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
         else if (isDynType(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
-            return;
+            return false;
         }
     }
 
     // If we have a `some T` on RHS, we are only allowed to copy if LHS is `dyn T`, 
     // we do not need explicit validation for this since `dyn` should be within
     // `some T` InheritanceInfo (implicitly covering this case)
+    return true;
 }
 
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(

@@ -3,37 +3,37 @@
 // CHECK: OpEntryPoint
 // CHECK-NOT: error
 
-// TODO: remove
-dyn interface IUnused
+
+dyn interface IFooDyn
 {
     int getVal();
 }
-struct StructForIUnused : IUnused
+
+struct StructForIFooDyn : IFooDyn
 {
-    __init(int v)
+    int data = 0;
+    __init(int dataIn = 1)
     {
-        a = v;
+        data = dataIn;
     }
-    int a = 0;
     int getVal()
     {
-        return a;
+        return data;
     }
-};
-void junk(dyn IUnused input)
-{
-    buffer[1] = input.getVal();
 }
-// TODO: remove
 
-interface IFoo
+interface IFooSome
 {
     int getVal();
     [mutating]
     void setVal(int v);
 }
 
-struct StructForIFoo1 : IFoo
+interface IFooSomeOuter : IFooSome
+{
+}
+
+struct StructForIFooSome1 : IFooSomeOuter
 {
     __init(int v)
     {
@@ -50,7 +50,7 @@ struct StructForIFoo1 : IFoo
         a = v;
     }
 };
-struct StructForIFoo2 : IFoo
+struct StructForIFooSome2 : IFooSomeOuter
 {
     __init(int v)
     {
@@ -68,7 +68,7 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-struct StructForIFoo3 : IFoo
+struct StructForIFooSome3 : IFooSomeOuter
 {
     __init(int v)
     {
@@ -86,23 +86,19 @@ struct StructForIFoo3 : IFoo
     }
 }
 
-void logic(inout some IFoo v1, out some IFoo v2)
+void logic(out dyn IFooDyn v1, out some IFooSome v2)
 {
-    v1.setVal(1);
-    v2 = StructForIFoo2(1);
+    v1 = StructForIFooDyn(1);
+    v2 = StructForIFooSome2(1);
+    
+    v2.setVal(1 + v1.getVal());
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    // TODO: remove
-    dyn IUnused unused = StructForIUnused(2);
-    junk(unused);
-    // TODO: remove
-
-    some IFoo data1;
-    data1 = StructForIFoo1(1);
-    some IFoo data2;
+    dyn IFooDyn data1;
+    some IFooSome data2;
     logic(data1, data2);
 
     buffer[0] = data1.getVal() + data2.getVal();

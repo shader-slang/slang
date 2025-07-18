@@ -41,11 +41,15 @@ struct DynStruct2 : DynInterface
     }
 }
 
+dyn DynInterface getDynVar()
+{
+    return DynStruct1(1);
+}
+
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    dyn DynInterface dynVar = DynStruct1(1);
-
+    dyn DynInterface dynVar = getDynVar();
     some DynInterface someVar = DynStruct2(1);
 
     dynVar = someVar;

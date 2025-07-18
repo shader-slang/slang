@@ -393,7 +393,6 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE() TypeExp targetType;
 };
 
-
 // Represents the type of `some Type` for `some Type varName`.
 // This decl of `some Type` is not assignable since it already
 // has a given value.

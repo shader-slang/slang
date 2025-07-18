@@ -1527,7 +1527,7 @@ public:
         Expr* fromExpr,
         Expr** outExpr);
 
-    void validateSomeTypeCoerce(
+    bool validateSomeTypeCoerce(
         CoercionSite site,
         Type* toType,
         QualType fromType,
