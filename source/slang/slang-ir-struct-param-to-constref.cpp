@@ -227,6 +227,55 @@ struct StructParamToConstRefContext
         }
     }
 
+    // Check if an instruction represents an addressable value
+    bool isAddressable(IRInst* inst)
+    {
+        if (!inst)
+            return false;
+
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+        case kIROp_Param:
+            return true;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+            return isAddressable(inst->getOperand(0));
+        case kIROp_Load:
+            // Check if the load is from an addressable source
+            return isAddressable(inst->getOperand(0));
+        default:
+            return false;
+        }
+    }
+
+    // Get the address of an instruction if it's addressable
+    IRInst* getAddressOf(IRInst* inst)
+    {
+        if (!inst)
+            return nullptr;
+
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+            return inst;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+            return inst;
+        case kIROp_Load:
+            // If this is a load from an addressable source, return the source address
+            if (isAddressable(inst->getOperand(0)))
+                return inst->getOperand(0);
+            return nullptr;
+        default:
+            return nullptr;
+        }
+    }
+
     // Update call sites to pass addresses instead of values
     void updateCallSites(
         IRFunc* originalFunc,
@@ -261,11 +310,18 @@ struct StructParamToConstRefContext
 
                 if (shouldTransformParamType(argType))
                 {
-                    // For ConstRef parameters, create temporary and pass address
-                    // This handles all cases: f(expr) -> { temp = expr; f(&temp); }
-                    auto tempVar = builder.emitVar(arg->getFullType());
-                    builder.emitStore(tempVar, arg);
-                    newArgs.add(tempVar);
+                    // Check if we can pass the address directly instead of creating a temporary
+                    if (auto directAddr = getAddressOf(arg))
+                    {
+                        newArgs.add(directAddr);
+                    }
+                    else
+                    {
+                        // For ConstRef parameters, create temporary and pass address
+                        auto tempVar = builder.emitVar(arg->getFullType());
+                        builder.emitStore(tempVar, arg);
+                        newArgs.add(tempVar);
+                    }
                 }
                 else
                 {
