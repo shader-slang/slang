@@ -46,6 +46,70 @@ local function walk_instructions(insts, callback, parent_struct)
 	end
 end
 
+-- Generate IRBuilder method for an instruction with operands
+local function generateIRBuilderMethod(struct_name, operands, mnemonic)
+        if not operands or #operands == 0 then
+                return nil
+        end
+
+        -- Convert struct_name to method name (e.g., "VectorType" -> "getVectorType")
+        local methodName = "get" .. struct_name
+
+        -- Generate parameter list
+        local params = {}
+        local operandArgs = {}
+
+        for i, operand in ipairs(operands) do
+                local paramName = operand[1]
+                local paramType = operand[2]
+
+                if not paramType then
+                    paramType = "IRInst"
+                end
+                -- Add * for pointer types
+                local paramDecl = paramType .. "* " .. paramName
+                table.insert(params, paramDecl)
+                table.insert(operandArgs, paramName)
+        end
+
+        local paramList = table.concat(params, ", ")
+        local operandList = table.concat(operandArgs, ", ")
+
+        -- Generate the method
+        local method = string.format([[
+    IR%s* %s(%s);]],
+                struct_name, methodName, paramList)
+
+        return method
+end
+
+-- Generate all IRBuilder methods for instructions with operands
+local function generateAllIRBuilderMethods()
+        local insts = require("source/slang/slang-ir-insts.lua").insts
+        local output = {}
+
+        local function traverse(tbl)
+                for _, i in ipairs(tbl) do
+                        local key, value = next(i)
+
+                        -- Only generate for leaf instructions with operands
+                        if value.is_leaf and value.operands and #value.operands > 0 then
+                                local struct_name = value.struct_name or key
+                                local method = generateIRBuilderMethod(struct_name, value.operands, value.mnemonic or key)
+                                if method then
+                                        table.insert(output, method)
+                                end
+                        end
+
+                        -- Recursively process nested instructions
+                        traverse(value)
+                end
+        end
+
+        traverse(insts)
+        return table.concat(output, "\n")
+end
+
 -- The definitions for leaf instructions
 local leafInst = function(name, args)
 	args = args or {}
@@ -287,4 +351,5 @@ return {
 	instStructForwardDecls = instStructForwardDecls,
 	instInfoEntries = instInfoEntries,
 	instEnums = instEnums,
+	generateAllIRBuilderMethods = generateAllIRBuilderMethods,
 }

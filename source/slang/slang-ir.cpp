@@ -3109,6 +3109,14 @@ IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateCon
         getType(kIROp_BackwardDiffIntermediateContextType, 1, &func);
 }
 
+
+IRMetalMeshType* IRBuilder::getMetalMeshType(IRType* vertexType, IRType* primitiveType,
+    IRInst* numVertices, IRInst* numPrimitives, IRIntLit* topology)
+{
+    IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
+    return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
+}
+
 IRFuncType* IRBuilder::getFuncType(UInt paramCount, IRType* const* paramTypes, IRType* resultType)
 {
     return (IRFuncType*)createIntrinsicInst(
