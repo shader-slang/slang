@@ -112,7 +112,7 @@ void rayGenerationMain()
     // Change the payload
     SomeValues otherValues = { idx * -2, idx * 8.0f };
 
-    HitObject::Invoke( scene, hit, otherValues );
+    HitObject::Invoke( hit, otherValues );
     HitObject motionHitObj[2];
     motionHitObj[0] = HitObject::MakeMotionHit(
         scene,
