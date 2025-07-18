@@ -3948,6 +3948,40 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
+    // Warn about separate debug info being used with unsupported targets
+    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    {
+        // Check all targets to see if any use separate debug info with an unsupported target
+        for (const auto& rawTarget : m_rawTargets)
+        {
+            if (rawTarget.format != CodeGenTarget::SPIRV)
+            {
+                // Get the target name for the warning message
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
+            }
+        }
+
+        // Also check the default target if no explicit targets were specified
+        if (m_rawTargets.getCount() == 0)
+        {
+            if (m_defaultTarget.format != CodeGenTarget::SPIRV)
+            {
+                // Get the target name for the warning message
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
+            }
+        }
+    }
+
     return (m_sink->getErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
 }
 

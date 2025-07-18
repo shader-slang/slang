@@ -2289,14 +2289,20 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
     {
         const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
-        // The artifact's name may have been set to the debug build id hash, use
-        // it as the filename if it exists.
-        String dbgPath = dbgArtifact->getName();
-        if (dbgPath.getLength() == 0)
-            dbgPath = _getDebugSpvPath(path);
-        else
-            dbgPath.append(".dbg.spv");
-        return _maybeWriteArtifact(dbgPath, dbgArtifact);
+        // Check if a debug artifact was actually created (only for SPIR-V targets)
+        if (dbgArtifact)
+        {
+            // The artifact's name may have been set to the debug build id hash, use
+            // it as the filename if it exists.
+            String dbgPath = dbgArtifact->getName();
+            if (dbgPath.getLength() == 0)
+                dbgPath = _getDebugSpvPath(path);
+            else
+                dbgPath.append(".dbg.spv");
+            return _maybeWriteArtifact(dbgPath, dbgArtifact);
+        }
+        // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
+        // The warning about unsupported targets is already issued during option parsing
     }
 
     return SLANG_OK;
