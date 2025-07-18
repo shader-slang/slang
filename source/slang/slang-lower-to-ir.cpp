@@ -8644,10 +8644,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
         }
-        if (const auto parentSomeTypeDecl = as<SomeTypeDecl>(parentDecl))
-        {
-            return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
-        }
         //
         // We also need to cover the case where an `extension`
         // declaration is being used to add a conformance to
@@ -9269,12 +9265,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitVarDecl(VarDecl* decl)
     {
-        if (isDeclRefTypeOf<SomeTypeDecl>(decl->type))
-        {
-            int a = 5;
-            a = 1;
-        }
-
         // Detect global (or effectively global) variables
         // and handle them differently.
         if (isGlobalVarDecl(decl))
@@ -9303,6 +9293,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 lowerType(context, getInterfaceType(getCurrentASTBuilder(), someTypeDeclRef));
         else
             irVarType = lowerType(context, varType);
+
         // As a special case, an immutable local variable with an
         // initializer can just lower to the SSA value of its initializer.
         //

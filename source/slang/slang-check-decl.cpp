@@ -3600,14 +3600,6 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
     {
         checkExtensionConformance(extensionDecl);
     }
-
-    void visitSomeTypeDecl(SomeTypeDecl* decl)
-    {
-        // Fill in the minimal amount of conformance info needed
-        auto inheritanceDecl = decl->getDirectMemberDeclsOfType<InheritanceDecl>();
-        SLANG_ASSERT(inheritanceDecl.getFirst());
-        checkConformance(getInterfaceType(m_astBuilder, decl), inheritanceDecl.getFirst(), decl);
-    }
 };
 
 // Check that types used as `Differential` type use themselves as their own `Differential` type.
@@ -7944,12 +7936,6 @@ bool SemanticsVisitor::checkConformance(
             // This is *not* a reasonable semantic to keep long-term,
             // but it is required for some of our current example
             // code to work.
-            return true;
-        }
-
-        // always conforms
-        if (as<SomeTypeDecl>(parentDecl))
-        {
             return true;
         }
     }
