@@ -37,32 +37,113 @@
 // Developer mode is required for D3D12 experimental features
 static bool isWindowsDeveloperModeEnabled()
 {
-    HKEY key;
-    LONG ret = RegOpenKeyExA(
-        HKEY_LOCAL_MACHINE,
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
-        0,
-        KEY_READ | KEY_WOW64_32KEY,
-        &key);
-    
-    if (ret != ERROR_SUCCESS)
+    // Helper function to check a specific registry key with detailed logging
+    auto checkRegistryKey = [](HKEY rootKey,
+                               const char* rootName,
+                               const char* path,
+                               const char* valueName,
+                               bool try32BitView = false) -> bool
     {
-        return false;
+        HKEY key;
+        DWORD accessFlags = KEY_READ | (try32BitView ? KEY_WOW64_32KEY : KEY_WOW64_64KEY);
+        LONG ret = RegOpenKeyExA(rootKey, path, 0, accessFlags, &key);
+
+        if (ret != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        DWORD value = 0;
+        DWORD size = sizeof(DWORD);
+        DWORD type = REG_DWORD;
+
+        ret = RegQueryValueExA(key, valueName, nullptr, &type, (LPBYTE)&value, &size);
+
+        RegCloseKey(key);
+
+        if (ret != ERROR_SUCCESS || type != REG_DWORD)
+        {
+            return false;
+        }
+
+        return value == 1;
+    };
+
+    // Method 1: Check multiple registry locations with different views
+    struct RegistryLocation
+    {
+        HKEY rootKey;
+        const char* rootName;
+        const char* path;
+        const char* valueName;
+    };
+
+    RegistryLocation locations[] = {
+        // Windows 10+ main location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Alternative user location
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Windows 11 alternative
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowAllTrustedApps"},
+
+        // Policy location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Additional alternative locations
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+    };
+
+    for (const auto& location : locations)
+    {
+        // Try 64-bit view first
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                false))
+        {
+            return true;
+        }
+
+        // Try 32-bit view as fallback
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                true))
+        {
+            return true;
+        }
     }
 
-    DWORD value = 0;
-    DWORD size = sizeof(DWORD);
-    DWORD type = REG_DWORD;
+    printf("*** Developer Mode NOT DETECTED ***\n");
+    printf("To enable Developer Mode:\n");
+    printf("1. Open Windows Settings (Windows key + I)\n");
+    printf("2. Go to 'System' -> 'For developers'\n");
+    printf("3. Turn on 'Developer Mode'\n");
+    printf("4. Restart the application\n");
+    printf("==========================================\n");
 
-    ret = RegQueryValueExA(key, "AllowDevelopmentWithoutDevLicense", nullptr, &type, (LPBYTE)&value, &size);
-    RegCloseKey(key);
-
-    if (ret != ERROR_SUCCESS || type != REG_DWORD)
-    {
-        return false;
-    }
-
-    return value == 1;
+    return false;
 }
 #endif
 
@@ -1466,13 +1547,6 @@ static SlangResult _innerMain(
             // Check if Windows Developer mode is enabled
             if (!isWindowsDeveloperModeEnabled())
             {
-                fprintf(stderr, "ERROR: D3D12 experimental features require Windows Developer mode to be enabled.\n");
-                fprintf(stderr, "To enable Developer mode:\n");
-                fprintf(stderr, "1. Open Windows Settings (Windows key + I)\n");
-                fprintf(stderr, "2. Go to 'Privacy & Security' or 'Update & Security'\n");
-                fprintf(stderr, "3. Select 'For developers'\n");
-                fprintf(stderr, "4. Turn on 'Developer Mode'\n");
-                fprintf(stderr, "5. Restart the application\n");
                 return SLANG_E_NOT_AVAILABLE;
             }
             desc.next = &experimentalFD;
