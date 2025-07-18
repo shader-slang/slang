@@ -12095,7 +12095,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #if 0
     if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
+        FileWriter writer(stdout, WriterFlag::IsUnowned);
         dumpIR(
             module,
             compileRequest->m_irDumpOptions,
@@ -12337,7 +12337,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // then we can dump the initial IR for the module here.
     if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
+        FileWriter writer(stdout, WriterFlag::IsUnowned);
 
         dumpIR(
             module,
