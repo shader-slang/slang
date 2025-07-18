@@ -6205,11 +6205,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
+                    
+                    // Check if the noperspective modifier has been applied to this varying input
+                    if (auto interpolationDecor = inst->findDecoration<IRInterpolationModeDecoration>())
+                    {
+                        if (interpolationDecor->getMode() == IRInterpolationMode::NoPerspective)
+                        {
+                            return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNoPerspKHR, inst);
+                        }
+                    }
+                    
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
-
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {

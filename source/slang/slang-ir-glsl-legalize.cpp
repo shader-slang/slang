@@ -330,6 +330,20 @@ struct GLSLLegalizationContext
     IRBuilder* getBuilder() { return builder; }
 };
 
+// Hold the in-stack linked list that represents the access chain
+// to the current global varying parameter being created.
+// e.g. if the user code has:
+//    struct Params { in float member; }
+//    void main(in Params inParams);
+// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
+// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
+//
+struct OuterParamInfoLink
+{
+    IRInst* outerParam;
+    OuterParamInfoLink* next;
+};
+
 // This examines the passed type and determines the GLSL mesh shader indices
 // builtin name and type
 GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
@@ -399,6 +413,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     Stage stage,
     IRType* type,
     GlobalVaryingDeclarator* declarator,
+    OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* inStorage)
 {
     SLANG_UNUSED(codeGenContext);
@@ -862,13 +877,37 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(
-            UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
-        name = "gl_BaryCoordEXT";
-
-        // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-        // we ought to use if the `noperspective` modifier has been
-        // applied to this varying input.
+        
+        // Check for noperspective interpolation mode in the parameter chain
+        bool hasNoPerspective = false;
+        for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
+        {
+            auto param = paramInfo->outerParam;
+            auto decorParent = param;
+            if (auto field = as<IRStructField>(decorParent))
+                decorParent = field->getKey();
+            if (auto interpolationModeDecor = decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                if (interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                {
+                    hasNoPerspective = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasNoPerspective)
+        {
+            context->requireGLSLExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+            name = "gl_BaryCoordNoPerspEXT";
+        }
+        else
+        {
+            context->requireGLSLExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+            name = "gl_BaryCoordEXT";
+        }
     }
     else if (semanticName == "sv_cullprimitive")
     {
@@ -920,19 +959,6 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     return nullptr;
 }
 
-// Hold the in-stack linked list that represents the access chain
-// to the current global varying parameter being created.
-// e.g. if the user code has:
-//    struct Params { in float member; }
-//    void main(in Params inParams);
-// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
-// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
-//
-struct OuterParamInfoLink
-{
-    IRInst* outerParam;
-    OuterParamInfoLink* next;
-};
 
 void createVarLayoutForLegalizedGlobalParam(
     GLSLLegalizationContext* context,
@@ -1300,6 +1326,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         stage,
         inType,
         declarator,
+        outerParamInfo,
         &systemValueInfoStorage);
 
     {
