@@ -22267,10 +22267,11 @@ ${
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), footprint);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), _footprint);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
-
         case hlsl:
             uint isSingleLod = 0;
             __queryFootprint$(CoarseOrFine)NVAPI(
@@ -22302,8 +22303,10 @@ ${
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), footprint, lodBias);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintGLSL(sampler, coords, granularity, $(isCoarseVal), _footprint, lodBias);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
@@ -22336,8 +22339,10 @@ ${
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), footprint);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), _footprint);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         }
     }
@@ -22361,8 +22366,10 @@ ${
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), footprint, lodBias);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintClampGLSL(sampler, coords, lodClamp, granularity, $(isCoarseVal), _footprint, lodBias);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         }
     }
@@ -22385,8 +22392,10 @@ ${
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintLodGLSL(sampler, coords, lod, granularity, $(isCoarseVal), footprint);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintLodGLSL(sampler, coords, lod, granularity, $(isCoarseVal), _footprint);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
@@ -22424,8 +22433,10 @@ ${{{
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintGradGLSL(sampler, coords, dx, dy, granularity, $(isCoarseVal), footprint);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintGradGLSL(sampler, coords, dx, dy, granularity, $(isCoarseVal), _footprint);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
@@ -22460,8 +22471,10 @@ ${{{
         {
         case glsl:
         case spirv:
-            Footprint footprint;
-            footprint._isSingleLevel = __queryFootprintGradClampGLSL(sampler, coords, dx, dy, lodClamp, granularity, $(isCoarseVal), footprint);
+            Footprint footprint = {false};
+            __FootprintData _footprint = footprint;
+            bool _isSingleLevel = __queryFootprintGradClampGLSL(sampler, coords, dx, dy, lodClamp, granularity, $(isCoarseVal), _footprint);
+            footprint._isSingleLevel = _isSingleLevel;
             return footprint;
         }
     }
