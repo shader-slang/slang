@@ -8479,6 +8479,16 @@ bool SemanticsVisitor::isScalarIntegerType(Type* type)
     return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
 }
 
+Type* SemanticsVisitor::getMatchingIntType(Type* type)
+{
+    if (isScalarIntegerType(type))
+        return type;
+    if (auto enumTypeDecl = isDeclRefTypeOf<EnumDecl>(type))
+        if (enumTypeDecl.getDecl()->tagType)
+            return getMatchingIntType(enumTypeDecl.getDecl()->tagType);
+    return m_astBuilder->getIntType();
+}
+
 bool SemanticsVisitor::isHalfType(Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
