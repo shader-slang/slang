@@ -2569,10 +2569,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto arrayType = as<IRArrayType>(resultType);
             if (arrayType && as<IRVectorType>(arrayType->getElementType()))
             {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
                 auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
                 
                 emitType(resultType);
                 m_writer->emit("(");
@@ -2648,10 +2645,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto arrayType = as<IRArrayType>(resultType);
             if (arrayType && as<IRVectorType>(arrayType->getElementType()))
             {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
                 auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
                 
                 const char* funcName = _getGLSLVectorCompareFunctionName(inst->getOp());
                 if (funcName)
