@@ -1444,9 +1444,12 @@ static void addLinkageDecoration(
             // We add this to the internal instruction, like other name-like
             // decorations, for instance "nameHint". This prevents it becoming
             // lost during specialization.
-            builder->addKnownBuiltinDecoration(
-                inInst,
-                knownBuiltinModifier->name.getUnownedSlice());
+            auto constantIntVal = as<ConstantIntVal>(knownBuiltinModifier->name);
+            if (constantIntVal)
+            {
+                auto enumValue = constantIntVal->getValue();
+                builder->addKnownBuiltinDecoration(inInst, KnownBuiltinDeclName(enumValue));
+            }
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
@@ -9496,6 +9499,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 switch (requirementVal->getOp())
                 {
                 default:
+                    // Remove linkage decorations from the requirement value to prevent
+                    // duplicate mangled names and allow DCE to clean up unused functions.
+                    // Interface requirements only need the type information, not the linkage.
+                    removeLinkageDecorations(requirementVal);
+
                     // For the majority of requirements, we only care about its type in an
                     // interface definition, so we store only the type from the lowered IR
                     // in the interface entry.

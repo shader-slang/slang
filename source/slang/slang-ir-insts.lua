@@ -8,13 +8,7 @@
 -- !! Slang::IRModule accordingly when modifying this file.
 -- !!
 --
--- The instructions struct name, i.e. something like "IRVoidType" can be specified with struct_name, otherwise it will be a PascalCase version of the instruction key
---
--- Flags, such as hoistable, global, parent, use_other are inherited from a parent abstract type
---
--- min_operands specifies the number of required operands for an instruction, it defaults to 0
---
--- Instructions here will automatically be given a struct definition in slang-ir-insts.h if it is no handwritten
+-- For a detailed description of the schema, please see docs/design/ir-instruction-definition.md
 --
 
 local insts = {
@@ -496,11 +490,11 @@ local insts = {
 			{
 				ptr_constant = { struct_name = "PtrLit" },
 			},
+			{ void_constant = { struct_name = "VoidLit" } },
 			{ string_constant = { struct_name = "StringLit" } },
 			{
 				blob_constant = { struct_name = "BlobLit" },
 			},
-			{ void_constant = { struct_name = "VoidLit" } },
 		},
 	},
 	{ CapabilitySet = { hoistable = true, { capabilityConjunction = {} }, { capabilityDisjunction = {} } } },

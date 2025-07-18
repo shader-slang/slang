@@ -1060,13 +1060,13 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
 
-        String name;
-        if (!checkLiteralStringVal(attr->args[0], &name))
+        ConstantIntVal* value = checkConstantEnumVal(attr->args[0]);
+        if (!value)
         {
             return nullptr;
         }
 
-        knownBuiltinAttr->name = name;
+        knownBuiltinAttr->name = value;
     }
     else if (auto pyExportAttr = as<PyExportAttribute>(attr))
     {
@@ -1656,19 +1656,6 @@ Modifier* SemanticsVisitor::checkModifier(
         //
 
         auto checkedAttr = checkAttribute(hlslUncheckedAttribute, syntaxNode);
-
-        if (auto unscopedEnumAttr = as<UnscopedEnumAttribute>(checkedAttr))
-        {
-            auto transparentModifier = getASTBuilder()->create<TransparentModifier>();
-            if (auto parentDecl = getParentDecl(as<Decl>(syntaxNode)))
-            {
-                parentDecl
-                    ->_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
-                        unscopedEnumAttr,
-                        transparentModifier);
-            }
-            return transparentModifier;
-        }
         return checkedAttr;
     }
 

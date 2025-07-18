@@ -831,7 +831,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DumpIntermediatePrefix,
          "-dump-intermediate-prefix",
          "-dump-intermediate-prefix <prefix>",
-         "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'"},
+         "File name prefix for -dump-intermediates outputs, default is no prefix"},
         {OptionKind::DumpIntermediates,
          "-dump-intermediates",
          nullptr,
@@ -2049,7 +2049,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         writer->appendDescriptionForCategory(m_cmdOptions, categoryIndex);
     }
 
-    m_sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+    // Write help text to stdout
+    FileWriter stdoutWriter(stdout, WriterFlag::IsUnowned);
+    stdoutWriter.write(buf.getBuffer(), buf.getLength());
 
     return SLANG_OK;
 }

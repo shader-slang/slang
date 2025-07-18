@@ -141,6 +141,7 @@ struct Options
         int argc,
         char** argv,
         TestCategorySet* categorySet,
+        Slang::WriterHelper stdOut,
         Slang::WriterHelper stdError,
         Options* optionsOut);
 

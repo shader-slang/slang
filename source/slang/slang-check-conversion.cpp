@@ -1438,7 +1438,11 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (outToExpr)
                 {
-                    *outToExpr = fromExpr;
+                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    castExpr->type = toType;
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->base = fromExpr;
+                    *outToExpr = castExpr;
                 }
                 return true;
             }

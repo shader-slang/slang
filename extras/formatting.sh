@@ -97,6 +97,13 @@ require_bin() {
   if [ "$no_version_check" -eq 0 ]; then
     version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
 
+    # Debug output to stderr
+    if [ -n "$max_version" ]; then
+      echo "found $name $version, required [$min_version, $max_version)" >&2
+    else
+      echo "found $name $version, required at least $min_version" >&2
+    fi
+
     if ! printf '%s\n%s\n' "$min_version" "$version" | sort -V -C; then
       echo "$name version $version is too old. Version $min_version or newer is required." >&2
       missing_bin=1
@@ -114,7 +121,7 @@ require_bin() {
 }
 
 require_bin "git" "1.8"
-((run_all || run_cmake)) && require_bin "gersemi" "0.17"
+((run_all || run_cmake)) && require_bin "gersemi" "0.21" "0.22"
 ((run_all || run_cpp)) && require_bin "xargs" "3"
 require_bin "diff" "2"
 ((run_all || run_cpp)) && require_bin "clang-format" "17" "18"

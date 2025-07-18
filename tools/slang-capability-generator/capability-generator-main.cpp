@@ -1326,8 +1326,6 @@ SlangResult parseDefFile(
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
     Lexer lexer;
     NamePool namePool;
-    RootNamePool rootPool;
-    namePool.setRootNamePool(&rootPool);
     lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
 
     CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);

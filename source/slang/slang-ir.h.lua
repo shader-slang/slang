@@ -179,6 +179,7 @@ local function instEnums()
 					RAW("    kIROp_Last" .. value.struct_name .. " = " .. child_last .. ",")
 				end
 			end
+			RAW("\n")
 		end
 
 		return first_child, last_child

@@ -2353,9 +2353,9 @@ public:
     StringSlicePool m_stringSlicePool;
 
     // Name pool for looking up names
-    NamePool namePool;
+    NamePool* namePool = nullptr;
 
-    NamePool* getNamePool() { return &namePool; }
+    NamePool* getNamePool() { return namePool; }
 
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
@@ -3740,10 +3740,8 @@ public:
 
     // Name pool stuff for unique-ing identifiers
 
-    RootNamePool rootNamePool;
     NamePool namePool;
 
-    RootNamePool* getRootNamePool() { return &rootNamePool; }
     NamePool* getNamePool() { return &namePool; }
     Name* getNameObj(String name) { return namePool.getName(name); }
     Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }
