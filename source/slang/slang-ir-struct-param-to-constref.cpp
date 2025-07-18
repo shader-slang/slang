@@ -340,16 +340,16 @@ struct StructParamToConstRefContext
 
     bool shouldProcessFunction(IRFunc* func)
     {
+        // First check if this should be skipped entirely (includes entry points)
+        if (shouldSkipFunction(func))
+            return false;
+
         // Only process functions that have method decorations
         if (!func->findDecoration<IRMethodDecoration>())
             return false;
 
         // Skip constructor functions (they have special initialization semantics)
         if (func->findDecoration<IRConstructorDecoration>())
-            return false;
-
-        // Skip functions that are already handled by shouldSkipFunction
-        if (shouldSkipFunction(func))
             return false;
 
         return true;
@@ -375,6 +375,22 @@ struct StructParamToConstRefContext
 
         // Skip CUDA kernel functions (marked with [CudaKernel])
         if (func->findDecoration<IRCudaKernelDecoration>())
+            return true;
+
+        // Skip PyTorch entry point functions
+        if (func->findDecoration<IRTorchEntryPointDecoration>())
+            return true;
+
+        // Skip functions with compute shader specific decorations
+        if (func->findDecoration<IRNumThreadsDecoration>())
+            return true;
+
+        // Skip functions with other shader stage decorations
+        if (func->findDecoration<IRMaxVertexCountDecoration>() ||
+            func->findDecoration<IRInstanceDecoration>() ||
+            func->findDecoration<IRWaveSizeDecoration>() ||
+            func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>() ||
+            func->findDecoration<IRStreamOutputTypeDecoration>())
             return true;
 
         // Skip differentiable functions (they have special ConstRef semantics)
