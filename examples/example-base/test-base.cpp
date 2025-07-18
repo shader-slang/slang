@@ -5,7 +5,10 @@
 // include ordering sensitive
 #    include <windows.h>
 #    include <shellapi.h>
+#    include <io.h>
+#    include <fcntl.h>
 // clang-format on
+#include <iostream>
 #include <string>
 #endif
 
@@ -56,6 +59,50 @@ static void printOutput(const char* text)
 #endif
 }
 
+#ifdef _WIN32
+// For WIN32 apps, allocate a console window to show help text
+static bool ensureConsoleVisible()
+{
+    // Check if we already have a console (running from cmd.exe or already allocated)
+    if (GetConsoleWindow() != NULL)
+    {
+        // We already have a console, just use it
+        return false; // No new window created
+    }
+
+    // Check if stdout is being redirected (pipe, file, etc.)
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hStdOut != INVALID_HANDLE_VALUE)
+    {
+        DWORD fileType = GetFileType(hStdOut);
+        if (fileType != FILE_TYPE_UNKNOWN)
+        {
+            // Output is being redirected, don't create a console
+            return false;
+        }
+    }
+
+    // No console exists and output isn't redirected, so allocate a new one
+    if (AllocConsole())
+    {
+        // Redirect stdout to the console
+        freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+        freopen_s((FILE**)stderr, "CONOUT$", "w", stderr);
+        freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
+
+        // Make sure cout, wcout, cin, wcin, wcerr, cerr, wclog and clog
+        // point to console as well
+        std::ios::sync_with_stdio(true);
+
+        // Set console title
+        SetConsoleTitleA("Triangle Example - Help");
+        return true; // New window was created
+    }
+
+    return false; // Failed to create console
+}
+#endif
+
 int TestBase::parseOption(int argc, char** argv)
 {
     // Parse command line arguments for help, API selection, and test mode
@@ -96,6 +143,10 @@ int TestBase::parseOption(int argc, char** argv)
             }
             else
             {
+#ifdef _WIN32
+                // For WIN32 apps, ensure we have a visible console window for errors too
+                ensureConsoleVisible();
+#endif
                 std::string errorMsg = "Unknown API: " + apiStr + "\n";
                 printOutput(errorMsg.c_str());
                 m_showHelp = true;
@@ -142,6 +193,11 @@ void TestBase::printEntrypointHashes(
 
 void TestBase::printUsage(const char* programName) const
 {
+#ifdef _WIN32
+    // For WIN32 apps, ensure we have a visible console window
+    bool createdNewWindow = ensureConsoleVisible();
+#endif
+
     // Use printOutput to ensure output appears in both console and debug output (for WIN32 apps)
     std::string usage = "Usage: " + std::string(programName) + " [options]\n\n";
     printOutput(usage.c_str());
@@ -178,4 +234,13 @@ void TestBase::printUsage(const char* programName) const
     printOutput("  cpu      - CPU execution\n");
     printOutput("  cuda     - CUDA\n");
     printOutput("  webgpu   - WebGPU\n");
+
+#ifdef _WIN32
+    // For WIN32 apps, only prompt if we created a new console window
+    if (createdNewWindow)
+    {
+        printOutput("\nPress Enter to continue or close this window...\n");
+        getchar(); // Wait for user input
+    }
+#endif
 }
