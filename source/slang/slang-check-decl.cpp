@@ -3258,7 +3258,7 @@ bool isProperConstraineeType(Type* type)
         return false;
     if (as<InterfaceDecl>(declRef.getDecl()))
         return false;
-    if(as<SomeTypeDecl>(declRef.getDecl()))
+    if (as<SomeTypeDecl>(declRef.getDecl()))
         return false;
     return true;
 }
@@ -10679,7 +10679,8 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
                 (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsAllowed);
 
         auto subVisitor =
-            (SemanticsDeclHeaderVisitor)withSemanticsContextState(semanticsContextState).withModifierPropagationTarget(funcDecl);
+            (SemanticsDeclHeaderVisitor)withSemanticsContextState(semanticsContextState)
+                .withModifierPropagationTarget(funcDecl);
         resultType = subVisitor.CheckProperType(resultType);
     }
     else if (!funcDecl->returnType.type)

@@ -383,7 +383,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     }
 
     // Implicitly make a `some`/`dyn` type
-    //validate if `some`/`dyn` are a proper-type
+    // validate if `some`/`dyn` are a proper-type
     {
         bool isDyn = false;
 

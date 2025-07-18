@@ -1921,7 +1921,7 @@ bool SemanticsVisitor::validateSomeTypeCoerce(
         }
     }
 
-    // If we have a `some T` on RHS, we are only allowed to copy if LHS is `dyn T`, 
+    // If we have a `some T` on RHS, we are only allowed to copy if LHS is `dyn T`,
     // we do not need explicit validation for this since `dyn` should be within
     // `some T` InheritanceInfo (implicitly covering this case)
     return true;
