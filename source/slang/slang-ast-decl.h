@@ -370,10 +370,11 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE() TypeExp targetType;
 };
 
-// Represents the type of `some Type` for `some Type varName`.
+// Represents the type of `some T` for `some T varName`.
 // This decl of `some Type` is not assignable since it already
 // has a given value.
-// The interface type is stored as a member.
+// The concrete-interface of `some T` is stored as an
+// `InheritanceDecl`.
 FIDDLE()
 class SomeTypeDecl : public AggTypeDeclBase
 {
@@ -382,11 +383,12 @@ class SomeTypeDecl : public AggTypeDeclBase
     InheritanceDecl* getBase();
 };
 
-// Represents the type of `some Type` for `some Type varName`
-// when `varName` is unassigned/unbound. This decl simmilarly
-// represents the `out some Type` type.
+// Represents the type of `some T` for `some T varName`
+// when `varName` is unassigned/unbound.
 // This variant of `some Type` is assignable since it is either
 // a new variable without value or equivlent.
+// The concrete-interface of `some T` is stored as an
+// `InheritanceDecl`.s
 FIDDLE()
 class UnboundSomeTypeDecl : public SomeTypeDecl
 {
