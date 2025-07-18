@@ -206,6 +206,12 @@ struct GlobalVaryingDeclarator
     GlobalVaryingDeclarator* next;
 };
 
+struct OuterParamInfoLink
+{
+    IRInst* outerParam;
+    OuterParamInfoLink* next;
+};
+
 enum GLSLSystemValueKind
 {
     General,
@@ -399,6 +405,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     Stage stage,
     IRType* type,
     GlobalVaryingDeclarator* declarator,
+    OuterParamInfoLink* outerParamInfo,
     GLSLSystemValueInfo* inStorage)
 {
     SLANG_UNUSED(codeGenContext);
@@ -862,13 +869,37 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(
-            UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
-        name = "gl_BaryCoordEXT";
-
-        // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-        // we ought to use if the `noperspective` modifier has been
-        // applied to this varying input.
+        
+        // Check for noperspective interpolation mode in the parameter chain
+        bool hasNoPerspective = false;
+        for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
+        {
+            auto param = paramInfo->outerParam;
+            auto decorParent = param;
+            if (auto field = as<IRStructField>(decorParent))
+                decorParent = field->getKey();
+            if (auto interpolationModeDecor = decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                if (interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                {
+                    hasNoPerspective = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasNoPerspective)
+        {
+            context->requireGLSLExtension(
+                UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+            name = "gl_BaryCoordNoPerspNV";
+        }
+        else
+        {
+            context->requireGLSLExtension(
+                UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+            name = "gl_BaryCoordEXT";
+        }
     }
     else if (semanticName == "sv_cullprimitive")
     {
@@ -928,11 +959,6 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 // Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
 // will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
 //
-struct OuterParamInfoLink
-{
-    IRInst* outerParam;
-    OuterParamInfoLink* next;
-};
 
 void createVarLayoutForLegalizedGlobalParam(
     GLSLLegalizationContext* context,
@@ -1300,6 +1326,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         stage,
         inType,
         declarator,
+        outerParamInfo,
         &systemValueInfoStorage);
 
     {
