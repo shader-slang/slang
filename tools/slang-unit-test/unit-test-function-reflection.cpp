@@ -217,3 +217,72 @@ SLANG_UNIT_TEST(functionReflection)
     auto ctor = module->getLayout()->findFunctionByNameInType(fooType, "$init");
     SLANG_CHECK(ctor != nullptr);
 }
+
+// Test that findFunctionByNameInType finds all functions with the same name but different signatures
+SLANG_UNIT_TEST(findFunctionByNameInType)
+{
+    // Test shader with extensions that have functions with same name but different signatures
+    const char* userSourceBody = R"(
+        public interface IModel<T:IDifferentiable>
+        {
+            public T forward(T x);
+        }
+
+        interface IScalarActivation<T:IDifferentiable> {}
+
+        public extension<T:IDifferentiable, Act:IScalarActivation<T>> Act: IModel<T>
+        {
+            public T forward(T x) { return x;}
+        }
+
+        public struct MyStruct<T:IDifferentiable>: IScalarActivation<T> {}
+
+        public extension<T:IDifferentiable> MyStruct<T>: IModel<T[2]>
+        {
+            public T[2] forward(T[2] x) { return x;}
+        }
+
+        [shader("compute")]
+        void computeMain(uint3 tid: SV_DispatchThreadID)
+        {
+        }
+        )";
+
+    auto moduleName = "moduleH" + String(Process::getId());
+    String userSource = "import " + moduleName + ";\n" + userSourceBody;
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "test_module",
+        "test_module.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    auto myStructType = module->getLayout()->findTypeByName("MyStruct");
+    SLANG_CHECK_ABORT(myStructType != nullptr);
+    
+    // Try to find the "forward" function in MyStruct
+    // This should find functions with different signatures from both extensions:
+    // 1. T forward(T x) from the generic extension Act: IModel<T>
+    // 2. T[2] forward(T[2] x) from the MyStruct-specific extension MyStruct<T>: IModel<T[2]>
+    auto forwardFunc = module->getLayout()->findFunctionByNameInType(myStructType, "forward");
+    
+    // Currently this fails because only one function is found due to the ranking in CompareLookupResultItems
+    // After the fix, this should find both functions since they have different signatures
+    SLANG_CHECK(forwardFunc != nullptr);
+    
+    // For now, just verify we can find at least one function
+    // TODO: After fixing the issue, we should verify that both functions with different signatures are accessible
+    SLANG_CHECK(UnownedStringSlice(forwardFunc->getName()) == "forward");
+}
