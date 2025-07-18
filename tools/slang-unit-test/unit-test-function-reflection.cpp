@@ -270,10 +270,10 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
         diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
 
-    auto myStructType = module->getLayout()->findTypeByName("MyStruct");
+    auto myStructType = module->getLayout()->findTypeByName("MyStruct<float>");
     SLANG_CHECK_ABORT(myStructType != nullptr);
 
-    // Try to find the "forward" function in MyStruct
+    // Try to find the "forward" function in MyStruct<float>
     // This should find functions with different signatures from both extensions:
     // 1. float forward(float x) from the generic extension Act: IModel<float>
     // 2. float[2] forward(float[2] x) from the MyStruct-specific extension MyStruct<float>: IModel<float[2]>
