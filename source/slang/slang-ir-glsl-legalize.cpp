@@ -862,13 +862,26 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_barycentrics")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension(
-            UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
-        name = "gl_BaryCoordEXT";
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
 
-        // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-        // we ought to use if the `noperspective` modifier has been
-        // applied to this varying input.
+        // Check for noperspective interpolation modifier
+        bool isNoPerspective = false;
+        if (auto interpolationDecor = varLayout->findDecoration<IRInterpolationModeDecoration>())
+        {
+            if (interpolationDecor->getMode() == IRInterpolationMode::NoPerspective)
+            {
+                isNoPerspective = true;
+            }
+        }
+
+        if (isNoPerspective)
+        {
+            name = "gl_BaryCoordNoPerspEXT";
+        }
+        else
+        {
+            name = "gl_BaryCoordEXT";
+        }
     }
     else if (semanticName == "sv_cullprimitive")
     {
