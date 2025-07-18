@@ -50,6 +50,9 @@ struct MatrixTypeLoweringContext
         case CodeGenTarget::WGSL:
         case CodeGenTarget::WGSLSPIRV:
         case CodeGenTarget::WGSLSPIRVAssembly:
+        case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
             return true;
         default:
             return false;

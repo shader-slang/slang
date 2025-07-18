@@ -1560,7 +1560,6 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (arrayType && as<IRVectorType>(arrayType->getElementType()))
             {
                 auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
                 auto rowCount = getIntVal(arrayType->getElementCount());
                 auto colCount = getIntVal(vectorType->getElementCount());
                 
@@ -1724,10 +1723,7 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto arrayType = as<IRArrayType>(resultType);
             if (arrayType && as<IRVectorType>(arrayType->getElementType()))
             {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
                 auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
                 
                 emitType(resultType);
                 m_writer->emit("(");
