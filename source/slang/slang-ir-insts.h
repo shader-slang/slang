@@ -3537,7 +3537,7 @@ public:
     {
     }
 
-    Session* getSession() const { return m_module->getSession(); }
+    GlobalSession* getSession() const { return m_module->getSession(); }
 
     IRModule* getModule() const { return m_module; }
 

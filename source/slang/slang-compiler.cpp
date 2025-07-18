@@ -519,7 +519,7 @@ CapabilityAtom getAtomFromStage(Stage stage)
     }
 }
 
-SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
+SlangResult checkExternalCompilerSupport(GlobalSession* session, PassThroughMode passThrough)
 {
     // Check if the type is supported on this compile
     if (passThrough == PassThroughMode::None)
@@ -2075,8 +2075,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 struct CompileTimerRAII
 {
     std::chrono::high_resolution_clock::time_point startTime;
-    Session* session;
-    CompileTimerRAII(Session* inSession)
+    GlobalSession* session;
+    CompileTimerRAII(GlobalSession* inSession)
     {
         startTime = std::chrono::high_resolution_clock::now();
         session = inSession;

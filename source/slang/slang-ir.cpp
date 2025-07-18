@@ -4700,7 +4700,7 @@ IRInst* IRBuilder::addIntermediateContextFieldDifferentialTypeDecoration(
     return addDecoration(target, kIROp_IntermediateContextFieldDifferentialTypeDecoration, witness);
 }
 
-RefPtr<IRModule> IRModule::create(Session* session)
+RefPtr<IRModule> IRModule::create(GlobalSession* session)
 {
     RefPtr<IRModule> module = new IRModule(session);
 
