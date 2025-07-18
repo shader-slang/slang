@@ -8,6 +8,8 @@
 // CHECK: OpExtension "SPV_KHR_fragment_shader_barycentric"
 
 // CHECK: OpEntryPoint Fragment %main "main"
+// CHECK: OpDecorate %{{.*}} BuiltIn BaryCoordKHR
+// CHECK: OpDecorate %{{.*}} BuiltIn BaryCoordNoPerspKHR
 // CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_0
 // CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_1
 // CHECK: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_2
@@ -16,9 +18,11 @@
 void main(
     pervertex float4 color : COLOR,
     float3 bary : SV_Barycentrics,
+    noperspective float3 baryNoPersp : SV_Barycentrics,
     out float4 result : SV_Target)
 {
     result = bary.x * GetAttributeAtVertex(color, 0)
            + bary.y * GetAttributeAtVertex(color, 1)
-           + bary.z * GetAttributeAtVertex(color, 2);
+           + bary.z * GetAttributeAtVertex(color, 2)
+           + baryNoPersp.x * 0.01; // Use the noperspective input as well
 }

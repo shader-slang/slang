@@ -5861,22 +5861,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvBuiltIn builtinName;
         SpvStorageClass storageClass = SpvStorageClassInput;
         bool flat = false;
+        IRInterpolationMode interpolationMode = IRInterpolationMode::Linear;
         BuiltinSpvVarKey() = default;
-        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat)
-            : builtinName(builtin), storageClass(storageClass), flat(isFlat)
+        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat, IRInterpolationMode interpMode = IRInterpolationMode::Linear)
+            : builtinName(builtin), storageClass(storageClass), flat(isFlat), interpolationMode(interpMode)
         {
         }
         bool operator==(const BuiltinSpvVarKey& other) const
         {
             return builtinName == other.builtinName && storageClass == other.storageClass &&
-                   flat == other.flat;
+                   flat == other.flat && interpolationMode == other.interpolationMode;
         }
         HashCode getHashCode() const
         {
             return combineHash(
                 Slang::getHashCode(builtinName),
                 Slang::getHashCode(storageClass),
-                Slang::getHashCode(flat));
+                Slang::getHashCode(flat),
+                Slang::getHashCode((int)interpolationMode));
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
@@ -5926,7 +5928,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         bool isFlat = needFlatDecorationForBuiltinVar(irInst);
-        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat);
+        
+        // Extract interpolation mode for barycentric coordinates
+        IRInterpolationMode interpMode = IRInterpolationMode::Linear;
+        if (builtinVal == SpvBuiltInBaryCoordKHR || builtinVal == SpvBuiltInBaryCoordNoPerspKHR)
+        {
+            if (auto layout = getVarLayout(irInst))
+            {
+                if (auto interpolationDecor = layout->findDecoration<IRInterpolationModeDecoration>())
+                {
+                    interpMode = interpolationDecor->getMode();
+                }
+            }
+        }
+        
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, interpMode);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
@@ -6212,11 +6228,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    // Check for noperspective interpolation modifier
+                    SpvBuiltIn builtinId = SpvBuiltInBaryCoordKHR;
+                    if (auto layout = getVarLayout(inst))
+                    {
+                        if (auto interpolationDecor = layout->findDecoration<IRInterpolationModeDecoration>())
+                        {
+                            if (interpolationDecor->getMode() == IRInterpolationMode::NoPerspective)
+                            {
+                                builtinId = SpvBuiltInBaryCoordNoPerspKHR;
+                            }
+                        }
+                    }
+
+                    return getBuiltinGlobalVar(inst->getFullType(), builtinId, inst);
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
