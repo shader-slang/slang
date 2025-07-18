@@ -187,11 +187,10 @@ jobs:
           fi
 
       # Run Claude Code Action with optimized environment variables
-      - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
+      - name: Execute Claude Code Action
         id: claude-action
-        uses: anthropics/claude-code-action@v0.0.31
+        uses: anthropics/claude-code-action@beta
         with:
-          # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
             # Build system information:
             - OS: Ubuntu Linux
@@ -199,9 +198,7 @@ jobs:
               * Configure: `cmake --preset default`
               * Build: `cmake --build --preset debug`
               * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
-              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
-            - Run formatting script before committing changes
 
             # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
@@ -209,11 +206,10 @@ jobs:
               - Use repoName: "shader-slang/slang" for all queries
               - Ask specific technical questions about architecture, patterns, or implementation approaches
               - Examples: "What does the type legalization pass do?" or "What's the pattern for adding new code generation targets?"
-              - Use responses to understand existing patterns before implementing changes
 
               **Implementation Guidelines:**
               - Always follow existing code patterns and architectural decisions discovered through deepwiki
-              - Consult the tool when you need context about unfamiliar parts of the codebase
+	      - Use this to get a secondary opinion and to get expert insights on the best approach for the given problem
 
             # Debugging backend crashes or invalid downstream code:
 
@@ -222,6 +218,41 @@ jobs:
               of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
               keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
               in the IR passes.
+
+            # Test-Driven Development (TDD) Requirements:
+
+              **CRITICAL: ALL development (Bugs/Feature) category MUST follow Test-Driven Development practices:**
+
+              1. **Write Tests FIRST**: Before implementing any feature or fix, always create tests that demonstrate the expected behavior
+                 - For language features: Create `.slang` files under `tests/` with appropriate test directives
+                 - For compiler bugs: Create minimal reproduction test cases first
+                 - For IR passes: Write tests that validate the transformation
+
+              2. **Test Types Based on Context**:
+                 - **Language features**: Use `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` for CPU execution
+                 - **Type checking**: Use `//TEST:SIMPLE(filecheck=CHECK):-target hlsl` to verify compile-time behavior
+                 - **Code generation**: Use `//TEST:COMPARE_COMPUTE_EX:-slang -compute` for GPU compute tests
+                 - **Error cases**: Use `//TEST(compile):SIMPLE(filecheck=CHECK):-target hlsl` with expected diagnostic messages
+
+              3. **TDD Workflow**:
+                 - Step 1: Write failing test that captures the desired behavior
+                 - Step 2: Run test to confirm it fails for the right reason: `./build/Debug/bin/slang-test tests/path/to/test.slang`
+                 - Step 3: Implement minimal code to make test pass
+                 - Step 4: Run test again to confirm it passes
+                 - Step 5: Refactor if needed while keeping tests green
+                 - Step 6: Add additional edge case tests
+
+              4. **Test Verification Requirements**:
+                 - ALWAYS run your new test before implementing to verify it fails correctly
+                 - Test failure messages must be meaningful and point to the actual issue
+                 - After implementation, verify the test passes and covers the feature completely
+
+              5. **No Implementation Without Tests**:
+                 - Do not write any production code without a corresponding failing test
+                 - Exception: Only when fixing obvious typos or updating documentation
+                 - All bug fixes must include regression tests
+
+              **Remember**: Think hard on the USER comment and request as you work on the problem. Before sending PR the code *should build*.
 
           mcp_config: |
             {
@@ -250,6 +281,7 @@ jobs:
             GITHUB_ACTOR: ${{ github.actor }}
             ANTHROPIC_AUTH_TOKEN: ${{ env.ANTHROPIC_AUTH_TOKEN }}
             DISABLE_TELEMETRY: 1
+            DEBUG: 1
 
         # The ANTHROPIC_API_KEY environment variable is automatically picked up
         continue-on-error: true
