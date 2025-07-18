@@ -6,11 +6,59 @@
 #    include <windows.h>
 #    include <shellapi.h>
 // clang-format on
+#include <string>
 #endif
+
+static rhi::DeviceType parseApiString(const char* apiStr)
+{
+    static const struct
+    {
+        const char* name;
+        rhi::DeviceType type;
+    } apiTable[] = {
+#ifdef _WIN32
+        {"d3d11", rhi::DeviceType::D3D11},
+        {"d3d12", rhi::DeviceType::D3D12},
+#endif
+        {"vulkan", rhi::DeviceType::Vulkan},
+#ifdef __APPLE__
+        {"metal", rhi::DeviceType::Metal},
+#endif
+        {"cpu", rhi::DeviceType::CPU},
+        {"cuda", rhi::DeviceType::CUDA},
+        {"webgpu", rhi::DeviceType::WGPU}};
+
+    for (auto& api : apiTable)
+    {
+        if (strcmp(apiStr, api.name) == 0)
+        {
+            return api.type;
+        }
+    }
+    return rhi::DeviceType::Default; // Invalid/unknown
+}
+
+#ifdef _WIN32
+static std::string wstringToString(const std::wstring& wstr)
+{
+    char buffer[256];
+    wcstombs(buffer, wstr.c_str(), sizeof(buffer));
+    return std::string(buffer);
+}
+#endif
+
+// Simple output function that works for both console and WIN32 apps
+static void printOutput(const char* text)
+{
+    printf("%s", text);
+#ifdef _WIN32
+    OutputDebugStringA(text);
+#endif
+}
 
 int TestBase::parseOption(int argc, char** argv)
 {
-    // We only make the parse in a very loose way for only extracting the test option.
+    // Parse command line arguments for help, API selection, and test mode
 #ifdef _WIN32
     wchar_t** szArglist;
     szArglist = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -19,12 +67,39 @@ int TestBase::parseOption(int argc, char** argv)
     for (int i = 0; i < argc; i++)
     {
 #ifdef _WIN32
-        if (wcscmp(szArglist[i], L"--test-mode") == 0)
+        std::string arg = wstringToString(szArglist[i]);
 #else
-        if (strcmp(argv[i], "--test-mode") == 0)
+        std::string arg = argv[i];
 #endif
+
+        if (arg == "--test-mode" || arg == "-test-mode")
         {
             m_isTestMode = true;
+        }
+        else if (arg == "-h" || arg == "--help")
+        {
+            m_showHelp = true;
+        }
+        else if ((arg == "-api" || arg == "--api") && i + 1 < argc)
+        {
+            i++; // Move to the next argument which should be the API name
+#ifdef _WIN32
+            std::string apiStr = wstringToString(szArglist[i]);
+#else
+            std::string apiStr = argv[i];
+#endif
+
+            rhi::DeviceType newType = parseApiString(apiStr.c_str());
+            if (newType != rhi::DeviceType::Default)
+            {
+                m_deviceType = newType;
+            }
+            else
+            {
+                std::string errorMsg = "Unknown API: " + apiStr + "\n";
+                printOutput(errorMsg.c_str());
+                m_showHelp = true;
+            }
         }
     }
 
@@ -63,4 +138,44 @@ void TestBase::printEntrypointHashes(
             fprintf(stdout, "%s\n", strBuilder.begin());
         }
     }
+}
+
+void TestBase::printUsage(const char* programName) const
+{
+    // Use printOutput to ensure output appears in both console and debug output (for WIN32 apps)
+    std::string usage = "Usage: " + std::string(programName) + " [options]\n\n";
+    printOutput(usage.c_str());
+    printOutput("Options:\n");
+    printOutput(" -h, --help                     Show this help message\n");
+    printOutput(" -api (");
+#ifdef _WIN32
+    printOutput("d3d11|d3d12|");
+#endif
+    printOutput("vulkan");
+#ifdef __APPLE__
+    printOutput("|metal");
+#endif
+    printOutput("|cpu|cuda|webgpu)\n");
+#ifdef _WIN32
+    printOutput("                                Use a given rendering API (Default: d3d12)\n");
+#elif defined(__APPLE__)
+    printOutput("                                Use a given rendering API (Default: metal)\n");
+#else
+    printOutput("                                Use a given rendering API (Default: vulkan)\n");
+#endif
+    printOutput(
+        " -test-mode                     Print the hash value of the rendered scene and exit\n");
+    printOutput("\n");
+    printOutput("Supported APIs:\n");
+#ifdef _WIN32
+    printOutput("  d3d11    - Direct3D 11\n");
+    printOutput("  d3d12    - Direct3D 12\n");
+#endif
+    printOutput("  vulkan   - Vulkan\n");
+#ifdef __APPLE__
+    printOutput("  metal    - Metal (macOS/iOS)\n");
+#endif
+    printOutput("  cpu      - CPU execution\n");
+    printOutput("  cuda     - CUDA\n");
+    printOutput("  webgpu   - WebGPU\n");
 }
