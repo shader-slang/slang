@@ -51,10 +51,10 @@ struct StructParamToConstRefContext
         case kIROp_StructType:
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
-            // case kIROp_VectorType:     // ADD
-            // case kIROp_MatrixType:     // ADD
-            // case kIROp_TupleType:      // ADD
-            // case kIROp_CoopVectorType: // ADD (if targeting cooperative operations)
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+        case kIROp_TupleType:
+        case kIROp_CoopVectorType:
             return true;
         default:
             return false;
