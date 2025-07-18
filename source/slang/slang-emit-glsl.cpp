@@ -943,7 +943,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(
     case LayoutResourceKind::SpecializationConstant:
         m_writer->emit("layout(constant_id = ");
         m_writer->emit(index);
-        m_writer->emit(")\n");
+        m_writer->emit(")\nconst ");
         break;
 
     case LayoutResourceKind::ConstantBuffer:

@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
@@ -1124,6 +1125,7 @@ Result linkAndOptimizeIR(
     {
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
+        checkForOutOfBoundAccess(irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
             checkForMissingReturns(irModule, sink, target, false);

@@ -248,29 +248,6 @@ class ContainerDecl : public Decl
     // examples of how to interact with the Slang AST.
     //
 
-    /// Invalidate the acceleration structures used for declaration lookup,
-    /// because the code is about to replace `unscopedEnumAttr` with `transparentModifier`
-    /// as part of semantic checking of an `EnumDecl` nested under this `ContainerDecl`.
-    ///
-    /// Cannot be expressed in terms of the rest of the public API because the
-    /// existing assumption has been that any needed `TransparentModifier`s would
-    /// be manifestly obvious just from the syntax being parsed, so that they would
-    /// already be in place on parsed ASTs. the `UnscopedEnumAttribute` is a `TransparentModifier`
-    /// in all but name, but the two don't share a common base class such that code
-    /// could check for them together.
-    ///
-    /// TODO: In the long run, the obvious fix is to eliminate `UnscopedEnumAttribute`,
-    /// becuase it only exists to enable legacy code to be expressed in Slang, rather than
-    /// representing anything we want/intend to support long-term.
-    ///
-    /// TODO: In the even *longer* run, we should eliminate `TransparentModifier` as well,
-    /// because it only exists to support legacy `cbuffer` declarations and similar syntax,
-    /// and those should be deprecated over time.
-    ///
-    void _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
-        UnscopedEnumAttribute* unscopedEnumAttr,
-        TransparentModifier* transparentModifier);
-
     /// Remove a constructor declaration from the direct member declarations of this container.
     ///
     /// This operation is seemingly used when a default constructor declaration has been synthesized
@@ -639,7 +616,7 @@ FIDDLE(abstract)
 class FunctionDeclBase : public CallableDecl
 {
     FIDDLE(...)
-    FIDDLE() Stmt* body = nullptr;
+    Stmt* body = nullptr;
 };
 
 // A constructor/initializer to create instances of a type

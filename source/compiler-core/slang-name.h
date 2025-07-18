@@ -43,28 +43,10 @@ UnownedStringSlice getUnownedStringSliceText(Name* name);
 // Get a name as a C style string, or nullptr if name is nullptr
 const char* getCstr(Name* name);
 
-// A `RootNamePool` is used to store and look up names.
+// A `NamePool` is used to store and look up names.
 // If two systems need to work together with names, and be sure that they
 // get equivalent names for a string like `"Foo"`, then they need to use
-// the same root name pool (directly or indirectly).
-//
-struct RootNamePool
-{
-    // The mapping from text strings to the corresponding name.
-    Dictionary<String, RefPtr<Name>> names;
-};
-
-// A `NamePool` is effectively a way of storing a subset of the
-// names that have been created through a `RootNamePool`.
-//
-// The intention is that eventually we will add the ability to clean
-// up a `NamePool`, and remove the names it created from the corresponding
-// `RootNamePool` *if* those names are no longer in use.
-//
-// The goal of such an approach would be to ensure that the memory
-// usage of a `Session` can't bloat over time just because of multiple
-// `CompileRequest`s being created, used, and then destroyed (each time
-// adding just a few more strings to the name mapping).
+// the same name pool (directly or indirectly).
 //
 struct NamePool
 {
@@ -74,13 +56,9 @@ struct NamePool
     // Try find the `Name` that represents the given `text`.
     // If the name does not exist, return nullptr
     Name* tryGetName(String const& text);
-    // Set the parent name pool to use for lookup
-    void setRootNamePool(RootNamePool* rootNamePool) { this->rootPool = rootNamePool; }
 
-    //
-
-    // The root name pool to use for storage/lookup
-    RootNamePool* rootPool = nullptr;
+    // The mapping from text strings to the corresponding name.
+    Dictionary<String, RefPtr<Name>> names;
 };
 
 } // namespace Slang

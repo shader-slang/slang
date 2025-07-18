@@ -8,15 +8,8 @@
 -- !! Slang::IRModule accordingly when modifying this file.
 -- !!
 --
--- The instructions struct name, i.e. something like "IRVoidType" can be specified with struct_name, otherwise it will be a PascalCase version of the instruction key
+-- For a detailed description of the schema, please see docs/design/ir-instruction-definition.md
 --
--- Flags, such as hoistable, global, parent, use_other are inherited from a parent abstract type
---
--- min_operands specifies the number of required operands for an instruction, it defaults to 0
---
--- Instructions here will automatically be given a struct definition in slang-ir-insts.h if it is no handwritten
---
-
 local insts = {
 	{ nop = {} },
 	-- This opcode is used as a placeholder if we were ever to deserialize a
@@ -57,12 +50,12 @@ local insts = {
 			},
 			{ CapabilitySet = { struct_name = "CapabilitySetType", hoistable = true } },
 			{ DynamicType = { hoistable = true } },
-			{ AnyValueType = { min_operands = 1, hoistable = true } },
+			{ AnyValueType = { operands = { { "size" } }, hoistable = true } },
 			{
 				RawPointerTypeBase = {
 					hoistable = true,
 					{ RawPointerType = {} },
-					{ RTTIPointerType = { min_operands = 1 } },
+					{ RTTIPointerType = { operands = { { "rTTIOperand" } } } },
 					{ AfterRawPointerTypeBase = {} },
 				},
 			},
@@ -75,13 +68,13 @@ local insts = {
 			},
 			{ Func = { struct_name = "FuncType", hoistable = true } },
 			{ BasicBlock = { struct_name = "BasicBlockType", hoistable = true } },
-			{ Vec = { struct_name = "VectorType", min_operands = 2, hoistable = true } },
-			{ Mat = { struct_name = "MatrixType", min_operands = 4, hoistable = true } },
+			{ Vec = { struct_name = "VectorType", operands = { { "elementType", "IRType" }, { "elementCount" } }, hoistable = true } },
+			{ Mat = { struct_name = "MatrixType", operands = { { "elementType", "IRType" }, { "rowCount" }, { "columnCount" }, { "layout" } }, hoistable = true } },
 			{ Conjunction = { struct_name = "ConjunctionType", hoistable = true } },
-			{ Attributed = { struct_name = "AttributedType", hoistable = true } },
-			{ Result = { struct_name = "ResultType", min_operands = 2, hoistable = true } },
-			{ Optional = { struct_name = "OptionalType", min_operands = 1, hoistable = true } },
-			{ Enum = { struct_name = "EnumType", min_operands = 1, parent = true } },
+			{ Attributed = { struct_name = "AttributedType", operands =  { { "baseType", "IRType" }, { "attr" } }, hoistable = true } },
+			{ Result = { struct_name = "ResultType", operands = { { "valueType", "IRType" }, { "errorType", "IRType" } }, hoistable = true } },
+			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			{ Enum = { struct_name = "EnumType", operands = { { "tagType", "IRType" } }, parent = true } },
 			{
 				DifferentialPairTypeBase = {
 					hoistable = true,
@@ -93,14 +86,14 @@ local insts = {
 			{
 				BwdDiffIntermediateCtxType = {
 					struct_name = "BackwardDiffIntermediateContextType",
-					min_operands = 1,
+					operands = { { "func" } },
 					hoistable = true,
 				},
 			},
-			{ TensorView = { struct_name = "TensorViewType", min_operands = 1, hoistable = true } },
+			{ TensorView = { struct_name = "TensorViewType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ TorchTensor = { struct_name = "TorchTensorType", hoistable = true } },
-			{ ArrayListVector = { struct_name = "ArrayListType", min_operands = 1, hoistable = true } },
-			{ Atomic = { struct_name = "AtomicType", min_operands = 1, hoistable = true } },
+			{ ArrayListVector = { struct_name = "ArrayListType", operands = { { "elementType", "IRType" } }, hoistable = true } },
+			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
 				BindExistentialsTypeBase = {
 					hoistable = true,
@@ -135,7 +128,7 @@ local insts = {
 					{ ActualGlobalRate = {} },
 				},
 			},
-			{ RateQualified = { struct_name = "RateQualifiedType", min_operands = 2, hoistable = true } },
+			{ RateQualified = { struct_name = "RateQualifiedType", operands = { { "rate", "IRRate" }, { "valueType", "IRType" } }, hoistable = true } },
 			{
 				Kind = {
 					-- Kinds represent the "types of types."
@@ -176,7 +169,7 @@ local insts = {
 				ComPtr = {
 					-- A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
 					struct_name = "ComPtrType",
-					min_operands = 1,
+					operands = { { "valueType", "IRType" } },
 					hoistable = true,
 				},
 			},
@@ -184,7 +177,7 @@ local insts = {
 				NativePtr = {
 					-- A NativePtr<T> type represents a native pointer to a managed resource.
 					struct_name = "NativePtrType",
-					min_operands = 1,
+					operands = { { "valueType", "IRType" } },
 					hoistable = true,
 				},
 			},
@@ -192,7 +185,7 @@ local insts = {
 				DescriptorHandle = {
 					-- A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
 					struct_name = "DescriptorHandleType",
-					min_operands = 1,
+					operands = { { "resourceType", "IRType" } },
 					hoistable = true,
 				},
 			},
@@ -214,7 +207,7 @@ local insts = {
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
-			{ SubpassInputType = { min_operands = 2, hoistable = true } },
+			{ SubpassInputType = { operands = { { "elementType", "IRType" }, { "isMultisampleInst" } }, hoistable = true } },
 			{ TextureFootprintType = { min_operands = 1, hoistable = true } },
 			{ TextureShape1DType = { hoistable = true } },
 			{ TextureShape2DType = { struct_name = "TextureShape2DType", hoistable = true } },
@@ -281,7 +274,7 @@ local insts = {
 							{ Primitives = { struct_name = "PrimitivesType", min_operands = 2 } },
 						},
 					},
-					{ ["metal::mesh"] = { struct_name = "MetalMeshType", min_operands = 5 } },
+					{ ["metal::mesh"] = { struct_name = "MetalMeshType", operands = { { "verticesType", "IRType" }, { "primitivesType", "IRType" }, { "numVertices" }, { "numPrimitives" }, { "topology", "IRIntLit" } } } },
 					{ mesh_grid_properties = { struct_name = "MetalMeshGridPropertiesType" } },
 					{
 						HLSLStructuredBufferTypeBase = {
@@ -357,10 +350,10 @@ local insts = {
 					hoistable = true,
 				},
 			},
-			{ CoopVectorType = { min_operands = 2, hoistable = true } },
-			{ CoopMatrixType = { min_operands = 5, hoistable = true } },
+			{ CoopVectorType = { operands = { { "elementType", "IRType"}, { "elementCount" } }, hoistable = true } },
+			{ CoopMatrixType = { operands = { { "elementType", "IRType"}, { "scope" }, { "rowCount" }, { "columnCount" }, { "matrixUse" } }, hoistable = true } },
 			{
-				TensorAddressingTensorLayoutType = { min_operands = 2, hoistable = true },
+				TensorAddressingTensorLayoutType = { operands = { { "dimension"}, { "clampMode" } }, hoistable = true },
 			},
 			{
 				TensorAddressingTensorViewType = {
@@ -417,7 +410,7 @@ local insts = {
 				spirvLiteralType = {
 					-- A type that identifies it's contained type as being emittable as `spirv_literal.
 					struct_name = "SPIRVLiteralType",
-					min_operands = 1,
+					operands = { { "valueType", "IRType" } },
 					hoistable = true,
 				},
 			},
@@ -497,11 +490,11 @@ local insts = {
 			{
 				ptr_constant = { struct_name = "PtrLit" },
 			},
+			{ void_constant = { struct_name = "VoidLit" } },
 			{ string_constant = { struct_name = "StringLit" } },
 			{
 				blob_constant = { struct_name = "BlobLit" },
 			},
-			{ void_constant = { struct_name = "VoidLit" } },
 		},
 	},
 	{ CapabilitySet = { hoistable = true, { capabilityConjunction = {} }, { capabilityDisjunction = {} } } },
@@ -625,7 +618,7 @@ local insts = {
 	{ packAnyValue = { min_operands = 1 } },
 	{ unpackAnyValue = { min_operands = 1 } },
 	{ witness_table_entry = { min_operands = 2 } },
-	{ interface_req_entry = { struct_name = "InterfaceRequirementEntry", min_operands = 2, global = true } },
+	{ interface_req_entry = { struct_name = "InterfaceRequirementEntry", operands = { { "requirementKey" }, { "requirementVal" } }, global = true } },
 	-- An inst to represent the workgroup size of the calling entry point.
 	-- We will materialize this inst during `translateGlobalVaryingVar`.
 	{ GetWorkGroupSize = { hoistable = true } },
@@ -982,7 +975,7 @@ local insts = {
 	{ loopExitValue = { min_operands = 1 } },
 	{
 		getStringHash = {
-			min_operands = 1,
+			operands = { { "stringLit", "IRStringLit" } },
 		},
 	},
 	{ waveGetActiveMask = {} },
@@ -2275,8 +2268,8 @@ local function process(insts)
 				end
 			end
 
-			-- If it's a leaf and doesn't have min_operands, add it
-			if is_leaf(value) and value.min_operands == nil then
+			-- If it's a leaf and doesn't have min_operands and operands, add min_operands = 0
+			if is_leaf(value) and value.min_operands == nil and value.operands == nil then
 				value.min_operands = 0
 			end
 
@@ -2328,7 +2321,6 @@ local function process(insts)
 		-- Start walking from the top-level insts
 		walk_insts(insts)
 	end
-
 	return {
 		insts = insts,
 		stable_name_to_inst = stable_name_to_inst,
