@@ -139,7 +139,6 @@ struct EliminateMultiLevelBreakContext
 
         void gatherInfo(IRGlobalValueWithCode* func)
         {
-            sortBlocksInFunc(func);
             for (auto block : func->getBlocks())
             {
                 if (processedBlocks.contains(block))
