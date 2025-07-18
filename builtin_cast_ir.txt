@@ -1,0 +1,729 @@
+### LOWER-TO-IR:
+undefined
+DifferentiableTypeAnnotation(Array(Float, 3 : Int), specialize(%1, Float, 3 : Int, %2))
+DifferentiableTypeAnnotation(Float, %2)
+let  %2	: witness_table_t(%IDifferentiable)	= lookupWitness(%3, %4)
+let  %3	: witness_table_t(%IFloat)	= lookupWitness(%5, %6)
+let  %7	: CapabilitySet	= capabilityDisjunction(%8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18, %19, %20, %21, %22, %23, %24, %25, %26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39, %40, %41, %42, %43, %44, %45, %46, %47, %48, %49, %50, %51, %52, %53, %54, %55, %56, %57, %58, %59, %60, %61, %62, %63, %64, %65, %66, %67, %68, %69, %70, %71, %72, %73, %74, %75, %76, %77, %78, %79, %80, %81, %82, %83, %84, %85, %86, %87, %88, %89, %90, %91, %92, %93, %94, %95, %96, %97, %98, %99, %100, %101, %102, %103, %104, %105, %106, %107, %108, %109, %110, %111, %112, %113, %114, %115, %116, %117, %118, %119, %120, %121, %122, %123, %124, %125, %126, %127, %128, %129, %130, %131, %132, %133, %134, %135, %136, %137, %138, %139, %140, %141, %142)
+let  %142	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 82 : Int)
+let  %141	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 81 : Int)
+let  %140	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 80 : Int)
+let  %139	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 79 : Int)
+let  %138	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 78 : Int)
+let  %137	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 77 : Int)
+let  %136	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 76 : Int)
+let  %135	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 75 : Int)
+let  %134	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 74 : Int)
+let  %133	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 73 : Int)
+let  %132	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 72 : Int)
+let  %131	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 71 : Int)
+let  %130	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 70 : Int)
+let  %129	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 69 : Int)
+let  %128	: CapabilitySet	= capabilityConjunction(1 : Int, 10 : Int, 68 : Int)
+let  %127	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 82 : Int)
+let  %126	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 81 : Int)
+let  %125	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 80 : Int)
+let  %124	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 79 : Int)
+let  %123	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 78 : Int)
+let  %122	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 77 : Int)
+let  %121	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 76 : Int)
+let  %120	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 75 : Int)
+let  %119	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 74 : Int)
+let  %118	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 73 : Int)
+let  %117	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 72 : Int)
+let  %116	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 71 : Int)
+let  %115	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 70 : Int)
+let  %114	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 69 : Int)
+let  %113	: CapabilitySet	= capabilityConjunction(1 : Int, 9 : Int, 68 : Int)
+let  %112	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 82 : Int)
+let  %111	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 81 : Int)
+let  %110	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 80 : Int)
+let  %109	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 79 : Int)
+let  %108	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 78 : Int)
+let  %107	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 77 : Int)
+let  %106	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 76 : Int)
+let  %105	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 75 : Int)
+let  %104	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 74 : Int)
+let  %103	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 73 : Int)
+let  %102	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 72 : Int)
+let  %101	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 71 : Int)
+let  %100	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 70 : Int)
+let  %99	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 69 : Int)
+let  %98	: CapabilitySet	= capabilityConjunction(1 : Int, 8 : Int, 68 : Int)
+let  %97	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 82 : Int)
+let  %96	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 81 : Int)
+let  %95	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 80 : Int)
+let  %94	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 79 : Int)
+let  %93	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 78 : Int)
+let  %92	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 77 : Int)
+let  %91	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 76 : Int)
+let  %90	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 75 : Int)
+let  %89	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 74 : Int)
+let  %88	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 73 : Int)
+let  %87	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 72 : Int)
+let  %86	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 71 : Int)
+let  %85	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 70 : Int)
+let  %84	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 69 : Int)
+let  %83	: CapabilitySet	= capabilityConjunction(1 : Int, 7 : Int, 68 : Int)
+let  %82	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 82 : Int)
+let  %81	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 81 : Int)
+let  %80	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 80 : Int)
+let  %79	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 79 : Int)
+let  %78	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 78 : Int)
+let  %77	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 77 : Int)
+let  %76	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 76 : Int)
+let  %75	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 75 : Int)
+let  %74	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 74 : Int)
+let  %73	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 73 : Int)
+let  %72	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 72 : Int)
+let  %71	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 71 : Int)
+let  %70	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 70 : Int)
+let  %69	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 69 : Int)
+let  %68	: CapabilitySet	= capabilityConjunction(1 : Int, 6 : Int, 68 : Int)
+let  %67	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 82 : Int)
+let  %66	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 81 : Int)
+let  %65	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 80 : Int)
+let  %64	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 79 : Int)
+let  %63	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 78 : Int)
+let  %62	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 77 : Int)
+let  %61	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 76 : Int)
+let  %60	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 75 : Int)
+let  %59	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 74 : Int)
+let  %58	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 73 : Int)
+let  %57	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 72 : Int)
+let  %56	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 71 : Int)
+let  %55	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 70 : Int)
+let  %54	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 69 : Int)
+let  %53	: CapabilitySet	= capabilityConjunction(1 : Int, 5 : Int, 68 : Int)
+let  %52	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 82 : Int)
+let  %51	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 81 : Int)
+let  %50	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 80 : Int)
+let  %49	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 79 : Int)
+let  %48	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 78 : Int)
+let  %47	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 77 : Int)
+let  %46	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 76 : Int)
+let  %45	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 75 : Int)
+let  %44	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 74 : Int)
+let  %43	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 73 : Int)
+let  %42	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 72 : Int)
+let  %41	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 71 : Int)
+let  %40	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 70 : Int)
+let  %39	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 69 : Int)
+let  %38	: CapabilitySet	= capabilityConjunction(1 : Int, 4 : Int, 68 : Int)
+let  %37	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 82 : Int)
+let  %36	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 81 : Int)
+let  %35	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 80 : Int)
+let  %34	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 79 : Int)
+let  %33	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 78 : Int)
+let  %32	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 77 : Int)
+let  %31	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 76 : Int)
+let  %30	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 75 : Int)
+let  %29	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 74 : Int)
+let  %28	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 73 : Int)
+let  %27	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 72 : Int)
+let  %26	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 71 : Int)
+let  %25	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 70 : Int)
+let  %24	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 69 : Int)
+let  %23	: CapabilitySet	= capabilityConjunction(1 : Int, 3 : Int, 68 : Int)
+let  %22	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 82 : Int)
+let  %21	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 81 : Int)
+let  %20	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 80 : Int)
+let  %19	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 79 : Int)
+let  %18	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 78 : Int)
+let  %17	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 77 : Int)
+let  %16	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 76 : Int)
+let  %15	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 75 : Int)
+let  %14	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 74 : Int)
+let  %13	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 73 : Int)
+let  %12	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 72 : Int)
+let  %11	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 71 : Int)
+let  %10	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 70 : Int)
+let  %9	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 69 : Int)
+let  %8	: CapabilitySet	= capabilityConjunction(1 : Int, 2 : Int, 68 : Int)
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %143:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %144	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%144, 1 : Float)
+	let  %145	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %146	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%145, 0 : Int)
+	store(%146, 1 : Float)
+	let  %147	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %148	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%147, 1 : Int)
+	store(%148, 1 : Float)
+	let  %149	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %150	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%149, 2 : Int)
+	store(%150, 1 : Float)
+	let  %151	: %ConstantsHSOutput	= load(%output)
+	return_val(%151)
+}
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+func %hullMain	: Func(Void)
+{
+block %152:
+	return_val(void_constant)
+}
+let  %153	: _	= interface_req_entry(%154, witness_table_t(%x5Fx5FBuiltinRealType))
+let  %155	: _	= interface_req_entry(%6, witness_table_t(%IFloat))
+let  %156	: _	= interface_req_entry(%157, Func(this_type(%x5Fx5FBuiltinFloatingPointType)))
+let  %158	: _	= interface_req_entry(%159, Func(DiffPairUserCode(this_type(%x5Fx5FBuiltinFloatingPointType), %160)))
+let  %161	: _	= interface_req_entry(%162, Func(Void, associated_type(%IDifferentiable)))
+[treatAsDifferentiableDecoration]
+[BuiltinDecoration]
+[import("_ST4core26__BuiltinFloatingPointType")]
+[nameHint("__BuiltinFloatingPointType")]
+let  %x5Fx5FBuiltinFloatingPointType	: Type	= interface(%153, %155, %156, %158, %161)
+[import("_S4core26__BuiltinFloatingPointTypeI4core17__BuiltinRealTypeR15_24xinheritance")]
+let  %154	: _	= key
+let  %163	: _	= interface_req_entry(%164, witness_table_t(%x5Fx5FBuiltinSignedArithmeticType))
+[BuiltinDecoration]
+[import("_ST4core17__BuiltinRealType")]
+[nameHint("__BuiltinRealType")]
+let  %x5Fx5FBuiltinRealType	: Type	= interface(%163)
+[import("_S4core17__BuiltinRealTypeI4core29__BuiltinSignedArithmeticTypeR15_24xinheritance")]
+let  %164	: _	= key
+let  %165	: _	= interface_req_entry(%166, witness_table_t(%x5Fx5FBuiltinArithmeticType))
+[BuiltinDecoration]
+[import("_ST4core29__BuiltinSignedArithmeticType")]
+[nameHint("__BuiltinSignedArithmeticType")]
+let  %x5Fx5FBuiltinSignedArithmeticType	: Type	= interface(%165)
+[import("_S4core29__BuiltinSignedArithmeticTypeI4core23__BuiltinArithmeticTypeR15_24xinheritance")]
+let  %166	: _	= key
+let  %167	: _	= interface_req_entry(%168, witness_table_t(%x5Fx5FBuiltinType))
+let  %169	: _	= interface_req_entry(%170, witness_table_t(%IArithmetic))
+[BuiltinDecoration]
+[import("_ST4core23__BuiltinArithmeticType")]
+[nameHint("__BuiltinArithmeticType")]
+let  %x5Fx5FBuiltinArithmeticType	: Type	= interface(%167, %169)
+[import("_S4core23__BuiltinArithmeticTypeI4core13__BuiltinTypeR15_24xinheritance")]
+let  %168	: _	= key
+[BuiltinDecoration]
+[import("_ST4core13__BuiltinType")]
+[nameHint("__BuiltinType")]
+let  %x5Fx5FBuiltinType	: Type	= interface
+[import("_S4core23__BuiltinArithmeticTypeI4core11IArithmeticR15_24xinheritance")]
+let  %170	: _	= key
+let  %171	: _	= interface_req_entry(%172, witness_table_t(%IComparable))
+let  %173	: _	= interface_req_entry(%174, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %175	: _	= interface_req_entry(%176, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %177	: _	= interface_req_entry(%178, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %179	: _	= interface_req_entry(%180, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %181	: _	= interface_req_entry(%182, Func(this_type(%IArithmetic), this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %183	: _	= interface_req_entry(%184, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+let  %185	: _	= interface_req_entry(%186, Func(this_type(%IArithmetic), Int))
+let  %187	: _	= interface_req_entry(%188, Func(this_type(%IArithmetic), this_type(%IArithmetic)))
+[import("_ST4core11IArithmetic")]
+[nameHint("IArithmetic")]
+let  %IArithmetic	: Type	= interface(%171, %173, %175, %177, %179, %181, %183, %185, %187)
+[import("_S4core11IArithmeticI4core11IComparableR15_24xinheritance")]
+let  %172	: _	= key
+let  %189	: _	= interface_req_entry(%190, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %191	: _	= interface_req_entry(%192, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+let  %193	: _	= interface_req_entry(%194, Func(Bool, this_type(%IComparable), this_type(%IComparable)))
+[import("_ST4core11IComparable")]
+[nameHint("IComparable")]
+let  %IComparable	: Type	= interface(%189, %191, %193)
+[import("_S4core11IComparable6equalsp1pi_4core11IComparable4Thisb")]
+let  %190	: _	= key
+[import("_S4core11IComparable8lessThanp1pi_4core11IComparable4Thisb")]
+let  %192	: _	= key
+[import("_S4core11IComparable16lessThanOrEqualsp1pi_4core11IComparable4Thisb")]
+let  %194	: _	= key
+[import("_S4core11IArithmetic3addp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %174	: _	= key
+[import("_S4core11IArithmetic3subp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %176	: _	= key
+[import("_S4core11IArithmetic3mulp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %178	: _	= key
+[import("_S4core11IArithmetic3divp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %180	: _	= key
+[import("_S4core11IArithmetic3modp1pi_4core11IArithmetic4This4core11IArithmetic4This")]
+let  %182	: _	= key
+[import("_S4core11IArithmetic3negp0p4core11IArithmetic4This")]
+let  %184	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_i")]
+let  %186	: _	= key
+[import("_S4core11IArithmeticR8_24xinitp1pi_4core11IArithmetic4This")]
+let  %188	: _	= key
+[import("_S4core26__BuiltinFloatingPointTypeI4core6IFloatR15_24xinheritance")]
+let  %6	: _	= key
+let  %195	: _	= interface_req_entry(%196, witness_table_t(%IArithmetic))
+let  %197	: _	= interface_req_entry(%4, witness_table_t(%IDifferentiable))
+let  %198	: _	= interface_req_entry(%199, Func(this_type(%IFloat), Float))
+let  %200	: _	= interface_req_entry(%201, Func(Float, this_type(%IFloat)))
+let  %202	: _	= interface_req_entry(%203, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %204	: _	= interface_req_entry(%205, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %206	: _	= interface_req_entry(%207, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %208	: _	= interface_req_entry(%209, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %210	: _	= interface_req_entry(%211, Func(this_type(%IFloat), this_type(%IFloat), this_type(%IFloat)))
+let  %212	: _	= interface_req_entry(%213, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %214	: _	= interface_req_entry(%215, Func(this_type(%IFloat), this_type(%IFloat)))
+let  %216	: _	= interface_req_entry(%217, %218)
+[import("_ST4core6IFloat")]
+[nameHint("IFloat")]
+let  %IFloat	: Type	= interface(%195, %197, %198, %200, %202, %204, %206, %208, %210, %212, %214, %216)
+[import("_S4core6IFloatI4core11IArithmeticR15_24xinheritance")]
+let  %196	: _	= key
+[import("_S4core6IFloatI4core15IDifferentiableR15_24xinheritance")]
+let  %4	: _	= key
+let  %219	: _	= interface_req_entry(%220, associated_type(%IDifferentiable))
+let  %221	: _	= interface_req_entry(%222, witness_table_t(%IDifferentiable))
+let  %223	: _	= interface_req_entry(%224, Func(associated_type(%IDifferentiable)))
+let  %225	: _	= interface_req_entry(%226, Func(associated_type(%IDifferentiable), associated_type(%IDifferentiable), associated_type(%IDifferentiable)))
+let  %227	: _	= interface_req_entry(%228, %229)
+[KnownBuiltinDecoration(6 : Int)]
+[import("_ST4core15IDifferentiable")]
+[nameHint("IDifferentiable")]
+let  %IDifferentiable	: Type	= interface(%219, %221, %223, %225, %227)
+[import("_ST4core15IDifferentiable12Differential")]
+let  %220	: _	= key
+[import("_S4core15IDifferentiable12DifferentialI4core15IDifferentiable0")]
+let  %222	: _	= key
+[StaticRequirementDecoration]
+[import("_S4core15IDifferentiable5dzerop0p4core15IDifferentiable12Differential")]
+let  %224	: _	= key
+[StaticRequirementDecoration]
+[import("_S4core15IDifferentiable4daddp2pi_4core15IDifferentiable12Differentiali_4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
+let  %226	: _	= key
+[StaticRequirementDecoration]
+[import("_S4core15IDifferentiable4dmulg2TCGP04core17__BuiltinRealTypep2pi_GP0i_4core15IDifferentiable12Differential4core15IDifferentiable12Differential")]
+let  %228	: _	= key
+generic %229	: Generic
+{
+block %230(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinRealType)]
+		[nameHint("IDifferentiable.T")]
+		param %IDifferentiablex5FT	: type_t,
+		param %231	: witness_table_t(%x5Fx5FBuiltinRealType)):
+	return_val(Func(associated_type(%IDifferentiable), %IDifferentiablex5FT, associated_type(%IDifferentiable)))
+}
+[import("_S4core6IFloatR8_24xinitp1pi_f")]
+let  %199	: _	= key
+[import("_S4core6IFloat7toFloatp0pf")]
+let  %201	: _	= key
+[import("_S4core6IFloat3addp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %203	: _	= key
+[import("_S4core6IFloat3subp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %205	: _	= key
+[import("_S4core6IFloat3mulp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %207	: _	= key
+[import("_S4core6IFloat3divp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %209	: _	= key
+[import("_S4core6IFloat3modp1pi_4core6IFloat4This4core6IFloat4This")]
+let  %211	: _	= key
+[import("_S4core6IFloat3negp0p4core6IFloat4This")]
+let  %213	: _	= key
+[import("_S4core6IFloatR8_24xinitp1pi_4core6IFloat4This")]
+let  %215	: _	= key
+[import("_S4core6IFloat5scaleg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP04core6IFloat4This")]
+let  %217	: _	= key
+generic %218	: Generic
+{
+block %232(
+		[TypeConstraintDecoration(%x5Fx5FBuiltinFloatingPointType)]
+		[nameHint("IFloat.T")]
+		param %IFloatx5FT	: type_t,
+		param %233	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)):
+	return_val(Func(this_type(%IFloat), this_type(%IFloat), %IFloatx5FT))
+}
+[backwardDiffReference(%162)]
+[fwdDerivative(%159)]
+[StaticRequirementDecoration]
+[import("_S4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
+let  %157	: _	= key
+[StaticRequirementDecoration]
+[import("_SFwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
+let  %159	: _	= key
+[StaticRequirementDecoration]
+[import("_SBwdReq_4core26__BuiltinFloatingPointType5getPip0p4core26__BuiltinFloatingPointType4Thisb")]
+let  %162	: _	= key
+let  %160	: witness_table_t(%IDifferentiable)	= undefined
+[import("_SWf4core26__BuiltinFloatingPointType")]
+witness_table %5	: witness_table_t(%x5Fx5FBuiltinFloatingPointType)(Float);
+
+[import("_SW4coreX4core5ArrayG2GP0K1NI4core15IDifferentiableg3TviCGP04core15IDifferentiable4core15IDifferentiable")]
+generic %1	: witness_table_t(%IDifferentiable)
+{
+block %234(
+		[TypeConstraintDecoration(%IDifferentiable)]
+		[nameHint("T")]
+		param %T	: type_t,
+		[nameHint("N")]
+		param %N	: Int,
+		param %235	: witness_table_t(%IDifferentiable)):
+	witness_table %236	: witness_table_t(%IDifferentiable)(Array(%T, %N));
+
+	return_val(%236)
+}
+[treatAsDifferentiableDecoration]
+[constructor(true)]
+[method]
+[public]
+[export("_S17test_builtin_cast17ConstantsHSOutputR8_24xinitp2pi_4core5ArrayG2fk3i_f")]
+[nameHint("ConstantsHSOutput.$init")]
+func %ConstantsHSOutputx5Fx24init	: Func(%ConstantsHSOutput, Array(Float, 3 : Int), Float)
+{
+block %237(
+		[nameHint("TessLevelOuter")]
+		param %TessLevelOuter1	: Array(Float, 3 : Int),
+		[nameHint("TessLevelInner")]
+		param %TessLevelInner1	: Float):
+	let  %238	: Ptr(%ConstantsHSOutput)	= var
+	let  %239	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%238, %TessLevelOuter)
+	store(%239, %TessLevelOuter1)
+	let  %240	: Ptr(Float)	= get_field_addr(%238, %TessLevelInner)
+	store(%240, %TessLevelInner1)
+	let  %241	: %ConstantsHSOutput	= load(%238)
+	return_val(%241)
+}
+###
+### POST IR VALIDATION:
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= typeLayout
+let  %2	: Void	= varLayout(%5)
+let  %5	: Void	= structTypeLayout
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %6:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %7	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%7, 1 : Float)
+	let  %8	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %9	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%8, 0 : Int)
+	store(%9, 1 : Float)
+	let  %10	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %11	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%10, 1 : Int)
+	store(%11, 1 : Float)
+	let  %12	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %13	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%12, 2 : Int)
+	store(%13, 1 : Float)
+	let  %14	: %ConstantsHSOutput	= load(%output)
+	return_val(%14)
+}
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[keepAlive]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+[layout(%1)]
+func %hullMain	: Func(Void)
+{
+block %15:
+	return_val(void_constant)
+}
+###
+### BEFORE-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= typeLayout
+let  %2	: Void	= varLayout(%5)
+let  %5	: Void	= structTypeLayout
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[readNone]
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %6:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %7	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%7, 1 : Float)
+	let  %8	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %9	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%8, 0 : Int)
+	store(%9, 1 : Float)
+	let  %10	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %11	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%10, 1 : Int)
+	store(%11, 1 : Float)
+	let  %12	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %13	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%12, 2 : Int)
+	store(%13, 1 : Float)
+	let  %14	: %ConstantsHSOutput	= load(%output)
+	return_val(%14)
+}
+[readNone]
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[keepAlive]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+[layout(%1)]
+func %hullMain	: Func(Void)
+{
+block %15:
+	return_val(void_constant)
+}
+###
+### AFTER-SPECIALIZE:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= typeLayout
+let  %2	: Void	= varLayout(%5)
+let  %5	: Void	= structTypeLayout
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[readNone]
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %6:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %7	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%7, 1 : Float)
+	let  %8	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %9	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%8, 0 : Int)
+	store(%9, 1 : Float)
+	let  %10	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %11	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%10, 1 : Int)
+	store(%11, 1 : Float)
+	let  %12	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %13	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%12, 2 : Int)
+	store(%13, 1 : Float)
+	let  %14	: %ConstantsHSOutput	= load(%output)
+	return_val(%14)
+}
+[readNone]
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[keepAlive]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+[layout(%1)]
+func %hullMain	: Func(Void)
+{
+block %15:
+	return_val(void_constant)
+}
+GenericSpecializationDictionary
+ExistentialFuncSpecializationDictionary
+ExistentialTypeSpecializationDictionary
+###
+### BEFORE-LOWER-GENERICS:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= typeLayout
+let  %2	: Void	= varLayout(%5)
+let  %5	: Void	= structTypeLayout
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[readNone]
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %6:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %7	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%7, 1 : Float)
+	let  %8	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %9	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%8, 0 : Int)
+	store(%9, 1 : Float)
+	let  %10	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %11	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%10, 1 : Int)
+	store(%11, 1 : Float)
+	let  %12	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %13	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%12, 2 : Int)
+	store(%13, 1 : Float)
+	let  %14	: %ConstantsHSOutput	= load(%output)
+	return_val(%14)
+}
+[readNone]
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[keepAlive]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+[layout(%1)]
+func %hullMain	: Func(Void)
+{
+block %15:
+	return_val(void_constant)
+}
+###
+### AFTER-LOWER-GENERICS:
+undefined
+let  %1	: Void	= EntryPointLayout(%2, %3)
+let  %3	: Void	= varLayout(%4)
+let  %4	: Void	= typeLayout
+let  %2	: Void	= varLayout(%5)
+let  %5	: Void	= structTypeLayout
+[semantic("SV_TessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelOuter")]
+[semantic("SV_TessFactor", 0 : Int)]
+[nameHint("TessLevelOuter")]
+let  %TessLevelOuter	: _	= key
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[export("_SV17test_builtin_cast17ConstantsHSOutput14TessLevelInner")]
+[semantic("SV_InsideTessFactor", 0 : Int)]
+[nameHint("TessLevelInner")]
+let  %TessLevelInner	: _	= key
+[export("_ST17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHSOutput")]
+struct %ConstantsHSOutput	: Type
+{
+	field(%TessLevelOuter, Array(Float, 3 : Int))
+	field(%TessLevelInner, Float)
+}
+
+[readNone]
+[export("_S17test_builtin_cast11ConstantsHSp0p17test_builtin_cast17ConstantsHSOutput")]
+[nameHint("ConstantsHS")]
+func %ConstantsHS	: Func(%ConstantsHSOutput)
+{
+block %6:
+	[nameHint("output")]
+	let  %output	: Ptr(%ConstantsHSOutput)	= var
+	let  %7	: Ptr(Float)	= get_field_addr(%output, %TessLevelInner)
+	store(%7, 1 : Float)
+	let  %8	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %9	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%8, 0 : Int)
+	store(%9, 1 : Float)
+	let  %10	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %11	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%10, 1 : Int)
+	store(%11, 1 : Float)
+	let  %12	: Ptr(Array(Float, 3 : Int))	= get_field_addr(%output, %TessLevelOuter)
+	let  %13	: Ptr(Float, 2147483647 : UInt64)	= getElementPtr(%12, 2 : Int)
+	store(%13, 1 : Float)
+	let  %14	: %ConstantsHSOutput	= load(%output)
+	return_val(%14)
+}
+[readNone]
+[entryPoint(2 : Int, "hullMain", "test_builtin_cast")]
+[keepAlive]
+[outputControlPoints(3 : Int)]
+[outputTopology("triangle_cw", 4 : Int)]
+[partioning("integer")]
+[domain("tri")]
+[patchConstantFunc(%ConstantsHS)]
+[export("_S17test_builtin_cast8hullMainp0pV")]
+[nameHint("hullMain")]
+[layout(%1)]
+func %hullMain	: Func(Void)
+{
+block %15:
+	return_val(void_constant)
+}
+###
+(0): error 99999: Slang compilation aborted due to an exception of N5Slang13InternalErrorE: unexpected: unimplemented
