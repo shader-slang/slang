@@ -2,18 +2,12 @@
 #include "slang-ir.h"
 
 #include "../core/slang-basic.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
-
-#ifdef SLANG_LINUX_FAMILY
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <execinfo.h>
-#endif
 
 namespace Slang
 {
@@ -1766,25 +1760,10 @@ uint32_t _debugGetAndIncreaseInstCounter()
 #if _WIN32 && defined(_MSC_VER)
         __debugbreak();
 #endif
-#ifdef SLANG_LINUX_FAMILY
         if (_slangIRPrintStackAtBreak)
         {
-            // Print stack trace for LLM debugging assistance
-            void* stackTrace[64];
-            int stackDepth = backtrace(stackTrace, 64);
-            char** symbols = backtrace_symbols(stackTrace, stackDepth);
-            fprintf(stderr, "IR instruction UID %u created at:\n", _slangIRAllocBreak);
-            if (symbols)
-            {
-                for (int i = 0; i < stackDepth; ++i)
-                {
-                    fprintf(stderr, "%s\n", symbols[i]);
-                }
-                free(symbols);
-            }
-            fprintf(stderr, "\n");
+            PlatformUtil::backtrace(_slangIRAllocBreak);
         }
-#endif
     }
     return _debugGetIRAllocCounter()++;
 }

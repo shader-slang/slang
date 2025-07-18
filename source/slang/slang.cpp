@@ -7,6 +7,7 @@
 #include "../core/slang-platform.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-string.h"
 #include "../core/slang-type-convert-util.h"
 #include "../core/slang-type-text-util.h"
 // Artifact
@@ -171,11 +172,9 @@ void Session::init()
             irBreakEnv)))
     {
         String envValue = irBreakEnv.produceString();
-        char* endPtr;
-        long value = std::strtol(envValue.getBuffer(), &endPtr, 10);
-        if (endPtr != envValue.getBuffer() && *endPtr == '\0' && value >= 0 && value <= UINT32_MAX)
+        if (envValue.getLength())
         {
-            _slangIRAllocBreak = static_cast<uint32_t>(value);
+            _slangIRAllocBreak = stringToInt(envValue);
             _slangIRPrintStackAtBreak = true;
         }
     }

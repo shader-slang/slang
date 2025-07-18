@@ -150,6 +150,11 @@ struct PlatformUtil
     /// @param text Text to be displayed in 'debugger output'
     /// @return SLANG_E_NOT_AVAILABLE if not on this platform, and potentially other errors
     static SlangResult outputDebugMessage(const char* text);
+
+    /// Print a stack trace to stderr for debugging purposes.
+    /// Only available on Linux family platforms.
+    /// @param uid The instruction UID that triggered the stack trace
+    static void backtrace(uint32_t uid);
 };
 
 #ifndef _MSC_VER
