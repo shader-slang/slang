@@ -199,7 +199,6 @@ jobs:
               * Build: `cmake --build --preset debug`
               * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
             - Project is pre-built and ready for development tasks
-              * Run `./build/Debug/bin/slang-test ./tests/library/library-test.slang` for testing setup is working
 
             # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
@@ -207,11 +206,10 @@ jobs:
               - Use repoName: "shader-slang/slang" for all queries
               - Ask specific technical questions about architecture, patterns, or implementation approaches
               - Examples: "What does the type legalization pass do?" or "What's the pattern for adding new code generation targets?"
-              - Use responses to understand existing patterns before implementing changes
 
               **Implementation Guidelines:**
               - Always follow existing code patterns and architectural decisions discovered through deepwiki
-              - Consult the tool when you need context about unfamiliar parts of the codebase
+	      - Use this to get a secondary opinion and to get expert insights on the best approach for the given problem
 
             # Debugging backend crashes or invalid downstream code:
 
@@ -254,7 +252,7 @@ jobs:
                  - Exception: Only when fixing obvious typos or updating documentation
                  - All bug fixes must include regression tests
 
-              **Remember**: Ensure there are no Build and Test failures when executing user request. Think hard on the USER comment and request as you work on the problem.
+              **Remember**: Think hard on the USER comment and request as you work on the problem. Before sending PR the code *should build*.
 
           mcp_config: |
             {
@@ -283,7 +281,6 @@ jobs:
             GITHUB_ACTOR: ${{ github.actor }}
             ANTHROPIC_AUTH_TOKEN: ${{ env.ANTHROPIC_AUTH_TOKEN }}
             DISABLE_TELEMETRY: 1
-            BASH_DEFAULT_TIMEOUT_MS: 18000000
             DEBUG: 1
 
         # The ANTHROPIC_API_KEY environment variable is automatically picked up

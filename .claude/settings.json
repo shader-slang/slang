@@ -7,10 +7,6 @@
           {
             "type": "command",
             "command": "./extras/formatting.sh --no-version-check --since master"
-          },
-          {
-            "type": "command",
-            "command": "cmake --build --preset debug"
           }
         ]
       }
@@ -21,10 +17,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"LLM_STOP_HOOK\""
+            "command": "echo 'Claude Completed'"
           }
         ]
       }
     ]
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": 1200000,
+    "BASH_MAX_TIMEOUT_MS": 2400000
   }
 }
