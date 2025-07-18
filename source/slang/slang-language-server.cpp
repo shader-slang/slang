@@ -1616,7 +1616,9 @@ static CallCandidateMatchCost getCallCandidateMatchCost(
         {
             auto paramType = getType(version->linkage->getASTBuilder(), paramList[argId]);
             ConversionCost argCost = 0;
-            if (paramType && semanticsVisitor.canCoerce(paramType, arg->type.type, arg, CoercionSite::General, &argCost))
+            if (paramType &&
+                semanticsVisitor
+                    .canCoerce(paramType, arg->type.type, arg, CoercionSite::General, &argCost))
             {
                 result.matchedArgCount++;
                 result.maxArgConversionCost = Math::Max(result.maxArgConversionCost, argCost);
