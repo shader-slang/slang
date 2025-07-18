@@ -3978,8 +3978,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
-                String e = "Unhandled local inst in spirv-emit:\n" +
-                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                String e = "Unhandled local inst in spirv-emit:\n";
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+                e = e + "DebugUID: " + String(inst->_debugUID) + "\n";
+#endif
+                e = e + dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
         case kIROp_Specialize:
