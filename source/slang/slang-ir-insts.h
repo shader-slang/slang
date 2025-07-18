@@ -3509,8 +3509,12 @@ FIDDLE(allOtherInstStructs())
 
 struct IRBuilderSourceLocRAII;
 
+FIDDLE()
 struct IRBuilder
 {
+    // Auto-generated IRBuilder methods for IR instructions with operands
+    FIDDLE(generateAllIRBuilderMethods())
+
 private:
     /// Deduplication context from the module.
     IRDeduplicationContext* m_dedupContext = nullptr;
@@ -3674,18 +3678,15 @@ public:
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
-    IRNativePtrType* getNativePtrType(IRType* valueType);
 
     IRType* getCapabilitySetType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRType* interfaceType);
     IRRawPointerType* getRawPointerType();
-    IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRRTTIType* getRTTIType();
     IRRTTIHandleType* getRTTIHandleType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
-    IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();
 
     IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
@@ -3706,9 +3707,6 @@ public:
         IRType* type,
         IRInst* pattern,
         ArrayView<IRInst*> capture);
-
-    IRResultType* getResultType(IRType* valueType, IRType* errorType);
-    IROptionalType* getOptionalType(IRType* valueType);
 
     IRBasicBlockType* getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -3748,11 +3746,6 @@ public:
         IRInst* isCombined,
         IRInst* format);
 
-    IRComPtrType* getComPtrType(IRType* valueType);
-
-    /// Get a 'SPIRV literal'
-    IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
-
     IRArrayTypeBase* getArrayTypeBase(
         IROp op,
         IRType* elementType,
@@ -3767,20 +3760,8 @@ public:
 
     IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType, IRInst* stride);
 
-    IRVectorType* getVectorType(IRType* elementType, IRInst* elementCount);
-
     IRVectorType* getVectorType(IRType* elementType, IRIntegerValue elementCount);
 
-    IRCoopVectorType* getCoopVectorType(IRType* elementType, IRInst* elementCount);
-
-    IRMatrixType* getMatrixType(
-        IRType* elementType,
-        IRInst* rowCount,
-        IRInst* columnCount,
-        IRInst* layout);
-
-    IRArrayListType* getArrayListType(IRType* elementType);
-    IRTensorViewType* getTensorViewType(IRType* elementType);
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
 
     IRDifferentialPairType* getDifferentialPairType(IRType* valueType, IRInst* witnessTable);
@@ -3790,8 +3771,6 @@ public:
     IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
         IRType* valueType,
         IRInst* witnessTable);
-
-    IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
 
     IRFuncType* getFuncType(UInt paramCount, IRType* const* paramTypes, IRType* resultType);
 
@@ -3814,8 +3793,6 @@ public:
     IRGroupSharedRate* getGroupSharedRate();
     IRActualGlobalRate* getActualGlobalRate();
     IRSpecConstRate* getSpecConstRate();
-
-    IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRInst* const* slotArgs);
 
@@ -3852,17 +3829,6 @@ public:
     IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
     {
         return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
-    }
-
-    IRMetalMeshType* getMetalMeshType(
-        IRType* vertexType,
-        IRType* primitiveType,
-        IRInst* numVertices,
-        IRInst* numPrimitives,
-        IRInst* topology)
-    {
-        IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
-        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);

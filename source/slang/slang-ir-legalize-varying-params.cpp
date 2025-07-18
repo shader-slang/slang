@@ -3603,7 +3603,12 @@ protected:
         }
 
         const auto topologyEnum = outputDeco->getTopologyType();
-        IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
+        IRIntLit* topologyConst = as<IRIntLit>(builder.getIntValue(builder.getIntType(), topologyEnum));
+        if (topologyConst == nullptr)
+        {
+            SLANG_UNEXPECTED("Failed to convert IRInst to IRIntLit for the topology count of Metal mesh");
+            return;
+        }
 
         IRType* vertexType = nullptr;
         IRType* indicesType = nullptr;
