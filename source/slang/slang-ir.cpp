@@ -1782,11 +1782,6 @@ uint32_t _debugGetAndIncreaseInstCounter()
                 }
                 free(symbols);
             }
-            else
-            {
-                // Fallback to addresses only if symbol resolution fails
-                backtrace_symbols_fd(stackTrace, stackDepth, STDERR_FILENO);
-            }
             fprintf(stderr, "\n");
         }
 #endif

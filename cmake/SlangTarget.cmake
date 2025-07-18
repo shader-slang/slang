@@ -300,11 +300,6 @@ function(slang_add_target dir type)
             ${target}
             PRIVATE "$<$<CONFIG:${debug_configs}>:-g>"
         )
-        # Add -rdynamic for better stack traces in debug builds on Linux
-        target_link_options(
-            ${target}
-            PRIVATE "$<$<CONFIG:${debug_configs}>:-rdynamic>"
-        )
     endif()
 
     #

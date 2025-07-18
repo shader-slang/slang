@@ -4,6 +4,7 @@
 #include "../core/slang-castable.h"
 #include "../core/slang-io.h"
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-type-convert-util.h"
@@ -164,12 +165,15 @@ void Session::init()
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
     // Read environment variable for IR debugging
-    const char* irBreakEnv = std::getenv("SLANG_DEBUG_IR_BREAK");
-    if (irBreakEnv)
+    StringBuilder irBreakEnv;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_DEBUG_IR_BREAK"),
+            irBreakEnv)))
     {
+        String envValue = irBreakEnv.produceString();
         char* endPtr;
-        long value = std::strtol(irBreakEnv, &endPtr, 10);
-        if (endPtr != irBreakEnv && *endPtr == '\0' && value >= 0 && value <= UINT32_MAX)
+        long value = std::strtol(envValue.getBuffer(), &endPtr, 10);
+        if (endPtr != envValue.getBuffer() && *endPtr == '\0' && value >= 0 && value <= UINT32_MAX)
         {
             _slangIRAllocBreak = static_cast<uint32_t>(value);
             _slangIRPrintStackAtBreak = true;
