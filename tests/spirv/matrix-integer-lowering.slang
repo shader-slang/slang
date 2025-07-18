@@ -10,7 +10,7 @@ typealias m2x3 = matrix<TYPE, 2, 3>;
 typealias m3x3 = matrix<TYPE, 3, 3>;
 typealias m2x4 = matrix<TYPE, 2, 4>;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<TYPE> outputBuffer;
 
 struct matrixWrapper {
@@ -87,6 +87,22 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     TYPE any_nonzero = TYPE(any(mixed_mat));
     TYPE any_zero = TYPE(any(zero_mat));
     
+    // Test bit shift operations
+    m2x2 shift_mat = m2x2(1, 2, 4, 8);
+    m2x2 left_shift = shift_mat << 1;
+    m2x2 right_shift = shift_mat >> 1;
+    
+    // Test comparison operations (these return bool matrices, cast to TYPE for output)
+    m2x2 comp_mat1 = m2x2(1, 3, 2, 4);
+    m2x2 comp_mat2 = m2x2(2, 2, 3, 3);
+    
+    matrix<bool, 2, 2> less_than = comp_mat1 < comp_mat2;
+    matrix<bool, 2, 2> greater_than = comp_mat1 > comp_mat2;
+    matrix<bool, 2, 2> less_equal = comp_mat1 <= comp_mat2;
+    matrix<bool, 2, 2> greater_equal = comp_mat1 >= comp_mat2;
+    matrix<bool, 2, 2> equal_to = comp_mat1 == comp_mat2;
+    matrix<bool, 2, 2> not_equal = comp_mat1 != comp_mat2;
+    
     // Store results
     outputBuffer[0] = val1;
     // CHECK: 1
@@ -132,10 +148,42 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 1
     outputBuffer[20] = any_zero;
     // CHECK-NEXT: 0
-    outputBuffer[21] = trans2x2[0][0];  // transpose([[1,2],[3,4]])[0][0] = 1
+    outputBuffer[21] = trans2x2[0][0];
     // CHECK-NEXT: 1
-    outputBuffer[22] = trans2x2[1][0];  // transpose([[1,2],[3,4]])[1][0] = 2 
+    outputBuffer[22] = trans2x2[1][0];
     // CHECK-NEXT: 2
-    outputBuffer[23] = trans2x3[0][0];  // transpose(wrapper.mat2)[0][0] = 5
+    outputBuffer[23] = trans2x3[0][0];
     // CHECK-NEXT: 5
+    
+    // Bit shift operation results
+    outputBuffer[24] = left_shift[0][0];
+    // CHECK-NEXT: 2
+    outputBuffer[25] = left_shift[0][1];
+    // CHECK-NEXT: 4
+    outputBuffer[26] = right_shift[1][0];
+    // CHECK-NEXT: 2
+    outputBuffer[27] = right_shift[1][1];
+    // CHECK-NEXT: 4
+    
+    // Comparison operation results (bool matrices cast to TYPE)
+    outputBuffer[28] = TYPE(less_than[0][0]);
+    // CHECK-NEXT: 1
+    outputBuffer[29] = TYPE(less_than[0][1]);
+    // CHECK-NEXT: 0
+    outputBuffer[30] = TYPE(greater_than[0][1]);
+    // CHECK-NEXT: 1
+    outputBuffer[31] = TYPE(greater_than[1][1]);
+    // CHECK-NEXT: 1
+    outputBuffer[32] = TYPE(less_equal[0][0]);
+    // CHECK-NEXT: 1
+    outputBuffer[33] = TYPE(less_equal[0][1]);
+    // CHECK-NEXT: 0
+    outputBuffer[34] = TYPE(greater_equal[0][1]);
+    // CHECK-NEXT: 1
+    outputBuffer[35] = TYPE(greater_equal[1][0]);
+    // CHECK-NEXT: 0
+    outputBuffer[36] = TYPE(equal_to[0][0]);
+    // CHECK-NEXT: 0
+    outputBuffer[37] = TYPE(not_equal[0][0]);
+    // CHECK-NEXT: 1
 }
