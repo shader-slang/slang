@@ -13,8 +13,6 @@
 #include "../compiler-core/slang-artifact-container-util.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-impl.h"
-
-#include <cstdlib>  // for getenv
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-source-loc.h"
 #include "../core/slang-file-system.h"
@@ -26,6 +24,7 @@
 #include "slang-check.h"
 #include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
+#include "slang-ir.h"
 #include "slang-lookup.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -41,8 +40,8 @@
 #include "slang-serialize-ir.h"
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
-#include "slang-ir.h"
 
+#include <cstdlib> // for getenv
 #include <sys/stat.h>
 
 // Used to print exception type names in internal-compiler-error messages

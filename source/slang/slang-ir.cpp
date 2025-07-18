@@ -9,8 +9,8 @@
 #include "slang-mangle.h"
 
 #ifdef SLANG_LINUX_FAMILY
-#include <execinfo.h>
 #include <cstdio>
+#include <execinfo.h>
 #endif
 
 namespace Slang
