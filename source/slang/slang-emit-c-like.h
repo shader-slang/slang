@@ -625,7 +625,6 @@ protected:
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitParamTypeModifier(IRType* type) { SLANG_UNUSED(type); }
-    virtual bool shouldEmitConstForConstRef() { return false; }
     virtual void emitIntrinsicCallExprImpl(
         IRCall* inst,
         UnownedStringSlice intrinsicDefinition,
