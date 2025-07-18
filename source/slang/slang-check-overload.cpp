@@ -1367,9 +1367,59 @@ int SemanticsVisitor::CompareLookupResultItems(
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
-    // a non-free-form extension.
+    // a non-free-form extension, UNLESS they have different function signatures.
+    // Functions with different signatures should both be kept for overload resolution.
     if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+    {
+        // Check if both are functions with different signatures
+        auto leftFuncDecl = as<FunctionDeclBase>(left.declRef.getDecl());
+        auto rightFuncDecl = as<FunctionDeclBase>(right.declRef.getDecl());
+
+        if (leftFuncDecl && rightFuncDecl)
+        {
+            // Compare signatures to see if they're different
+            bool signaturesEqual = true;
+
+            // Compare return types
+            if (leftFuncDecl->returnType.type && rightFuncDecl->returnType.type)
+            {
+                if (!leftFuncDecl->returnType.type->equals(rightFuncDecl->returnType.type))
+                    signaturesEqual = false;
+            }
+
+            // Compare parameter counts and types
+            if (signaturesEqual)
+            {
+                auto leftParams = leftFuncDecl->getParameters();
+                auto rightParams = rightFuncDecl->getParameters();
+                if (leftParams.getCount() != rightParams.getCount())
+                {
+                    signaturesEqual = false;
+                }
+                else
+                {
+                    for (Index i = 0; i < leftParams.getCount(); i++)
+                    {
+                        auto leftParamType = leftParams[i]->type.type;
+                        auto rightParamType = rightParams[i]->type.type;
+                        if (!leftParamType || !rightParamType ||
+                            !leftParamType->equals(rightParamType))
+                        {
+                            signaturesEqual = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If signatures are different, both should be kept (equal ranking)
+            if (!signaturesEqual)
+                return 0;
+        }
+
+        // If signatures are the same or not both functions, apply the ranking
         return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
+    }
 
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
