@@ -10,7 +10,7 @@ uniform MyData* myData;
 uniform int * output;
 
 [numthreads(1, 1, 1)]
-void computeMain()
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // These are all ill-formed, but we want to still ensure our backend
     // can handle them gracefully without crashing.
@@ -21,7 +21,7 @@ void computeMain()
     
     // Use runtime values to access the 0-sized array to avoid triggering
     // the new out-of-bounds diagnostic for constant indices
-    int runtimeIndex = 0;
+    uint runtimeIndex = dispatchThreadID.x;
     InterlockedAdd(myData.a[runtimeIndex][runtimeIndex][runtimeIndex], 1);
     myData.a[runtimeIndex][runtimeIndex][runtimeIndex] += 1;
     output[0] = myData.a[runtimeIndex][runtimeIndex][runtimeIndex];
