@@ -18,6 +18,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-link.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
@@ -493,6 +494,10 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
+    // External (imported) unsafeForceInline functions that need to
+    // prelink into the current module after lowering.
+    List<IRInst*> externalSymbolsToPrelink;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -10791,6 +10796,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FunctionDeclBase* decl,
         bool emitBody = true)
     {
+        bool isFromDifferentModule = isDeclInDifferentModule(context, decl);
+        if (isFromDifferentModule && isForceInlineEarly(decl))
+        {
+            // If a function is imported from another module then
+            // we usually don't want to emit it as a definition, and
+            // will instead only emit a declaration for it with an
+            // appropriate `[import(...)]` linkage decoration.
+            //
+            // However, if the function is marked with `[__unsafeForceInlineEarly]`
+            // then we need to make sure the IR for its definition is available
+            // to the mandatory optimization passes.
+            //
+            // We do so by finding the IR function from the imported module, and clone
+            // the body of the IRFunc from the imported module to the current module.
+            //
+            auto importedModule = getModule(decl);
+            auto irModule = importedModule->getIRModule();
+            SLANG_ASSERT(irModule && "Module containing imported decl does not have an IRModule.");
+            String mangledName = getMangledName(context->astBuilder, decl);
+            auto importedFunc = irModule->findSymbolByMangledName(mangledName);
+            SLANG_ASSERT(importedFunc.getCount() > 0);
+            subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+        }
+
         IRGeneric* outerGeneric = nullptr;
         subContext->funcDecl = decl;
 
@@ -10881,32 +10910,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irFunc);
 
-        // If a function is imported from another module then
-        // we usually don't want to emit it as a definition, and
-        // will instead only emit a declaration for it with an
-        // appropriate `[import(...)]` linkage decoration.
-        //
-        // However, if the function is marked with `[__unsafeForceInlineEarly]`
-        // then we need to make sure the IR for its definition is available
-        // to the mandatory optimization passes.
-        //
-        // TODO: The design here means that we will re-emit the inline
-        // function from its AST in every module that uses it. We should
-        // instead have logic to clone the target function in from the
-        // pre-generated IR for the module that defines it (or do some kind
-        // of minimal linking to bring in the inline functions).
-        //
-        if (!decl->body)
-        {
-            // This is a function declaration without a body.
-            // In Slang we currently try not to support forward declarations
-            // (although we might have to give in eventually), so
-            // this case should really only occur for builtin declarations.
-        }
-        else if (isDeclInDifferentModule(context, decl) && !isForceInlineEarly(decl))
-        {
-        }
-        else if (emitBody)
+        if (emitBody && decl->body && !isFromDifferentModule)
         {
             // This is a function definition, so we need to actually
             // construct IR for the body...
@@ -12258,7 +12262,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     validateIRModuleIfEnabled(compileRequest, module);
 
-
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:
     //
@@ -12276,6 +12279,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // uncomment this line while debugging.
 
     //      dumpIR(module);
+
+    // Before we can do any validation, we need to prelink [unsafeForceInlineEarly]
+    // functions.
+    prelinkIR(translationUnit->module, module, context->shared->externalSymbolsToPrelink);
 
     // First, lower error handling logic into normal control flow.
     // This includes lowering throwing functions into functions that
