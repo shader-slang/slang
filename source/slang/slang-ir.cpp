@@ -10,6 +10,8 @@
 
 #ifdef SLANG_LINUX_FAMILY
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <execinfo.h>
 #endif
 
@@ -1770,8 +1772,21 @@ uint32_t _debugGetAndIncreaseInstCounter()
             // Print stack trace for LLM debugging assistance
             void* stackTrace[64];
             int stackDepth = backtrace(stackTrace, 64);
+            char** symbols = backtrace_symbols(stackTrace, stackDepth);
             fprintf(stderr, "IR instruction UID %u created at:\n", _slangIRAllocBreak);
-            backtrace_symbols_fd(stackTrace, stackDepth, STDERR_FILENO);
+            if (symbols)
+            {
+                for (int i = 0; i < stackDepth; ++i)
+                {
+                    fprintf(stderr, "%s\n", symbols[i]);
+                }
+                free(symbols);
+            }
+            else
+            {
+                // Fallback to addresses only if symbol resolution fails
+                backtrace_symbols_fd(stackTrace, stackDepth, STDERR_FILENO);
+            }
             fprintf(stderr, "\n");
         }
 #endif
