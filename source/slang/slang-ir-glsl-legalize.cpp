@@ -2094,6 +2094,24 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
             }
         }
     }
+    else if (auto toArray = as<IRArrayTypeBase>(toType))
+    {
+        // Handle scalar-to-array conversion for tessellation factors
+        if (as<IRBasicType>(fromType))
+        {
+            List<IRInst*> elements;
+            auto arraySize = getIntVal(toArray->getElementCount());
+            
+            // Fill all elements with the scalar value
+            for (Index i = 0; i < arraySize; i++)
+            {
+                elements.add(val);
+            }
+            
+            val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());
+            return ScalarizedVal::value(val);
+        }
+    }
     // TODO: actually consider what needs to go on here...
     return ScalarizedVal::value(builder->emitCast(toType, val));
 }
