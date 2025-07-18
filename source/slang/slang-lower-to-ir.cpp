@@ -4017,13 +4017,13 @@ struct ExprLoweringContext
                     auto someTypeDecl = someTypeDeclRef.getDecl();
                     auto interfaceType = getInterfaceType(m_astBuilder, someTypeDeclRef);
                     auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType);
-                    VarDecl* varDecl = m_astBuilder->create<VarDecl>();
+                    VarDecl* varDecl = m_astBuilder->template create<VarDecl>();
                     varDecl->parentDecl = nullptr;
 
                     SLANG_ASSERT(someTypeDecl->parentDecl);
                     
                     someTypeDecl->parentDecl->addMember(varDecl);
-                    addModifier(varDecl, m_astBuilder->create<LocalTempVarModifier>());
+                    addModifier(varDecl, m_astBuilder->template create<LocalTempVarModifier>());
                     varDecl->checkState = DeclCheckState::DefinitionChecked;
                     varDecl->nameAndLoc.loc = baseExpr->loc;
                     varDecl->initExpr = baseExpr;
@@ -4031,18 +4031,18 @@ struct ExprLoweringContext
 
                     auto varDeclRef = makeDeclRef(varDecl);
 
-                    LetExpr* letExpr = m_astBuilder->create<LetExpr>();
+                    LetExpr* letExpr = m_astBuilder->template create<LetExpr>();
                     letExpr->decl = varDecl;
 
                     ExtractExistentialType* openedType =
-                        m_astBuilder->getOrCreate<ExtractExistentialType>(
+                        m_astBuilder->template getOrCreate<ExtractExistentialType>(
                             varDeclRef,
                             interfaceType,
                             interfaceDeclRef);
                     thisType = openedType;
 
                     ExtractExistentialValueExpr* openedValue =
-                        m_astBuilder->create<ExtractExistentialValueExpr>();
+                        m_astBuilder->template create<ExtractExistentialValueExpr>();
                     openedValue->declRef = varDeclRef;
                     openedValue->type = QualType(openedType);
                     openedValue->originalExpr = expr;
