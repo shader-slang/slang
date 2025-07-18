@@ -1427,12 +1427,17 @@ IRInst* cloneInst(
     }
     auto funcType = cloneType(context, originalInst->getFullType());
     context->builder = oldBuilder;
-
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugSetInstBeingCloned(originalInst->_debugUID);
+#endif
     IRInst* clonedInst = builder->createIntrinsicInst(
         funcType,
         originalInst->getOp(),
         argCount,
         newArgs.getArrayView().getBuffer());
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugResetInstBeingCloned();
+#endif
     builder->addInst(clonedInst);
     registerClonedValue(context, clonedInst, originalValues);
     if (canInstContainBasicBlocks(clonedInst->getOp()))

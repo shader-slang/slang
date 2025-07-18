@@ -339,7 +339,7 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
 /* static */ void PlatformUtil::backtrace()
 {
 #if SLANG_LINUX_FAMILY
-    // Print stack trace for LLM debugging assistance
+    // Print stack trace for debugging assistance
     void* stackTrace[64];
     int stackDepth = ::backtrace(stackTrace, 64);
     char** symbols = ::backtrace_symbols(stackTrace, stackDepth);
@@ -347,11 +347,11 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
     {
         for (int i = 0; i < stackDepth; ++i)
         {
-            fprintf(stderr, "%s\n", symbols[i]);
+            fprintf(stdout, "%s\n", symbols[i]);
         }
         free(symbols);
     }
-    fprintf(stderr, "\n");
+    fprintf(stdout, "\n");
 #endif
 }
 

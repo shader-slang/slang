@@ -2642,6 +2642,8 @@ bool isMovableInst(IRInst* inst);
 uint32_t& _debugGetIRAllocCounter();
 extern uint32_t _slangIRAllocBreak;
 extern bool _slangIRPrintStackAtBreak;
+void _debugSetInstBeingCloned(uint32_t uid);
+void _debugResetInstBeingCloned();
 #endif
 
 // TODO: Ellie, comment and move somewhere more appropriate?

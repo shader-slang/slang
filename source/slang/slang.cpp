@@ -43,7 +43,6 @@
 #include "slang-tag-version.h"
 #include "slang-type-layout.h"
 
-#include <cstdlib> // for getenv
 #include <sys/stat.h>
 
 // Used to print exception type names in internal-compiler-error messages

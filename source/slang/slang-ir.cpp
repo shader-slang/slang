@@ -1740,8 +1740,20 @@ void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 SLANG_API uint32_t _slangIRAllocBreak = 0xFFFFFFFF;
-SLANG_API bool _slangIRPrintStackAtBreak = false;
+bool _slangIRPrintStackAtBreak = false;
 static bool _slangIRAllocBreakFirst = true;
+static uint32_t _slangInstBeingCloned = 0xFFFFFFFF;
+
+void _debugSetInstBeingCloned(uint32_t uid)
+{
+    _slangInstBeingCloned = uid;
+}
+
+void _debugResetInstBeingCloned()
+{
+    _slangInstBeingCloned = 0xFFFFFFFF;
+}
+
 uint32_t& _debugGetIRAllocCounter()
 {
     static uint32_t counter = 0;
@@ -1762,11 +1774,20 @@ uint32_t _debugGetAndIncreaseInstCounter()
 #endif
         if (_slangIRPrintStackAtBreak)
         {
-            fprintf(stderr, "IR instruction UID %u created at:\n", _slangIRAllocBreak);
+            fprintf(stdout, "IR instruction #%u created at:\n", _slangIRAllocBreak);
             PlatformUtil::backtrace();
+            if (_slangInstBeingCloned != 0xFFFFFFFF)
+            {
+                fprintf(
+                    stdout,
+                    "Inst #%u is a clone of Inst #%u.\n",
+                    _slangIRAllocBreak,
+                    _slangInstBeingCloned);
+            }
         }
     }
-    return _debugGetIRAllocCounter()++;
+}
+return _debugGetIRAllocCounter()++;
 }
 #endif
 
