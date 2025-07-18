@@ -63,14 +63,6 @@ struct EliminateMultiLevelBreakContext
             for (auto child : childRegions)
                 child->forEach(f);
         }
-
-        template<typename Func>
-        void forEachBottomUp(const Func& f)
-        {
-            for (auto child : childRegions)
-                child->forEachBottomUp(f);
-            f(this);
-        }
     };
 
     struct MultiLevelBreakInfo
@@ -147,6 +139,7 @@ struct EliminateMultiLevelBreakContext
 
         void gatherInfo(IRGlobalValueWithCode* func)
         {
+            sortBlocksInFunc(func);
             for (auto block : func->getBlocks())
             {
                 if (processedBlocks.contains(block))
@@ -169,21 +162,13 @@ struct EliminateMultiLevelBreakContext
             }
             for (auto& l : regions)
             {
-                l->forEachBottomUp(
+                l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
                         if (!isUnreachableRootBlock(region->getBreakBlock()))
-                        {
-                            // Only add if not already mapped (inner regions take precedence)
-                            if (!mapBreakBlockToRegion.containsKey(region->getBreakBlock()))
-                                mapBreakBlockToRegion.add(region->getBreakBlock(), region);
-                        }
+                            mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
-                        {
-                            // Only add if not already mapped (inner regions take precedence)
-                            if (!mapBlockToRegion.containsKey(block))
-                                mapBlockToRegion.add(block, region);
-                        }
+                            mapBlockToRegion[block] = region;
                     });
             }
 
