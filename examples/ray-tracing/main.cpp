@@ -365,47 +365,77 @@ struct RayTracing : public WindowedAppBase
 
             // Build acceleration structure.
             ComPtr<IQueryPool> compactedSizeQuery;
-            QueryPoolDesc queryPoolDesc;
-            queryPoolDesc.count = 1;
-            queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
-            SLANG_RETURN_ON_FAIL(
-                gDevice->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef()));
+            bool isMetalDevice = (gDevice->getInfo().deviceType == DeviceType::Metal);
 
-            ComPtr<IAccelerationStructure> draftAS;
-            AccelerationStructureDesc draftCreateDesc;
-            draftCreateDesc.size = sizes.accelerationStructureSize;
-            SLANG_RETURN_ON_FAIL(
-                gDevice->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
+            // Skip compaction on Metal as AccelerationStructureCompactedSize queries are not
+            // supported
+            if (!isMetalDevice)
+            {
+                QueryPoolDesc queryPoolDesc;
+                queryPoolDesc.count = 1;
+                queryPoolDesc.type = QueryType::AccelerationStructureCompactedSize;
+                SLANG_RETURN_ON_FAIL(
+                    gDevice->createQueryPool(queryPoolDesc, compactedSizeQuery.writeRef()));
+            }
 
-            compactedSizeQuery->reset();
+            if (!isMetalDevice)
+            {
+                // Use compaction on non-Metal devices
+                ComPtr<IAccelerationStructure> draftAS;
+                AccelerationStructureDesc draftCreateDesc;
+                draftCreateDesc.size = sizes.accelerationStructureSize;
+                SLANG_RETURN_ON_FAIL(
+                    gDevice->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
 
-            auto commandEncoder = gQueue->createCommandEncoder();
-            AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
-            compactedSizeQueryDesc.queryPool = compactedSizeQuery;
-            compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
-            commandEncoder->buildAccelerationStructure(
-                buildDesc,
-                draftAS,
-                nullptr,
-                scratchBuffer,
-                1,
-                &compactedSizeQueryDesc);
-            gQueue->submit(commandEncoder->finish());
-            gQueue->waitOnHost();
+                compactedSizeQuery->reset();
 
-            uint64_t compactedSize = 0;
-            compactedSizeQuery->getResult(0, 1, &compactedSize);
-            AccelerationStructureDesc createDesc;
-            createDesc.size = compactedSize;
-            gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
+                auto commandEncoder = gQueue->createCommandEncoder();
+                AccelerationStructureQueryDesc compactedSizeQueryDesc = {};
+                compactedSizeQueryDesc.queryPool = compactedSizeQuery;
+                compactedSizeQueryDesc.queryType = QueryType::AccelerationStructureCompactedSize;
+                commandEncoder->buildAccelerationStructure(
+                    buildDesc,
+                    draftAS,
+                    nullptr,
+                    scratchBuffer,
+                    1,
+                    &compactedSizeQueryDesc);
+                gQueue->submit(commandEncoder->finish());
+                gQueue->waitOnHost();
 
-            commandEncoder = gQueue->createCommandEncoder();
-            commandEncoder->copyAccelerationStructure(
-                gBLAS,
-                draftAS,
-                AccelerationStructureCopyMode::Compact);
-            gQueue->submit(commandEncoder->finish());
-            gQueue->waitOnHost();
+                uint64_t compactedSize = 0;
+                compactedSizeQuery->getResult(0, 1, &compactedSize);
+                AccelerationStructureDesc createDesc;
+                createDesc.size = compactedSize;
+                gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
+
+                commandEncoder = gQueue->createCommandEncoder();
+                commandEncoder->copyAccelerationStructure(
+                    gBLAS,
+                    draftAS,
+                    AccelerationStructureCopyMode::Compact);
+                gQueue->submit(commandEncoder->finish());
+                gQueue->waitOnHost();
+            }
+            else
+            {
+                // Build directly without compaction on Metal
+                AccelerationStructureDesc createDesc;
+                createDesc.size = sizes.accelerationStructureSize;
+                SLANG_RETURN_ON_FAIL(
+                    gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef()));
+
+                auto commandEncoder = gQueue->createCommandEncoder();
+                commandEncoder->buildAccelerationStructure(
+                    buildDesc,
+                    gBLAS,
+                    nullptr,
+                    scratchBuffer,
+                    0,
+                    nullptr);
+                gQueue->submit(commandEncoder->finish());
+                gQueue->waitOnHost();
+            }
         }
 
         // Build top level acceleration structure.
