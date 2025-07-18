@@ -1292,7 +1292,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     //    (erroring if multiple valid results are found).
                     //    [logic already implemented in `ArielG-NV`->`implement-SP024-some-support`
                     // 2. Fully reset state if we fail `tryParseUsingSyntaxDeclImpl`. This is
-                    //    important because currently if we just implement #1, parser-context 
+                    //    important because currently if we just implement #1, parser-context
                     //    will still be changed, breaking parsing.
                     parsedModifier = parser->astBuilder->create<DynModifier>();
                     parsedModifier->loc = nameToken.loc;
