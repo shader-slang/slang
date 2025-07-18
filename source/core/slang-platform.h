@@ -153,8 +153,7 @@ struct PlatformUtil
 
     /// Print a stack trace to stderr for debugging purposes.
     /// Only available on Linux family platforms.
-    /// @param uid The instruction UID that triggered the stack trace
-    static void backtrace(uint32_t uid);
+    static void backtrace();
 };
 
 #ifndef _MSC_VER

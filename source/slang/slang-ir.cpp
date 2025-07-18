@@ -1762,7 +1762,8 @@ uint32_t _debugGetAndIncreaseInstCounter()
 #endif
         if (_slangIRPrintStackAtBreak)
         {
-            PlatformUtil::backtrace(_slangIRAllocBreak);
+            fprintf(stderr, "IR instruction UID %u created at:\n", _slangIRAllocBreak);
+            PlatformUtil::backtrace();
         }
     }
     return _debugGetIRAllocCounter()++;

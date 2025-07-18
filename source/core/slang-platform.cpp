@@ -15,7 +15,7 @@
 #include <dlfcn.h>
 #endif
 
-#include "slang.h"
+
 #if SLANG_LINUX_FAMILY
 #include <execinfo.h>
 #endif
@@ -336,14 +336,13 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
 #endif
 }
 
-/* static */ void PlatformUtil::backtrace(uint32_t uid)
+/* static */ void PlatformUtil::backtrace()
 {
 #if SLANG_LINUX_FAMILY
     // Print stack trace for LLM debugging assistance
     void* stackTrace[64];
     int stackDepth = ::backtrace(stackTrace, 64);
     char** symbols = ::backtrace_symbols(stackTrace, stackDepth);
-    fprintf(stderr, "IR instruction UID %u created at:\n", uid);
     if (symbols)
     {
         for (int i = 0; i < stackDepth; ++i)
