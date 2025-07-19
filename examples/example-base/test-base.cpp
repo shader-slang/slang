@@ -220,7 +220,7 @@ void TestBase::printUsage(const char* programName) const
     printOutput("                                Use a given rendering API (Default: vulkan)\n");
 #endif
     printOutput(
-        " -test-mode                     Print the hash value of the rendered scene and exit\n");
+        " -test-mode                     Print hash values of compiled shader entry points and skip rendering\n");
     printOutput("\n");
     printOutput("Supported APIs:\n");
 #ifdef _WIN32
