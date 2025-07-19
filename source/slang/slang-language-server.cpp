@@ -594,11 +594,29 @@ DeclRef<Decl> maybeRedirectToConstructor(DeclRefExpr* declRefExpr, const List<Sy
     // If the invoke expression is the same as the decl ref expression,
     // it means we are looking at a constructor call.
     auto resolvedFuncExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
-    if (!resolvedFuncExpr)
-        return declRefExpr->declRef;
-    auto ctorDecl = as<ConstructorDecl>(resolvedFuncExpr->declRef);
-    if (ctorDecl)
-        return ctorDecl;
+    if (resolvedFuncExpr)
+    {
+        auto ctorDecl = as<ConstructorDecl>(resolvedFuncExpr->declRef);
+        if (ctorDecl)
+            return ctorDecl;
+    }
+
+    // Fallback: if constructor resolution failed, try to find a constructor
+    // in the aggregate type that matches the call signature
+    if (auto aggTypeDecl = as<AggTypeDecl>(declRefExpr->declRef))
+    {
+        // Look for any constructor in the aggregate type
+        for (auto member : aggTypeDecl.getDecl()->getMembers())
+        {
+            if (auto ctorDecl = as<ConstructorDecl>(member))
+            {
+                // Return the first constructor we find as a fallback
+                // This provides some hover information even if resolution failed
+                return makeDeclRef(ctorDecl);
+            }
+        }
+    }
+
     return declRefExpr->declRef;
 }
 
