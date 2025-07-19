@@ -23,7 +23,6 @@ def traceInst(inst_uid, command):
     env = dict(os.environ, SLANG_DEBUG_IR_BREAK=inst_uid)
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     stdout, stderr = process.communicate()
-    print(f"Inst #{inst_uid} is created at: ")
 
     # Parse the output to find the string between "BEGIN IR Trace" and "END IR Trace"
     ir_trace = re.search(r"BEGIN IR Trace(.*?)END IR Trace", stdout.decode(encoding='utf-8', errors='ignore'), re.DOTALL)
@@ -35,35 +34,62 @@ def traceInst(inst_uid, command):
     regex = r"(\S+)\(\+(0x[0-9a-f]+)\) \[0x[0-9a-f]+\]"
 
     lines = traceOutput.splitlines()
-    # First we collect all addresses to call addr2line to convert them to file and line numbers.
-    addresses = []
+    
+    # First, collect all addresses grouped by library file for batching
+    lib_addresses = {}  # libFile -> list of addresses
+    line_info = []  # (line, libFile, address) for each line
+    
     for line in lines:
-        # Match lines that look like "/home/yongh/slang/build/Debug/bin/../lib/libslang.so(+0xe0e11a) [0x7f95f8e0e11a]"
-        # and convert the address to a file and line number using addr2line
         match = re.search(regex, line)
         if match:
             libFile = match.group(1)
             address = match.group(2)
-            addresses.append((libFile, address))
-
-    for line in lines:
-        # Match lines that look like "/home/yongh/slang/build/Debug/bin/../lib/libslang.so(+0xe0e11a) [0x7f95f8e0e11a]"
-        # and convert the address to a file and line number using addr2line
-        # The regex should capture the library file name and the address.
-        match = re.search(regex, line)
-        
-        if match:
-            libFile = match.group(1)
-            address = match.group(2)
-            # Use addr2line to convert the address to a file and line number
-            addr2line_command = ["addr2line", "-e", libFile, "-f", "-C", address]
+            line_info.append((line, libFile, address))
+            
+            if libFile not in lib_addresses:
+                lib_addresses[libFile] = []
+            lib_addresses[libFile].append(address)
+        else:
+            line_info.append((line, None, None))
+    
+    # Batch call addr2line for each library file
+    address_to_symbol = {}  # (libFile, address) -> symbol info
+    
+    for libFile, addresses in lib_addresses.items():
+        if not addresses:
+            continue
+            
+        # Call addr2line once with all addresses for this library
+        addr2line_command = ["addr2line", "-e", libFile, "-f", "-C"] + addresses
+        try:
             addr2line_process = subprocess.Popen(addr2line_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = addr2line_process.communicate()
-            outputStr = stdout.decode(encoding='utf-8', errors='ignore').replace("\n", " ").strip()
-            print(outputStr)
-    else:
-        # print the line as is if it doesn't match the address format
-        print(line)
+            
+            # Parse the output - addr2line returns function name and location for each address
+            output_lines = stdout.decode(encoding='utf-8', errors='ignore').strip().split('\n')
+            
+            # Each address produces 2 lines: function name, then file:line
+            for i, address in enumerate(addresses):
+                if i * 2 + 1 < len(output_lines):
+                    function_name = output_lines[i * 2].strip()
+                    location = output_lines[i * 2 + 1].strip()
+                    symbol_info = f"{function_name} {location}"
+                    address_to_symbol[(libFile, address)] = symbol_info
+                else:
+                    address_to_symbol[(libFile, address)] = f"<unknown> {address}"
+        except Exception as e:
+            # Fallback if addr2line fails
+            for address in addresses:
+                address_to_symbol[(libFile, address)] = f"<addr2line failed> {address}"
+    
+    # Now print the results using the cached symbol information
+    for line, libFile, address in line_info:
+        if libFile and address:
+            symbol_info = address_to_symbol.get((libFile, address), f"<not found> {address}")
+            print(symbol_info)
+        else:
+            # print the line as is if it doesn't match the address format
+            print(line)
 
     print("(end of stacktrace)")
 
@@ -73,8 +99,6 @@ def traceInst(inst_uid, command):
     if clone_match:
         clone_inst_uid = clone_match.group(1)
         original_inst_uid = clone_match.group(2)
-
-        print(f"Note: Inst #{clone_inst_uid} is a clone of Inst #{original_inst_uid}.")
         traceInst(original_inst_uid, command)
 
 def main():
