@@ -984,6 +984,13 @@ struct IRDifferentiableCallDecoration : IRDecoration
     FIDDLE(leafInst())
 };
 
+// Mark a call as explicitly calling a differentiable function.
+FIDDLE()
+struct IRSomeTypeDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
 // Mark a type as being eligible for trimming if necessary. If
 // any fields don't have any effective loads from them, they can be
 // removed.
