@@ -313,6 +313,20 @@ The C-style layout of an array type differs from the standard layout in that the
 
 The D3D constant buffer layout of an array differs from the standard layout in that the element stride of the array is set to the smallest multiple of the alignment of `T` that is not less than the stride of `T`
 
+ShortString
+-----------
+
+String literals of `N` characters are typed with `ShortString<N>`.
+The null terminator is not included in the character count `N`.
+String literals are stored in UTF-8, so the actual number of characters `N` might be more than apparent.
+`ShortString<N>` conforms to the `IArray<uint>` interface and is immutable.
+The subscript operator returns a `uint` character since it is the only intergral type guaranteed to be available, the low 8 bits contains the character.
+
+> Note: string literals are not available for most language targets, so the implementation differs.
+> - For targets that support string literals (such as C++ or CUDA), `ShortString<N>` is backed by a string literal and a `const char*`, with the appropriate casting when subscripting.
+> - For targets that support `uint8_t`, `ShortString<N>` is backed by an `Array<uint8_t, N>`, with the appropriate casting when subscripting.
+> - For other targets (HLSL and WGSL), `ShortString<N>` is backed by a packed `Array<uint, (N+3)/4>`, with byte extraction when subscripting.
+
 This Type
 ---------
 
