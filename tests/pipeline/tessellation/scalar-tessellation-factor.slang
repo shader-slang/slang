@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck=CHECK): -target spirv -stage hull -entry hullMain -warnings-disable 39001
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage hull -entry hullMain -warnings-disable 39001
 
 // Test for issue #7000: scalar tessellation factors should convert to arrays properly
 
