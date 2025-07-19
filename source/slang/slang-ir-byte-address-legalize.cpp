@@ -41,7 +41,7 @@ struct ByteAddressBufferLegalizationContext
     Dictionary<IRInst*, IRType*> byteAddrBufferToReplace;
 
     // Everything starts with a request to process a module,
-    // which delegates to the central recrusive walk of the IR.
+    // which delegates to the central recursive walk of the IR.
     //
     void processModule(IRModule* module)
     {
@@ -178,6 +178,19 @@ struct ByteAddressBufferLegalizationContext
                 return false;
             }
 
+            // For Metal targets, 64-bit integer types need special handling
+            // because Metal doesn't support as_type casts from 64-bit to 32-bit.
+            // These types should be lowered to two 32-bit operations.
+            //
+            if (m_options.lowerBasicTypeOps)
+            {
+                auto baseType = basicType->getBaseType();
+                if (baseType == BaseType::Int64 || baseType == BaseType::UInt64)
+                {
+                    return false; // Force legalization for 64-bit integer types
+                }
+            }
+
             // Otherwise, scalar types are assumed
             // legal for load/store.
             //
@@ -190,7 +203,7 @@ struct ByteAddressBufferLegalizationContext
         {
             // If we've been asked to scalarize all
             // vector load/store, then we need to
-            // tread them as illegal.
+            // treat them as illegal.
             //
             if (m_options.scalarizeVectorLoadStore)
                 return false;
@@ -223,7 +236,7 @@ struct ByteAddressBufferLegalizationContext
         else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
         {
             // If the offset is not known during compile time, use the explicit align
-            // field of the overloaded `Load` or `Store` operation or vi `LoadAligned`
+            // field of the overloaded `Load` or `Store` operation or via `LoadAligned`
             // or `StoreAligned` function.
             //
             // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
@@ -348,8 +361,8 @@ struct ByteAddressBufferLegalizationContext
             }
 
             // Once all the field values have been loaded, we can bind
-            // then together to make a singel value of the `struct` type,
-            // representing the reuslt of the legalized load.
+            // then together to make a single value of the `struct` type,
+            // representing the result of the legalized load.
             //
             return m_builder.emitMakeStruct(type, fieldVals);
         }
@@ -358,7 +371,7 @@ struct ByteAddressBufferLegalizationContext
             // Loading a value of array type amounts to loading each
             // of its elements. There is shared logic between the
             // array, matrix, and vector cases, so we factor it into
-            // a subroutien that we will explain later.
+            // a subroutine that we will explain later.
             //
             // We need a known constant number of elements in an array
             // to be able to emit per-element loads, so we skip
