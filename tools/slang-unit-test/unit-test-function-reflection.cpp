@@ -304,11 +304,11 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
             if (overload->getParameterCount() > 0)
             {
                 auto paramTypeName = overload->getParameterByIndex(0)->getType()->getName();
-                if (strstr(paramTypeName, "float[2]") || strstr(paramTypeName, "vector<float,2>"))
+                if (strstr(paramTypeName, "Array"))
                 {
                     foundFloatArrayParam = true;
                 }
-                else if (strstr(paramTypeName, "float") && !strstr(paramTypeName, "["))
+                else if (strstr(paramTypeName, "float"))
                 {
                     foundFloatParam = true;
                 }
