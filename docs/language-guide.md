@@ -126,7 +126,7 @@ struct PointLight : ILight
 }
 ```
 
-### `some` and `dyn` Interfaces
+### `some` and `dyn`
 
 Interface-typed variables can be qualified with either `some` or `dyn` when used as variable, parameter, or return type to make explicit distinction between compile-time polymorphism (`some`) and runtime polymorphism (`dyn`). When not explicitly qualified, interface typed variables default to `some` in language version 2026+ and `dyn` in language version 2025.
 
@@ -236,7 +236,7 @@ void example()
 ```C#
 void localVariableExample()
 {
-    some ILight light; // Uninitialized `unbound_some` variable
+    some ILight light;
     some ILight lights[10]; // ERROR: cannot use some in complex types
 }
 // ERROR: cannot use some in struct fields
@@ -246,10 +246,10 @@ struct Container { some ILight light; }
 static some ILight globalLight;
 ```
 
-**Assignment rules for `some`:**
-- Cannot assign two different `some` declarations since they are **different types**.
+**General assignment rules for `some`:**
+- Cannot assign two different `some` declarations since they are considered **different types**.
 - `some` typed return's must return the same type via all `return` statements.
-- `some` variables must only be assigned/initialized once throughout their lifetime
+- `some` variables must only be assigned/initialized once throughout their lifetime.
     - Unassigned `some` type will be called `unbound_some` type for clarity. All `unbound_some` types must be assigned by the same type in a given compile
 	    - `out` types are considered `unbound_some` types
 		- New variables are an `unbound_some` type.
@@ -329,7 +329,7 @@ void lightMultiAssignmentExample(int choice)
 
 #### `dyn` Interface Typed Variables
 
-A `dyn` interface variable can store any type implementing a `dyn` interface and may use dynamic dispatch. Only interfaces marked with `dyn` can be used with `dyn` variables. `some` type can be assigned to `dyn`.
+A `dyn` interface variable can store any type implementing a `dyn` interface and may use dynamic dispatch. Only interfaces marked with `dyn` can be used with `dyn` variables.
 
 ```C#
 #lang 2026
@@ -359,7 +359,7 @@ void renderScene()
 	- Complex type expressions like `dyn IRenderer[]`
 	- ...
 
-**Assignment rules for `dyn`:**
+**General assignment rules for `dyn`:**
 - Allowed to assign `dyn` variables to each other
 - May be assigned & reassigned as needed
 
@@ -384,11 +384,16 @@ void dynFunctions(dyn IRenderer renderer)
 #### Interactions between `some` and `dyn` variables
 
 - Variables are allowed to assign `some` interface to `dyn` interface (implicit conversion).
+    - Cannot assign `some` to `out dyn` or `inout dyn`
 - Variables are not allowed to assign `dyn` interface to `some` interface.
 
 ```C#
 #lang 2026
 
+void outDyn(out dyn ILight Var)
+{
+
+}
 void conversionRules(some ILight someLight, dyn ILight dynLight1, dyn ILight dynLight2)
 {
     // OK: some can be implicitly converted to `dyn`
@@ -399,7 +404,10 @@ void conversionRules(some ILight someLight, dyn ILight dynLight1, dyn ILight dyn
     dynLight1 = dynLight2;
 	
     // ERROR: `dyn` cannot be converted to some
-    // some ILight someFromDyn = dynLight;
+    some ILight someFromDyn = dynLight;
+
+    // ERROR: cannot assign `some` to `out dyn`, `inout dyn`, or other L-value senarios
+    outDyn(someLight);
 }
 
 // Implicit conversions work with some but not `dyn` due to type uniqueness
