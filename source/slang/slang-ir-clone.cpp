@@ -54,6 +54,10 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
 
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugSetInstBeingCloned(oldInst->_debugUID);
+    SLANG_DEFER(_debugResetInstBeingCloned());
+#endif
     // We start by mapping the type of the orignal instruction
     // to its replacement value, if any.
     //
