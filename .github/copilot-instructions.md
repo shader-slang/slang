@@ -31,7 +31,7 @@ is wrong, you can run the following command to trace the callstack where the ins
 
 ```bash
 # From workspace root:
-python3 ./extras/insttrace.py 1234 slangc tests/my-test.slang -target spirv
+python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang -target spirv
 ```
 
 ## Testing
