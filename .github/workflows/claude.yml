@@ -189,7 +189,7 @@ jobs:
       # Run Claude Code Action with optimized environment variables
       - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
-        uses: anthropics/claude-code-action@v0.0.31
+        uses: anthropics/claude-code-action@v0.0.38
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
