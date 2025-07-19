@@ -352,6 +352,8 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
         free(symbols);
     }
     fprintf(stdout, "\n");
+#else
+    fprintf(stdout, "Stack trace not available on this platform.\n");
 #endif
 }
 

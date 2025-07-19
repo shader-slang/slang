@@ -23,6 +23,17 @@ Add the "pr: breaking" label to  your PR if you are introducing public API chang
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
 
+## Debugging
+
+If you encounter a bug related to a problematic instruction, it is often useful to trace the location where the instruction is created.
+You can use the `extras/insttrace.py` script to do this. For example, during debugging you find that an instruction with `_debugUID=1234`
+is wrong, you can run the following command to trace the callstack where the instruction is created:
+
+```bash
+# From workspace root:
+python3 ./extras/insttrace.py 1234 slangc tests/my-test.slang -target spirv
+```
+
 ## Testing
 
 Your PR should include a regression test for the bug you are fixing.

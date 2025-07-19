@@ -1774,7 +1774,7 @@ uint32_t _debugGetAndIncreaseInstCounter()
 #endif
         if (_slangIRPrintStackAtBreak)
         {
-            fprintf(stdout, "IR instruction #%u created at:\n", _slangIRAllocBreak);
+            fprintf(stdout, "BEGIN IR Trace\nInstruction #%u created at:\n", _slangIRAllocBreak);
             PlatformUtil::backtrace();
             if (_slangInstBeingCloned != 0xFFFFFFFF)
             {
@@ -1784,10 +1784,10 @@ uint32_t _debugGetAndIncreaseInstCounter()
                     _slangIRAllocBreak,
                     _slangInstBeingCloned);
             }
+            fprintf(stdout, "END IR Trace\n");
         }
     }
-}
-return _debugGetIRAllocCounter()++;
+    return _debugGetIRAllocCounter()++;
 }
 #endif
 
