@@ -98,8 +98,8 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
-    getSession()->m_typeDictionarySize = Math::Max(
-        getSession()->m_typeDictionarySize,
+    getGlobalSession()->m_typeDictionarySize = Math::Max(
+        getGlobalSession()->m_typeDictionarySize,
         (int)m_mapDeclRefToInheritanceInfo.getCount());
 
     return info;

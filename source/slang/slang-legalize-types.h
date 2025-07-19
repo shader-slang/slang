@@ -587,7 +587,7 @@ struct LegalFuncInfo : RefObject
 /// override (e.g., to specify what needs to be legalized).
 struct IRTypeLegalizationContext
 {
-    Session* session;
+    GlobalSession* session;
     IRModule* module;
     IRBuilder* builder;
     TargetProgram* targetProgram;

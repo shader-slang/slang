@@ -12,7 +12,7 @@ namespace Slang
 
 SharedASTBuilder::SharedASTBuilder() {}
 
-void SharedASTBuilder::init(Session* session)
+void SharedASTBuilder::init(GlobalSession* session)
 {
     m_namePool = session->getNamePool();
 

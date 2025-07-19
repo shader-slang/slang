@@ -8,7 +8,7 @@
 
 namespace Slang
 {
-String Session::getCoreModulePath()
+String GlobalSession::getCoreModulePath()
 {
     if (coreModulePath.getLength() == 0)
     {

@@ -8,7 +8,7 @@ namespace Slang
 {
 
 struct IRModule;
-class Session;
+class GlobalSession;
 class SerialSourceLocReader;
 class SerialSourceLocWriter;
 class String;
@@ -25,7 +25,7 @@ void writeSerializedModuleIR(
 
 [[nodiscard]] Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
-    Session* session,
+    GlobalSession* session,
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
 

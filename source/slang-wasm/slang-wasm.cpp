@@ -66,7 +66,7 @@ GlobalSession* createGlobalSession()
     return new GlobalSession(globalSession);
 }
 
-Session* GlobalSession::createSession(int compileTarget)
+GlobalSession* GlobalGlobalSession::createSession(int compileTarget)
 {
     Slang::ComPtr<ISession> session;
     {
@@ -93,14 +93,14 @@ Session* GlobalSession::createSession(int compileTarget)
     return new Session(session);
 }
 
-Session::~Session()
+GlobalSession::~Session()
 {
     m_componentTypes = {};
     auto refCount = static_cast<Slang::Linkage*>(m_interface.get())->debugGetReferenceCount();
     m_interface = nullptr;
 }
 
-emscripten::val Session::loadModuleFromSource(
+emscripten::val GlobalSession::loadModuleFromSource(
     const std::string& slangCode,
     const std::string& name,
     const std::string& path)
@@ -203,7 +203,7 @@ emscripten::val Module::getDefinedEntryPoint(int index)
 }
 
 
-emscripten::val Session::createCompositeComponentType(emscripten::val components)
+emscripten::val GlobalSession::createCompositeComponentType(emscripten::val components)
 {
     if (!components.isArray())
     {

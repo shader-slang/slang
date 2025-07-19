@@ -13,6 +13,8 @@
 namespace Slang
 {
 
+class GlobalSession;
+
 class SharedASTBuilder : public RefObject
 {
     friend class ASTBuilder;
@@ -65,7 +67,7 @@ public:
     NamePool* getNamePool() { return m_namePool; }
 
     /// Must be called before used
-    void init(Session* session);
+    void init(GlobalSession* session);
 
     SharedASTBuilder();
 
@@ -120,7 +122,7 @@ protected:
 
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
 
     Index m_id = 1;
 };
@@ -659,7 +661,7 @@ public:
     SharedASTBuilder* getSharedASTBuilder() { return m_sharedASTBuilder; }
 
     /// Get the global session
-    Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
+    GlobalSession* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
     Index getId() { return m_id; }
 

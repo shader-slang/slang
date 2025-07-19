@@ -478,7 +478,7 @@ void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
 {
     auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
     if (getShared()->isInLanguageServer() &&
-        getShared()->getSession()->getCompletionRequestTokenName() ==
+        getShared()->getGlobalSession()->getCompletionRequestTokenName() ==
             stmt->capabilityToken.getName())
     {
         getShared()->getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =

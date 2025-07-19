@@ -287,8 +287,8 @@ LookupRequest initLookupRequest(
     request.scope = scope;
     request.declToExclude = declToExclude;
 
-    if (semantics && semantics->getSession() &&
-        name == semantics->getSession()->getCompletionRequestTokenName())
+    if (semantics && semantics->getGlobalSession() &&
+        name == semantics->getGlobalSession()->getCompletionRequestTokenName())
         request.options = (LookupOptions)((int)request.options | (int)LookupOptions::Completion);
 
     return request;

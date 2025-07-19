@@ -253,7 +253,7 @@ SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
         return SLANG_E_NOT_IMPLEMENTED;
 
     // Create the session
-    Slang::Session* globalSession = new Slang::Session();
+    Slang::GlobalSession* globalSession = new Slang::GlobalSession();
     // Put an interface ref on it
     Slang::ComPtr<slang::IGlobalSession> result(globalSession);
 
@@ -274,12 +274,12 @@ SLANG_API void spDestroySession(SlangSession* inSession)
     if (!inSession)
         return;
 
-    Slang::Session* session = Slang::asInternal(inSession);
+    Slang::GlobalSession* globalSession = Slang::asInternal(inSession);
     // It is assumed there is only a single reference on the session (the one placed
     // with spCreateSession) if this function is called
-    SLANG_ASSERT(session->debugGetReferenceCount() == 1);
+    SLANG_ASSERT(globalSession->debugGetReferenceCount() == 1);
     // Release
-    session->release();
+    globalSession->release();
 }
 
 SLANG_API const char* spGetBuildTagString()

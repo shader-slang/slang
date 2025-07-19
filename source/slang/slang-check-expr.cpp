@@ -3321,7 +3321,7 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
 
-    if (expr->name == getSession()->getCompletionRequestTokenName())
+    if (expr->name == getGlobalSession()->getCompletionRequestTokenName())
     {
         auto scopeKind = CompletionSuggestions::ScopeKind::Expr;
         if (!m_parentFunc)
@@ -4598,7 +4598,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     bool anyDuplicates = false;
     int zeroIndexOffset = -1;
 
-    if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
+    if (memberRefExpr->name == getGlobalSession()->getCompletionRequestTokenName())
     {
         auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
         suggestions.clear();
@@ -4757,7 +4757,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     if (tupleElementCount == 0)
         return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
 
-    if (memberExpr->name == getSession()->getCompletionRequestTokenName())
+    if (memberExpr->name == getGlobalSession()->getCompletionRequestTokenName())
     {
         auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
         suggestions.clear();
@@ -5191,7 +5191,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
         return lookupMemberResultFailure(expr, baseType, diagnosed);
     }
 
-    if (expr->name == getSession()->getCompletionRequestTokenName())
+    if (expr->name == getGlobalSession()->getCompletionRequestTokenName())
     {
         suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, globalLookupResult);
     }
@@ -5323,7 +5323,7 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
     {
         return lookupMemberResultFailure(expr, baseType, diagnosed);
     }
-    if (expr->name == getSession()->getCompletionRequestTokenName())
+    if (expr->name == getGlobalSession()->getCompletionRequestTokenName())
     {
         suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
         if (expr->baseExpression)
@@ -5518,7 +5518,7 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
                 // aggregate type, so the expression should be
                 // of the corresponding type.
                 expr->type.type = DeclRefType::Create(
-                    getSession(),
+                    getGlobalSession(),
                     makeDeclRef(aggTypeDecl));
                 return expr;
             }
@@ -5804,7 +5804,7 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     // Firstly, get the info for this op, the opcode has already been
     // discovered by the parser
     //
-    const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
+    const auto& spirvInfo = getGlobalSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
     // them

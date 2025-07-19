@@ -156,7 +156,7 @@ const char* getBuildTagString()
 }
 
 
-void Session::init()
+void GlobalSession::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
@@ -243,7 +243,7 @@ void Session::init()
         spirvCoreGrammarInfo = SPIRVCoreGrammarInfo::getEmbeddedVersion();
 }
 
-Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
+Module* GlobalSession::getBuiltinModule(slang::BuiltinModuleName name)
 {
     auto info = getBuiltinModuleInfo(name);
     auto builtinLinkage = getBuiltinLinkage();
@@ -254,7 +254,7 @@ Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
     return nullptr;
 }
 
-void Session::_initCodeGenTransitionMap()
+void GlobalSession::_initCodeGenTransitionMap()
 {
     // TODO(JS): Might want to do something about these in the future...
 
@@ -315,7 +315,7 @@ void Session::_initCodeGenTransitionMap()
         PassThroughMode::MetalC);
 }
 
-void Session::addBuiltins(char const* sourcePath, char const* source)
+void GlobalSession::addBuiltins(char const* sourcePath, char const* source)
 {
     auto sourceBlob = StringBlob::moveCreate(String(source));
 
@@ -326,7 +326,7 @@ void Session::addBuiltins(char const* sourcePath, char const* source)
         coreModules.add(module);
 }
 
-void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
+void GlobalSession::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 {
     // External API allows passing of nullptr to reset the loader
     loader = loader ? loader : DefaultSharedLibraryLoader::getSingleton();
@@ -334,14 +334,14 @@ void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     _setSharedLibraryLoader(loader);
 }
 
-ISlangSharedLibraryLoader* Session::getSharedLibraryLoader()
+ISlangSharedLibraryLoader* GlobalSession::getSharedLibraryLoader()
 {
     return (m_sharedLibraryLoader == DefaultSharedLibraryLoader::getSingleton())
                ? nullptr
                : m_sharedLibraryLoader.get();
 }
 
-SlangResult Session::checkCompileTargetSupport(SlangCompileTarget inTarget)
+SlangResult GlobalSession::checkCompileTargetSupport(SlangCompileTarget inTarget)
 {
     auto target = CodeGenTarget(inTarget);
 
@@ -350,12 +350,12 @@ SlangResult Session::checkCompileTargetSupport(SlangCompileTarget inTarget)
                                            : SLANG_OK;
 }
 
-SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
+SlangResult GlobalSession::checkPassThroughSupport(SlangPassThrough inPassThrough)
 {
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
-void Session::writeCoreModuleDoc(String config)
+void GlobalSession::writeCoreModuleDoc(String config)
 {
     ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
     SourceManager* sourceManager = getBuiltinSourceManager();
@@ -402,14 +402,14 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
     return result;
 }
 
-TypeCheckingCache* Session::getTypeCheckingCache()
+TypeCheckingCache* GlobalSession::getTypeCheckingCache()
 {
     return static_cast<TypeCheckingCache*>(m_typeCheckingCache.get());
 }
 
-Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleName name)
+GlobalSession::BuiltinModuleInfo GlobalSession::getBuiltinModuleInfo(slang::BuiltinModuleName name)
 {
-    Session::BuiltinModuleInfo result;
+    GlobalSession::BuiltinModuleInfo result;
 
     result.name = getBuiltinModuleNameStr(name);
 
@@ -428,12 +428,12 @@ Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleNam
     return result;
 }
 
-SlangResult Session::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
+SlangResult GlobalSession::compileCoreModule(slang::CompileCoreModuleFlags compileFlags)
 {
     return compileBuiltinModule(slang::BuiltinModuleName::Core, compileFlags);
 }
 
-void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
+void GlobalSession::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName)
 {
     switch (moduleName)
     {
@@ -448,7 +448,7 @@ void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName
     }
 }
 
-SlangResult Session::compileBuiltinModule(
+SlangResult GlobalSession::compileBuiltinModule(
     slang::BuiltinModuleName moduleName,
     slang::CompileCoreModuleFlags compileFlags)
 {
@@ -521,12 +521,12 @@ SlangResult Session::compileBuiltinModule(
     return SLANG_OK;
 }
 
-SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
+SlangResult GlobalSession::loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes)
 {
     return loadBuiltinModule(slang::BuiltinModuleName::Core, coreModule, coreModuleSizeInBytes);
 }
 
-SlangResult Session::loadBuiltinModule(
+SlangResult GlobalSession::loadBuiltinModule(
     slang::BuiltinModuleName moduleName,
     const void* moduleData,
     size_t sizeInBytes)
@@ -567,12 +567,12 @@ SlangResult Session::loadBuiltinModule(
     return SLANG_OK;
 }
 
-SlangResult Session::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
+SlangResult GlobalSession::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     return saveBuiltinModule(slang::BuiltinModuleName::Core, archiveType, outBlob);
 }
 
-SlangResult Session::saveBuiltinModule(
+SlangResult GlobalSession::saveBuiltinModule(
     slang::BuiltinModuleName moduleTag,
     SlangArchiveType archiveType,
     ISlangBlob** outBlob)
@@ -678,7 +678,7 @@ SlangResult Session::saveBuiltinModule(
     return SLANG_OK;
 }
 
-SlangResult Session::_readBuiltinModule(
+SlangResult GlobalSession::_readBuiltinModule(
     ISlangFileSystem* fileSystem,
     Scope* scope,
     String moduleName,
@@ -791,16 +791,16 @@ SlangResult Session::_readBuiltinModule(
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
-Session::queryInterface(SlangUUID const& uuid, void** outObject)
+GlobalSession::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == Session::getTypeGuid())
+    if (uuid == GlobalSession::getTypeGuid())
     {
         addReference();
-        *outObject = static_cast<Session*>(this);
+        *outObject = static_cast<GlobalSession*>(this);
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IGlobalSession::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == slang::IGlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::IGlobalSession*>(this);
@@ -860,9 +860,9 @@ static T makeFromSizeVersioned(const uint8_t* src)
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
-Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSession)
+GlobalSession::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSession)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "GlobalSession::astBuilder"));
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
@@ -958,7 +958,7 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
-Session::createCompileRequest(slang::ICompileRequest** outCompileRequest)
+GlobalSession::createCompileRequest(slang::ICompileRequest** outCompileRequest)
 {
     auto req = new EndToEndCompileRequest(this);
 
@@ -971,18 +971,18 @@ Session::createCompileRequest(slang::ICompileRequest** outCompileRequest)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(char const* name)
+SLANG_NO_THROW SlangProfileID SLANG_MCALL GlobalSession::findProfile(char const* name)
 {
     return SlangProfileID(Slang::Profile::lookUp(name).raw);
 }
 
-SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(char const* name)
+SLANG_NO_THROW SlangCapabilityID SLANG_MCALL GlobalSession::findCapability(char const* name)
 {
     return SlangCapabilityID(Slang::findCapabilityName(UnownedTerminatedStringSlice(name)));
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Session::setDownstreamCompilerPath(SlangPassThrough inPassThrough, char const* path)
+GlobalSession::setDownstreamCompilerPath(SlangPassThrough inPassThrough, char const* path)
 {
     PassThroughMode passThrough = PassThroughMode(inPassThrough);
     SLANG_ASSERT(
@@ -999,7 +999,7 @@ Session::setDownstreamCompilerPath(SlangPassThrough inPassThrough, char const* p
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Session::setDownstreamCompilerPrelude(SlangPassThrough inPassThrough, char const* prelude)
+GlobalSession::setDownstreamCompilerPrelude(SlangPassThrough inPassThrough, char const* prelude)
 {
     PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
     SLANG_ASSERT(
@@ -1011,7 +1011,7 @@ Session::setDownstreamCompilerPrelude(SlangPassThrough inPassThrough, char const
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Session::getDownstreamCompilerPrelude(SlangPassThrough inPassThrough, ISlangBlob** outPrelude)
+GlobalSession::getDownstreamCompilerPrelude(SlangPassThrough inPassThrough, ISlangBlob** outPrelude)
 {
     PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
     SLANG_ASSERT(
@@ -1023,7 +1023,7 @@ Session::getDownstreamCompilerPrelude(SlangPassThrough inPassThrough, ISlangBlob
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Session::setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude)
+GlobalSession::setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude)
 {
     SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
     SLANG_ASSERT(
@@ -1039,7 +1039,7 @@ Session::setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* pr
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Session::getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude)
+GlobalSession::getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude)
 {
     SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
 
@@ -1054,12 +1054,12 @@ Session::getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** o
     }
 }
 
-SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
+SLANG_NO_THROW const char* SLANG_MCALL GlobalSession::getBuildTagString()
 {
     return ::Slang::getBuildTagString();
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSession::setDefaultDownstreamCompiler(
     SlangSourceLanguage sourceLanguage,
     SlangPassThrough defaultCompiler)
 {
@@ -1072,14 +1072,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(
 }
 
 SlangPassThrough SLANG_MCALL
-Session::getDefaultDownstreamCompiler(SlangSourceLanguage inSourceLanguage)
+GlobalSession::getDefaultDownstreamCompiler(SlangSourceLanguage inSourceLanguage)
 {
     SLANG_ASSERT(inSourceLanguage >= 0 && inSourceLanguage < SLANG_SOURCE_LANGUAGE_COUNT_OF);
     auto sourceLanguage = SourceLanguage(inSourceLanguage);
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-void Session::setDownstreamCompilerForTransition(
+void GlobalSession::setDownstreamCompilerForTransition(
     SlangCompileTarget source,
     SlangCompileTarget target,
     SlangPassThrough compiler)
@@ -1098,7 +1098,7 @@ void Session::setDownstreamCompilerForTransition(
     }
 }
 
-SlangPassThrough Session::getDownstreamCompilerForTransition(
+SlangPassThrough GlobalSession::getDownstreamCompilerForTransition(
     SlangCompileTarget inSource,
     SlangCompileTarget inTarget)
 {
@@ -1137,7 +1137,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
     return SLANG_PASS_THROUGH_NONE;
 }
 
-IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
+IDownstreamCompiler* GlobalSession::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
 {
     PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(
         SlangCompileTarget(source),
@@ -1145,7 +1145,7 @@ IDownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGe
     return getOrLoadDownstreamCompiler(compilerType, nullptr);
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL Session::setSPIRVCoreGrammar(char const* jsonPath)
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSession::setSPIRVCoreGrammar(char const* jsonPath)
 {
     if (!jsonPath)
     {
@@ -1187,7 +1187,7 @@ struct ParsedCommandLineData : public ISlangUnknown, public ComObject
     List<slang::TargetDesc> targets;
 };
 
-SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSession::parseCommandLineArguments(
     int argc,
     const char* const* argv,
     slang::SessionDesc* outDesc,
@@ -1224,7 +1224,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
-Session::getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob)
+GlobalSession::getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob)
 {
     ComPtr<slang::ISession> tempSession;
     createSession(*sessionDesc, tempSession.writeRef());
@@ -1360,7 +1360,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 
 //
 
-Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
+Linkage::Linkage(GlobalSession* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
     , m_retainedSession(session)
     , m_sourceManager(&m_defaultSourceManager)
@@ -1391,7 +1391,7 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == slang::IGlobalSession::getTypeGuid())
         return asExternal(this);
 
     return nullptr;
@@ -2272,7 +2272,7 @@ TargetRequest::TargetRequest(const TargetRequest& other)
 }
 
 
-Session* TargetRequest::getSession()
+GlobalSession* TargetRequest::getGlobalSession()
 {
     return linkage->getSessionImpl();
 }
@@ -2494,9 +2494,9 @@ TranslationUnitRequest::TranslationUnitRequest(FrontEndCompileRequest* compileRe
     moduleName = getNamePool()->getName(m->getName());
 }
 
-Session* TranslationUnitRequest::getSession()
+GlobalSession* TranslationUnitRequest::getGlobalSession()
 {
-    return compileRequest->getSession();
+    return compileRequest->getGlobalSession();
 }
 
 NamePool* TranslationUnitRequest::getNamePool()
@@ -2515,14 +2515,14 @@ Scope* TranslationUnitRequest::getLanguageScope()
     switch (sourceLanguage)
     {
     case SourceLanguage::HLSL:
-        languageScope = getSession()->hlslLanguageScope;
+        languageScope = getGlobalSession()->hlslLanguageScope;
         break;
     case SourceLanguage::GLSL:
-        languageScope = getSession()->glslLanguageScope;
+        languageScope = getGlobalSession()->glslLanguageScope;
         break;
     case SourceLanguage::Slang:
     default:
-        languageScope = getSession()->slangLanguageScope;
+        languageScope = getGlobalSession()->slangLanguageScope;
         break;
     }
     return languageScope;
@@ -3533,14 +3533,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         switch (sourceLanguage)
         {
         case SourceLanguage::HLSL:
-            languageScope = getSession()->hlslLanguageScope;
+            languageScope = getGlobalSession()->hlslLanguageScope;
             break;
         case SourceLanguage::GLSL:
-            languageScope = getSession()->glslLanguageScope;
+            languageScope = getGlobalSession()->glslLanguageScope;
             break;
         case SourceLanguage::Slang:
         default:
-            languageScope = getSession()->slangLanguageScope;
+            languageScope = getGlobalSession()->slangLanguageScope;
             break;
         }
 
@@ -3682,7 +3682,7 @@ void FrontEndCompileRequest::generateIR()
 
             // Verify debug information
             if (SLANG_FAILED(
-                    SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
+                    SerialContainerUtil::verifyIRSerialize(irModule, getGlobalSession(), options)))
             {
                 getSink()->diagnose(
                     irModule->getModuleInst()->sourceLoc,
@@ -3799,7 +3799,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     return SLANG_OK;
 }
 
-EndToEndCompileRequest::EndToEndCompileRequest(Session* session)
+EndToEndCompileRequest::EndToEndCompileRequest(GlobalSession* session)
     : m_session(session), m_sink(nullptr, Lexer::sourceLocationLexer)
 {
     RefPtr<ASTBuilder> astBuilder(
@@ -6679,7 +6679,7 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
 
 //
 
-Session* CompileRequestBase::getSession()
+GlobalSession* CompileRequestBase::getGlobalSession()
 {
     return getLinkage()->getSessionImpl();
 }
@@ -6916,7 +6916,7 @@ RefPtr<Module> findOrImportModule(
     return linkage->findOrImportModule(name, loc, sink, loadedModules);
 }
 
-void Session::addBuiltinSource(
+void GlobalSession::addBuiltinSource(
     Scope* scope,
     String const& path,
     ISlangBlob* sourceBlob,
@@ -6986,7 +6986,7 @@ void Session::addBuiltinSource(
     outModule = module;
 }
 
-Session::~Session()
+GlobalSession::~GlobalSession()
 {
     // This is necessary because this ASTBuilder uses the SharedASTBuilder also owned by the
     // session. If the SharedASTBuilder gets dtored before the globalASTBuilder it has a dangling
@@ -7663,7 +7663,7 @@ SlangResult EndToEndCompileRequest::compile()
 
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportDownstreamTime))
     {
-        getSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
+        getGlobalSession()->getCompilerElapsedTime(&totalStartTime, &downstreamStartTime);
         PerformanceProfiler::getProfiler()->clear();
     }
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
@@ -7732,7 +7732,7 @@ SlangResult EndToEndCompileRequest::compile()
     {
         double downstreamEndTime = 0;
         double totalEndTime = 0;
-        getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
+        getGlobalSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
         getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
@@ -7741,7 +7741,7 @@ SlangResult EndToEndCompileRequest::compile()
     {
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
-        perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
+        perfResult << "\nType Dictionary Size: " << getGlobalSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(
             SourceLoc(),
             Diagnostics::performanceBenchmarkResult,

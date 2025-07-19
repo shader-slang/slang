@@ -47,7 +47,7 @@ struct SPIRVEmitSharedContext
         , m_targetProgram(program)
         , m_targetRequest(program->getTargetReq())
         , m_sink(sink)
-        , m_grammarInfo(&module->getSession()->getSPIRVCoreGrammarInfo())
+        , m_grammarInfo(&module->getGlobalSession()->getSPIRVCoreGrammarInfo())
     {
         IRBuilder builder(module);
         builder.setInsertInto(module);

@@ -714,7 +714,7 @@ public:
     {
     }
 
-    Session* getSession() { return m_linkage->getSessionImpl(); }
+    GlobalSession* getGlobalSession() { return m_linkage->getSessionImpl(); }
 
     Linkage* getLinkage() { return m_linkage; }
 
@@ -972,7 +972,7 @@ public:
 
     DiagnosticSink* getSink() { return m_sink; }
 
-    Session* getSession() { return m_shared->getSession(); }
+    GlobalSession* getGlobalSession() { return m_shared->getGlobalSession(); }
 
     Linkage* getLinkage() { return m_shared->m_linkage; }
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }

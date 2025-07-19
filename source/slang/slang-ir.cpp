@@ -4700,7 +4700,7 @@ IRInst* IRBuilder::addIntermediateContextFieldDifferentialTypeDecoration(
     return addDecoration(target, kIROp_IntermediateContextFieldDifferentialTypeDecoration, witness);
 }
 
-RefPtr<IRModule> IRModule::create(Session* session)
+RefPtr<IRModule> IRModule::create(GlobalSession* session)
 {
     RefPtr<IRModule> module = new IRModule(session);
 
@@ -7308,7 +7308,7 @@ static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
 
         // Get the compiler from the session through the module
         auto module = inst->getModule();
-        auto session = module->getSession();
+        auto session = module->getGlobalSession();
         IDownstreamCompiler* compiler =
             session->getOrLoadDownstreamCompiler(PassThroughMode::SpirvDis, nullptr);
 

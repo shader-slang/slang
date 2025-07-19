@@ -505,7 +505,7 @@ struct SharedIRGenContext
     }
 
     SharedIRGenContext(
-        Session* session,
+        GlobalSession* session,
         DiagnosticSink* sink,
         bool obfuscateCode,
         ModuleDecl* mainModuleDecl,
@@ -518,7 +518,7 @@ struct SharedIRGenContext
     {
     }
 
-    Session* m_session = nullptr;
+    GlobalSession* m_session = nullptr;
     DiagnosticSink* m_sink = nullptr;
     bool m_obfuscateCode = false;
     ModuleDecl* m_mainModuleDecl = nullptr;
@@ -639,7 +639,7 @@ struct IRGenContext
 
     void setValue(Decl* decl, LoweredValInfo value) { env->mapDeclToValue[decl] = value; }
 
-    Session* getSession() { return shared->m_session; }
+    GlobalSession* getSession() { return shared->m_session; }
 
     DiagnosticSink* getSink() { return shared->m_sink; }
 
@@ -12044,7 +12044,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     SLANG_PROFILE;
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    auto session = translationUnit->getSession();
+    auto session = translationUnit->getGlobalSession();
     auto compileRequest = translationUnit->compileRequest;
     Linkage* linkage = compileRequest->getLinkage();
 
@@ -12398,7 +12398,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 {
     DiagnosticSink* sink;
     Linkage* linkage;
-    Session* session;
+    GlobalSession* session;
     IRGenContext* context;
     IRBuilder* builder;
 
@@ -12541,7 +12541,7 @@ struct TypeConformanceIRGenContext
 {
     DiagnosticSink* sink;
     Linkage* linkage;
-    Session* session;
+    GlobalSession* session;
     IRGenContext* context;
     IRBuilder* builder;
 

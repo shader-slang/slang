@@ -157,7 +157,7 @@ static unsigned int getUserAttributeCount(Decl* decl)
 }
 
 static SlangReflectionUserAttribute* findUserAttributeByName(
-    Session* session,
+    GlobalSession* session,
     Decl* decl,
     const char* name)
 {
