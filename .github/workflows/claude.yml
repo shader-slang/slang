@@ -195,13 +195,8 @@ jobs:
           custom_instructions: |
             # Build system information:
             - OS: Ubuntu Linux
-            - Build commands: 
-              * Configure: `cmake --preset default`
-              * Build: `cmake --build --preset debug`
-              * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
-              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
-            - Run formatting script before committing changes
+            - See CLAUDE.md for detailed build, test, and formatting instructions
 
             # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
