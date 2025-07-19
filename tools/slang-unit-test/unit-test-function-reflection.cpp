@@ -276,12 +276,12 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
     // Try to find the "forward" function in MyStruct<float>
     // This should find functions with different signatures from both extensions:
     // 1. float forward(float x) from the generic extension Act: IModel<float>
-    // 2. float[2] forward(float[2] x) from the MyStruct-specific extension MyStruct<float>: IModel<float[2]>
+    // 2. float[2] forward(float[2] x) from the MyStruct-specific extension MyStruct<float>:
+    // IModel<float[2]>
     auto forwardFunc = module->getLayout()->findFunctionByNameInType(myStructType, "forward");
 
     // With the fix, this should find functions with different signatures
     SLANG_CHECK(forwardFunc != nullptr);
-    SLANG_CHECK(UnownedStringSlice(forwardFunc->getName()) == "forward");
 
     // The function should be overloaded since there are multiple functions with different
     // signatures
@@ -299,6 +299,8 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
         for (int i = 0; i < forwardFunc->getOverloadCount(); i++)
         {
             auto overload = forwardFunc->getOverload(i);
+            // Check that each overload has the correct name
+            SLANG_CHECK(UnownedStringSlice(overload->getName()) == "forward");
             if (overload->getParameterCount() > 0)
             {
                 auto paramTypeName = overload->getParameterByIndex(0)->getType()->getName();
