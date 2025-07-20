@@ -1,0 +1,20 @@
+time="2025-07-20T03:54:02Z" level=info msg="Using docker host 'unix:///var/run/docker.sock', and daemon socket 'unix:///var/run/docker.sock'"
+[ClaudeCode - Slang Assistant/Claude Code Assistant] ⭐ Run Set up job
+[ClaudeCode - Slang Assistant/Claude Code Assistant] 🚀  Start image=catthehacker/ubuntu:act-latest
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   🐳  docker pull image=catthehacker/ubuntu:act-latest platform=linux/arm64 username= forcePull=true
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   🐳  docker create image=catthehacker/ubuntu:act-latest platform=linux/arm64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   🐳  docker run image=catthehacker/ubuntu:act-latest platform=linux/arm64 entrypoint=["tail" "-f" "/dev/null"] cmd=[] network="host"
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   🐳  docker exec cmd=[node --no-warnings -e console.log(process.execPath)] user= workdir=
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ✅  Success - Set up job
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/actions/create-github-app-token' # ref=v***
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/anthropics/claude-code-action' # ref=v0.0.3***
+[ClaudeCode - Slang Assistant/Claude Code Assistant] ⭐ Run Pre Execute Claude Code Action
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/oven-sh/setup-bun' # ref=735343b667d3e6f658f44d0eca948eb6282f2b76
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/anthropics/claude-code-base-action' # ref=3560d2***b4***bd***9b***d3ac6c9000af378903d8df0e
+[ClaudeCode - Slang Assistant/Claude Code Assistant] ⭐ Run Pre Run Claude Code
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/actions/setup-node' # ref=49933ea5288caeca8642d***e84afbd3f7d6820020
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ☁  git clone 'https://github.com/oven-sh/setup-bun' # ref=735343b667d3e6f658f44d0eca948eb6282f2b76
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ✅  Success - Pre Run Claude Code [2.575676676s]
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   ✅  Success - Pre Execute Claude Code Action [5.42******42577s]
+[ClaudeCode - Slang Assistant/Claude Code Assistant] ⭐ Run Main Checkout repository
+[ClaudeCode - Slang Assistant/Claude Code Assistant]   🐳  docker cp src=/home/droid/slang/. dst=/home/droid/slang
