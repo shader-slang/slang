@@ -208,8 +208,22 @@ void test()
 }
 ```
 
-> #### Note ####
-> Slang currently does not allow default values on struct members, but we intend to support them in the future.
+### Default values 
+
+Alternatively, you can specify default values of members in the struct like so: 
+
+```hlsl
+struct MyData
+{
+     int a = 1;
+     float3 b = {0.5};
+}
+void test()
+{
+     MyData data = MyData();  // will initialize data.a to 1 and data.b to {0.5, 0.5, 0.5}
+     MyData data2; // data2.a and data2.b will be undefined !    
+}
+```
 
 ### Enumeration Types
 
