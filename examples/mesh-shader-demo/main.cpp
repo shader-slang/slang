@@ -29,15 +29,19 @@ using namespace rhi;
 struct MeshShaderApp : public WindowedAppBase
 {
     // Uniform data structure that matches the shader
-    // Must match UniformBufferObject in const_buffer_value_missing.slang
+    // Must match UniformBufferObject in rotating-triangle.slang
     struct Uniforms
     {
         float time;
-        float padding[3]; // Add padding for alignment
+        float colors[3][3]; // Array of 3 float3 colors for the triangle vertices
     };
 
+
     // Load and compile the mesh shader program
-    Result loadShaderProgram(IDevice* device, ComPtr<IShaderProgram>& outShaderProgram)
+    Result loadShaderProgram(
+        IDevice* device,
+        ComPtr<IShaderProgram>& outShaderProgram,
+        slang::ProgramLayout*& slangReflection)
     {
         // Get Slang compilation session from the graphics device
         ComPtr<slang::ISession> slangSession;
@@ -97,11 +101,16 @@ struct MeshShaderApp : public WindowedAppBase
         programDesc.slangGlobalScope = linkedProgram.get();
         auto shaderProgram = device->createShaderProgram(programDesc);
         outShaderProgram = shaderProgram;
-        return SLANG_OK;
+
+        // Get the program layout
+        slangReflection = linkedProgram->getLayout();
+        return shaderProgram ? SLANG_OK : SLANG_FAIL;
+        ;
     }
 
     ComPtr<IShaderProgram> gShaderProgram;
-    ComPtr<IPipeline> gPipeline;
+    slang::ProgramLayout* slangReflection = nullptr;
+    ComPtr<IRenderPipeline> gPipeline;
 
     bool firstTime = true;
     platform::TimePoint startTime;
@@ -111,7 +120,7 @@ struct MeshShaderApp : public WindowedAppBase
         SLANG_RETURN_ON_FAIL(initializeBase("Mesh Shader Demo", 1024, 768, DeviceType::Vulkan));
 
         // Load mesh shader program
-        SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, gShaderProgram));
+        SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, gShaderProgram, slangReflection));
 
         // Create render pipeline for mesh shaders
         ColorTargetDesc colorTarget;
@@ -147,7 +156,6 @@ struct MeshShaderApp : public WindowedAppBase
 
     virtual void renderFrame(ITexture* texture) override
     {
-        auto commandEncoder = gQueue->createCommandEncoder();
         
         if (firstTime)
         {
@@ -155,9 +163,29 @@ struct MeshShaderApp : public WindowedAppBase
             firstTime = false;
         }
 
-        // Update uniform buffer with current time
+        // Update uniform buffer with current time and dynamic colors
         Uniforms uniforms = {};
-        uniforms.time = platform::PerformanceCounter::getElapsedTimeInSeconds(startTime);
+        float currentTime = platform::PerformanceCounter::getElapsedTimeInSeconds(startTime);
+        uniforms.time = currentTime;
+
+        // Create smoothly changing colors based on time
+        // Each vertex gets different phase offsets to create variety
+        float colorSpeed = 1.5f; // Speed of color change
+
+        // Vertex 0 (Top) - cycles through warm colors
+        uniforms.colors[0][0] = 0.5f + 0.5f * sin(currentTime * colorSpeed);        // Red
+        uniforms.colors[0][1] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 2.0f); // Green
+        uniforms.colors[0][2] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 4.0f); // Blue
+
+        // Vertex 1 (Bottom Right) - cycles with different phase
+        uniforms.colors[1][0] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 2.1f); // Red
+        uniforms.colors[1][1] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 4.2f); // Green
+        uniforms.colors[1][2] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 0.3f); // Blue
+
+        // Vertex 2 (Bottom Left) - cycles with another different phase
+        uniforms.colors[2][0] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 4.3f); // Red
+        uniforms.colors[2][1] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 0.4f); // Green
+        uniforms.colors[2][2] = 0.5f + 0.5f * sin(currentTime * colorSpeed + 2.5f); // Blue
 
         // Encode render commands
         ComPtr<ITextureView> textureView = gDevice->createTextureView(texture, {});
@@ -169,8 +197,6 @@ struct MeshShaderApp : public WindowedAppBase
         renderPass.colorAttachments = &colorAttachment;
         renderPass.colorAttachmentCount = 1;
 
-        auto encoder = commandEncoder->beginRenderPass(renderPass);
-
         // Set up render state
         RenderState renderState = {};
         renderState.viewports[0] = Viewport::fromSize(windowWidth, windowHeight);
@@ -178,22 +204,41 @@ struct MeshShaderApp : public WindowedAppBase
         renderState.scissorRects[0] = ScissorRect::fromSize(windowWidth, windowHeight);
         renderState.scissorRectCount = 1;
 
-        // Bind pipeline and set uniforms
-        auto rootObject = encoder->bindPipeline(static_cast<IRenderPipeline*>(gPipeline.get()));
-        auto constantBuffer = rootObject->getObject(ShaderOffset());
-        constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
+        // Bind pipeline and set uniforms and color buffer
+        ComPtr<IShaderObject> cbObject;
+        {
+            gDevice->createShaderObject(
+                nullptr,
+                slangReflection->findTypeByName("UniformBufferObject"),
+                ShaderObjectContainerType::None,
+                cbObject.writeRef());
+            ShaderCursor cursor(cbObject);
+            cursor["time"].setData(uniforms.time);
+            cursor["colors"].setData(uniforms.colors);
+            cbObject->finalize();
+        }
 
-        encoder->setRenderState(renderState);
+        ComPtr<IShaderObject> rootObject = gDevice->createRootShaderObject(gShaderProgram);
+        ShaderCursor rootCursor(rootObject);
+        rootCursor["ubo"].setObject(cbObject);
+
+        // We have done all the set up work, now it is time to start recording a command buffer for
+        // GPU execution.
+        auto commandEncoder = gQueue->createCommandEncoder();
+        auto passEncoder = commandEncoder->beginRenderPass(renderPass);
+        passEncoder->bindPipeline(gPipeline, rootObject);
+
+        passEncoder->setRenderState(renderState);
 
         // For mesh shaders, we use draw without vertex buffers
         // The mesh shader generates its own geometry
         DrawArguments drawArgs = {};
         drawArgs.vertexCount = 3;  // This is ignored by mesh shaders, but required by API
-        encoder->draw(drawArgs);
+        passEncoder->draw(drawArgs);
 
-        encoder->end();
-
+        passEncoder->end();
         gQueue->submit(commandEncoder->finish());
+        gQueue->waitOnHost();
 
         if (!isTestMode())
         {

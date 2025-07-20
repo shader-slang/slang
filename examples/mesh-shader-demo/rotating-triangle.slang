@@ -3,9 +3,10 @@
 
 struct UniformBufferObject {
     float time;
+    float3 colors[3]; // Array of 3 colors for the triangle vertices
 };
 
-[[vk::binding(0, 0)]] ConstantBuffer<UniformBufferObject> ubo;
+ConstantBuffer<UniformBufferObject> ubo;
 
 struct MeshOutput {
     float4 Position : SV_Position;
@@ -16,8 +17,11 @@ struct MeshOutput {
 [shader("mesh")]
 [numthreads(1, 1, 1)]
 [outputtopology("triangle")]
-void main(uint threadID : SV_GroupIndex, out indices uint3 Triangles[1], out vertices MeshOutput Vertices[3])
-{
+void main(
+    uint threadID : SV_GroupIndex,
+    out indices uint3 Triangles[1],
+    out vertices MeshOutput Vertices[3]
+) {
     SetMeshOutputCounts(3, 1);
     
     // Define three vertices of a triangle
@@ -26,11 +30,12 @@ void main(uint threadID : SV_GroupIndex, out indices uint3 Triangles[1], out ver
         float2( 0.5, -0.5), // Right
         float2(-0.5, -0.5)  // Left
     };
-    
+
+    // Get colors from constant buffer
     float3 colors[3] = {
-        float3(1, 0, 0), // Red
-        float3(0, 1, 0), // Green
-        float3(0, 0, 1)  // Blue
+        ubo.colors[0], // Dynamic color from CPU
+        ubo.colors[1], // Dynamic color from CPU
+        ubo.colors[2]  // Dynamic color from CPU
     };
     
     // Assign vertex data with rotation based on time
