@@ -1,0 +1,44 @@
+{
+  "repository": {
+    "name": "slang",
+    "full_name": "szihs/slang",
+    "owner": {
+      "login": "szihs",
+      "id": 675653
+    },
+    "default_branch": "master",
+    "html_url": "https://github.com/szihs/slang",
+    "clone_url": "https://github.com/szihs/slang.git"
+  },
+  "issue": {
+    "number": 8,
+    "id": 3217907650,
+    "title": "DebugGlobalVariable instructions are missing from SPIR-V output",
+    "body": "## Issue Description\n\nWhen compiling Slang shaders to SPIR-V with debug information (`-g2`), no `DebugGlobalVariable` instructions are generated for global variables (like `Texture2D` and `SamplerState` shader parameters). This results in incomplete debug information where global variables are not visible to debuggers.\n\nThis is a missing functionality in the SPIR-V debug information generation, similar to how `DebugLocalVariable` was fixed in PR #7516.\n\n## Expected Behavior\n\nGlobal variables should have `DebugGlobalVariable` instructions generated with appropriate scope information, enabling debuggers to locate and display global variables.",
+    "state": "open",
+    "user": {
+      "login": "szihs",
+      "id": 675653
+    },
+    "created_at": "2025-07-10T05:04:35Z",
+    "updated_at": "2025-07-10T09:00:06Z"
+  },
+  "comment": {
+    "id": 3056271814,
+    "body": "@claude can you land a PR to fix this issue.",
+    "user": {
+      "login": "szihs",
+      "id": 675653
+    },
+    "created_at": "2025-07-10T08:20:47Z",
+    "updated_at": "2025-07-10T08:20:47Z",
+    "author_association": "OWNER"
+  },
+  "sender": {
+    "login": "szihs",
+    "id": 675653,
+    "type": "User"
+  },
+  "action": "created"
+}
+
