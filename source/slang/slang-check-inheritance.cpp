@@ -858,13 +858,42 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             SubtypeWitness* baseIsSubtypeOfFacet = foundFacet->subtypeWitness;
 
-            auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
-                selfIsSubtypeOfBase,
-                baseIsSubtypeOfFacet);
+            // Check if this would create an unwanted struct->struct->interface conformance
+            // We want to prevent transitive witnesses of the form: struct Child -> struct Parent -> interface IFoo
+            bool shouldSkipTransitiveWitness = false;
 
-            indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+            if (auto selfIsBaseDeclWitness = as<DeclaredSubtypeWitness>(selfIsSubtypeOfBase))
+            {
+                if (auto baseFacetDeclWitness = as<DeclaredSubtypeWitness>(baseIsSubtypeOfFacet))
+                {
+                    auto selfType = selfIsBaseDeclWitness->getSub();
+                    auto baseType = selfIsBaseDeclWitness->getSup(); 
+                    auto facetType = baseFacetDeclWitness->getSup();
+                    
+                    auto selfDeclRefType = as<DeclRefType>(selfType);
+                    auto baseDeclRefType = as<DeclRefType>(baseType);
+                    auto facetDeclRefType = as<DeclRefType>(facetType);
+                    if (selfDeclRefType && baseDeclRefType && facetDeclRefType)
+                    {
+                        auto selfDecl = as<StructDecl>(selfDeclRefType->getDeclRef().getDecl());
+                        auto baseDecl = as<StructDecl>(baseDeclRefType->getDeclRef().getDecl());
+                        auto facetDecl = as<InterfaceDecl>(facetDeclRefType->getDeclRef().getDecl());
+                        
+                        shouldSkipTransitiveWitness = selfDecl && baseDecl && facetDecl;
+                    }
+                }
+            }
 
-            ioMergedFacets.add(indirectFacet);
+            if (!shouldSkipTransitiveWitness)
+            {
+                auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
+                    selfIsSubtypeOfBase,
+                    baseIsSubtypeOfFacet);
+
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+
+                ioMergedFacets.add(indirectFacet);
+            }
         }
 
         // We picked one `foundFacet` above to be added to the merged
