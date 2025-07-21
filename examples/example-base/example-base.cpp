@@ -1,4 +1,5 @@
 #include "example-base.h"
+#include "slang.h"
 
 #include <chrono>
 
@@ -23,6 +24,15 @@ Slang::Result WindowedAppBase::initializeBase(
 #ifdef _DEBUG
     deviceDesc.enableValidation = true;
 #endif
+
+    slang::CompilerOptionEntry slangOptions[] = {
+        {slang::CompilerOptionName::EmitSpirvDirectly, {slang::CompilerOptionValueKind::Int, 1}},
+        {slang::CompilerOptionName::DebugInformation,
+         {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD}}
+    };
+    deviceDesc.slang.compilerOptionEntries = slangOptions;
+    deviceDesc.slang.compilerOptionEntryCount = 2;
+
     gDevice = getRHI()->createDevice(deviceDesc);
     if (!gDevice)
     {
