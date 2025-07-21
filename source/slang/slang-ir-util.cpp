@@ -454,6 +454,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
 
     switch (type->getOp())
     {
+    case kIROp_BoolType:
+        sb << "bool";
+        break;
     case kIROp_FloatType:
         sb << "float";
         break;
