@@ -189,19 +189,14 @@ jobs:
       # Run Claude Code Action with optimized environment variables
       - name: Execute Claude Code Action # Right now direct prompt to automatic PR Review
         id: claude-action
-        uses: anthropics/claude-code-action@v0.0.31
+        uses: anthropics/claude-code-action@v0.0.38
         with:
           # Direct Prompt is for testing. We shall use the triggers (on) which shall trigger this part on runtime
           custom_instructions: |
             # Build system information:
             - OS: Ubuntu Linux
-            - Build commands: 
-              * Configure: `cmake --preset default`
-              * Build: `cmake --build --preset debug`
-              * Test: `./build/Release/bin/slang-test ./tests/path/to/test.slang`
-              * Format code: `./extras/formatting.sh`
             - Project is pre-built and ready for development tasks
-            - Run formatting script before committing changes
+            - See CLAUDE.md for detailed build, test, and formatting instructions
 
             # CRITICAL: You have access to the mcp__deepwiki__ask_question tool for deep repository knowledge.
 
@@ -214,14 +209,6 @@ jobs:
               **Implementation Guidelines:**
               - Always follow existing code patterns and architectural decisions discovered through deepwiki
               - Consult the tool when you need context about unfamiliar parts of the codebase
-
-            # Debugging backend crashes or invalid downstream code:
-
-              Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
-              early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
-              of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
-              keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
-              in the IR passes.
 
           mcp_config: |
             {

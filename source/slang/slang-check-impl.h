@@ -2139,6 +2139,12 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
+    // This function is used to get the best integer type that matches the given type.
+    // If `type` is already an integer type, return it as is.
+    // If `type` is a enum type, return the tag type if it exists.
+    // Otherwise, return the 32-bit signed integer type.
+    Type* getMatchingIntType(Type* type);
+
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
 
