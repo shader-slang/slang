@@ -213,10 +213,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // causing errors.
         bool hasConst = false;
         bool hasUniform = false;
-        bool hasUniform = false;
         bool hasExportOrExtern = false;
         bool hasStatic = false;
-        bool hasSpecializationConstant = false;
         bool hasSpecializationConstant = false;
         for (auto m : decl->modifiers)
         {
@@ -226,12 +224,8 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 hasConst = true;
             else if (as<HLSLUniformModifier>(m))
                 hasUniform = true;
-            else if (as<HLSLUniformModifier>(m))
-                hasUniform = true;
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
-            else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
-                hasSpecializationConstant = true;
             else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
                 hasSpecializationConstant = true;
         }
@@ -246,13 +240,19 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // In HLSL, const global variables without static are uniform parameters
         // that cannot have default values
         // Exception: specialization constants are allowed to have initializers
+        // Exception: In GLSL mode, global const variables are real constants, not uniform
+        // parameters
         if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
             !hasSpecializationConstant && decl->initExpr)
         {
-            getSink()->diagnose(
-                decl,
-                Diagnostics::constGlobalVarWithInitRequiresStatic,
-                decl->getName());
+            auto moduleDecl = getModuleDecl(decl);
+            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            {
+                getSink()->diagnose(
+                    decl,
+                    Diagnostics::constGlobalVarWithInitRequiresStatic,
+                    decl->getName());
+            }
         }
     }
 
