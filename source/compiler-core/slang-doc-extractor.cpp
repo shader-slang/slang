@@ -885,9 +885,7 @@ SlangResult DocMarkupExtractor::extract(
 
         MemoryArena memoryArena(4096);
 
-        RootNamePool rootNamePool;
         NamePool namePool;
-        namePool.setRootNamePool(&rootNamePool);
 
         Index viewIndex = -1;
         SourceView* sourceView = nullptr;

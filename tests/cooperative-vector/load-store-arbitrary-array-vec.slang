@@ -1,4 +1,4 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector
 
 // CHECK: 1
 // CHECK-NEXT: 2
@@ -31,5 +31,5 @@ void computeMain()
     vec.storeAny(temp);
     let result = CoopVec<uint32_t, 15>.loadAny(temp);
     for(int i = 0; i < result.getCount(); ++i)
-        outputBuffer[i] = result[i];;
+        outputBuffer[i] = result[i];
 }

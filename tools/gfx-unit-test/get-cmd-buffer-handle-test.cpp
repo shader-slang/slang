@@ -1,42 +1,39 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
 #if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>
 #endif
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 void getBufferHandleTestImpl(IDevice* device, UnitTestContext* context)
 {
-    // We need to create a transient heap in order to create a command buffer.
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
+    // Create a command queue and encoder to get a command buffer
+    ComPtr<ICommandQueue> queue;
+    GFX_CHECK_CALL_ABORT(device->getQueue(QueueType::Graphics, queue.writeRef()));
 
-    auto commandBuffer = transientHeap->createCommandBuffer();
-    struct CloseComandBufferRAII
-    {
-        ICommandBuffer* m_commandBuffer;
-        ~CloseComandBufferRAII() { m_commandBuffer->close(); }
-    } closeCommandBufferRAII{commandBuffer};
-    InteropHandle handle = {};
+    ComPtr<ICommandEncoder> encoder;
+    GFX_CHECK_CALL_ABORT(queue->createCommandEncoder(encoder.writeRef()));
+
+    ComPtr<ICommandBuffer> commandBuffer;
+    GFX_CHECK_CALL_ABORT(encoder->finish(commandBuffer.writeRef()));
+
+    NativeHandle handle = {};
     GFX_CHECK_CALL_ABORT(commandBuffer->getNativeHandle(&handle));
-    if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
+    if (device->getInfo().deviceType == rhi::DeviceType::Vulkan)
     {
-        SLANG_CHECK(handle.handleValue != 0);
+        SLANG_CHECK(handle.value != 0);
     }
 #if SLANG_WINDOWS_FAMILY
     else
     {
-        auto d3d12Handle = (ID3D12GraphicsCommandList*)handle.handleValue;
+        auto d3d12Handle = (ID3D12GraphicsCommandList*)handle.value;
         Slang::ComPtr<IUnknown> testHandle1;
         GFX_CHECK_CALL_ABORT(d3d12Handle->QueryInterface<IUnknown>(testHandle1.writeRef()));
         Slang::ComPtr<ID3D12GraphicsCommandList> testHandle2;
@@ -49,23 +46,22 @@ void getBufferHandleTestImpl(IDevice* device, UnitTestContext* context)
 
 void getBufferHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
 {
-    gfxEnableDebugLayer(context->enableDebugLayers);
     if ((api & context->enabledApis) == 0)
     {
         SLANG_IGNORE_TEST;
     }
     Slang::ComPtr<IDevice> device;
-    IDevice::Desc deviceDesc = {};
+    DeviceDesc deviceDesc = {};
     switch (api)
     {
     case Slang::RenderApiFlag::D3D11:
-        deviceDesc.deviceType = gfx::DeviceType::DirectX11;
+        deviceDesc.deviceType = rhi::DeviceType::D3D11;
         break;
     case Slang::RenderApiFlag::D3D12:
-        deviceDesc.deviceType = gfx::DeviceType::DirectX12;
+        deviceDesc.deviceType = rhi::DeviceType::D3D12;
         break;
     case Slang::RenderApiFlag::Vulkan:
-        deviceDesc.deviceType = gfx::DeviceType::Vulkan;
+        deviceDesc.deviceType = rhi::DeviceType::Vulkan;
         break;
     default:
         SLANG_IGNORE_TEST;
@@ -74,14 +70,14 @@ void getBufferHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum
     const char* searchPaths[] = {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"};
     deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
     deviceDesc.slang.searchPaths = searchPaths;
-    auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
+    auto createDeviceResult = getRHI()->createDevice(deviceDesc, device.writeRef());
     if (SLANG_FAILED(createDeviceResult))
     {
         SLANG_IGNORE_TEST;
     }
     // Ignore this test on swiftshader. Swiftshader seems to have a bug that causes the test
     // to crash.
-    if (Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
+    if (Slang::String(device->getInfo().adapterName).toLower().contains("swiftshader"))
     {
         SLANG_IGNORE_TEST;
     }

@@ -2251,6 +2251,11 @@ public:
         const char* path,
         slang::IBlob* source,
         slang::IBlob** outDiagnostics = nullptr) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) override;
     SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
         const char* path,
@@ -2344,10 +2349,13 @@ public:
     SourceManager* m_sourceManager = nullptr;
     RefPtr<CommandLineContext> m_cmdLineContext;
 
-    // Name pool for looking up names
-    NamePool namePool;
+    // Used to store strings returned by the api as const char*
+    StringSlicePool m_stringSlicePool;
 
-    NamePool* getNamePool() { return &namePool; }
+    // Name pool for looking up names
+    NamePool* namePool = nullptr;
+
+    NamePool* getNamePool() { return namePool; }
 
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
@@ -3732,10 +3740,8 @@ public:
 
     // Name pool stuff for unique-ing identifiers
 
-    RootNamePool rootNamePool;
     NamePool namePool;
 
-    RootNamePool* getRootNamePool() { return &rootNamePool; }
     NamePool* getNamePool() { return &namePool; }
     Name* getNameObj(String name) { return namePool.getName(name); }
     Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }

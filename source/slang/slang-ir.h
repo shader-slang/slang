@@ -1456,8 +1456,6 @@ FIDDLE()
 struct IRSubpassInputType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getIsMultisampleInst() { return getOperand(1); }
     bool isMultisample() { return getIntVal(getIsMultisampleInst()) == 1; }
 };
 
@@ -1509,12 +1507,6 @@ FIDDLE()
 struct IRMetalMeshType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getVerticesType() { return (IRType*)getOperand(0); }
-    IRType* getPrimitivesType() { return (IRType*)getOperand(1); }
-    IRInst* getNumVertices() { return (IRInst*)getOperand(2); }
-    IRInst* getNumPrimitives() { return (IRInst*)getOperand(3); }
-    IRIntLit* getTopology() { return (IRIntLit*)getOperand(4); }
 };
 
 FIDDLE()
@@ -1584,8 +1576,6 @@ FIDDLE()
 struct IRAtomicType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getElementType() { return (IRType*)getOperand(0); }
 };
 
 
@@ -1593,15 +1583,12 @@ FIDDLE()
 struct IRRateQualifiedType : IRType
 {
     FIDDLE(leafInst())
-    IRRate* getRate() { return (IRRate*)getOperand(0); }
-    IRType* getValueType() { return (IRType*)getOperand(1); }
 };
 
 FIDDLE()
 struct IRDescriptorHandleType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getResourceType() { return (IRType*)getOperand(0); }
 };
 
 // Unlike the AST-level type system where `TypeType` tracks the
@@ -1649,39 +1636,30 @@ FIDDLE()
 struct IRBackwardDiffIntermediateContextType : IRType
 {
     FIDDLE(leafInst())
-    IRInst* getFunc() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRVectorType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getElementCount() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRMatrixType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getRowCount() { return getOperand(1); }
-    IRInst* getColumnCount() { return getOperand(2); }
-    IRInst* getLayout() { return getOperand(3); }
 };
 
 FIDDLE()
 struct IRArrayListType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
 };
 
 FIDDLE()
 struct IRTensorViewType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
 };
 
 FIDDLE()
@@ -1694,8 +1672,6 @@ FIDDLE()
 struct IRSPIRVLiteralType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getValueType() { return static_cast<IRType*>(getOperand(0)); }
 };
 
 FIDDLE()
@@ -1721,14 +1697,12 @@ FIDDLE()
 struct IRComPtrType : public IRType
 {
     FIDDLE(leafInst())
-    IRType* getValueType() { return (IRType*)getOperand(0); }
 };
 
 FIDDLE()
 struct IRNativePtrType : public IRType
 {
     FIDDLE(leafInst())
-    IRType* getValueType() { return (IRType*)getOperand(0); }
 };
 
 FIDDLE()
@@ -1758,7 +1732,6 @@ FIDDLE()
 struct IRRTTIPointerType : IRRawPointerTypeBase
 {
     FIDDLE(leafInst())
-    IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -1771,8 +1744,6 @@ FIDDLE()
 struct IRGetStringHash : IRInst
 {
     FIDDLE(leafInst())
-
-    IRStringLit* getStringLit() { return as<IRStringLit>(getOperand(0)); }
 };
 
 /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
@@ -1809,27 +1780,18 @@ FIDDLE()
 struct IRCoopVectorType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getElementCount() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRCoopMatrixType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getScope() { return getOperand(1); }
-    IRInst* getRowCount() { return getOperand(2); }
-    IRInst* getColumnCount() { return getOperand(3); }
-    IRInst* getMatrixUse() { return getOperand(4); }
 };
 
 FIDDLE()
 struct IRTensorAddressingTensorLayoutType : IRType
 {
     FIDDLE(leafInst())
-    IRInst* getDimension() { return getOperand(0); }
-    IRInst* getClampMode() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -1933,8 +1895,6 @@ FIDDLE()
 struct IRInterfaceRequirementEntry : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getRequirementKey() { return getOperand(0); }
-    IRInst* getRequirementVal() { return getOperand(1); }
     void setRequirementKey(IRInst* val) { setOperand(0, val); }
     void setRequirementVal(IRInst* val) { setOperand(1, val); }
 };
@@ -1960,9 +1920,6 @@ FIDDLE()
 struct IRAttributedType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getBaseType() { return (IRType*)getOperand(0); }
-    IRInst* getAttr() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -2021,9 +1978,6 @@ FIDDLE()
 struct IRResultType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getValueType() { return (IRType*)getOperand(0); }
-    IRType* getErrorType() { return (IRType*)getOperand(1); }
 };
 
 /// Represents an `Optional<T>`.
@@ -2031,8 +1985,6 @@ FIDDLE()
 struct IROptionalType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getValueType() { return (IRType*)getOperand(0); }
 };
 
 /// Represents an enum type
@@ -2040,8 +1992,6 @@ FIDDLE()
 struct IREnumType : IRType
 {
     FIDDLE(leafInst())
-
-    IRType* getTagType() { return (IRType*)getOperand(0); }
 };
 
 FIDDLE()
@@ -2069,7 +2019,6 @@ FIDDLE()
 struct IRAnyValueType : IRType
 {
     FIDDLE(leafInst())
-    IRInst* getSize() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -2357,8 +2306,10 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
+FIDDLE()
 struct IRModule : RefObject
 {
+    FIDDLE(...)
 public:
     enum
     {
@@ -2441,7 +2392,28 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
+    //
+    // The range of module versions this compiler supports
+    //
+    // This will need to be updated if for example an instruction is removed,
+    // the max supported version should be incremented and the min supported
+    // version set to above the last version an instance of that instruction
+    // could be found
+    //
+    // Additionally this should be updated when new instructions are added,
+    // however only k_maxSupportedModuleVersion needs to be incremented in that
+    // case
+    //
+    // It represents the version of module regarding semantics and doesn't have
+    // anything to do with serialization format
+    //
+    const static UInt k_minSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 1;
+
 private:
+    friend struct IRSerialReadContext;
+    friend struct IRSerialWriteContext;
+    friend struct Fossilized_IRModule;
     IRModule() = delete;
 
     /// Ctor
@@ -2460,10 +2432,13 @@ private:
     /// instructions from an arbitrary IR instruction we expect to find the
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
-    IRModuleInst* m_moduleInst = nullptr;
+    FIDDLE() IRModuleInst* m_moduleInst = nullptr;
 
     // The name of the module.
-    Name* m_name = nullptr;
+    FIDDLE() Name* m_name = nullptr;
+
+    // The version of the module as it was loaded
+    FIDDLE() UInt64 m_version = k_maxSupportedModuleVersion;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.
@@ -2665,6 +2640,10 @@ bool isMovableInst(IRInst* inst);
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
+extern uint32_t _slangIRAllocBreak;
+extern bool _slangIRPrintStackAtBreak;
+void _debugSetInstBeingCloned(uint32_t uid);
+void _debugResetInstBeingCloned();
 #endif
 
 // TODO: Ellie, comment and move somewhere more appropriate?

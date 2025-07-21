@@ -16,18 +16,20 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        devShell =
-          with pkgs;
-          mkShell {
-            buildInputs = [
-              cmake
-              llvm
-              ninja
-              nixfmt-rfc-style
-              python3
-              xorg.libX11
-            ];
-          };
+        devShell = pkgs.mkShell {
+          buildInputs = [
+            pkgs.cmake
+            pkgs.gersemi
+            pkgs.llvm
+            pkgs.llvmPackages_17.clang-tools
+            pkgs.ninja
+            pkgs.nixfmt-rfc-style
+            pkgs.prettier
+            pkgs.python3
+            pkgs.shfmt
+            pkgs.xorg.libX11
+          ];
+        };
       }
     );
 }

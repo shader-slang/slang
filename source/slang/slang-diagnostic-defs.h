@@ -659,6 +659,11 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30029,
+    Error,
+    arrayIndexOutOfBounds,
+    "array index '$0' is out of bounds for array of size '$1'.")
+DIAGNOSTIC(
     30026,
     Error,
     returnInComponentMustComeLast,
@@ -701,6 +706,11 @@ DIAGNOSTIC(
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(
+    30078,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
+DIAGNOSTIC(
     30048,
     Error,
     argumentHasMoreMemoryQualifiersThanParam,
@@ -709,9 +719,10 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30049,
     Note,
-    thisIsImmutableByDefault,
-    "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` "
-    "attribute to the function declaration to opt in to a mutable `this`")
+    attemptingToAssignToConstVariable,
+    "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on "
+    "the containing method to allow modification")
+
 DIAGNOSTIC(
     30050,
     Error,
@@ -1054,6 +1065,11 @@ DIAGNOSTIC(
     Error,
     throwTypeIncompatibleWithErrorType,
     "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+DIAGNOSTIC(
+    30117,
+    Error,
+    forwardReferenceInGenericConstraint,
+    "generic constraint for parameter '$0' references type parameter '$1' before it is declared")
 
 // Include
 DIAGNOSTIC(
@@ -1394,6 +1410,15 @@ DIAGNOSTIC(
     primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
     "primal substitute function for differentiable method must also be differentiable. Use "
     "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
+DIAGNOSTIC(
+    31159,
+    Warning,
+    noDerivativeOnNonDifferentiableThisType,
+    "There is no derivative calculated for member '$0' because the parent struct is not "
+    "differentiable. "
+    "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
+    "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
+    "derivatives.")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
@@ -1487,6 +1512,12 @@ DIAGNOSTIC(
     Error,
     ExternAndExportVarDeclMustBeConst,
     "extern and export variables must be static const: '$0'")
+
+DIAGNOSTIC(
+    31224,
+    Error,
+    constGlobalVarWithInitRequiresStatic,
+    "global const variable with initializer must be declared static: '$0'")
 
 // Enums
 
@@ -1633,6 +1664,11 @@ DIAGNOSTIC(
     requiredConstraintIsNotChecked,
     "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
     "usage.")
+DIAGNOSTIC(
+    30404,
+    Error,
+    invalidEqualityConstraintSupType,
+    "type '$0' is not a proper type to use in a generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -1679,6 +1715,11 @@ DIAGNOSTIC(
     Error,
     genericValueParameterMustHaveType,
     "a generic value parameter must be given an explicit type")
+DIAGNOSTIC(
+    30624,
+    Error,
+    genericValueParameterTypeNotSupported,
+    "generic value parameter type '$0' is not supported; only integer and enum types are allowed")
 
 // 307xx: parameters
 DIAGNOSTIC(
@@ -1776,7 +1817,17 @@ DIAGNOSTIC(
     Error,
     overrideModifierNotOverridingBaseDecl,
     "'$0' marked as 'override' is not overriding any base declarations.")
-
+DIAGNOSTIC(
+    30855,
+    Error,
+    unreferencedGenericParamInExtension,
+    "generic parameter '$0' is not referenced by extension target type '$1'.")
+DIAGNOSTIC(
+    30856,
+    Warning,
+    genericParamInExtensionNotReferencedByTargetType,
+    "the extension is non-standard and may not work as intended because the generic parameter '$0' "
+    "is not referenced by extension target type '$1'.")
 // 309xx: subscripts
 DIAGNOSTIC(
     30900,
@@ -2148,12 +2199,6 @@ DIAGNOSTIC(
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
-
-DIAGNOSTIC(
-    38202,
-    Error,
-    matrixWithDisallowedElementTypeEncountered,
-    "matrix with disallowed element type '$0' encountered")
 
 DIAGNOSTIC(
     38203,
@@ -2846,6 +2891,12 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
+
+DIAGNOSTIC(
+    56103,
+    Error,
+    int16NotSupportedInWGSL,
+    "16-bit integer type '$0' is not supported by the WGSL backend.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
