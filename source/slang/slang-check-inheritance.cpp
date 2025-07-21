@@ -859,7 +859,8 @@ void SharedSemanticsContext::_mergeFacetLists(
             SubtypeWitness* baseIsSubtypeOfFacet = foundFacet->subtypeWitness;
 
             // Check if this would create an unwanted struct->struct->interface conformance
-            // We want to prevent transitive witnesses of the form: struct Child -> struct Parent -> interface IFoo
+            // We want to prevent transitive witnesses of the form: struct Child -> struct Parent ->
+            // interface IFoo
             bool shouldSkipTransitiveWitness = false;
 
             if (auto selfIsBaseDeclWitness = as<DeclaredSubtypeWitness>(selfIsSubtypeOfBase))
@@ -867,9 +868,9 @@ void SharedSemanticsContext::_mergeFacetLists(
                 if (auto baseFacetDeclWitness = as<DeclaredSubtypeWitness>(baseIsSubtypeOfFacet))
                 {
                     auto selfType = selfIsBaseDeclWitness->getSub();
-                    auto baseType = selfIsBaseDeclWitness->getSup(); 
+                    auto baseType = selfIsBaseDeclWitness->getSup();
                     auto facetType = baseFacetDeclWitness->getSup();
-                    
+
                     auto selfDeclRefType = as<DeclRefType>(selfType);
                     auto baseDeclRefType = as<DeclRefType>(baseType);
                     auto facetDeclRefType = as<DeclRefType>(facetType);
@@ -877,8 +878,9 @@ void SharedSemanticsContext::_mergeFacetLists(
                     {
                         auto selfDecl = as<StructDecl>(selfDeclRefType->getDeclRef().getDecl());
                         auto baseDecl = as<StructDecl>(baseDeclRefType->getDeclRef().getDecl());
-                        auto facetDecl = as<InterfaceDecl>(facetDeclRefType->getDeclRef().getDecl());
-                        
+                        auto facetDecl =
+                            as<InterfaceDecl>(facetDeclRefType->getDeclRef().getDecl());
+
                         shouldSkipTransitiveWitness = selfDecl && baseDecl && facetDecl;
                     }
                 }
