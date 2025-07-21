@@ -4093,12 +4093,17 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         // If we have a context, provide a specific diagnostic about the return type mismatch
         if (context)
         {
-            context->innerSink.diagnose(
+            context->hasSignatureMismatch = true;
+            getSink()->diagnose(
                 satisfyingMemberDeclRef,
                 Diagnostics::memberReturnTypeMismatch,
                 satisfyingMemberDeclRef,
                 satisfyingResultType,
                 requiredResultType);
+            getSink()->diagnose(
+                requiredMemberDeclRef,
+                Diagnostics::seeDeclarationOfInterfaceRequirement,
+                requiredMemberDeclRef);
         }
         return false;
     }
@@ -7532,17 +7537,24 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
     // wrappers that redirects the call into the inner element.
     //
-    context->innerSink.reset();
-    if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
-    {
-        return true;
-    }
-
-    // Finally, if there is a default implementation for the required member,
-    // we can use that as a witness.
+    // However, if we've already identified a clear signature mismatch,
+    // we should not attempt synthesis as it will likely fail with a
+    // confusing error message.
     //
-    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
-        return true;
+    if (!context->hasSignatureMismatch)
+    {
+        context->innerSink.reset();
+        if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
+        {
+            return true;
+        }
+
+        // Finally, if there is a default implementation for the required member,
+        // we can use that as a witness.
+        //
+        if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+            return true;
+    }
 
     // We failed to find a member of the type that can be used
     // to satisfy the requirement (even via synthesis), so we

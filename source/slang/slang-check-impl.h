@@ -1862,6 +1862,9 @@ public:
         // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
         DiagnosticSink innerSink;
 
+        // Flag to track if we've encountered a clear signature mismatch that should prevent synthesis
+        bool hasSignatureMismatch = false;
+
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
 
