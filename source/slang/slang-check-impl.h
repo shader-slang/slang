@@ -1862,23 +1862,18 @@ public:
         // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
         DiagnosticSink innerSink;
 
-        // Flag to track if we've encountered a clear signature mismatch that should prevent synthesis
-        bool hasSignatureMismatch = false;
-
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
 
     bool doesSignatureMatchRequirement(
         DeclRef<CallableDecl> satisfyingMemberDeclRef,
         DeclRef<CallableDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable,
-        ConformanceCheckingContext* context = nullptr);
+        RefPtr<WitnessTable> witnessTable);
 
     bool doesMemberSatisfyRequirement(
         DeclRef<Decl> memberDeclRef,
         DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable,
-        ConformanceCheckingContext* context = nullptr);
+        RefPtr<WitnessTable> witnessTable);
 
     void addModifiersToSynthesizedDecl(
         ConformanceCheckingContext* context,

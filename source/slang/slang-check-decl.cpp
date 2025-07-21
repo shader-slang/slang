@@ -3993,8 +3993,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable,
-    ConformanceCheckingContext* context)
+    RefPtr<WitnessTable> witnessTable)
 {
     if (satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() !=
         requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
@@ -4089,24 +4088,7 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
-    {
-        // If we have a context, provide a specific diagnostic about the return type mismatch
-        if (context)
-        {
-            context->hasSignatureMismatch = true;
-            getSink()->diagnose(
-                satisfyingMemberDeclRef,
-                Diagnostics::memberReturnTypeMismatch,
-                satisfyingMemberDeclRef,
-                satisfyingResultType,
-                requiredResultType);
-            getSink()->diagnose(
-                requiredMemberDeclRef,
-                Diagnostics::seeDeclarationOfInterfaceRequirement,
-                requiredMemberDeclRef);
-        }
         return false;
-    }
 
     if (hasForwardDerivative || hasBackwardDerivative)
     {
@@ -4702,8 +4684,7 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
 bool SemanticsVisitor::doesMemberSatisfyRequirement(
     DeclRef<Decl> memberDeclRef,
     DeclRef<Decl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable,
-    ConformanceCheckingContext* context)
+    RefPtr<WitnessTable> witnessTable)
 {
     // Sanity check: if are checking whether a type `T`
     // implements, say, `IFoo::bar` and lookup of `bar`
@@ -4741,7 +4722,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
         if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
         {
             // Check signature match.
-            return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable, context);
+            return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable);
         }
     }
     else if (auto memberInitDecl = memberDeclRef.as<ConstructorDecl>())
@@ -4749,7 +4730,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
         if (auto requiredInitDecl = requiredMemberDeclRef.as<ConstructorDecl>())
         {
             // Check signature match.
-            return doesSignatureMatchRequirement(memberInitDecl, requiredInitDecl, witnessTable, context);
+            return doesSignatureMatchRequirement(memberInitDecl, requiredInitDecl, witnessTable);
         }
     }
     else if (auto genDecl = memberDeclRef.as<GenericDecl>())
@@ -5554,31 +5535,55 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // so we also need to coerce the result of the call to
     // the expected type.
     //
-    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, getSink());
+    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, &tempSink);
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
     // for the requirement.
     //
-    // TODO: We might want to detect *why* overload resolution
-    // or type coercion failed, and report errors accordingly.
-    //
-    // More detailed diagnostics could help users understand
-    // what they did wrong, e.g.:
-    //
-    // * "We tried to use `foo(int)` but the interface requires `foo(String)`
-    //
-    // * "You have two methods that can apply as `bar()` and we couldn't tell which one you meant
-    //
-    // For now we just bail out here and rely on the caller to
-    // diagnose a generic "failed to satisfying requirement" error.
+    // Check if this was specifically a return type coercion failure
+    // and provide a more specific diagnostic.
     //
     if (tempSink.getErrorCount() != 0)
     {
-        context->innerSink.diagnose(
-            SourceLoc(),
-            Diagnostics::cannotResolveOverloadForMethodRequirement,
-            baseOverloadedExpr->name);
+        // Check if the failure was due to return type coercion
+        bool hasReturnTypeError = false;
+        if (checkedCall && checkedCall->type)
+        {
+            // The call resolved - check if it's a return type mismatch
+            auto actualReturnType = checkedCall->type;
+            if (!actualReturnType->equals(resultType))
+            {
+                hasReturnTypeError = true;
+                
+                // Find the actual implementation method that was called
+                if (auto invokeExpr = as<InvokeExpr>(checkedCall))
+                {
+                    if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
+                    {
+                        context->innerSink.diagnose(
+                            memberRefExpr->declRef,
+                            Diagnostics::memberReturnTypeMismatch,
+                            memberRefExpr->declRef,
+                            actualReturnType,
+                            resultType);
+                        
+                        context->innerSink.diagnose(
+                            requiredMemberDeclRef,
+                            Diagnostics::seeDeclarationOfInterfaceRequirement,
+                            requiredMemberDeclRef);
+                    }
+                }
+            }
+        }
+        
+        if (!hasReturnTypeError)
+        {
+            context->innerSink.diagnose(
+                SourceLoc(),
+                Diagnostics::cannotResolveOverloadForMethodRequirement,
+                baseOverloadedExpr->name);
+        }
         return false;
     }
 
@@ -7500,7 +7505,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         if (member.breadcrumbs != nullptr)
             continue;
 
-        if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable, context))
+        if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
         {
             // The member satisfies the requirement in every other way except that
             // it may have a lower visibility than min(parentVisibility, requirementVisibilty),
@@ -7537,24 +7542,17 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
     // wrappers that redirects the call into the inner element.
     //
-    // However, if we've already identified a clear signature mismatch,
-    // we should not attempt synthesis as it will likely fail with a
-    // confusing error message.
-    //
-    if (!context->hasSignatureMismatch)
+    context->innerSink.reset();
+    if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
     {
-        context->innerSink.reset();
-        if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
-        {
-            return true;
-        }
-
-        // Finally, if there is a default implementation for the required member,
-        // we can use that as a witness.
-        //
-        if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
-            return true;
+        return true;
     }
+
+    // Finally, if there is a default implementation for the required member,
+    // we can use that as a witness.
+    //
+    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+        return true;
 
     // We failed to find a member of the type that can be used
     // to satisfy the requirement (even via synthesis), so we
