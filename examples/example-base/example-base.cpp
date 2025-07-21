@@ -31,7 +31,9 @@ Slang::Result WindowedAppBase::initializeBase(
          {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD}}
     };
     deviceDesc.slang.compilerOptionEntries = slangOptions;
-    deviceDesc.slang.compilerOptionEntryCount = 2;
+    // When in test mode, don't include debug information to avoid altering hash values during testing
+    // Otherwise, include debug information for better debugging experience
+    deviceDesc.slang.compilerOptionEntryCount = isTestMode() ? 1 : 2;
 
     gDevice = getRHI()->createDevice(deviceDesc);
     if (!gDevice)
