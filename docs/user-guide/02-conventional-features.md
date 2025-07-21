@@ -215,8 +215,8 @@ Alternatively, you can specify default values of members in the struct like so:
 ```hlsl
 struct MyData
 {
-     int a = {1};
-     float3 b = {0.5};
+     int a = 1;
+     float3 b = float3(0.5);
 }
 void test()
 {
