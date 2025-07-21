@@ -10,7 +10,6 @@
 --
 -- For a detailed description of the schema, please see docs/design/ir-instruction-definition.md
 --
-
 local insts = {
 	{ nop = {} },
 	-- This opcode is used as a placeholder if we were ever to deserialize a
