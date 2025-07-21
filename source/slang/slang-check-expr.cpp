@@ -2490,13 +2490,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     {
         expr = CheckExpr(expr);
     }
-    auto indexExpr = subscriptExpr->indexExprs[0];
+    auto& indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!isScalarIntegerType(indexExpr->type.type))
-    {
-        getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
-        return CreateErrorExpr(subscriptExpr);
-    }
+    auto intTargetType = getMatchingIntType(indexExpr->type.type);
+    indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
@@ -5664,7 +5661,10 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
     expr->base = CheckProperType(expr->base);
     if (as<ErrorType>(expr->base.type))
         expr->type = expr->base.type;
-    auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
+    auto ptrType = m_astBuilder->getPtrType(
+        expr->base.type,
+        AccessQualifier::ReadWrite,
+        AddressSpace::UserPointer);
     expr->type = m_astBuilder->getTypeType(ptrType);
     return expr;
 }
@@ -5749,6 +5749,13 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
     {
         return m_astBuilder->getNoDiffModifierVal();
+    }
+    else if (as<ConstModifier>(modifier))
+    {
+        getSink()->diagnose(
+            modifier,
+            Diagnostics::disallowConstAsTypeModifier);
+        return nullptr;
     }
     else
     {

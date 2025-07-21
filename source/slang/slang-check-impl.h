@@ -458,6 +458,12 @@ struct FacetImpl
     ///
     Facet::Origin origin;
 
+    // DeclRef to the container that represent this facet for member lookup.
+    // If the facet is for an interface decl, this declref will be a specialized `LookupDeclRef`
+    // containing the subtype witness that the type this facet belongs to is a subtype of interface
+    // represented by this facet.
+    DeclRef<ContainerDecl> declRefForMemberLookup;
+
     Type* getType() const { return origin.type; }
     DeclRef<Decl> getDeclRef() const { return origin.declRef; }
 
@@ -470,9 +476,18 @@ struct FacetImpl
     /// The next facet in the linearized inheritance list of the entity.
     Facet next;
 
+    void setSubtypeWitness(ASTBuilder* builder, SubtypeWitness* witness)
+    {
+        subtypeWitness = witness;
+        init(builder);
+    }
+
+    void init(ASTBuilder* builder);
+
     FacetImpl() {}
 
     FacetImpl(
+        ASTBuilder* astBuilder,
         Facet::Kind kind,
         Facet::Directness directness,
         DeclRef<Decl> declRef,
@@ -480,6 +495,7 @@ struct FacetImpl
         SubtypeWitness* subtypeWitness)
         : kind(kind), directness(directness), origin(declRef, type), subtypeWitness(subtypeWitness)
     {
+        init(astBuilder);
     }
 };
 
@@ -2122,6 +2138,12 @@ public:
 
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
+
+    // This function is used to get the best integer type that matches the given type.
+    // If `type` is already an integer type, return it as is.
+    // If `type` is a enum type, return the tag type if it exists.
+    // Otherwise, return the 32-bit signed integer type.
+    Type* getMatchingIntType(Type* type);
 
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);

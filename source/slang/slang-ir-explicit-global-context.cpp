@@ -317,7 +317,7 @@ struct IntroduceExplicitGlobalContextPass
         // so we get and cache that pointer type up front.
         //
         m_contextStructPtrType =
-            builder.getPtrType(kIROp_PtrType, m_contextStructType, getAddressSpaceOfLocal());
+            builder.getPtrType(kIROp_PtrType, m_contextStructType, AccessQualifier::ReadWrite, getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
@@ -559,8 +559,10 @@ struct IntroduceExplicitGlobalContextPass
                 {
                     builder.addNameHintDecoration(var, nameDecor->getName());
                 }
-                auto ptrPtrType =
-                    builder.getPtrType(getGlobalVarPtrType(globalVar), getAddressSpaceOfLocal());
+                auto ptrPtrType = builder.getPtrType(
+                    getGlobalVarPtrType(globalVar),
+                    AccessQualifier::ReadWrite,
+                    getAddressSpaceOfLocal());
                 auto fieldPtr = builder.emitFieldAddress(ptrPtrType, contextVarPtr, fieldInfo.key);
                 builder.emitStore(fieldPtr, var);
             }
@@ -612,10 +614,12 @@ struct IntroduceExplicitGlobalContextPass
         {
             return builder.getPtrType(
                 globalVar->getDataType()->getValueType(),
+                AccessQualifier::ReadWrite,
                 AddressSpace::GroupShared);
         }
         return builder.getPtrType(
             globalVar->getDataType()->getValueType(),
+            AccessQualifier::ReadWrite,
             getAddressSpaceOfLocal());
     }
 
@@ -630,7 +634,11 @@ struct IntroduceExplicitGlobalContextPass
 
         auto ptrType = getGlobalVarPtrType(globalVar);
         if (fieldInfo.needDereference)
-            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, getAddressSpaceOfLocal());
+            ptrType = builder.getPtrType(
+                kIROp_PtrType,
+                ptrType,
+                AccessQualifier::ReadWrite,
+                getAddressSpaceOfLocal());
 
         // We then iterate over the uses of the variable,
         // being careful to defend against the use/def information

@@ -15,6 +15,8 @@
 
 #if defined(_WIN32)
 #include <d3d12.h>
+#include <windows.h>
+#pragma comment(lib, "advapi32")
 #endif
 
 #include <slang-rhi.h>
@@ -28,6 +30,121 @@
 #include "external/renderdoc_app.h"
 
 #include <windows.h>
+#endif
+
+#if defined(_WIN32)
+// Check if Windows Developer mode is enabled
+// Developer mode is required for D3D12 experimental features
+static bool isWindowsDeveloperModeEnabled()
+{
+    // Helper function to check a specific registry key with detailed logging
+    auto checkRegistryKey = [](HKEY rootKey,
+                               const char* rootName,
+                               const char* path,
+                               const char* valueName,
+                               bool try32BitView = false) -> bool
+    {
+        HKEY key;
+        DWORD accessFlags = KEY_READ | (try32BitView ? KEY_WOW64_32KEY : KEY_WOW64_64KEY);
+        LONG ret = RegOpenKeyExA(rootKey, path, 0, accessFlags, &key);
+
+        if (ret != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        DWORD value = 0;
+        DWORD size = sizeof(DWORD);
+        DWORD type = REG_DWORD;
+
+        ret = RegQueryValueExA(key, valueName, nullptr, &type, (LPBYTE)&value, &size);
+
+        RegCloseKey(key);
+
+        if (ret != ERROR_SUCCESS || type != REG_DWORD)
+        {
+            return false;
+        }
+
+        return value == 1;
+    };
+
+    // Method 1: Check multiple registry locations with different views
+    struct RegistryLocation
+    {
+        HKEY rootKey;
+        const char* rootName;
+        const char* path;
+        const char* valueName;
+    };
+
+    RegistryLocation locations[] = {
+        // Windows 10+ main location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Alternative user location
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Windows 11 alternative
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowAllTrustedApps"},
+
+        // Policy location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Additional alternative locations
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+    };
+
+    for (const auto& location : locations)
+    {
+        // Try 64-bit view first
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                false))
+        {
+            return true;
+        }
+
+        // Try 32-bit view as fallback
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                true))
+        {
+            return true;
+        }
+    }
+
+    printf("*** Developer Mode NOT DETECTED ***\n");
+    printf("To enable Developer Mode:\n");
+    printf("1. Open Windows Settings (Windows key + I)\n");
+    printf("2. Go to 'System' -> 'For developers'\n");
+    printf("3. Turn on 'Developer Mode'\n");
+    printf("4. Restart the application\n");
+    printf("==========================================\n");
+
+    return false;
+}
 #endif
 
 namespace renderer_test
@@ -1426,7 +1543,14 @@ static SlangResult _innerMain(
         experimentalFD.configurationStructSizes = nullptr;
 
         if (options.dx12Experimental)
+        {
+            // Check if Windows Developer mode is enabled
+            if (!isWindowsDeveloperModeEnabled())
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
             desc.next = &experimentalFD;
+        }
 #endif
 
         // Look for args going to slang

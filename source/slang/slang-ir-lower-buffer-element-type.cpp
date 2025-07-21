@@ -161,7 +161,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -214,7 +215,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         IRType* paramTypes[] = {outStructType, matrixType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -300,7 +302,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -364,7 +367,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outLoweredType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outLoweredType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         IRType* paramTypes[] = {outLoweredType, structType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -713,7 +717,9 @@ struct LoweredElementTypeContext
                     info.convertLoweredToOriginal.func,
                     UnownedStringSlice("unpackStorage"));
                 builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
-                auto refLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto refLoweredType = builder.getRefType(
+                    loweredType,
+                    AccessQualifier::ReadWrite, AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
                 builder.emitBlock();
@@ -750,7 +756,9 @@ struct LoweredElementTypeContext
                     UnownedStringSlice("packStorage"));
                 builder.addForceInlineDecoration(info.convertOriginalToLowered.func);
 
-                auto outLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto outLoweredType = builder.getRefType(
+                    loweredType,
+                    AccessQualifier::ReadWrite, AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(
                     builder.getFuncType(2, paramTypes, builder.getVoidType()));
@@ -1067,6 +1075,7 @@ struct LoweredElementTypeContext
                             newArrayPtrVal = builder.emitBitCast(
                                 builder.getPtrType(
                                     loweredInnerType.loweredType,
+                                    AccessQualifier::ReadWrite,
                                     ptrType->getAddressSpace()),
                                 newArrayPtrVal);
                             traverseUses(

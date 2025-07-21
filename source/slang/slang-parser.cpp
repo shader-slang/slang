@@ -3578,7 +3578,34 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
+    // Check for GLSL layout qualifiers when GLSL input is allowed
+    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    {
+        auto getLayoutArg = [&](const char* defaultLayout)
+        {
+            if (auto dataLayoutMod =
+                    parser->pendingModifiers->findModifier<GLSLBufferDataLayoutModifier>())
+            {
+                if (as<GLSLStd140Modifier>(dataLayoutMod))
+                    return "Std140DataLayout";
+                else if (as<GLSLStd430Modifier>(dataLayoutMod))
+                    return "Std430DataLayout";
+                else if (as<GLSLScalarModifier>(dataLayoutMod))
+                    return "ScalarDataLayout";
+            }
+            return defaultLayout;
+        };
+
+        String layoutType = getLayoutArg("Std140DataLayout");
+        return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
+    }
+
     return ParseBufferBlockDecl(parser, "ConstantBuffer");
+}
+
+static NodeBase* parseHLSLCBufferDeclWithLayout(Parser* parser, String layoutType)
+{
+    return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
 }
 
 static NodeBase* parseHLSLTBufferDecl(Parser* parser, void* /*userData*/)
@@ -4834,6 +4861,31 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
         }
     }
 }
+
+static EnumDecl* isUnscopedEnum(Decl* decl)
+{
+    EnumDecl* enumDecl = as<EnumDecl>(decl);
+    if (!enumDecl)
+        return nullptr;
+    for (auto mod : enumDecl->modifiers)
+    {
+        if (as<UnscopedEnumAttribute>(mod))
+        {
+            return enumDecl;
+        }
+        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
+        {
+            // We have to perform an ugly string comparison here, because the attributes
+            // haven't been checked during parsing.
+            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
+            {
+                return enumDecl;
+            }
+        }
+    }
+    return nullptr;
+}
+
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
@@ -4909,6 +4961,24 @@ static void CompleteDecl(
         {
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
+
+            // As a special case, if we are adding an unscoped enum to container, we should also
+            // create static const decls for each enum case and add them to the container.
+            if (auto enumDecl = isUnscopedEnum(decl))
+            {
+                for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
+                {
+                    auto staticConstDecl = parser->astBuilder->create<LetDecl>();
+                    staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
+                    addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
+                    addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto valueExpr = parser->astBuilder->create<VarExpr>();
+                    valueExpr->declRef = DeclRef<Decl>(enumCase);
+                    staticConstDecl->initExpr = valueExpr;
+                    staticConstDecl->loc = enumCase->loc;
+                    AddMember(containerDecl, staticConstDecl);
+                }
+            }
         }
     }
 
@@ -4994,7 +5064,9 @@ static DeclBase* ParseDeclWithModifiers(
 
                     if (as<HLSLUniformModifier>(mod))
                     {
-                        decl = as<Decl>(parseHLSLCBufferDecl(parser, nullptr));
+                        decl = as<Decl>(parseHLSLCBufferDeclWithLayout(
+                            parser,
+                            getLayoutArg("Std140DataLayout")));
                         break;
                     }
                     else
@@ -5527,17 +5599,16 @@ static Decl* parseEnumDecl(Parser* parser)
         decl->nameAndLoc = expectIdentifier(parser);
     }
 
-    // If the type needs to be unscoped, insert modifiers to make it so.
-    if (isUnscoped)
-    {
-        addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
-        addModifier(decl, parser->astBuilder->create<TransparentModifier>());
-    }
 
     return parseOptGenericDecl(
         parser,
         [&](GenericDecl* genericParent)
         {
+            // If the type needs to be unscoped, insert modifiers to make it so.
+            if (isUnscoped && !genericParent)
+            {
+                addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
+            }
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);
@@ -9280,6 +9351,15 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
+static NodeBase* parseBuiltinEnumModifier(Parser* parser, void* /*userData*/)
+{
+    BuiltinEnumModifier* modifier = parser->astBuilder->create<BuiltinEnumModifier>();
+    parser->ReadToken(TokenType::LParent);
+    modifier->name = parser->ReadToken(TokenType::Identifier).getContent();
+    parser->ReadToken(TokenType::RParent);
+    return modifier;
+}
+
 static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
@@ -9523,6 +9603,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
 
     _makeParseModifier("__builtin_type", parseBuiltinTypeModifier),
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
+
+    _makeParseModifier("__builtin_enum", parseBuiltinEnumModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),

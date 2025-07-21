@@ -15,7 +15,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 
     // Constant pointers arent a thing in slang
-    // CHECK: error 30078:
+    // CHECK: error 30079:
     float* ptr = &constant_float_buffer[threadId.x];
 
 

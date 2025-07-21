@@ -212,22 +212,48 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
         // causing errors.
         bool hasConst = false;
+        bool hasUniform = false;
+        bool hasUniform = false;
         bool hasExportOrExtern = false;
         bool hasStatic = false;
+        bool hasSpecializationConstant = false;
+        bool hasSpecializationConstant = false;
         for (auto m : decl->modifiers)
         {
             if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
                 hasExportOrExtern = true;
             else if (as<ConstModifier>(m))
                 hasConst = true;
+            else if (as<HLSLUniformModifier>(m))
+                hasUniform = true;
+            else if (as<HLSLUniformModifier>(m))
+                hasUniform = true;
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
+            else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
+                hasSpecializationConstant = true;
+            else if (as<SpecializationConstantAttribute>(m) || as<VkConstantIdAttribute>(m))
+                hasSpecializationConstant = true;
         }
         if (hasExportOrExtern && hasConst != hasStatic)
             getSink()->diagnose(
                 decl,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
                 decl->getName());
+
+
+        // Global const or uniform variables with initializers must be static
+        // In HLSL, const global variables without static are uniform parameters
+        // that cannot have default values
+        // Exception: specialization constants are allowed to have initializers
+        if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
+            !hasSpecializationConstant && decl->initExpr)
+        {
+            getSink()->diagnose(
+                decl,
+                Diagnostics::constGlobalVarWithInitRequiresStatic,
+                decl->getName());
+        }
     }
 
     void visitDecl(Decl* decl) { checkModifiers(decl); }
@@ -2330,6 +2356,14 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Not allowed a `globallycoherent T*` or related
+    if (as<PtrType>(varDecl->type))
+        if (auto memoryQualifierSet = varDecl->findModifier<MemoryQualifierSetModifier>())
+            if (memoryQualifierSet->getMemoryQualifierBit() &
+                MemoryQualifierSetModifier::Flags::kCoherent)
+                getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
+
     checkVisibility(varDecl);
 }
 
@@ -3660,6 +3694,10 @@ void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
+    if (auto builtinEnum = decl->findModifier<BuiltinEnumModifier>())
+    {
+        sharedASTBuilder->registerBuiltinEnum(decl, builtinEnum);
+    }
 }
 
 
@@ -3711,6 +3749,10 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
         ioDecls.add(decl);
     }
     else if (decl->findModifier<BuiltinRequirementModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<BuiltinEnumModifier>())
     {
         ioDecls.add(decl);
     }
@@ -8459,6 +8501,16 @@ bool SemanticsVisitor::isScalarIntegerType(Type* type)
     return isIntegerBaseType(baseType) || baseType == BaseType::Bool;
 }
 
+Type* SemanticsVisitor::getMatchingIntType(Type* type)
+{
+    if (isScalarIntegerType(type))
+        return type;
+    if (auto enumTypeDecl = isDeclRefTypeOf<EnumDecl>(type))
+        if (enumTypeDecl.getDecl()->tagType)
+            return getMatchingIntType(enumTypeDecl.getDecl()->tagType);
+    return m_astBuilder->getIntType();
+}
+
 bool SemanticsVisitor::isHalfType(Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
@@ -8849,6 +8901,8 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     // TODO: Do we need/want to support generic cases some day?
     auto parentEnumDecl = as<EnumDecl>(decl->parentDecl);
     SLANG_ASSERT(parentEnumDecl);
+
+    ensureDecl(parentEnumDecl, DeclCheckState::ReadyForLookup);
 
     decl->type.type = DeclRefType::create(m_astBuilder, makeDeclRef(parentEnumDecl));
 

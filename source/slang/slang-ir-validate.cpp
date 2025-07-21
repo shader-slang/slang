@@ -482,6 +482,43 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     return false;
 }
 
+void validatePointerAccess(DiagnosticSink* sink, IRInst* inst)
+{
+    auto errorIfReadOnlyPtrInst = [&](IRInst* maybePtrInst)
+    {
+        auto ptrType = as<IRPtrType>(maybePtrInst->getDataType());
+        if (!ptrType)
+            return;
+        if (ptrType->getAccessQualifier() == AccessQualifier::Read)
+            sink->diagnose(inst->sourceLoc, Diagnostics::cannotWriteToReadOnlyPointer);
+    };
+
+    switch (inst->getOp())
+    {
+    case kIROp_Store:
+        {
+            auto storeInst = as<IRStore>(inst);
+            errorIfReadOnlyPtrInst(storeInst->getPtr());
+            break;
+        }
+    case kIROp_SwizzledStore:
+        {
+            auto swizzledStoreInst = as<IRSwizzledStore>(inst);
+            errorIfReadOnlyPtrInst(swizzledStoreInst->getDest());
+            break;
+        }
+    case kIROp_AtomicStore:
+        {
+            auto atomicStoreInst = as<IRAtomicStore>(inst);
+            errorIfReadOnlyPtrInst(atomicStoreInst->getPtr());
+            break;
+        }
+    }
+
+    for (auto child : inst->getModifiableChildren())
+        validatePointerAccess(sink, child);
+}
+
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
 {
     switch (inst->getOp())
@@ -598,21 +635,9 @@ void validateVectorsAndMatrices(
                 }
             }
 
-            // Verify that the element type is a floating point type, or an allowed integral type
-            auto elementType = matrixType->getElementType();
-            uint32_t allowedWidths = 0U;
-            if (isCPUTarget(targetRequest))
-                allowedWidths = 8U | 16U | 32U | 64U;
-            else if (isCUDATarget(targetRequest))
-                allowedWidths = 32U | 64U;
-            else if (isD3DTarget(targetRequest))
-                allowedWidths = 16U | 32U;
-            validateVectorOrMatrixElementType(
-                sink,
-                matrixType->sourceLoc,
-                elementType,
-                allowedWidths,
-                Diagnostics::matrixWithDisallowedElementTypeEncountered);
+            // Matrix element type validation removed to allow integer/bool matrices
+            // which will be lowered to arrays of vectors on targets that don't support them
+            // natively
         }
         else if (auto vectorType = as<IRVectorType>(globalInst))
         {

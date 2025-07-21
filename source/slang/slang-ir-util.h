@@ -253,7 +253,7 @@ IRInst* emitLoopBlocks(
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Remove all linkage decorations from func.
-void removeLinkageDecorations(IRGlobalValueWithCode* func);
+void removeLinkageDecorations(IRInst* inst);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 

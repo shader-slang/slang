@@ -533,6 +533,16 @@ DIAGNOSTIC(
     Error,
     missingLayoutBindingModifier,
     "Expecting 'binding' modifier in the layout qualifier here")
+DIAGNOSTIC(
+    20017,
+    Error,
+    disallowConstAsModifierOfCppPtr,
+    "cannot use 'const' on 'T*', prefer to use the syntax 'const Ptr<T>' instead")
+DIAGNOSTIC(
+    20018,
+    Error,
+    disallowConstAsTypeModifier,
+    "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -659,6 +669,11 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30029,
+    Error,
+    arrayIndexOutOfBounds,
+    "array index '$0' is out of bounds for array of size '$1'.")
+DIAGNOSTIC(
     30026,
     Error,
     returnInComponentMustComeLast,
@@ -700,11 +715,6 @@ DIAGNOSTIC(
     Error,
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(
-    30078,
-    Error,
-    cannotTakeConstantPointers,
-    "Not allowed to take pointer of an immutable object")
 DIAGNOSTIC(
     30048,
     Error,
@@ -822,7 +832,16 @@ DIAGNOSTIC(
     "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
-
+DIAGNOSTIC(
+    30078,
+    Error,
+    coherentKeywordOnAPointer,
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent operations instead")
+DIAGNOSTIC(
+    30079,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
 DIAGNOSTIC(
     30100,
     Error,
@@ -930,7 +949,7 @@ DIAGNOSTIC(
     30080,
     Error,
     ambiguousConversion,
-    "more than one implicit conversion exists from '$0' to '$1'")
+    "more than one conversion exists from '$0' to '$1'")
 DIAGNOSTIC(
     30081,
     Warning,
@@ -1507,6 +1526,12 @@ DIAGNOSTIC(
     Error,
     ExternAndExportVarDeclMustBeConst,
     "extern and export variables must be static const: '$0'")
+
+DIAGNOSTIC(
+    31224,
+    Error,
+    constGlobalVarWithInitRequiresStatic,
+    "global const variable with initializer must be declared static: '$0'")
 
 // Enums
 
@@ -2190,12 +2215,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
 DIAGNOSTIC(
-    38202,
-    Error,
-    matrixWithDisallowedElementTypeEncountered,
-    "matrix with disallowed element type '$0' encountered")
-
-DIAGNOSTIC(
     38203,
     Error,
     vectorWithDisallowedElementTypeEncountered,
@@ -2624,6 +2643,8 @@ DIAGNOSTIC(
     invalidAtomicDestinationPointer,
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
+
+DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
 
 //
 // 5xxxx - Target code generation.

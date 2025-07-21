@@ -927,7 +927,10 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         }
         if (paramDecl->findModifier<RefModifier>())
         {
-            paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
+            paramType = astBuilder->getRefType(
+                paramType,
+                AccessQualifier::ReadWrite,
+                AddressSpace::Generic);
         }
         else if (paramDecl->findModifier<ConstRefModifier>())
         {

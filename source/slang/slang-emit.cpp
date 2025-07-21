@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
@@ -60,6 +61,7 @@
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -438,6 +440,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_Select:
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
+        break;
+    case kIROp_PtrType:
+        if (as<IRPtrType>(inst)->getAccessQualifier() == AccessQualifier::Read)
+            result.validateReadOnlyPtr = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1067,6 +1073,11 @@ Result linkAndOptimizeIR(
         }
     }
 
+    if (requiredLoweringPassSet.validateReadOnlyPtr)
+    {
+        validatePointerAccess(sink, irModule->getModuleInst());
+    }
+
     switch (target)
     {
     case CodeGenTarget::CPPSource:
@@ -1109,6 +1120,7 @@ Result linkAndOptimizeIR(
     {
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
+        checkForOutOfBoundAccess(irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
             checkForMissingReturns(irModule, sink, target, false);
@@ -1332,6 +1344,7 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
+    legalizeMatrixTypes(targetProgram, irModule, sink);
     legalizeVectorTypes(irModule, sink);
 
     // Once specialization and type legalization have been performed,
@@ -2209,6 +2222,10 @@ SlangResult emitSPIRVFromIR(
 class SpirvInstructionHelper
 {
 public:
+    // The result id of the OpExtInstImport instruction, eg.g %2 below
+    // %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+    uint32_t m_nonSemanticDebugInfoExtSetId = 0;
+
     // The index of the SPIRV words in the blob.
     // The first 5 words are the header as defined by the SPIRV spec.
     enum SpvWordIndex
@@ -2351,6 +2368,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,
         NonSemanticShaderDebugInfo100DebugLocalVariable,
+        NonSemanticShaderDebugInfo100DebugGlobalVariable,
         NonSemanticShaderDebugInfo100DebugInlinedVariable,
         NonSemanticShaderDebugInfo100DebugDeclare,
         NonSemanticShaderDebugInfo100DebugValue,
@@ -2395,6 +2413,15 @@ static SlangResult stripDbgSpirvFromArtifact(
                     return;
                 }
             }
+            else if (inst.getOpCode() == SpvOpExtInstImport)
+            {
+                // looking for result id of "OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+                auto importName = inst.getStringFromInst();
+                if (importName == "NonSemantic.Shader.DebugInfo.100")
+                {
+                    spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId = inst.getOperand(0);
+                }
+            }
         });
 
     // Iterate over the instructions from the artifact and add them to the list
@@ -2415,14 +2442,19 @@ static SlangResult stripDbgSpirvFromArtifact(
                     foundDebugString = true;
                 }
                 if (!foundDebugString)
+                {
                     return;
+                }
             }
             // Also check if the instruction is an extended instruction containing DebugInfo.
             if (inst.getOpCode() == SpvOpExtInst)
             {
-                // Ignore this if the instruction contains DebugInfo.
-                if (debugExtInstNumbers.contains(inst.getOperand(3)))
+                // Ignore this if the instruction contains DebugInfo and is from the debug import
+                if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
+                    inst.getOperand(2) == spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId)
+                {
                     return;
+                }
             }
             // Otherwise this is a non-debug instruction and should be included.
             spirvWordsList.addRange(

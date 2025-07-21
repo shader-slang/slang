@@ -8616,6 +8616,55 @@ T determinant(matrix<T,N,N> m)
     }
 }
 
+/// @param m The matrix.
+/// @return The determinant of the matrix.
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(glsl_hlsl_metal_spirv_wgsl)]
+T determinant(matrix<T,N,N> m)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "determinant";
+    case hlsl: __intrinsic_asm "determinant";
+    case metal: __intrinsic_asm "determinant";
+    case wgsl: __intrinsic_asm "determinant";
+    // SPIR-V doesn't support integer determinants, so we need to implement it manually
+    default:
+        static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
+        if (N == 1)
+        {
+            return m[0][0];
+        }
+        else if (N == 2)
+        {
+            return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        }
+        else if (N == 3)
+        {
+            return
+                m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+              - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+              + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+        else// if (N == 4)
+        {
+            T a = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+            T b = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+            T c = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+            T d = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+            T e = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+            T f = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+            return
+                m[0][0] * (m[1][1] * a - m[1][2] * b + m[1][3] * c)
+              - m[0][1] * (m[1][0] * a - m[1][2] * d + m[1][3] * e)
+              + m[0][2] * (m[1][0] * b - m[1][1] * d + m[1][3] * f)
+              - m[0][3] * (m[1][0] * c - m[1][1] * e + m[1][2] * f);
+        }
+    }
+}
+
 /// Barrier for device memory.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
@@ -13107,7 +13156,7 @@ int sign(T x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "i32(sign($0))";
     }
 }
 
@@ -13131,7 +13180,7 @@ vector<int, N> sign(vector<T, N> x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -13720,10 +13769,8 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     {
     case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
-    case spirv: return spirv_asm {
-        OpTranspose $$matrix<T, M, N> result $x
-    };
     case wgsl: __intrinsic_asm "transpose";
+    // SPIRV-V doenst't support integer matrices, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -26742,7 +26789,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27193,7 +27239,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27370,6 +27415,10 @@ CoopVec<T, M> coopVecMatMulPacked(
         int operands = 0; // NoneKHR
         let zero = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27439,9 +27488,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let zero : int32_t = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
         let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

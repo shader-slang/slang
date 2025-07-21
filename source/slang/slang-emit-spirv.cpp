@@ -216,7 +216,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instruction's word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
@@ -360,7 +360,7 @@ struct SpvLiteralBits
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string’s nul-termination character (0), and
+        // > The final word contains the string's nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
 
         // First work out the amount of words we'll need
@@ -2039,17 +2039,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
+                auto elementType = matrixType->getElementType();
+
+                // SPIR-V only supports floating-point matrices
+                // bool/int matrices should be lowered to
+                // arrays of vectors before reaching here
+                SLANG_ASSERT(!as<IRBoolType>(elementType));
+                SLANG_ASSERT(!as<IRIntType>(elementType));
+                SLANG_ASSERT(!as<IRUIntType>(elementType));
+
                 auto vectorSpvType = ensureVectorType(
-                    static_cast<IRBasicType*>(matrixType->getElementType())->getBaseType(),
+                    static_cast<IRBasicType*>(elementType)->getBaseType(),
                     static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue(),
                     nullptr);
                 const auto columnCount =
                     static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
-                auto matrixSPVType = emitOpTypeMatrix(
-                    inst,
-                    vectorSpvType,
-                    SpvLiteralInteger::from32(int32_t(columnCount)));
-                return matrixSPVType;
+                const auto columnCountSpv = SpvLiteralInteger::from32(int32_t(columnCount));
+                SpvInst* matrixSpvType = emitOpTypeMatrix(inst, vectorSpvType, columnCountSpv);
+                return matrixSpvType;
             }
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
@@ -2621,7 +2628,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
-        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+        // Vulkan spec 16.1: "The "Depth" operand of OpTypeImage is ignored."
         SpvWord depth =
             ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
@@ -3251,6 +3258,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getPtrType(
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
+                AccessQualifier::ReadWrite,
                 AddressSpace::BuiltinInput),
             kind,
             spvAsmBuiltinVar);
@@ -3886,7 +3894,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
-            auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
+            auto debugVarPtrType =
+                builder.getPtrType(varType, AccessQualifier::ReadWrite, AddressSpace::Function);
             auto actualHelperVar =
                 emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
             maybeEmitPointerDecoration(actualHelperVar, debugVar);
@@ -7120,7 +7129,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, AccessQualifier::ReadWrite, addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
@@ -7201,6 +7210,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
+            AccessQualifier::ReadWrite,
             addressSpace);
     }
 
@@ -7267,7 +7277,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }
@@ -7374,6 +7384,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isIntegralType(fromType));
         SLANG_ASSERT(isIntegralType(toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         const auto fromInfo = getIntTypeInfo(fromType);
         const auto toInfo = getIntTypeInfo(toType);
@@ -7491,7 +7507,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
-        SLANG_ASSERT(!isTypeEqual(fromType, toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         if (isMatrixCast)
         {
@@ -7756,12 +7777,40 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, operands are raw elements, we need to construct row vectors first,
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
-        auto matrixType = as<IRMatrixType>(inst->getDataType());
-        auto rowCount = getIntVal(matrixType->getRowCount());
-        auto colCount = getIntVal(matrixType->getColumnCount());
+
+        IRIntegerValue rowCount;
+        IRIntegerValue colCount;
+        IRType* elementType;
+
+        // Data type can be either matrix or vector depending on the
+        // legalization requirements
+        auto dataType = inst->getDataType();
+
+        if (auto matrixType = as<IRMatrixType>(dataType))
+        {
+            elementType = matrixType->getElementType();
+            rowCount = getIntVal(matrixType->getRowCount());
+            colCount = getIntVal(matrixType->getColumnCount());
+        }
+        else if (auto arrayType = as<IRArrayType>(dataType))
+        {
+            auto vectorType = as<IRVectorType>(arrayType->getElementType());
+            SLANG_ASSERT(vectorType);
+
+            elementType = vectorType->getElementType();
+            rowCount = getIntVal(arrayType->getElementCount());
+            colCount = getIntVal(vectorType->getElementCount());
+        }
+        else
+        {
+            SLANG_UNEXPECTED("data type for makeMatrix operation is "
+                             "expected be either a matrix or array type");
+        }
+
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+        auto rowVectorType = builder.getVectorType(elementType, colCount);
+
         List<IRInst*> colElements;
         UInt index = 0;
         for (IRIntegerValue j = 0; j < rowCount; j++)
@@ -7886,7 +7935,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ArrayView<IRInst*> operands)
     {
         IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
+        SLANG_ASSERT(elementType);
+
         IRBasicType* basicType = as<IRBasicType>(elementType);
+        SLANG_ASSERT(basicType);
 
         SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
         if (opCode == SpvOpUndef)
@@ -7947,6 +7999,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
+    // Helper method to handle composite arithmetic operations for matrices and arrays
+    SpvInst* emitCompositeArithmetic(
+        SpvInstParent* parent,
+        IRInst* inst,
+        IRIntegerValue rowCount,
+        IRIntegerValue colCount,
+        IRType* elementType,
+        IRType* resultType,
+        bool isMatrixType)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto rowVectorType = builder.getVectorType(elementType, colCount);
+        List<SpvInst*> rows;
+
+        for (IRIntegerValue i = 0; i < rowCount; i++)
+        {
+            List<IRInst*> operands;
+            for (UInt j = 0; j < inst->getOperandCount(); j++)
+            {
+                auto originalOperand = inst->getOperand(j);
+                bool shouldExtract =
+                    isMatrixType ? as<IRMatrixType>(originalOperand->getDataType()) != nullptr
+                                 : as<IRArrayType>(originalOperand->getDataType()) != nullptr;
+
+                if (shouldExtract)
+                {
+                    auto operand = builder.emitElementExtract(originalOperand, i);
+                    emitLocalInst(parent, operand);
+                    operands.add(operand);
+                }
+                else
+                {
+                    operands.add(originalOperand);
+                }
+            }
+            rows.add(emitVectorOrScalarArithmetic(
+                parent,
+                nullptr,
+                rowVectorType,
+                inst->getOp(),
+                inst->getOperandCount(),
+                operands.getArrayView()));
+        }
+        return emitCompositeConstruct(parent, inst, resultType, rows);
+    }
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
@@ -7954,36 +8052,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
             auto colCount = getIntVal(matrixType->getColumnCount());
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
-            List<SpvInst*> rows;
-            for (IRIntegerValue i = 0; i < rowCount; i++)
-            {
-                List<IRInst*> operands;
-                for (UInt j = 0; j < inst->getOperandCount(); j++)
-                {
-                    auto originalOperand = inst->getOperand(j);
-                    if (as<IRMatrixType>(originalOperand->getDataType()))
-                    {
-                        auto operand = builder.emitElementExtract(originalOperand, i);
-                        emitLocalInst(parent, operand);
-                        operands.add(operand);
-                    }
-                    else
-                    {
-                        operands.add(originalOperand);
-                    }
-                }
-                rows.add(emitVectorOrScalarArithmetic(
-                    parent,
-                    nullptr,
-                    rowVectorType,
-                    inst->getOp(),
-                    inst->getOperandCount(),
-                    operands.getArrayView()));
-            }
-            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
+            return emitCompositeArithmetic(
+                parent,
+                inst,
+                rowCount,
+                colCount,
+                matrixType->getElementType(),
+                inst->getDataType(),
+                true);
+        }
+        else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
+        {
+            // Only for legalization
+            auto arrayElementType = arrayType->getElementType();
+            SLANG_ASSERT(as<IRVectorType>(arrayElementType));
+
+            auto vectorType = as<IRVectorType>(arrayElementType);
+            auto elementType = vectorType->getElementType();
+            SLANG_ASSERT(
+                as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
+                as<IRIntType>(elementType));
+
+            auto rowCount = getIntVal(arrayType->getElementCount());
+            auto colCount = getIntVal(vectorType->getElementCount());
+
+            return emitCompositeArithmetic(
+                parent,
+                inst,
+                rowCount,
+                colCount,
+                elementType,
+                inst->getDataType(),
+                false);
         }
 
         Array<IRInst*, 4> operands;

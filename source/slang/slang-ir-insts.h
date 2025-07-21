@@ -3727,14 +3727,31 @@ public:
 
     IROutType* getOutType(IRType* valueType);
     IRInOutType* getInOutType(IRType* valueType);
-    IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
-    IRConstRefType* getConstRefType(IRType* valueType);
+    IRRefType* getRefType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
+    IRConstRefType* getConstRefType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
-    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        IRInst* accessQualifier,
+        IRInst* addressSpace);
+    IRPtrType* getPtrType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace)
     {
-        return getPtrType(kIROp_PtrType, valueType, addressSpace);
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
     }
 
     IRTextureTypeBase* getTextureType(
