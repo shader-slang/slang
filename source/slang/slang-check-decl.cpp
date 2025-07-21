@@ -3993,7 +3993,8 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    ConformanceCheckingContext* context)
 {
     if (satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() !=
         requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
@@ -4088,7 +4089,19 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
     if (!requiredResultType->equals(satisfyingResultType))
+    {
+        // If we have a context, provide a specific diagnostic about the return type mismatch
+        if (context)
+        {
+            context->innerSink.diagnose(
+                satisfyingMemberDeclRef,
+                Diagnostics::memberReturnTypeMismatch,
+                satisfyingMemberDeclRef,
+                satisfyingResultType,
+                requiredResultType);
+        }
         return false;
+    }
 
     if (hasForwardDerivative || hasBackwardDerivative)
     {
@@ -4684,7 +4697,8 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
 bool SemanticsVisitor::doesMemberSatisfyRequirement(
     DeclRef<Decl> memberDeclRef,
     DeclRef<Decl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    ConformanceCheckingContext* context)
 {
     // Sanity check: if are checking whether a type `T`
     // implements, say, `IFoo::bar` and lookup of `bar`
@@ -4722,7 +4736,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
         if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
         {
             // Check signature match.
-            return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable);
+            return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable, context);
         }
     }
     else if (auto memberInitDecl = memberDeclRef.as<ConstructorDecl>())
@@ -4730,7 +4744,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
         if (auto requiredInitDecl = requiredMemberDeclRef.as<ConstructorDecl>())
         {
             // Check signature match.
-            return doesSignatureMatchRequirement(memberInitDecl, requiredInitDecl, witnessTable);
+            return doesSignatureMatchRequirement(memberInitDecl, requiredInitDecl, witnessTable, context);
         }
     }
     else if (auto genDecl = memberDeclRef.as<GenericDecl>())
@@ -7481,7 +7495,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         if (member.breadcrumbs != nullptr)
             continue;
 
-        if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
+        if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable, context))
         {
             // The member satisfies the requirement in every other way except that
             // it may have a lower visibility than min(parentVisibility, requirementVisibilty),

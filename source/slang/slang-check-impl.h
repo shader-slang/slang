@@ -1803,11 +1803,6 @@ public:
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
     void checkVisibility(Decl* decl);
 
-    bool doesSignatureMatchRequirement(
-        DeclRef<CallableDecl> satisfyingMemberDeclRef,
-        DeclRef<CallableDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool doesAccessorMatchRequirement(
         DeclRef<AccessorDecl> satisfyingMemberDeclRef,
         DeclRef<AccessorDecl> requiredMemberDeclRef);
@@ -1848,10 +1843,6 @@ public:
     //
     // If it does, then inserts a witness into `witnessTable`
     // and returns `true`, otherwise returns `false`
-    bool doesMemberSatisfyRequirement(
-        DeclRef<Decl> memberDeclRef,
-        DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     // State used while checking if a declaration (either a type declaration
     // or an extension of that type) conforms to the interfaces it claims
@@ -1873,6 +1864,18 @@ public:
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
+
+    bool doesSignatureMatchRequirement(
+        DeclRef<CallableDecl> satisfyingMemberDeclRef,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        ConformanceCheckingContext* context = nullptr);
+
+    bool doesMemberSatisfyRequirement(
+        DeclRef<Decl> memberDeclRef,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        ConformanceCheckingContext* context = nullptr);
 
     void addModifiersToSynthesizedDecl(
         ConformanceCheckingContext* context,

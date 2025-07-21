@@ -2071,6 +2071,11 @@ DIAGNOSTIC(
     memberDoesNotMatchRequirementSignature,
     "member '$0' does not match interface requirement.")
 DIAGNOSTIC(
+    38106,
+    Error,
+    memberReturnTypeMismatch,
+    "member '$0' return type '$1' does not match interface requirement return type '$2'.")
+DIAGNOSTIC(
     38101,
     Error,
     thisExpressionOutsideOfTypeDecl,
