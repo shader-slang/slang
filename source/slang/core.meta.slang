@@ -1730,15 +1730,15 @@ struct Array : IRWArray<T>
 
 //@public:
 /// @category misc_types
-/// Represents a static UTF-8 string literal of `N` characters.
-/// @remarks An implicit null terminator is not included in the character count `N`.
+/// Represents a static UTF-8 string literal of `N` bytes.
+/// @remarks An implicit null terminator is not included in the byte count `N`.
 __generic<int N>
 __magic_type(ShortStringType)
 __intrinsic_type($(kIROp_ShortStringType))
 struct ShortString : IArray<uint>
 {
-    /// Get the number of characters in the string.
-    /// @return The number of characters in the string.
+    /// Get the number of bytes in the string.
+    /// @return The number of bytes in the string.
     /// @remarks Does not count the implicit null terminator.
     [__unsafeForceInlineEarly]
     int getCount()
@@ -1746,17 +1746,17 @@ struct ShortString : IArray<uint>
         return N;
     }
 
-    /// Get the number of characters in the string.
-    /// @return The number of characters in the string.
+    /// Get the number of bytes in the string.
+    /// @return The number of bytes in the string.
     /// @remarks Does not count the implicit null terminator.
     property uint length
     {
         [__unsafeForceInlineEarly] get { return (uint)getCount(); }
     }
 
-    /// Get the i-th caracter of the string.
-    /// @param i The index of the character. Must be strictly less than `N`.
-    /// @return The unsigned character in the lower 8 bits. The remaining 24 high bits are guaranteed to be zero.
+    /// Get the i-th byte of the string.
+    /// @param i The index of the byte. Must be strictly less than `N`.
+    /// @return The byte in the lower 8 bits. The remaining 24 high bits are guaranteed to be zero.
     __subscript(uint i) -> uint
     {
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetCharFromString)) get;
