@@ -38,6 +38,7 @@ Makefile
 *.actual.png
 *.actual.txt
 *.slang-repro
+*.slang-ast
 
 tests/**/*.exp
 tests/**/*.lib
