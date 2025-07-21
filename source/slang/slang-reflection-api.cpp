@@ -1386,6 +1386,29 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
             return 0;
+            
+        // Fix for Issue #7441: Boolean vectors on CUDA targets should report 4-byte element stride
+        // instead of 1-byte, because they are implemented as int1, int2, etc.
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            // Check if this is a boolean vector on CUDA target
+            if (auto elementType = vectorTypeLayout->type)
+            {
+                if (auto vectorType = as<VectorExpressionType>(elementType))
+                {
+                    if (auto basicElementType = as<BasicExpressionType>(vectorType->getElementType()))
+                    {
+                        if (basicElementType->getBaseType() == BaseType::Bool)
+                        {
+                            // Check if this is for a CUDA-like target where bool vectors use int layout
+                            // For CUDA, boolean vectors use 4-byte elements (sizeof(int32_t))
+                            return sizeof(int32_t);
+                        }
+                    }
+                }
+            }
+        }
+        
         return resInfo->count.getFiniteValue();
     }
 

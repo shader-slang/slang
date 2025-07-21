@@ -10,14 +10,15 @@ struct VectorTypeLoweringContext
 {
     IRModule* module;
     DiagnosticSink* sink;
+    CodeGenTarget target;
 
     InstWorkList workList;
     InstHashSet workListSet;
 
     Dictionary<IRInst*, IRInst*> replacements;
 
-    VectorTypeLoweringContext(IRModule* module)
-        : module(module), workList(module), workListSet(module)
+    VectorTypeLoweringContext(IRModule* module, CodeGenTarget target)
+        : module(module), target(target), workList(module), workListSet(module)
     {
     }
 
@@ -39,7 +40,24 @@ struct VectorTypeLoweringContext
     bool is1Vector(IRType* t)
     {
         const auto lenLit = composeGetters<IRIntLit>(t, &IRVectorType::getElementCount);
-        return lenLit ? getIntVal(lenLit) == 1 : false;
+        if (!lenLit || getIntVal(lenLit) != 1)
+            return false;
+
+        // Fix for Issue #7441: For CUDA targets, preserve boolean vectors (bool1, bool2, etc.)
+        // because they are typedef'd to int1, int2, etc. in CUDA prelude and should not be
+        // simplified to scalar bool.
+        if (target == CodeGenTarget::CUDASource)
+        {
+            if (auto vectorType = as<IRVectorType>(t))
+            {
+                if (vectorType->getElementType()->getOp() == kIROp_BoolType)
+                {
+                    return false; // Don't treat boolean vectors as "1-vectors" for CUDA
+                }
+            }
+        }
+
+        return true;
     };
 
     bool has1VectorType(IRInst* i) { return is1Vector(i->getDataType()); }
@@ -178,9 +196,9 @@ struct VectorTypeLoweringContext
     }
 };
 
-void legalizeVectorTypes(IRModule* module, DiagnosticSink* sink)
+void legalizeVectorTypes(IRModule* module, DiagnosticSink* sink, CodeGenTarget target)
 {
-    VectorTypeLoweringContext context(module);
+    VectorTypeLoweringContext context(module, target);
     context.sink = sink;
     context.processModule();
 }

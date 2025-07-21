@@ -494,9 +494,33 @@ struct PeepholeContext : InstPassBase
                 inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement ||
                 inst->getOperand(0)->getOp() == kIROp_MakeVectorFromScalar)
             {
-                inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                maybeRemoveOldInst(inst);
-                changed = true;
+                // Fix for Issue #7441: For CUDA targets, preserve boolean vectors (bool1, bool2,
+                // etc.) because they are typedef'd to int1, int2, etc. in CUDA prelude and should
+                // not be simplified to scalar bool.
+                bool shouldPreserveBoolVector = false;
+                if (inst->getOperand(0)->getOp() == kIROp_MakeVectorFromScalar && targetProgram)
+                {
+                    // Check if this is a CUDA target
+                    auto target = targetProgram->getTargetReq();
+                    if (target->getTarget() == CodeGenTarget::CUDASource)
+                    {
+                        // Check if this is a boolean vector
+                        if (auto vectorType = as<IRVectorType>(inst->getOperand(0)->getDataType()))
+                        {
+                            if (vectorType->getElementType()->getOp() == kIROp_BoolType)
+                            {
+                                shouldPreserveBoolVector = true;
+                            }
+                        }
+                    }
+                }
+
+                if (!shouldPreserveBoolVector)
+                {
+                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             else
             {
