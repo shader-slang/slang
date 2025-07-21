@@ -2456,7 +2456,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 //
                 for (auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
                 {
-                    SLANG_RELEASE_ASSERT(fieldTypeResInfo.count != 0);
+                    // If the field is a Conditional<T, false> type, then it could have 0 size.
+                    // We should skip this field if it has no use of layout units.
+                    if (fieldTypeResInfo.count == 0)
+                        continue;
+
                     auto kind = fieldTypeResInfo.kind;
 
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
