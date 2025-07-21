@@ -27,11 +27,14 @@ Slang::Result WindowedAppBase::initializeBase(
 
     slang::CompilerOptionEntry slangOptions[] = {
         {slang::CompilerOptionName::EmitSpirvDirectly, {slang::CompilerOptionValueKind::Int, 1}},
+#if 0
+	// TODO: We need to add a new command-line argumnet to enable this.
         {slang::CompilerOptionName::DebugInformation,
          {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD}}
+#endif
     };
     deviceDesc.slang.compilerOptionEntries = slangOptions;
-    deviceDesc.slang.compilerOptionEntryCount = 2;
+    deviceDesc.slang.compilerOptionEntryCount = 1;
 
     gDevice = getRHI()->createDevice(deviceDesc);
     if (!gDevice)

@@ -219,6 +219,8 @@ void TestBase::printUsage(const char* programName) const
 #else
     printOutput("                                Use a given rendering API (Default: vulkan)\n");
 #endif
+    printOutput(" -test-mode                     Print hash values of compiled shader entry points "
+                "and skip rendering\n");
     printOutput(
         " -test-mode                     Print hash values of compiled shader entry points and skip rendering\n");
     printOutput("\n");
