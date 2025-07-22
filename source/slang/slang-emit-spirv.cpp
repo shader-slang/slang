@@ -3017,7 +3017,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 layout->usesResourceKind(LayoutResourceKind::VaryingInput))
             {
                 const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
-                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
+                if (ptrType && (isIntegralScalarOrCompositeType(ptrType->getValueType()) ||
+                                isDoublePrecisionFloatingScalarOrCompositeType(ptrType->getValueType())))
                     emitOpDecorate(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
@@ -5910,7 +5911,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = ptrType->getAddressSpace();
         if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()) ||
+                isDoublePrecisionFloatingScalarOrCompositeType(ptrType->getValueType()))
             {
                 if (isInstUsedInStage(irInst, Stage::Fragment))
                     return true;
