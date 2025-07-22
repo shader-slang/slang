@@ -22625,6 +22625,11 @@ struct ConstBufferPointer<T, int alignment = 16>
         return _ptr != nullptr;
     }
 
+    __init(T* val)
+    {
+        _ptr = val;
+    }
+
     __init(uint64_t val)
     {
         _ptr = (T*)val;
