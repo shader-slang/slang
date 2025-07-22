@@ -404,7 +404,6 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                     // in `_coerceInitializerList()` and produce unrelated errors.
                     if (outExpr)
                         *outExpr = CreateErrorExpr(ctorInvokeExpr);
-                    return true;
                 }
                 return false;
             }
