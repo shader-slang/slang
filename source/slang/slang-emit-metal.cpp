@@ -874,7 +874,68 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                     m_writer->emit("}");
                     return true;
                 }
-                // For matrix * matrix, fall through to default handling or let meta.slang handle it
+                else if (leftIsArray && rightIsArray)
+                {
+                    // Matrix * Matrix: implement proper matrix multiplication
+                    // For lowered matrices (arrays of row vectors), we need to compute:
+                    // result[i][j] = sum over k of left[i][k] * right[k][j]
+                    
+                    auto leftArrayType = as<IRArrayType>(left->getDataType());
+                    auto rightArrayType = as<IRArrayType>(right->getDataType());
+                    auto leftVectorType = as<IRVectorType>(leftArrayType->getElementType());
+                    auto rightVectorType = as<IRVectorType>(rightArrayType->getElementType());
+                    
+                    auto leftRows = getIntVal(leftArrayType->getElementCount());    // M
+                    auto leftCols = getIntVal(leftVectorType->getElementCount());   // K  
+                    auto rightCols = getIntVal(rightVectorType->getElementCount()); // N
+                    
+                    auto resultVectorType = as<IRVectorType>(arrayType->getElementType());
+                    
+                    emitType(resultType);
+                    m_writer->emit("{");
+                    
+                    for (IRIntegerValue i = 0; i < leftRows; i++)
+                    {
+                        if (i != 0) m_writer->emit(", ");
+                        
+                        // Construct result row i
+                        emitType(resultVectorType);
+                        m_writer->emit("(");
+                        
+                        for (IRIntegerValue j = 0; j < rightCols; j++)
+                        {
+                            if (j != 0) m_writer->emit(", ");
+                            
+                            // Compute dot product of left row i with right column j
+                            m_writer->emit("(");
+                            for (IRIntegerValue k = 0; k < leftCols; k++)
+                            {
+                                if (k != 0) m_writer->emit(" + ");
+                                
+                                // left[i][k] * right[k][j]
+                                emitOperand(left, getInfo(EmitOp::Postfix));
+                                m_writer->emit("[");
+                                m_writer->emit(i);
+                                m_writer->emit("][");
+                                m_writer->emit(k);
+                                m_writer->emit("] * ");
+                                emitOperand(right, getInfo(EmitOp::Postfix));
+                                m_writer->emit("[");
+                                m_writer->emit(k);
+                                m_writer->emit("][");
+                                m_writer->emit(j);
+                                m_writer->emit("]");
+                            }
+                            m_writer->emit(")");
+                        }
+                        
+                        m_writer->emit(")");
+                    }
+                    
+                    m_writer->emit("}");
+                    return true;
+                }
+                // If neither case above applies, fall through to default handling
             }
             break;
         }
