@@ -2711,7 +2711,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0],
                                             &tempSink,
                                             &conversionCost);
-                if (tempSink.getErrorCount())
+                if (!isInitializerListForImplicitCtorContext() && tempSink.getErrorCount())
                 {
                     Slang::ComPtr<ISlangBlob> blob;
                     tempSink.getBlobIfNeeded(blob.writeRef());

@@ -1333,15 +1333,16 @@ enum Access : uint64_t
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, Access access = Access::ReadWrite, AddressSpace addrSpace = AddressSpace::UserPointer>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
-struct Ptr
+struct Ptr<
+    T, 
+    Access access = Access::ReadWrite, 
+    AddressSpace addrSpace = AddressSpace::UserPointer>
 {
     // A user is allowed to explicitly cast between any pointer type.
-    __generic<U, Access accessOther>
     __intrinsic_op($(kIROp_BitCast))
-    __init(Ptr<U, accessOther, addrSpace> ptr);
+    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
