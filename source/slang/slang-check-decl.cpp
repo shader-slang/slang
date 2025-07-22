@@ -5548,8 +5548,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     if (tempSink.getErrorCount() != 0)
     {
         // Check if the failure was due to return type coercion
-        bool hasReturnTypeError = false;
-        if (checkedCall && checkedCall->type)
+        if (checkedCall && checkedCall->type && outFailureDetails)
         {
             // The call resolved - check if it's a return type mismatch
             auto actualReturnType = checkedCall->type;
@@ -5560,29 +5559,21 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 {
                     if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
                     {
-                        hasReturnTypeError = true;
-
                         // Store failure details instead of emitting diagnostic immediately
-                        if (outFailureDetails)
-                        {
-                            outFailureDetails->reason =
-                                WitnessSynthesisFailureReason::MethodResultTypeMismatch;
-                            outFailureDetails->candidateMethod = memberRefExpr->declRef;
-                            outFailureDetails->actualType = actualReturnType;
-                            outFailureDetails->expectedType = resultType;
-                        }
+                        outFailureDetails->reason =
+                            WitnessSynthesisFailureReason::MethodResultTypeMismatch;
+                        outFailureDetails->candidateMethod = memberRefExpr->declRef;
+                        outFailureDetails->actualType = actualReturnType;
+                        outFailureDetails->expectedType = resultType;
                     }
                 }
             }
         }
 
-        if (!hasReturnTypeError)
-        {
-            context->innerSink.diagnose(
-                SourceLoc(),
-                Diagnostics::cannotResolveOverloadForMethodRequirement,
-                baseOverloadedExpr->name);
-        }
+        context->innerSink.diagnose(
+            SourceLoc(),
+            Diagnostics::cannotResolveOverloadForMethodRequirement,
+            baseOverloadedExpr->name);
         return false;
     }
 
