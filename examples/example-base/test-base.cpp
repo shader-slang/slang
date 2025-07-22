@@ -77,9 +77,9 @@ static bool ensureConsoleVisible()
         DWORD fileType = GetFileType(hStdOut);
         switch (fileType)
         {
-        case FILE_TYPE_CHAR:  // Console
-        case FILE_TYPE_DISK:  // File redirection
-        case FILE_TYPE_PIPE:  // Pipe redirection
+        case FILE_TYPE_CHAR: // Console
+        case FILE_TYPE_DISK: // File redirection
+        case FILE_TYPE_PIPE: // Pipe redirection
             // Output goes to console or is redirected, don't create a console
             return false;
         }
@@ -223,8 +223,8 @@ void TestBase::printUsage(const char* programName) const
 #else
     printOutput("                                Use a given rendering API (Default: vulkan)\n");
 #endif
-    printOutput(
-        " -test-mode                     Print hash values of compiled shader entry points and skip rendering\n");
+    printOutput(" -test-mode                     Print hash values of compiled shader entry points "
+                "and skip rendering\n");
     printOutput("\n");
     printOutput("Supported APIs:\n");
 #ifdef _WIN32
