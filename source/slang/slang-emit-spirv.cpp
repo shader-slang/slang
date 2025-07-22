@@ -1083,6 +1083,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return SpvLiteralBits::from32(FloatAsInt((float)fval->getValue()));
                 break;
             }
+        case kIROp_BFloat16Type:
+            {
+                // TODO:
+                break;
+            }
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
 #if SLANG_PTR_IS_64
@@ -1166,6 +1171,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 inst,
                 type,
                 SpvLiteralBits::from32(uint32_t(FloatToHalf(float(val)))));
+        }
+        else if (type->getOp() == kIROp_BFloat16Type)
+        {
+            // TODO.
+            SLANG_UNEXPECTED("missing case in SPIR-V emitFloatConstant");
         }
         else
         {
@@ -1774,6 +1784,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFloat16);
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
+        case kIROp_BFloat16Type:
+            {
+                requireBfloat16Extension();
+                return emitOpTypeFloat(
+                    inst,
+                    SpvLiteralInteger::from32(16),
+                    SpvFPEncoding::SpvFPEncodingBFloat16KHR);
+            }
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
@@ -1926,6 +1944,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 IRBuilder builder(m_irModule);
                 auto coopMatType = static_cast<IRCoopMatrixType*>(inst);
+                if (coopMatType->getElementType()->getOp() == kIROp_BFloat16Type)
+                {
+                    requireSPIRVCapability(SpvCapabilityBFloat16CooperativeMatrixKHR);
+                    requireBfloat16Extension();
+                }
+
                 return emitOpTypeCoopMat(
                     coopMatType,
                     coopMatType->getElementType(),
@@ -8605,6 +8629,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 spvEncoding = 3; // Float
                 break;
             case kIROp_BoolType:
@@ -9338,6 +9363,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ops...);
             }
         }
+    }
+
+    void requireBfloat16Extension()
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_bfloat16"));
+        requireSPIRVCapability(SpvCapabilityBFloat16TypeKHR);
     }
 
     SPIRVEmitContext(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
