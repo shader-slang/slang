@@ -5561,11 +5561,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
                     {
                         hasReturnTypeError = true;
-                        
+
                         // Store failure details instead of emitting diagnostic immediately
                         if (outFailureDetails)
                         {
-                            outFailureDetails->reason = WitnessSynthesisFailureReason::MethodResultTypeMismatch;
+                            outFailureDetails->reason =
+                                WitnessSynthesisFailureReason::MethodResultTypeMismatch;
                             outFailureDetails->candidateMethod = memberRefExpr->declRef;
                             outFailureDetails->requiredMethod = requiredMemberDeclRef;
                             outFailureDetails->actualType = actualReturnType;
@@ -7581,35 +7582,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             failureDetails.candidateMethod,
             failureDetails.actualType,
             failureDetails.expectedType);
-            
+
         getSink()->diagnose(
             failureDetails.requiredMethod,
             Diagnostics::seeDeclarationOfInterfaceRequirement,
             failureDetails.requiredMethod);
-    }
-    else if (failureDetails.reason == WitnessSynthesisFailureReason::MethodParameterMismatch)
-    {
-        // Emit specific parameter mismatch diagnostic
-        // TODO: This could be enhanced with more detailed parameter mismatch information
-        if (!lookupResult.isOverloaded() && lookupResult.isValid())
-        {
-            getSink()->diagnose(
-                lookupResult.item.declRef,
-                Diagnostics::memberDoesNotMatchRequirementSignature,
-                lookupResult.item.declRef);
-        }
-        else
-        {
-            getSink()->diagnose(
-                inheritanceDecl,
-                Diagnostics::typeDoesntImplementInterfaceRequirement,
-                subType,
-                requiredMemberDeclRef);
-        }
-        getSink()->diagnose(
-            requiredMemberDeclRef,
-            Diagnostics::seeDeclarationOfInterfaceRequirement,
-            requiredMemberDeclRef);
     }
     else
     {

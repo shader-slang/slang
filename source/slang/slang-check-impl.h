@@ -1868,19 +1868,18 @@ public:
     /// Reasons why witness synthesis can fail
     enum class WitnessSynthesisFailureReason
     {
-        General,                      // Generic failure (default)
-        MethodResultTypeMismatch,     // Method return type doesn't match interface requirement
-        MethodParameterMismatch       // Method parameter types don't match interface requirement
+        General,                 // Generic failure (default)
+        MethodResultTypeMismatch // Method return type doesn't match interface requirement
     };
 
     /// Details about method witness synthesis failure
     struct MethodWitnessSynthesisFailureDetails
     {
         WitnessSynthesisFailureReason reason = WitnessSynthesisFailureReason::General;
-        DeclRef<Decl> candidateMethod;      // The method that was considered but failed
-        DeclRef<Decl> requiredMethod;       // The interface requirement method
-        Type* actualType = nullptr;         // For type mismatches: the actual type found
-        Type* expectedType = nullptr;       // For type mismatches: the expected type
+        DeclRef<Decl> candidateMethod; // The method that was considered but failed
+        DeclRef<Decl> requiredMethod;  // The interface requirement method
+        Type* actualType = nullptr;    // For type mismatches: the actual type found
+        Type* expectedType = nullptr;  // For type mismatches: the expected type
     };
 
     bool doesSignatureMatchRequirement(
