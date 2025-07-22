@@ -404,6 +404,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                     // in `_coerceInitializerList()` and produce unrelated errors.
                     if (outExpr)
                         *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                    return true;
                 }
                 return false;
             }
@@ -965,13 +966,13 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // We will fall back to the legacy logic of initialize list.
+    Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
             toType,
-            outToExpr,
+            &outInitListExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
-
     if (argIndex != argCount)
     {
         if (outToExpr)
@@ -983,6 +984,8 @@ bool SemanticsVisitor::_coerceInitializerList(
                 argCount);
         }
     }
+    if (outToExpr)
+        *outToExpr = outInitListExpr;
 
     return true;
 }

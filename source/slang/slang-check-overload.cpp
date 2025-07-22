@@ -2699,9 +2699,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // equivalent in (almost) all cases.
     // If callee is a type, and we are calling with one argument, then treat it as a
     // type coercion.
+    //
+    // Exception: if the argument is an initializer list, such as
+    // Foo({1,2,3}), we should not coerce {1,2,3} to Foo, but rather
+    // treat it as a ctor call with {1,2,3} as the first argument.
+    //
     bool typeOverloadChecked = false;
 
-    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr))
+    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
+        !as<InitializerListExpr>(expr->arguments[0]))
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
