@@ -190,10 +190,24 @@ typedef size_t NonUniformResourceIndex;
 template<typename T, int ROWS, int COLS>
 struct Matrix;
 
-typedef int1 bool1;
-typedef int2 bool2;
-typedef int3 bool3;
-typedef int4 bool4;
+// Boolean vector types should have the same memory layout as bool arrays
+// Using structs with named fields
+struct bool1
+{
+    bool x;
+};
+struct bool2
+{
+    bool x, y;
+};
+struct bool3
+{
+    bool x, y, z;
+};
+struct bool4
+{
+    bool x, y, z, w;
+};
 
 #if SLANG_CUDA_RTC
 
@@ -291,6 +305,7 @@ SLANG_VECTOR_GET_ELEMENT(longlong)
 SLANG_VECTOR_GET_ELEMENT(ulonglong)
 SLANG_VECTOR_GET_ELEMENT(float)
 SLANG_VECTOR_GET_ELEMENT(double)
+SLANG_VECTOR_GET_ELEMENT(bool)
 
 #define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                      \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1 * x, int index) \
@@ -319,6 +334,7 @@ SLANG_VECTOR_GET_ELEMENT_PTR(longlong)
 SLANG_VECTOR_GET_ELEMENT_PTR(ulonglong)
 SLANG_VECTOR_GET_ELEMENT_PTR(float)
 SLANG_VECTOR_GET_ELEMENT_PTR(double)
+SLANG_VECTOR_GET_ELEMENT_PTR(bool)
 
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_VECTOR_GET_ELEMENT(__half)
@@ -334,15 +350,14 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
                 _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
         return result;                                                                        \
     }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
-    {                                                                                \
-        bool##n result;                                                              \
-        for (int i = 0; i < n; i++)                                                  \
-            *_slang_vector_get_element_ptr(&result, i) =                             \
-                (int)(_slang_vector_get_element(thisVal, i)                          \
-                          op _slang_vector_get_element(other, i));                   \
-        return result;                                                               \
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
+    {                                                                                           \
+        bool##n result;                                                                         \
+        for (int i = 0; i < n; i++)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
+        return result;                                                                          \
     }
 #define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
@@ -467,31 +482,57 @@ SLANG_MAKE_VECTOR(__half)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
 {
-    return bool1{x};
+    bool1 result;
+    result.x = x;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x, bool y)
 {
-    return bool2{x, y};
+    bool2 result;
+    result.x = x;
+    result.y = y;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x, bool y, bool z)
 {
-    return bool3{x, y, z};
+    bool3 result;
+    result.x = x;
+    result.y = y;
+    result.z = z;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x, bool y, bool z, bool w)
 {
-    return bool4{x, y, z, w};
+    bool4 result;
+    result.x = x;
+    result.y = y;
+    result.z = z;
+    result.w = w;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x)
 {
-    return bool2{x, x};
+    bool2 result;
+    result.x = x;
+    result.y = x;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x)
 {
-    return bool3{x, x, x};
+    bool3 result;
+    result.x = x;
+    result.y = x;
+    result.z = x;
+    return result;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x)
 {
-    return bool4{x, x, x, x};
+    bool4 result;
+    result.x = x;
+    result.y = x;
+    result.z = x;
+    result.w = x;
+    return result;
 }
 
 #if SLANG_CUDA_RTC
@@ -603,6 +644,7 @@ GET_VECTOR_TYPE_IMPL_N(longlong)
 GET_VECTOR_TYPE_IMPL_N(ulonglong)
 GET_VECTOR_TYPE_IMPL_N(float)
 GET_VECTOR_TYPE_IMPL_N(double)
+GET_VECTOR_TYPE_IMPL_N(bool)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
