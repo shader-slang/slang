@@ -6745,7 +6745,7 @@ bool any(vector<T, N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch
@@ -13779,14 +13779,14 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "transpose";
-    // GLSL, WGSL, and SPIR-V don't support integer matrices when lowered, so transpose it manually
+    // GLSL, WGSL, SPIR-V, and Metal don't support integer matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -13797,7 +13797,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -13808,7 +13808,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     case spirv: return spirv_asm {
         OpTranspose $$matrix<T, M, N> result $x
     };
-    // GLSL and WGSL don't support bool matrices when lowered, so transpose it manually
+    // GLSL, WGSL, and Metal don't support bool matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
