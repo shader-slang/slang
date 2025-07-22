@@ -5568,7 +5568,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                             outFailureDetails->reason =
                                 WitnessSynthesisFailureReason::MethodResultTypeMismatch;
                             outFailureDetails->candidateMethod = memberRefExpr->declRef;
-                            outFailureDetails->requiredMethod = requiredMemberDeclRef;
                             outFailureDetails->actualType = actualReturnType;
                             outFailureDetails->expectedType = resultType;
                         }
@@ -7584,9 +7583,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             failureDetails.expectedType);
 
         getSink()->diagnose(
-            failureDetails.requiredMethod,
+            requiredMemberDeclRef,
             Diagnostics::seeDeclarationOfInterfaceRequirement,
-            failureDetails.requiredMethod);
+            requiredMemberDeclRef);
     }
     else
     {

@@ -1877,7 +1877,6 @@ public:
     {
         WitnessSynthesisFailureReason reason = WitnessSynthesisFailureReason::General;
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
-        DeclRef<Decl> requiredMethod;  // The interface requirement method
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
     };
