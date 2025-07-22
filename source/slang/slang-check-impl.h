@@ -1459,7 +1459,18 @@ public:
 
     Type* ExtractGenericArgType(Expr* exp);
 
-    IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink);
+    enum class ConstantFoldingKind
+    {
+        CompileTime,
+        LinkTime,
+        SpecializationConstant
+    };
+
+    IntVal* ExtractGenericArgInteger(
+        Expr* exp,
+        Type* genericParamType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
     Val* ExtractGenericArgVal(Expr* exp);
@@ -2199,12 +2210,6 @@ public:
 
     Expr* checkPredicateExpr(Expr* expr);
 
-    enum class ConstantFoldingKind
-    {
-        CompileTime,
-        LinkTime,
-        SpecializationConstant
-    };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
         IntVal** outIntVal,

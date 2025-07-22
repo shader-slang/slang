@@ -145,6 +145,24 @@ jobs:
         if: ${{ matrix.os == 'linux' && matrix.config == 'debug' }}
         run: ./extras/check-ir-stable-names-gh-actions.sh
 
+      - name: Check Version Constants
+        id: check-ir-versions
+        if: ${{ matrix.os == 'linux' && matrix.config == 'debug' && github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: ./extras/check-inst-version-changes.sh
+
+      - name: Upload IR version check results
+        if: ${{ steps.check-versions.outputs.artifact_created == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ir-version-check-results
+          path: ir-version-check-artifact/
+          retention-days: 1
+
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |

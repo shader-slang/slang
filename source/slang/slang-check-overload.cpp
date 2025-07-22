@@ -270,11 +270,30 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     return true;
 }
 
+static bool isArrayDecl(Decl* decl)
+{
+    if (auto magicMod = decl->findModifier<MagicTypeModifier>())
+    {
+        if (magicMod->magicNodeType.getTag() == ASTNodeType::ArrayExpressionType)
+            return true;
+    }
+    return false;
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
 {
     auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
+
+    // All generic arguments, except array sizes, need to be at least a link-time constant.
+    // Exception: array sizes can also be a specialization constant.
+    //
+    ConstantFoldingKind argFoldingKind = ConstantFoldingKind::LinkTime;
+    if (isArrayDecl(genericDeclRef.getDecl()))
+    {
+        argFoldingKind = ConstantFoldingKind::SpecializationConstant;
+    }
 
     // Only allow constructing a PartialGenericAppExpr when referencing a callable decl.
     // Other types of generic decls must be fully specified.
@@ -497,6 +516,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 val = ExtractGenericArgInteger(
                     arg,
                     getType(m_astBuilder, valParamRef),
+                    argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
             }
 

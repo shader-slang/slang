@@ -225,7 +225,7 @@ struct HelloWorld : public WindowedAppBase
     {
         // Create a window for our application to render into.
         //
-        SLANG_RETURN_ON_FAIL(initializeBase("hello-world", 1024, 768));
+        SLANG_RETURN_ON_FAIL(initializeBase("triangle", 1024, 768, getDeviceType()));
 
         // We will create objects needed to configure the "input assembler"
         // (IA) stage of the D3D pipeline.

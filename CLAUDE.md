@@ -139,6 +139,22 @@ When checking the IR dump, look for type consistency or logical errors in the IR
 pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
 type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
 
+#### InstTrace
+
+Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
+early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
+of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
+keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
+in the IR passes.
+
+If you encounter a bug related to a problematic instruction, it is often useful to trace the location where the instruction is created.
+You can use the `extras/insttrace.py` script to do this. For example, during debugging you find that an instruction with `_debugUID=1234`
+is wrong, you can run the following command to trace the callstack where the instruction is created:
+
+```bash
+# From workspace root:
+python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang -target spirv
+```
 
 #### slangc with `-target spirv-asm`
 slangc with `-target spirv-asm` is the most common way to see how the given slang shader is compiled into spirv code.
