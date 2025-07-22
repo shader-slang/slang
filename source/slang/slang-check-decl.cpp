@@ -5555,7 +5555,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             if (!actualReturnType->equals(resultType))
             {
                 hasReturnTypeError = true;
-                
+
                 // Find the actual implementation method that was called
                 if (auto invokeExpr = as<InvokeExpr>(checkedCall))
                 {
@@ -5567,7 +5567,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                             memberRefExpr->declRef,
                             actualReturnType,
                             resultType);
-                        
+
                         context->innerSink.diagnose(
                             requiredMemberDeclRef,
                             Diagnostics::seeDeclarationOfInterfaceRequirement,
@@ -5576,7 +5576,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 }
             }
         }
-        
+
         if (!hasReturnTypeError)
         {
             context->innerSink.diagnose(
