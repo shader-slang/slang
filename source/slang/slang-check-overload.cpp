@@ -2967,13 +2967,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
-                if (auto invokeExpr = as<InvokeExpr>(outExpr))
-                {
-                    invokeExpr->originalFunctionExpr = typeExpr;
-                    return CreateErrorExpr(invokeExpr);
-                }
-              
-                // throw "saved up" errors
+                // Drain our error sink of "saved errors"
                 if (collectedErrorsSink.getErrorCount())
                 {
                     Slang::ComPtr<ISlangBlob> blob;
@@ -2982,7 +2976,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                         Severity::Error,
                         static_cast<char const*>(blob->getBufferPointer()));
                 }
-              
+
+                if (auto invokeExpr = as<InvokeExpr>(outExpr))
+                {
+                    invokeExpr->originalFunctionExpr = typeExpr;
+                    return CreateErrorExpr(invokeExpr);
+                }
                 return CreateErrorExpr(typeExpr);
             }
             return outExpr;
