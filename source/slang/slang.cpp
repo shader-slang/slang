@@ -3039,7 +3039,34 @@ Expr* ComponentType::findDeclFromStringInType(
     }
 
     auto checkedTerm = visitor.CheckTerm(expr);
-    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    // Check if checkedTerm is overloaded functions and avoid resolving if so
+    // to preserve all function overloads with different signatures
+    Expr* resolvedTerm = checkedTerm;
+    if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
+    {
+        // Check if all candidates are function references
+        bool allAreFunctions = true;
+        for (auto item : overloadedExpr->lookupResult2.items)
+        {
+            if (!as<FunctionDeclBase>(item.declRef.getDecl()))
+            {
+                allAreFunctions = false;
+                break;
+            }
+        }
+
+        // If not all are functions, resolve the overload as usual
+        if (!allAreFunctions)
+        {
+            resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+        }
+    }
+    else
+    {
+        // Not overloaded, resolve as usual
+        resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+    }
 
 
     if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))
