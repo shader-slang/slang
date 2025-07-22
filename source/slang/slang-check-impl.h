@@ -1863,9 +1863,6 @@ public:
         DiagnosticSink innerSink;
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
-
-        /// Flag to track whether a specific return type mismatch error was found during synthesis
-        bool hasSpecificReturnTypeError = false;
     };
 
     bool doesSignatureMatchRequirement(
@@ -1935,7 +1932,8 @@ public:
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<FuncDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        bool* outSpecificDiagnosticEmitted = nullptr);
 
     bool trySynthesizeConstructorRequirementWitness(
         ConformanceCheckingContext* context,
@@ -1992,7 +1990,8 @@ public:
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        bool* outSpecificDiagnosticEmitted = nullptr);
 
 
     enum SynthesisPattern

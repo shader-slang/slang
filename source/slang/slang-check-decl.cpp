@@ -5326,7 +5326,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
     DeclRef<FuncDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    bool* outSpecificDiagnosticEmitted)
 {
     // The situation here is that the context of an inheritance
     // declaration didn't provide an exact match for a required
@@ -5560,9 +5561,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
                     {
                         hasReturnTypeError = true;
-                        context->hasSpecificReturnTypeError = true;
-                        
-                        // Emit the specific diagnostic directly to the main sink for proper formatting
+                        if (outSpecificDiagnosticEmitted)
+                            *outSpecificDiagnosticEmitted = true;
+
+                        // Emit the specific diagnostic directly to the main sink for proper
+                        // formatting
                         auto sink = getSink();
                         sink->diagnose(
                             memberRefExpr->declRef,
@@ -6706,7 +6709,8 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
     DeclRef<Decl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    bool* outSpecificDiagnosticEmitted)
 {
     SLANG_UNUSED(lookupResult);
     SLANG_UNUSED(requiredMemberDeclRef);
@@ -6719,7 +6723,8 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                 context,
                 lookupResult,
                 requiredFuncDeclRef,
-                witnessTable))
+                witnessTable,
+                outSpecificDiagnosticEmitted))
             return true;
 
         if (auto builtinAttr =
@@ -7546,8 +7551,13 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // wrappers that redirects the call into the inner element.
     //
     context->innerSink.reset();
-    context->hasSpecificReturnTypeError = false;
-    if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
+    bool specificDiagnosticEmitted = false;
+    if (trySynthesizeRequirementWitness(
+            context,
+            lookupResult,
+            requiredMemberDeclRef,
+            witnessTable,
+            &specificDiagnosticEmitted))
     {
         return true;
     }
@@ -7568,7 +7578,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // and if nothing is found we print the candidates that made it
     // furthest in checking.
     //
-    if (!context->hasSpecificReturnTypeError)
+    if (!specificDiagnosticEmitted)
     {
         if (!lookupResult.isOverloaded() && lookupResult.isValid())
         {
@@ -7587,7 +7597,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         }
         if (context->innerSink.outputBuffer.getLength())
         {
-            getSink()->diagnoseRaw(Severity::Note, context->innerSink.outputBuffer.getUnownedSlice());
+            getSink()->diagnoseRaw(
+                Severity::Note,
+                context->innerSink.outputBuffer.getUnownedSlice());
         }
         getSink()->diagnose(
             requiredMemberDeclRef,
