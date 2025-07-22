@@ -95,6 +95,7 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-short-string.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -441,6 +442,9 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_ShortStringType:
+        result.shortString = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -740,6 +744,17 @@ Result linkAndOptimizeIR(
     RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    ShortStringsOptions shortStrOptions = {};
+    shortStrOptions.targetSupportsStringLiterals =
+        (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+         target == CodeGenTarget::CSource);
+    shortStrOptions.targetSupports8BitsIntegrals =
+        (target != CodeGenTarget::WGSL && target != CodeGenTarget::HLSL);
+    if (requiredLoweringPassSet.shortString)
+    {
+        lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
+    }
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
     // opt out of debug info.
