@@ -4976,7 +4976,8 @@ static void CompleteDecl(
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
                     {
-                        auto newVisibilityModifier = as<VisibilityModifier>(parser->astBuilder->createByNodeType(visibilityModifier->astNodeType));
+                        auto newVisibilityModifier = as<VisibilityModifier>(
+                            parser->astBuilder->createByNodeType(visibilityModifier->astNodeType));
                         addModifier(staticConstDecl, newVisibilityModifier);
                     }
 
