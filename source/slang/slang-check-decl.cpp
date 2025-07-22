@@ -5554,21 +5554,24 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             auto actualReturnType = checkedCall->type;
             if (!actualReturnType->equals(resultType))
             {
-                hasReturnTypeError = true;
-
                 // Find the actual implementation method that was called
                 if (auto invokeExpr = as<InvokeExpr>(checkedCall))
                 {
                     if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
                     {
-                        context->innerSink.diagnose(
+                        hasReturnTypeError = true;
+                        context->hasSpecificReturnTypeError = true;
+                        
+                        // Emit the specific diagnostic directly to the main sink for proper formatting
+                        auto sink = getSink();
+                        sink->diagnose(
                             memberRefExpr->declRef,
                             Diagnostics::memberReturnTypeMismatch,
                             memberRefExpr->declRef,
                             actualReturnType,
                             resultType);
 
-                        context->innerSink.diagnose(
+                        sink->diagnose(
                             requiredMemberDeclRef,
                             Diagnostics::seeDeclarationOfInterfaceRequirement,
                             requiredMemberDeclRef);
@@ -7543,6 +7546,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // wrappers that redirects the call into the inner element.
     //
     context->innerSink.reset();
+    context->hasSpecificReturnTypeError = false;
     if (trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable))
     {
         return true;
@@ -7564,29 +7568,32 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // and if nothing is found we print the candidates that made it
     // furthest in checking.
     //
-    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+    if (!context->hasSpecificReturnTypeError)
     {
+        if (!lookupResult.isOverloaded() && lookupResult.isValid())
+        {
+            getSink()->diagnose(
+                lookupResult.item.declRef,
+                Diagnostics::memberDoesNotMatchRequirementSignature,
+                lookupResult.item.declRef);
+        }
+        else
+        {
+            getSink()->diagnose(
+                inheritanceDecl,
+                Diagnostics::typeDoesntImplementInterfaceRequirement,
+                subType,
+                requiredMemberDeclRef);
+        }
+        if (context->innerSink.outputBuffer.getLength())
+        {
+            getSink()->diagnoseRaw(Severity::Note, context->innerSink.outputBuffer.getUnownedSlice());
+        }
         getSink()->diagnose(
-            lookupResult.item.declRef,
-            Diagnostics::memberDoesNotMatchRequirementSignature,
-            lookupResult.item.declRef);
-    }
-    else
-    {
-        getSink()->diagnose(
-            inheritanceDecl,
-            Diagnostics::typeDoesntImplementInterfaceRequirement,
-            subType,
+            requiredMemberDeclRef,
+            Diagnostics::seeDeclarationOfInterfaceRequirement,
             requiredMemberDeclRef);
     }
-    if (context->innerSink.outputBuffer.getLength())
-    {
-        getSink()->diagnoseRaw(Severity::Note, context->innerSink.outputBuffer.getUnownedSlice());
-    }
-    getSink()->diagnose(
-        requiredMemberDeclRef,
-        Diagnostics::seeDeclarationOfInterfaceRequirement,
-        requiredMemberDeclRef);
     return false;
 }
 

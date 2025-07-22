@@ -1863,6 +1863,9 @@ public:
         DiagnosticSink innerSink;
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
+
+        /// Flag to track whether a specific return type mismatch error was found during synthesis
+        bool hasSpecificReturnTypeError = false;
     };
 
     bool doesSignatureMatchRequirement(
