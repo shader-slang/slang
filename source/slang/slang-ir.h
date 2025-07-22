@@ -1691,7 +1691,7 @@ struct IRPtrTypeBase : IRType
     {
         return getOperandCount() > 2 && getAddressSpace() != AddressSpace::Generic;
     }
-    
+
     AddressSpace getAddressSpace()
     {
         return getOperandCount() > 2

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
 
 RWStructuredBuffer<float> mutable_float_buffer;
 RWStructuredBuffer<uint> mutable_uint_buffer;
@@ -14,8 +14,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 
+    // TODO: taking a pointer from `StructuredBuffer` should be Access::Read
     // Constant pointers arent a thing in slang
-    // CHECK: error 30079:
+    // CHECK: error 30047:
     float* ptr = &constant_float_buffer[threadId.x];
 
 
