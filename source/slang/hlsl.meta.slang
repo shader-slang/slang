@@ -22610,7 +22610,7 @@ struct ConstBufferPointer<T, int alignment = 16>
     [ForceInline]
     static ConstBufferPointer<T> fromUInt(uint64_t val)
     {
-        return {(T*)val};
+        return ConstBufferPointer<T>(val);
     }
 
     [ForceInline]
@@ -22623,6 +22623,11 @@ struct ConstBufferPointer<T, int alignment = 16>
     bool isValid()
     {
         return _ptr != nullptr;
+    }
+
+    __init(uint64_t val)
+    {
+        _ptr = (T*)val;
     }
 }
 

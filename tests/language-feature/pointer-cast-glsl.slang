@@ -3,7 +3,7 @@
 // Test that pointer casts in GLSL generate constructor-style casts instead of C-style casts
 // This addresses issue https://github.com/shader-slang/slang/issues/7838
 
-//GLSL: BufferPointer__S1_2(address_0)
+// GLSL: BufferPointer{{[a-zA-Z0-9_]+}}({{[a-zA-Z0-9_]+}}_0)
 
 [shader("vertex")]
 float4 main(uint vertexID : SV_VertexID, uint64_t address) : SV_Position
