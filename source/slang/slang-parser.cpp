@@ -4976,7 +4976,18 @@ static void CompleteDecl(
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
                     {
-                        addModifier(staticConstDecl, visibilityModifier);
+                        if (as<PublicModifier>(visibilityModifier))
+                        {
+                            addModifier(staticConstDecl, parser->astBuilder->create<PublicModifier>());
+                        }
+                        else if (as<PrivateModifier>(visibilityModifier))
+                        {
+                            addModifier(staticConstDecl, parser->astBuilder->create<PrivateModifier>());
+                        }
+                        else if (as<InternalModifier>(visibilityModifier))
+                        {
+                            addModifier(staticConstDecl, parser->astBuilder->create<InternalModifier>());
+                        }
                     }
 
                     auto valueExpr = parser->astBuilder->create<VarExpr>();
