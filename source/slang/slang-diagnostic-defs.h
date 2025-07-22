@@ -138,6 +138,12 @@ DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
+DIAGNOSTIC(
+    18,
+    Warning,
+    separateDebugInfoUnsupportedForTarget,
+    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
+    "SPIR-V binary targets.")
 DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(
