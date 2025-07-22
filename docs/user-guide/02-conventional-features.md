@@ -208,7 +208,7 @@ void test()
 }
 ```
 
-### Default values 
+### Default Values for Struct Members
 
 Alternatively, you can specify default values of members in the struct like so: 
 
