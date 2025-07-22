@@ -5327,7 +5327,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     LookupResult const& lookupResult,
     DeclRef<FuncDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable,
-    bool* outSpecificDiagnosticEmitted)
+    MethodWitnessSynthesisFailureDetails* outFailureDetails)
 {
     // The situation here is that the context of an inheritance
     // declaration didn't provide an exact match for a required
@@ -5561,23 +5561,16 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
                     {
                         hasReturnTypeError = true;
-                        if (outSpecificDiagnosticEmitted)
-                            *outSpecificDiagnosticEmitted = true;
-
-                        // Emit the specific diagnostic directly to the main sink for proper
-                        // formatting
-                        auto sink = getSink();
-                        sink->diagnose(
-                            memberRefExpr->declRef,
-                            Diagnostics::memberReturnTypeMismatch,
-                            memberRefExpr->declRef,
-                            actualReturnType,
-                            resultType);
-
-                        sink->diagnose(
-                            requiredMemberDeclRef,
-                            Diagnostics::seeDeclarationOfInterfaceRequirement,
-                            requiredMemberDeclRef);
+                        
+                        // Store failure details instead of emitting diagnostic immediately
+                        if (outFailureDetails)
+                        {
+                            outFailureDetails->reason = WitnessSynthesisFailureReason::MethodResultTypeMismatch;
+                            outFailureDetails->candidateMethod = memberRefExpr->declRef;
+                            outFailureDetails->requiredMethod = requiredMemberDeclRef;
+                            outFailureDetails->actualType = actualReturnType;
+                            outFailureDetails->expectedType = resultType;
+                        }
                     }
                 }
             }
@@ -6710,7 +6703,7 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
     LookupResult const& lookupResult,
     DeclRef<Decl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable,
-    bool* outSpecificDiagnosticEmitted)
+    MethodWitnessSynthesisFailureDetails* outFailureDetails)
 {
     SLANG_UNUSED(lookupResult);
     SLANG_UNUSED(requiredMemberDeclRef);
@@ -6724,7 +6717,7 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                 lookupResult,
                 requiredFuncDeclRef,
                 witnessTable,
-                outSpecificDiagnosticEmitted))
+                outFailureDetails))
             return true;
 
         if (auto builtinAttr =
@@ -7551,13 +7544,13 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // wrappers that redirects the call into the inner element.
     //
     context->innerSink.reset();
-    bool specificDiagnosticEmitted = false;
+    MethodWitnessSynthesisFailureDetails failureDetails;
     if (trySynthesizeRequirementWitness(
             context,
             lookupResult,
             requiredMemberDeclRef,
             witnessTable,
-            &specificDiagnosticEmitted))
+            &failureDetails))
     {
         return true;
     }
@@ -7578,8 +7571,49 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // and if nothing is found we print the candidates that made it
     // furthest in checking.
     //
-    if (!specificDiagnosticEmitted)
+    // Based on the failure reason, emit specific diagnostics
+    if (failureDetails.reason == WitnessSynthesisFailureReason::MethodResultTypeMismatch)
     {
+        // Emit specific return type mismatch diagnostic
+        getSink()->diagnose(
+            failureDetails.candidateMethod,
+            Diagnostics::memberReturnTypeMismatch,
+            failureDetails.candidateMethod,
+            failureDetails.actualType,
+            failureDetails.expectedType);
+            
+        getSink()->diagnose(
+            failureDetails.requiredMethod,
+            Diagnostics::seeDeclarationOfInterfaceRequirement,
+            failureDetails.requiredMethod);
+    }
+    else if (failureDetails.reason == WitnessSynthesisFailureReason::MethodParameterMismatch)
+    {
+        // Emit specific parameter mismatch diagnostic
+        // TODO: This could be enhanced with more detailed parameter mismatch information
+        if (!lookupResult.isOverloaded() && lookupResult.isValid())
+        {
+            getSink()->diagnose(
+                lookupResult.item.declRef,
+                Diagnostics::memberDoesNotMatchRequirementSignature,
+                lookupResult.item.declRef);
+        }
+        else
+        {
+            getSink()->diagnose(
+                inheritanceDecl,
+                Diagnostics::typeDoesntImplementInterfaceRequirement,
+                subType,
+                requiredMemberDeclRef);
+        }
+        getSink()->diagnose(
+            requiredMemberDeclRef,
+            Diagnostics::seeDeclarationOfInterfaceRequirement,
+            requiredMemberDeclRef);
+    }
+    else
+    {
+        // General failure - use existing logic
         if (!lookupResult.isOverloaded() && lookupResult.isValid())
         {
             getSink()->diagnose(

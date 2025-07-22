@@ -1865,6 +1865,24 @@ public:
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
 
+    /// Reasons why witness synthesis can fail
+    enum class WitnessSynthesisFailureReason
+    {
+        General,                      // Generic failure (default)
+        MethodResultTypeMismatch,     // Method return type doesn't match interface requirement
+        MethodParameterMismatch       // Method parameter types don't match interface requirement
+    };
+
+    /// Details about method witness synthesis failure
+    struct MethodWitnessSynthesisFailureDetails
+    {
+        WitnessSynthesisFailureReason reason = WitnessSynthesisFailureReason::General;
+        DeclRef<Decl> candidateMethod;      // The method that was considered but failed
+        DeclRef<Decl> requiredMethod;       // The interface requirement method
+        Type* actualType = nullptr;         // For type mismatches: the actual type found
+        Type* expectedType = nullptr;       // For type mismatches: the expected type
+    };
+
     bool doesSignatureMatchRequirement(
         DeclRef<CallableDecl> satisfyingMemberDeclRef,
         DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -1927,13 +1945,14 @@ public:
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<FuncDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable,
-        bool* outSpecificDiagnosticEmitted = nullptr);
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     bool trySynthesizeConstructorRequirementWitness(
         ConformanceCheckingContext* context,
@@ -1985,14 +2004,14 @@ public:
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized declaration in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<Decl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable,
-        bool* outSpecificDiagnosticEmitted = nullptr);
-
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     enum SynthesisPattern
     {
