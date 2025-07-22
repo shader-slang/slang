@@ -70,16 +70,20 @@ static bool ensureConsoleVisible()
         return false; // No new window created
     }
 
-    // Check if stdout is being redirected (pipe, file, etc.)
+    // Check if stdout is connected to a console or redirected
     HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hStdOut != INVALID_HANDLE_VALUE)
     {
         DWORD fileType = GetFileType(hStdOut);
-        if (fileType != FILE_TYPE_UNKNOWN)
+        switch (fileType)
         {
-            // Output is being redirected, don't create a console
+        case FILE_TYPE_CHAR:  // Console
+        case FILE_TYPE_DISK:  // File redirection
+        case FILE_TYPE_PIPE:  // Pipe redirection
+            // Output goes to console or is redirected, don't create a console
             return false;
         }
+        // FILE_TYPE_UNKNOWN or other cases: proceed to create console
     }
 
     // No console exists and output isn't redirected, so allocate a new one
