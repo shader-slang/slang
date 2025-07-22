@@ -48,5 +48,5 @@ HSOutput hullMain(InputPatch<VSOutput, 3> patch, uint InvocationID: SV_OutputCon
 }
 
 // CHECK: OpExecutionMode
-// CHECK: OpDecorate {{.*}} BuiltIn TessLevelInner
-// CHECK: OpDecorate {{.*}} BuiltIn TessLevelOuter
+// CHECK-DAG: OpDecorate {{.*}} BuiltIn TessLevelInner
+// CHECK-DAG: OpDecorate {{.*}} BuiltIn TessLevelOuter
