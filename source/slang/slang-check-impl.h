@@ -985,18 +985,6 @@ public:
         return result;
     }
 
-    SemanticsContext withInitializerListForImplicitCtor(InitializerListExpr* initializerListExpr)
-    {
-        SemanticsContext result(*this);
-        result.m_parentInitializerListForImplicitCtor = initializerListExpr;
-        return result;
-    }
-
-    bool isInitializerListForImplicitCtorContext()
-    {
-        return m_parentInitializerListForImplicitCtor;
-    }
-
     FunctionDeclBase* getParentFuncOfVisitor() { return m_parentFunc; }
     void setParentFuncOfVisitor(FunctionDeclBase* funcDecl) { m_parentFunc = funcDecl; }
 
@@ -1186,9 +1174,6 @@ protected:
 
     /// The parent function (if any) that surrounds the statement being checked.
     FunctionDeclBase* m_parentFunc = nullptr;
-
-    /// The parent context initializer list
-    InitializerListExpr* m_parentInitializerListForImplicitCtor;
 
     DifferentiableAttribute* m_parentDifferentiableAttr = nullptr;
 

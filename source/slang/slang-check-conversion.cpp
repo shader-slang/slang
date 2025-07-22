@@ -383,7 +383,6 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 
             DiagnosticSink tempSink(getSourceManager(), nullptr);
             SemanticsVisitor subVisitor(withSink(&tempSink));
-            subVisitor = subVisitor.withInitializerListForImplicitCtor(fromInitializerListExpr);
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
             if (tempSink.getErrorCount())

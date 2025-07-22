@@ -2713,6 +2713,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // type coercion.
     bool typeOverloadChecked = false;
 
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
+
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr))
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
@@ -2720,24 +2722,20 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
             {
                 Expr* resultExpr = nullptr;
-                DiagnosticSink tempSink(getSourceManager(), nullptr);
                 ConversionCost conversionCost = kConversionCost_None;
-                auto coerceResult = SemanticsVisitor(withSink(&tempSink))
+                auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
                                             typeType->getType(),
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            &tempSink,
+                                            &collectedErrorsSink,
                                             &conversionCost);
-                if (!isInitializerListForImplicitCtorContext() && tempSink.getErrorCount())
+                if (collectedErrorsSink.getErrorCount())
                 {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    tempSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
+                    // failed, do not consider the result to have been "coerced"
+                    coerceResult = false;
                 }
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
@@ -2951,7 +2949,21 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         initListExpr->type = m_astBuilder->getInitializerListType();
         Expr* outExpr = nullptr;
         if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
+        {
+            if (IsErrorExpr(outExpr))
+            {
+                // throw "saved up" errors
+                if (collectedErrorsSink.getErrorCount())
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+            }
             return outExpr;
+        }
     }
 
     // Nothing at all was found that we could even consider invoking.
