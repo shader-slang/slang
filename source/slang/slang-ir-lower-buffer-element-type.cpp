@@ -719,7 +719,8 @@ struct LoweredElementTypeContext
                 builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
                 auto refLoweredType = builder.getRefType(
                     loweredType,
-                    AccessQualifier::ReadWrite, AddressSpace::Generic);
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
                 builder.emitBlock();
@@ -758,7 +759,8 @@ struct LoweredElementTypeContext
 
                 auto outLoweredType = builder.getRefType(
                     loweredType,
-                    AccessQualifier::ReadWrite, AddressSpace::Generic);
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(
                     builder.getFuncType(2, paramTypes, builder.getVoidType()));

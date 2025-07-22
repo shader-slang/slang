@@ -2069,7 +2069,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
-        
+
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
             accessQualifier = getSimpleVal(context, lowerVal(context, astAccessQualifier));
@@ -2085,9 +2085,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 getBuilder()->getUInt64Type(),
                 (IRIntegerValue)AddressSpace::Generic);
         }
-        
-        return getBuilder()
-            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
+
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3475,10 +3474,7 @@ void _lowerFuncDeclBaseTypeInfo(
             break;
         case kParameterDirection_Ref:
             irParamType =
-                builder->getRefType(
-                    irParamType,
-                    AccessQualifier::ReadWrite,
-                    AddressSpace::Generic);
+                builder->getRefType(irParamType, AccessQualifier::ReadWrite, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(
