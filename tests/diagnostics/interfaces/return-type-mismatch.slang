@@ -1,6 +1,6 @@
 // return-type-mismatch.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 enum LobeTypes : uint32_t { None = 0, Diffuse = 1 }
 
@@ -9,7 +9,9 @@ interface IMaterialInstance {
 }
 
 struct Broken : IMaterialInstance {
+    // CHECK: ([[# @LINE+1]]): error 38105:
     uint get_lobe_types() { return LobeTypes::Diffuse; }
+    // CHECK: error 38106:
 }
 
 int test()
