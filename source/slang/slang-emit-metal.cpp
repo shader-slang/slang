@@ -810,17 +810,71 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             // because Metal uses infix `*` to express inner product
             // when working with matrices.
 
-            // Are both operands matrices?
-            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
-                as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            auto left = inst->getOperand(0);
+            auto right = inst->getOperand(1);
+            auto resultType = inst->getDataType();
+
+            // Handle native matrix-matrix multiplication
+            if (as<IRMatrixType>(left->getDataType()) &&
+                as<IRMatrixType>(right->getDataType()))
             {
                 ensurePrelude(kMetalBuiltinPreludeMatrixCompMult);
                 m_writer->emit("_slang_matrixCompMult(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(left, getInfo(EmitOp::General));
                 m_writer->emit(", ");
-                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                emitOperand(right, getInfo(EmitOp::General));
                 m_writer->emit(")");
                 return true;
+            }
+
+            // Handle lowered matrix multiplication (arrays of vectors)
+            auto arrayType = as<IRArrayType>(resultType);
+            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
+            {
+                auto rowCount = getIntVal(arrayType->getElementCount());
+                
+                // Check operand types
+                bool leftIsArray = as<IRArrayType>(left->getDataType()) && 
+                                  as<IRVectorType>(as<IRArrayType>(left->getDataType())->getElementType());
+                bool rightIsArray = as<IRArrayType>(right->getDataType()) && 
+                                   as<IRVectorType>(as<IRArrayType>(right->getDataType())->getElementType());
+                
+                if (!leftIsArray && rightIsArray)
+                {
+                    // Scalar * Matrix: broadcast scalar to each vector
+                    emitType(resultType);
+                    m_writer->emit("{");
+                    for (IRIntegerValue i = 0; i < rowCount; i++)
+                    {
+                        if (i != 0) m_writer->emit(", ");
+                        emitOperand(left, getInfo(EmitOp::General));
+                        m_writer->emit(" * ");
+                        emitOperand(right, getInfo(EmitOp::Postfix));
+                        m_writer->emit("[");
+                        m_writer->emit(i);
+                        m_writer->emit("]");
+                    }
+                    m_writer->emit("}");
+                    return true;
+                }
+                else if (leftIsArray && !rightIsArray)
+                {
+                    // Matrix * Scalar: multiply each vector by scalar
+                    emitType(resultType);
+                    m_writer->emit("{");
+                    for (IRIntegerValue i = 0; i < rowCount; i++)
+                    {
+                        if (i != 0) m_writer->emit(", ");
+                        emitOperand(left, getInfo(EmitOp::Postfix));
+                        m_writer->emit("[");
+                        m_writer->emit(i);
+                        m_writer->emit("] * ");
+                        emitOperand(right, getInfo(EmitOp::General));
+                    }
+                    m_writer->emit("}");
+                    return true;
+                }
+                // For matrix * matrix, fall through to default handling or let meta.slang handle it
             }
             break;
         }

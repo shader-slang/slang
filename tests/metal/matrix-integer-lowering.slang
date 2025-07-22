@@ -28,7 +28,7 @@ TYPE elementAdd(m2x2 matrix)
         + matrix[1][1];
 }
 
-// METAL: array<array<{{(int|uint)}}, 2>, 2>
+// METAL: array<{{(int|uint)}}2, int(2)>
 // METALLIB: @computeMain
 
 [numthreads(1, 1, 1)]

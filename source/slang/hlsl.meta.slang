@@ -6696,7 +6696,17 @@ bool any(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "any";
     case metal:
-        __intrinsic_asm "any";
+        if (__isBool<T>())
+            __intrinsic_asm "any";
+        else
+        {
+            // For non-bool types, convert to bool vector first
+            // Metal's any() only works with bool vectors
+            bool result = false;
+            for(int i = 0; i < N; ++i)
+                result = result || any(x[i]);
+            return result;
+        }
     case glsl:
         __intrinsic_asm "any(bvec$N0($0))";
     case spirv:
@@ -8647,7 +8657,6 @@ T determinant(matrix<T,N,N> m)
     __target_switch
     {
     case hlsl: __intrinsic_asm "determinant";
-    case metal: __intrinsic_asm "determinant";
     // GLSL, WGSL, and SPIR-V don't support integer determinants for lowered matrices, so we need to implement it manually
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
