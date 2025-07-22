@@ -7129,7 +7129,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, AccessQualifier::ReadWrite, addrSpace);
+        auto ptrElementType = builder.getPtrType(
+            kIROp_PtrType,
+            sourceElementType,
+            AccessQualifier::ReadWrite,
+            addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
