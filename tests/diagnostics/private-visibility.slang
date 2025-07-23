@@ -24,21 +24,20 @@ struct MyType
         get { return member; }
         set { member = newValue; }
     }
-    // CHECK:{{.*}}(28): error 30601:
+    // CHECK:{{.*}}([[# @LINE+1]]): error 30601:
     public void publicMethod() {} // ERROR.
 }
 
 void test()
 {
-    // CHECK:{{.*}}(34): error 30600:
-    MyType t; // ERROR.
+    MyType t; // should leave uninitialized.
     // CHECK-NOT:{{.*}}error
     t.func1(); // OK.
-    // CHECK:{{.*}}(38): error 30600:
+    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
     t.func(); // ERROR.
-    // CHECK:{{.*}}(40): error 30600:
+    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
     t[0] = 1; // ERROR.
 
-    // CHECK:{{.*}}(43): error 30600:
+    // CHECK:{{.*}}([[# @LINE+1]]): error 30600:
     t.member = 2;
 }
