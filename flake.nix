@@ -16,7 +16,9 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        devShell = pkgs.mkShell {
+        # For debugging with LLDB, Clang seems to behave better than GCC about
+        # respecting breakpoint locations and not having missing variables.
+        devShell = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
           buildInputs = [
             pkgs.cmake
             pkgs.gersemi

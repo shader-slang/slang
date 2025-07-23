@@ -21,6 +21,9 @@ $ lldb --local-lldbinit build/Debug/bin/slangc -- tests/byte-code/hello.slang -d
 (lldb) run
 ```
 
+LLDB can be used with either GCC or Clang, but Clang seems to behave better
+about respecting breakpoint locations and not having missing variables.
+
 ### VS Code
 
 If instead you prefer to debug within VS Code, you can run LLDB via the
