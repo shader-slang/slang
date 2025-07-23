@@ -863,27 +863,20 @@ void SharedSemanticsContext::_mergeFacetLists(
             // interface IFoo
             bool shouldSkipTransitiveWitness = false;
 
-            if (auto selfIsBaseDeclWitness = as<DeclaredSubtypeWitness>(selfIsSubtypeOfBase))
+            auto selfType = selfIsSubtypeOfBase->getSub();
+            auto baseType = selfIsSubtypeOfBase->getSup();
+            auto facetType = baseIsSubtypeOfFacet->getSup();
+
+            if (selfType && baseType && facetType)
             {
-                if (auto baseFacetDeclWitness = as<DeclaredSubtypeWitness>(baseIsSubtypeOfFacet))
-                {
-                    auto selfType = selfIsBaseDeclWitness->getSub();
-                    auto baseType = selfIsBaseDeclWitness->getSup();
-                    auto facetType = baseFacetDeclWitness->getSup();
+                auto selfDeclRef = isDeclRefTypeOf<StructDecl>(selfType);
+                auto baseDeclRef = isDeclRefTypeOf<StructDecl>(baseType);
+                auto facetDeclRef = isDeclRefTypeOf<InterfaceDecl>(facetType);
 
-                    auto selfDeclRefType = as<DeclRefType>(selfType);
-                    auto baseDeclRefType = as<DeclRefType>(baseType);
-                    auto facetDeclRefType = as<DeclRefType>(facetType);
-                    if (selfDeclRefType && baseDeclRefType && facetDeclRefType)
-                    {
-                        auto selfDecl = as<StructDecl>(selfDeclRefType->getDeclRef().getDecl());
-                        auto baseDecl = as<StructDecl>(baseDeclRefType->getDeclRef().getDecl());
-                        auto facetDecl =
-                            as<InterfaceDecl>(facetDeclRefType->getDeclRef().getDecl());
-
-                        shouldSkipTransitiveWitness = selfDecl && baseDecl && facetDecl;
-                    }
-                }
+                // Only skip if we have struct->struct->interface
+                // and the struct->struct witness is not the identity witness
+                shouldSkipTransitiveWitness = selfDeclRef && baseDeclRef && facetDeclRef &&
+                                              !isTypeEqualityWitness(selfIsSubtypeOfBase);
             }
 
             if (!shouldSkipTransitiveWitness)
