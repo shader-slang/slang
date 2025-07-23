@@ -13,22 +13,15 @@ namespace Slang
 //
 // This forms a lattice with
 //
-// None < Value
-// None < ConcreteX < SetOfX < Unbounded
+// None < Set < Unbounded
 // None < Existential < Unbounded
 //
 enum class PropagationJudgment
 {
-    None,          // No judgment (initial value)
-    Value,         // Regular value computation (unrelated to dynamic dispatch)
-    ConcreteType,  // Concrete type reference
-    ConcreteTable, // Concrete witness table reference
-    ConcreteFunc,  // Concrete function reference
-    SetOfTypes,    // Set of possible types
-    SetOfTables,   // Set of possible witness tables
-    SetOfFuncs,    // Set of possible functions
-    Existential,   // Existential box with a set of possible witness tables
-    Unbounded,     // Unknown set of possible types/tables/funcs (e.g. COM interface types)
+    None,        // Either uninitialized or irrelevant
+    Set,         // Set of possible types/tables/funcs
+    Existential, // Existential box with a set of possible witness tables
+    Unbounded,   // Unknown set of possible types/tables/funcs (e.g. COM interface types)
 };
 
 // Data structure to hold propagation information for an instruction
@@ -36,17 +29,11 @@ struct PropagationInfo : RefObject
 {
     PropagationJudgment judgment;
 
-    // For concrete references
-    IRInst* concreteValue = nullptr;
-
     // For sets of types/tables/funcs and existential witness tables
     HashSet<IRInst*> possibleValues;
 
-    // For SetOfFuncs
-    IRFuncType* dynFuncType;
-
     PropagationInfo()
-        : judgment(PropagationJudgment::None), concreteValue(nullptr), dynFuncType(nullptr)
+        : judgment(PropagationJudgment::None)
     {
     }
 
@@ -55,15 +42,25 @@ struct PropagationInfo : RefObject
     {
     }
 
-    static PropagationInfo makeValue() { return PropagationInfo(PropagationJudgment::Value); }
-    static PropagationInfo makeConcrete(PropagationJudgment j, IRInst* value);
-    static PropagationInfo makeSet(PropagationJudgment j, const HashSet<IRInst*>& values);
-    static PropagationInfo makeSetOfFuncs(const HashSet<IRInst*>& funcs, IRFuncType* dynFuncType);
+    static PropagationInfo makeSingletonSet(IRInst* value);
+    static PropagationInfo makeSet(const HashSet<IRInst*>& values);
     static PropagationInfo makeExistential(const HashSet<IRInst*>& tables);
     static PropagationInfo makeUnbounded();
     static PropagationInfo none();
 
     bool isNone() const { return judgment == PropagationJudgment::None; }
+    bool isSingleton() const
+    {
+        return judgment == PropagationJudgment::Set && possibleValues.getCount() == 1;
+    }
+
+    IRInst* getSingletonValue() const
+    {
+        if (judgment == PropagationJudgment::Set && possibleValues.getCount() == 1)
+            return *possibleValues.begin();
+
+        SLANG_UNEXPECTED("getSingletonValue called on non-singleton PropagationInfo");
+    }
 
     operator bool() const { return judgment != PropagationJudgment::None; }
 };
@@ -160,29 +157,17 @@ struct WorkItem
 };
 
 // PropagationInfo implementation
-PropagationInfo PropagationInfo::makeConcrete(PropagationJudgment j, IRInst* value)
+PropagationInfo PropagationInfo::makeSingletonSet(IRInst* value)
 {
-    auto info = PropagationInfo(j);
-    info.concreteValue = value;
+    auto info = PropagationInfo(PropagationJudgment::Set);
+    info.possibleValues.add(value);
     return info;
 }
 
-PropagationInfo PropagationInfo::makeSet(PropagationJudgment j, const HashSet<IRInst*>& values)
+PropagationInfo PropagationInfo::makeSet(const HashSet<IRInst*>& values)
 {
-    auto info = PropagationInfo(j);
-    SLANG_ASSERT(j != PropagationJudgment::SetOfFuncs);
+    auto info = PropagationInfo(PropagationJudgment::Set);
     info.possibleValues = values;
-    return info;
-}
-
-
-PropagationInfo PropagationInfo::makeSetOfFuncs(
-    const HashSet<IRInst*>& values,
-    IRFuncType* dynFuncType)
-{
-    auto info = PropagationInfo(PropagationJudgment::SetOfFuncs);
-    info.possibleValues = values;
-    info.dynFuncType = dynFuncType;
     return info;
 }
 
@@ -210,17 +195,10 @@ bool areInfosEqual(const PropagationInfo& a, const PropagationInfo& b)
 
     switch (a.judgment)
     {
-    case PropagationJudgment::Value:
-        return true; // All value judgments are equal
-
-    case PropagationJudgment::ConcreteType:
-    case PropagationJudgment::ConcreteTable:
-    case PropagationJudgment::ConcreteFunc:
-        return a.concreteValue == b.concreteValue;
-
-    case PropagationJudgment::SetOfTypes:
-    case PropagationJudgment::SetOfTables:
-    case PropagationJudgment::SetOfFuncs:
+    case PropagationJudgment::None:
+    case PropagationJudgment::Unbounded:
+        return true;
+    case PropagationJudgment::Set:
         if (a.possibleValues.getCount() != b.possibleValues.getCount())
             return false;
         for (auto value : a.possibleValues)
@@ -239,10 +217,6 @@ bool areInfosEqual(const PropagationInfo& a, const PropagationInfo& b)
                 return false;
         }
         return true;
-
-    case PropagationJudgment::Unbounded:
-        return true; // All unknown sets are considered equal
-
     default:
         return false;
     }
@@ -256,30 +230,13 @@ struct DynamicInstLoweringContext
         // If this is a global instruction (parent is module), return concrete info
         if (as<IRModuleInst>(inst->getParent()))
         {
-            if (as<IRType>(inst))
+            if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
             {
-                PropagationInfo typeInfo =
-                    PropagationInfo::makeConcrete(PropagationJudgment::ConcreteType, nullptr);
-                typeInfo.concreteValue = inst;
-                return typeInfo;
-            }
-            else if (as<IRWitnessTable>(inst))
-            {
-                PropagationInfo tableInfo =
-                    PropagationInfo::makeConcrete(PropagationJudgment::ConcreteTable, nullptr);
-                tableInfo.concreteValue = inst;
-                return tableInfo;
-            }
-            else if (as<IRFunc>(inst))
-            {
-                PropagationInfo funcInfo =
-                    PropagationInfo::makeConcrete(PropagationJudgment::ConcreteFunc, nullptr);
-                funcInfo.concreteValue = inst;
-                return funcInfo;
+                return PropagationInfo::makeSingletonSet(inst);
             }
             else
             {
-                return PropagationInfo::makeValue();
+                return PropagationInfo::none();
             }
         }
 
@@ -571,7 +528,7 @@ struct DynamicInstLoweringContext
     {
         // For now, error out as specified
         SLANG_UNIMPLEMENTED_X("IRCreateExistentialObject lowering not yet implemented");
-        return PropagationInfo::makeValue();
+        return PropagationInfo::none();
     }
 
     PropagationInfo analyzeMakeExistential(IRMakeExistential* inst)
@@ -590,106 +547,47 @@ struct DynamicInstLoweringContext
             return PropagationInfo::makeUnbounded();
 
         HashSet<IRInst*> tables;
-
-        if (witnessTableInfo.judgment == PropagationJudgment::ConcreteTable)
-        {
-            tables.add(witnessTableInfo.concreteValue);
-        }
-        else if (witnessTableInfo.judgment == PropagationJudgment::SetOfTables)
-        {
+        if (witnessTableInfo.judgment == PropagationJudgment::Set)
             for (auto table : witnessTableInfo.possibleValues)
-            {
                 tables.add(table);
-            }
-        }
 
         return PropagationInfo::makeExistential(tables);
     }
 
-    static IRInst* lookupEntry(IRInst* witnessTable, IRInst* key)
+    static IRInst* findEntryInConcreteTable(IRInst* witnessTable, IRInst* key)
     {
         if (auto concreteTable = as<IRWitnessTable>(witnessTable))
-        {
             for (auto entry : concreteTable->getEntries())
-            {
                 if (entry->getRequirementKey() == key)
-                {
                     return entry->getSatisfyingVal();
-                }
-            }
-        }
         return nullptr; // Not found
     }
 
     PropagationInfo analyzeLookupWitnessMethod(IRLookupWitnessMethod* inst)
     {
-        auto witnessTable = inst->getWitnessTable();
         auto key = inst->getRequirementKey();
+
+        auto witnessTable = inst->getWitnessTable();
         auto witnessTableInfo = tryGetInfo(witnessTable);
 
-        if (!witnessTableInfo)
-            return PropagationInfo::none();
-
-        if (witnessTableInfo.judgment == PropagationJudgment::Unbounded)
-            return PropagationInfo::makeUnbounded();
-
-        HashSet<IRInst*> results;
-
-        if (witnessTableInfo.judgment == PropagationJudgment::ConcreteTable)
+        switch (witnessTableInfo.judgment)
         {
-            results.add(lookupEntry(witnessTableInfo.concreteValue, key));
-        }
-        else if (witnessTableInfo.judgment == PropagationJudgment::SetOfTables)
-        {
-            for (auto table : witnessTableInfo.possibleValues)
+        case PropagationJudgment::None:
+        case PropagationJudgment::Unbounded:
+            return witnessTableInfo.judgment;
+        case PropagationJudgment::Set:
             {
-                results.add(lookupEntry(table, key));
+                HashSet<IRInst*> results;
+                for (auto table : witnessTableInfo.possibleValues)
+                    results.add(findEntryInConcreteTable(table, key));
+                return PropagationInfo::makeSet(results);
             }
-        }
-
-        if (witnessTableInfo.judgment == PropagationJudgment::ConcreteTable)
-        {
-            if (as<IRFuncType>(inst->getDataType()))
-            {
-                return PropagationInfo::makeConcrete(
-                    PropagationJudgment::ConcreteFunc,
-                    *results.begin());
-            }
-            else if (as<IRTypeKind>(inst->getDataType()))
-            {
-                return PropagationInfo::makeConcrete(
-                    PropagationJudgment::ConcreteType,
-                    *results.begin());
-            }
-            else if (as<IRWitnessTableType>(inst->getDataType()))
-            {
-                return PropagationInfo::makeConcrete(
-                    PropagationJudgment::ConcreteTable,
-                    *results.begin());
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unexpected data type for LookupWitnessMethod");
-            }
-        }
-        else
-        {
-            if (auto funcType = as<IRFuncType>(inst->getDataType()))
-            {
-                return PropagationInfo::makeSetOfFuncs(results, funcType);
-            }
-            else if (as<IRTypeKind>(inst->getDataType()))
-            {
-                return PropagationInfo::makeSet(PropagationJudgment::SetOfTypes, results);
-            }
-            else if (as<IRWitnessTableType>(inst->getDataType()))
-            {
-                return PropagationInfo::makeSet(PropagationJudgment::SetOfTables, results);
-            }
-            else
-            {
-                SLANG_UNEXPECTED("Unexpected data type for LookupWitnessMethod");
-            }
+        case PropagationJudgment::Existential:
+            SLANG_UNEXPECTED("Unexpected LookupWitnessMethod on Existential");
+            break;
+        default:
+            SLANG_UNEXPECTED("Unhandled PropagationJudgment in analyzeLookupWitnessMethod");
+            break;
         }
     }
 
@@ -698,33 +596,23 @@ struct DynamicInstLoweringContext
         auto operand = inst->getOperand(0);
         auto operandInfo = tryGetInfo(operand);
 
-        if (!operandInfo)
-            return PropagationInfo::none();
-
-        if (operandInfo.judgment == PropagationJudgment::Unbounded)
-            return PropagationInfo::makeUnbounded();
-
-        if (operandInfo.judgment == PropagationJudgment::Existential)
+        switch (operandInfo.judgment)
         {
-            HashSet<IRInst*> tables;
-            for (auto table : operandInfo.possibleValues)
-            {
-                tables.add(table);
-            }
-
-            if (tables.getCount() == 1)
-            {
-                return PropagationInfo::makeConcrete(
-                    PropagationJudgment::ConcreteTable,
-                    *tables.begin());
-            }
-            else
-            {
-                return PropagationInfo::makeSet(PropagationJudgment::SetOfTables, tables);
-            }
+        case PropagationJudgment::None:
+            return PropagationInfo::none();
+        case PropagationJudgment::Unbounded:
+            return PropagationInfo::makeUnbounded();
+        case PropagationJudgment::Existential:
+            return PropagationInfo::makeSet(operandInfo.possibleValues);
+        case PropagationJudgment::Set:
+            SLANG_UNEXPECTED(
+                "Unexpected ExtractExistentialWitnessTable on Set (should be Existential)");
+            break;
+        default:
+            SLANG_UNEXPECTED(
+                "Unhandled PropagationJudgment in analyzeExtractExistentialWitnessTable");
+            break;
         }
-
-        return PropagationInfo::makeConcrete(PropagationJudgment::ConcreteTable, inst);
     }
 
     PropagationInfo analyzeExtractExistentialType(IRExtractExistentialType* inst)
@@ -732,57 +620,37 @@ struct DynamicInstLoweringContext
         auto operand = inst->getOperand(0);
         auto operandInfo = tryGetInfo(operand);
 
-        if (!operandInfo)
-            return PropagationInfo::none();
-
-        if (operandInfo.judgment == PropagationJudgment::Unbounded)
-            return PropagationInfo::makeUnbounded();
-
-        if (operandInfo.judgment == PropagationJudgment::Existential)
+        switch (operandInfo.judgment)
         {
-            HashSet<IRInst*> types;
-            // Extract types from witness tables by looking at the concrete types
-            for (auto table : operandInfo.possibleValues)
+        case PropagationJudgment::None:
+            return PropagationInfo::none();
+        case PropagationJudgment::Unbounded:
+            return PropagationInfo::makeUnbounded();
+        case PropagationJudgment::Existential:
             {
-                // Get the concrete type from the witness table
-                if (auto witnessTable = as<IRWitnessTable>(table))
-                {
-                    if (auto concreteType = witnessTable->getConcreteType())
-                    {
-                        types.add(concreteType);
-                    }
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Expected witness table in existential extraction base type");
-                }
+                HashSet<IRInst*> types;
+                for (auto table : operandInfo.possibleValues)
+                    if (auto witnessTable = cast<IRWitnessTable>(table)) // Expect witness table
+                        if (auto concreteType = witnessTable->getConcreteType())
+                            types.add(concreteType);
+                return PropagationInfo::makeSet(types);
             }
-
-            if (types.getCount() == 0)
-            {
-                // No concrete types found, treat as this instruction
-                types.add(inst);
-            }
-
-            if (types.getCount() == 1)
-            {
-                return PropagationInfo::makeConcrete(
-                    PropagationJudgment::ConcreteType,
-                    *types.begin());
-            }
-            else
-            {
-                return PropagationInfo::makeSet(PropagationJudgment::SetOfTypes, types);
-            }
+        case PropagationJudgment::Set:
+            SLANG_UNEXPECTED(
+                "Unexpected ExtractExistentialWitnessTable on Set (should be Existential)");
+            break;
+        default:
+            SLANG_UNEXPECTED("Unhandled PropagationJudgment in analyzeExtractExistentialType");
+            break;
         }
-
-        return PropagationInfo::makeConcrete(PropagationJudgment::ConcreteType, inst);
     }
 
     PropagationInfo analyzeExtractExistentialValue(IRExtractExistentialValue* inst)
     {
-        // The value itself is just a regular value
-        return PropagationInfo::makeValue();
+        // We don't care about the value itself.
+        // (We rely on the propagation info for the type)
+        //
+        return PropagationInfo::none();
     }
 
     PropagationInfo analyzeCall(IRCall* inst, LinkedList<WorkItem>& workQueue)
@@ -819,19 +687,11 @@ struct DynamicInstLoweringContext
             workQueue.addLast(WorkItem(InterproceduralEdge::Direction::CallToFunc, inst, func));
         };
 
-        if (calleeInfo)
+        if (calleeInfo.judgment == PropagationJudgment::Set)
         {
-            if (calleeInfo.judgment == PropagationJudgment::ConcreteFunc)
-            {
-                // If we have a concrete function, register the call site
-                propagateToCallSite(as<IRFunc>(calleeInfo.concreteValue));
-            }
-            else if (calleeInfo.judgment == PropagationJudgment::SetOfFuncs)
-            {
-                // If we have a set of functions, register each one
-                for (auto func : calleeInfo.possibleValues)
-                    propagateToCallSite(as<IRFunc>(func));
-            }
+            // If we have a set of functions, register each one
+            for (auto func : calleeInfo.possibleValues)
+                propagateToCallSite(cast<IRFunc>(func));
         }
 
         if (auto callInfo = tryGetInfo(inst))
@@ -979,6 +839,12 @@ struct DynamicInstLoweringContext
         }
     }
 
+    PropagationInfo getFuncReturnInfo(IRFunc* func)
+    {
+        funcReturnInfo.addIfNotExists(func, PropagationInfo::none());
+        return funcReturnInfo[func];
+    }
+
     void initializeFirstBlockParameters(IRFunc* func)
     {
         auto firstBlock = func->getFirstBlock();
@@ -1000,15 +866,9 @@ struct DynamicInstLoweringContext
                 else
                     propagationMap[param] = PropagationInfo::none(); // Initialize to none.
             }
-            else if (
-                as<IRWitnessTableType>(paramType) || as<IRFuncType>(paramType) ||
-                as<IRTypeKind>(paramType) || as<IRTypeType>(paramType))
-            {
-                propagationMap[param] = PropagationInfo::none();
-            }
             else
             {
-                propagationMap[param] = PropagationInfo::makeValue();
+                propagationMap[param] = PropagationInfo::none();
             }
         }
     }
@@ -1026,49 +886,20 @@ struct DynamicInstLoweringContext
 
         // Get return value info if there is a return value
         PropagationInfo returnValueInfo;
-        if (returnInst->getOperandCount() > 0)
-        {
-            auto returnValue = returnInst->getOperand(0);
-            returnValueInfo = tryGetInfo(returnValue);
-        }
-        else
-        {
-            // Void return
-            returnValueInfo = PropagationInfo::makeValue();
-        }
+        returnValueInfo = tryGetInfo(returnInst->getVal());
 
         // Update function return info by unioning with existing info
-        auto existingReturnInfo = funcReturnInfo.tryGetValue(func);
         bool returnInfoChanged = false;
-
-        if (returnValueInfo)
+        auto existingReturnInfo = getFuncReturnInfo(func);
+        auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnValueInfo);
+        if (!areInfosEqual(newReturnInfo, existingReturnInfo))
         {
-            if (existingReturnInfo)
-            {
-                auto newReturnInfo = unionPropagationInfo(
-                    List<PropagationInfo>({*existingReturnInfo, returnValueInfo}));
+            funcReturnInfo[func] = newReturnInfo;
 
-                if (!areInfosEqual(*existingReturnInfo, newReturnInfo))
-                {
-                    funcReturnInfo[func] = newReturnInfo;
-                    returnInfoChanged = true;
-                }
-            }
-            else
-            {
-                funcReturnInfo[func] = returnValueInfo;
-                returnInfoChanged = true;
-            }
-        }
-
-        // If return info changed, add return edges to call sites
-        if (returnInfoChanged && this->funcCallSites.containsKey(func))
-        {
-            for (auto callSite : this->funcCallSites[func])
-            {
-                workQueue.addLast(
-                    WorkItem(InterproceduralEdge::Direction::FuncToCall, callSite, func));
-            }
+            if (this->funcCallSites.containsKey(func))
+                for (auto callSite : this->funcCallSites[func])
+                    workQueue.addLast(
+                        WorkItem(InterproceduralEdge::Direction::FuncToCall, callSite, func));
         }
 
         return returnInfoChanged;
@@ -1078,7 +909,7 @@ struct DynamicInstLoweringContext
     {
         if (infos.getCount() == 0)
         {
-            return PropagationInfo::makeValue();
+            return PropagationInfo::none();
         }
 
         if (infos.getCount() == 1)
@@ -1112,94 +943,42 @@ struct DynamicInstLoweringContext
         {
             switch (info.judgment)
             {
-            case PropagationJudgment::ConcreteType:
-                unionJudgment = PropagationJudgment::SetOfTypes;
-                allValues.add(info.concreteValue);
-                break;
-            case PropagationJudgment::ConcreteTable:
-                unionJudgment = PropagationJudgment::SetOfTables;
-                allValues.add(info.concreteValue);
-                break;
-            case PropagationJudgment::ConcreteFunc:
-                unionJudgment = PropagationJudgment::SetOfFuncs;
-                allValues.add(info.concreteValue);
-                break;
-            case PropagationJudgment::SetOfTypes:
-                unionJudgment = PropagationJudgment::SetOfTypes;
-                for (auto value : info.possibleValues)
-                    allValues.add(value);
-                break;
-            case PropagationJudgment::SetOfTables:
-                unionJudgment = PropagationJudgment::SetOfTables;
-                for (auto value : info.possibleValues)
-                    allValues.add(value);
-                break;
-            case PropagationJudgment::SetOfFuncs:
-                unionJudgment = PropagationJudgment::SetOfFuncs;
-                for (auto value : info.possibleValues)
-                    allValues.add(value);
-                if (!dynFuncType)
-                {
-                    // If we haven't set a function type yet, use the first one
-                    dynFuncType = info.dynFuncType;
-                }
-                else if (dynFuncType != info.dynFuncType)
-                {
-                    SLANG_UNEXPECTED(
-                        "Mismatched function types in union propagation info for SetOfFuncs");
-                }
-
-                break;
-            case PropagationJudgment::Value:
-                if (unionJudgment == PropagationJudgment::None)
-                    unionJudgment = PropagationJudgment::Value;
-                else
-                {
-                    SLANG_ASSERT(unionJudgment == PropagationJudgment::Value);
-                }
-                break;
             case PropagationJudgment::None:
-                // None judgments are basically 'empty'
+                break;
+            case PropagationJudgment::Set:
+                unionJudgment = PropagationJudgment::Set;
+                for (auto value : info.possibleValues)
+                    allValues.add(value);
                 break;
             case PropagationJudgment::Existential:
                 // For existential union, we need to collect all witness tables
                 // For now, we'll handle this properly by creating a new existential with all tables
-                {
-                    HashSet<IRInst*> allTables;
-                    for (auto otherInfo : infos)
-                    {
-                        if (otherInfo.judgment == PropagationJudgment::Existential)
-                        {
-                            for (auto table : otherInfo.possibleValues)
-                            {
-                                allTables.add(table);
-                            }
-                        }
-                    }
-                    if (allTables.getCount() > 0)
-                    {
-                        return PropagationInfo::makeExistential(allTables);
-                    }
-                }
-                return PropagationInfo::none();
+                unionJudgment = PropagationJudgment::Existential;
+                for (auto value : info.possibleValues)
+                    allValues.add(value);
+                break;
             case PropagationJudgment::Unbounded:
                 // If any info is unbounded, the union is unbounded
                 return PropagationInfo::makeUnbounded();
             }
         }
 
-        // If we collected values, create a set; otherwise return value
-        if (allValues.getCount() > 0)
-        {
-            if (unionJudgment == PropagationJudgment::SetOfFuncs && dynFuncType)
-                return PropagationInfo::makeSetOfFuncs(allValues, dynFuncType);
+        if (unionJudgment == PropagationJudgment::Existential)
+            if (allValues.getCount() > 0)
+                return PropagationInfo::makeExistential(allValues);
+            else
+                return PropagationInfo::none();
 
-            return PropagationInfo::makeSet(unionJudgment, allValues);
-        }
-        else
-        {
-            return PropagationInfo::none();
-        }
+        if (unionJudgment == PropagationJudgment::Set)
+            if (allValues.getCount() > 1)
+                return PropagationInfo::makeSet(allValues);
+            else
+                return PropagationInfo::none();
+
+        // If we reach here, crash instead of returning none (which could make the analysis go into
+        // an infinite loop)
+        //
+        SLANG_UNEXPECTED("Unhandled prop-info union");
     }
 
     PropagationInfo unionPropagationInfo(PropagationInfo info1, PropagationInfo info2)
@@ -1214,22 +993,10 @@ struct DynamicInstLoweringContext
     PropagationInfo analyzeDefault(IRInst* inst)
     {
         // Check if this is a type, witness table, or function
-        if (as<IRType>(inst))
-        {
-            return PropagationInfo::makeConcrete(PropagationJudgment::ConcreteType, inst);
-        }
-        else if (as<IRWitnessTable>(inst))
-        {
-            return PropagationInfo::makeConcrete(PropagationJudgment::ConcreteTable, inst);
-        }
-        else if (as<IRFunc>(inst))
-        {
-            return PropagationInfo::makeConcrete(PropagationJudgment::ConcreteFunc, inst);
-        }
+        if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
+            return PropagationInfo::makeSingletonSet(inst);
         else
-        {
-            return PropagationInfo::makeValue();
-        }
+            return PropagationInfo::none(); // Default case, no propagation info
     }
 
     void performDynamicInstLowering()
@@ -1278,7 +1045,7 @@ struct DynamicInstLoweringContext
                                         instWithReplacementTypes.add(child);
 
                                 if (auto calleeInfo = tryGetInfo(as<IRCall>(child)->getCallee()))
-                                    if (calleeInfo.judgment == PropagationJudgment::SetOfFuncs)
+                                    if (calleeInfo.judgment == PropagationJudgment::Set)
                                         valueInstsToLower.add(child);
                             }
                             break;
@@ -1416,44 +1183,44 @@ struct DynamicInstLoweringContext
         builder.setInsertBefore(inst);
 
         // Check if this is a TypeKind data type with SetOfTypes judgment
-        if (info.judgment == PropagationJudgment::SetOfTypes &&
-            inst->getDataType()->getOp() == kIROp_TypeKind)
+        if (info.judgment == PropagationJudgment::Set)
         {
-            // Create an any-value type based on the set of types
-            auto anyValueType = createAnyValueTypeFromInsts(info.possibleValues);
-
-            // Store the mapping for later use
-            loweredInstToAnyValueType[inst] = anyValueType;
-
-            // Replace the instruction with the any-value type
-            inst->replaceUsesWith(anyValueType);
-            inst->removeAndDeallocate();
-            return;
-        }
-
-        if (info.judgment == PropagationJudgment::SetOfTables ||
-            info.judgment == PropagationJudgment::SetOfFuncs)
-        {
-            // Get the witness table operand info
-            auto witnessTableInst = inst->getWitnessTable();
-            auto witnessTableInfo = tryGetInfo(witnessTableInst);
-
-            if (witnessTableInfo && witnessTableInfo.judgment == PropagationJudgment::SetOfTables)
+            if (inst->getDataType()->getOp() == kIROp_TypeKind)
             {
-                // Create a key mapping function
-                auto keyMappingFunc = createKeyMappingFunc(
-                    inst->getRequirementKey(),
-                    witnessTableInfo.possibleValues,
-                    info.possibleValues);
+                // Create an any-value type based on the set of types
+                auto anyValueType = createAnyValueTypeFromInsts(info.possibleValues);
 
-                // Replace with call to key mapping function
-                auto witnessTableId = builder.emitCallInst(
-                    builder.getUIntType(),
-                    keyMappingFunc,
-                    List<IRInst*>({inst->getWitnessTable()}));
-                inst->replaceUsesWith(witnessTableId);
-                propagationMap[witnessTableId] = info;
+                // Store the mapping for later use
+                loweredInstToAnyValueType[inst] = anyValueType;
+
+                // Replace the instruction with the any-value type
+                inst->replaceUsesWith(anyValueType);
                 inst->removeAndDeallocate();
+                return;
+            }
+            else
+            {
+                // Get the witness table operand info
+                auto witnessTableInst = inst->getWitnessTable();
+                auto witnessTableInfo = tryGetInfo(witnessTableInst);
+
+                if (witnessTableInfo.judgment == PropagationJudgment::Set)
+                {
+                    // Create a key mapping function
+                    auto keyMappingFunc = createKeyMappingFunc(
+                        inst->getRequirementKey(),
+                        witnessTableInfo.possibleValues,
+                        info.possibleValues);
+
+                    // Replace with call to key mapping function
+                    auto witnessTableId = builder.emitCallInst(
+                        builder.getUIntType(),
+                        keyMappingFunc,
+                        List<IRInst*>({inst->getWitnessTable()}));
+                    inst->replaceUsesWith(witnessTableId);
+                    propagationMap[witnessTableId] = info;
+                    inst->removeAndDeallocate();
+                }
             }
         }
     }
@@ -1467,7 +1234,7 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (info.judgment == PropagationJudgment::SetOfTables)
+        if (info.judgment == PropagationJudgment::Set)
         {
             // Replace with GetElement(loweredInst, 0) -> uint
             auto operand = inst->getOperand(0);
@@ -1501,7 +1268,7 @@ struct DynamicInstLoweringContext
     void lowerExtractExistentialType(IRExtractExistentialType* inst)
     {
         auto info = tryGetInfo(inst);
-        if (!info || info.judgment != PropagationJudgment::SetOfTypes)
+        if (!info || info.judgment != PropagationJudgment::Set)
             return;
 
         IRBuilder builder(inst);
@@ -1557,7 +1324,10 @@ struct DynamicInstLoweringContext
         auto callee = inst->getCallee();
         auto calleeInfo = tryGetInfo(callee);
 
-        if (!calleeInfo || calleeInfo.judgment != PropagationJudgment::SetOfFuncs)
+        if (!calleeInfo || calleeInfo.judgment != PropagationJudgment::Set)
+            return;
+
+        if (calleeInfo.isSingleton() && calleeInfo.getSingletonValue() == callee)
             return;
 
         IRBuilder builder(inst);
@@ -1908,30 +1678,6 @@ struct DynamicInstLoweringContext
                 maxSize = size;
         }
         return maxSize;
-    }
-
-    bool needsReinterpret(PropagationInfo sourceInfo, PropagationInfo targetInfo)
-    {
-        if (!sourceInfo || !targetInfo)
-            return false;
-
-        // Check if both are SetOfTypes with different sets
-        if (sourceInfo.judgment == PropagationJudgment::SetOfTypes &&
-            targetInfo.judgment == PropagationJudgment::SetOfTypes)
-        {
-            if (sourceInfo.possibleValues.getCount() != targetInfo.possibleValues.getCount())
-                return true;
-        }
-
-        // Check if both are Existential with different witness table sets
-        if (sourceInfo.judgment == PropagationJudgment::Existential &&
-            targetInfo.judgment == PropagationJudgment::Existential)
-        {
-            if (sourceInfo.possibleValues.getCount() != targetInfo.possibleValues.getCount())
-                return true;
-        }
-
-        return false;
     }
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }
