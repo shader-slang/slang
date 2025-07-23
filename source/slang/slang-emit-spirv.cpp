@@ -3166,7 +3166,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (opCode == SpvOpUndef)
         {
             String e = "Unhandled inst in spirv-emit:\n" +
-                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                       dumpIRToString(
+                           inst,
+                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
             SLANG_UNIMPLEMENTED_X(e.getBuffer());
         }
 
@@ -3986,7 +3988,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
                 String e = "Unhandled local inst in spirv-emit:\n" +
-                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                           dumpIRToString(
+                               inst,
+                               {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
         case kIROp_Specialize:
@@ -4745,7 +4749,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // Couldn't handle
             String e = "Unhandled local inst in spirv-emit:\n" +
-                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                       dumpIRToString(
+                           inst,
+                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
             SLANG_UNIMPLEMENTED_X(e.getBuffer());
         }
     }
