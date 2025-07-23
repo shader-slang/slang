@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_AIR): -target metallib -stage compute -entry computeMain
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda
 
 // This reproduces the specific case that was failing where uniform pointers
 // are used for buffer copy operations with array indexing targeting Metal.
