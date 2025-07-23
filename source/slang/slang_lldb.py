@@ -1,7 +1,6 @@
 """
 This python script provides LLDB formatters for Slang IR types.
-To use it, add the following line to your ~/.lldbinit file:
-command script import /path/to/source/slang/slang_lldb.py
+To use it, see the `docs/debugging.md` file in this repo.
 """
 
 import json
