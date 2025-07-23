@@ -549,10 +549,23 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 targetOptionSet.hasOption(CompilerOptionName::Profile) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
                  SLANG_PROFILE_UNKNOWN);
-            bool specificCapabilityRequested =
-                targetOptionSet.hasOption(CompilerOptionName::Capability) &&
-                (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
-                 SLANG_CAPABILITY_UNKNOWN);
+            bool specificCapabilityRequested = false;
+            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+            {
+                switch (atomVal.kind)
+                {
+                case CompilerOptionValueKind::Int:
+                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
+                        specificCapabilityRequested = true;
+                    break;
+                case CompilerOptionValueKind::String:
+                    // User made a specific capability request
+                    specificCapabilityRequested = true;
+                    break;
+                }
+                if (specificCapabilityRequested)
+                    break;
+            }
 
             if (auto declaredCapsMod =
                     entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())

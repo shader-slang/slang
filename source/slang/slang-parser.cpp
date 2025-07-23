@@ -4972,6 +4972,15 @@ static void CompleteDecl(
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+
+                    // Copy visibility modifiers from the enum declaration
+                    if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
+                    {
+                        auto newVisibilityModifier = as<VisibilityModifier>(
+                            parser->astBuilder->createByNodeType(visibilityModifier->astNodeType));
+                        addModifier(staticConstDecl, newVisibilityModifier);
+                    }
+
                     auto valueExpr = parser->astBuilder->create<VarExpr>();
                     valueExpr->declRef = DeclRef<Decl>(enumCase);
                     staticConstDecl->initExpr = valueExpr;

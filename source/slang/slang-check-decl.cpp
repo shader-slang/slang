@@ -2996,6 +2996,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         assocTypeDef->type.type = context->conformingType;
         context->parentDecl->addMember(assocTypeDef);
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
+        auto visibility = getDeclVisibility(context->parentDecl);
+        addVisibilityModifier(assocTypeDef, visibility);
 
         markSelfDifferentialMembersOfType(
             as<AggTypeDecl>(context->parentDecl),
@@ -3029,6 +3031,10 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         aggTypeDecl = m_astBuilder->create<StructDecl>();
         aggTypeDecl->nameAndLoc.name = requirementDeclRef.getName();
         aggTypeDecl->loc = context->parentDecl->nameAndLoc.loc;
+
+        // The visibility of synthesized decl should be the same of the parent decl.
+        auto thisVisibility = getDeclVisibility(context->parentDecl);
+        addVisibilityModifier(aggTypeDecl, thisVisibility);
 
         context->parentDecl->addDirectMemberDecl(aggTypeDecl);
         synth.pushScopeForContainer(aggTypeDecl);
@@ -3152,7 +3158,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         assocTypeDef->nameAndLoc.name = differentialName;
         assocTypeDef->type.type = satisfyingType;
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-
+        auto visibility = getDeclVisibility(aggTypeDecl);
+        addVisibilityModifier(assocTypeDef, visibility);
         aggTypeDecl->addDirectMemberDecl(assocTypeDef);
     }
 
@@ -3184,9 +3191,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
 
     addModifier(aggTypeDecl, m_astBuilder->create<SynthesizedModifier>());
 
-    // The visibility of synthesized decl should be the same of the parent decl.
-    auto thisVisibility = getDeclVisibility(context->parentDecl);
-    addVisibilityModifier(aggTypeDecl, thisVisibility);
 
     // Synthesize the rest of IDifferential method conformances by recursively checking
     // conformance on the synthesized decl.
@@ -7499,25 +7503,17 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
 
         if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
         {
-            // The member satisfies the requirement in every other way except that
-            // it may have a lower visibility than min(parentVisibility, requirementVisibilty),
-            // in that case we will treat it as an error.
-            auto minRequiredVisibility = Math::Min(
-                getDeclVisibility(requiredMemberDeclRef.getDecl()),
-                getTypeVisibility(subType));
-            if (getDeclVisibility(member.declRef.getDecl()) < minRequiredVisibility)
-            {
-                getSink()->diagnose(
-                    member.declRef,
-                    Diagnostics::satisfyingDeclCannotHaveLowerVisibility,
-                    member.declRef);
-                getSink()->diagnose(
-                    requiredMemberDeclRef,
-                    Diagnostics::seeDeclarationOf,
-                    QualifiedDeclPath(requiredMemberDeclRef));
-                return false;
-            }
+            // The member satisfies the requirement, so we should add an `IsOverriding`
+            // modifier to the decl, to enable us to verify if a method with `override` keyword
+            // is actually overriding something.
             markOverridingDecl(context, member.declRef.getDecl(), requiredMemberDeclRef);
+
+            // Note: we do not impose any additional requirement on the visibility of the member.
+            // Specifically, it is valid for a method with lower visibility to implement an
+            // interface requirement that has higher visibility. It simply means the method is
+            // only accessible externally from the interface and not directly from the concrete
+            // type.
+            //
             return true;
         }
     }
