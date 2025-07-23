@@ -255,57 +255,131 @@ struct DynamicInstLoweringContext
         return PropagationInfo::none();
     }
 
+    // Centralized method to update propagation info and manage work queue
+    // Use this when you want to propagate new information to an existing instruction
+    // This will union the new info with existing info and add users to work queue if changed
+    void updateInfo(IRInst* inst, PropagationInfo newInfo, LinkedList<WorkItem>& workQueue)
+    {
+        auto existingInfo = tryGetInfo(inst);
+        auto unionedInfo = unionPropagationInfo(existingInfo, newInfo);
+
+        // Only proceed if info actually changed
+        if (areInfosEqual(existingInfo, unionedInfo))
+            return;
+
+        // Update the propagation map
+        propagationMap[inst] = unionedInfo;
+
+        // Add all users to appropriate work items
+        addUsersToWorkQueue(inst, unionedInfo, workQueue);
+    }
+
+    // Helper to add users of an instruction to the work queue based on how they use it
+    // This handles intra-procedural edges, inter-procedural edges, and return value propagation
+    void addUsersToWorkQueue(IRInst* inst, PropagationInfo info, LinkedList<WorkItem>& workQueue)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+
+            // If user is in a different block (or the inst is a param), add that block to work
+            // queue.
+            //
+            if (auto userBlock = as<IRBlock>(user->getParent()))
+            {
+                auto instBlock = as<IRBlock>(inst->getParent());
+                if (userBlock != instBlock || as<IRParam>(inst))
+                {
+                    workQueue.addLast(WorkItem(userBlock));
+                }
+            }
+
+            // If user is a terminator, add intra-procedural edges
+            if (auto terminator = as<IRTerminatorInst>(user))
+            {
+                auto parentBlock = as<IRBlock>(terminator->getParent());
+                if (parentBlock)
+                {
+                    auto successors = parentBlock->getSuccessors();
+                    for (auto succIter = successors.begin(); succIter != successors.end();
+                         ++succIter)
+                    {
+                        workQueue.addLast(WorkItem(succIter.getEdge()));
+                    }
+                }
+            }
+
+            // If user is a return instruction, handle function return propagation
+            if (auto returnInst = as<IRReturn>(user))
+            {
+                auto func = as<IRFunc>(returnInst->getParent()->getParent());
+                if (func)
+                {
+                    updateFuncReturnInfo(func, info, workQueue);
+                }
+            }
+
+            /* If user is a call instruction and inst is the callee, add interprocedural edges
+            if (auto callInst = as<IRCall>(user))
+            {
+                if (callInst->getCallee() == inst && info.judgment == PropagationJudgment::Set)
+                {
+                    // Add interprocedural edges for each possible function
+                    for (auto funcInst : info.possibleValues)
+                    {
+                        if (auto func = as<IRFunc>(funcInst))
+                        {
+                            workQueue.addLast(WorkItem(
+                                InterproceduralEdge::Direction::CallToFunc,
+                                callInst,
+                                func));
+                        }
+                    }
+                }
+            }*/
+        }
+    }
+
+    // Helper method to update function return info and propagate to call sites
+    void updateFuncReturnInfo(
+        IRFunc* func,
+        PropagationInfo returnInfo,
+        LinkedList<WorkItem>& workQueue)
+    {
+        auto existingReturnInfo = getFuncReturnInfo(func);
+        auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnInfo);
+
+        if (!areInfosEqual(existingReturnInfo, newReturnInfo))
+        {
+            funcReturnInfo[func] = newReturnInfo;
+
+            // Add interprocedural edges to all call sites
+            if (funcCallSites.containsKey(func))
+            {
+                for (auto callSite : funcCallSites[func])
+                {
+                    workQueue.addLast(
+                        WorkItem(InterproceduralEdge::Direction::FuncToCall, callSite, func));
+                }
+            }
+        }
+    }
+
+    // Summary of centralized propagation methods:
+    // - updateInfo(): Use for propagating new info to existing instructions (unions and manages
+    // work queue)
+    // - addUsersToWorkQueue(): Handles adding users to work queue for intra/inter-procedural
+    // propagation
+    // - updateFuncReturnInfo(): Specialized helper for function return value propagation
+
     void processBlock(IRBlock* block, LinkedList<WorkItem>& workQueue)
     {
-        bool anyInfoChanged = false;
-
-        HashSet<IRBlock*> affectedBlocks;
-        HashSet<IRTerminatorInst*> affectedTerminators;
         for (auto inst : block->getChildren())
         {
             // Skip parameters & terminator
             if (as<IRParam>(inst) || as<IRTerminatorInst>(inst))
                 continue;
-
-            auto oldInfo = tryGetInfo(inst);
             processInstForPropagation(inst, workQueue);
-            auto newInfo = tryGetInfo(inst);
-
-            // If information has changed, propagate to appropriate blocks/edges
-            if (!areInfosEqual(oldInfo, newInfo))
-            {
-                for (auto use = inst->firstUse; use; use = use->nextUse)
-                {
-                    auto userBlock = as<IRBlock>(use->getUser());
-                    if (userBlock && userBlock != block)
-                        affectedBlocks.add(userBlock);
-
-                    if (auto terminator = as<IRTerminatorInst>(use->getUser()))
-                        affectedTerminators.add(terminator);
-                }
-            }
-        }
-
-        for (auto block : affectedBlocks)
-        {
-            workQueue.addLast(WorkItem(block));
-        }
-
-        for (auto terminator : affectedTerminators)
-        {
-            auto successors = as<IRBlock>(terminator->getParent())->getSuccessors();
-            for (auto succIter = successors.begin(), succEnd = successors.end();
-                 succIter != succEnd;
-                 ++succIter)
-            {
-                workQueue.addLast(WorkItem(succIter.getEdge()));
-            }
-        }
-
-        if (as<IRReturn>(block->getTerminator()))
-        {
-            // If the block has a return inst, we need to propagate return values
-            propagateReturnValues(block, workQueue);
         }
     };
 
@@ -521,14 +595,13 @@ struct DynamicInstLoweringContext
             break;
         }
 
-        propagationMap[inst] = info;
+        updateInfo(inst, info, workQueue);
     }
 
     PropagationInfo analyzeCreateExistentialObject(IRCreateExistentialObject* inst)
     {
         // For now, error out as specified
         SLANG_UNIMPLEMENTED_X("IRCreateExistentialObject lowering not yet implemented");
-        return PropagationInfo::none();
     }
 
     PropagationInfo analyzeMakeExistential(IRMakeExistential* inst)
@@ -721,8 +794,6 @@ struct DynamicInstLoweringContext
             return;
 
         // Collect propagation info for each argument and update corresponding parameter
-        // TODO: Unify this logic with the affectedBlocks logic in the per-inst processing logic.
-        HashSet<IRBlock*> affectedBlocks;
         Index paramIndex = 0;
         for (auto param : successorBlock->getParams())
         {
@@ -731,37 +802,11 @@ struct DynamicInstLoweringContext
                 auto arg = unconditionalBranch->getArg(paramIndex);
                 if (auto argInfo = tryGetInfo(arg))
                 {
-                    // Union with existing parameter info
-                    bool infoChanged = false;
-                    if (auto existingInfo = tryGetInfo(param))
-                    {
-                        propagationMap[param] = unionPropagationInfo(existingInfo, argInfo);
-                        if (!infoChanged && !areInfosEqual(existingInfo, propagationMap[param]))
-                            infoChanged = true;
-                    }
-                    else
-                    {
-                        propagationMap[param] = argInfo;
-                        infoChanged = true;
-                    }
-                    // If any info changed, add all user blocks to the affected set
-                    if (infoChanged)
-                    {
-                        for (auto use = param->firstUse; use; use = use->nextUse)
-                        {
-                            auto user = use->getUser();
-                            if (auto block = as<IRBlock>(user->getParent()))
-                                affectedBlocks.add(block);
-                        }
-                    }
+                    // Use centralized update method
+                    updateInfo(param, argInfo, workQueue);
                 }
             }
             paramIndex++;
-        }
-
-        for (auto block : affectedBlocks)
-        {
-            workQueue.addLast(WorkItem(block));
         }
     }
 
@@ -781,7 +826,6 @@ struct DynamicInstLoweringContext
                     return;
 
                 Index argIndex = 1; // Skip callee (operand 0)
-                HashSet<IRBlock*> affectedBlocks;
                 for (auto param : firstBlock->getParams())
                 {
                     if (argIndex < callInst->getOperandCount())
@@ -789,48 +833,24 @@ struct DynamicInstLoweringContext
                         auto arg = callInst->getOperand(argIndex);
                         if (auto argInfo = tryGetInfo(arg))
                         {
-                            // Union with existing parameter info
-                            auto existingInfo = tryGetInfo(param);
-                            auto newInfo = unionPropagationInfo(tryGetInfo(param), argInfo);
-                            propagationMap[param] = newInfo;
-                            if (!areInfosEqual(existingInfo, newInfo))
-                            {
-                                for (auto use = param->firstUse; use; use = use->nextUse)
-                                {
-                                    auto user = use->getUser();
-                                    if (auto block = as<IRBlock>(user->getParent()))
-                                        affectedBlocks.add(block);
-                                }
-                            }
+                            // Use centralized update method
+                            updateInfo(param, argInfo, workQueue);
                         }
                     }
                     argIndex++;
                 }
-                // Add the affected block to the work queue if any info changed
-                for (auto block : affectedBlocks)
-                    workQueue.addLast(WorkItem(block));
                 break;
             }
         case InterproceduralEdge::Direction::FuncToCall:
             {
                 // Propagate return value info from function to call site
                 auto returnInfo = funcReturnInfo.tryGetValue(targetFunc);
-
-                bool anyInfoChanged = false;
                 if (returnInfo)
                 {
-                    // Union with existing call info
-                    auto existingCallInfo = tryGetInfo(callInst);
-                    auto newInfo = unionPropagationInfo(existingCallInfo, *returnInfo);
-                    propagationMap[callInst] = newInfo;
-                    if (!areInfosEqual(existingCallInfo, newInfo))
-                        anyInfoChanged = true;
-                }
-
-                // Add the callInst's parent block to the work queue if any info changed
-                if (anyInfoChanged)
+                    // Use centralized update method
                     workQueue.addLast(WorkItem(as<IRBlock>(callInst->getParent())));
-
+                    updateInfo(callInst, *returnInfo, workQueue);
+                }
                 break;
             }
         default:
@@ -871,38 +891,6 @@ struct DynamicInstLoweringContext
                 propagationMap[param] = PropagationInfo::none();
             }
         }
-    }
-
-    bool propagateReturnValues(IRBlock* block, LinkedList<WorkItem>& workQueue)
-    {
-        auto terminator = block->getTerminator();
-        auto returnInst = as<IRReturn>(terminator);
-        if (!returnInst)
-            return false;
-
-        auto func = as<IRFunc>(block->getParent());
-        if (!func)
-            return false;
-
-        // Get return value info if there is a return value
-        PropagationInfo returnValueInfo;
-        returnValueInfo = tryGetInfo(returnInst->getVal());
-
-        // Update function return info by unioning with existing info
-        bool returnInfoChanged = false;
-        auto existingReturnInfo = getFuncReturnInfo(func);
-        auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnValueInfo);
-        if (!areInfosEqual(newReturnInfo, existingReturnInfo))
-        {
-            funcReturnInfo[func] = newReturnInfo;
-
-            if (this->funcCallSites.containsKey(func))
-                for (auto callSite : this->funcCallSites[func])
-                    workQueue.addLast(
-                        WorkItem(InterproceduralEdge::Direction::FuncToCall, callSite, func));
-        }
-
-        return returnInfoChanged;
     }
 
     PropagationInfo unionPropagationInfo(const List<PropagationInfo>& infos)
@@ -1126,21 +1114,6 @@ struct DynamicInstLoweringContext
         auto info = tryGetInfo(inst);
         if (!info || info.judgment != PropagationJudgment::Existential)
             return;
-
-        /* Replace type with Tuple<UInt, AnyValueType>
-        IRBuilder builder(module);
-        builder.setInsertBefore(inst);
-
-        HashSet<IRInst*> types;
-        // Extract types from witness tables by looking at the concrete types
-        for (auto table : info.possibleValues)
-            if (auto witnessTable = as<IRWitnessTable>(table))
-                if (auto concreteType = witnessTable->getConcreteType())
-                    types.add(concreteType);
-
-        auto anyValueType = createAnyValueTypeFromInsts(types);
-        auto tupleType = builder.getTupleType(List<IRType*>({builder.getUIntType(),
-        anyValueType}));*/
 
         inst->setFullType(getTypeForExistential(info));
     }
