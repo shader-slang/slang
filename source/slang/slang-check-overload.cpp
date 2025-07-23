@@ -2726,7 +2726,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
-    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2735,21 +2734,17 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
             {
                 Expr* resultExpr = nullptr;
+                DiagnosticSink tempSink(getSourceManager(), nullptr);
                 ConversionCost conversionCost = kConversionCost_None;
-                auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
+                auto coerceResult = SemanticsVisitor(withSink(&tempSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
                                             typeType->getType(),
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            &collectedErrorsSink,
+                                            &tempSink,
                                             &conversionCost);
-                if (collectedErrorsSink.getErrorCount())
-                {
-                    // failed, do not consider the result to have been "coerced"
-                    coerceResult = false;
-                }
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
@@ -2967,16 +2962,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
-                // Drain our error sink of "saved errors"
-                if (collectedErrorsSink.getErrorCount())
-                {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                }
-
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
