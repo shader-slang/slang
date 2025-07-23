@@ -93,6 +93,7 @@ struct WorkItem
     enum class Type
     {
         None,      // Invalid
+        Inst,      // Propagate through a single instruction
         Block,     // Propagate information within a block
         IntraProc, // Propagate through within-function edge (IREdge)
         InterProc  // Propagate across function call/return (InterproceduralEdge)
@@ -101,13 +102,19 @@ struct WorkItem
     Type type;
     union
     {
-        IRBlock* block;
-        IREdge intraProcEdge;
-        InterproceduralEdge interProcEdge;
+        IRInst* inst;                      // Type::Inst
+        IRBlock* block;                    // Type::Block
+        IREdge intraProcEdge;              // Type::IntraProc
+        InterproceduralEdge interProcEdge; // Type::InterProc
     };
 
     WorkItem()
         : type(Type::None)
+    {
+    }
+
+    WorkItem(IRInst* inst)
+        : type(Type::Inst), inst(inst)
     {
     }
 
@@ -139,6 +146,8 @@ struct WorkItem
             intraProcEdge = other.intraProcEdge;
         else if (type == Type::InterProc)
             interProcEdge = other.interProcEdge;
+        else if (type == Type::Inst)
+            inst = other.inst;
         else
             block = other.block;
     }
@@ -150,6 +159,8 @@ struct WorkItem
             intraProcEdge = other.intraProcEdge;
         else if (type == Type::InterProc)
             interProcEdge = other.interProcEdge;
+        else if (type == Type::Inst)
+            inst = other.inst;
         else
             block = other.block;
         return *this;
@@ -285,14 +296,7 @@ struct DynamicInstLoweringContext
             // If user is in a different block (or the inst is a param), add that block to work
             // queue.
             //
-            if (auto userBlock = as<IRBlock>(user->getParent()))
-            {
-                auto instBlock = as<IRBlock>(inst->getParent());
-                if (userBlock != instBlock || as<IRParam>(inst))
-                {
-                    workQueue.addLast(WorkItem(userBlock));
-                }
-            }
+            workQueue.addLast(WorkItem(user));
 
             // If user is a terminator, add intra-procedural edges
             if (auto terminator = as<IRTerminatorInst>(user))
@@ -318,25 +322,6 @@ struct DynamicInstLoweringContext
                     updateFuncReturnInfo(func, info, workQueue);
                 }
             }
-
-            /* If user is a call instruction and inst is the callee, add interprocedural edges
-            if (auto callInst = as<IRCall>(user))
-            {
-                if (callInst->getCallee() == inst && info.judgment == PropagationJudgment::Set)
-                {
-                    // Add interprocedural edges for each possible function
-                    for (auto funcInst : info.possibleValues)
-                    {
-                        if (auto func = as<IRFunc>(funcInst))
-                        {
-                            workQueue.addLast(WorkItem(
-                                InterproceduralEdge::Direction::CallToFunc,
-                                callInst,
-                                func));
-                        }
-                    }
-                }
-            }*/
         }
     }
 
@@ -364,13 +349,6 @@ struct DynamicInstLoweringContext
             }
         }
     }
-
-    // Summary of centralized propagation methods:
-    // - updateInfo(): Use for propagating new info to existing instructions (unions and manages
-    // work queue)
-    // - addUsersToWorkQueue(): Handles adding users to work queue for intra/inter-procedural
-    // propagation
-    // - updateFuncReturnInfo(): Specialized helper for function return value propagation
 
     void processBlock(IRBlock* block, LinkedList<WorkItem>& workQueue)
     {
@@ -415,6 +393,9 @@ struct DynamicInstLoweringContext
 
             switch (item.type)
             {
+            case WorkItem::Type::Inst:
+                processInstForPropagation(item.inst, workQueue);
+                break;
             case WorkItem::Type::Block:
                 processBlock(item.block, workQueue);
                 break;
@@ -600,8 +581,28 @@ struct DynamicInstLoweringContext
 
     PropagationInfo analyzeCreateExistentialObject(IRCreateExistentialObject* inst)
     {
-        // For now, error out as specified
-        SLANG_UNIMPLEMENTED_X("IRCreateExistentialObject lowering not yet implemented");
+        //
+        // TODO: Actually use the integer<->type map present in the linkage to
+        // extract a set of possible witness tables (if the index is a compile-time constant).
+        //
+
+        if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
+        {
+            if (!interfaceType->findDecoration<IRComInterfaceDecoration>())
+            {
+                auto tables = collectExistentialTables(interfaceType);
+                if (tables.getCount() > 0)
+                    return PropagationInfo::makeExistential(tables);
+                else
+                    return PropagationInfo::none();
+            }
+            else
+            {
+                return PropagationInfo::makeUnbounded();
+            }
+        }
+
+        return PropagationInfo::none();
     }
 
     PropagationInfo analyzeMakeExistential(IRMakeExistential* inst)
@@ -848,7 +849,6 @@ struct DynamicInstLoweringContext
                 if (returnInfo)
                 {
                     // Use centralized update method
-                    workQueue.addLast(WorkItem(as<IRBlock>(callInst->getParent())));
                     updateInfo(callInst, *returnInfo, workQueue);
                 }
                 break;
@@ -1364,17 +1364,48 @@ struct DynamicInstLoweringContext
         IRInst* tupleArgs[] = {tableId, packedValue};
         auto tuple = builder.emitMakeTuple(tupleType, 2, tupleArgs);
 
+        if (auto info = tryGetInfo(inst))
+            propagationMap[tuple] = info;
+
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
     }
 
     void lowerCreateExistentialObject(IRCreateExistentialObject* inst)
     {
-        // Error out for now as specified
-        sink->diagnose(
-            inst,
-            Diagnostics::unimplemented,
-            "IRCreateExistentialObject lowering not yet implemented");
+        auto info = tryGetInfo(inst);
+        if (!info || info.judgment != PropagationJudgment::Existential)
+            return;
+
+        Dictionary<UInt, UInt> mapping;
+        for (auto table : info.possibleValues)
+        {
+            // Get unique ID for the witness table
+            auto witnessTable = cast<IRWitnessTable>(table);
+            auto outputId = getUniqueID(witnessTable);
+            auto inputId = table->findDecoration<IRSequentialIDDecoration>()->getSequentialID();
+            mapping[inputId] = outputId; // Map ID to itself for now
+        }
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto translatedID = builder.emitCallInst(
+            builder.getUIntType(),
+            createIntegerMappingFunc(mapping),
+            List<IRInst*>({inst->getTypeID()}));
+
+        auto existentialTupleType = as<IRTupleType>(getTypeForExistential(info));
+        auto existentialTuple = builder.emitMakeTuple(
+            existentialTupleType,
+            List<IRInst*>(
+                {translatedID,
+                 builder.emitReinterpret(existentialTupleType->getOperand(1), inst->getValue())}));
+
+        if (auto info = tryGetInfo(inst))
+            propagationMap[existentialTuple] = info;
+
+        inst->replaceUsesWith(existentialTuple);
+        inst->removeAndDeallocate();
     }
 
     UInt getUniqueID(IRInst* funcOrTable)
@@ -1388,10 +1419,7 @@ struct DynamicInstLoweringContext
         return newId;
     }
 
-    IRFunc* createKeyMappingFunc(
-        IRInst* key,
-        const HashSet<IRInst*>& inputTables,
-        const HashSet<IRInst*>& outputVals)
+    IRFunc* createIntegerMappingFunc(Dictionary<UInt, UInt>& mapping)
     {
         // Create a function that maps input IDs to output IDs
         IRBuilder builder(module);
@@ -1419,43 +1447,15 @@ struct DynamicInstLoweringContext
         List<IRInst*> caseValues;
         List<IRBlock*> caseBlocks;
 
-        // Build mapping from input tables to output values
-        List<IRInst*> inputTableArray;
-        List<IRInst*> outputValArray;
-
-        for (auto table : inputTables)
-            inputTableArray.add(table);
-        for (auto table : outputVals)
-            outputValArray.add(table);
-
-        for (Index i = 0; i < inputTableArray.getCount(); i++)
+        for (auto item : mapping)
         {
-            auto inputTable = inputTableArray[i];
-            auto inputId = getUniqueID(inputTable);
+            // Create case block
+            auto caseBlock = builder.emitBlock();
+            builder.setInsertInto(caseBlock);
+            builder.emitReturn(builder.getIntValue(builder.getUIntType(), item.second));
 
-            // Find corresponding output table (for now, use simple 1:1 mapping)
-            IRInst* outputVal = nullptr;
-            if (i < outputValArray.getCount())
-            {
-                outputVal = outputValArray[i];
-            }
-            else if (outputValArray.getCount() > 0)
-            {
-                outputVal = outputValArray[0]; // Fallback to first output
-            }
-
-            if (outputVal)
-            {
-                auto outputId = getUniqueID(outputVal);
-
-                // Create case block
-                auto caseBlock = builder.emitBlock();
-                builder.setInsertInto(caseBlock);
-                builder.emitReturn(builder.getIntValue(builder.getUIntType(), outputId));
-
-                caseValues.add(builder.getIntValue(builder.getUIntType(), inputId));
-                caseBlocks.add(caseBlock);
-            }
+            caseValues.add(builder.getIntValue(builder.getUIntType(), item.first));
+            caseBlocks.add(caseBlock);
         }
 
         // Create flattened case arguments array
@@ -1481,6 +1481,24 @@ struct DynamicInstLoweringContext
             flattenedCaseArgs.getBuffer());
 
         return func;
+    }
+
+    IRFunc* createKeyMappingFunc(
+        IRInst* key,
+        const HashSet<IRInst*>& inputTables,
+        const HashSet<IRInst*>& outputVals)
+    {
+        Dictionary<UInt, UInt> mapping;
+
+        // Create a mapping.
+        for (auto table : inputTables)
+        {
+            auto inputId = getUniqueID(table);
+            auto outputId = getUniqueID(findEntryInConcreteTable(table, key));
+            mapping[inputId] = outputId;
+        }
+
+        return createIntegerMappingFunc(mapping);
     }
 
     IRFunc* createDispatchFunc(const HashSet<IRInst*>& funcs, IRFuncType* expectedFuncType)
