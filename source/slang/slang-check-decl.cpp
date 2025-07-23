@@ -7535,7 +7535,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // wrappers that redirects the call into the inner element.
     //
     context->innerSink.reset();
-    MethodWitnessSynthesisFailureDetails failureDetails;
+    MethodWitnessSynthesisFailureDetails failureDetails = {};
     if (trySynthesizeRequirementWitness(
             context,
             lookupResult,
