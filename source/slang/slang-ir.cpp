@@ -2938,8 +2938,7 @@ IRRefType* IRBuilder::getRefType(
     AccessQualifier accessQualifier,
     AddressSpace addrSpace)
 {
-    return (
-        IRRefType*)getPtrType(kIROp_RefType, valueType, accessQualifier, addrSpace);
+    return (IRRefType*)getPtrType(kIROp_RefType, valueType, accessQualifier, addrSpace);
 }
 
 IRConstRefType* IRBuilder::getConstRefType(
@@ -2969,7 +2968,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     if (ptrWithAddrSpace->hasAddressSpace())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
-            valueType,           
+            valueType,
             ptrWithAddrSpace->getAccessQualifier(),
             ptrWithAddrSpace->getAddressSpace());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
@@ -2985,8 +2984,7 @@ IRPtrType* IRBuilder::getPtrType(
         op,
         valueType,
         getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
-        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace))
-    );
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
 }
 
 IRPtrType* IRBuilder::getPtrType(

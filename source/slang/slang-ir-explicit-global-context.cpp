@@ -316,8 +316,11 @@ struct IntroduceExplicitGlobalContextPass
         // The context will usually be passed around by pointer,
         // so we get and cache that pointer type up front.
         //
-        m_contextStructPtrType =
-            builder.getPtrType(kIROp_PtrType, m_contextStructType, AccessQualifier::ReadWrite, getAddressSpaceOfLocal());
+        m_contextStructPtrType = builder.getPtrType(
+            kIROp_PtrType,
+            m_contextStructType,
+            AccessQualifier::ReadWrite,
+            getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
