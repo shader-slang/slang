@@ -878,9 +878,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                 {
                     // Matrix * Matrix: implement component-wise multiplication (Hadamard product)
                     // In Slang/HLSL, the * operator between matrices is component-wise, not mathematical matrix multiplication
-                    
-                    auto rowCount = getIntVal(arrayType->getElementCount());
-                    
                     emitType(resultType);
                     m_writer->emit("{");
                     
