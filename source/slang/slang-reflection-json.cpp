@@ -728,7 +728,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"None\"";
         break;
     default:
-        fprintf(stderr, "Unhandled type kind: %d\n", (int)kind);
+        SLANG_ASSERT(!"Unhandled type kind");
         writer.maybeComma();
         writer << "\"kind\": \"Unknown\"";
         break;

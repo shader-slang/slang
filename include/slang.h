@@ -2241,11 +2241,11 @@ struct TypeReflection
         GenericTypeParameter = SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
         Interface = SLANG_TYPE_KIND_INTERFACE,
         OutputStream = SLANG_TYPE_KIND_OUTPUT_STREAM,
-        MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
         Specialized = SLANG_TYPE_KIND_SPECIALIZED,
         Feedback = SLANG_TYPE_KIND_FEEDBACK,
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
