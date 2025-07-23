@@ -1,26 +1,31 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHK_AIR): -target metallib -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_MTL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_AIR): -target metallib -stage compute -entry computeMain
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
 
 // This reproduces the specific case that was failing where uniform pointers
 // are used for buffer copy operations with array indexing targeting Metal.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<uint64_t> outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 
-// CHECK: uint{{.*}}device{{ *\*}} src
-// CHECK: uint{{.*}}device{{ *\*}} dst
+//CHECK_MTL: int{{.*}}device{{ *\*}} src
 
 // "indirect_argument" means a pointer
-//CHK_AIR: !"uint", !"src{{[^"]*}}", !"air.indirect_argument"
+//CHECK_AIR: !"int", !"src{{[^"]*}}", !"air.indirect_argument"
 
-uniform uint32_t* src;
-uniform uint32_t* dst;
+//TEST_INPUT: set src = ubuffer(data=[1 2 3 4 5 6 7 8],stride=4);
+uniform int* src;
 
 [shader("compute")]
 [numthreads(4,1,1)]
-void computeMain(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 threadID : SV_DispatchThreadID)
 {
-    var input = src[sv_dispatchThreadID.x];
-    dst[sv_dispatchThreadID.x] = input;
+    let input = src[threadID.x];
+    outputBuffer[threadID.x] = input;
 }
+
+//CHECK:1
+//CHECK-NEXT:2
+//CHECK-NEXT:3
+//CHECK-NEXT:4
