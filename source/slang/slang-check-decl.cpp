@@ -5572,7 +5572,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
         context->innerSink.diagnose(
             SourceLoc(),
-            Diagnostics::cannotResolveOverloadForMethodRequirement,
+            Diagnostics::genericSignatureDoesNotMatchRequirement,
             baseOverloadedExpr->name);
         return false;
     }
