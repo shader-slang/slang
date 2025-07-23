@@ -131,7 +131,8 @@ An idiomatic approach would be something like:
     class $T;
 %end
 #else // FIDDLE OUTPUT:
-#endif
+// Fiddle output goes here.
+#endif // FIDDLE END
 ```
 
 For the template part of things, you can write lines of more-or-less ordinary C++ code, interspersed with two kinds of script code:
@@ -151,7 +152,7 @@ For example, given the input above, the generated output for the template might 
 #else // FIDDLE OUTPUT:
 #define FIDDLE_TEMPLATE_OUTPUT_ID 0
 #include "my-class-forward-decls.h.fiddle"
-#endif
+#endif // FIDDLE END
 ```
 
 Inside templates there is a global defined `THIS_FILE` which is the file path
