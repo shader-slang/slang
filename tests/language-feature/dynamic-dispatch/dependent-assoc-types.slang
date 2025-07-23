@@ -1,4 +1,6 @@
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface ISerializer<T>
@@ -61,8 +63,8 @@ struct B : ICalculation
 {
     typealias Data = BData;
     typealias DataSerializer = BDataSerializer;
-    float calc(Data d, float x) { return d.x * x * x + d.y; }
-    Data make(float q) { return {q, q}; }
+    float calc(Data d, float x) { return d.x * x + d.y; }
+    Data make(float q) { return {q, q * q}; }
 };
 
 struct C : ICalculation
@@ -73,7 +75,7 @@ struct C : ICalculation
     Data make(float q) { return q; }
 };
 
-ICalculation factoryAB(uint id, float x)
+ICalculation factoryAB(uint id)
 {
     if (id == 0)
         return A();
@@ -81,17 +83,19 @@ ICalculation factoryAB(uint id, float x)
         return B();
 }
 
-float f(uint id, float x)
+float f(uint id, float q)
 {
-    let obj = factoryAB(id, x);
-    obj.Data d = obj.make(x);
+    let obj = factoryAB(id);
+    obj.Data d = obj.make(q);
     obj.DataSerializer::serialize(d, outputBuffer);
-    outputBuffer[3] = id;
+    outputBuffer[2] = id;
+    return 0;
 }
 
-float g(uint id, float x)
+float g(float x)
 {
-    let obj = factoryAB(id, x);
+    uint id = (uint)outputBuffer[2];
+    let obj = factoryAB(id);
     obj.Data d = obj.DataSerializer::deserialize(outputBuffer);
     return obj.calc(d, x);
 }
@@ -99,6 +103,19 @@ float g(uint id, float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    f(0, 1.f);
-    g(0, 1.f);
+    f(0, 3.f);
+    outputBuffer[3] = g(2.f);
+    f(1, 2.f);
+    outputBuffer[4] = g(2.f); 
+
+    // Clear the first 3 elements
+    outputBuffer[0] = 0.f;
+    outputBuffer[1] = 0.f;
+    outputBuffer[2] = 0.f;
+
+    // CHECK: 0.0
+    // CHECK: 0.0
+    // CHECK: 0.0
+    // CHECK: 12.0
+    // CHECK: 8.0
 }

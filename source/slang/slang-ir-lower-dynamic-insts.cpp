@@ -1299,14 +1299,14 @@ struct DynamicInstLoweringContext
         for (auto inst : typeInstsToLower)
             lowerInst(inst);
 
+        for (auto func : funcTypesToProcess)
+            replaceFuncType(func, this->funcReturnInfo[func]);
+
         for (auto inst : valueInstsToLower)
             lowerInst(inst);
 
         for (auto inst : instWithReplacementTypes)
             replaceType(inst);
-
-        for (auto func : funcTypesToProcess)
-            replaceFuncType(func, this->funcReturnInfo[func]);
     }
 
     void replaceFuncType(IRFunc* func, PropagationInfo& returnTypeInfo)
@@ -1579,6 +1579,7 @@ struct DynamicInstLoweringContext
         inst->replaceUsesWith(newCall);
         if (auto info = tryGetInfo(inst))
             propagationMap[newCall] = info;
+        replaceType(newCall); // "maybe replace type"
         inst->removeAndDeallocate();
     }
 
