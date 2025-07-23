@@ -1444,7 +1444,18 @@ public:
 
     Type* ExtractGenericArgType(Expr* exp);
 
-    IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink);
+    enum class ConstantFoldingKind
+    {
+        CompileTime,
+        LinkTime,
+        SpecializationConstant
+    };
+
+    IntVal* ExtractGenericArgInteger(
+        Expr* exp,
+        Type* genericParamType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
     Val* ExtractGenericArgVal(Expr* exp);
@@ -2139,6 +2150,12 @@ public:
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
 
+    // This function is used to get the best integer type that matches the given type.
+    // If `type` is already an integer type, return it as is.
+    // If `type` is a enum type, return the tag type if it exists.
+    // Otherwise, return the 32-bit signed integer type.
+    Type* getMatchingIntType(Type* type);
+
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
 
@@ -2178,12 +2195,6 @@ public:
 
     Expr* checkPredicateExpr(Expr* expr);
 
-    enum class ConstantFoldingKind
-    {
-        CompileTime,
-        LinkTime,
-        SpecializationConstant
-    };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
         IntVal** outIntVal,

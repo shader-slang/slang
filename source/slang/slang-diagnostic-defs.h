@@ -138,6 +138,12 @@ DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
+DIAGNOSTIC(
+    18,
+    Warning,
+    separateDebugInfoUnsupportedForTarget,
+    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
+    "SPIR-V binary targets.")
 DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(
@@ -658,6 +664,11 @@ DIAGNOSTIC(
     cannotConvertArrayOfSmallerToLargerSize,
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
+DIAGNOSTIC(
+    30029,
+    Error,
+    arrayIndexOutOfBounds,
+    "array index '$0' is out of bounds for array of size '$1'.")
 DIAGNOSTIC(
     30026,
     Error,
@@ -2194,12 +2205,6 @@ DIAGNOSTIC(
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
-
-DIAGNOSTIC(
-    38202,
-    Error,
-    matrixWithDisallowedElementTypeEncountered,
-    "matrix with disallowed element type '$0' encountered")
 
 DIAGNOSTIC(
     38203,

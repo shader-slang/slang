@@ -616,7 +616,7 @@ FIDDLE(abstract)
 class FunctionDeclBase : public CallableDecl
 {
     FIDDLE(...)
-    FIDDLE() Stmt* body = nullptr;
+    Stmt* body = nullptr;
 };
 
 // A constructor/initializer to create instances of a type

@@ -4,8 +4,10 @@
 #include "../core/slang-castable.h"
 #include "../core/slang-io.h"
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-string.h"
 #include "../core/slang-type-convert-util.h"
 #include "../core/slang-type-text-util.h"
 // Artifact
@@ -24,6 +26,7 @@
 #include "slang-check.h"
 #include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
+#include "slang-ir.h"
 #include "slang-lookup.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -160,6 +163,21 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    // Read environment variable for IR debugging
+    StringBuilder irBreakEnv;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_DEBUG_IR_BREAK"),
+            irBreakEnv)))
+    {
+        String envValue = irBreakEnv.produceString();
+        if (envValue.getLength())
+        {
+            _slangIRAllocBreak = stringToInt(envValue);
+            _slangIRPrintStackAtBreak = true;
+        }
+    }
+#endif
 
     _initCodeGenTransitionMap();
 
@@ -3021,7 +3039,34 @@ Expr* ComponentType::findDeclFromStringInType(
     }
 
     auto checkedTerm = visitor.CheckTerm(expr);
-    auto resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+
+    // Check if checkedTerm is overloaded functions and avoid resolving if so
+    // to preserve all function overloads with different signatures
+    Expr* resolvedTerm = checkedTerm;
+    if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
+    {
+        // Check if all candidates are function references
+        bool allAreFunctions = true;
+        for (auto item : overloadedExpr->lookupResult2.items)
+        {
+            if (!as<FunctionDeclBase>(item.declRef.getDecl()))
+            {
+                allAreFunctions = false;
+                break;
+            }
+        }
+
+        // If not all are functions, resolve the overload as usual
+        if (!allAreFunctions)
+        {
+            resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+        }
+    }
+    else
+    {
+        // Not overloaded, resolve as usual
+        resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
+    }
 
 
     if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))

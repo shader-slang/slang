@@ -101,7 +101,7 @@ struct PlatformTest : public WindowedAppBase
 
     Slang::Result initialize()
     {
-        SLANG_RETURN_ON_FAIL(initializeBase("platform-test", 1024, 768));
+        SLANG_RETURN_ON_FAIL(initializeBase("platform-test", 1024, 768, getDeviceType()));
 
         // We may not have a window if we're running in test mode
         SLANG_ASSERT(isTestMode() || gWindow);

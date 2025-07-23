@@ -2490,13 +2490,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     {
         expr = CheckExpr(expr);
     }
-    auto indexExpr = subscriptExpr->indexExprs[0];
+    auto& indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!isScalarIntegerType(indexExpr->type.type))
-    {
-        getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
-        return CreateErrorExpr(subscriptExpr);
-    }
+    auto intTargetType = getMatchingIntType(indexExpr->type.type);
+    indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
@@ -2848,6 +2845,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
+        if (!invoke->functionExpr)
+            return rs;
+
         // if this is still an invoke expression, test arguments passed to inout/out parameter are
         // LValues
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
