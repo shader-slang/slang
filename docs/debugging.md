@@ -28,8 +28,23 @@ about respecting breakpoint locations and not having missing variables.
 
 If instead you prefer to debug within VS Code, you can run LLDB via the
 [CodeLLDB][] extension. For example, to recreate the same debugging session as
-above, create a `.vscode/launch.json` file with these contents, place any
-breakpoints you want, then hit F5:
+above, create a `.vscode/tasks.json` file with these contents:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Debug build",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "--preset", "debug"]
+    }
+  ]
+}
+```
+
+Then create a `.vscode/launch.json` file with these contents:
 
 ```json
 {
@@ -37,6 +52,7 @@ breakpoints you want, then hit F5:
   "configurations": [
     {
       "name": "LLDB",
+      "preLaunchTask": "Debug build",
       "type": "lldb",
       "request": "launch",
       "initCommands": ["command source .lldbinit"],
@@ -46,6 +62,8 @@ breakpoints you want, then hit F5:
   ]
 }
 ```
+
+Finally, place any breakpoints you want, and hit F5.
 
 [`--local-lldbinit`]: https://lldb.llvm.org/man/lldb.html#cmdoption-lldb-local-lldbinit
 [codelldb]: https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb
