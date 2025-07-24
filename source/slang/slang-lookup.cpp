@@ -357,6 +357,32 @@ static Type* _maybeSpecializeSuperType(
     return superType;
 }
 
+void FacetImpl::init(ASTBuilder* astBuilder)
+{
+    if (directness != Facet::Directness::Self)
+    {
+        // Depending on the type of the facet, we may want to specialize the
+        // declRef that we are going to lookup in. If the facet represents
+        // an extension, we should just lookup in the extension decl.
+        //
+        // If the facet is an extension to an interface type, we should
+        // specialize the interface declRef to the concrete type that this
+        // extension applied to.
+        //
+        // If the facet represents an implementation of interface type,
+        // we should also specialize the interface declRef with the concrete
+        // type info.
+        //
+        declRefForMemberLookup =
+            _maybeSpecializeSuperTypeDeclRef(astBuilder, origin.declRef, getType(), subtypeWitness)
+                .as<ContainerDecl>();
+    }
+    else
+    {
+        declRefForMemberLookup = origin.declRef.as<ContainerDecl>();
+    }
+}
+
 static void _lookUpMembersInType(
     ASTBuilder* astBuilder,
     Name* name,
@@ -490,27 +516,9 @@ static void _lookupMembersInSuperTypeFacets(
 
         BreadcrumbInfo* newBreadcrumbs = inBreadcrumbs;
         BreadcrumbInfo subtypeInfo;
-        auto parentDeclRef = containerDeclRef;
+        auto parentDeclRef = facet->declRefForMemberLookup;
         if (facet->directness != Facet::Directness::Self)
         {
-            // Depending on the type of the facet, we may want to specialize the
-            // declRef that we are going to lookup in. If the facet represents
-            // an extension, we should just lookup in the extension decl.
-            //
-            // If the facet is an extension to an interface type, we should
-            // specialize the interface declRef to the concrete type that this
-            // extension applied to.
-            //
-            // If the facet represents an implementation of interface type,
-            // we should also specialize the interface declRef with the concrete
-            // type info.
-            //
-            parentDeclRef = _maybeSpecializeSuperTypeDeclRef(
-                                astBuilder,
-                                containerDeclRef,
-                                facet->getType(),
-                                facet->subtypeWitness)
-                                .as<ContainerDecl>();
             if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && getText(name) == "This")
             {
                 // If we are going looking for `This` in a `ThisType`, we just need to return the
@@ -959,7 +967,23 @@ static void _lookUpInScopes(
                     }
                 }
 
-                _lookUpMembersInType(astBuilder, name, type, request, result, breadcrumbPtr);
+                // When looking up in an extension declaration, we should not automatically
+                // dereference pointer types, as the 'This' type should refer to the
+                // extension target type itself, not the pointed-to type.
+                LookupRequest modifiedRequest = request;
+                if (aggTypeDeclBaseRef.as<ExtensionDecl>())
+                {
+                    modifiedRequest.options = (LookupOptions)((uint32_t)modifiedRequest.options |
+                                                              (uint32_t)LookupOptions::NoDeref);
+                }
+
+                _lookUpMembersInType(
+                    astBuilder,
+                    name,
+                    type,
+                    modifiedRequest,
+                    result,
+                    breadcrumbPtr);
             }
             else
             {

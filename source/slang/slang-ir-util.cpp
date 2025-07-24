@@ -453,6 +453,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
 
     switch (type->getOp())
     {
+    case kIROp_BoolType:
+        sb << "bool";
+        break;
     case kIROp_FloatType:
         sb << "float";
         break;
@@ -997,12 +1000,15 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func)
         block->insertAtEnd(func);
 }
 
-void removeLinkageDecorations(IRGlobalValueWithCode* func)
+void removeLinkageDecorations(IRInst* inst)
 {
+    if (!inst)
+        return;
+
     List<IRInst*> toRemove;
-    for (auto inst : func->getDecorations())
+    for (auto decoration : inst->getDecorations())
     {
-        switch (inst->getOp())
+        switch (decoration->getOp())
         {
         case kIROp_ImportDecoration:
         case kIROp_ExportDecoration:
@@ -1013,14 +1019,14 @@ void removeLinkageDecorations(IRGlobalValueWithCode* func)
         case kIROp_CudaDeviceExportDecoration:
         case kIROp_DllExportDecoration:
         case kIROp_HLSLExportDecoration:
-            toRemove.add(inst);
+            toRemove.add(decoration);
             break;
         default:
             break;
         }
     }
-    for (auto inst : toRemove)
-        inst->removeAndDeallocate();
+    for (auto decoration : toRemove)
+        decoration->removeAndDeallocate();
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
@@ -1775,6 +1781,38 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
     if (!decor)
         return UnownedStringSlice();
+
+    // For backward compatibility, convert enum back to string
+    switch (decor->getName())
+    {
+    case KnownBuiltinDeclName::GeometryStreamAppend:
+        return UnownedStringSlice::fromLiteral("GeometryStreamAppend");
+    case KnownBuiltinDeclName::GeometryStreamRestart:
+        return UnownedStringSlice::fromLiteral("GeometryStreamRestart");
+    case KnownBuiltinDeclName::GetAttributeAtVertex:
+        return UnownedStringSlice::fromLiteral("GetAttributeAtVertex");
+    case KnownBuiltinDeclName::DispatchMesh:
+        return UnownedStringSlice::fromLiteral("DispatchMesh");
+    case KnownBuiltinDeclName::saturated_cooperation:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation");
+    case KnownBuiltinDeclName::saturated_cooperation_using:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation_using");
+    case KnownBuiltinDeclName::IDifferentiable:
+        return UnownedStringSlice::fromLiteral("IDifferentiable");
+    case KnownBuiltinDeclName::IDifferentiablePtr:
+        return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
+    case KnownBuiltinDeclName::NullDifferential:
+        return UnownedStringSlice::fromLiteral("NullDifferential");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee)
+{
+    auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
+    if (!decor)
+        return KnownBuiltinDeclName::COUNT; // Use COUNT as invalid value
     return decor->getName();
 }
 

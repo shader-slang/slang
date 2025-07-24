@@ -645,7 +645,7 @@ extension vector<int64_t,2>:ITexelElement
 /// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
 /// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
 /// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
-/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit normalized unsigned integer texture |
 /// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
 /// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
 /// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
@@ -6111,7 +6111,7 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6122,7 +6122,7 @@ struct PointStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6141,7 +6141,7 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6152,7 +6152,7 @@ struct LineStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6171,7 +6171,7 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6182,7 +6182,7 @@ struct TriangleStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6619,8 +6619,25 @@ void AllMemoryBarrierWithGroupSync()
 
 // Returns the workgroup size of the calling entry point.
 [require(compute)]
+[require(meshshading)]
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
+
+// Returns number of workgroups that have been dispatched to a GLSL or SPIR-V compute shader
+[require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+[require(glsl_spirv, meshshading)]
+uint3 WorkgroupCount()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumWorkGroups)";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+        };
+    }
+}
 
 // Test if any components is non-zero.
 
@@ -8599,6 +8616,55 @@ T determinant(matrix<T,N,N> m)
     }
 }
 
+/// @param m The matrix.
+/// @return The determinant of the matrix.
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(glsl_hlsl_metal_spirv_wgsl)]
+T determinant(matrix<T,N,N> m)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "determinant";
+    case hlsl: __intrinsic_asm "determinant";
+    case metal: __intrinsic_asm "determinant";
+    case wgsl: __intrinsic_asm "determinant";
+    // SPIR-V doesn't support integer determinants, so we need to implement it manually
+    default:
+        static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
+        if (N == 1)
+        {
+            return m[0][0];
+        }
+        else if (N == 2)
+        {
+            return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        }
+        else if (N == 3)
+        {
+            return
+                m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+              - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+              + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+        else// if (N == 4)
+        {
+            T a = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+            T b = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+            T c = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+            T d = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+            T e = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+            T f = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+            return
+                m[0][0] * (m[1][1] * a - m[1][2] * b + m[1][3] * c)
+              - m[0][1] * (m[1][0] * a - m[1][2] * d + m[1][3] * e)
+              + m[0][2] * (m[1][0] * b - m[1][1] * d + m[1][3] * f)
+              - m[0][3] * (m[1][0] * c - m[1][1] * e + m[1][2] * f);
+        }
+    }
+}
+
 /// Barrier for device memory.
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
@@ -10239,7 +10305,7 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-[KnownBuiltin("GetAttributeAtVertex")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::GetAttributeAtVertex))]
 [__unsafeForceInlineEarly]
 T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
@@ -13090,7 +13156,7 @@ int sign(T x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "i32(sign($0))";
     }
 }
 
@@ -13114,7 +13180,7 @@ vector<int, N> sign(vector<T, N> x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -13703,10 +13769,8 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     {
     case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
-    case spirv: return spirv_asm {
-        OpTranspose $$matrix<T, M, N> result $x
-    };
     case wgsl: __intrinsic_asm "transpose";
+    // SPIRV-V doenst't support integer matrices, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -18275,7 +18339,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 /// and provide the values for per-mesh payload parameters.
 /// @return This function doesn't return.
 /// @category meshshading
-[KnownBuiltin("DispatchMesh")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::DispatchMesh))]
 [require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
@@ -18947,7 +19011,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
             };
         }
     }
@@ -21562,7 +21626,7 @@ uint3 cudaBlockDim()
 // the signature or behavior of this function should be adjusted for there).
 //
 //@hidden:
-[KnownBuiltin("saturated_cooperation")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation))]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -21593,7 +21657,7 @@ func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
 // waveMatch: a function to return a mask of lanes with the same input as this one
 // broadcast: a function which returns the value passed into it on the specified lane
 //
-[KnownBuiltin("saturated_cooperation_using")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation_using))]
 func saturated_cooperation_using<A, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -26725,7 +26789,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27176,7 +27239,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27353,6 +27415,10 @@ CoopVec<T, M> coopVecMatMulPacked(
         int operands = 0; // NoneKHR
         let zero = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27422,9 +27488,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let zero : int32_t = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
         let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

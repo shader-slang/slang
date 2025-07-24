@@ -11,6 +11,9 @@
 
 #include <mutex>
 
+// Forward declaration
+enum class VerbosityLevel;
+
 enum class TestOutputMode
 {
     Default = 0, ///< Default mode is to write test results to the console
@@ -139,7 +142,7 @@ public:
 
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
-    bool m_isVerbose = false;
+    VerbosityLevel m_verbosity;
     bool m_hideIgnored = false;
     bool m_isSubReporter = false;
     Slang::HashSet<Slang::String> m_expectedFailureList;

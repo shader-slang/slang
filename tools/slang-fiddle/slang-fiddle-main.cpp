@@ -42,12 +42,12 @@ public:
 struct App
 {
 public:
-    App(SourceManager& sourceManager, DiagnosticSink& sink, RootNamePool& rootNamePool)
-        : sourceManager(sourceManager), sink(sink), rootNamePool(rootNamePool)
+    App(SourceManager& sourceManager, DiagnosticSink& sink, NamePool& namePool)
+        : sourceManager(sourceManager), sink(sink), namePool(namePool)
     {
     }
 
-    RootNamePool& rootNamePool;
+    NamePool& namePool;
     SourceManager& sourceManager;
     DiagnosticSink& sink;
 
@@ -61,7 +61,7 @@ public:
         return fiddle::parseSourceUnit(
             inputSourceView,
             logicalModule,
-            &rootNamePool,
+            &namePool,
             &sink,
             &sourceManager,
             outputFileName);
@@ -409,7 +409,7 @@ int main(int argc, char const* const* argv)
 
     ComPtr<ISlangWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
 
-    RootNamePool rootNamePool;
+    NamePool namePool;
 
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
@@ -433,7 +433,7 @@ int main(int argc, char const* const* argv)
 
     try
     {
-        App app(sourceManager, sink, rootNamePool);
+        App app(sourceManager, sink, namePool);
         app.execute(argc, argv);
     }
     catch (...)

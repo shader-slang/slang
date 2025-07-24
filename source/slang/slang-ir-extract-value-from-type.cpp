@@ -331,12 +331,21 @@ IRInst* extractMultiByteValueAtOffset(
             src,
             restSize,
             offset + firstHalfSize);
+
+        auto resultType = builder.getUIntType();
+        if (size > 4)
+        {
+            resultType = builder.getUInt64Type();
+            firstHalf = builder.emitCast(resultType, firstHalf);
+            secondHalf = builder.emitCast(resultType, secondHalf);
+        }
+
         uint32_t shift = firstHalfSize * 8;
         auto resultValue = builder.emitBitOr(
-            builder.getUIntType(),
+            resultType,
             firstHalf,
             builder.emitShl(
-                builder.getUIntType(),
+                resultType,
                 secondHalf,
                 builder.getIntValue(builder.getUIntType(), shift)));
         return resultValue;

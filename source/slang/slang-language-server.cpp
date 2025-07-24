@@ -565,6 +565,12 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
     return location;
 }
 
+void LanguageServer::removePendingModuleToUpdateDiagnostics(const String& uri)
+{
+    String canonicalPath = uriToCanonicalPath(uri);
+    m_pendingModulesToUpdateDiagnostics.remove(canonicalPath);
+}
+
 // When user code has `Foo(123)` where `Foo` is a `struct`, goto-definition on
 // `Foo` should redirect to the constructor of `Foo` instead of the type declaration of `Foo`.
 // This function will check if the `declRefExpr` is a reference to a type declaration,
@@ -601,6 +607,8 @@ SlangResult LanguageServer::hover(
     const JSONValue& responseId)
 {
     auto result = m_core.hover(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -614,6 +622,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     const LanguageServerProtocol::HoverParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
@@ -982,6 +991,8 @@ SlangResult LanguageServer::gotoDefinition(
     const JSONValue& responseId)
 {
     auto result = m_core.gotoDefinition(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1363,6 +1374,8 @@ SlangResult LanguageServer::semanticTokens(
     const JSONValue& responseId)
 {
     auto result = m_core.semanticTokens(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1536,6 +1549,8 @@ SlangResult LanguageServer::signatureHelp(
     const JSONValue& responseId)
 {
     auto result = m_core.signatureHelp(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1914,6 +1929,8 @@ SlangResult LanguageServer::inlayHint(
     const JSONValue& responseId)
 {
     auto result = m_core.inlayHint(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -2120,6 +2137,13 @@ void LanguageServer::publishDiagnostics()
 
     auto version = m_core.m_workspace->getCurrentVersion();
     SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
+    // Make sure modules in pendingSet are being compiled.
+    for (auto canonicalPath : m_pendingModulesToUpdateDiagnostics)
+    {
+        version->getOrLoadModule(canonicalPath);
+    }
+    m_pendingModulesToUpdateDiagnostics.clear();
 
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;
@@ -2752,6 +2776,18 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
 {
     resetDiagnosticUpdateTime();
     auto result = m_core.didChangeTextDocument(args);
+
+    // Register the module path for a diagnostics update.
+    // Note: we don't want to trigger a compile and generate the diagnostics immediately on
+    // every text change. Instead, we want to defer it to when it is the right time for an
+    // update. This is needed to reduce the latency of other requests, such as completion.
+    // For example, when user types `.`, there will be a text change event followed by a
+    // completion request. We don't want to run compile once to get the diagnostics, and then
+    // process the completion request, as this will double the latency to popup the completion
+    // list.
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    m_pendingModulesToUpdateDiagnostics.add(canonicalPath);
+
     if (!m_core.m_options.periodicDiagnosticUpdate)
     {
         publishDiagnostics();
@@ -2764,13 +2800,6 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
-
-    auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = version->getOrLoadModule(canonicalPath);
-    if (!parsedModule)
-    {
-        return SLANG_FAIL;
-    }
 
     return SLANG_OK;
 }

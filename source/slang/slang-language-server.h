@@ -191,6 +191,9 @@ public:
     TraceOptions m_traceOptions = TraceOptions::Off;
     std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
     Dictionary<String, String> m_lastPublishedDiagnostics;
+    HashSet<String> m_pendingModulesToUpdateDiagnostics;
+
+    void removePendingModuleToUpdateDiagnostics(const String& uri);
 
     LanguageServer(LanguageServerStartupOptions options)
         : m_core(options)

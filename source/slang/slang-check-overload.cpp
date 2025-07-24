@@ -245,13 +245,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     OverloadResolveContext& context,
     OverloadCandidate const& candidate)
 {
-    // Always succeeds when we are trying out constructors.
-    if (context.mode == OverloadResolveContext::Mode::JustTrying)
-    {
-        if (as<ConstructorDecl>(candidate.item.declRef))
-            return true;
-    }
-
     if (!context.sourceScope)
         return true;
 
@@ -270,11 +263,30 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     return true;
 }
 
+static bool isArrayDecl(Decl* decl)
+{
+    if (auto magicMod = decl->findModifier<MagicTypeModifier>())
+    {
+        if (magicMod->magicNodeType.getTag() == ASTNodeType::ArrayExpressionType)
+            return true;
+    }
+    return false;
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
 {
     auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
+
+    // All generic arguments, except array sizes, need to be at least a link-time constant.
+    // Exception: array sizes can also be a specialization constant.
+    //
+    ConstantFoldingKind argFoldingKind = ConstantFoldingKind::LinkTime;
+    if (isArrayDecl(genericDeclRef.getDecl()))
+    {
+        argFoldingKind = ConstantFoldingKind::SpecializationConstant;
+    }
 
     // Only allow constructing a PartialGenericAppExpr when referencing a callable decl.
     // Other types of generic decls must be fully specified.
@@ -497,6 +509,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 val = ExtractGenericArgInteger(
                     arg,
                     getType(m_astBuilder, valParamRef),
+                    argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
             }
 
@@ -913,7 +926,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                         context.loc,
                         Diagnostics::mutatingMethodOnImmutableValue,
                         funcDeclRef.getName());
-                    maybeDiagnoseThisNotLValue(context.baseExpr);
+                    maybeDiagnoseConstVariableAssignment(context.baseExpr);
                 }
                 return false;
             }
@@ -1260,6 +1273,21 @@ error:
 
     if (context.originalExpr)
     {
+        // Even when there is an error, we still want to update
+        // the expr we return to refer to the candidate we found so far
+        // so language server can still provide info on the potential callee.
+        if (candidate.flavor == OverloadCandidate::Flavor::Func)
+        {
+            if (auto invokeExpr = as<InvokeExpr>(context.originalExpr))
+            {
+                invokeExpr->functionExpr = ConstructLookupResultExpr(
+                    candidate.item,
+                    context.baseExpr,
+                    candidate.item.declRef.getName(),
+                    context.funcLoc,
+                    context.originalExpr);
+            }
+        }
         return CreateErrorExpr(context.originalExpr);
     }
     else
@@ -2691,9 +2719,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // equivalent in (almost) all cases.
     // If callee is a type, and we are calling with one argument, then treat it as a
     // type coercion.
+    //
+    // Exception: if the argument is an initializer list, such as
+    // Foo({1,2,3}), we should not coerce {1,2,3} to Foo, but rather
+    // treat it as a ctor call with {1,2,3} as the first argument.
+    //
     bool typeOverloadChecked = false;
 
-    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr))
+    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
+        !as<InitializerListExpr>(expr->arguments[0]))
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
@@ -2923,7 +2957,20 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         initListExpr->type = m_astBuilder->getInitializerListType();
         Expr* outExpr = nullptr;
         if (_coerceInitializerList(typetype->getType(), &outExpr, initListExpr))
+        {
+            // If there is a coercion error, make sure we return a valid original expr
+            // for language server to use.
+            if (IsErrorExpr(outExpr))
+            {
+                if (auto invokeExpr = as<InvokeExpr>(outExpr))
+                {
+                    invokeExpr->originalFunctionExpr = typeExpr;
+                    return CreateErrorExpr(invokeExpr);
+                }
+                return CreateErrorExpr(typeExpr);
+            }
             return outExpr;
+        }
     }
 
     // Nothing at all was found that we could even consider invoking.

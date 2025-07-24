@@ -1034,6 +1034,9 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
+        GetModuleInfo,              // Print serialized module version and name
+        GetSupportedModuleVersions, // Print the min and max module versions this compiler supports
+
         EmitSeparateDebug, // bool
 
         // Floating point denormal handling modes
@@ -4167,6 +4170,16 @@ struct ISession : public ISlangUnknown
         slang::TypeReflection* interfaceType,
         uint32_t* outRTTIDataBuffer,
         uint32_t bufferSizeInBytes) = 0;
+
+    /** Read module info (name and version) from a module blob
+     *
+     * The returned pointers are valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4188,7 +4201,7 @@ struct IMetadata : public ISlangCastable
     /*
     Returns the debug build identifier for a base and debug spirv pair.
     */
-    virtual const char* getDebugBuildIdentifier() = 0;
+    virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
@@ -4204,9 +4217,9 @@ struct ICompileResult : public ISlangCastable
         0x41e5,
         {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
 
-    virtual uint32_t getItemCount() = 0;
-    virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
-    virtual SlangResult getMetadata(IMetadata** outMetadata) = 0;
+    virtual uint32_t SLANG_MCALL getItemCount() = 0;
+    virtual SlangResult SLANG_MCALL getItemData(uint32_t index, IBlob** outblob) = 0;
+    virtual SlangResult SLANG_MCALL getMetadata(IMetadata** outMetadata) = 0;
 };
     #define SLANG_UUID_ICompileResult ICompileResult::getTypeGuid()
 
