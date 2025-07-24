@@ -7,5 +7,5 @@
 namespace Slang
 {
 // Main entry point for the pass
-void lowerDynamicInsts(IRModule* module, DiagnosticSink* sink);
+bool lowerDynamicInsts(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang
