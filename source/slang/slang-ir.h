@@ -2459,7 +2459,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 0;
-    const static UInt k_maxSupportedModuleVersion = 0;
+    const static UInt k_maxSupportedModuleVersion = 1;
 
 private:
     friend struct IRSerialReadContext;

@@ -30,36 +30,53 @@ struct PropagationInfo : RefObject
     PropagationJudgment judgment;
 
     // For sets of types/tables/funcs and existential witness tables
-    HashSet<IRInst*> possibleValues;
+    // Instead of HashSet, we use an IRCollection instruction with sorted operands
+    IRInst* collection;
 
     PropagationInfo()
-        : judgment(PropagationJudgment::None)
+        : judgment(PropagationJudgment::None), collection(nullptr)
     {
     }
 
     PropagationInfo(PropagationJudgment j)
-        : judgment(j)
+        : judgment(j), collection(nullptr)
     {
     }
 
-    static PropagationInfo makeSingletonSet(IRInst* value);
-    static PropagationInfo makeSet(const HashSet<IRInst*>& values);
-    static PropagationInfo makeExistential(const HashSet<IRInst*>& tables);
-    static PropagationInfo makeUnbounded();
-    static PropagationInfo none();
+    PropagationInfo(PropagationJudgment j, IRInst* coll)
+        : judgment(j), collection(coll)
+    {
+    }
+
+    // NOTE: Factory methods moved to DynamicInstLoweringContext to access collection creation
 
     bool isNone() const { return judgment == PropagationJudgment::None; }
     bool isSingleton() const
     {
-        return judgment == PropagationJudgment::Set && possibleValues.getCount() == 1;
+        return judgment == PropagationJudgment::Set && getCollectionCount() == 1;
     }
 
     IRInst* getSingletonValue() const
     {
-        if (judgment == PropagationJudgment::Set && possibleValues.getCount() == 1)
-            return *possibleValues.begin();
+        if (judgment == PropagationJudgment::Set && getCollectionCount() == 1)
+            return getCollectionElement(0);
 
         SLANG_UNEXPECTED("getSingletonValue called on non-singleton PropagationInfo");
+    }
+
+    // Helper functions to access collection elements
+    UInt getCollectionCount() const
+    {
+        if (!collection)
+            return 0;
+        return collection->getOperandCount();
+    }
+
+    IRInst* getCollectionElement(UInt index) const
+    {
+        if (!collection || index >= collection->getOperandCount())
+            return nullptr;
+        return collection->getOperand(index);
     }
 
     operator bool() const { return judgment != PropagationJudgment::None; }
@@ -167,37 +184,7 @@ struct WorkItem
     }
 };
 
-// PropagationInfo implementation
-PropagationInfo PropagationInfo::makeSingletonSet(IRInst* value)
-{
-    auto info = PropagationInfo(PropagationJudgment::Set);
-    info.possibleValues.add(value);
-    return info;
-}
-
-PropagationInfo PropagationInfo::makeSet(const HashSet<IRInst*>& values)
-{
-    auto info = PropagationInfo(PropagationJudgment::Set);
-    info.possibleValues = values;
-    return info;
-}
-
-PropagationInfo PropagationInfo::makeExistential(const HashSet<IRInst*>& tables)
-{
-    auto info = PropagationInfo(PropagationJudgment::Existential);
-    info.possibleValues = tables;
-    return info;
-}
-
-PropagationInfo PropagationInfo::makeUnbounded()
-{
-    return PropagationInfo(PropagationJudgment::Unbounded);
-}
-
-PropagationInfo PropagationInfo::none()
-{
-    return PropagationInfo(PropagationJudgment::None);
-}
+// PropagationInfo implementations will be added to DynamicInstLoweringContext
 
 bool areInfosEqual(const PropagationInfo& a, const PropagationInfo& b)
 {
@@ -210,24 +197,10 @@ bool areInfosEqual(const PropagationInfo& a, const PropagationInfo& b)
     case PropagationJudgment::Unbounded:
         return true;
     case PropagationJudgment::Set:
-        if (a.possibleValues.getCount() != b.possibleValues.getCount())
-            return false;
-        for (auto value : a.possibleValues)
-        {
-            if (!b.possibleValues.contains(value))
-                return false;
-        }
-        return true;
-
     case PropagationJudgment::Existential:
-        if (a.possibleValues.getCount() != b.possibleValues.getCount())
-            return false;
-        for (auto table : a.possibleValues)
-        {
-            if (!b.possibleValues.contains(table))
-                return false;
-        }
-        return true;
+        // For collection-based sets, compare the collection instructions
+        // If both have the same collection instruction (from hoisting), they're equal
+        return a.collection == b.collection;
     default:
         return false;
     }
@@ -235,27 +208,107 @@ bool areInfosEqual(const PropagationInfo& a, const PropagationInfo& b)
 
 struct DynamicInstLoweringContext
 {
+    // Helper methods for creating canonical collections
+    IRInst* createCollection(const HashSet<IRInst*>& elements)
+    {
+        if (elements.getCount() == 0)
+            return nullptr;
+
+        List<IRInst*> sortedElements;
+        for (auto element : elements)
+            sortedElements.add(element);
+
+        return createCollection(sortedElements);
+    }
+
+    IRInst* createCollection(const List<IRInst*>& elements)
+    {
+        if (elements.getCount() == 0)
+            return nullptr;
+
+        // Verify that all operands are global instructions
+        for (auto element : elements)
+            if (element->getParent()->getOp() != kIROp_ModuleInst)
+                SLANG_ASSERT_FAILURE("createCollection called with non-global operands");
+
+        // Sort elements by their unique IDs to ensure canonical ordering
+        List<IRInst*> sortedElements = elements;
+        sortedElements.sort(
+            [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
+
+        // Create the collection instruction
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+
+        // Use makeTuple as a temporary implementation until IRCollection is available
+        return builder.emitIntrinsicInst(
+            nullptr,
+            kIROp_TypeFlowCollection,
+            sortedElements.getCount(),
+            sortedElements.getBuffer());
+    }
+
+    // Factory methods for PropagationInfo
+    PropagationInfo makeSingletonSet(IRInst* value)
+    {
+        HashSet<IRInst*> singleSet;
+        singleSet.add(value);
+        auto collection = createCollection(singleSet);
+        return PropagationInfo(PropagationJudgment::Set, collection);
+    }
+
+    PropagationInfo makeSet(const HashSet<IRInst*>& values)
+    {
+        SLANG_ASSERT(values.getCount() > 0);
+        auto collection = createCollection(values);
+        return PropagationInfo(PropagationJudgment::Set, collection);
+    }
+
+    PropagationInfo makeExistential(const HashSet<IRInst*>& tables)
+    {
+        SLANG_ASSERT(tables.getCount() > 0);
+        auto collection = createCollection(tables);
+        return PropagationInfo(PropagationJudgment::Existential, collection);
+    }
+
+    PropagationInfo makeUnbounded()
+    {
+        return PropagationInfo(PropagationJudgment::Unbounded, nullptr);
+    }
+
+    PropagationInfo none() { return PropagationInfo(PropagationJudgment::None, nullptr); }
+
+    // Helper to iterate over collection elements
+    template<typename F>
+    void forEachInCollection(const PropagationInfo& info, F func)
+    {
+        for (UInt i = 0; i < info.getCollectionCount(); ++i)
+            func(info.getCollectionElement(i));
+    }
+
+    // Helper to convert collection to HashSet
+    HashSet<IRInst*> collectionToHashSet(const PropagationInfo& info)
+    {
+        HashSet<IRInst*> result;
+        forEachInCollection(info, [&](IRInst* element) { result.add(element); });
+        return result;
+    }
+
     // DynamicInstLoweringContext implementation
     PropagationInfo tryGetInfo(IRInst* inst)
     {
         // If this is a global instruction (parent is module), return concrete info
         if (as<IRModuleInst>(inst->getParent()))
-        {
             if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
-            {
-                return PropagationInfo::makeSingletonSet(inst);
-            }
+                return makeSingletonSet(inst);
             else
-            {
-                return PropagationInfo::none();
-            }
-        }
+                return none();
 
         // For non-global instructions, look up in the map
         auto found = propagationMap.tryGetValue(inst);
         if (found)
             return *found;
-        return PropagationInfo::none();
+        return none();
     }
 
     PropagationInfo tryGetFuncReturnInfo(IRFunc* func)
@@ -263,7 +316,7 @@ struct DynamicInstLoweringContext
         auto found = funcReturnInfo.tryGetValue(func);
         if (found)
             return *found;
-        return PropagationInfo::none();
+        return none();
     }
 
     // Centralized method to update propagation info and manage work queue
@@ -422,7 +475,7 @@ struct DynamicInstLoweringContext
         if (argInfo.judgment == PropagationJudgment::Existential &&
             destInfo.judgment == PropagationJudgment::Existential)
         {
-            if (argInfo.possibleValues.getCount() != destInfo.possibleValues.getCount())
+            if (argInfo.getCollectionCount() != destInfo.getCollectionCount())
             {
                 // If the sets of witness tables are not equal, reinterpret to the parameter type
                 IRBuilder builder(module);
@@ -592,17 +645,17 @@ struct DynamicInstLoweringContext
             {
                 auto tables = collectExistentialTables(interfaceType);
                 if (tables.getCount() > 0)
-                    return PropagationInfo::makeExistential(tables);
+                    return makeExistential(tables);
                 else
-                    return PropagationInfo::none();
+                    return none();
             }
             else
             {
-                return PropagationInfo::makeUnbounded();
+                return makeUnbounded();
             }
         }
 
-        return PropagationInfo::none();
+        return none();
     }
 
     PropagationInfo analyzeMakeExistential(IRMakeExistential* inst)
@@ -615,17 +668,16 @@ struct DynamicInstLoweringContext
         auto witnessTableInfo = tryGetInfo(witnessTable);
 
         if (!witnessTableInfo)
-            return PropagationInfo::none();
+            return none();
 
         if (witnessTableInfo.judgment == PropagationJudgment::Unbounded)
-            return PropagationInfo::makeUnbounded();
+            return makeUnbounded();
 
         HashSet<IRInst*> tables;
         if (witnessTableInfo.judgment == PropagationJudgment::Set)
-            for (auto table : witnessTableInfo.possibleValues)
-                tables.add(table);
+            forEachInCollection(witnessTableInfo, [&](IRInst* table) { tables.add(table); });
 
-        return PropagationInfo::makeExistential(tables);
+        return makeExistential(tables);
     }
 
     static IRInst* findEntryInConcreteTable(IRInst* witnessTable, IRInst* key)
@@ -652,9 +704,10 @@ struct DynamicInstLoweringContext
         case PropagationJudgment::Set:
             {
                 HashSet<IRInst*> results;
-                for (auto table : witnessTableInfo.possibleValues)
-                    results.add(findEntryInConcreteTable(table, key));
-                return PropagationInfo::makeSet(results);
+                forEachInCollection(
+                    witnessTableInfo,
+                    [&](IRInst* table) { results.add(findEntryInConcreteTable(table, key)); });
+                return makeSet(results);
             }
         case PropagationJudgment::Existential:
             SLANG_UNEXPECTED("Unexpected LookupWitnessMethod on Existential");
@@ -673,11 +726,16 @@ struct DynamicInstLoweringContext
         switch (operandInfo.judgment)
         {
         case PropagationJudgment::None:
-            return PropagationInfo::none();
+            return none();
         case PropagationJudgment::Unbounded:
-            return PropagationInfo::makeUnbounded();
+            return makeUnbounded();
         case PropagationJudgment::Existential:
-            return PropagationInfo::makeSet(operandInfo.possibleValues);
+            {
+                // Convert collection to HashSet and create Set PropagationInfo
+                HashSet<IRInst*> tables;
+                forEachInCollection(operandInfo, [&](IRInst* table) { tables.add(table); });
+                return makeSet(tables);
+            }
         case PropagationJudgment::Set:
             SLANG_UNEXPECTED(
                 "Unexpected ExtractExistentialWitnessTable on Set (should be Existential)");
@@ -697,17 +755,21 @@ struct DynamicInstLoweringContext
         switch (operandInfo.judgment)
         {
         case PropagationJudgment::None:
-            return PropagationInfo::none();
+            return none();
         case PropagationJudgment::Unbounded:
-            return PropagationInfo::makeUnbounded();
+            return makeUnbounded();
         case PropagationJudgment::Existential:
             {
                 HashSet<IRInst*> types;
-                for (auto table : operandInfo.possibleValues)
-                    if (auto witnessTable = cast<IRWitnessTable>(table)) // Expect witness table
-                        if (auto concreteType = witnessTable->getConcreteType())
-                            types.add(concreteType);
-                return PropagationInfo::makeSet(types);
+                forEachInCollection(
+                    operandInfo,
+                    [&](IRInst* table)
+                    {
+                        if (auto witnessTable = cast<IRWitnessTable>(table)) // Expect witness table
+                            if (auto concreteType = witnessTable->getConcreteType())
+                                types.add(concreteType);
+                    });
+                return makeSet(types);
             }
         case PropagationJudgment::Set:
             SLANG_UNEXPECTED(
@@ -724,7 +786,7 @@ struct DynamicInstLoweringContext
         // We don't care about the value itself.
         // (We rely on the propagation info for the type)
         //
-        return PropagationInfo::none();
+        return none();
     }
 
     PropagationInfo analyzeCall(IRCall* inst, LinkedList<WorkItem>& workQueue)
@@ -764,14 +826,15 @@ struct DynamicInstLoweringContext
         if (calleeInfo.judgment == PropagationJudgment::Set)
         {
             // If we have a set of functions, register each one
-            for (auto func : calleeInfo.possibleValues)
-                propagateToCallSite(cast<IRFunc>(func));
+            forEachInCollection(
+                calleeInfo,
+                [&](IRInst* func) { propagateToCallSite(cast<IRFunc>(func)); });
         }
 
         if (auto callInfo = tryGetInfo(inst))
             return callInfo;
         else
-            return PropagationInfo::none();
+            return none();
     }
 
     void propagateWithinFuncEdge(IREdge edge, LinkedList<WorkItem>& workQueue)
@@ -861,7 +924,7 @@ struct DynamicInstLoweringContext
 
     PropagationInfo getFuncReturnInfo(IRFunc* func)
     {
-        funcReturnInfo.addIfNotExists(func, PropagationInfo::none());
+        funcReturnInfo.addIfNotExists(func, none());
         return funcReturnInfo[func];
     }
 
@@ -882,13 +945,13 @@ struct DynamicInstLoweringContext
             if (auto interfaceType = as<IRInterfaceType>(paramType))
             {
                 if (interfaceType->findDecoration<IRComInterfaceDecoration>())
-                    propagationMap[param] = PropagationInfo::makeUnbounded();
+                    propagationMap[param] = makeUnbounded();
                 else
-                    propagationMap[param] = PropagationInfo::none(); // Initialize to none.
+                    propagationMap[param] = none(); // Initialize to none.
             }
             else
             {
-                propagationMap[param] = PropagationInfo::none();
+                propagationMap[param] = none();
             }
         }
     }
@@ -897,7 +960,7 @@ struct DynamicInstLoweringContext
     {
         if (infos.getCount() == 0)
         {
-            return PropagationInfo::none();
+            return none();
         }
 
         if (infos.getCount() == 1)
@@ -935,33 +998,31 @@ struct DynamicInstLoweringContext
                 break;
             case PropagationJudgment::Set:
                 unionJudgment = PropagationJudgment::Set;
-                for (auto value : info.possibleValues)
-                    allValues.add(value);
+                forEachInCollection(info, [&](IRInst* value) { allValues.add(value); });
                 break;
             case PropagationJudgment::Existential:
                 // For existential union, we need to collect all witness tables
                 // For now, we'll handle this properly by creating a new existential with all tables
                 unionJudgment = PropagationJudgment::Existential;
-                for (auto value : info.possibleValues)
-                    allValues.add(value);
+                forEachInCollection(info, [&](IRInst* value) { allValues.add(value); });
                 break;
             case PropagationJudgment::Unbounded:
                 // If any info is unbounded, the union is unbounded
-                return PropagationInfo::makeUnbounded();
+                return makeUnbounded();
             }
         }
 
         if (unionJudgment == PropagationJudgment::Existential)
             if (allValues.getCount() > 0)
-                return PropagationInfo::makeExistential(allValues);
+                return makeExistential(allValues);
             else
-                return PropagationInfo::none();
+                return none();
 
         if (unionJudgment == PropagationJudgment::Set)
             if (allValues.getCount() > 1)
-                return PropagationInfo::makeSet(allValues);
+                return makeSet(allValues);
             else
-                return PropagationInfo::none();
+                return none();
 
         // If we reach here, crash instead of returning none (which could make the analysis go into
         // an infinite loop)
@@ -980,11 +1041,13 @@ struct DynamicInstLoweringContext
 
     PropagationInfo analyzeDefault(IRInst* inst)
     {
-        // Check if this is a type, witness table, or function
-        if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
-            return PropagationInfo::makeSingletonSet(inst);
+        // Check if this is a global type, witness table, or function.
+        // If so, it's a concrete element. We'll create a singleton set for it.
+        if (inst->getParent()->getOp() == kIROp_ModuleInst &&
+            (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst)))
+            return makeSingletonSet(inst);
         else
-            return PropagationInfo::none(); // Default case, no propagation info
+            return none(); // Default case, no propagation info
     }
 
     void performDynamicInstLowering()
@@ -1100,10 +1163,14 @@ struct DynamicInstLoweringContext
 
         HashSet<IRInst*> types;
         // Extract types from witness tables by looking at the concrete types
-        for (auto table : info.possibleValues)
-            if (auto witnessTable = as<IRWitnessTable>(table))
-                if (auto concreteType = witnessTable->getConcreteType())
-                    types.add(concreteType);
+        forEachInCollection(
+            info,
+            [&](IRInst* table)
+            {
+                if (auto witnessTable = as<IRWitnessTable>(table))
+                    if (auto concreteType = witnessTable->getConcreteType())
+                        types.add(concreteType);
+            });
 
         auto anyValueType = createAnyValueTypeFromInsts(types);
         return builder.getTupleType(List<IRType*>({builder.getUIntType(), anyValueType}));
@@ -1161,7 +1228,7 @@ struct DynamicInstLoweringContext
             if (inst->getDataType()->getOp() == kIROp_TypeKind)
             {
                 // Create an any-value type based on the set of types
-                auto anyValueType = createAnyValueTypeFromInsts(info.possibleValues);
+                auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(info));
 
                 // Store the mapping for later use
                 loweredInstToAnyValueType[inst] = anyValueType;
@@ -1182,8 +1249,8 @@ struct DynamicInstLoweringContext
                     // Create a key mapping function
                     auto keyMappingFunc = createKeyMappingFunc(
                         inst->getRequirementKey(),
-                        witnessTableInfo.possibleValues,
-                        info.possibleValues);
+                        collectionToHashSet(witnessTableInfo),
+                        collectionToHashSet(info));
 
                     // Replace with call to key mapping function
                     auto witnessTableId = builder.emitCallInst(
@@ -1248,7 +1315,7 @@ struct DynamicInstLoweringContext
         builder.setInsertBefore(inst);
 
         // Create an any-value type based on the set of types
-        auto anyValueType = createAnyValueTypeFromInsts(info.possibleValues);
+        auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(info));
 
         // Store the mapping for later use
         loweredInstToAnyValueType[inst] = anyValueType;
@@ -1308,7 +1375,7 @@ struct DynamicInstLoweringContext
 
         auto expectedFuncType = getExpectedFuncType(inst);
         // Create dispatch function
-        auto dispatchFunc = createDispatchFunc(calleeInfo.possibleValues, expectedFuncType);
+        auto dispatchFunc = createDispatchFunc(collectionToHashSet(calleeInfo), expectedFuncType);
 
         // Replace call with dispatch
         List<IRInst*> newArgs;
@@ -1335,22 +1402,24 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        // Get unique ID for the witness table. TODO: Assert that this is a concrete table..
+        // Get unique ID for the witness table.
         auto witnessTable = cast<IRWitnessTable>(inst->getWitnessTable());
         auto tableId = builder.getIntValue(builder.getUIntType(), getUniqueID(witnessTable));
 
         // Collect types from the witness tables to determine the any-value type
         HashSet<IRType*> types;
-        for (auto table : info.possibleValues)
-        {
-            if (auto witnessTableInst = as<IRWitnessTable>(table))
+        forEachInCollection(
+            info,
+            [&](IRInst* table)
             {
-                if (auto concreteType = witnessTableInst->getConcreteType())
+                if (auto witnessTableInst = as<IRWitnessTable>(table))
                 {
-                    types.add(concreteType);
+                    if (auto concreteType = witnessTableInst->getConcreteType())
+                    {
+                        types.add(concreteType);
+                    }
                 }
-            }
-        }
+            });
 
         // Create the appropriate any-value type
         auto anyValueType = createAnyValueType(types);
@@ -1378,14 +1447,20 @@ struct DynamicInstLoweringContext
             return;
 
         Dictionary<UInt, UInt> mapping;
-        for (auto table : info.possibleValues)
-        {
-            // Get unique ID for the witness table
-            auto witnessTable = cast<IRWitnessTable>(table);
-            auto outputId = getUniqueID(witnessTable);
-            auto inputId = table->findDecoration<IRSequentialIDDecoration>()->getSequentialID();
-            mapping[inputId] = outputId; // Map ID to itself for now
-        }
+        forEachInCollection(
+            info,
+            [&](IRInst* table)
+            {
+                // Get unique ID for the witness table
+                auto witnessTable = cast<IRWitnessTable>(table);
+                auto outputId = getUniqueID(witnessTable);
+                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
+                if (seqDecoration)
+                {
+                    auto inputId = seqDecoration->getSequentialID();
+                    mapping[inputId] = outputId; // Map ID to itself for now
+                }
+            });
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
@@ -1757,4 +1832,5 @@ void lowerDynamicInsts(IRModule* module, DiagnosticSink* sink)
     DynamicInstLoweringContext context(module, sink);
     context.processModule();
 }
+
 } // namespace Slang
