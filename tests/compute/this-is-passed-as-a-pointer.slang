@@ -1,0 +1,45 @@
+
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -output-using-type -cpu
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -output-using-type -vk
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain
+
+//TEST_INPUT:ubuffer(data=[1, 2, 3], stride=4):name=inputBuffer
+RWStructuredBuffer<int> inputBuffer;
+//TEST_INPUT:ubuffer(data=[0, 0, 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
+struct Data
+{
+    int val;
+
+    // `this` must be passed as pointer on metal/cpp/cuda.
+    // `this` must be passed as `in` on glsl/hlsl
+    // CUDA: (Data{{.*}}*
+    int fetch(int data)
+    {
+        return data + val;
+    }
+    // `this` must be passed as pointer on metal/cpp/cuda.
+    // `this` must be passed as `inout` on glsl/hlsl
+    // CUDA: (Data{{.*}}*
+    [mutating]
+    int modifyAndFetch(int data)
+    {
+        val += data;
+        return val;
+    }
+};
+
+//BUF: 3
+//BUF: 4
+//BUF: 5
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid: SV_DispatchThreadID)
+{
+    Data data;
+    data.val = inputBuffer[0];
+    outputBuffer[0] = data.fetch(inputBuffer[1]);
+    outputBuffer[1] = data.modifyAndFetch(inputBuffer[1])+1;
+    outputBuffer[2] = data.val+2;
+}
