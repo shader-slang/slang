@@ -2994,7 +2994,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     //
     if (parentDecl->hasModifier<NonmutatingAttribute>())
     {
-        return kParameterDirection_In;
+        return kParameterDirection_ConstRef;
     }
     else if (as<SetterDecl>(parentDecl))
     {
