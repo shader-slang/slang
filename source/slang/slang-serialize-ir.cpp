@@ -14,6 +14,8 @@
 #include "slang-tag-version.h"
 #include "slang.h"
 
+#include "core/slang-performance-profiler.h"
+
 //
 #include "slang-serialize-ir.cpp.fiddle"
 
@@ -269,11 +271,11 @@ struct IRSerialWriteContext;
 // Specialize to the reader/writer for the specific backend we're targeting
 // instead of ISerializerImpl to avoid some virtual function calls
 #if USE_RIFF
-using IRWriteSerializer = Serializer_<RIFFSerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer_<RIFFSerialReader, IRSerialReadContext>;
+using IRWriteSerializer = Serializer<RIFFSerialWriter, IRSerialWriteContext>;
+using IRReadSerializer = Serializer<RIFFSerialReader, IRSerialReadContext>;
 #else
-using IRWriteSerializer = Serializer_<Fossil::SerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer_<Fossil::SerialReader, IRSerialReadContext>;
+using IRWriteSerializer = Serializer<Fossil::SerialWriter, IRSerialWriteContext>;
+using IRReadSerializer = Serializer<Fossil::SerialReader, IRSerialReadContext>;
 #endif
 
 struct IRSerialWriteContext : SourceLocSerialContext
@@ -848,6 +850,8 @@ Result readSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
+    SLANG_PROFILE;
+
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
 
     //
