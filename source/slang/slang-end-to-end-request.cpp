@@ -442,7 +442,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
 {
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
     {
-        const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
+        const auto dbgArtifact = getSeparateDbgArtifact(artifact);
         // Check if a debug artifact was actually created (only for SPIR-V targets)
         if (dbgArtifact)
         {

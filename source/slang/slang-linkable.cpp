@@ -860,7 +860,7 @@ Expr* ComponentType::findDeclFromStringInType(
 
     Expr* expr = nullptr;
 
-    if (isSimpleName(name))
+    if (_isSimpleName(name))
     {
         auto varExpr = astBuilder->create<VarExpr>();
         varExpr->scope = scope;
