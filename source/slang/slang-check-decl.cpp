@@ -2356,6 +2356,14 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Not allowed a `globallycoherent T*` or related
+    if (as<PtrType>(varDecl->type))
+        if (auto memoryQualifierSet = varDecl->findModifier<MemoryQualifierSetModifier>())
+            if (memoryQualifierSet->getMemoryQualifierBit() &
+                MemoryQualifierSetModifier::Flags::kCoherent)
+                getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
+
     checkVisibility(varDecl);
 }
 
@@ -3690,6 +3698,10 @@ void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
+    if (auto builtinEnum = decl->findModifier<BuiltinEnumModifier>())
+    {
+        sharedASTBuilder->registerBuiltinEnum(decl, builtinEnum);
+    }
 }
 
 
@@ -3741,6 +3753,10 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
         ioDecls.add(decl);
     }
     else if (decl->findModifier<BuiltinRequirementModifier>())
+    {
+        ioDecls.add(decl);
+    }
+    else if (decl->findModifier<BuiltinEnumModifier>())
     {
         ioDecls.add(decl);
     }
