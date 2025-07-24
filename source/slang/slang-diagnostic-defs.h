@@ -78,11 +78,7 @@ DIAGNOSTIC(
     genericSignatureDoesNotMatchRequirement,
     "generic signature of '$0' does not match interface requirement.")
 
-DIAGNOSTIC(
-    -1,
-    Note,
-    cannotResolveOverloadForMethodRequirement,
-    "none of the overloads of '$0' match the interface requirement.")
+DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 
 DIAGNOSTIC(
     -1,

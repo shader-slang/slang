@@ -7604,6 +7604,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 Diagnostics::typeDoesntImplementInterfaceRequirement,
                 subType,
                 requiredMemberDeclRef);
+
+            for (auto& item : lookupResult)
+                getSink()->diagnose(item.declRef, Diagnostics::seeOverloadConsidered, item.declRef);
         }
     }
     getSink()->diagnose(
