@@ -32,34 +32,32 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-std-writers.h"
+#include "slang-base-type-info.h"
 #include "slang-capability.h"
+#include "slang-code-gen.h"
 #include "slang-com-ptr.h"
+#include "slang-compile-request.h"
+#include "slang-compiler-api.h"
 #include "slang-compiler-options.h"
 #include "slang-content-assist-info.h"
 #include "slang-diagnostics.h"
+#include "slang-end-to-end-request.h"
+#include "slang-global-session.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-linkable-impls.h"
+#include "slang-linkable.h"
+#include "slang-module.h"
+#include "slang-pass-through.h"
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-serialize-ir-types.h"
+#include "slang-session.h"
 #include "slang-syntax.h"
+#include "slang-target.h"
+#include "slang-translation-unit.h"
 #include "slang.h"
 
 #include <chrono>
-
-
-#include "slang-base-type-info.h"
-#include "slang-code-gen.h"
-#include "slang-compiler-api.h"
-#include "slang-compile-request.h"
-#include "slang-end-to-end-request.h"
-#include "slang-global-session.h"
-#include "slang-linkable.h"
-#include "slang-linkable-impls.h"
-#include "slang-pass-through.h"
-#include "slang-module.h"
-#include "slang-session.h"
-#include "slang-target.h"
-#include "slang-translation-unit.h"
 
 namespace Slang
 {
@@ -80,7 +78,6 @@ enum class CompilerMode
     ProduceShader,
     GenerateChoice
 };
-
 
 
 enum class LineDirectiveMode : SlangLineDirectiveModeIntegral
@@ -147,13 +144,7 @@ class Module;
 class TranslationUnitRequest;
 
 
-
-
-
-
-
 class SourceFile;
-
 
 
 enum class FloatingPointMode : SlangFloatingPointModeIntegral
@@ -169,7 +160,6 @@ enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
     Preserve = SLANG_FP_DENORM_MODE_PRESERVE,
     FlushToZero = SLANG_FP_DENORM_MODE_FTZ,
 };
-
 
 
 // Compute the "effective" profile to use when outputting the given entry point
@@ -188,10 +178,8 @@ enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target);
 
 
-
 /// Get the build tag string
 const char* getBuildTagString();
-
 
 
 //

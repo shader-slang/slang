@@ -12,15 +12,13 @@
 // from the public API.
 //
 
-#include "slang-pass-through.h"
-#include "slang-target.h"
-
-#include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-downstream-compiler-set.h"
 #include "../compiler-core/slang-downstream-compiler-util.h"
+#include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-spirv-core-grammar.h"
-
 #include "../core/slang-command-options.h"
+#include "slang-pass-through.h"
+#include "slang-target.h"
 
 namespace Slang
 {

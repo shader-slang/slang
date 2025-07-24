@@ -13,12 +13,10 @@
 // own header: `slang-end-to-end-request.h`.
 //
 
-#include "../core/slang-smart-pointer.h"
-#include "../core/slang-std-writers.h"
-
 #include "../compiler-core/slang-artifact.h"
 #include "../compiler-core/slang-source-loc.h"
-
+#include "../core/slang-smart-pointer.h"
+#include "../core/slang-std-writers.h"
 #include "slang-compiler-fwd.h"
 #include "slang-diagnostics.h"
 #include "slang-module.h"
@@ -361,4 +359,4 @@ protected:
     }
 };
 
-}
+} // namespace Slang

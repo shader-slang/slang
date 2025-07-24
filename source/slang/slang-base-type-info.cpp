@@ -92,4 +92,4 @@ namespace Slang
     }
 }
 
-}
+} // namespace Slang

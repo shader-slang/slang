@@ -122,4 +122,4 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

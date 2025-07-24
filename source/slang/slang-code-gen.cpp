@@ -1,15 +1,12 @@
 // slang-code-gen.cpp
 #include "slang-code-gen.h"
 
-#include "slang-compiler.h"
-
-#include "slang-emit-cuda.h" // for `CUDAExtensionTracker`
-#include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
-
 #include "../compiler-core/slang-slice-allocator.h"
-
 #include "../core/slang-type-convert-util.h"
 #include "../core/slang-type-text-util.h"
+#include "slang-compiler.h"
+#include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
+#include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 
 // TODO: The "artifact" system is a scourge.
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -1405,4 +1402,4 @@ SlangResult CodeGenContext::requireTranslationUnitSourceFiles()
     return SLANG_OK;
 }
 
-}
+} // namespace Slang

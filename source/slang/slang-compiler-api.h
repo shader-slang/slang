@@ -121,4 +121,4 @@ SLANG_FORCE_INLINE SlangSourceLanguage asExternal(SourceLanguage sourceLanguage)
     return (SlangSourceLanguage)sourceLanguage;
 }
 
-}
+} // namespace Slang

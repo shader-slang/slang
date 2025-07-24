@@ -10,9 +10,8 @@
 // cost of implicit conversions between the base types.
 //
 
-#include "slang-type-system-shared.h"
-
 #include "../core/slang-basic.h"
+#include "slang-type-system-shared.h"
 
 namespace Slang
 {
@@ -48,4 +47,4 @@ private:
     static const BaseTypeInfo s_info[Index(BaseType::CountOf)];
 };
 
-}
+} // namespace Slang

@@ -8,7 +8,6 @@
 //
 
 #include "../core/slang-smart-pointer.h"
-
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-ir.h"
 #include "slang-linkable.h"
@@ -141,4 +140,4 @@ private:
 /// If no intermediate source language is required, will return SourceLanguage::Unknown
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* req);
 
-}
+} // namespace Slang

@@ -12,14 +12,12 @@
 // from the public API.
 //
 
-#include "../core/slang-riff.h"
-#include "../core/slang-smart-pointer.h"
-
 #include "../compiler-core/slang-artifact.h"
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-include-system.h"
 #include "../compiler-core/slang-name.h"
-
+#include "../core/slang-riff.h"
+#include "../core/slang-smart-pointer.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"

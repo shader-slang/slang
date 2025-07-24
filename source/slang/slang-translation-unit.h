@@ -7,15 +7,13 @@
 // that will yield a single `Module`.
 //
 
+#include "../compiler-core/slang-artifact.h"
+#include "../compiler-core/slang-source-loc.h"
+#include "../core/slang-smart-pointer.h"
 #include "slang-compiler-fwd.h"
 #include "slang-entry-point.h"
 #include "slang-module.h"
 #include "slang-profile.h"
-
-#include "../compiler-core/slang-artifact.h"
-#include "../compiler-core/slang-source-loc.h"
-
-#include "../core/slang-smart-pointer.h"
 
 namespace Slang
 {
@@ -116,4 +114,4 @@ protected:
     HashSet<SourceFile*> m_includedFileSet;
 };
 
-}
+} // namespace Slang

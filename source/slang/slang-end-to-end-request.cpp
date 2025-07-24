@@ -1,25 +1,23 @@
 // slang-end-to-end-request.cpp
 #include "slang-end-to-end-request.h"
 
+#include "compiler-core/slang-pretty-writer.h"
+#include "core/slang-memory-file-system.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
 #include "slang-module-library.h"
 #include "slang-options.h"
-#include "slang-repro.h"
 #include "slang-reflection-json.h"
+#include "slang-repro.h"
 #include "slang-serialize-container.h"
-
-#include "compiler-core/slang-pretty-writer.h"
-
-#include "core/slang-performance-profiler.h"
-#include "core/slang-memory-file-system.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "compiler-core/slang-artifact-associated-impl.h"
-#include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-container-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "slang-artifact-output-util.h"
 

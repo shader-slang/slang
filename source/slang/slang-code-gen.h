@@ -13,8 +13,8 @@
 //
 
 #include "slang-entry-point.h"
-#include "slang-target-program.h"
 #include "slang-session.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {

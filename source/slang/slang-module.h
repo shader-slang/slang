@@ -7,7 +7,6 @@
 //
 
 #include "../core/slang-string-util.h"
-
 #include "slang-ast-builder.h"
 #include "slang-entry-point.h"
 #include "slang-linkable.h"

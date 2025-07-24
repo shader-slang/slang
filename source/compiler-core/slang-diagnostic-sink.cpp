@@ -869,5 +869,4 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
 }
 
 
-
 } // namespace Slang

@@ -12,14 +12,13 @@
 // `.slang-module` file).
 //
 
+#include "../compiler-core/slang-artifact.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 
-#include "../compiler-core/slang-artifact.h"
-
-#include <slang.h>
 #include <slang-com-helper.h>
+#include <slang.h>
 
 namespace Slang
 {

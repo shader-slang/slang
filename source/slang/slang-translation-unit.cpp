@@ -248,4 +248,4 @@ List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
     return m_sourceFiles;
 }
 
-}
+} // namespace Slang
