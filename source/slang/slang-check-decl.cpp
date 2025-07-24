@@ -5509,10 +5509,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         //
         if (tempSink.getErrorCount() != 0)
         {
-            context->innerSink.diagnose(
-                SourceLoc(),
-                Diagnostics::genericSignatureDoesNotMatchRequirement,
-                baseOverloadedExpr->name);
+            if (outFailureDetails)
+                outFailureDetails->reason = WitnessSynthesisFailureReason::GenericSignatureMismatch;
             return false;
         }
     }
@@ -5615,12 +5613,15 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                             getParameterDirection(calleeParam),
                             getParameterDirection(synParam)))
                     {
-                        context->innerSink.diagnose(
-                            calleeParam,
-                            Diagnostics::parameterDirectionDoesNotMatchRequirement,
-                            calleeParam,
-                            getParameterDirection(calleeParam),
-                            getParameterDirection(synParam));
+                        if (outFailureDetails)
+                        {
+                            outFailureDetails->reason =
+                                WitnessSynthesisFailureReason::ParameterDirMismatch;
+                            outFailureDetails->candidateMethod = declRefExpr->declRef;
+                            outFailureDetails->actualDir = getParameterDirection(calleeParam);
+                            outFailureDetails->expectedDir = getParameterDirection(synParam);
+                            outFailureDetails->paramDecl = calleeParam;
+                        }
                         return false;
                     }
                 }
@@ -7532,7 +7533,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
     // wrappers that redirects the call into the inner element.
     //
-    context->innerSink.reset();
     MethodWitnessSynthesisFailureDetails failureDetails = {};
     if (trySynthesizeRequirementWitness(
             context,
@@ -7570,11 +7570,22 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             failureDetails.candidateMethod,
             failureDetails.actualType,
             failureDetails.expectedType);
-
+    }
+    else if (failureDetails.reason == WitnessSynthesisFailureReason::ParameterDirMismatch)
+    {
         getSink()->diagnose(
-            requiredMemberDeclRef,
-            Diagnostics::seeDeclarationOfInterfaceRequirement,
-            requiredMemberDeclRef);
+            failureDetails.paramDecl,
+            Diagnostics::parameterDirectionDoesNotMatchRequirement,
+            failureDetails.paramDecl,
+            failureDetails.actualDir,
+            failureDetails.expectedDir);
+    }
+    else if (failureDetails.reason == WitnessSynthesisFailureReason::GenericSignatureMismatch)
+    {
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::genericSignatureDoesNotMatchRequirement,
+            requiredMemberDeclRef.getDecl()->getName());
     }
     else
     {
@@ -7594,17 +7605,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 subType,
                 requiredMemberDeclRef);
         }
-        if (context->innerSink.outputBuffer.getLength())
-        {
-            getSink()->diagnoseRaw(
-                Severity::Note,
-                context->innerSink.outputBuffer.getUnownedSlice());
-        }
-        getSink()->diagnose(
-            requiredMemberDeclRef,
-            Diagnostics::seeDeclarationOfInterfaceRequirement,
-            requiredMemberDeclRef);
     }
+    getSink()->diagnose(
+        requiredMemberDeclRef,
+        Diagnostics::seeDeclarationOfInterfaceRequirement,
+        requiredMemberDeclRef);
     return false;
 }
 

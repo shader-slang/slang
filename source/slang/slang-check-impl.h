@@ -1859,17 +1859,16 @@ public:
         /// declaration)
         ContainerDecl* parentDecl;
 
-        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
-        DiagnosticSink innerSink;
-
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
 
     /// Reasons why witness synthesis can fail
     enum class WitnessSynthesisFailureReason
     {
-        General,                 // Generic failure (default)
-        MethodResultTypeMismatch // Method return type doesn't match interface requirement
+        General,                  // Generic failure (default)
+        MethodResultTypeMismatch, // Method return type doesn't match interface requirement
+        ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
+        GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
     };
 
     /// Details about method witness synthesis failure
@@ -1879,6 +1878,11 @@ public:
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
+        ParameterDirection actualDir =
+            kParameterDirection_In; // For direction mismatches: the actual direction
+        ParameterDirection expectedDir =
+            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
     bool doesSignatureMatchRequirement(
