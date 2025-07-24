@@ -8,7 +8,48 @@
 namespace Slang
 {
 
+// Elements for which we keep track of propagation information.
+struct Element
+{
+    IRInst* context;
+    IRInst* inst;
 
+    Element(IRInst* context, IRInst* inst)
+        : context(context), inst(inst)
+    {
+    }
+
+    // Create element from an instruction that has a
+    // concrete parent (i.e. global IRFunc)
+    //
+    Element(IRInst* inst)
+        : inst(inst)
+    {
+        auto block = cast<IRBlock>(inst->getParent());
+        auto func = cast<IRFunc>(block->getParent());
+
+        // If parent func is not a global, then it is not a direct
+        // reference. An explicit IRSpecialize instruction must be provided as
+        // context.
+        //
+        SLANG_ASSERT(func->getParent()->getOp() == kIROp_ModuleInst);
+
+        context = func;
+    }
+
+    Element(const Element& other)
+        : context(other.context), inst(other.inst)
+    {
+    }
+
+    bool operator==(const Element& other) const
+    {
+        return context == other.context && inst == other.inst;
+    }
+
+    // getHashCode()
+    HashCode64 getHashCode() const { return combineHash(HashCode(context), HashCode(inst)); }
+};
 // Enumeration for different kinds of judgments about IR instructions.
 //
 // This forms a lattice with
@@ -298,7 +339,7 @@ struct DynamicInstLoweringContext
                 return none();
 
         // For non-global instructions, look up in the map
-        auto found = propagationMap.tryGetValue(inst);
+        auto found = propagationMap.tryGetValue(Element(inst));
         if (found)
             return *found;
         return none();
@@ -404,6 +445,12 @@ struct DynamicInstLoweringContext
             if (as<IRParam>(inst) || as<IRTerminatorInst>(inst))
                 continue;
             processInstForPropagation(inst, workQueue);
+        }
+
+        if (auto returnInfo = as<IRReturn>(block->getTerminator()))
+        {
+            auto valInfo = returnInfo->getVal();
+            updateFuncReturnInfo(as<IRFunc>(block->getParent()), tryGetInfo(valInfo), workQueue);
         }
     };
 
@@ -1272,6 +1319,9 @@ struct DynamicInstLoweringContext
 
     bool replaceType(IRInst* inst)
     {
+        if (inst->getParent() == nullptr)
+            return false; // Not a valid instruction
+
         auto info = tryGetInfo(inst);
         if (!info || info.judgment != PropagationJudgment::Existential)
             return false;
@@ -1918,7 +1968,7 @@ struct DynamicInstLoweringContext
     DiagnosticSink* sink;
 
     // Mapping from instruction to propagation information
-    Dictionary<IRInst*, PropagationInfo> propagationMap;
+    Dictionary<Element, PropagationInfo> propagationMap;
 
     // Mapping from function to return value propagation information
     Dictionary<IRInst*, PropagationInfo> funcReturnInfo;
