@@ -2955,10 +2955,12 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 {
     auto parentParent = getParentAggTypeDecl(parentDecl);
 
-    // The `this` parameter for a `class` is always `in`.
+    // The `this` parameter for a `class` is always `const_ref`
+    // since it is immutable, so we might as well be passing this
+    // param by const-ref
     if (as<ClassDecl>(parentParent))
     {
-        return kParameterDirection_In;
+        return kParameterDirection_ConstRef;
     }
 
     if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
@@ -3021,9 +3023,9 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
         return defaultDirection;
     }
 
-    // For now we make any `this` parameter default to `in`.
+    // For now we make any `this` parameter default to `const_ref`.
     //
-    return kParameterDirection_In;
+    return kParameterDirection_ConstRef;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
