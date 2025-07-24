@@ -19,7 +19,7 @@
 
 namespace Slang
 {
-
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
 // Our goal in this file is to convert a module in the Slang IR over to an
 // equivalent module in the SPIR-V intermediate language.
 //
@@ -9807,9 +9807,9 @@ SlangResult emitSPIRVFromIR(
             &writer);
     }
 #endif
-
+    dumpIRIfEnabled(codeGenContext, irModule, "POST legalizeIRForSPIRV");
     removeAvailableInDownstreamModuleDecorations(irModule, CodeGenTarget::SPIRV);
-
+    dumpIRIfEnabled(codeGenContext, irModule, "POST removeAvailableInDownstreamModuleDecorations");
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(

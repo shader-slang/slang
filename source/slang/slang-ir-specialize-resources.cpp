@@ -10,6 +10,8 @@
 
 namespace Slang
 {
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
+String dumpIRToString(IRInst* root, IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
 
 struct ResourceParameterSpecializationCondition : FunctionCallSpecializeCondition
 {
@@ -217,8 +219,15 @@ struct ResourceOutputSpecializationPass
         //
         FuncInfo funcInfo;
         SpecializeFuncResult result = specializeFunc(newFunc, funcInfo);
+        //UnownedStringSlice newFuncName = newFunc->findDecoration<IRLinkageDecoration>() ?
+        //    newFunc->findDecoration<IRLinkageDecoration>()->getMangledName() :
+        //        (newFunc->findDecoration<IRNameHintDecoration>() ? newFunc->findDecoration<IRNameHintDecoration>()->getName() :
+        //            UnownedStringSlice("<unnamed>"));
+        //String newFuncStr = dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
         if (failedResult(result))
         {
+            //fprintf(stderr, "ResourceOutputSpecializationPass::processFunc specializeFunc fail:%.*s\n%s\n",
+            //    (int)newFuncName.getLength(), newFuncName.begin(), newFuncStr.getBuffer());
             // Even though we deterined that we *should* specialize
             // this function, we were not able to because of some
             // failure inside the body of the function.
@@ -250,6 +259,9 @@ struct ResourceOutputSpecializationPass
             if (result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
                 unspecializableFuncs->add(oldFunc);
             return false;
+        } else {
+            //fprintf(stderr, "ResourceOutputSpecializationPass::processFunc specializeFunc succ:%.*s\n%s\n",
+            //    (int)newFuncName.getLength(), newFuncName.begin(), newFuncStr.getBuffer());
         }
 
         // Specialization might have changed the signature of `newFunc`,
@@ -1263,6 +1275,8 @@ bool specializeResourceOutputs(
 
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
+    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE specializeResourceUsage");
+
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
     //
@@ -1318,6 +1332,7 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             codeGenContext->getTargetProgram(),
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
+    dumpIRIfEnabled(codeGenContext, irModule, "POST specializeResourceUsage");
     return result;
 }
 

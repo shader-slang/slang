@@ -13002,16 +13002,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             nvapiSlotModifier->spaceName.getUnownedSlice());
     }
 
-#if 0
-    if (compileRequest->optionSet.shouldDumpIR())
+#if 1
+    //if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(
-            module,
-            compileRequest->m_irDumpOptions,
-            "GENERATED",
-            compileRequest->getSourceManager(),
-            &writer);
+        dumpIR(module, compileRequest->m_irDumpOptions, "GENERATED", compileRequest->getSourceManager(), nullptr);
     }
 #endif
 
@@ -13086,11 +13080,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     dceOptions.keepLayoutsAlive = true;
     dceOptions.useFastAnalysis = true;
 
+    dumpIR(module, compileRequest->m_irDumpOptions, "BEFORE DCE0", compileRequest->getSourceManager(), nullptr);
+
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
             eliminateDeadCode(func, dceOptions);
     }
+
+    dumpIR(module, compileRequest->m_irDumpOptions, "POST DCE0", compileRequest->getSourceManager(), nullptr);
 
     // Where possible, move loop condition checks to the end of loops, and wrap
     // the loop in an 'if(condition)'.
@@ -13151,6 +13149,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             break;
     }
 
+    dumpIR(module, compileRequest->m_irDumpOptions, "generateIRForTranslationUnit1", compileRequest->getSourceManager(), nullptr);
+
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // We don't allow recursive types.
@@ -13182,6 +13182,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
+
+    dumpIR(module, compileRequest->m_irDumpOptions, "generateIRForTranslationUnit2", compileRequest->getSourceManager(), nullptr);
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
@@ -13220,7 +13222,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripFrontEndOnlyInstructions(module, stripOptions);
 
         stripImportedWitnessTable(module);
-
+        dumpIR(module, compileRequest->m_irDumpOptions, "BEFORE DCE1", compileRequest->getSourceManager(), nullptr);
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -13230,7 +13232,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // eliminate anything that has been marked for export.
         //
         eliminateDeadCode(module, dceOptions);
-
+        dumpIR(module, compileRequest->m_irDumpOptions, "POST DCE1", compileRequest->getSourceManager(), nullptr);
         if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
         {
             // The obfuscated source map is stored on the module
@@ -13252,16 +13254,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
-    if (compileRequest->optionSet.shouldDumpIR())
+    // if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
-
-        dumpIR(
-            module,
-            compileRequest->m_irDumpOptions,
-            "LOWER-TO-IR",
-            compileRequest->getSourceManager(),
-            &writer);
+        // DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(module, compileRequest->m_irDumpOptions, "LOWER-TO-IR", compileRequest->getSourceManager(), nullptr);
     }
 
     module->buildMangledNameToGlobalInstMap();

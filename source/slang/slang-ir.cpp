@@ -6806,7 +6806,7 @@ static String getName(IRDumpContext* context, IRInst* value)
 static void dumpDebugID(IRDumpContext* context, IRInst* inst)
 {
 #if SLANG_ENABLE_IR_BREAK_ALLOC
-    if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
+    // if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
     {
         dump(context, "{");
         dump(context, String(inst->_debugUID));
@@ -7301,6 +7301,19 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
 
     dump(context, opInfo.name);
     dumpInstOperandList(context, inst);
+
+    extern String lastDumpedEntryPoint;
+    if (op == kIROp_EntryPointDecoration)
+    {
+        lastDumpedEntryPoint = ".";
+        auto irConst1 = as<IRConstant>(inst->getOperand(1));
+        auto irConst2 = as<IRConstant>(inst->getOperand(2));
+        if (irConst1)
+            lastDumpedEntryPoint.append(String(irConst1->getStringSlice().begin(), irConst1->getStringSlice().end()) + ".");
+        if (irConst2)
+            lastDumpedEntryPoint.append(String(irConst2->getStringSlice().begin(), irConst2->getStringSlice().end()) + ".");
+        lastDumpedEntryPoint.append(".txt");
+    }
 }
 
 static void dumpInstBody(IRDumpContext* context, IRInst* inst)
@@ -7478,6 +7491,21 @@ void dumpIR(
     SourceManager* sourceManager,
     ISlangWriter* inWriter)
 {
+    extern bool dumpEnable;
+    FileWriter* fileWriter = dynamic_cast<FileWriter*>(inWriter);
+    std::FILE* f = nullptr;
+    extern String dumpFileNameBase;
+    extern String lastDumpedEntryPoint;
+    extern int dumpCount;
+    String dumpFileName = "";
+    lastDumpedEntryPoint = "";
+    if (!fileWriter && dumpEnable) {
+        dumpFileName = (dumpFileNameBase + String(dumpCount++) + "." + label + ".txt");
+        fopen_s(&f, dumpFileName.getBuffer(), "wt");
+        inWriter = new FileWriter(f, 0);
+    } else if (!inWriter)
+        return;
+
     WriterHelper writer(inWriter);
 
     if (label)
@@ -7492,6 +7520,13 @@ void dumpIR(
     if (label)
     {
         writer.put("###\n");
+    }
+
+    if (!fileWriter && dumpEnable) {
+        fclose(f);
+        if (lastDumpedEntryPoint != "") {
+            std::rename(dumpFileName.getBuffer(), (dumpFileName + lastDumpedEntryPoint).getBuffer());
+        }
     }
 }
 
