@@ -1695,6 +1695,62 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::VulkanEmitReflection);
     }
 
+    // Helper function to check if a type contains 16-bit types
+    bool typeContains16BitTypes(IRType* type)
+    {
+        if (!type)
+            return false;
+        
+        switch (type->getOp())
+        {
+        case kIROp_HalfType:
+        case kIROp_UInt16Type:
+        case kIROp_Int16Type:
+            return true;
+        case kIROp_VectorType:
+            {
+                auto vectorType = as<IRVectorType>(type);
+                return typeContains16BitTypes(vectorType->getElementType());
+            }
+        case kIROp_MatrixType:
+            {
+                auto matrixType = as<IRMatrixType>(type);
+                return typeContains16BitTypes(matrixType->getElementType());
+            }
+        case kIROp_ArrayType:
+            {
+                auto arrayType = as<IRArrayType>(type);
+                return typeContains16BitTypes(arrayType->getElementType());
+            }
+        case kIROp_UnsizedArrayType:
+            {
+                auto arrayType = as<IRUnsizedArrayType>(type);
+                return typeContains16BitTypes(arrayType->getElementType());
+            }
+        case kIROp_StructType:
+            {
+                auto structType = as<IRStructType>(type);
+                for (auto field : structType->getFields())
+                {
+                    if (typeContains16BitTypes(field->getFieldType()))
+                        return true;
+                }
+                return false;
+            }
+        case kIROp_PtrType:
+        case kIROp_RefType:
+        case kIROp_ConstRefType:
+        case kIROp_OutType:
+        case kIROp_InOutType:
+            {
+                auto ptrType = as<IRPtrTypeBase>(type);
+                return typeContains16BitTypes(ptrType->getValueType());
+            }
+        default:
+            return false;
+        }
+    }
+
     void requirePhysicalStorageAddressing()
     {
         if (m_addressingMode == SpvAddressingModelPhysicalStorageBuffer64)
@@ -1799,6 +1855,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_AMDX_shader_enqueue"));
                     break;
+                }
+
+                // For SPIR-V 1.3 and later, require uniformAndStorageBuffer16BitAccess capability
+                // when uniform or storage buffers contain 16-bit types
+                if ((storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer) &&
+                    typeContains16BitTypes(ptrType->getValueType()))
+                {
+                    requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
                 }
 
                 auto valueType = ptrType->getValueType();
