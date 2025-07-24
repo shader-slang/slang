@@ -5547,8 +5547,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     if (tempSink.getErrorCount() != 0)
     {
+        if (outFailureDetails)
+            outFailureDetails->reason = WitnessSynthesisFailureReason::General;
+
         // Check if the failure was due to return type coercion
-        if (checkedCall && checkedCall->type && outFailureDetails)
+        if (!IsErrorExpr(checkedCall) && outFailureDetails)
         {
             // The call resolved - check if it's a return type mismatch
             auto actualReturnType = checkedCall->type;
@@ -5557,23 +5560,18 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 // Find the actual implementation method that was called
                 if (auto invokeExpr = as<InvokeExpr>(checkedCall))
                 {
-                    if (auto memberRefExpr = as<MemberExpr>(invokeExpr->functionExpr))
+                    if (auto declRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
                     {
                         // Store failure details instead of emitting diagnostic immediately
                         outFailureDetails->reason =
                             WitnessSynthesisFailureReason::MethodResultTypeMismatch;
-                        outFailureDetails->candidateMethod = memberRefExpr->declRef;
+                        outFailureDetails->candidateMethod = declRefExpr->declRef;
                         outFailureDetails->actualType = actualReturnType;
                         outFailureDetails->expectedType = resultType;
                     }
                 }
             }
         }
-
-        context->innerSink.diagnose(
-            SourceLoc(),
-            Diagnostics::genericSignatureDoesNotMatchRequirement,
-            baseOverloadedExpr->name);
         return false;
     }
 
