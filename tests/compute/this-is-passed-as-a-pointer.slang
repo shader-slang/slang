@@ -1,11 +1,16 @@
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -output-using-type -cpu
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -output-using-type -vk
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain
 
-//TEST_INPUT:ubuffer(data=[1, 2, 3], stride=4):name=inputBuffer
+//TEST_INPUT: ubuffer(data=[1 2 3], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
-//TEST_INPUT:ubuffer(data=[0, 0, 0], stride=4):out,name=outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 struct Data
