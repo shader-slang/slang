@@ -144,12 +144,10 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
                 sb.append(i);
                 if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
                 {
-                    printf("========================== Specializing linkage for %s\n", typeLinkage->getMangledName().begin());
                     sb.append(typeLinkage->getMangledName());
                 }
                 else
                 {
-                    printf("------------------------- USE getTypeNameHint\n");
                     // getTypeNameHint may produce a name with characters that can't
                     // be part of an identifier, so we need to filter it afterward.
                     StringBuilder tmp;

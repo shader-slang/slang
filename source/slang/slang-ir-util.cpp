@@ -740,7 +740,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         {
             auto ptrLit = as<IRPtrLit>(type);
             sb << "ptr_";
-            sb << (uintptr_t)ptrLit->getValue();
+            sb << (UInt64)ptrLit->getValue();
         }
         break;
     default:
