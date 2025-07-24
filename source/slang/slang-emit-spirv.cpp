@@ -5738,7 +5738,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
             if (!isPhysicalType)
+            {
+                id++;
                 continue;
+            }
 
             // Emit explicit struct field layout decorations if the struct is physical.
             IRIntegerValue offset = 0;
