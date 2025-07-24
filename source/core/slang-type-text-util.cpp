@@ -78,7 +78,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_METAL, "metal", "metal", "Metal shader source"},
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
     {SLANG_METAL_LIB_ASM,
-     "metallib-asm"
+     "metallib-asm",
      "metallib-asm",
      "Metal Library Bytecode assembly"},
     {SLANG_WGSL, "wgsl", "wgsl", "WebGPU shading language source"},
