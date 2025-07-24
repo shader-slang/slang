@@ -159,6 +159,14 @@ struct MatrixTypeLoweringContext
     IRInst* legalizeMatrixConstruction(IRInst* inst)
     {
         auto dataType = inst->getDataType();
+        
+        // Ensure result type is in lowered form
+        if (auto matrixType = as<IRMatrixType>(dataType))
+        {
+            if (shouldLowerMatrixType(matrixType))
+                dataType = as<IRType>(getReplacement(dataType));
+        }
+        
         auto arrayType = as<IRArrayType>(dataType);
         SLANG_ASSERT(arrayType);
         
