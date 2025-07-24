@@ -1,6 +1,7 @@
 // slang-session.cpp
 #include "slang-session.h"
 
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
@@ -11,8 +12,6 @@
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
-
-#include "compiler-core/slang-artifact-util.h"
 
 namespace Slang
 {

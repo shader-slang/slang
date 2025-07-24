@@ -1,11 +1,10 @@
 // slang-target.cpp
 #include "slang-target.h"
 
+#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
-
-#include "compiler-core/slang-artifact-desc-util.h"
-#include "../core/slang-type-text-util.h"
 
 namespace Slang
 {

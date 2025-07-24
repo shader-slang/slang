@@ -110,4 +110,4 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
     return _createEntryPointResult(entryPointIndex, sink);
 }
 
-}
+} // namespace Slang

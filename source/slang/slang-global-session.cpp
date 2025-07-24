@@ -1,8 +1,12 @@
 // slang-global-session.cpp
 #include "slang-global-session.h"
 
-#include "slang-compiler.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-archive-file-system.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-type-convert-util.h"
 #include "slang-check-impl.h"
+#include "slang-compiler.h"
 #include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
 #include "slang-options.h"
@@ -10,12 +14,6 @@
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
-
-#include "compiler-core/slang-artifact-desc-util.h"
-
-#include "core/slang-archive-file-system.h"
-#include "core/slang-performance-profiler.h"
-#include "core/slang-type-convert-util.h"
 
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();

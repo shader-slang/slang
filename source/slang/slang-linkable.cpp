@@ -1,16 +1,14 @@
 // slang-linkable.cpp
 #include "slang-linkable.h"
 
-#include "slang-check-impl.h"
-#include "slang-compiler.h"
-#include "slang-mangle.h"
-
 #include "compiler-core/slang-artifact-container-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-impl.h"
-
 #include "core/slang-char-util.h"
 #include "core/slang-memory-file-system.h"
+#include "slang-check-impl.h"
+#include "slang-compiler.h"
+#include "slang-mangle.h"
 
 namespace Slang
 {

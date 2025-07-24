@@ -17,4 +17,4 @@ class EndToEndCompileRequest;
 SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest);
 
 
-}
+} // namespace Slang

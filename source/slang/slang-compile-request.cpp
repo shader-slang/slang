@@ -1,6 +1,9 @@
 // slang-compile-request.cpp
 #include "slang-compile-request.h"
 
+#include "../core/slang-performance-profiler.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-ast-dump.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
@@ -8,11 +11,6 @@
 #include "slang-lower-to-ir.h"
 #include "slang-parser.h"
 #include "slang-serialize-container.h"
-
-#include "compiler-core/slang-artifact-desc-util.h"
-#include "compiler-core/slang-artifact-util.h"
-
-#include "../core/slang-performance-profiler.h"
 
 namespace Slang
 {
@@ -106,8 +104,7 @@ static void _calcViewInitiatingHierarchy(
     for (auto& [_, value] : outHierarchy)
     {
         value.sort(
-            [](SourceView* a, SourceView* b) -> bool
-            {
+            [](SourceView* a, SourceView* b) -> bool {
                 return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
             });
     }

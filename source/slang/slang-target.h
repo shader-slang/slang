@@ -8,12 +8,11 @@
 // code generation and/or layout for that target.
 //
 
+#include "../core/slang-string.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
-
-#include "../core/slang-string.h"
 
 #include <slang.h>
 

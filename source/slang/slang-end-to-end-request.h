@@ -21,11 +21,9 @@
 // the public API.
 //
 
-#include "slang-compile-request.h"
-
 #include "../compiler-core/slang-source-embed-util.h"
-
 #include "../core/slang-file-system.h"
+#include "slang-compile-request.h"
 
 namespace Slang
 {
