@@ -7766,62 +7766,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitMakeMatrix(SpvInstParent* parent, IRInst* inst)
     {
-        // If operands are already row vectors, use CompositeConstruct directly.
-        if (as<IRVectorType>(inst->getOperand(0)->getDataType()))
-        {
-            return emitCompositeConstruct(parent, inst);
-        }
-        // Otherwise, operands are raw elements, we need to construct row vectors first,
-        // then construct matrix from row vectors.
-        List<SpvInst*> rowVectors;
-
-        IRIntegerValue rowCount;
-        IRIntegerValue colCount;
-        IRType* elementType;
-
-        // Data type can be either matrix or vector depending on the
-        // legalization requirements
-        auto dataType = inst->getDataType();
-
-        if (auto matrixType = as<IRMatrixType>(dataType))
-        {
-            elementType = matrixType->getElementType();
-            rowCount = getIntVal(matrixType->getRowCount());
-            colCount = getIntVal(matrixType->getColumnCount());
-        }
-        else if (auto arrayType = as<IRArrayType>(dataType))
-        {
-            auto vectorType = as<IRVectorType>(arrayType->getElementType());
-            SLANG_ASSERT(vectorType);
-
-            elementType = vectorType->getElementType();
-            rowCount = getIntVal(arrayType->getElementCount());
-            colCount = getIntVal(vectorType->getElementCount());
-        }
-        else
-        {
-            SLANG_UNEXPECTED("data type for makeMatrix operation is "
-                             "expected be either a matrix or array type");
-        }
-
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(elementType, colCount);
-
-        List<IRInst*> colElements;
-        UInt index = 0;
-        for (IRIntegerValue j = 0; j < rowCount; j++)
-        {
-            colElements.clear();
-            for (IRIntegerValue i = 0; i < colCount; i++)
-            {
-                colElements.add(inst->getOperand(index));
-                index++;
-            }
-            auto rowVector = emitCompositeConstruct(parent, nullptr, rowVectorType, colElements);
-            rowVectors.add(rowVector);
-        }
-        return emitCompositeConstruct(parent, inst, inst->getDataType(), rowVectors);
+        // Matrix construction is now handled by the centralized legalization pass,
+        // so we should only see native matrix operations here
+        return emitCompositeConstruct(parent, inst);
     }
 
     SpvInst* emitConstruct(SpvInstParent* parent, IRInst* inst)
@@ -7996,93 +7943,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
-    // Helper method to handle composite arithmetic operations for matrices and arrays
-    SpvInst* emitCompositeArithmetic(
-        SpvInstParent* parent,
-        IRInst* inst,
-        IRIntegerValue rowCount,
-        IRIntegerValue colCount,
-        IRType* elementType,
-        IRType* resultType,
-        bool isMatrixType)
-    {
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(elementType, colCount);
-        List<SpvInst*> rows;
-
-        for (IRIntegerValue i = 0; i < rowCount; i++)
-        {
-            List<IRInst*> operands;
-            for (UInt j = 0; j < inst->getOperandCount(); j++)
-            {
-                auto originalOperand = inst->getOperand(j);
-                bool shouldExtract =
-                    isMatrixType ? as<IRMatrixType>(originalOperand->getDataType()) != nullptr
-                                 : as<IRArrayType>(originalOperand->getDataType()) != nullptr;
-
-                if (shouldExtract)
-                {
-                    auto operand = builder.emitElementExtract(originalOperand, i);
-                    emitLocalInst(parent, operand);
-                    operands.add(operand);
-                }
-                else
-                {
-                    operands.add(originalOperand);
-                }
-            }
-            rows.add(emitVectorOrScalarArithmetic(
-                parent,
-                nullptr,
-                rowVectorType,
-                inst->getOp(),
-                inst->getOperandCount(),
-                operands.getArrayView()));
-        }
-        return emitCompositeConstruct(parent, inst, resultType, rows);
-    }
-
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
-        {
-            auto rowCount = getIntVal(matrixType->getRowCount());
-            auto colCount = getIntVal(matrixType->getColumnCount());
-            return emitCompositeArithmetic(
-                parent,
-                inst,
-                rowCount,
-                colCount,
-                matrixType->getElementType(),
-                inst->getDataType(),
-                true);
-        }
-        else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
-        {
-            // Only for legalization
-            auto arrayElementType = arrayType->getElementType();
-            SLANG_ASSERT(as<IRVectorType>(arrayElementType));
-
-            auto vectorType = as<IRVectorType>(arrayElementType);
-            auto elementType = vectorType->getElementType();
-            SLANG_ASSERT(
-                as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-                as<IRIntType>(elementType));
-
-            auto rowCount = getIntVal(arrayType->getElementCount());
-            auto colCount = getIntVal(vectorType->getElementCount());
-
-            return emitCompositeArithmetic(
-                parent,
-                inst,
-                rowCount,
-                colCount,
-                elementType,
-                inst->getDataType(),
-                false);
-        }
-
+        // Matrix arithmetic operations are now handled by the centralized legalization pass,
+        // so we should only see native matrix and scalar/vector operations here
         Array<IRInst*, 4> operands;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             operands.add(inst->getOperand(i));

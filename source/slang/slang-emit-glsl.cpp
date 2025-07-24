@@ -2156,81 +2156,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
-    case kIROp_MakeMatrix:
-        {
-            // For GLSL, when matrices are lowered to arrays of vectors,
-            // we need to construct row vectors first, then construct the array
-            auto dataType = inst->getDataType();
-            
-            // If operands are already row vectors, use them directly
-            if (inst->getOperandCount() > 0 && as<IRVectorType>(inst->getOperand(0)->getDataType()))
-            {
-                emitType(dataType);
-                m_writer->emit("(");
-                for (UInt i = 0; i < inst->getOperandCount(); i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    emitOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                }
-                m_writer->emit(")");
-                return true;
-            }
-            
-            // Otherwise, operands are raw elements, construct row vectors first
-            IRIntegerValue rowCount;
-            IRIntegerValue colCount;
-            IRType* elementType;
-            
-            if (auto matrixType = as<IRMatrixType>(dataType))
-            {
-                elementType = matrixType->getElementType();
-                rowCount = getIntVal(matrixType->getRowCount());
-                colCount = getIntVal(matrixType->getColumnCount());
-            }
-            else if (auto arrayType = as<IRArrayType>(dataType))
-            {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                if (!vectorType) return false;
-                
-                elementType = vectorType->getElementType();
-                rowCount = getIntVal(arrayType->getElementCount());
-                colCount = getIntVal(vectorType->getElementCount());
-            }
-            else
-            {
-                return false;
-            }
-            
-            emitType(dataType);
-            m_writer->emit("(");
-            
-            UInt index = 0;
-            for (IRIntegerValue row = 0; row < rowCount; row++)
-            {
-                if (row != 0) m_writer->emit(", ");
-                
-                // Construct row vector  
-                _emitGLSLTypePrefix(elementType);
-                m_writer->emit("vec");
-                m_writer->emit(colCount);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue col = 0; col < colCount; col++)
-                {
-                    if (col != 0) m_writer->emit(", ");
-                    if (index < inst->getOperandCount())
-                    {
-                        emitOperand(inst->getOperand(index), getInfo(EmitOp::General));
-                        index++;
-                    }
-                }
-                m_writer->emit(")");
-            }
-            
-            m_writer->emit(")");
-            return true;
-        }
-        break;
+
         
     case kIROp_ControlBarrier:
         {
@@ -2302,96 +2228,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
 
-    case kIROp_Add:
-    case kIROp_Sub:
     case kIROp_Mul:
-    case kIROp_Lsh:
-    case kIROp_Rsh:
         {
-            // Handle arithmetic operations for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            
-            // Check if this is a lowered matrix operation (result is array of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
-                
-                const char* opStr = nullptr;
-                switch (inst->getOp())
-                {
-                case kIROp_Add: opStr = " + "; break;
-                case kIROp_Sub: opStr = " - "; break;
-                case kIROp_Mul: opStr = " * "; break;
-                case kIROp_Lsh: opStr = " << "; break;
-                case kIROp_Rsh: opStr = " >> "; break;
-                }
-                
-                emitType(resultType);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    auto left = inst->getOperand(0);
-                    auto right = inst->getOperand(1);
-                    
-                    // Check if operands are arrays (matrices) or scalars
-                    bool leftIsArray = as<IRArrayType>(left->getDataType()) && 
-                                      as<IRVectorType>(as<IRArrayType>(left->getDataType())->getElementType());
-                    bool rightIsArray = as<IRArrayType>(right->getDataType()) && 
-                                       as<IRVectorType>(as<IRArrayType>(right->getDataType())->getElementType());
-                    
-                    if (leftIsArray)
-                    {
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        _emitGLSLTypePrefix(elementType);
-                        m_writer->emit("vec");
-                        m_writer->emit(colCount);
-                        m_writer->emit("(");
-                        emitOperand(left, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                    
-                    m_writer->emit(opStr);
-                    
-                    if (rightIsArray)
-                    {
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        _emitGLSLTypePrefix(elementType);
-                        m_writer->emit("vec");
-                        m_writer->emit(colCount);
-                        m_writer->emit("(");
-                        emitOperand(right, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                }
-                
-                m_writer->emit(")");
-                return true;
-            }
-            
             // Handle original matrix * matrix case (not lowered) - component-wise multiplication
-            if (inst->getOp() == kIROp_Mul && 
-                as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
                 as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
                 m_writer->emit("matrixCompMult(");
@@ -2564,31 +2404,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             IRInst* operand = inst->getOperand(0);
             
-            // Handle logical NOT operation for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                emitType(resultType);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    m_writer->emit("not(");
-                    emitOperand(operand, getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("])");
-                }
-                
-                m_writer->emit(")");
-                return true;
-            }
-            
             // Handle regular vector NOT operations
             if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
             {
@@ -2636,43 +2451,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Geq:
     case kIROp_Leq:
         {
-            // Handle comparison operations for lowered matrices (arrays of vectors)
             IRInst* left = inst->getOperand(0);
             IRInst* right = inst->getOperand(1);
-            
-            // Check if this is a lowered matrix comparison (result is array of vectors)
-            auto resultType = inst->getDataType();
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                const char* funcName = _getGLSLVectorCompareFunctionName(inst->getOp());
-                if (funcName)
-                {
-                    emitType(resultType);
-                    m_writer->emit("(");
-                    
-                    for (IRIntegerValue i = 0; i < rowCount; i++)
-                    {
-                        if (i != 0) m_writer->emit(", ");
-                        
-                        m_writer->emit(funcName);
-                        m_writer->emit("(");
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("], ");
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("])");
-                    }
-                    
-                    m_writer->emit(")");
-                    return true;
-                }
-            }
 
             // If the comparison is between vectors use GLSL vector comparisons
             auto leftVectorType = as<IRVectorType>(left->getDataType());
