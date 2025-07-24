@@ -2170,6 +2170,14 @@ local insts = {
 			},
 		},
 	},
+	{
+		-- A collection of IR instructions used for propagation analysis
+		-- The operands are the elements of the set, sorted by unique ID to ensure canonical ordering
+		TypeFlow = {
+			hoistable = true,
+			{ TypeFlowCollection = {} } 
+		},
+	}
 }
 
 -- A function to calculate some useful properties and put it in the table,

@@ -8722,6 +8722,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
         return false;
 
+    case kIROp_TypeFlowCollection:
+        return false;
+
     case kIROp_Div:
     case kIROp_IRem:
         if (isIntegralScalarOrCompositeType(getFullType()))
