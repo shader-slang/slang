@@ -156,6 +156,25 @@ struct MatrixTypeLoweringContext
         }
     }
 
+    // Helper method for comparison operations that have the same pattern
+    IRInst* legalizeComparisonOperation(
+        IRBuilder& builder, 
+        IROp opCode, 
+        IRInst* leftOperand, 
+        IRInst* rightOperand, 
+        IRVectorType* vectorType, 
+        IRIntegerValue colCount)
+    {
+        // For vector comparisons, result should match vectorType if it's bool, otherwise bool vector
+        IRType* resultVectorType = vectorType;
+        if (!as<IRBoolType>(vectorType->getElementType()))
+        {
+            resultVectorType = builder.getVectorType(builder.getBoolType(), colCount);
+        }
+        IRInst* operands[2] = { leftOperand, rightOperand };
+        return builder.emitIntrinsicInst(resultVectorType, opCode, 2, operands);
+    }
+
     IRInst* legalizeMatrixConstruction(IRInst* inst)
     {
         auto dataType = inst->getDataType();
@@ -341,42 +360,12 @@ struct MatrixTypeLoweringContext
                 }
                 break;
             case kIROp_Less:
-                resultRow = builder.emitLess(leftOperand, rightOperand);
-                break;
             case kIROp_Greater:
-                {
-                    // For vector comparisons, result should match vectorType if it's bool, otherwise bool vector
-                    IRType* resultVectorType = vectorType;
-                    if (!as<IRBoolType>(vectorType->getElementType()))
-                    {
-                        resultVectorType = builder.getVectorType(builder.getBoolType(), colCount);
-                    }
-                    IRInst* operands[2] = { leftOperand, rightOperand };
-                    auto greaterInst = builder.emitIntrinsicInst(resultVectorType, kIROp_Greater, 2, operands);
-                    resultRow = greaterInst;
-                }
-                break;
             case kIROp_Leq:
-                {
-                    // For vector comparisons, result should match vectorType if it's bool, otherwise bool vector
-                    IRType* resultVectorType = vectorType;
-                    if (!as<IRBoolType>(vectorType->getElementType()))
-                    {
-                        resultVectorType = builder.getVectorType(builder.getBoolType(), colCount);
-                    }
-                    IRInst* operands[2] = { leftOperand, rightOperand };
-                    auto leqInst = builder.emitIntrinsicInst(resultVectorType, kIROp_Leq, 2, operands);
-                    resultRow = leqInst;
-                }
-                break;
             case kIROp_Geq:
-                resultRow = builder.emitGeq(leftOperand, rightOperand);
-                break;
             case kIROp_Eql:
-                resultRow = builder.emitEql(leftOperand, rightOperand);
-                break;
             case kIROp_Neq:
-                resultRow = builder.emitNeq(leftOperand, rightOperand);
+                resultRow = legalizeComparisonOperation(builder, inst->getOp(), leftOperand, rightOperand, vectorType, colCount);
                 break;
             default:
                 SLANG_UNEXPECTED("unhandled binary operation");
