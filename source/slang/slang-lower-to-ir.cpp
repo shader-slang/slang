@@ -2994,7 +2994,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     //
     if (parentDecl->hasModifier<NonmutatingAttribute>())
     {
-        return kParameterDirection_ConstRef;
+        return kParameterDirection_In;
     }
     else if (as<SetterDecl>(parentDecl))
     {
@@ -3023,8 +3023,15 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
         return defaultDirection;
     }
 
+    // All intrinsic ops are magic tricks that assume properties.
+    // We might as well pass in a `in` since this keeps legalization
+    // consistent
+    if (parentDecl->hasModifier<IntrinsicOpModifier>())
+        return kParameterDirection_In;
+
     // For now we make any `this` parameter default to `const_ref`.
-    //
+    // `this` in this case is without a doubt, not mutating, so this
+    // is not dangerous.
     return kParameterDirection_ConstRef;
 }
 
