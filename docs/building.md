@@ -143,6 +143,10 @@ build/Debug/bin/slang-test
 
 See the [documentation on testing](../tools/slang-test/README.md) for more information.
 
+## Debugging
+
+See the [documentation on debugging](/docs/debugging.md).
+
 ## More niche topics
 
 ### CMake options
