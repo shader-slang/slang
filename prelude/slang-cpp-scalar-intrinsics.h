@@ -656,7 +656,7 @@ SLANG_FORCE_INLINE uint32_t U16_firstbitlow(uint16_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     return __builtin_ffs(v) - 1;
-#elif SLANG_PROCESSOR_X86_64 && SLANG_VC  
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
     unsigned long index;
     if (_BitScanForward(&index, v))
         return index;
@@ -799,7 +799,8 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     // __builtin_ffs returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
-    // We need 0-based index, so subtract 1. When __builtin_ffs returns 0, we get -1 (0xFFFFFFFF for uint)
+    // We need 0-based index, so subtract 1. When __builtin_ffs returns 0, we get -1 (0xFFFFFFFF for
+    // uint)
     return __builtin_ffs(v) - 1;
 #elif SLANG_PROCESSOR_X86_64 && SLANG_VC
     unsigned long index;
