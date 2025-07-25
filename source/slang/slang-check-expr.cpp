@@ -1210,6 +1210,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
     {
         getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
     }
+    expr->type = m_astBuilder->getErrorType();
 }
 
 Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
@@ -5279,11 +5280,9 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
                 shouldRemove = true;
             if (!shouldRemove)
             {
-                filteredLookupResult.items.add(lookupResult);
+                AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
-        if (filteredLookupResult.items.getCount() == 1)
-            filteredLookupResult.item = filteredLookupResult.items.getFirst();
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
             filteredLookupResult,
@@ -5306,6 +5305,8 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
 
     auto resultBaseExpr =
         maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+
+    resultBaseExpr = maybeResolveOverloadedExpr(resultBaseExpr, LookupMask::Default, getSink());
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
@@ -5360,6 +5361,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     bool needDeref = false;
     expr->baseExpression =
         checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
+
+    if (IsErrorExpr(expr->baseExpression))
+    {
+        return CreateErrorExpr(expr);
+    }
 
     if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
     {
@@ -5427,10 +5433,6 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     else if (auto baseTupleType = as<TupleType>(baseType))
     {
         return checkTupleSwizzleExpr(expr, baseTupleType);
-    }
-    else if (as<ErrorType>(baseType))
-    {
-        return CreateErrorExpr(expr);
     }
     else
     {
