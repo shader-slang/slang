@@ -7186,7 +7186,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
             }
-            if (targetCase->capability == 0)
+            if (targetCase->capability == (int32_t)CapabilityName::Invalid)
             {
                 info.defaultLabel = caseBlock;
             }
