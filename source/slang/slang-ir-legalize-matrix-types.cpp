@@ -109,8 +109,6 @@ struct MatrixTypeLoweringContext
         case kIROp_Mul:
         case kIROp_Lsh:
         case kIROp_Rsh:
-        case kIROp_And:
-        case kIROp_Or:
         case kIROp_BitAnd:
         case kIROp_BitOr:
         case kIROp_BitXor:
@@ -692,8 +690,6 @@ struct MatrixTypeLoweringContext
         case kIROp_Mul:
         case kIROp_Lsh:
         case kIROp_Rsh:
-        case kIROp_And:
-        case kIROp_Or:
         case kIROp_BitAnd:
         case kIROp_BitOr:
         case kIROp_BitXor:
