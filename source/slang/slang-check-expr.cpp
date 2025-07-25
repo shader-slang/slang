@@ -1776,7 +1776,7 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     }
     else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(expr))
     {
-        return GetBaseExpr(partiallyApplied->originalExpr);
+        return GetBaseExpr(partiallyApplied->baseExpr);
     }
     return nullptr;
 }
