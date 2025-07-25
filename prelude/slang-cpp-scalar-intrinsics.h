@@ -652,6 +652,54 @@ SLANG_FORCE_INLINE uint32_t I16_countbits(int16_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE uint32_t U16_firstbitlow(uint16_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC  
+    unsigned long index;
+    if (_BitScanForward(&index, v))
+        return index;
+    else
+        return 0xFFFFFFFF;
+#else
+    // Fallback implementation
+    if (v == 0)
+        return 0xFFFFFFFF;
+    uint32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
+}
+
+SLANG_FORCE_INLINE int32_t I16_firstbitlow(int16_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    if (_BitScanForward(&index, v))
+        return (int32_t)index;
+    else
+        return -1;
+#else
+    // Fallback implementation
+    if (v == 0)
+        return -1;
+    int32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
+}
+
 // ----------------------------- U8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
 {
@@ -663,6 +711,36 @@ SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
 SLANG_FORCE_INLINE uint32_t I8_countbits(int16_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t U8_firstbitlow(uint8_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    if (_BitScanForward(&index, v))
+        return index;
+    else
+        return 0xFFFFFFFF;
+#else
+    return U16_firstbitlow(uint16_t(v));
+#endif
+}
+
+SLANG_FORCE_INLINE int32_t I8_firstbitlow(int8_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    if (_BitScanForward(&index, v))
+        return (int32_t)index;
+    else
+        return -1;
+#else
+    return I16_firstbitlow(int16_t(v));
+#endif
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -861,6 +939,54 @@ SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t U64_firstbitlow(uint64_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffsll(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    if (_BitScanForward64(&index, v))
+        return index;
+    else
+        return 0xFFFFFFFF;
+#else
+    // Fallback implementation
+    if (v == 0)
+        return 0xFFFFFFFF;
+    uint32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
+}
+
+SLANG_FORCE_INLINE int32_t I64_firstbitlow(int64_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_ffsll(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    if (_BitScanForward64(&index, v))
+        return (int32_t)index;
+    else
+        return -1;
+#else
+    // Fallback implementation
+    if (v == 0)
+        return -1;
+    int32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
 }
 
 // ----------------------------- UPTR -----------------------------------------
