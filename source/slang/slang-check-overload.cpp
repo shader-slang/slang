@@ -1250,7 +1250,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                 expr->loc = context.loc;
-                expr->originalExpr = baseExpr;
+                expr->originalExpr = context.originalExpr;
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
