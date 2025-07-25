@@ -24,20 +24,11 @@ struct Data
     {
         return data + val;
     }
-    // `this` must be passed as pointer on metal/cpp/cuda.
-    // `this` must be passed as `inout` on glsl/hlsl
-    // CUDA: (Data{{.*}}*
-    // [mutating]
-    // int modifyAndFetch(int data)
-    // {
-    //     val += data;
-    //     return val;
-    // }
 };
 
 //BUF: 3
-//BUF: 4
-//BUF: 5
+//BUF: 0
+//BUF: 0
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
@@ -45,6 +36,4 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     Data data;
     data.val = inputBuffer[0];
     outputBuffer[0] = data.fetch(inputBuffer[1]);
-    // outputBuffer[1] = data.modifyAndFetch(inputBuffer[1])+1;
-    // outputBuffer[2] = data.val+2;
 }

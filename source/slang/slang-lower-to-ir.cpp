@@ -721,7 +721,52 @@ bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern
 /// declaration?
 bool isEffectivelyStatic(Decl* decl, ContainerDecl* parentDecl);
 
-bool isCoreModuleMemberFuncDecl(Decl* decl);
+/// Is `decl` a member function (or effectively a member function) when considered as a core
+/// module declaration?
+bool isCoreModuleMemberFuncDecl(Decl* inDecl)
+{
+    auto decl = as<CallableDecl>(inDecl);
+    if (!decl)
+        return false;
+
+    // Constructors aren't really member functions, insofar
+    // as they aren't called with a `this` parameter.
+    if (as<ConstructorDecl>(decl))
+        return false;
+
+    // Exclude `static` functions for same reason.
+    if (decl->findModifier<HLSLStaticModifier>())
+    {
+        return false;
+    }
+
+    auto dd = decl->parentDecl;
+    for (;;)
+    {
+        if (auto genericDecl = as<GenericDecl>(dd))
+        {
+            dd = genericDecl->parentDecl;
+            continue;
+        }
+
+        if (auto subscriptDecl = as<SubscriptDecl>(dd))
+        {
+            dd = subscriptDecl->parentDecl;
+        }
+
+        break;
+    }
+
+    // Note: the use of `AggTypeDeclBase` here instead of just
+    // `AggTypeDecl` means that we consider a declaration that
+    // is under a `struct` *or* an `extension` to be a member
+    // function for our purposes.
+    //
+    if (as<AggTypeDeclBase>(dd))
+        return true;
+
+    return false;
+}
 
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl);
@@ -3027,6 +3072,14 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // We might as well pass in a `in` since this keeps legalization
     // consistent
     if (parentDecl->hasModifier<IntrinsicOpModifier>())
+        return kParameterDirection_In;
+    
+    // Core was designed with `in` as the default in mind; for now we will
+    // temporarily keep this behavior.
+    //
+    // If we do not do this, `__intrinsic_asm` assumptions (we have a value,
+    // not a var-ptr) will be broken and require fixing/work-around
+    if (isCoreModuleMemberFuncDecl(parentDecl))
         return kParameterDirection_In;
 
     // For now we make any `this` parameter default to `const_ref`.
@@ -10498,53 +10551,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->offset));
             }
         }
-    }
-
-    /// Is `decl` a member function (or effectively a member function) when considered as a core
-    /// module declaration?
-    bool isCoreModuleMemberFuncDecl(Decl* inDecl)
-    {
-        auto decl = as<CallableDecl>(inDecl);
-        if (!decl)
-            return false;
-
-        // Constructors aren't really member functions, insofar
-        // as they aren't called with a `this` parameter.
-        if (as<ConstructorDecl>(decl))
-            return false;
-
-        // Exclude `static` functions for same reason.
-        if (decl->findModifier<HLSLStaticModifier>())
-        {
-            return false;
-        }
-
-        auto dd = decl->parentDecl;
-        for (;;)
-        {
-            if (auto genericDecl = as<GenericDecl>(dd))
-            {
-                dd = genericDecl->parentDecl;
-                continue;
-            }
-
-            if (auto subscriptDecl = as<SubscriptDecl>(dd))
-            {
-                dd = subscriptDecl->parentDecl;
-            }
-
-            break;
-        }
-
-        // Note: the use of `AggTypeDeclBase` here instead of just
-        // `AggTypeDecl` means that we consider a declaration that
-        // is under a `struct` *or* an `extension` to be a member
-        // function for our purposes.
-        //
-        if (as<AggTypeDeclBase>(dd))
-            return true;
-
-        return false;
     }
 
     /// Add a "catch-all" decoration for a core module function if it would be needed
