@@ -2133,6 +2133,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
     return U32_countbits(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
+{
+    return U32_firstbitlow(uint32_t(v));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)

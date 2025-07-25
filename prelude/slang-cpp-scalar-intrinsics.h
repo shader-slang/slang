@@ -721,7 +721,7 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 {
     if (v == 0)
         return ~0u;
-        
+
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     // __builtin_ctz returns number of trailing zeros, which is the 0-based index of first set bit
     return __builtin_ctz(v);
@@ -774,6 +774,11 @@ SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi)
 SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
 {
     return U32_countbits(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t I32_firstbitlow(int32_t v)
+{
+    return U32_firstbitlow(uint32_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------
