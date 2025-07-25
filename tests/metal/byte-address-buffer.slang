@@ -1,8 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
 
-uniform RWStructuredBuffer<float> outputBuffer;
-
 RWByteAddressBuffer buffer;
 
 // CHECK-ASM: define void @main_kernel
@@ -37,4 +35,9 @@ void main_kernel(uint3 tid: SV_DispatchThreadID)
     // CHECK: {{.*}}[(268U)>>2] = as_type<uint32_t>(0U);
     uint64_t u64 = 123;
     buffer.Store(264, u64);
+
+    int64_t* ptr = Ptr<int64_t>(0xFF);
+    // CHECK: {{.*}}[(272U)>>2] = as_type<uint32_t>({{.*}});
+    // CHECK: {{.*}}[(276U)>>2] = as_type<uint32_t>({{.*}});
+    buffer.Store(272, ptr);
 }

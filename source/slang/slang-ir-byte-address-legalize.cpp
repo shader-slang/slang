@@ -184,8 +184,9 @@ struct ByteAddressBufferLegalizationContext
             //
             if (m_options.lowerBasicTypeOps)
             {
-                auto baseType = basicType->getBaseType();
-                if (baseType == BaseType::Int64 || baseType == BaseType::UInt64)
+                // getSameSizeUIntBaseType should convert any 64-bit types to UInt64
+                auto unsignedBaseType = getSameSizeUIntBaseType(type->getOp());
+                if (unsignedBaseType == BaseType::UInt64)
                 {
                     return false; // Force legalization for 64-bit integer types
                 }
@@ -745,14 +746,28 @@ struct ByteAddressBufferLegalizationContext
                     kIROp_ByteAddressBufferLoad,
                     2,
                     loadHiArgs);
-                auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
-                auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
-                auto shift = m_builder.emitShl(
-                    m_builder.getUInt64Type(),
-                    hi64,
-                    m_builder.getIntValue(m_builder.getUInt64Type(), 32));
-                auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
-                return m_builder.emitBitCast(type, fullValue);
+                    auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
+                    auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
+                    auto shift = m_builder.emitShl(
+                        m_builder.getUInt64Type(),
+                        hi64,
+                        m_builder.getIntValue(m_builder.getUInt64Type(), 32));
+                    auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
+                // For pointer types, Metal doesn't allow as_type casts from integers to pointers,
+                // so we use proper cast operations instead of bit casts.
+                if (type->getOp() == kIROp_PtrType || 
+                    type->getOp() == kIROp_RawPointerType ||
+                    type->getOp() == kIROp_IntPtrType ||
+                    type->getOp() == kIROp_UIntPtrType)
+                {
+                    // Use proper cast operation instead of bit cast for pointers
+                    return m_builder.emitCastIntToPtr(type, fullValue);
+                }
+                else
+                {
+                    // For non-pointer 64-bit types, use uint64
+                    return m_builder.emitBitCast(type, fullValue);
+                }
             }
             else if (sizeAlignment.size < 4)
             {
@@ -1113,7 +1128,7 @@ struct ByteAddressBufferLegalizationContext
 
     void processStore(IRInst* store)
     {
-        // Just as for loads, the logic for stores is base don the type
+        // Just as for loads, the logic for stores is base on the type
         // being used, but unlike in the load case we don't care about
         // the type of the store operation, but instead the operand
         // that represents the value to be stored.
@@ -1397,16 +1412,33 @@ struct ByteAddressBufferLegalizationContext
         if (m_options.lowerBasicTypeOps)
         {
             // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte
-            // sized. We need to lower such loads.
+            // sized. We need to lower such stores.
             IRSizeAndAlignment sizeAlignment;
             SLANG_RETURN_ON_FAIL(
                 getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to store the value as two 4-byte values.
-                auto uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
-                auto loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
-                auto hiVal = m_builder.emitCast(
+                // For pointer types, Metal doesn't allow as_type casts from pointers to integers,
+                // so we use proper cast operations instead of bit casts.
+                IRInst* loVal;
+                IRInst* hiVal;
+                IRInst* uint64Val;
+                if (type->getOp() == kIROp_PtrType || 
+                    type->getOp() == kIROp_RawPointerType ||
+                    type->getOp() == kIROp_IntPtrType ||
+                    type->getOp() == kIROp_UIntPtrType)
+                {
+                    // Use proper cast operation instead of bit cast for pointers
+                    uint64Val = m_builder.emitCastPtrToInt(value);
+                }
+                else
+                {
+                    // For non-pointer 64-bit types, use uint64
+                    uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
+                }
+                loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
+                hiVal = m_builder.emitCast(
                     m_builder.getUIntType(),
                     m_builder.emitShr(
                         m_builder.getUInt64Type(),
