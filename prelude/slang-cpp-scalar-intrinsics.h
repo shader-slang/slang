@@ -717,6 +717,27 @@ SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
+{
+    if (v == 0)
+        return ~0u;
+        
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_ctz returns number of trailing zeros, which is the 0-based index of first set bit
+    return __builtin_ctz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanForward returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanForward(&index, v) ? index : ~0u;
+#else
+    // Generic implementation - find first set bit
+    uint32_t result = 0;
+    while (result < 32 && !(v & (1u << result)))
+        result++;
+    return result == 32 ? ~0u : result;
+#endif
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 SLANG_FORCE_INLINE int32_t I32_abs(int32_t f)
