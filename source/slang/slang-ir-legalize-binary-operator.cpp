@@ -179,12 +179,56 @@ void legalizeLogicalAndOr(IRInst* inst)
     auto op = inst->getOp();
     if (op == kIROp_And || op == kIROp_Or)
     {
+        auto dataType = inst->getDataType();
+        
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        // Logical-AND and logical-OR takes boolean types as its operands.
-        // If they are not, legalize them by casting to boolean type.
-        //
+        // Check if we're dealing with arrays that represent matrices (arrays of vectors)
+        bool isArrayMatrix = false;
+        if (auto arrayType = as<IRArrayType>(dataType)) {
+            if (as<IRVectorType>(arrayType->getElementType())) {
+                isArrayMatrix = true;
+            }
+        }
+
+        if (isArrayMatrix) {
+            // Handle logical operations on arrays representing matrices
+            auto arrayType = as<IRArrayType>(dataType);
+            auto elementVectorType = as<IRVectorType>(arrayType->getElementType());
+            auto arraySize = arrayType->getElementCount();
+            
+            auto lhs = inst->getOperand(0);
+            auto rhs = inst->getOperand(1);
+            
+            // Create a new array by performing element-wise logical operations
+            List<IRInst*> resultElements;
+            
+            for (IRIntegerValue i = 0; i < getIntVal(arraySize); i++) {
+                // Extract the i-th row from both operands
+                auto lhsRow = builder.emitElementExtract(lhs, builder.getIntValue(builder.getIntType(), i));
+                auto rhsRow = builder.emitElementExtract(rhs, builder.getIntValue(builder.getIntType(), i));
+                
+                // Perform logical operation on the row vectors
+                IRInst* resultRow;
+                if (op == kIROp_And) {
+                    resultRow = builder.emitAnd(elementVectorType, lhsRow, rhsRow);
+                } else {
+                    resultRow = builder.emitOr(elementVectorType, lhsRow, rhsRow);
+                }
+                
+                resultElements.add(resultRow);
+            }
+            
+            // Create the result array
+            auto resultArray = builder.emitMakeArray(arrayType, resultElements.getCount(), resultElements.getBuffer());
+            
+            inst->replaceUsesWith(resultArray);
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Original logic for vectors and scalars
         SLANG_ASSERT(inst->getOperandCount() == 2);
         for (UInt i = 0; i < 2; i++)
         {
@@ -209,12 +253,6 @@ void legalizeLogicalAndOr(IRInst* inst)
         }
 
         // Legalize the return type; mostly for SPIRV.
-        // The return type of OpLogicalOr must be boolean type.
-        // If not, we need to recreate the instruction with boolean return type.
-        // Then, we have to cast it back to the original type so that other instrucitons that
-        // use have the matching types.
-        //
-        auto dataType = inst->getDataType();
         auto lhs = inst->getOperand(0);
         auto rhs = inst->getOperand(1);
         IRInst* newInst = nullptr;
