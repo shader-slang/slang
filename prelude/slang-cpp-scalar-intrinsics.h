@@ -753,7 +753,6 @@ SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
     return _BitScanReverse(&index, v) ? index : ~0u;
 #else
     // Generic implementation - find highest set bit
-    // Generic implementation - find highest set bit
     int result = 31;
     while (result >= 0 && !(v & (1u << result)))
         result--;
