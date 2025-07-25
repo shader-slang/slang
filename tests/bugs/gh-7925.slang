@@ -1,5 +1,5 @@
-//TEST_CATEGORY(smoke, compute)
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_8 -stage mesh -entry main
+//TEST_CATEGORY(smoke, mesh)
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_6 -stage mesh -entry main
 
 struct MeshOutput 
 {
@@ -14,8 +14,9 @@ uniform uint iTime;
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void main(
-    out indices uint3 triangles[1], 
-    out vertices MeshOutput vertices[3]
+    in uint tig : SV_GroupIndex,
+    OutputVertices<MeshOutput, 3> vertices,
+    OutputIndices<uint3, 1> triangles
 )
 {
     // Set the number of vertices and primitives
@@ -45,11 +46,11 @@ void main(
     vertices[2].color = float3(0.0, 0.0, 1.0); // Blue
 }
 
-// CHECK: OpCapability MeshShadingNV
-// CHECK: OpExtension "SPV_NV_mesh_shader"
+// CHECK: OpCapability MeshShadingEXT
+// CHECK: OpExtension "SPV_EXT_mesh_shader"
 // CHECK: OpMemoryModel Logical GLSL450
-// CHECK: OpEntryPoint MeshNV %main "main"
+// CHECK: OpEntryPoint MeshEXT %main "main"
 // CHECK: OpExecutionMode %main LocalSize 1 1 1
-// CHECK: OpExecutionMode %main OutputPrimitivesNV 1
+// CHECK: OpExecutionMode %main OutputPrimitivesEXT 1
 // CHECK: OpExecutionMode %main OutputVertices 3
-// CHECK: OpExecutionMode %main OutputTrianglesNV
+// CHECK: OpExecutionMode %main OutputTrianglesEXT
