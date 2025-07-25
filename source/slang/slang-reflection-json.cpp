@@ -496,6 +496,11 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         writer.maybeComma();
         writer << "\"feedback\": true";
     }
+    if (shape & SLANG_TEXTURE_COMBINED_FLAG)
+    {
+        writer.maybeComma();
+        writer << "\"combined\": true";
+    }
 
     if (access != SLANG_RESOURCE_ACCESS_READ)
     {
