@@ -27110,6 +27110,28 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     }
 }
 
+// CPU and CUDA fallback implementation for coopVecReduceSumAccumulate
+[require(cooperative_vector)]
+void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
+    CoopVec<T, N> v,
+    $(buffer.type) buffer,
+    int32_t offset
+)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        for (int i = 0; i < N; ++i)
+        {
+            int byteOffset = offset + i * __naturalStrideOf<T>();
+            T currentValue = buffer.LoadByteOffset<T>(byteOffset);
+            T newValue = currentValue + __arithmetic_cast<T>(v[i]);
+            buffer.StoreByteOffset(byteOffset, newValue);
+        }
+    }
+}
+
 ${{{{
 } // if rw
 } // buffer type loop
@@ -27337,6 +27359,28 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     }
 }
 
+// CPU and CUDA fallback implementation for coopVecReduceSumAccumulate (structured buffer version)
+[require(cooperative_vector)]
+void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, IgnoredBufferElementType>(
+    CoopVec<T, N> v,
+    $(buffer.type) buffer,
+    int32_t offset
+)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        for (int i = 0; i < N; ++i)
+        {
+            int byteOffset = offset + i * __naturalStrideOf<T>();
+            T currentValue = buffer.LoadByteOffset<T>(byteOffset);
+            T newValue = currentValue + __arithmetic_cast<T>(v[i]);
+            buffer.StoreByteOffset(byteOffset, newValue);
+        }
+    }
+}
+
 ${{{{
 } // if rw
 } // buffer type loop
@@ -27382,6 +27426,31 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let
             OpCapability CooperativeVectorTrainingNV;
             OpCooperativeVectorReduceSumAccumulateNV &buffer $offset $v;
         };
+    }
+}
+
+// CPU and CUDA fallback implementation for coopVecReduceSumAccumulate (groupshared buffer version)
+[require(cooperative_vector)]
+void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let IgnoredBufferSize : int>(
+    CoopVec<T, N> v,
+    __ref groupshared U[IgnoredBufferSize] buffer,
+    int32_t offset
+)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        for (int i = 0; i < N; ++i)
+        {
+            int idx = offset + i;
+            if (idx < IgnoredBufferSize)
+            {
+                T currentValue = (T)buffer[idx];
+                T newValue = currentValue + __arithmetic_cast<T>(v[i]);
+                buffer[idx] = (U)newValue;
+            }
+        }
     }
 }
 
@@ -27574,6 +27643,28 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
             OpCapability CooperativeVectorTrainingNV;
             OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $zero $v;
         };
+    }
+}
+
+// CPU and CUDA fallback implementation for coopVecReduceSumAccumulate (void* buffer version)
+[require(cooperative_vector)]
+void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
+    CoopVec<T, N> v,
+    void* buffer
+)
+{
+    let zero : int32_t = 0;
+    let bufferPtr = (Ptr<T[]>)(buffer);
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        for (int i = 0; i < N; ++i)
+        {
+            T currentValue = bufferPtr[i];
+            T newValue = currentValue + __arithmetic_cast<T>(v[i]);
+            bufferPtr[i] = newValue;
+        }
     }
 }
 
