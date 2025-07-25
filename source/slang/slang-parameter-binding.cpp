@@ -2561,17 +2561,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // underlying integer types.
             //
             auto tagType = enumDeclRef.getDecl()->tagType;
-            if (tagType)
-            {
-                return processEntryPointVaryingParameter(context, tagType, state, varLayout);
-            }
-            else
-            {
-                // If no explicit tag type is specified, treat as `int`
-                auto astBuilder = context->getASTBuilder();
-                auto intType = astBuilder->getIntType();
-                return processEntryPointVaryingParameter(context, intType, state, varLayout);
-            }
+            SLANG_ASSERT(tagType);
+            return processEntryPointVaryingParameter(context, tagType, state, varLayout);
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
         {

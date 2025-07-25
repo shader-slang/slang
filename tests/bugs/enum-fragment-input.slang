@@ -22,4 +22,4 @@ FragmentOutput main(in FragmentInput input) {
     return output;
 }
 
-//CHECK: {{.*}}
+//CHECK: main

@@ -25,4 +25,4 @@ VertexOutput main(in VertexInput input) {
     return output;
 }
 
-//CHECK: {{.*}}
+//CHECK: main
