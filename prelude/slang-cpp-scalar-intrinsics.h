@@ -734,7 +734,7 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
     uint32_t result = 0;
     while (result < 32 && !(v & (1u << result)))
         result++;
-    return result == 32 ? ~0u : result;
+    return result;
 #endif
 }
 
