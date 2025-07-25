@@ -9539,6 +9539,39 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
     }
 }
 
+// Helper functions for Metal target
+int __metal_clz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+uint __metal_clz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+int __metal_ctz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
+uint __metal_ctz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
 /// Find first set bit starting at high bit and working down.
 /// @param value The value to find set bits in.
 /// @return The bit index number of the most significant bit,
@@ -9559,7 +9592,7 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal: return (value==0) ? -1 : __metal_clz(value);
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -9576,7 +9609,6 @@ vector<int, N> firstbithigh(vector<int, N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
     };
@@ -9596,7 +9628,7 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal: return (value==0) ? -1 : __metal_clz(value);
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
@@ -9613,7 +9645,6 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
     };
@@ -9639,7 +9670,7 @@ int firstbitlow(int value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindILsb $value
     };
@@ -9656,7 +9687,6 @@ vector<int,N> firstbitlow(vector<int,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int,N> result glsl450 FindILsb $value
     };
@@ -9676,7 +9706,7 @@ uint firstbitlow(uint value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindILsb $value
     };
@@ -9693,7 +9723,6 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
     };
