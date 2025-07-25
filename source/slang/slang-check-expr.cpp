@@ -1184,6 +1184,20 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     return result;
 }
 
+bool SemanticsVisitor::maybeDiagnoseAmbiguousReference(Expr* expr)
+{
+    if (auto overloadExpr = as<OverloadedExpr>(expr))
+    {
+        if (overloadExpr->lookupResult2.isValid() &&
+            !as<NamespaceDecl>(overloadExpr->lookupResult2.item.declRef.getDecl()))
+        {
+            diagnoseAmbiguousReference(overloadExpr);
+            return true;
+        }
+    }
+    return false;
+}
+
 void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
@@ -1762,6 +1776,10 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     if (auto memberExpr = as<MemberExpr>(expr))
     {
         return memberExpr->baseExpression;
+    }
+    else if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+    {
+        return staticMemberExpr->baseExpression;
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
@@ -2608,7 +2626,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     if (!lookupResult.isValid())
     {
         if (!diagnosed)
-            getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        {
+            if (!maybeDiagnoseAmbiguousReference(baseExpr))
+                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        }
         return CreateErrorExpr(subscriptExpr);
     }
     auto subscriptFuncExpr = createLookupResultExpr(
@@ -5229,9 +5250,12 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     // Check it's a member expression
     SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-    if (!supressDiagnostic)
-        getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
     expr->type = QualType(m_astBuilder->getErrorType());
+    if (!supressDiagnostic)
+    {
+        if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+    }
     return expr;
 }
 
@@ -5306,8 +5330,6 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     auto resultBaseExpr =
         maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
 
-    resultBaseExpr = maybeResolveOverloadedExpr(resultBaseExpr, LookupMask::Default, getSink());
-
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
         maybeRegisterDifferentiableType(getASTBuilder(), resultBaseExpr->type.type);
@@ -5361,11 +5383,6 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     bool needDeref = false;
     expr->baseExpression =
         checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
-
-    if (IsErrorExpr(expr->baseExpression))
-    {
-        return CreateErrorExpr(expr);
-    }
 
     if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
     {
@@ -5433,6 +5450,10 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     else if (auto baseTupleType = as<TupleType>(baseType))
     {
         return checkTupleSwizzleExpr(expr, baseTupleType);
+    }
+    else if (as<ErrorType>(baseType))
+    {
+        return CreateErrorExpr(expr);
     }
     else
     {
