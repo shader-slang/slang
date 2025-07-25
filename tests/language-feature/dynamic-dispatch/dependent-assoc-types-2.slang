@@ -1,10 +1,15 @@
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 
-RWStructuredBuffer<uint8_t> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):name=scratchBuffer
+RWStructuredBuffer<uint> scratchBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 interface IBufferRef
 {
-    uint8_t[N] get<let N : int>(uint index);
-    void set<let N : int>(uint index, uint8_t[N] value);
+    uint[N] get<let N : int>(uint index);
+    void set<let N : int>(uint index, uint[N] value);
     This withOffset(uint offset);
 };
 
@@ -26,12 +31,11 @@ struct StandardSerializer<T : __BuiltinFloatingPointType> : ISerializer<T>
 {
     static void serialize(T data, IBufferRef buffer)
     {
-        buffer.set<4>(0, bit_cast<uint8_t[4]>(data));
+        buffer.set<1>(0, bit_cast<uint[1]>(data));
     }
-
     static T deserialize(IBufferRef buffer)
     {
-        return bit_cast<T>(buffer.get<4>(0));
+        return bit_cast<T>(buffer.get<1>(0));
     }
 };
 
@@ -54,13 +58,13 @@ struct BDataSerializer : ISerializer<BData>
     static void serialize(BData data, IBufferRef buffer)
     {
         StandardSerializer<float>::serialize(data.x, buffer.withOffset(0));
-        StandardSerializer<float>::serialize(data.y, buffer.withOffset(4));
+        StandardSerializer<float>::serialize(data.y, buffer.withOffset(1));
     }
 
     static BData deserialize(IBufferRef buffer)
     {
         return BData(StandardSerializer<float>::deserialize(buffer.withOffset(0)),
-                StandardSerializer<float>::deserialize(buffer.withOffset(4)));
+                StandardSerializer<float>::deserialize(buffer.withOffset(1)));
     }
 };
 
@@ -80,7 +84,7 @@ struct C : ICalculation
     Data make(float q) { return q; }
 };
 
-ICalculation factoryAB(uint id, float x)
+ICalculation factoryAB(uint id)
 {
     if (id == 0)
         return A();
@@ -91,53 +95,56 @@ ICalculation factoryAB(uint id, float x)
 struct BufferRef : IBufferRef
 {
     uint offset;
-    uint8_t[N] get<let N : int>(uint index)
+    uint[N] get<let N : int>(uint index)
     {
-        uint offset = index * N;
-        uint8_t[N] result;
+        uint[N] result;
         for (int i = 0; i < N; ++i)
-        {
-            result[i] = outputBuffer[offset + i];
-        }
+            result[i] = scratchBuffer[offset + i];
         return result;
     }
 
-    void set<let N : int>(uint index, uint8_t[N] value)
+    void set<let N : int>(uint index, uint[N] value)
     {
-        uint offset = index * N;
         for (int i = 0; i < N; ++i)
-        {
-            outputBuffer[offset + i] = value[i];
-        }
+            scratchBuffer[offset + i] = value[i];
     }
 
     This withOffset(uint offset)
     {
-        return {offset + this.offset};
+        return {this.offset + offset};
     }
 };
-IBufferRef getOutputBufferAsRef()
+IBufferRef getScratchBufferAsRef()
 {
     return BufferRef(0);
 }
 
-float f(uint id, float x)
+void f(uint id, float q)
 {
-    let obj = factoryAB(id, x);
-    obj.Data d = obj.make(x);
-    obj.DataSerializer::serialize(d, getOutputBufferAsRef());
+    let obj = factoryAB(id);
+    obj.Data d = obj.make(q);
+    IBufferRef buf = getScratchBufferAsRef();
+    buf.set<1>(0, {(uint)id});
+    obj.DataSerializer::serialize(d, buf.withOffset(1));
 }
 
-float g(uint id, float x)
+float g(float x)
 {
-    let obj = factoryAB(id, x);
-    obj.Data d = obj.DataSerializer::deserialize(getOutputBufferAsRef());
+    IBufferRef buf = getScratchBufferAsRef();
+    uint id = buf.get<1>(0)[0];
+    let obj = factoryAB(id);
+    obj.Data d = obj.DataSerializer::deserialize(buf.withOffset(1));
     return obj.calc(d, x);
 }
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    f(0, 1.f);
-    g(0, 1.f);
+    f(0, 3.f);
+    outputBuffer[0] = g(2.f);
+    f(1, 2.f);
+    outputBuffer[1] = g(2.f);
+
+    // CHECK: 12.0
+    // CHECK: 10.0
 }

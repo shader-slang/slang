@@ -14,9 +14,47 @@ struct Element
     IRInst* context;
     IRInst* inst;
 
+    Element()
+        : context(nullptr), inst(nullptr)
+    {
+    }
+
     Element(IRInst* context, IRInst* inst)
         : context(context), inst(inst)
     {
+        validateElement();
+    }
+
+    bool validateElement() const
+    {
+        switch (context->getOp())
+        {
+        case kIROp_Func:
+            {
+                SLANG_ASSERT(inst->getParent()->getParent() == context);
+                break;
+            }
+        case kIROp_Specialize:
+            {
+                auto generic = as<IRSpecialize>(context)->getBase();
+                // The base should be a parent of the inst.
+                bool foundParent = false;
+                for (auto parent = inst->getParent(); parent; parent = parent->getParent())
+                {
+                    if (parent == generic)
+                    {
+                        foundParent = true;
+                        break;
+                    }
+                }
+                SLANG_ASSERT(foundParent);
+            }
+            break;
+        default:
+            {
+                SLANG_UNEXPECTED("Invalid context for Element");
+            }
+        }
     }
 
     // Create element from an instruction that has a
@@ -135,15 +173,17 @@ struct InterproceduralEdge
     };
 
     Direction direction;
-    IRCall* callInst;   // The call instruction
-    IRFunc* targetFunc; // The function being called/returned from
+    IRInst* callerContext; // The context of the call (e.g. function or specialized generic)
+    IRCall* callInst;      // The call instruction
+    IRInst* targetContext; // The function/specialized-generic being called/returned from
 
     InterproceduralEdge() = default;
-    InterproceduralEdge(Direction dir, IRCall* call, IRFunc* func)
-        : direction(dir), callInst(call), targetFunc(func)
+    InterproceduralEdge(Direction dir, IRInst* callerContext, IRCall* call, IRInst* func)
+        : direction(dir), callerContext(callerContext), callInst(call), targetContext(func)
     {
     }
 };
+
 
 // Union type representing either an intra-procedural or interprocedural edge
 struct WorkItem
@@ -158,6 +198,7 @@ struct WorkItem
     };
 
     Type type;
+    IRInst* context; // The context of the work item.
     union
     {
         IRInst* inst;                      // Type::Inst
@@ -171,34 +212,41 @@ struct WorkItem
     {
     }
 
-    WorkItem(IRInst* inst)
-        : type(Type::Inst), inst(inst)
+    WorkItem(IRInst* context, IRInst* inst)
+        : type(Type::Inst), inst(inst), context(context)
     {
+        SLANG_ASSERT(context != nullptr && inst != nullptr);
+        // Validate that the context is appropriate for the instruction
+        Element(context, inst).validateElement();
     }
 
-    WorkItem(IRBlock* block)
-        : type(Type::Block), block(block)
+    WorkItem(IRInst* context, IRBlock* block)
+        : type(Type::Block), block(block), context(context)
     {
+        SLANG_ASSERT(context != nullptr && block != nullptr);
+        // Validate that the context is appropriate for the block
+        Element(context, block->getFirstChild()).validateElement();
     }
 
-    WorkItem(IREdge edge)
-        : type(Type::IntraProc), intraProcEdge(edge)
+    WorkItem(IRInst* context, IREdge edge)
+        : type(Type::IntraProc), intraProcEdge(edge), context(context)
     {
+        SLANG_ASSERT(context != nullptr);
     }
 
     WorkItem(InterproceduralEdge edge)
-        : type(Type::InterProc), interProcEdge(edge)
+        : type(Type::InterProc), interProcEdge(edge), context(nullptr)
     {
     }
 
-    WorkItem(InterproceduralEdge::Direction dir, IRCall* call, IRFunc* func)
-        : type(Type::InterProc), interProcEdge(dir, call, func)
+    WorkItem(InterproceduralEdge::Direction dir, IRInst* callerCtx, IRCall* call, IRInst* callee)
+        : type(Type::InterProc), interProcEdge(dir, callerCtx, call, callee), context(nullptr)
     {
     }
 
     // Copy constructor and assignment needed for union with non-trivial types
     WorkItem(const WorkItem& other)
-        : type(other.type)
+        : type(other.type), context(other.context)
     {
         if (type == Type::IntraProc)
             intraProcEdge = other.intraProcEdge;
@@ -213,6 +261,7 @@ struct WorkItem
     WorkItem& operator=(const WorkItem& other)
     {
         type = other.type;
+        context = other.context;
         if (type == Type::IntraProc)
             intraProcEdge = other.intraProcEdge;
         else if (type == Type::InterProc)
@@ -328,8 +377,7 @@ struct DynamicInstLoweringContext
         return result;
     }
 
-    // DynamicInstLoweringContext implementation
-    PropagationInfo tryGetInfo(IRInst* inst)
+    /*PropagationInfo tryGetInfo(IRInst* inst)
     {
         // If this is a global instruction (parent is module), return concrete info
         if (as<IRModuleInst>(inst->getParent()))
@@ -338,11 +386,28 @@ struct DynamicInstLoweringContext
             else
                 return none();
 
+        return tryGetInfo(Element(inst));
+    }*/
+
+    PropagationInfo tryGetInfo(Element element)
+    {
         // For non-global instructions, look up in the map
-        auto found = propagationMap.tryGetValue(Element(inst));
+        auto found = propagationMap.tryGetValue(element);
         if (found)
             return *found;
         return none();
+    }
+
+    PropagationInfo tryGetInfo(IRInst* context, IRInst* inst)
+    {
+        // If this is a global instruction (parent is module), return concrete info
+        if (as<IRModuleInst>(inst->getParent()))
+            if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
+                return makeSingletonSet(inst);
+            else
+                return none();
+
+        return tryGetInfo(Element(context, inst));
     }
 
     PropagationInfo tryGetFuncReturnInfo(IRFunc* func)
@@ -356,9 +421,13 @@ struct DynamicInstLoweringContext
     // Centralized method to update propagation info and manage work queue
     // Use this when you want to propagate new information to an existing instruction
     // This will union the new info with existing info and add users to work queue if changed
-    void updateInfo(IRInst* inst, PropagationInfo newInfo, LinkedList<WorkItem>& workQueue)
+    void updateInfo(
+        IRInst* context,
+        IRInst* inst,
+        PropagationInfo newInfo,
+        LinkedList<WorkItem>& workQueue)
     {
-        auto existingInfo = tryGetInfo(inst);
+        auto existingInfo = tryGetInfo(context, inst);
         auto unionedInfo = unionPropagationInfo(existingInfo, newInfo);
 
         // Only proceed if info actually changed
@@ -366,15 +435,19 @@ struct DynamicInstLoweringContext
             return;
 
         // Update the propagation map
-        propagationMap[inst] = unionedInfo;
+        propagationMap[Element(context, inst)] = unionedInfo;
 
         // Add all users to appropriate work items
-        addUsersToWorkQueue(inst, unionedInfo, workQueue);
+        addUsersToWorkQueue(context, inst, unionedInfo, workQueue);
     }
 
     // Helper to add users of an instruction to the work queue based on how they use it
     // This handles intra-procedural edges, inter-procedural edges, and return value propagation
-    void addUsersToWorkQueue(IRInst* inst, PropagationInfo info, LinkedList<WorkItem>& workQueue)
+    void addUsersToWorkQueue(
+        IRInst* context,
+        IRInst* inst,
+        PropagationInfo info,
+        LinkedList<WorkItem>& workQueue)
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
@@ -383,7 +456,7 @@ struct DynamicInstLoweringContext
             // If user is in a different block (or the inst is a param), add that block to work
             // queue.
             //
-            workQueue.addLast(WorkItem(user));
+            workQueue.addLast(WorkItem(context, user));
 
             // If user is a terminator, add intra-procedural edges
             if (auto terminator = as<IRTerminatorInst>(user))
@@ -395,7 +468,7 @@ struct DynamicInstLoweringContext
                     for (auto succIter = successors.begin(); succIter != successors.end();
                          ++succIter)
                     {
-                        workQueue.addLast(WorkItem(succIter.getEdge()));
+                        workQueue.addLast(WorkItem(context, succIter.getEdge()));
                     }
                 }
             }
@@ -403,54 +476,53 @@ struct DynamicInstLoweringContext
             // If user is a return instruction, handle function return propagation
             if (auto returnInst = as<IRReturn>(user))
             {
-                auto func = as<IRFunc>(returnInst->getParent()->getParent());
-                if (func)
-                {
-                    updateFuncReturnInfo(func, info, workQueue);
-                }
+                updateFuncReturnInfo(context, info, workQueue);
             }
         }
     }
 
     // Helper method to update function return info and propagate to call sites
     void updateFuncReturnInfo(
-        IRFunc* func,
+        IRInst* callable,
         PropagationInfo returnInfo,
         LinkedList<WorkItem>& workQueue)
     {
-        auto existingReturnInfo = getFuncReturnInfo(func);
+        auto existingReturnInfo = getFuncReturnInfo(callable);
         auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnInfo);
 
         if (!areInfosEqual(existingReturnInfo, newReturnInfo))
         {
-            funcReturnInfo[func] = newReturnInfo;
+            funcReturnInfo[callable] = newReturnInfo;
 
             // Add interprocedural edges to all call sites
-            if (funcCallSites.containsKey(func))
+            if (funcCallSites.containsKey(callable))
             {
-                for (auto callSite : funcCallSites[func])
+                for (auto callSite : funcCallSites[callable])
                 {
-                    workQueue.addLast(
-                        WorkItem(InterproceduralEdge::Direction::FuncToCall, callSite, func));
+                    workQueue.addLast(WorkItem(
+                        InterproceduralEdge::Direction::FuncToCall,
+                        callSite.context,
+                        as<IRCall>(callSite.inst),
+                        callable));
                 }
             }
         }
     }
 
-    void processBlock(IRBlock* block, LinkedList<WorkItem>& workQueue)
+    void processBlock(IRInst* context, IRBlock* block, LinkedList<WorkItem>& workQueue)
     {
         for (auto inst : block->getChildren())
         {
             // Skip parameters & terminator
             if (as<IRParam>(inst) || as<IRTerminatorInst>(inst))
                 continue;
-            processInstForPropagation(inst, workQueue);
+            processInstForPropagation(context, inst, workQueue);
         }
 
         if (auto returnInfo = as<IRReturn>(block->getTerminator()))
         {
             auto valInfo = returnInfo->getVal();
-            updateFuncReturnInfo(as<IRFunc>(block->getParent()), tryGetInfo(valInfo), workQueue);
+            updateFuncReturnInfo(context, tryGetInfo(context, valInfo), workQueue);
         }
     };
 
@@ -459,23 +531,10 @@ struct DynamicInstLoweringContext
         // Global worklist for interprocedural analysis
         LinkedList<WorkItem> workQueue;
 
-        // Add all global function entry blocks to worklist.
+        // Add all global functions to worklist
         for (auto inst : module->getGlobalInsts())
-        {
             if (auto func = as<IRFunc>(inst))
-            {
-                initializeFirstBlockParameters(func);
-
-                // Add all blocks to start with. Once the initial
-                // sweep is done, propagation will proceed on an on-demand basis
-                // depending on affected blocks & edges
-                //
-                for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
-                {
-                    workQueue.addLast(WorkItem(block));
-                }
-            }
-        }
+                discoverContext(func, workQueue);
 
         // Process until fixed point
         while (workQueue.getCount() > 0)
@@ -487,13 +546,13 @@ struct DynamicInstLoweringContext
             switch (item.type)
             {
             case WorkItem::Type::Inst:
-                processInstForPropagation(item.inst, workQueue);
+                processInstForPropagation(item.context, item.inst, workQueue);
                 break;
             case WorkItem::Type::Block:
-                processBlock(item.block, workQueue);
+                processBlock(item.context, item.block, workQueue);
                 break;
             case WorkItem::Type::IntraProc:
-                propagateWithinFuncEdge(item.intraProcEdge, workQueue);
+                propagateWithinFuncEdge(item.context, item.intraProcEdge, workQueue);
                 break;
             case WorkItem::Type::InterProc:
                 propagateInterproceduralEdge(item.interProcEdge, workQueue);
@@ -505,9 +564,9 @@ struct DynamicInstLoweringContext
         }
     }
 
-    IRInst* maybeReinterpret(IRInst* arg, PropagationInfo destInfo)
+    IRInst* maybeReinterpret(IRInst* context, IRInst* arg, PropagationInfo destInfo)
     {
-        auto argInfo = tryGetInfo(arg);
+        auto argInfo = tryGetInfo(context, arg);
 
         if (!argInfo || !destInfo)
             return arg;
@@ -525,7 +584,7 @@ struct DynamicInstLoweringContext
                 // and if it doesn't, this will help catch it before code-gen.
                 //
                 auto reinterpret = builder.emitReinterpret(nullptr, arg);
-                propagationMap[reinterpret] = destInfo;
+                propagationMap[Element(reinterpret)] = destInfo;
                 return reinterpret; // Return the reinterpret instruction
             }
         }
@@ -541,6 +600,7 @@ struct DynamicInstLoweringContext
         {
             if (auto func = as<IRFunc>(inst))
             {
+                auto context = func;
                 // Skip the first block as it contains function parameters, not phi parameters
                 for (auto block = func->getFirstBlock()->getNextBlock(); block;
                      block = block->getNextBlock())
@@ -574,7 +634,7 @@ struct DynamicInstLoweringContext
                                 if (paramIndex < unconditionalBranch->getArgCount())
                                 {
                                     auto arg = unconditionalBranch->getArg(paramIndex);
-                                    auto newArg = maybeReinterpret(arg, tryGetInfo(param));
+                                    auto newArg = maybeReinterpret(context, arg, tryGetInfo(param));
 
                                     if (newArg != arg)
                                     {
@@ -595,7 +655,7 @@ struct DynamicInstLoweringContext
                         {
                             auto funcReturnInfo = tryGetFuncReturnInfo(func);
                             auto newReturnVal =
-                                maybeReinterpret(returnInst->getVal(), funcReturnInfo);
+                                maybeReinterpret(context, returnInst->getVal(), funcReturnInfo);
                             if (newReturnVal != returnInst->getVal())
                             {
                                 // Replace the return value with the reinterpreted value
@@ -623,8 +683,10 @@ struct DynamicInstLoweringContext
                             Index i = 0;
                             for (auto param : irFunc->getParams())
                             {
-                                auto newArg =
-                                    maybeReinterpret(callInst->getArg(i), tryGetInfo(param));
+                                auto newArg = maybeReinterpret(
+                                    context,
+                                    callInst->getArg(i),
+                                    tryGetInfo(param));
                                 if (newArg != callInst->getArg(i))
                                 {
                                     // Replace the argument in the call instruction
@@ -642,46 +704,47 @@ struct DynamicInstLoweringContext
         return changed;
     }
 
-    void processInstForPropagation(IRInst* inst, LinkedList<WorkItem>& workQueue)
+    void processInstForPropagation(IRInst* context, IRInst* inst, LinkedList<WorkItem>& workQueue)
     {
         PropagationInfo info;
 
         switch (inst->getOp())
         {
         case kIROp_CreateExistentialObject:
-            info = analyzeCreateExistentialObject(as<IRCreateExistentialObject>(inst));
+            info = analyzeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
             break;
         case kIROp_MakeExistential:
-            info = analyzeMakeExistential(as<IRMakeExistential>(inst));
+            info = analyzeMakeExistential(context, as<IRMakeExistential>(inst));
             break;
         case kIROp_LookupWitnessMethod:
-            info = analyzeLookupWitnessMethod(as<IRLookupWitnessMethod>(inst));
+            info = analyzeLookupWitnessMethod(context, as<IRLookupWitnessMethod>(inst));
             break;
         case kIROp_ExtractExistentialWitnessTable:
-            info =
-                analyzeExtractExistentialWitnessTable(as<IRExtractExistentialWitnessTable>(inst));
+            info = analyzeExtractExistentialWitnessTable(
+                context,
+                as<IRExtractExistentialWitnessTable>(inst));
             break;
         case kIROp_ExtractExistentialType:
-            info = analyzeExtractExistentialType(as<IRExtractExistentialType>(inst));
+            info = analyzeExtractExistentialType(context, as<IRExtractExistentialType>(inst));
             break;
         case kIROp_ExtractExistentialValue:
-            info = analyzeExtractExistentialValue(as<IRExtractExistentialValue>(inst));
+            info = analyzeExtractExistentialValue(context, as<IRExtractExistentialValue>(inst));
             break;
         case kIROp_Call:
-            info = analyzeCall(as<IRCall>(inst), workQueue);
+            info = analyzeCall(context, as<IRCall>(inst), workQueue);
             break;
         case kIROp_Specialize:
-            info = analyzeSpecialize(as<IRSpecialize>(inst));
+            info = analyzeSpecialize(context, as<IRSpecialize>(inst));
             break;
         default:
-            info = analyzeDefault(inst);
+            info = analyzeDefault(context, inst);
             break;
         }
 
-        updateInfo(inst, info, workQueue);
+        updateInfo(context, inst, info, workQueue);
     }
 
-    PropagationInfo analyzeCreateExistentialObject(IRCreateExistentialObject* inst)
+    PropagationInfo analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
         //
         // TODO: Actually use the integer<->type map present in the linkage to
@@ -707,14 +770,14 @@ struct DynamicInstLoweringContext
         return none();
     }
 
-    PropagationInfo analyzeMakeExistential(IRMakeExistential* inst)
+    PropagationInfo analyzeMakeExistential(IRInst* context, IRMakeExistential* inst)
     {
         auto witnessTable = inst->getWitnessTable();
         auto value = inst->getWrappedValue();
         auto valueType = value->getDataType();
 
         // Get the witness table info
-        auto witnessTableInfo = tryGetInfo(witnessTable);
+        auto witnessTableInfo = tryGetInfo(context, witnessTable);
 
         if (!witnessTableInfo)
             return none();
@@ -738,12 +801,12 @@ struct DynamicInstLoweringContext
         return nullptr; // Not found
     }
 
-    PropagationInfo analyzeLookupWitnessMethod(IRLookupWitnessMethod* inst)
+    PropagationInfo analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
         auto key = inst->getRequirementKey();
 
         auto witnessTable = inst->getWitnessTable();
-        auto witnessTableInfo = tryGetInfo(witnessTable);
+        auto witnessTableInfo = tryGetInfo(context, witnessTable);
 
         switch (witnessTableInfo.judgment)
         {
@@ -767,10 +830,12 @@ struct DynamicInstLoweringContext
         }
     }
 
-    PropagationInfo analyzeExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
+    PropagationInfo analyzeExtractExistentialWitnessTable(
+        IRInst* context,
+        IRExtractExistentialWitnessTable* inst)
     {
         auto operand = inst->getOperand(0);
-        auto operandInfo = tryGetInfo(operand);
+        auto operandInfo = tryGetInfo(context, operand);
 
         switch (operandInfo.judgment)
         {
@@ -796,10 +861,10 @@ struct DynamicInstLoweringContext
         }
     }
 
-    PropagationInfo analyzeExtractExistentialType(IRExtractExistentialType* inst)
+    PropagationInfo analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
         auto operand = inst->getOperand(0);
-        auto operandInfo = tryGetInfo(operand);
+        auto operandInfo = tryGetInfo(context, operand);
 
         switch (operandInfo.judgment)
         {
@@ -830,7 +895,7 @@ struct DynamicInstLoweringContext
         }
     }
 
-    PropagationInfo analyzeExtractExistentialValue(IRExtractExistentialValue* inst)
+    PropagationInfo analyzeExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
         // We don't care about the value itself.
         // (We rely on the propagation info for the type)
@@ -839,10 +904,10 @@ struct DynamicInstLoweringContext
     }
 
 
-    PropagationInfo analyzeSpecialize(IRSpecialize* inst)
+    PropagationInfo analyzeSpecialize(IRInst* context, IRSpecialize* inst)
     {
         auto operand = inst->getOperand(0);
-        auto operandInfo = tryGetInfo(operand);
+        auto operandInfo = tryGetInfo(context, operand);
 
         switch (operandInfo.judgment)
         {
@@ -862,12 +927,15 @@ struct DynamicInstLoweringContext
                 {
                     // For integer args, add as is (also applies to any value args)
                     if (as<IRIntLit>(inst->getArg(i)))
+                    {
                         specializationArgs.add(inst->getArg(i));
+                        continue;
+                    }
 
                     // For type args, we need to replace any dynamic args with
                     // their sets.
                     //
-                    auto argInfo = tryGetInfo(inst->getArg(i));
+                    auto argInfo = tryGetInfo(context, inst->getArg(i));
                     switch (argInfo.judgment)
                     {
                     case PropagationJudgment::None:
@@ -895,8 +963,40 @@ struct DynamicInstLoweringContext
                 IRType* typeOfSpecialization = nullptr;
                 if (inst->getDataType()->getParent()->getOp() == kIROp_ModuleInst)
                     typeOfSpecialization = inst->getDataType();
+                else if (auto funcType = as<IRFuncType>(inst->getDataType()))
+                {
+                    auto substituteSets = [&](IRInst* type) -> IRInst*
+                    {
+                        if (auto info = tryGetInfo(context, type))
+                        {
+                            if (info.judgment == PropagationJudgment::Set)
+                            {
+                                if (info.getCollectionCount() == 1)
+                                    return info.getSingletonValue();
+                                else
+                                    return info.collection;
+                            }
+                            else
+                                return type;
+                        }
+                        else
+                            return type;
+                    };
+
+                    List<IRType*> newParamTypes;
+                    for (auto paramType : funcType->getParamTypes())
+                        newParamTypes.add((IRType*)substituteSets(paramType));
+                    IRBuilder builder(module);
+                    builder.setInsertInto(module);
+                    typeOfSpecialization = builder.getFuncType(
+                        newParamTypes.getCount(),
+                        newParamTypes.getBuffer(),
+                        (IRType*)substituteSets(funcType->getResultType()));
+                }
                 else
-                    SLANG_UNIMPLEMENTED_X("unhandled specialization type in non-global context");
+                {
+                    SLANG_ASSERT_FAILURE("Unexpected data type for specialization instruction");
+                }
 
                 // Specialize each element in the set
                 HashSet<IRInst*> specializedSet;
@@ -922,10 +1022,82 @@ struct DynamicInstLoweringContext
         }
     }
 
-    PropagationInfo analyzeCall(IRCall* inst, LinkedList<WorkItem>& workQueue)
+    void discoverContext(IRInst* context, LinkedList<WorkItem>& workQueue)
+    {
+        if (this->availableContexts.add(context))
+        {
+            IRFunc* func = nullptr;
+
+            // Newly discovered context. Initialize it.
+            switch (context->getOp())
+            {
+            case kIROp_Func:
+                {
+                    func = cast<IRFunc>(context);
+
+                    // Initialize the first block parameters
+                    initializeFirstBlockParameters(context, func);
+
+                    // Add all blocks to the work queue
+                    for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
+                        workQueue.addLast(WorkItem(context, block));
+                    break;
+                }
+            case kIROp_Specialize:
+                {
+                    auto specialize = cast<IRSpecialize>(context);
+                    auto generic = cast<IRGeneric>(specialize->getBase());
+                    func = cast<IRFunc>(findGenericReturnVal(generic));
+
+                    // Transfer information from specialization arguments to the params in the
+                    // first generic block.
+                    //
+                    IRParam* param = generic->getFirstBlock()->getFirstParam();
+                    for (auto index = 0; index < specialize->getArgCount() && param;
+                         ++index, param = param->getNextParam())
+                    {
+                        // Map the specialization argument to the corresponding parameter
+                        auto arg = specialize->getArg(index);
+                        if (as<IRIntLit>(arg))
+                            continue;
+
+                        if (auto collection = as<IRTypeFlowCollection>(arg))
+                        {
+                            updateInfo(
+                                context,
+                                param,
+                                PropagationInfo(PropagationJudgment::Set, collection),
+                                workQueue);
+                        }
+                        else if (as<IRType>(arg) || as<IRWitnessTable>(arg))
+                        {
+                            updateInfo(context, param, makeSingletonSet(arg), workQueue);
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("Unexpected argument type in specialization");
+                        }
+                    }
+
+                    // Initialize the first block parameters
+                    initializeFirstBlockParameters(context, func);
+
+                    // Add all blocks to the work queue for an initial sweep
+                    for (auto block = generic->getFirstBlock(); block;
+                         block = block->getNextBlock())
+                        workQueue.addLast(WorkItem(context, block));
+
+                    for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
+                        workQueue.addLast(WorkItem(context, block));
+                }
+            }
+        }
+    }
+
+    PropagationInfo analyzeCall(IRInst* context, IRCall* inst, LinkedList<WorkItem>& workQueue)
     {
         auto callee = inst->getCallee();
-        auto calleeInfo = tryGetInfo(callee);
+        auto calleeInfo = tryGetInfo(context, callee);
 
         auto funcType = as<IRFuncType>(callee->getDataType());
 
@@ -937,7 +1109,7 @@ struct DynamicInstLoweringContext
         // For now, we'll handle just a concrete func. But the logic for multiple functions
         // is exactly the same (add an edge for each function).
         //
-        auto propagateToCallSite = [&](IRFunc* func)
+        auto propagateToCallSite = [&](IRInst* callee)
         {
             // Register the call site in the map to allow for the
             // return-edge to be created.
@@ -946,31 +1118,33 @@ struct DynamicInstLoweringContext
             // func, since we might have functions that are called indirectly
             // through lookups.
             //
-            this->funcCallSites.addIfNotExists(func, HashSet<IRCall*>());
-            if (this->funcCallSites[func].add(inst))
+            discoverContext(callee, workQueue);
+
+            this->funcCallSites.addIfNotExists(callee, HashSet<Element>());
+            if (this->funcCallSites[callee].add(inst))
             {
                 // If this is a new call site, add a propagation task to the queue (in case there's
                 // already information about this function)
-                workQueue.addLast(WorkItem(InterproceduralEdge::Direction::FuncToCall, inst, func));
+                workQueue.addLast(
+                    WorkItem(InterproceduralEdge::Direction::FuncToCall, context, inst, callee));
             }
-            workQueue.addLast(WorkItem(InterproceduralEdge::Direction::CallToFunc, inst, func));
+            workQueue.addLast(
+                WorkItem(InterproceduralEdge::Direction::CallToFunc, context, inst, callee));
         };
 
         if (calleeInfo.judgment == PropagationJudgment::Set)
         {
             // If we have a set of functions, register each one
-            forEachInCollection(
-                calleeInfo,
-                [&](IRInst* func) { propagateToCallSite(cast<IRFunc>(func)); });
+            forEachInCollection(calleeInfo, [&](IRInst* func) { propagateToCallSite(func); });
         }
 
-        if (auto callInfo = tryGetInfo(inst))
+        if (auto callInfo = tryGetInfo(context, inst))
             return callInfo;
         else
             return none();
     }
 
-    void propagateWithinFuncEdge(IREdge edge, LinkedList<WorkItem>& workQueue)
+    void propagateWithinFuncEdge(IRInst* context, IREdge edge, LinkedList<WorkItem>& workQueue)
     {
         // Handle intra-procedural edge (original logic)
         auto predecessorBlock = edge.getPredecessor();
@@ -997,10 +1171,10 @@ struct DynamicInstLoweringContext
             if (paramIndex < unconditionalBranch->getArgCount())
             {
                 auto arg = unconditionalBranch->getArg(paramIndex);
-                if (auto argInfo = tryGetInfo(arg))
+                if (auto argInfo = tryGetInfo(context, arg))
                 {
                     // Use centralized update method
-                    updateInfo(param, argInfo, workQueue);
+                    updateInfo(context, param, argInfo, workQueue);
                 }
             }
             paramIndex++;
@@ -1011,14 +1185,14 @@ struct DynamicInstLoweringContext
     {
         // Handle interprocedural edge
         auto callInst = edge.callInst;
-        auto targetFunc = edge.targetFunc;
+        auto targetCallee = edge.targetContext;
 
         switch (edge.direction)
         {
         case InterproceduralEdge::Direction::CallToFunc:
             {
                 // Propagate argument info from call site to function parameters
-                auto firstBlock = targetFunc->getFirstBlock();
+                auto firstBlock = targetCallee->getFirstBlock();
                 if (!firstBlock)
                     return;
 
@@ -1028,10 +1202,10 @@ struct DynamicInstLoweringContext
                     if (argIndex < callInst->getOperandCount())
                     {
                         auto arg = callInst->getOperand(argIndex);
-                        if (auto argInfo = tryGetInfo(arg))
+                        if (auto argInfo = tryGetInfo(edge.callerContext, arg))
                         {
                             // Use centralized update method
-                            updateInfo(param, argInfo, workQueue);
+                            updateInfo(edge.targetContext, param, argInfo, workQueue);
                         }
                     }
                     argIndex++;
@@ -1041,11 +1215,11 @@ struct DynamicInstLoweringContext
         case InterproceduralEdge::Direction::FuncToCall:
             {
                 // Propagate return value info from function to call site
-                auto returnInfo = funcReturnInfo.tryGetValue(targetFunc);
+                auto returnInfo = funcReturnInfo.tryGetValue(targetCallee);
                 if (returnInfo)
                 {
                     // Use centralized update method
-                    updateInfo(callInst, *returnInfo, workQueue);
+                    updateInfo(edge.callerContext, callInst, *returnInfo, workQueue);
                 }
                 break;
             }
@@ -1055,13 +1229,13 @@ struct DynamicInstLoweringContext
         }
     }
 
-    PropagationInfo getFuncReturnInfo(IRFunc* func)
+    PropagationInfo getFuncReturnInfo(IRInst* callee)
     {
-        funcReturnInfo.addIfNotExists(func, none());
-        return funcReturnInfo[func];
+        funcReturnInfo.addIfNotExists(callee, none());
+        return funcReturnInfo[callee];
     }
 
-    void initializeFirstBlockParameters(IRFunc* func)
+    void initializeFirstBlockParameters(IRInst* context, IRFunc* func)
     {
         auto firstBlock = func->getFirstBlock();
         if (!firstBlock)
@@ -1071,20 +1245,20 @@ struct DynamicInstLoweringContext
         for (auto param : firstBlock->getParams())
         {
             auto paramType = param->getDataType();
-            auto paramInfo = tryGetInfo(param);
+            auto paramInfo = tryGetInfo(context, param);
             if (paramInfo)
                 continue; // Already has some information
 
             if (auto interfaceType = as<IRInterfaceType>(paramType))
             {
                 if (interfaceType->findDecoration<IRComInterfaceDecoration>())
-                    propagationMap[param] = makeUnbounded();
+                    propagationMap[Element(context, param)] = makeUnbounded();
                 else
-                    propagationMap[param] = none(); // Initialize to none.
+                    propagationMap[Element(context, param)] = none(); // Initialize to none.
             }
             else
             {
-                propagationMap[param] = none();
+                propagationMap[Element(context, param)] = none();
             }
         }
     }
@@ -1152,7 +1326,7 @@ struct DynamicInstLoweringContext
                 return none();
 
         if (unionJudgment == PropagationJudgment::Set)
-            if (allValues.getCount() > 1)
+            if (allValues.getCount() > 0)
                 return makeSet(allValues);
             else
                 return none();
@@ -1172,7 +1346,7 @@ struct DynamicInstLoweringContext
         return unionPropagationInfo(infos);
     }
 
-    PropagationInfo analyzeDefault(IRInst* inst)
+    PropagationInfo analyzeDefault(IRInst* context, IRInst* inst)
     {
         // Check if this is a global type, witness table, or function.
         // If so, it's a concrete element. We'll create a singleton set for it.
@@ -1186,9 +1360,9 @@ struct DynamicInstLoweringContext
     bool performDynamicInstLowering()
     {
         // Collect all instructions that need lowering
-        List<IRInst*> typeInstsToLower;
-        List<IRInst*> valueInstsToLower;
-        List<IRInst*> instWithReplacementTypes;
+        List<Element> typeInstsToLower;
+        List<Element> valueInstsToLower;
+        List<Element> instWithReplacementTypes;
         List<IRFunc*> funcTypesToProcess;
 
         bool hasChanges = false;
@@ -1196,6 +1370,7 @@ struct DynamicInstLoweringContext
         {
             if (auto func = as<IRFunc>(globalInst))
             {
+                auto context = func;
                 // Process each function's instructions
                 for (auto block : func->getBlocks())
                 {
@@ -1209,37 +1384,38 @@ struct DynamicInstLoweringContext
                         case kIROp_LookupWitnessMethod:
                             {
                                 if (child->getDataType()->getOp() == kIROp_TypeKind)
-                                    typeInstsToLower.add(child);
+                                    typeInstsToLower.add(Element(context, child));
                                 else
-                                    valueInstsToLower.add(child);
+                                    valueInstsToLower.add(Element(context, child));
                                 break;
                             }
                         case kIROp_ExtractExistentialType:
-                            typeInstsToLower.add(child);
+                            typeInstsToLower.add(Element(context, child));
                             break;
                         case kIROp_ExtractExistentialWitnessTable:
                         case kIROp_ExtractExistentialValue:
                         case kIROp_MakeExistential:
                         case kIROp_CreateExistentialObject:
-                            valueInstsToLower.add(child);
+                            valueInstsToLower.add(Element(context, child));
                             break;
                         case kIROp_Call:
                             {
-                                if (auto info = tryGetInfo(child))
+                                if (auto info = tryGetInfo(context, child))
                                     if (info.judgment == PropagationJudgment::Existential)
-                                        instWithReplacementTypes.add(child);
+                                        instWithReplacementTypes.add(Element(context, child));
 
-                                if (auto calleeInfo = tryGetInfo(as<IRCall>(child)->getCallee()))
+                                if (auto calleeInfo =
+                                        tryGetInfo(context, as<IRCall>(child)->getCallee()))
                                     if (calleeInfo.judgment == PropagationJudgment::Set)
-                                        valueInstsToLower.add(child);
+                                        valueInstsToLower.add(Element(context, child));
                             }
                             break;
                         default:
-                            if (auto info = tryGetInfo(child))
+                            if (auto info = tryGetInfo(context, child))
                                 if (info.judgment == PropagationJudgment::Existential)
                                     // If this instruction has a set of types, tables, or funcs,
                                     // we need to lower it to a unified type.
-                                    instWithReplacementTypes.add(child);
+                                    instWithReplacementTypes.add(Element(context, child));
                         }
                     }
                 }
@@ -1248,17 +1424,21 @@ struct DynamicInstLoweringContext
             }
         }
 
-        for (auto inst : typeInstsToLower)
-            hasChanges |= lowerInst(inst);
+        for (auto instWithCtx : typeInstsToLower)
+            hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
 
         for (auto func : funcTypesToProcess)
             hasChanges |= replaceFuncType(func, this->funcReturnInfo[func]);
 
-        for (auto inst : valueInstsToLower)
-            hasChanges |= lowerInst(inst);
+        for (auto instWithCtx : valueInstsToLower)
+            hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
 
-        for (auto inst : instWithReplacementTypes)
-            hasChanges |= replaceType(inst);
+        for (auto instWithCtx : instWithReplacementTypes)
+        {
+            if (instWithCtx.inst->getParent() == nullptr)
+                continue;
+            hasChanges |= replaceType(instWithCtx.context, instWithCtx.inst);
+        }
 
         return hasChanges;
     }
@@ -1313,16 +1493,14 @@ struct DynamicInstLoweringContext
                         types.add(concreteType);
             });
 
-        auto anyValueType = createAnyValueTypeFromInsts(types);
-        return builder.getTupleType(List<IRType*>({builder.getUIntType(), anyValueType}));
+        SLANG_ASSERT(types.getCount() > 0);
+        auto unionType = types.getCount() > 1 ? createAnyValueTypeFromInsts(types) : *types.begin();
+        return builder.getTupleType(List<IRType*>({builder.getUIntType(), (IRType*)unionType}));
     }
 
-    bool replaceType(IRInst* inst)
+    bool replaceType(IRInst* context, IRInst* inst)
     {
-        if (inst->getParent() == nullptr)
-            return false; // Not a valid instruction
-
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info || info.judgment != PropagationJudgment::Existential)
             return false;
 
@@ -1330,51 +1508,62 @@ struct DynamicInstLoweringContext
         return true;
     }
 
-    bool lowerInst(IRInst* inst)
+    bool lowerInst(IRInst* context, IRInst* inst)
     {
         switch (inst->getOp())
         {
         case kIROp_LookupWitnessMethod:
-            return lowerLookupWitnessMethod(as<IRLookupWitnessMethod>(inst));
+            return lowerLookupWitnessMethod(context, as<IRLookupWitnessMethod>(inst));
         case kIROp_ExtractExistentialWitnessTable:
-            return lowerExtractExistentialWitnessTable(as<IRExtractExistentialWitnessTable>(inst));
+            return lowerExtractExistentialWitnessTable(
+                context,
+                as<IRExtractExistentialWitnessTable>(inst));
         case kIROp_ExtractExistentialType:
-            return lowerExtractExistentialType(as<IRExtractExistentialType>(inst));
+            return lowerExtractExistentialType(context, as<IRExtractExistentialType>(inst));
         case kIROp_ExtractExistentialValue:
-            return lowerExtractExistentialValue(as<IRExtractExistentialValue>(inst));
+            return lowerExtractExistentialValue(context, as<IRExtractExistentialValue>(inst));
         case kIROp_Call:
-            return lowerCall(as<IRCall>(inst));
+            return lowerCall(context, as<IRCall>(inst));
         case kIROp_MakeExistential:
-            return lowerMakeExistential(as<IRMakeExistential>(inst));
+            return lowerMakeExistential(context, as<IRMakeExistential>(inst));
         case kIROp_CreateExistentialObject:
-            return lowerCreateExistentialObject(as<IRCreateExistentialObject>(inst));
+            return lowerCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         default:
             return false;
         }
     }
 
-    bool lowerLookupWitnessMethod(IRLookupWitnessMethod* inst)
+    bool lowerLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info)
             return false;
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        // Check if this is a TypeKind data type with SetOfTypes judgment
-        if (info.judgment == PropagationJudgment::Set)
+        if (info.isSingleton())
         {
+            // Found a single possible type. Simple replacement.
+            inst->replaceUsesWith(info.getSingletonValue());
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (info.judgment == PropagationJudgment::Set)
+        {
+            // Set of types.
             if (inst->getDataType()->getOp() == kIROp_TypeKind)
             {
                 // Create an any-value type based on the set of types
-                auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(info));
+                auto typeSet = collectionToHashSet(info);
+                auto unionType = typeSet.getCount() > 1 ? createAnyValueTypeFromInsts(typeSet)
+                                                        : *typeSet.begin();
 
                 // Store the mapping for later use
-                loweredInstToAnyValueType[inst] = anyValueType;
+                loweredInstToAnyValueType[inst] = unionType;
 
                 // Replace the instruction with the any-value type
-                inst->replaceUsesWith(anyValueType);
+                inst->replaceUsesWith(unionType);
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -1382,7 +1571,7 @@ struct DynamicInstLoweringContext
             {
                 // Get the witness table operand info
                 auto witnessTableInst = inst->getWitnessTable();
-                auto witnessTableInfo = tryGetInfo(witnessTableInst);
+                auto witnessTableInfo = tryGetInfo(context, witnessTableInst);
 
                 if (witnessTableInfo.judgment == PropagationJudgment::Set)
                 {
@@ -1398,7 +1587,7 @@ struct DynamicInstLoweringContext
                         keyMappingFunc,
                         List<IRInst*>({inst->getWitnessTable()}));
                     inst->replaceUsesWith(witnessTableId);
-                    propagationMap[witnessTableId] = info;
+                    propagationMap[Element(witnessTableId)] = info;
                     inst->removeAndDeallocate();
                     return true;
                 }
@@ -1408,31 +1597,40 @@ struct DynamicInstLoweringContext
         return false;
     }
 
-    bool lowerExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
+    bool lowerExtractExistentialWitnessTable(
+        IRInst* context,
+        IRExtractExistentialWitnessTable* inst)
     {
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info)
             return false;
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (info.judgment == PropagationJudgment::Set)
+        if (info.isSingleton())
+        {
+            // Found a single possible type. Simple replacement.
+            inst->replaceUsesWith(info.getSingletonValue());
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (info.judgment == PropagationJudgment::Set)
         {
             // Replace with GetElement(loweredInst, 0) -> uint
             auto operand = inst->getOperand(0);
             auto element = builder.emitGetTupleElement(builder.getUIntType(), operand, 0);
             inst->replaceUsesWith(element);
-            propagationMap[element] = info;
+            propagationMap[Element(element)] = info;
             inst->removeAndDeallocate();
             return true;
         }
         return false;
     }
 
-    bool lowerExtractExistentialValue(IRExtractExistentialValue* inst)
+    bool lowerExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
-        auto operandInfo = tryGetInfo(inst->getOperand(0));
+        auto operandInfo = tryGetInfo(context, inst->getOperand(0));
         if (!operandInfo || operandInfo.judgment != PropagationJudgment::Existential)
             return false;
 
@@ -1444,7 +1642,7 @@ struct DynamicInstLoweringContext
         auto loweredType = loweredInstToAnyValueType.tryGetValue(inst);
         if (loweredType)
         {
-            resultType = *loweredType;
+            resultType = (IRType*)*loweredType;
         }
 
         // Replace with GetElement(loweredInst, 1) -> AnyValueType
@@ -1455,14 +1653,23 @@ struct DynamicInstLoweringContext
         return true;
     }
 
-    bool lowerExtractExistentialType(IRExtractExistentialType* inst)
+    bool lowerExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info || info.judgment != PropagationJudgment::Set)
             return false;
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
+
+        if (info.isSingleton())
+        {
+            // Found a single possible type. Simple replacement.
+            inst->replaceUsesWith(info.getSingletonValue());
+            inst->removeAndDeallocate();
+            loweredInstToAnyValueType[inst] = info.getSingletonValue();
+            return true;
+        }
 
         // Create an any-value type based on the set of types
         auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(info));
@@ -1476,7 +1683,7 @@ struct DynamicInstLoweringContext
         return true;
     }
 
-    IRFuncType* getExpectedFuncType(IRCall* inst)
+    IRFuncType* getExpectedFuncType(IRInst* context, IRCall* inst)
     {
         // Translate argument types into expected function type.
         // For now, we handle just 'in' arguments.
@@ -1484,7 +1691,7 @@ struct DynamicInstLoweringContext
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
-            if (auto argInfo = tryGetInfo(arg))
+            if (auto argInfo = tryGetInfo(context, arg))
             {
                 // If the argument is existential, we need to use the type for existential
                 if (argInfo.judgment == PropagationJudgment::Existential)
@@ -1499,7 +1706,7 @@ struct DynamicInstLoweringContext
 
         // Translate result type.
         IRType* resultType = inst->getDataType();
-        auto returnInfo = tryGetInfo(inst);
+        auto returnInfo = tryGetInfo(context, inst);
         if (returnInfo && returnInfo.judgment == PropagationJudgment::Existential)
         {
             resultType = getTypeForExistential(returnInfo);
@@ -1510,21 +1717,28 @@ struct DynamicInstLoweringContext
         return builder.getFuncType(argTypes, resultType);
     }
 
-    bool lowerCall(IRCall* inst)
+    bool lowerCall(IRInst* context, IRCall* inst)
     {
         auto callee = inst->getCallee();
-        auto calleeInfo = tryGetInfo(callee);
+        auto calleeInfo = tryGetInfo(context, callee);
 
         if (!calleeInfo || calleeInfo.judgment != PropagationJudgment::Set)
             return false;
 
-        if (calleeInfo.isSingleton() && calleeInfo.getSingletonValue() == callee)
-            return false;
+        if (calleeInfo.isSingleton())
+        {
+            if (calleeInfo.getSingletonValue() == callee)
+                return false;
+
+            IRBuilder builder(inst->getModule());
+            builder.replaceOperand(inst->getCalleeUse(), calleeInfo.getSingletonValue());
+            return true; // Replaced with a single function
+        }
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        auto expectedFuncType = getExpectedFuncType(inst);
+        auto expectedFuncType = getExpectedFuncType(context, inst);
         // Create dispatch function
         auto dispatchFunc = createDispatchFunc(collectionToHashSet(calleeInfo), expectedFuncType);
 
@@ -1538,16 +1752,16 @@ struct DynamicInstLoweringContext
 
         auto newCall = builder.emitCallInst(inst->getDataType(), dispatchFunc, newArgs);
         inst->replaceUsesWith(newCall);
-        if (auto info = tryGetInfo(inst))
-            propagationMap[newCall] = info;
-        replaceType(newCall); // "maybe replace type"
+        if (auto info = tryGetInfo(context, inst))
+            propagationMap[Element(newCall)] = info;
+        replaceType(context, newCall); // "maybe replace type"
         inst->removeAndDeallocate();
         return true;
     }
 
-    bool lowerMakeExistential(IRMakeExistential* inst)
+    bool lowerMakeExistential(IRInst* context, IRMakeExistential* inst)
     {
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info || info.judgment != PropagationJudgment::Existential)
             return false;
 
@@ -1574,10 +1788,11 @@ struct DynamicInstLoweringContext
             });
 
         // Create the appropriate any-value type
-        auto anyValueType = createAnyValueType(types);
+        SLANG_ASSERT(types.getCount() > 0);
+        auto unionType = types.getCount() > 1 ? createAnyValueType(types) : *types.begin();
 
         // Pack the value
-        auto packedValue = builder.emitPackAnyValue(anyValueType, inst->getWrappedValue());
+        auto packedValue = builder.emitPackAnyValue(unionType, inst->getWrappedValue());
 
         // Create tuple (table_unique_id, PackAnyValue(val))
         auto tupleType = builder.getTupleType(
@@ -1585,17 +1800,17 @@ struct DynamicInstLoweringContext
         IRInst* tupleArgs[] = {tableId, packedValue};
         auto tuple = builder.emitMakeTuple(tupleType, 2, tupleArgs);
 
-        if (auto info = tryGetInfo(inst))
-            propagationMap[tuple] = info;
+        if (auto info = tryGetInfo(context, inst))
+            propagationMap[Element(tuple)] = info;
 
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
         return true;
     }
 
-    bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
+    bool lowerCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
-        auto info = tryGetInfo(inst);
+        auto info = tryGetInfo(context, inst);
         if (!info || info.judgment != PropagationJudgment::Existential)
             return false;
 
@@ -1629,8 +1844,8 @@ struct DynamicInstLoweringContext
                 {translatedID,
                  builder.emitReinterpret(existentialTupleType->getOperand(1), inst->getValue())}));
 
-        if (auto info = tryGetInfo(inst))
-            propagationMap[existentialTuple] = info;
+        if (auto info = tryGetInfo(context, inst))
+            propagationMap[Element(existentialTuple)] = info;
 
         inst->replaceUsesWith(existentialTuple);
         inst->removeAndDeallocate();
@@ -1781,24 +1996,25 @@ struct DynamicInstLoweringContext
             builder.emitReturn(defaultValue);
         }
 
-        auto maybePackValue = [&](IRBuilder* builder, IRInst* value, IRType* type) -> IRInst*
+        auto maybeReinterpret = [&](IRBuilder* builder, IRInst* value, IRType* type) -> IRInst*
         {
-            // If the type is AnyValueType, pack the value
             if (as<IRAnyValueType>(type) && !as<IRAnyValueType>(value->getDataType()))
             {
                 return builder->emitPackAnyValue(type, value);
             }
-            return value; // Otherwise, return as is
-        };
-
-        auto maybeUnpackValue = [&](IRBuilder* builder, IRInst* value, IRType* type) -> IRInst*
-        {
-            // If the type is AnyValueType, unpack the value
-            if (as<IRAnyValueType>(value->getDataType()) && !as<IRAnyValueType>(type))
+            else if (as<IRAnyValueType>(value->getDataType()) && !as<IRAnyValueType>(type))
             {
                 return builder->emitUnpackAnyValue(type, value);
             }
-            return value; // Otherwise, return as is
+            else if (value->getDataType() != type)
+            {
+                // If the value's type is different from the expected type, reinterpret it
+                return builder->emitReinterpret(type, value);
+            }
+            else
+            {
+                return value; // Otherwise, return as is
+            }
         };
 
         // Go back to entry block and create switch
@@ -1820,7 +2036,7 @@ struct DynamicInstLoweringContext
             auto concreteFuncType = as<IRFuncType>(funcInst->getDataType());
             for (UIndex ii = 0; ii < originalParams.getCount(); ii++)
             {
-                callArgs.add(maybeUnpackValue(
+                callArgs.add(maybeReinterpret(
                     &builder,
                     originalParams[ii],
                     concreteFuncType->getParamType(ii)));
@@ -1836,7 +2052,7 @@ struct DynamicInstLoweringContext
             }
             else
             {
-                builder.emitReturn(maybePackValue(&builder, callResult, resultType));
+                builder.emitReturn(maybeReinterpret(&builder, callResult, resultType));
             }
 
             caseValues.add(builder.getIntValue(builder.getUIntType(), funcId));
@@ -1974,14 +2190,17 @@ struct DynamicInstLoweringContext
     Dictionary<IRInst*, PropagationInfo> funcReturnInfo;
 
     // Mapping from functions to call-sites.
-    Dictionary<IRInst*, HashSet<IRCall*>> funcCallSites;
+    Dictionary<IRInst*, HashSet<Element>> funcCallSites;
 
     // Unique ID assignment for functions and witness tables
     Dictionary<IRInst*, UInt> uniqueIds;
     UInt nextUniqueId = 1;
 
     // Mapping from lowered instruction to their any-value types
-    Dictionary<IRInst*, IRAnyValueType*> loweredInstToAnyValueType;
+    Dictionary<IRInst*, IRInst*> loweredInstToAnyValueType;
+
+    // Set of open contexts
+    HashSet<IRInst*> availableContexts;
 };
 
 // Main entry point
