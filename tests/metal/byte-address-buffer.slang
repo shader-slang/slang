@@ -40,4 +40,9 @@ void main_kernel(uint3 tid: SV_DispatchThreadID)
     // CHECK: {{.*}}[(272U)>>2] = as_type<uint32_t>({{.*}});
     // CHECK: {{.*}}[(276U)>>2] = as_type<uint32_t>({{.*}});
     buffer.Store(272, ptr);
+
+    // CHECK: {{.*}}[(280U)>>2] = as_type<uint32_t>(4294967295U);
+    // CHECK: {{.*}}[(284U)>>2] = as_type<uint32_t>(4294967295U);
+    uintptr_t uintptr_val = (uintptr_t)-1;
+    buffer.Store(280, uintptr_val);
 }

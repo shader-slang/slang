@@ -756,16 +756,14 @@ struct ByteAddressBufferLegalizationContext
                 // For pointer types, Metal doesn't allow as_type casts from integers to pointers,
                 // so we use proper cast operations instead of bit casts.
                 if (type->getOp() == kIROp_PtrType || 
-                    type->getOp() == kIROp_RawPointerType ||
-                    type->getOp() == kIROp_IntPtrType ||
-                    type->getOp() == kIROp_UIntPtrType)
+                    type->getOp() == kIROp_RawPointerType)
                 {
                     // Use proper cast operation instead of bit cast for pointers
                     return m_builder.emitCastIntToPtr(type, fullValue);
                 }
                 else
                 {
-                    // For non-pointer 64-bit types, use uint64
+                    // For non-pointer 64-bit types (including IntPtr/UIntPtr)
                     return m_builder.emitBitCast(type, fullValue);
                 }
             }
@@ -1425,16 +1423,14 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* hiVal;
                 IRInst* uint64Val;
                 if (type->getOp() == kIROp_PtrType || 
-                    type->getOp() == kIROp_RawPointerType ||
-                    type->getOp() == kIROp_IntPtrType ||
-                    type->getOp() == kIROp_UIntPtrType)
+                    type->getOp() == kIROp_RawPointerType)
                 {
                     // Use proper cast operation instead of bit cast for pointers
                     uint64Val = m_builder.emitCastPtrToInt(value);
                 }
                 else
                 {
-                    // For non-pointer 64-bit types, use uint64
+                    // For non-pointer 64-bit types (including IntPtr/UIntPtr)
                     uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
                 }
                 loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
