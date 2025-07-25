@@ -20614,17 +20614,6 @@ struct HitObject
         case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
         }
     }
-
-    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
-    [ForceInline]
-    [require(cuda, ser_raygen_closesthit_miss)]
-    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
-    {
-        __target_switch
-        {
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
-        }
-    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
@@ -21012,6 +21001,7 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".LoadLocalRootTableConstant";
+        case cuda: __intrinsic_asm "(*(uint32_t*)((char*)optixHitObjectGetSbtDataPointer()+RootConstantOffsetInBytes))";
         }
     }
 

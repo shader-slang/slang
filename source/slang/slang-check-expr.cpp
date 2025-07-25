@@ -386,6 +386,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // and given a type of `(Test) -> float` to indicate
             // that it is an "unbound" instance method.
             //
+            auto expr = m_astBuilder->create<StaticMemberExpr>();
+            expr->loc = loc;
+            expr->type = type;
             if (!isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
@@ -393,11 +396,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     Diagnostics::staticRefToNonStaticMember,
                     typeType->getType(),
                     declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
             }
 
-            auto expr = m_astBuilder->create<StaticMemberExpr>();
-            expr->loc = loc;
-            expr->type = type;
             expr->baseExpression = baseExpr;
             expr->name = name;
             expr->declRef = declRef;
