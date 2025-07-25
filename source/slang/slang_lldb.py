@@ -77,6 +77,14 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
 
     def update(self):
         self.children = Children()
+
+        if self.valobj.type.IsPointerType():
+            if self.valobj.unsigned != 0:
+                valobj = self.valobj.deref
+                for i in range(valobj.GetNumChildren()):
+                    self.children.append(valobj.GetChildAtIndex(i))
+            return
+
         target = self.valobj.target
         ty = self.valobj.type
         op = self.valobj.GetChildMemberWithName("m_op")
@@ -137,6 +145,8 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
 
 
 def IRInst_summary(valobj: lldb.SBValue, dict) -> str:
+    if valobj.type.IsPointerType():
+        return "nullptr" if valobj.unsigned == 0 else valobj.deref.summary
     val = valobj.GetNonSyntheticValue()
     op = val.GetChildMemberWithName("m_op")
     return f"{{{op.value} {val.address_of.value}}}"
