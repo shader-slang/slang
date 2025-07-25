@@ -1599,6 +1599,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     IRInst* m_defaultDebugSource = nullptr;
+    Dictionary<IRInst*, IRInst*> m_moduleCompilationUnitSource; // Maps module to best source for compilation unit
 
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
@@ -2284,6 +2285,40 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto moduleInst = inst->getModule()->getModuleInst();
                 if (!m_defaultDebugSource)
                     m_defaultDebugSource = debugSource;
+                
+                // Track the best compilation unit source per module
+                IRInst* currentBestSource = nullptr;
+                if (!m_moduleCompilationUnitSource.tryGetValue(moduleInst, currentBestSource))
+                {
+                    // First debug source for this module
+                    m_moduleCompilationUnitSource[moduleInst] = debugSource;
+                    currentBestSource = debugSource;
+                }
+                else
+                {
+                    // Compare current source with the best source so far
+                    auto debugSourceFileName = as<IRStringLit>(debugSource->getFileName())->getStringSlice();
+                    auto bestSourceFileName = as<IRStringLit>(as<IRDebugSource>(currentBestSource)->getFileName())->getStringSlice();
+                    
+                    // Simple heuristic: prefer source files that don't look like headers
+                    bool currentIsHeader = debugSourceFileName.indexOf(UnownedStringSlice::fromLiteral("util")) != -1 ||
+                                          debugSourceFileName.indexOf(UnownedStringSlice::fromLiteral("common")) != -1 ||
+                                          debugSourceFileName.indexOf(UnownedStringSlice::fromLiteral("shared")) != -1 ||
+                                          debugSourceFileName.indexOf(UnownedStringSlice::fromLiteral("header")) != -1;
+                    
+                    bool bestIsHeader = bestSourceFileName.indexOf(UnownedStringSlice::fromLiteral("util")) != -1 ||
+                                       bestSourceFileName.indexOf(UnownedStringSlice::fromLiteral("common")) != -1 ||
+                                       bestSourceFileName.indexOf(UnownedStringSlice::fromLiteral("shared")) != -1 ||
+                                       bestSourceFileName.indexOf(UnownedStringSlice::fromLiteral("header")) != -1;
+                    
+                    // If current source is not a header but the best one is, prefer current
+                    if (!currentIsHeader && bestIsHeader)
+                    {
+                        m_moduleCompilationUnitSource[moduleInst] = debugSource;
+                        currentBestSource = debugSource;
+                    }
+                }
+                
                 if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
                 {
                     IRBuilder builder(inst);
@@ -2295,7 +2330,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         getNonSemanticDebugInfoExtInst(),
                         emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
                         emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-                        result,
+                        ensureInst(currentBestSource),
                         emitIntConstant(
                             SpvSourceLanguageSlang,
                             builder.getUIntType())); // Language.
