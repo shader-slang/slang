@@ -2094,6 +2094,18 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
             }
         }
     }
+    else if (auto toArray = as<IRArrayType>(toType))
+    {
+        // Handle scalar-to-array conversion for tessellation factors
+        if (as<IRBasicType>(fromType))
+        {
+            // Convert the scalar value to the array's element type first
+            auto arrayElementType = toArray->getElementType();
+            auto convertedVal = builder->emitCast(arrayElementType, val);
+            val = builder->emitMakeArrayFromElement(toType, convertedVal);
+            return ScalarizedVal::value(val);
+        }
+    }
     // TODO: actually consider what needs to go on here...
     return ScalarizedVal::value(builder->emitCast(toType, val));
 }

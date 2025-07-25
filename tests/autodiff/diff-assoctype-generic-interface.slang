@@ -15,6 +15,7 @@ struct GetterImpl : IGetter
 {
     float[8] data;
 
+    [Differentiable]
     __init(float[8] data)
     { this.data = data; }
 

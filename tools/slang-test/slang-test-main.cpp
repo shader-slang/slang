@@ -657,7 +657,10 @@ static void SLANG_STDCALL _fileCheckDiagnosticCallback(
     auto& testReporter = *reinterpret_cast<TestReporter*>(data);
     testReporter.message(messageType, message);
 }
-
+struct bool2
+{
+    bool x, y;
+};
 //
 // Check some generated output with FileCheck
 //

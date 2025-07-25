@@ -1,10 +1,9 @@
 """
 This python script provides LLDB formatters for Slang core types.
-To use it, add the following line to your ~/.lldbinit file:
-command script import /path/to/source/core/core_lldb.py
+To use it, see the `docs/debugging.md` file in this repo.
 """
 
-import lldb  # type: ignore[import]
+import lldb
 
 # Set to True to enable the logger
 ENABLE_LOGGING = True
@@ -16,7 +15,7 @@ def log(msg):
         lldb.formatters.Logger.Logger() >> msg
 
 
-def make_string(F, L):
+def make_string(F: lldb.SBData, L: int) -> str:
     strval = ""
     G = F.uint8
     for X in range(L):
@@ -28,17 +27,17 @@ def make_string(F, L):
 
 
 # Return the pointer to the data in a Slang::RefPtr
-def get_ref_pointer(valobj):
+def get_ref_pointer(valobj: lldb.SBValue) -> lldb.SBValue:
     return valobj.GetNonSyntheticValue().GetChildMemberWithName("pointer")
 
 
 # Check if a pointer is nullptr
-def is_nullptr(valobj):
+def is_nullptr(valobj: lldb.SBValue) -> bool:
     return valobj.GetValueAsUnsigned(0) == 0
 
 
 # Slang::String summary
-def String_summary(valobj, dict):
+def String_summary(valobj: lldb.SBValue, dict) -> str:
     buffer_ptr = get_ref_pointer(valobj.GetChildMemberWithName("m_buffer"))
     if is_nullptr(buffer_ptr):
         return '""'
@@ -49,7 +48,7 @@ def String_summary(valobj, dict):
 
 
 # Slang::UnownedStringSlice summary
-def UnownedStringSlice_summary(valobj, dict):
+def UnownedStringSlice_summary(valobj: lldb.SBValue, dict) -> str:
     begin = valobj.GetChildMemberWithName("m_begin")
     end = valobj.GetChildMemberWithName("m_end")
     length = end.GetValueAsUnsigned(0) - begin.GetValueAsUnsigned(0)
@@ -60,8 +59,8 @@ def UnownedStringSlice_summary(valobj, dict):
 
 
 # Slang::RefPtr synthetic provider
-class RefPtr_synthetic:
-    def __init__(self, valobj, dict):
+class RefPtr_synthetic(lldb.SBSyntheticValueProvider):
+    def __init__(self, valobj: lldb.SBValue, dict):
         self.valobj = valobj
 
     def has_children(self):
@@ -71,14 +70,14 @@ class RefPtr_synthetic:
         return len(self.children)
 
     def get_child_index(self, name):
-        for index in range(self.num_children()):
-            if self.children[index].GetName() == name:
-                return index
+        for idx in range(self.num_children()):
+            if self.children[idx].GetName() == name:
+                return idx
         return -1
 
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.num_children():
-            return self.children[index]
+    def get_child_at_index(self, idx):
+        if idx >= 0 and idx < self.num_children():
+            return self.children[idx]
         else:
             return None
 
@@ -92,7 +91,7 @@ class RefPtr_synthetic:
 
 
 # Slang::RefPtr summary
-def RefPtr_summary(valobj, dict):
+def RefPtr_summary(valobj: lldb.SBValue, dict) -> str:
     pointer = valobj.GetNonSyntheticValue().GetChildMemberWithName("pointer")
     if is_nullptr(pointer):
         return "nullptr"
@@ -102,8 +101,8 @@ def RefPtr_summary(valobj, dict):
 
 
 # Slang::ComPtr synthetic provider
-class ComPtr_synthetic:
-    def __init__(self, valobj, dict):
+class ComPtr_synthetic(lldb.SBSyntheticValueProvider):
+    def __init__(self, valobj: lldb.SBValue, dict):
         self.valobj = valobj
 
     def has_children(self):
@@ -113,14 +112,14 @@ class ComPtr_synthetic:
         return len(self.children)
 
     def get_child_index(self, name):
-        for index in range(self.num_children()):
-            if self.children[index].GetName() == name:
-                return index
+        for idx in range(self.num_children()):
+            if self.children[idx].GetName() == name:
+                return idx
         return -1
 
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.num_children():
-            return self.children[index]
+    def get_child_at_index(self, idx):
+        if idx >= 0 and idx < self.num_children():
+            return self.children[idx]
         else:
             return None
 
@@ -132,7 +131,7 @@ class ComPtr_synthetic:
 
 
 # Slang::ComPtr summary
-def ComPtr_summary(valobj, dict):
+def ComPtr_summary(valobj: lldb.SBValue, dict) -> str:
     pointer = valobj.GetNonSyntheticValue().GetChildMemberWithName("m_ptr")
     if is_nullptr(pointer):
         return "nullptr"
@@ -140,8 +139,8 @@ def ComPtr_summary(valobj, dict):
 
 
 # Slang::Array synthetic provider
-class Array_synthetic:
-    def __init__(self, valobj, dict):
+class Array_synthetic(lldb.SBSyntheticValueProvider):
+    def __init__(self, valobj: lldb.SBValue, dict):
         self.valobj = valobj
 
     def has_children(self):
@@ -153,11 +152,11 @@ class Array_synthetic:
     def get_child_index(self, name):
         return int(name.lstrip("[").rstrip("]"))
 
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.num_children():
-            offset = index * self.data_size
+    def get_child_at_index(self, idx):
+        if idx >= 0 and idx < self.num_children():
+            offset = idx * self.data_size
             return self.buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
+                "[" + str(idx) + "]", offset, self.data_type
             )
         else:
             return None
@@ -170,8 +169,8 @@ class Array_synthetic:
 
 
 # Slang::List synthetic provider
-class List_synthetic:
-    def __init__(self, valobj, dict):
+class List_synthetic(lldb.SBSyntheticValueProvider):
+    def __init__(self, valobj: lldb.SBValue, dict):
         self.valobj = valobj
 
     def has_children(self):
@@ -183,11 +182,11 @@ class List_synthetic:
     def get_child_index(self, name):
         return int(name.lstrip("[").rstrip("]"))
 
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.num_children():
-            offset = index * self.data_size
+    def get_child_at_index(self, idx):
+        if idx >= 0 and idx < self.num_children():
+            offset = idx * self.data_size
             return self.buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
+                "[" + str(idx) + "]", offset, self.data_type
             )
         else:
             return None
@@ -200,8 +199,8 @@ class List_synthetic:
 
 
 # Slang::ShortList synthetic provider
-class ShortList_synthetic:
-    def __init__(self, valobj, dict):
+class ShortList_synthetic(lldb.SBSyntheticValueProvider):
+    def __init__(self, valobj: lldb.SBValue, dict):
         self.valobj = valobj
 
     def has_children(self):
@@ -213,16 +212,16 @@ class ShortList_synthetic:
     def get_child_index(self, name):
         return int(name.lstrip("[").rstrip("]"))
 
-    def get_child_at_index(self, index):
-        if index >= 0 and index < self.short_count:
-            offset = index * self.data_size
+    def get_child_at_index(self, idx):
+        if idx >= 0 and idx < self.short_count:
+            offset = idx * self.data_size
             return self.short_buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
+                "[" + str(idx) + "]", offset, self.data_type
             )
-        elif index >= self.short_count and index < self.num_children():
-            offset = (index - self.short_count) * self.data_size
+        elif idx >= self.short_count and idx < self.num_children():
+            offset = (idx - self.short_count) * self.data_size
             return self.buffer.CreateChildAtOffset(
-                "[" + str(index) + "]", offset, self.data_type
+                "[" + str(idx) + "]", offset, self.data_type
             )
         else:
             return None
@@ -236,7 +235,7 @@ class ShortList_synthetic:
         self.data_size = self.data_type.GetByteSize()
 
 
-def __lldb_init_module(debugger, internal_dict):
+def __lldb_init_module(debugger: lldb.SBDebugger, internal_dict):
     if ENABLE_LOGGING:
         lldb.formatters.Logger._lldb_formatters_debug_level = 2
 
