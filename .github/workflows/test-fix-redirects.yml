@@ -25,110 +25,116 @@ jobs:
           # Load shared redirect configuration
           source .github/workflows/redirect-config.sh
           
-          # Create a test directory with sample files
-          mkdir -p test-user-guide/subdir
+          echo "Configuration loaded:"
+          echo "  READTHEDOCS_DOMAIN: $READTHEDOCS_DOMAIN"
+          echo "  READTHEDOCS_VERSION: $READTHEDOCS_VERSION"
+          echo "  READTHEDOCS_USER_GUIDE_PREFIX: $READTHEDOCS_USER_GUIDE_PREFIX"
+          echo "  READTHEDOCS_USER_GUIDE_PATH: $READTHEDOCS_USER_GUIDE_PATH"
+          echo ""
           
-          # Test file 1: No front matter
-          cat > test-user-guide/no-frontmatter.md << 'EOF'
-          # Test File
-          This file has no front matter.
-          EOF
+          # Show current state of files
+          echo "Current state of user guide files:"
+          echo "=================================="
+          find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | head -5 | while read -r file; do
+            echo "File: $file"
+            echo "Front matter:"
+            sed -n '1,/^---$/p' "$file" | head -10
+            echo ""
+          done
           
-          # Test file 2: Has front matter but no redirect
-          cat > test-user-guide/has-frontmatter.md << 'EOF'
-          ---
-          layout: user-guide
-          permalink: /test
-          ---
-          # Test File
-          This file has front matter.
-          EOF
+          echo "Processing ${READTHEDOCS_USER_GUIDE_PATH} files..."
+          echo "=============================================="
           
-          # Test file 3: Has redirect (should be updated)
-          cat > test-user-guide/has-redirect.md << 'EOF'
-          ---
-          layout: user-guide
-          redirect_to: https://old-url.com/test.html
-          ---
-          # Test File
-          This file has wrong redirect.
-          EOF
+          # Track changes for summary
+          files_processed=0
+          files_updated=0
+          files_added_redirect=0
+          files_added_frontmatter=0
           
-          # Test file 4: In subdirectory
-          cat > test-user-guide/subdir/nested.md << 'EOF'
-          # Nested File
-          This file is in a subdirectory.
-          EOF
-          
-          echo "Before processing:"
-          echo "===================="
-          find test-user-guide -name "*.md" -exec echo "File: {}" \; -exec head -10 {} \; -exec echo "" \;
-          
-          # Run the same logic as the real workflow
-          find test-user-guide -name "*.md" -type f | while read -r file; do
+          # Run the same logic as the real workflow on actual files
+          find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | while read -r file; do
             if [ ! -f "$file" ]; then
               continue
             fi
             
-            echo "Processing $file..."
-            
-            # Expected URL (dynamically construct from file path)
-            file_path_no_ext=${file%.md}
-            expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
-            
-            echo "  Expected URL: $expected_url"
-            
-            # Check if file already has redirect_to
-            if grep -q "^redirect_to:" "$file"; then
-              # Update existing redirect_to
-              sed -i "s|^redirect_to:.*|redirect_to: $expected_url|" "$file"
-              echo "  ✅ Updated redirect_to in $file"
-            else
-              # Need to add redirect_to after the front matter
-              if grep -q "^---" "$file"; then
-                # File has front matter, add redirect_to before closing ---
-                awk -v url="$expected_url" '
-                  /^---/ && !frontmatter_started { 
-                    frontmatter_started = 1; 
-                    print; 
-                    next 
-                  }
-                  /^---/ && frontmatter_started && !redirect_added {
-                    print "redirect_to: " url;
-                    redirect_added = 1;
-                    print;
-                    next
-                  }
-                  { print }
-                ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-                echo "  ✅ Added redirect_to to existing front matter in $file"
-              else
-                # File has no front matter, add it
-                {
-                  echo "---"
-                  echo "layout: user-guide"
-                  echo "redirect_to: $expected_url"
-                  echo "---"
-                  echo ""
-                  cat "$file"
-                } > "$file.tmp" && mv "$file.tmp" "$file"
-                echo "  ✅ Added front matter with redirect_to to $file"
-              fi
-            fi
-          done
-          
-          echo ""
-          echo "After processing:"
-          echo "===================="
-          find test-user-guide -name "*.md" -exec echo "File: {}" \; -exec head -10 {} \; -exec echo "" \;
-          
-          # Verify results
-          echo ""
-          echo "Verification:"
-          echo "=============="
-          
-          failed=false
-          find test-user-guide -name "*.md" -type f | while read -r file; do
+                         files_processed=$((files_processed + 1))
+             echo "Processing $file..."
+             
+             # Expected URL (dynamically construct from file path)
+             file_path_no_ext=${file%.md}
+             expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
+             
+             echo "  Expected URL: $expected_url"
+             
+             # Check if file already has redirect_to
+             if grep -q "^redirect_to:" "$file"; then
+               # Update existing redirect_to
+               old_redirect=$(grep "^redirect_to:" "$file")
+               sed -i "s|^redirect_to:.*|redirect_to: $expected_url|" "$file"
+               echo "  ✅ Updated redirect_to in $file"
+               echo "    Old: $old_redirect"
+               echo "    New: redirect_to: $expected_url"
+               files_updated=$((files_updated + 1))
+             else
+               # Need to add redirect_to after the front matter
+               if grep -q "^---" "$file"; then
+                 # File has front matter, add redirect_to before closing ---
+                 awk -v url="$expected_url" '
+                   /^---/ && !frontmatter_started { 
+                     frontmatter_started = 1; 
+                     print; 
+                     next 
+                   }
+                   /^---/ && frontmatter_started && !redirect_added {
+                     print "redirect_to: " url;
+                     redirect_added = 1;
+                     print;
+                     next
+                   }
+                   { print }
+                 ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+                 echo "  ✅ Added redirect_to to existing front matter in $file"
+                 files_added_redirect=$((files_added_redirect + 1))
+               else
+                 # File has no front matter, add it
+                 {
+                   echo "---"
+                   echo "layout: user-guide"
+                   echo "redirect_to: $expected_url"
+                   echo "---"
+                   echo ""
+                   cat "$file"
+                 } > "$file.tmp" && mv "$file.tmp" "$file"
+                 echo "  ✅ Added front matter with redirect_to to $file"
+                 files_added_frontmatter=$((files_added_frontmatter + 1))
+               fi
+             fi
+           done
+           
+           echo ""
+           echo "Summary of Changes:"
+           echo "==================="
+           echo "Files processed: $files_processed"
+           echo "Existing redirects updated: $files_updated" 
+           echo "Redirects added to existing front matter: $files_added_redirect"
+           echo "Complete front matter added: $files_added_frontmatter"
+           
+           echo ""
+           echo "Sample of processed files:"
+           echo "=========================="
+           find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | head -3 | while read -r file; do
+             echo "File: $file"
+             echo "Front matter:"
+             sed -n '1,/^---$/p' "$file" | head -10
+             echo ""
+           done
+           
+           # Verify results
+           echo "Verification:"
+           echo "============="
+           
+           failed=false
+           find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | while read -r file; do
             file_path_no_ext=${file%.md}
             expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
             
@@ -149,10 +155,16 @@ jobs:
             fi
           done
           
-          echo ""
-          if [ "$failed" = "true" ]; then
-            echo "❌ Test failed - some files have incorrect redirects"
-            exit 1
-          else
-            echo "🎉 Test passed - all files have correct redirects!"
-          fi 
+                     echo ""
+           if [ "$failed" = "true" ]; then
+             echo "❌ Test failed - some files have incorrect redirects"
+             exit 1
+           else
+             echo "🎉 Test passed - all files have correct redirects!"
+           fi
+           
+           echo ""
+           echo "📝 NOTE: This test actually modified the real user guide files!"
+           echo "   The changes are now staged in your working directory."
+           echo "   You can see the exact changes in the 'Files changed' tab of your PR."
+           echo "   This demonstrates exactly what the /fix-redirects command would do." 
