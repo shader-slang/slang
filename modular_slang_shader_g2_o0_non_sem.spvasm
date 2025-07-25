@@ -1,0 +1,259 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 165
+; Schema: 0
+OpCapability Shader
+OpExtension "SPV_KHR_non_semantic_info"
+%2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+%95 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Fragment %main "main" %entryPointParam_main %input_texCoord
+OpExecutionMode %main OriginUpperLeft
+
+; Debug Information
+%1 = OpString "#ifndef SHADER_UTILS_SLANG
+#define SHADER_UTILS_SLANG
+
+// Helper function to calculate distance from center
+float calculateDistanceFromCenter(float2 uv)
+{
+    float2 center = float2(0.5, 0.5);
+    return length(uv - center);
+}
+
+// Additional utility function - simple smoothstep fade
+float createRadialFade(float2 uv, float radius)
+{
+    float dist = calculateDistanceFromCenter(uv);
+    return smoothstep(radius, 0.0, dist);
+}
+
+#endif // SHADER_UTILS_SLANG"
+%5 = OpString "/home/runner/work/slang/slang/shader_utils.slang"
+%11 = OpString "#include \"shader_utils.slang\"
+
+struct VertexOutput
+{
+    float4 position : SV_Position;
+    float2 texCoord : TEXCOORD0;
+}
+
+[shader(\"fragment\")]
+float4 main(VertexOutput input) : SV_Target
+{
+    // Create a simple gradient pattern based on texture coordinates
+    float2 uv = input.texCoord;
+    
+    // Call function from the included header file
+    float distanceFromCenter = calculateDistanceFromCenter(uv);
+    
+    // Use another function from the header for a radial fade effect
+    float radialFade = createRadialFade(uv, 0.7);
+    
+    // Create color pattern with both distance effects
+    float4 color = float4(
+        uv.x * (1.0 - distanceFromCenter * 0.5),  // Red with subtle distance fade
+        uv.y * radialFade,                        // Green with smooth radial fade
+        uv.x * uv.y,                             // Blue as product of coordinates
+        1.0                                      // Full opacity
+    );
+    
+    return color;
+}"
+%13 = OpString "/home/runner/work/slang/slang/modular_slang_shader.slang"
+OpSource Slang 1
+%30 = OpString "main"
+%36 = OpString "slangc"
+%37 = OpString "-target spirv  -I \"/home/runner/work/slang/slang/build/Debug/bin\" -matrix-layout-column-major -O0 -fvk-b-shift 0 0 -stage pixel -entry main -g2"
+%42 = OpString "float"
+%49 = OpString "input.texCoord"
+%56 = OpString "uv"
+%64 = OpString "distanceFromCenter"
+%75 = OpString "calculateDistanceFromCenter"
+%87 = OpString "center"
+%101 = OpString "radialFade"
+%114 = OpString "createRadialFade"
+%118 = OpString "radius"
+%129 = OpString "dist"
+%145 = OpString "color"
+%162 = OpString "entryPointParam_main"
+OpName %input_texCoord "input.texCoord"             ; id %40
+OpName %uv "uv"                                     ; id %55
+OpName %distanceFromCenter "distanceFromCenter"     ; id %63
+OpName %uv_0 "uv"                                   ; id %69
+OpName %uv_1 "uv"                                   ; id %79
+OpName %center "center"                             ; id %86
+OpName %calculateDistanceFromCenter "calculateDistanceFromCenter"   ; id %67
+OpName %distanceFromCenter_0 "distanceFromCenter"                   ; id %66
+OpName %radialFade "radialFade"                                     ; id %100
+OpName %uv_2 "uv"                                                   ; id %106
+OpName %radius "radius"                                             ; id %107
+OpName %radius_0 "radius"                                           ; id %117
+OpName %uv_3 "uv"                                                   ; id %121
+OpName %dist "dist"                                                 ; id %128
+OpName %dist_0 "dist"                                               ; id %131
+OpName %createRadialFade "createRadialFade"                         ; id %104
+OpName %radialFade_0 "radialFade"                                   ; id %103
+OpName %color "color"                                               ; id %144
+OpName %color_0 "color"                                             ; id %155
+OpName %entryPointParam_main "entryPointParam_main"                 ; id %160
+OpName %main "main"                                                 ; id %14
+
+; Annotations
+OpDecorate %input_texCoord Location 0
+OpDecorate %entryPointParam_main Location 0
+
+; Types, variables and constants
+%void = OpTypeVoid
+%4 = OpExtInst %void %2 DebugSource %5 %1
+%uint = OpTypeInt 32 0
+%uint_11 = OpConstant %uint 11
+%uint_5 = OpConstant %uint 5
+%uint_100 = OpConstant %uint 100
+%10 = OpExtInst %void %2 DebugCompilationUnit %uint_100 %uint_5 %4 %uint_11
+%12 = OpExtInst %void %2 DebugSource %13 %11
+%15 = OpTypeFunction %void
+%float = OpTypeFloat 32
+%v2float = OpTypeVector %float 2
+%_ptr_Function_v2float = OpTypePointer Function %v2float
+%_ptr_Function_float = OpTypePointer Function %float
+%v4float = OpTypeVector %float 4
+%_ptr_Function_v4float = OpTypePointer Function %v4float
+%uint_0 = OpConstant %uint 0
+%27 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void
+%uint_10 = OpConstant %uint 10
+%uint_8 = OpConstant %uint 8
+%29 = OpExtInst %void %2 DebugFunction %30 %27 %12 %uint_10 %uint_8 %10 %30 %uint_0 %uint_10
+%35 = OpExtInst %void %2 DebugEntryPoint %29 %10 %36 %37
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+%uint_32 = OpConstant %uint 32
+%uint_3 = OpConstant %uint 3
+%uint_131072 = OpConstant %uint 131072
+%41 = OpExtInst %void %2 DebugTypeBasic %42 %uint_32 %uint_3 %uint_131072
+%uint_2 = OpConstant %uint 2
+%46 = OpExtInst %void %2 DebugTypeVector %41 %uint_2
+%uint_13 = OpConstant %uint 13
+%uint_6 = OpConstant %uint 6
+%uint_12 = OpConstant %uint 12
+%uv = OpExtInst %void %2 DebugLocalVariable %56 %46 %12 %uint_13 %uint_12 %29 %uint_0
+%58 = OpExtInst %void %2 DebugExpression
+%uint_16 = OpConstant %uint 16
+%distanceFromCenter = OpExtInst %void %2 DebugLocalVariable %64 %41 %12 %uint_16 %uint_11 %29 %uint_0
+%68 = OpTypeFunction %float %v2float
+%73 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void
+%uint_7 = OpConstant %uint 7
+%74 = OpExtInst %void %2 DebugFunction %75 %73 %4 %uint_5 %uint_7 %10 %75 %uint_0 %uint_5
+%uint_1 = OpConstant %uint 1
+%uv_1 = OpExtInst %void %2 DebugLocalVariable %56 %46 %4 %uint_5 %uint_7 %74 %uint_0 %uint_1
+%center = OpExtInst %void %2 DebugLocalVariable %87 %46 %4 %uint_7 %uint_12 %74 %uint_0
+%float_0_5 = OpConstant %float 0.5
+%89 = OpConstantComposite %v2float %float_0_5 %float_0_5
+%uint_19 = OpConstant %uint 19
+%radialFade = OpExtInst %void %2 DebugLocalVariable %101 %41 %12 %uint_19 %uint_11 %29 %uint_0
+%105 = OpTypeFunction %float %v2float %float
+%112 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void
+%113 = OpExtInst %void %2 DebugFunction %114 %112 %4 %uint_12 %uint_7 %10 %114 %uint_0 %uint_12
+%radius_0 = OpExtInst %void %2 DebugLocalVariable %118 %41 %4 %uint_12 %uint_7 %113 %uint_0 %uint_2
+%uv_3 = OpExtInst %void %2 DebugLocalVariable %56 %46 %4 %uint_12 %uint_7 %113 %uint_0 %uint_1
+%uint_14 = OpConstant %uint 14
+%dist = OpExtInst %void %2 DebugLocalVariable %129 %41 %4 %uint_14 %uint_11 %113 %uint_0
+%uint_15 = OpConstant %uint 15
+%float_0 = OpConstant %float 0
+%float_0_699999988 = OpConstant %float 0.699999988
+%uint_22 = OpConstant %uint 22
+%uint_4 = OpConstant %uint 4
+%142 = OpExtInst %void %2 DebugTypeVector %41 %uint_4
+%color = OpExtInst %void %2 DebugLocalVariable %145 %142 %12 %uint_22 %uint_12 %29 %uint_0
+%float_1 = OpConstant %float 1
+%uint_29 = OpConstant %uint 29
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%input_texCoord = OpVariable %_ptr_Input_v2float Input  ; Location 0
+%48 = OpExtInst %void %2 DebugGlobalVariable %49 %46 %4 %uint_0 %uint_0 %10 %49 %input_texCoord %uint_0
+%entryPointParam_main = OpVariable %_ptr_Output_v4float Output  ; Location 0
+%161 = OpExtInst %void %2 DebugGlobalVariable %162 %142 %4 %uint_0 %uint_0 %10 %162 %entryPointParam_main %uint_0
+
+; Function main
+%main = OpFunction %void None %15
+%16 = OpLabel
+%20 = OpVariable %_ptr_Function_v2float Function
+%22 = OpVariable %_ptr_Function_float Function
+%23 = OpVariable %_ptr_Function_float Function
+%26 = OpVariable %_ptr_Function_v4float Function
+%33 = OpExtInst %void %2 DebugFunctionDefinition %29 %main
+%34 = OpExtInst %void %2 DebugScope %29
+%38 = OpLoad %v2float %input_texCoord
+%50 = OpExtInst %void %2 DebugLine %12 %uint_13 %uint_13 %uint_5 %uint_6
+%53 = OpExtInst %void %2 DebugLine %12 %uint_13 %uint_13 %uint_5 %uint_6
+%54 = OpExtInst %void %2 DebugLine %12 %uint_13 %uint_13 %uint_5 %uint_6
+%59 = OpExtInst %void %2 DebugDeclare %uv %20 %58
+OpStore %20 %38
+%61 = OpExtInst %void %2 DebugLine %12 %uint_16 %uint_16 %uint_5 %uint_6
+%65 = OpExtInst %void %2 DebugDeclare %distanceFromCenter %22 %58
+%distanceFromCenter_0 = OpFunctionCall %float %calculateDistanceFromCenter %38
+OpStore %22 %distanceFromCenter_0
+%98 = OpExtInst %void %2 DebugLine %12 %uint_19 %uint_19 %uint_5 %uint_6
+%102 = OpExtInst %void %2 DebugDeclare %radialFade %23 %58
+%radialFade_0 = OpFunctionCall %float %createRadialFade %38 %float_0_699999988
+OpStore %23 %radialFade_0
+%140 = OpExtInst %void %2 DebugLine %12 %uint_22 %uint_22 %uint_5 %uint_6
+%146 = OpExtInst %void %2 DebugDeclare %color %26 %58
+%147 = OpCompositeExtract %float %38 0
+%148 = OpFMul %float %distanceFromCenter_0 %float_0_5
+%149 = OpFSub %float %float_1 %148
+%151 = OpFMul %float %147 %149
+%152 = OpCompositeExtract %float %38 1
+%153 = OpFMul %float %152 %radialFade_0
+%154 = OpFMul %float %147 %152
+%color_0 = OpCompositeConstruct %v4float %151 %153 %154 %float_1
+OpStore %26 %color_0
+%157 = OpExtInst %void %2 DebugLine %12 %uint_29 %uint_29 %uint_5 %uint_6
+OpStore %entryPointParam_main %color_0
+OpReturn
+OpFunctionEnd
+
+; Function calculateDistanceFromCenter
+%calculateDistanceFromCenter = OpFunction %float None %68
+%uv_0 = OpFunctionParameter %v2float
+%70 = OpLabel
+%71 = OpVariable %_ptr_Function_v2float Function
+%72 = OpVariable %_ptr_Function_v2float Function
+%77 = OpExtInst %void %2 DebugFunctionDefinition %74 %calculateDistanceFromCenter
+%78 = OpExtInst %void %2 DebugScope %74
+%81 = OpExtInst %void %2 DebugDeclare %uv_1 %71 %58
+OpStore %71 %uv_0
+%83 = OpExtInst %void %2 DebugLine %4 %uint_7 %uint_7 %uint_5 %uint_6
+%84 = OpExtInst %void %2 DebugLine %4 %uint_7 %uint_7 %uint_5 %uint_6
+%85 = OpExtInst %void %2 DebugLine %4 %uint_7 %uint_7 %uint_5 %uint_6
+%88 = OpExtInst %void %2 DebugDeclare %center %72 %58
+OpStore %72 %89
+%92 = OpExtInst %void %2 DebugLine %4 %uint_8 %uint_8 %uint_5 %uint_6
+%93 = OpFSub %v2float %uv_0 %89
+%94 = OpExtInst %float %95 Length %93
+OpReturnValue %94
+OpFunctionEnd
+
+; Function createRadialFade
+%createRadialFade = OpFunction %float None %105
+%uv_2 = OpFunctionParameter %v2float
+%radius = OpFunctionParameter %float
+%108 = OpLabel
+%109 = OpVariable %_ptr_Function_float Function
+%110 = OpVariable %_ptr_Function_v2float Function
+%111 = OpVariable %_ptr_Function_float Function
+%115 = OpExtInst %void %2 DebugFunctionDefinition %113 %createRadialFade
+%116 = OpExtInst %void %2 DebugScope %113
+%119 = OpExtInst %void %2 DebugDeclare %radius_0 %109 %58
+OpStore %109 %radius
+%122 = OpExtInst %void %2 DebugDeclare %uv_3 %110 %58
+OpStore %110 %uv_2
+%124 = OpExtInst %void %2 DebugLine %4 %uint_14 %uint_14 %uint_5 %uint_6
+%126 = OpExtInst %void %2 DebugLine %4 %uint_14 %uint_14 %uint_5 %uint_6
+%127 = OpExtInst %void %2 DebugLine %4 %uint_14 %uint_14 %uint_5 %uint_6
+%130 = OpExtInst %void %2 DebugDeclare %dist %111 %58
+%dist_0 = OpFunctionCall %float %calculateDistanceFromCenter %uv_2
+OpStore %111 %dist_0
+%133 = OpExtInst %void %2 DebugLine %4 %uint_15 %uint_15 %uint_5 %uint_6
+%135 = OpExtInst %float %95 SmoothStep %radius %float_0 %dist_0
+OpReturnValue %135
+OpFunctionEnd
