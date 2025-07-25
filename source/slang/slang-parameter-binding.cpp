@@ -2554,6 +2554,25 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     globalGenericParamDecl.getDecl());
             }
         }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            // We handle an enumeration type as its tag type for varying parameters.
+            // This allows enums to be used in vertex output/input similar to their
+            // underlying integer types.
+            //
+            auto tagType = enumDeclRef.getDecl()->tagType;
+            if (tagType)
+            {
+                return processEntryPointVaryingParameter(context, tagType, state, varLayout);
+            }
+            else
+            {
+                // If no explicit tag type is specified, treat as `int`
+                auto astBuilder = context->getASTBuilder();
+                auto intType = astBuilder->getIntType();
+                return processEntryPointVaryingParameter(context, intType, state, varLayout);
+            }
+        }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
         {
             RefPtr<TypeLayout> assocTypeLayout = new TypeLayout();

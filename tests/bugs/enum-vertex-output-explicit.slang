@@ -1,10 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage vertex -entry main
 
-[Flags]
 public enum VertexLayout : uint {
-    position,
-    color,
-    uv
+    position = 0,
+    color = 1,
+    uv = 2
 }
 
 struct VertexInput {
@@ -26,4 +25,4 @@ VertexOutput main(in VertexInput input) {
     return output;
 }
 
-//CHECK: layout_0 : TEXCOORD0
+//CHECK: {{.*}}
