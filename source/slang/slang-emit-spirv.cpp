@@ -619,6 +619,79 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return nullptr;
     }
 
+    /// Finalize debug compilation units for all collected debug sources
+    void finalizeDebugCompilationUnits()
+    {
+        // Group debug sources by module
+        Dictionary<IRInst*, List<DebugSourceInfo*>> moduleToSources;
+        for (auto& debugInfo : m_collectedDebugSources)
+        {
+            if (!moduleToSources.containsKey(debugInfo.moduleInst))
+                moduleToSources[debugInfo.moduleInst] = List<DebugSourceInfo*>();
+            moduleToSources[debugInfo.moduleInst].add(&debugInfo);
+        }
+
+        // Create compilation units for each module
+        for (auto& [moduleInst, sources] : moduleToSources)
+        {
+            if (m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+                continue; // Already processed
+
+            // Find the main source file (not a header/utility file)
+            DebugSourceInfo* mainSourceInfo = nullptr;
+            for (auto sourceInfo : sources)
+            {
+                auto filename = sourceInfo->irDebugSource->getFileName();
+                auto filenameSlice = as<IRStringLit>(filename)->getStringSlice();
+                
+                // Heuristic: avoid files that look like headers or utility files
+                if (filenameSlice.endsWith(".h") || filenameSlice.endsWith(".hpp") ||
+                    filenameSlice.endsWith(".hlsl") || filenameSlice.endsWith(".glsl") ||
+                    filenameSlice.indexOf(UnownedStringSlice("util")) != -1 || 
+                    filenameSlice.indexOf(UnownedStringSlice("common")) != -1 ||
+                    filenameSlice.indexOf(UnownedStringSlice("shared")) != -1 || 
+                    filenameSlice.indexOf(UnownedStringSlice("header")) != -1)
+                {
+                    continue;
+                }
+                
+                // Prefer .slang files for main source
+                if (filenameSlice.endsWith(".slang"))
+                {
+                    mainSourceInfo = sourceInfo;
+                    break;
+                }
+                
+                // If no .slang file found, use the first non-header file
+                if (!mainSourceInfo)
+                    mainSourceInfo = sourceInfo;
+            }
+
+            // Fallback to the first source if no main source identified
+            if (!mainSourceInfo && sources.getCount() > 0)
+                mainSourceInfo = sources[0];
+
+            if (mainSourceInfo)
+            {
+                // Create the compilation unit with the main source
+                IRBuilder builder(mainSourceInfo->irDebugSource);
+                builder.setInsertBefore(mainSourceInfo->irDebugSource);
+                auto translationUnit = emitOpDebugCompilationUnit(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    moduleInst,
+                    mainSourceInfo->irDebugSource->getFullType(),
+                    getNonSemanticDebugInfoExtInst(),
+                    emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
+                    emitIntConstant(5, builder.getUIntType()),   // DWARF version.
+                    mainSourceInfo->spvDebugSource,
+                    emitIntConstant(
+                        SpvSourceLanguageSlang,
+                        builder.getUIntType())); // Language.
+                registerDebugInst(moduleInst, translationUnit);
+            }
+        }
+    }
+
     /// Get or reserve a SpvID for an IR value.
     SpvWord getIRInstSpvID(IRInst* inst)
     {
@@ -1599,6 +1672,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     IRInst* m_defaultDebugSource = nullptr;
+    
+    // For deferred debug compilation unit creation
+    struct DebugSourceInfo {
+        IRDebugSource* irDebugSource;
+        SpvInst* spvDebugSource;
+        IRInst* moduleInst;
+    };
+    List<DebugSourceInfo> m_collectedDebugSources;
+    HashSet<IRInst*> m_processedModules;
 
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
@@ -2234,73 +2316,69 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
                 auto debugSource = as<IRDebugSource>(inst);
                 auto sourceStr = as<IRStringLit>(debugSource->getSource())->getStringSlice();
+                SpvInst* result = nullptr;
+                
                 // If source content is empty, skip the content operand.
                 if (sourceStr.getLength() == 0)
                 {
-                    return emitOpDebugSource(
+                    result = emitOpDebugSource(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         inst,
                         inst->getFullType(),
                         getNonSemanticDebugInfoExtInst(),
                         debugSource->getFileName());
                 }
-                // SPIRV does not allow string lits longer than 65535, so we need to split the
-                // source string in OpDebugSourceContinued instructions.
-                auto sourceStrHead =
-                    sourceStr.getLength() > 65535 ? sourceStr.head(65535) : sourceStr;
-                auto spvStrHead = emitInst(
-                    getSection(SpvLogicalSectionID::DebugStringsAndSource),
-                    nullptr,
-                    SpvOpString,
-                    kResultID,
-                    SpvLiteralBits::fromUnownedStringSlice(sourceStrHead));
-
-                auto result = emitOpDebugSource(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                    inst,
-                    inst->getFullType(),
-                    getNonSemanticDebugInfoExtInst(),
-                    debugSource->getFileName(),
-                    spvStrHead);
-
-                for (Index start = 65535; start < sourceStr.getLength(); start += 65535)
+                else
                 {
-                    auto slice = sourceStr.tail(start);
-                    slice = slice.getLength() > 65535 ? slice.head(65535) : slice;
-                    auto sliceSpvStr = emitInst(
+                    // SPIRV does not allow string lits longer than 65535, so we need to split the
+                    // source string in OpDebugSourceContinued instructions.
+                    auto sourceStrHead =
+                        sourceStr.getLength() > 65535 ? sourceStr.head(65535) : sourceStr;
+                    auto spvStrHead = emitInst(
                         getSection(SpvLogicalSectionID::DebugStringsAndSource),
                         nullptr,
                         SpvOpString,
                         kResultID,
-                        SpvLiteralBits::fromUnownedStringSlice(slice));
-                    emitOpDebugSourceContinued(
+                        SpvLiteralBits::fromUnownedStringSlice(sourceStrHead));
+
+                    result = emitOpDebugSource(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        nullptr,
-                        m_voidType,
+                        inst,
+                        inst->getFullType(),
                         getNonSemanticDebugInfoExtInst(),
-                        sliceSpvStr);
+                        debugSource->getFileName(),
+                        spvStrHead);
+
+                    for (Index start = 65535; start < sourceStr.getLength(); start += 65535)
+                    {
+                        auto slice = sourceStr.tail(start);
+                        slice = slice.getLength() > 65535 ? slice.head(65535) : slice;
+                        auto sliceSpvStr = emitInst(
+                            getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                            nullptr,
+                            SpvOpString,
+                            kResultID,
+                            SpvLiteralBits::fromUnownedStringSlice(slice));
+                        emitOpDebugSourceContinued(
+                            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                            nullptr,
+                            m_voidType,
+                            getNonSemanticDebugInfoExtInst(),
+                            sliceSpvStr);
+                    }
                 }
 
                 auto moduleInst = inst->getModule()->getModuleInst();
                 if (!m_defaultDebugSource)
                     m_defaultDebugSource = debugSource;
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
-                {
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    auto translationUnit = emitOpDebugCompilationUnit(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        moduleInst,
-                        inst->getFullType(),
-                        getNonSemanticDebugInfoExtInst(),
-                        emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
-                        emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-                        result,
-                        emitIntConstant(
-                            SpvSourceLanguageSlang,
-                            builder.getUIntType())); // Language.
-                    registerDebugInst(moduleInst, translationUnit);
-                }
+                
+                // Collect debug source for deferred compilation unit creation
+                DebugSourceInfo debugInfo;
+                debugInfo.irDebugSource = debugSource;
+                debugInfo.spvDebugSource = result;
+                debugInfo.moduleInst = moduleInst;
+                m_collectedDebugSources.add(debugInfo);
+                
                 return result;
             }
         case kIROp_DebugBuildIdentifier:
@@ -9427,6 +9505,9 @@ SlangResult emitSPIRVFromIR(
             }
         }
     }
+
+    // Finalize debug compilation units after all debug sources have been processed
+    context.finalizeDebugCompilationUnits();
 
     // Emit source language info.
     // By default we will use SpvSourceLanguageSlang.
