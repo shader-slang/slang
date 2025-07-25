@@ -738,6 +738,28 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
+{
+    if (v == 0)
+        return ~0u;
+
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_clz returns number of leading zeros
+    // firstbithigh should return 0-based bit position of MSB
+    return 31 - __builtin_clz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanReverse returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanReverse(&index, v) ? index : ~0u;
+#else
+    // Generic implementation - find highest set bit
+    uint32_t result = 31;
+    while (result > 0 && !(v & (1u << result)))
+        result--;
+    return (v & (1u << result)) ? result : ~0u;
+#endif
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 SLANG_FORCE_INLINE int32_t I32_abs(int32_t f)
@@ -779,6 +801,11 @@ SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
 SLANG_FORCE_INLINE uint32_t I32_firstbitlow(int32_t v)
 {
     return U32_firstbitlow(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t I32_firstbithigh(int32_t v)
+{
+    return U32_firstbithigh(uint32_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------

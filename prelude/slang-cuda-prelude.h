@@ -2093,6 +2093,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
     return v == 0 ? ~0u : (__ffs(v) - 1);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
+{
+    // __clz counts leading zeros (from MSB)
+    // firstbithigh should return 0-based bit position of MSB or ~0u if no bits set
+    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g4b86e8ad43dbe18bf26d5cad74be4fb4
+    return v == 0 ? ~0u : (31 - __clz(v));
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 // Unary
@@ -2136,6 +2144,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
 {
     return U32_firstbitlow(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
+{
+    return U32_firstbithigh(uint32_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------
