@@ -2021,11 +2021,22 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U8_countbits(uint8_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U8_firstbitlow(uint8_t v)
+{
+    // No native 8bit ffs, cast to 32bit and use __ffs
+    return __ffs(uint32_t(v)) - 1;
+}
+
 // ----------------------------- I8 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I8_countbits(int8_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I8_firstbitlow(int8_t v)
+{
+    return __ffs(int32_t(v)) - 1;
 }
 
 // ----------------------------- U16 -----------------------------------------
@@ -2036,11 +2047,22 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U16_countbits(uint16_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U16_firstbitlow(uint16_t v)
+{
+    // No native 16bit ffs, cast to 32bit and use __ffs
+    return __ffs(uint32_t(v)) - 1;
+}
+
 // ----------------------------- I16 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I16_countbits(int16_t v)
 {
     return U16_countbits(uint16_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I16_firstbitlow(int16_t v)
+{
+    return __ffs(int32_t(v)) - 1;
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -2085,6 +2107,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
     return __popc(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
+{
+    // Find first set bit (least significant bit)
+    // __ffs returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __ffs returns 0, we get -1 (0xFFFFFFFF for uint)
+    return __ffs(v) - 1;
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 // Unary
@@ -2125,6 +2155,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
     return U32_countbits(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_firstbitlow(int32_t v)
+{
+    // Find first set bit (least significant bit)
+    // __ffs returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __ffs returns 0, we get -1
+    return __ffs(v) - 1;
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2147,6 +2185,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbitlow(uint64_t v)
+{
+    // Use __ffsll for 64-bit values
+    // __ffsll returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __ffsll returns 0, we get -1 (0xFFFFFFFF for uint)
+    return __ffsll(v) - 1;
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
@@ -2166,6 +2212,14 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I64_firstbitlow(int64_t v)
+{
+    // Use __ffsll for 64-bit values
+    // __ffsll returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __ffsll returns 0, we get -1
+    return __ffsll(v) - 1;
 }
 
 // ----------------------------- IPTR -----------------------------------------

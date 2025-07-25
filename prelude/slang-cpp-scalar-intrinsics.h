@@ -717,6 +717,33 @@ SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_ffs returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __builtin_ffs returns 0, we get -1 (0xFFFFFFFF for uint)
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    // _BitScanForward returns 0 if no bits set, otherwise 1 and stores 0-based index in index
+    if (_BitScanForward(&index, v))
+        return index;
+    else
+        return 0xFFFFFFFF; // -1 as uint32_t
+#else
+    // Fallback implementation
+    if (v == 0)
+        return 0xFFFFFFFF; // -1 as uint32_t
+    uint32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 SLANG_FORCE_INLINE int32_t I32_abs(int32_t f)
@@ -753,6 +780,33 @@ SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi)
 SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
 {
     return U32_countbits(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE int32_t I32_firstbitlow(int32_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_ffs returns 1-based index (1 for LSB, 2 for next bit, etc.), or 0 if no bits set
+    // We need 0-based index, so subtract 1. When __builtin_ffs returns 0, we get -1
+    return __builtin_ffs(v) - 1;
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    unsigned long index;
+    // _BitScanForward returns 0 if no bits set, otherwise 1 and stores 0-based index in index
+    if (_BitScanForward(&index, v))
+        return (int32_t)index;
+    else
+        return -1;
+#else
+    // Fallback implementation
+    if (v == 0)
+        return -1;
+    int32_t index = 0;
+    while ((v & 1) == 0)
+    {
+        v >>= 1;
+        index++;
+    }
+    return index;
+#endif
 }
 
 // ----------------------------- U64 -----------------------------------------
