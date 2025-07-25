@@ -582,22 +582,8 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        // For boolean vectors in CUDA, use 1-byte alignment to match our prelude implementation
-        // where boolean vectors use struct { bool x, y, z, w; } with 1-byte alignment
-        if (elementType == BaseType::Bool)
-        {
-            SimpleLayoutInfo vectorInfo;
-            vectorInfo.kind = elementInfo.kind;
-            vectorInfo.size = elementInfo.size * elementCount;
-            vectorInfo.alignment = 1; // Force 1-byte alignment for boolean vectors
-            return vectorInfo;
-        }
-
-        // With the new boolean vector implementation using actual bool elements,
-        // we no longer need to map to int32_t layout - use the actual bool layout
-        // (This change corresponds to the prelude update where bool1, bool2, etc.
-        // now use actual bool fields instead of int fields)
-        // The old special case for bool vectors has been removed.
+        // Boolean vectors now use typedef to ucharN to follow CUDA's builtin vector alignment rules
+        // No special case needed - they follow the same rules as other CUDA vector types
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
