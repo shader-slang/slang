@@ -740,11 +740,10 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
 {
-    // v == -1 since hlsl follows this rule, although not stated anywhere.
-    // Additional to note, glsl and wgsl state this rule explicitly.
-    if (v == 0 || v == ~0u)
+    if ((int32_t)v < 0)
+        v = ~v;
+    if(v == 0)
         return ~0u;
-
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     // __builtin_clz returns number of leading zeros
     // firstbithigh should return 0-based bit position of MSB

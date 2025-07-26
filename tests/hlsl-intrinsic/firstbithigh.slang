@@ -7,33 +7,31 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-[numthreads(10, 1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint idx = dispatchThreadID.x;
-    
-    if (idx < 5) {
-        // Test unsigned values
-        uint testValues[5] = {0, 1, 2, 4, 8};
-        uint value = testValues[idx];
-        uint result = firstbithigh(value);
-        outputBuffer[idx] = result;
-    } else {
-        // Test signed values: covers MSB position cases
-        int testValues[5] = {-1, -2, 0x7FFFFFFF, 0x40000000, 0}; // 0xFFFFFFFF, 0xFFFFFFFE, 0x7FFFFFFF, 0x40000000, 0
-        int value = testValues[idx - 5];
-        uint result = firstbithigh(value);
-        outputBuffer[idx] = result;
-    }
+    bool result = true;
+    result = result && firstbithigh(0) == -1;
+    result = result && firstbithigh(1) == 0;
+    result = result && firstbithigh(2) == 1;
+    result = result && firstbithigh(3) == 1;
+    result = result && firstbithigh(4) == 2;
+    result = result && firstbithigh(5) == 2;
+    result = result && firstbithigh(6) == 2;
+    result = result && firstbithigh(7) == 2;
+    result = result && firstbithigh(8) == 3;
+
+    result = result && firstbithigh(-1) == -1;
+    result = result && firstbithigh(-2) == 0;
+    result = result && firstbithigh(-3) == 1;
+    result = result && firstbithigh(-4) == 1;
+    result = result && firstbithigh(-5) == 2;
+    result = result && firstbithigh(-6) == 2;
+    result = result && firstbithigh(-7) == 2;
+    result = result && firstbithigh(-8) == 2;
+    result = result && firstbithigh(-9) == 3;
+
+    outputBuffer[0] = (result == true) ? 1 : 0;
 }
 
-// CHECK: FFFFFFFF
-// CHECK: 0
 // CHECK: 1
-// CHECK: 2
-// CHECK: 3
-// CHECK: 1F
-// CHECK: 1F
-// CHECK: 1E
-// CHECK: 1E
-// CHECK: FFFFFFFF

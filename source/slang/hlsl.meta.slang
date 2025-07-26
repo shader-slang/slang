@@ -9592,7 +9592,14 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: return (value==0 || value==-1) ? -1 : (31 - __metal_clz(value));
+    case metal:
+        {
+            if ((int)value < 0)
+                v = ~v;
+            if (v == 0)
+                return ~0u;
+            return __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -9628,7 +9635,14 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: return (value==0 || value==(uint)-1) ? -1 : (31 - __metal_clz(value));
+    case metal:
+        {
+            if ((int)value < 0)
+                v = ~v;
+            if (v == 0)
+                return ~0u;
+            return __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
