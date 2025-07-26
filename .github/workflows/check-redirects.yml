@@ -19,14 +19,14 @@ jobs:
         run: |
           #!/bin/bash
           set -e
-          
+
           # Load shared redirect configuration
           source .github/workflows/redirect-config.sh
-          
+
           echo "Checking redirect_to links in ${READTHEDOCS_USER_GUIDE_PATH}..."
-          
+
           failed=false
-          
+
           # Find all .md files recursively in the user guide directory
           # Use process substitution to avoid subshell issues in returning the failure state
           while read -r file; do
@@ -53,7 +53,7 @@ jobs:
             
             # Extract the URL from redirect_to line
             redirect_url=$(echo "$redirect_line" | sed 's/redirect_to: *//')
-          
+
             if [ "$redirect_url" != "$expected_url" ]; then
               echo "Incorrect redirect_to in $file"
               echo "    Found:    $redirect_url"
@@ -61,7 +61,7 @@ jobs:
               failed=true
             fi
           done < <(find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f)
-          
+
           # Check if any failures occurred
           if [ "$failed" = true ]; then
             echo ""

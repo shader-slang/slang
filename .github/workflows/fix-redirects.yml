@@ -28,12 +28,12 @@ jobs:
         id: fix
         run: |
           cd pr-branch
-          
+
           echo "Fixing redirect_to links in ${READTHEDOCS_USER_GUIDE_PATH}..."
-          
+
           # Load shared redirect configuration
           source .github/workflows/redirect-config.sh
-          
+
           # Find all .md files recursively in the user guide directory
           find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | while read -r file; do
             if [ ! -f "$file" ]; then
