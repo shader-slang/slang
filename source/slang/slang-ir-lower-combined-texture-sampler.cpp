@@ -144,7 +144,8 @@ void lowerCombinedTextureSamplers(
             continue;
         auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
-        if (!firstUse) {
+        if (!firstUse)
+        {
             firstUse = textureType->firstUse;
         }
 
