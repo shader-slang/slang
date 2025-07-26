@@ -740,7 +740,9 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
 {
-    if (v == 0)
+    // v == -1 since hlsl follows this rule, although not stated anywhere.
+    // Additional to note, glsl and wgsl state this rule explicitly.
+    if (v == 0 || v == ~0u)
         return ~0u;
 
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
