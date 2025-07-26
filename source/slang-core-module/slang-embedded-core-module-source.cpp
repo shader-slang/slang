@@ -394,6 +394,7 @@ ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
 
 ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
 {
+#if SLANG_EMBED_CORE_MODULE_SOURCE
     if (!glslLibraryCode)
     {
         const String path = getCoreModulePath();
@@ -401,6 +402,7 @@ ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
 #include "glsl.meta.slang.h"
         glslLibraryCode = StringBlob::moveCreate(sb);
     }
+#endif
     return glslLibraryCode;
 }
 } // namespace Slang
