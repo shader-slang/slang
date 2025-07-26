@@ -27,8 +27,13 @@ public:
         static const char* kSourceStrings[] = {"Layer", "Driver", "Slang"};
         if (type == rhi::DebugMessageType::Error)
         {
-            printf("[%s] (%s) %s\n", kTypeStrings[int(type)], kSourceStrings[int(source)], message);
-            fflush(stdout);
+            fprintf(
+                stderr,
+                "[%s] (%s) %s\n",
+                kTypeStrings[int(type)],
+                kSourceStrings[int(source)],
+                message);
+            fflush(stderr);
         }
     }
     static DebugPrinter* getInstance()
