@@ -22,6 +22,22 @@ struct LowerCombinedSamplerContext
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
+    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRType* type)
+    {
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            return findCombinedTextureSamplerTypeInArray(arrayType->getElementType());
+        }
+        else if (auto textureType = as<IRTextureTypeBase>(type))
+        {
+            return textureType;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(textureType))
@@ -116,11 +132,23 @@ void lowerCombinedTextureSamplers(
     for (auto globalInst : module->getGlobalInsts())
     {
         auto textureType = as<IRTextureTypeBase>(globalInst);
+        IRUse* firstUse = nullptr;
+
+        if (auto arrayType = as<IRArrayType>(globalInst))
+        {
+            textureType = context.findCombinedTextureSamplerTypeInArray(arrayType);
+            firstUse = arrayType->firstUse;
+        }
+
         if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
             continue;
         auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
-        for (auto use = textureType->firstUse; use; use = use->nextUse)
+        if (!firstUse) {
+            firstUse = textureType->firstUse;
+        }
+
+        for (auto use = firstUse; use; use = use->nextUse)
         {
             auto typeUser = use->getUser();
             if (use != &typeUser->typeUse)
