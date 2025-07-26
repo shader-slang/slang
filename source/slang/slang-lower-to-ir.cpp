@@ -2339,6 +2339,14 @@ LoweredValInfo lowerVal(IRGenContext* context, Val* val)
     return visitor.dispatch(resolvedVal);
 }
 
+IRType* lowerSomeTypeElseLowerType(IRGenContext* context, Type* type)
+{
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
+        return lowerType(context, getInterfaceType(context->astBuilder, someTypeDeclRef));
+    else
+        return lowerType(context, type);
+}
+
 IRType* lowerType(IRGenContext* context, Type* type)
 {
     ValLoweringVisitor visitor;
@@ -3444,12 +3452,7 @@ void _lowerFuncDeclBaseTypeInfo(
 
     for (auto paramInfo : parameterLists.params)
     {
-        IRType* irParamType;
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(paramInfo.type))
-            irParamType =
-                lowerType(context, getInterfaceType(getCurrentASTBuilder(), someTypeDeclRef));
-        else
-            irParamType = lowerType(context, paramInfo.type);
+        IRType* irParamType = lowerSomeTypeElseLowerType(context, paramInfo.type);
 
         switch (paramInfo.direction)
         {
@@ -3509,13 +3512,8 @@ void _lowerFuncDeclBaseTypeInfo(
     }
     else
     {
-        auto resultType = getResultType(context->astBuilder, declRef);
-        if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(resultType))
-            irResultType =
-                lowerType(context, getInterfaceType(getCurrentASTBuilder(), someTypeDecl));
-        else
-            irResultType = lowerType(context, resultType);
-
+        irResultType =
+            lowerSomeTypeElseLowerType(context, getResultType(context->astBuilder, declRef));
 
         if (auto setterDeclRef = declRef.as<SetterDecl>())
         {
@@ -3837,13 +3835,9 @@ struct ExprLoweringContext
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            auto astParamType = getType(getASTBuilder(), paramDeclRef);
-            IRType* irParamType;
-            if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(astParamType))
-                irParamType =
-                    lowerType(context, getInterfaceType(getASTBuilder(), someTypeDeclRef));
-            else
-                irParamType = lowerType(context, astParamType);
+            IRType* irParamType =
+                lowerSomeTypeElseLowerType(context, getType(getASTBuilder(), paramDeclRef));
+
             auto paramDirection = getParameterDirection(paramDecl);
 
             Index argIndex = argCounter++;
@@ -3957,12 +3951,8 @@ struct ExprLoweringContext
         LoweredValInfo destination,
         const TryClauseEnvironment& tryEnv)
     {
-        IRType* type;
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(expr->type))
-            type = lowerType(context, getInterfaceType(getASTBuilder(), someTypeDeclRef));
-        else
-            type = lowerType(context, expr->type);
-
+        IRType* type = lowerSomeTypeElseLowerType(context, expr->type);
+        
         // We are going to look at the syntactic form of
         // the "function" expression, so that we can avoid
         // a lot of complexity that would come from lowering
@@ -4243,12 +4233,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitVarExpr(VarExpr* expr)
     {
-        IRType* lowerTypeOfExpr;
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(expr->type.type))
-            lowerTypeOfExpr =
-                lowerType(context, getInterfaceType(getASTBuilder(), someTypeDeclRef));
-        else
-            lowerTypeOfExpr = lowerType(context, expr->type);
+        IRType* lowerTypeOfExpr = lowerSomeTypeElseLowerType(context, expr->type);
 
         auto declRef = expr->declRef;
         if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -5453,11 +5438,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
-        IRType* superType;
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(expr->type))
-            superType = lowerType(context, getInterfaceType(getASTBuilder(), someTypeDeclRef));
-        else
-            superType = lowerType(context, expr->type);
+        // TODO: make a nicer user-facing error?
+        // We cannot cast a value and assign to that L value, so error.
+        if (isLValueContext())
+            SLANG_UNEXPECTED("Trying to treat a Cast-To-Super as an L-value, "
+                             "something went wrong.");
+
         auto value = lowerRValueExpr(context, expr->valueArg);
 
         // First, we check if the witness is a type equality witness.
@@ -5470,6 +5456,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // equal types.
         if (isTypeEqualityWitness(expr->witnessArg))
         {
+            IRType* superType = lowerType(context, expr->type);
             return LoweredValInfo::simple(
                 getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
         }
@@ -5487,40 +5474,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         if (auto declRefType = as<DeclRefType>(expr->type))
         {
             auto declRef = declRefType->getDeclRef();
-
+            // We delay lowerType since otherwise we may lower an unlowerable type (`SomeTypeDecl` for example) 
+            IRType* superType = nullptr;
+       
             if (auto someTypeDeclRef = declRef.as<SomeTypeDecl>())
             {
-                if (isLValueContext())
-                {
-                    // TODO: this requires a proper fix of issue #7788. L-value casting
-                    // a cast-to-super is currently not properly supported.
-                    //
-                    // Logic for L-value casting super-type needs a rework, but at this
-                    // current point we can use the naive logic below since if we need
-                    // an L-value, the valueArg is the L-value of a SomeTypeDecl (which
-                    // semantically isn't a type we lower to IR).
-                    auto valueArgLValue = lowerLValueExpr(context, expr->valueArg);
-                    return LoweredValInfo::ptr(valueArgLValue.val);
-                }
-
-                // Remove the top-level info and just return an interface-type
-                // because at an IR level, `SomeTypeDecl` needs to be lowered
-                // as an interface-type it is concrete to.
-                auto interfaceType = getInterfaceType(getASTBuilder(), someTypeDeclRef.getDecl());
-                declRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType);
+                // This is the product of the following senario: `some T val = TImpl();`
+                // This situation must be a cast-to-super since `TImpl` implements the 
+                // concrete-type of `val`. We use `emitMakeExistential` since we lack
+                // the concrete-type infra to just emit a cast-to-concrete.
+                auto interfaceDeclRefOfSomeType =
+                    getInterfaceType(getASTBuilder(), someTypeDeclRef);
+                superType = lowerType(context, interfaceDeclRefOfSomeType);
+                declRef = isDeclRefTypeOf<InterfaceDecl>(interfaceDeclRefOfSomeType);
             }
-
-            // If we have a sub-type SomeTypeDecl, we have no existential
-            // and should just return the lowered-valueArg since some-type is
-            // a concrete type.
-            if (auto witness = as<SubtypeWitness>(expr->witnessArg))
-            {
-                if (!isLValueContext() && isDeclRefTypeOf<SomeTypeDecl>(witness->getSub()))
-                {
-                    auto concreteValue = getSimpleVal(context, value);
-                    return LoweredValInfo::simple(concreteValue);
-                }
-            }
+            else
+                superType = lowerType(context, expr->type);
 
             if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
@@ -5544,6 +5513,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 //
                 // TODO: Redesign `some` in the backend so that `some` does not rely
                 // on the Slang existential-type system.
+
                 auto concreteValue = getSimpleVal(context, value);
                 auto existentialValue =
                     getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
@@ -8736,7 +8706,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
 
-        auto irSubType = lowerType(subContext, subType);
+        // a subtype should never be a sometype. If this is the case, it means we are relying on
+        // the `declaredSubtypeWitness` of an Inheritance of `SomeTypeDecl`, which should never happen,
+        // we are supposed to catch all senarios of SomeTypeDecl ahead of time.
+        SLANG_ASSERT(!isDeclRefTypeOf<SomeTypeDecl>(subType));
+        
+        IRType* irSubType = lowerType(subContext, subType);
 
         // Create the IR-level witness table
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
@@ -9288,13 +9263,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // an `alloca` operation for the variable's storage,
         // plus some code to initialize it and then store to the variable.
 
-        auto varType = decl->getType();
-        IRType* irVarType;
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(varType))
-            irVarType =
-                lowerType(context, getInterfaceType(getCurrentASTBuilder(), someTypeDeclRef));
-        else
-            irVarType = lowerType(context, varType);
+        IRType* irVarType = lowerSomeTypeElseLowerType(context, decl->getType());
 
         // As a special case, an immutable local variable with an
         // initializer can just lower to the SSA value of its initializer.

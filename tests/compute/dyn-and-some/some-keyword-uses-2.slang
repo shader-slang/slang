@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
+// test some/dyn as an output parameter
+
 // CHECK: OpEntryPoint
 // CHECK-NOT: error
 

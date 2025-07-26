@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
+// test inout some/dyn.
+
 dyn interface IFoo
 {
     int getVal();

@@ -1207,12 +1207,27 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
-    // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
     if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
+        // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
+        // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
         if (!validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink))
             return false;
+
+        // simple copy of 2 equal `some` Types. `unbound_some<T> = some<T>` means `unbound_some<T>` is the same
+        // type as `some<T>`.
+        auto toSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(toType);
+        auto fromSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType);
+        if (fromSomeTypeDeclRef && toSomeTypeDeclRef)
+        {
+            if (getInterfaceType(m_astBuilder, toSomeTypeDeclRef)
+                    ->equals(getInterfaceType(m_astBuilder, fromSomeTypeDeclRef)))
+            {
+                if (outToExpr)
+                    *outToExpr = fromExpr;
+                return true;
+            }
+        }
     }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))

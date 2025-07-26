@@ -124,7 +124,31 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
     SubtypeWitness* failureWitness = nullptr;
 
-    auto superSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(superType);
+    // TODO: if we go from some->dyn do we nest witnesses? Do we forget about this relationship?
+
+    // TODO: preserve that we are a `some type`?
+    // We are an Existential at this point, but we cannot just 'cast away' the 'some' part of our type
+    // since the superType will still be 
+    // This really should never happen though!
+    // Better we generate a special witness that is just "concreteToExistential" and put that over the
+    // result of this function
+    //auto superSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(superType);
+    //if (superSomeTypeDeclRef)
+    //    superType = getInterfaceType(m_astBuilder, superSomeTypeDeclRef);
+
+    auto subSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(subType);
+    if (subSomeTypeDeclRef)
+    {
+        int a = 5;
+        a = 4;
+    }
+    //if (superSomeTypeDeclRef && subSomeTypeDeclRef)
+    //{
+    //    if (getInterfaceType(m_astBuilder, superSomeTypeDeclRef)->equals(getInterfaceType(m_astBuilder, subSomeTypeDeclRef)))
+    //    {
+    //        return createTypeEqualityWitness(superType);
+    //    }
+    //}
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
@@ -149,17 +173,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         //
         if (!facetType->equals(superType))
         {
-            // if we have a `some` type we need to check if the concrete-interface matches up
-            // since `some T` is a placeholder for a concrete-interface.
-            if (superSomeTypeDeclRef)
-            {
-                if (!facetType->equals(getInterfaceType(m_astBuilder, superSomeTypeDeclRef)))
-                    continue;
-            }
-            else
-            {
-                continue;
-            }
+            continue;
         }
 
         // If the `superType` appears in the flattened inheritance list
