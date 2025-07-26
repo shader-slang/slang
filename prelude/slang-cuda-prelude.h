@@ -2081,8 +2081,24 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double U32_asdouble(uint32_t low, uint32_t hi
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
 {
-    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
     return __popc(v);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
+{
+    // __ffs returns 1-based bit position or 0 if no bits set
+    // firstbitlow should return 0-based bit position or ~0u if no bits set
+    return v == 0 ? ~0u : (__ffs(v) - 1);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
+{
+    // maps to hlsl firstbithigh
+    if ((int32_t)v < 0)
+        v = ~v;
+    if (v == 0)
+        return ~0u;
+    return 31 - __clz(v);
 }
 
 // ----------------------------- I32 -----------------------------------------
@@ -2125,6 +2141,16 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
     return U32_countbits(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
+{
+    return U32_firstbitlow(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
+{
+    return U32_firstbithigh(uint32_t(v));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2143,7 +2169,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_max(uint64_t a, uint64_t b)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
 {
-    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
     return __popcll(v);
 }
 
