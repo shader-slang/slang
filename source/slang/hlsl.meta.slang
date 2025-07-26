@@ -9595,8 +9595,8 @@ int firstbithigh(int value)
     case metal:
         {
             if ((int)value < 0)
-                v = ~v;
-            if (v == 0)
+                value = ~value;
+            if (value == 0)
                 return ~0u;
             return __metal_clz(value);
         }
@@ -9638,8 +9638,8 @@ uint firstbithigh(uint value)
     case metal:
         {
             if ((int)value < 0)
-                v = ~v;
-            if (v == 0)
+                value = ~value;
+            if (value == 0)
                 return ~0u;
             return __metal_clz(value);
         }
