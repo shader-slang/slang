@@ -74,7 +74,7 @@ func fs_main(VertexOutput input)->FragmentOutput
 //WGSL-NEXT: {
 //WGSL-NEXT:     switch(_S10.value1_0.x)
 //WGSL-NEXT:     {
-//WGSL-NEXT:     case u32(0):
+//WGSL-NEXT:     case 0:
 //WGSL-NEXT:         {
 //WGSL-NEXT:             return Circle_getArea_0(unpackAnyValue16_0(_S10.value2_0));
 //WGSL-NEXT:         }
