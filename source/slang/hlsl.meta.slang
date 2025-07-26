@@ -20497,7 +20497,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsMiss()";
+        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20518,7 +20518,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsHit()";
+        case cuda: __intrinsic_asm "optixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20539,7 +20539,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsNop()";
+        case cuda: __intrinsic_asm "optixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20565,7 +20565,7 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
-        case cuda: __intrinsic_asm "optixHitObjectGetRayDesc()";
+        case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
         case spirv:
             return spirv_asm 
             {
@@ -20591,7 +20591,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex()";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20611,7 +20611,7 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".SetShaderTableIndex";
-        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex()";
+        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
@@ -20625,7 +20625,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex()";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20647,7 +20647,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId()";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20669,7 +20669,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex()";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20691,7 +20691,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex()";
+        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20735,7 +20735,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetClusterId()";
+        case cuda: __intrinsic_asm "optixHitObjectGetClusterId";
         case spirv:
             return spirv_asm
             {
@@ -20756,7 +20756,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius()";
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
         case spirv:
             return spirv_asm
@@ -20781,7 +20781,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii()";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
@@ -20812,7 +20812,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtIsSphereHit";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectIsSphereHit()";
+                __intrinsic_asm "optixHitObjectIsSphereHit";
             }
         case spirv:
             return spirv_asm
@@ -20834,7 +20834,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtIsLssHit";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectIsLSSHit()";
+                __intrinsic_asm "optixHitObjectIsLSSHit";
             }
         case spirv:
             return spirv_asm
@@ -20996,7 +20996,7 @@ struct HitObject
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [__requiresNVAPI]
     [require(hlsl, ser)]
-    [require(cuda)]
+    [require(cuda, ser)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
         __target_switch
