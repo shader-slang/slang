@@ -9598,7 +9598,7 @@ int firstbithigh(int value)
                 value = ~value;
             if (value == 0)
                 return ~0u;
-            return __metal_clz(value);
+            return 31 - __metal_clz(value);
         }
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
@@ -9641,7 +9641,7 @@ uint firstbithigh(uint value)
                 value = ~value;
             if (value == 0)
                 return ~0u;
-            return __metal_clz(value);
+            return 31 - __metal_clz(value);
         }
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
