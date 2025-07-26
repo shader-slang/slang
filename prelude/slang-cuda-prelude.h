@@ -2094,8 +2094,8 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
 {
     // __clz counts leading zeros (from MSB)
-    // firstbithigh should return 0-based bit position of MSB or ~0u if no bits set
-    return v == 0 ? ~0u : (31 - __clz(v));
+    // firstbithigh should return 0-based bit position of MSB or ~0u if no/all bits set
+    return (v == 0 || v == ~0u) ? ~0u : (31 - __clz(v));
 }
 
 // ----------------------------- I32 -----------------------------------------
