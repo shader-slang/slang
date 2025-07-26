@@ -861,7 +861,7 @@ program->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
 ```
 
 The linking step is also used to perform link-time specialization, which is a recommended approach for shader specialization
-compared to preprocessor based specialization. Please see [Link-time Specialization and Precompiled Modules](10-link-time-specialization) for more details.
+compared to preprocessor based specialization. Please see [Link-time Specialization and Precompiled Modules](10-link-time-specialization.md) for more details.
 
 Any diagnostic messages related to linking (for example, if an external symbol cannot be resolved) will be written to `diagnosticBlob`.
 

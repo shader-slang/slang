@@ -521,7 +521,7 @@ Variadic macros are supported by the Slang preprocessor.
 > #### Note ####
 > The use of `#include` in new code is discouraged as this functionality has
 > been superseded by the module system, please refer to
-> [./04-modules-and-access-control.md](./04-modules-and-access-control.md)
+> [Modules and Access Control](04-modules-and-access-control.md)
 
 Attributes
 ----------
