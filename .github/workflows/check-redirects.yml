@@ -33,26 +33,26 @@ jobs:
             if [ ! -f "$file" ]; then
               continue
             fi
-            
+
             echo "Checking $file..."
-            
+
             # Expected URL pattern (dynamically construct from file path)
             # Replace .md with .html and prepend the base URL components
             file_path_no_ext=${file%.md}
             expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
-            
+
             # Extract redirect_to line
             redirect_line=$(grep "^redirect_to:" "$file" || true)
-            
+
             if [ -z "$redirect_line" ]; then
               echo "Missing redirect_to in $file"
               echo "    Expected: $expected_url"
               failed=true
               continue
             fi
-            
-            # Extract the URL from redirect_to line
-            redirect_url=$(echo "$redirect_line" | sed 's/redirect_to: *//')
+
+            # Extract the URL from redirect_to line (strip CRLF if present)
+            redirect_url=$(echo "$redirect_line" | sed 's/redirect_to: *//' | tr -d '\r')
 
             if [ "$redirect_url" != "$expected_url" ]; then
               echo "Incorrect redirect_to in $file"

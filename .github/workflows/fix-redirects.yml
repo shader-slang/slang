@@ -39,14 +39,14 @@ jobs:
             if [ ! -f "$file" ]; then
               continue
             fi
-            
+
             echo "Processing $file..."
-            
+
             # Expected URL (dynamically construct from file path)
             # Replace .md with .html and prepend the base URL components
             file_path_no_ext=${file%.md}
             expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
-            
+
             # Check if file already has redirect_to
             if grep -q "^redirect_to:" "$file"; then
               # Update existing redirect_to
