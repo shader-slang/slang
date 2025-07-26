@@ -167,7 +167,7 @@ struct EliminateMultiLevelBreakContext
                         if (!isUnreachableRootBlock(region->getBreakBlock()))
                             mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
-                            mapBlockToRegion.add(block, region);
+                            mapBlockToRegion[block] = region;
                     });
             }
 
