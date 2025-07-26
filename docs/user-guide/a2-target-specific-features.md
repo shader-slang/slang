@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a2-target-specific-features.html
 ---
 
 # Target-Specific Features

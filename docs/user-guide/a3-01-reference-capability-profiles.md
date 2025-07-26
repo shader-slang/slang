@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a3-01-reference-capability-profiles.html
 ---
 
 Capability Profiles

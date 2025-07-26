@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/compiling
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/08-compiling.html
 ---
 
 Compiling Code with Slang

@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/targets
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/09-targets.html
 ---
 
 # Supported Compilation Targets
