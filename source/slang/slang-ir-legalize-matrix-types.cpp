@@ -76,8 +76,9 @@ struct MatrixTypeLoweringContext
 
         IRInst* newInst = inst;
 
-        if (auto matrixType = as<IRMatrixType>(inst))
+        if (as<IRMatrixType>(inst))
         {
+            auto matrixType = as<IRMatrixType>(inst);
             if (shouldLowerMatrixType(matrixType))
             {
                 // Lower matrix<T, R, C> to T[R][C] (array of R vectors of length C)
@@ -95,6 +96,59 @@ struct MatrixTypeLoweringContext
                 auto arrayType = builder.getArrayType(vectorType, rowCount);
 
                 newInst = arrayType;
+            }
+        }
+        else if (as<IRMakeMatrix>(inst))
+        {
+            auto makeMatrix = as<IRMakeMatrix>(inst);
+            auto matrixType = as<IRMatrixType>(makeMatrix->getDataType());
+            
+            if (matrixType && shouldLowerMatrixType(matrixType))
+            {
+                // Lower makeMatrix to makeArray of makeVectors
+                auto elementType = matrixType->getElementType();
+                auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+                auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+                
+                SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+                
+                IRBuilder builder(makeMatrix);
+                builder.setInsertBefore(makeMatrix);
+
+                // Create vector type for rows: vector<T, C>
+                auto vectorType = builder.getVectorType(elementType, columnCount);
+
+                // Create array type: vector<T, C>[R]
+                auto arrayType = builder.getArrayType(vectorType, rowCount);
+
+                // Group operands into rows and create vectors
+                List<IRInst*> rowVectors;
+                UInt operandIndex = 0;
+                
+                // Assert that we have the expected number of operands
+                SLANG_ASSERT(makeMatrix->getOperandCount() == UInt(rowCount->getValue() * columnCount->getValue()) && 
+                            "makeMatrix operand count must match matrix dimensions");
+                
+                for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
+                {
+                    List<IRInst*> rowElements;
+                    for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
+                    {
+                        SLANG_ASSERT(operandIndex < makeMatrix->getOperandCount() &&
+                            "Operand index out of bounds");
+                        rowElements.add(getReplacement(makeMatrix->getOperand(operandIndex)));
+                        operandIndex++;
+                    }
+                    
+                    SLANG_ASSERT(rowElements.getCount() == columnCount->getValue() &&
+                        "Row elements count must match column count");
+                    auto rowVector = builder.emitMakeVector(vectorType, rowElements);
+                    rowVectors.add(rowVector);
+                }
+                
+                SLANG_ASSERT(rowVectors.getCount() == rowCount->getValue() &&
+                    "Row vectors count must match matrix row count");
+                newInst = builder.emitMakeArray(arrayType, rowVectors.getCount(), rowVectors.getBuffer());
             }
         }
 
