@@ -72,23 +72,7 @@ DIAGNOSTIC(
     seeDeclarationOfInterfaceRequirement,
     "see interface requirement declaration of '$0'")
 
-DIAGNOSTIC(
-    -1,
-    Note,
-    genericSignatureDoesNotMatchRequirement,
-    "generic signature of '$0' does not match interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    cannotResolveOverloadForMethodRequirement,
-    "none of the overloads of '$0' match the interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    parameterDirectionDoesNotMatchRequirement,
-    "parameter '$0' is '$1' in the implementing member, but the interface requires '$2'.")
+DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
@@ -138,6 +122,12 @@ DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
+DIAGNOSTIC(
+    18,
+    Warning,
+    separateDebugInfoUnsupportedForTarget,
+    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
+    "SPIR-V binary targets.")
 DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(
@@ -2070,6 +2060,22 @@ DIAGNOSTIC(
     Error,
     memberDoesNotMatchRequirementSignature,
     "member '$0' does not match interface requirement.")
+DIAGNOSTIC(
+    38106,
+    Error,
+    memberReturnTypeMismatch,
+    "member '$0' return type '$1' does not match interface requirement return type '$2'.")
+DIAGNOSTIC(
+    38107,
+    Error,
+    genericSignatureDoesNotMatchRequirement,
+    "generic signature of '$0' does not match interface requirement.")
+DIAGNOSTIC(
+    38108,
+    Error,
+    parameterDirectionDoesNotMatchRequirement,
+    "parameter '$0' direction '$1' does not match interface requirement '$2'.")
+
 DIAGNOSTIC(
     38101,
     Error,
