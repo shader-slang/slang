@@ -41,14 +41,14 @@ public:
     using Offset = typename Traits::Offset;
     using UOffset = typename Traits::UOffset;
 
-    RelativePtr() = default;
-    RelativePtr(RelativePtr const& ptr) { set(ptr); }
-    RelativePtr(RelativePtr&& ptr) { set(ptr); }
-    RelativePtr(T* ptr) { set(ptr); }
+    SLANG_FORCE_INLINE RelativePtr() = default;
+    SLANG_FORCE_INLINE RelativePtr(RelativePtr const& ptr) { set(ptr); }
+    SLANG_FORCE_INLINE RelativePtr(RelativePtr&& ptr) { set(ptr); }
+    SLANG_FORCE_INLINE RelativePtr(T* ptr) { set(ptr); }
 
-    void operator=(RelativePtr const& ptr) { set(ptr); }
-    void operator=(RelativePtr&& ptr) { set(ptr); }
-    void operator=(T* ptr) { set(ptr); }
+    SLANG_FORCE_INLINE void operator=(RelativePtr const& ptr) { set(ptr); }
+    SLANG_FORCE_INLINE void operator=(RelativePtr&& ptr) { set(ptr); }
+    SLANG_FORCE_INLINE void operator=(T* ptr) { set(ptr); }
 
     T* get() const
     {
@@ -79,8 +79,8 @@ public:
         SLANG_ASSERT(intptr_t(_offset) == offsetVal);
     }
 
-    operator T*() const { return get(); }
-    T* operator->() const { return get(); }
+    SLANG_FORCE_INLINE operator T*() const { return get(); }
+    SLANG_FORCE_INLINE T* operator->() const { return get(); }
 
 private:
     Offset _offset = 0;
