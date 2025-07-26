@@ -190,10 +190,12 @@ typedef size_t NonUniformResourceIndex;
 template<typename T, int ROWS, int COLS>
 struct Matrix;
 
-typedef int1 bool1;
-typedef int2 bool2;
-typedef int3 bool3;
-typedef int4 bool4;
+// Boolean vector types should follow CUDA's builtin vector alignment rules
+// Using typedef to ucharN to match CUDA native vector types alignment
+typedef uchar1 bool1;
+typedef uchar2 bool2;
+typedef uchar3 bool3;
+typedef uchar4 bool4;
 
 #if SLANG_CUDA_RTC
 
@@ -334,15 +336,14 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
                 _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
         return result;                                                                        \
     }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
-    {                                                                                \
-        bool##n result;                                                              \
-        for (int i = 0; i < n; i++)                                                  \
-            *_slang_vector_get_element_ptr(&result, i) =                             \
-                (int)(_slang_vector_get_element(thisVal, i)                          \
-                          op _slang_vector_get_element(other, i));                   \
-        return result;                                                               \
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
+    {                                                                                           \
+        bool##n result;                                                                         \
+        for (int i = 0; i < n; i++)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
+        return result;                                                                          \
     }
 #define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
@@ -459,40 +460,12 @@ SLANG_MAKE_VECTOR(float)
 SLANG_MAKE_VECTOR(double)
 SLANG_MAKE_VECTOR(longlong)
 SLANG_MAKE_VECTOR(ulonglong)
+SLANG_MAKE_VECTOR(bool)
 #endif
 
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_MAKE_VECTOR(__half)
 #endif
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
-{
-    return bool1{x};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x, bool y)
-{
-    return bool2{x, y};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x, bool y, bool z)
-{
-    return bool3{x, y, z};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x, bool y, bool z, bool w)
-{
-    return bool4{x, y, z, w};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 make_bool2(bool x)
-{
-    return bool2{x, x};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 make_bool3(bool x)
-{
-    return bool3{x, x, x};
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 make_bool4(bool x)
-{
-    return bool4{x, x, x, x};
-}
 
 #if SLANG_CUDA_RTC
 #define SLANG_MAKE_VECTOR_FROM_SCALAR(T)                     \
@@ -537,6 +510,7 @@ SLANG_MAKE_VECTOR_FROM_SCALAR(longlong)
 SLANG_MAKE_VECTOR_FROM_SCALAR(ulonglong)
 SLANG_MAKE_VECTOR_FROM_SCALAR(float)
 SLANG_MAKE_VECTOR_FROM_SCALAR(double)
+SLANG_MAKE_VECTOR_FROM_SCALAR(bool)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_MAKE_VECTOR_FROM_SCALAR(__half)
 #if !SLANG_CUDA_RTC
@@ -603,6 +577,7 @@ GET_VECTOR_TYPE_IMPL_N(longlong)
 GET_VECTOR_TYPE_IMPL_N(ulonglong)
 GET_VECTOR_TYPE_IMPL_N(float)
 GET_VECTOR_TYPE_IMPL_N(double)
+GET_VECTOR_TYPE_IMPL_N(bool)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
