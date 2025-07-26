@@ -5738,7 +5738,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
             if (!isPhysicalType)
+            {
+                id++;
                 continue;
+            }
 
             // Emit explicit struct field layout decorations if the struct is physical.
             IRIntegerValue offset = 0;
@@ -6206,12 +6209,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "nv_viewport_mask")
                 {
-                    requireSPIRVCapability(SpvCapabilityPerViewAttributesNV);
-                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
-                    return getBuiltinGlobalVar(
-                        inst->getFullType(),
-                        SpvBuiltInViewportMaskPerViewNV,
-                        inst);
+                    requireSPIRVCapability(SpvCapabilityShaderViewportMaskNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_viewport_array2"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskNV, inst);
                 }
                 else if (semanticName == "sv_barycentrics")
                 {

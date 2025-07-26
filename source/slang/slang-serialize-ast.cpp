@@ -1234,7 +1234,6 @@ void serialize(ASTSerializer const& serializer, ValNodeOperand& value)
 //
 #if 0 // FIDDLE TEMPLATE:
 %for _,T in ipairs(astStructTypes) do
-% TRACE(T)
 /// Fossilized representation of a value of type `$T`
 struct Fossilized_$T
 %   if T.directSuperClass then
