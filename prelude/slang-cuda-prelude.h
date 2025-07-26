@@ -2096,7 +2096,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
     // maps to hlsl firstbithigh
     if ((int32_t)v < 0)
         v = ~v;
-    if(v == 0)
+    if (v == 0)
         return ~0u;
     return 31 - __clz(v);
 }

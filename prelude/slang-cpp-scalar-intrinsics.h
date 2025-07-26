@@ -742,7 +742,7 @@ SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
 {
     if ((int32_t)v < 0)
         v = ~v;
-    if(v == 0)
+    if (v == 0)
         return ~0u;
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
     // __builtin_clz returns number of leading zeros
