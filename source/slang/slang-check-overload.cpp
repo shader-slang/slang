@@ -2975,6 +2975,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     // Nothing at all was found that we could even consider invoking.
     // In all other cases, this is an error.
+    if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
+    {
+        if (overloadExpr->lookupResult2.isValid())
+        {
+            diagnoseAmbiguousReference(funcExpr);
+            return CreateErrorExpr(expr);
+        }
+    }
     getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;
