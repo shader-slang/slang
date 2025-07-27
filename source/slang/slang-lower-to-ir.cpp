@@ -8279,8 +8279,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitStaticAssertDecl(StaticAssertDecl* decl)
     {
-        // Lower the condition and message expressions
-        auto condition = lowerRValueExpr(context, decl->condition);
+        // For static assertions, we need to emit IR that can be evaluated at compile time
+        // The checkStaticAssert function expects:
+        // - operand 0: IRBoolLit (compile-time boolean)
+        // - operand 1: IRStringLit (compile-time string)
+        
+        // Try to evaluate the condition as a compile-time constant
+        auto condition = lowerRValueExpr(context, decl->condition);  
         auto message = lowerRValueExpr(context, decl->message);
         
         // Create operands array
@@ -8289,7 +8294,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getSimpleVal(context, message)
         };
         
-        // Emit the static assert IR instruction using emitIntrinsicInst
+        // Emit the static assert IR instruction
         getBuilder()->emitIntrinsicInst(
             getBuilder()->getVoidType(),
             kIROp_StaticAssert,

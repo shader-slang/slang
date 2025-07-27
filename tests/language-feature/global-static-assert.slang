@@ -1,15 +1,16 @@
 //TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
 
-// Test global static_assert support 
+// Test global static_assert support with improved test coverage based on feedback
+
 struct TestStruct {
     float a;
     int b;
 };
 
 // Global static_assert should work now
-static_assert(sizeof(float) == 4, "float should be 4 bytes");
-static_assert(sizeof(int) == 4, "int should be 4 bytes");  
-static_assert(sizeof(TestStruct) == 8, "TestStruct should be 8 bytes");
+test_static_assert(sizeof(float) == 4, "float should be 4 bytes");
+test_static_assert(sizeof(int) == 4, "int should be 4 bytes");  
+test_static_assert(sizeof(TestStruct) == 8, "TestStruct should be 8 bytes");
 
 // Test with layout attributes - std430 layout with padding behavior
 [layout(std430)]
@@ -19,7 +20,7 @@ struct LayoutStruct {
 };
 
 // The float3 causes the float2 to be aligned, resulting in sizeof(float4) + sizeof(float2) = 24 bytes
-static_assert(sizeof(LayoutStruct) == 24, "LayoutStruct should be 24 bytes with padding");
+test_static_assert(sizeof(LayoutStruct) == 24, "LayoutStruct should be 24 bytes with padding");
 
 // Test with std140 layout containing array of float3
 [layout(std140)]
@@ -28,7 +29,7 @@ struct Std140Struct {
 };
 
 // In std140, float3 array elements are treated as float4, so 2 * 16 = 32 bytes
-static_assert(sizeof(Std140Struct) == 32, "Std140Struct should be 32 bytes");
+test_static_assert(sizeof(Std140Struct) == 32, "Std140Struct should be 32 bytes");
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

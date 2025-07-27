@@ -1347,7 +1347,7 @@ static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
     parser->FillPosition(decl);
     
     // Parse: static_assert(condition, message);
-    // Note: the "static_assert" token has already been consumed by the dispatcher
+    // Note: the "static_assert" or "test_static_assert" token has already been consumed by the dispatcher
     
     parser->ReadMatchingToken(TokenType::LParent);
     decl->condition = parser->ParseArgExpr();  // Use ParseArgExpr to avoid comma operator issues
@@ -1357,6 +1357,23 @@ static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::Semicolon);
     
     return decl;
+}
+
+// Add a special parser for compound static_assert when it appears as two tokens
+static NodeBase* parseStaticKeyword(Parser* parser, void* /*userData*/)
+{
+    // Check if we have "static" followed by "assert" to handle static_assert compound keyword
+    if (parser->LookAheadToken(TokenType::Identifier, 1) && 
+        parser->LookAheadToken("assert", 1))
+    {
+        // Consume both tokens and parse as static_assert
+        parser->ReadToken("static");
+        parser->ReadToken("assert");
+        return parseStaticAssertDecl(parser, userData);
+    }
+    
+    // Otherwise, fall back to regular static parsing (this will likely cause an error)
+    return nullptr;
 }
 
 static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
@@ -9521,6 +9538,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("implementing", parseImplementingDecl),
     _makeParseDecl("static_assert", parseStaticAssertDecl),
     _makeParseDecl("test_static_assert", parseStaticAssertDecl),
+    _makeParseDecl("static", parseStaticKeyword),  // Handle compound static_assert parsing
     _makeParseDecl("let", parseLetDecl),
     _makeParseDecl("var", parseVarDecl),
     _makeParseDecl("func", parseFuncDecl),
