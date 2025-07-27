@@ -867,8 +867,8 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:
     case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::HostVM:
         break;
@@ -876,8 +876,8 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
-    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         break;
 
@@ -1078,6 +1078,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);
@@ -1325,6 +1326,7 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             legalizeEmptyTypes(targetProgram, irModule, sink);
@@ -1669,6 +1671,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:

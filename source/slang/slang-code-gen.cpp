@@ -225,6 +225,7 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     {
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return new CUDAExtensionTracker;
         }
@@ -1216,11 +1217,14 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::GLSL:
     case CodeGenTarget::HLSL:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::CSource:
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::WGSL:
         {
             RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);

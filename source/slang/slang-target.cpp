@@ -156,6 +156,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::ShaderSharedLibrary:
@@ -166,11 +167,13 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         atoms.add(CapabilityName::cuda);
         break;
 
     case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         atoms.add(CapabilityName::metal);
