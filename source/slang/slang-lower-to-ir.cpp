@@ -8277,6 +8277,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
+    LoweredValInfo visitStaticAssertDecl(StaticAssertDecl* decl)
+    {
+        // Lower the condition and message expressions
+        auto condition = lowerRValueExpr(context, decl->condition);
+        auto message = lowerRValueExpr(context, decl->message);
+        
+        // Create operands array
+        IRInst* operands[] = {
+            getSimpleVal(context, condition),
+            getSimpleVal(context, message)
+        };
+        
+        // Emit the static assert IR instruction
+        auto staticAssertInst = getBuilder()->_createInst(
+            sizeof(IRStaticAssert),
+            getBuilder()->getVoidType(),
+            kIROp_StaticAssert,
+            2,
+            operands,
+            0,
+            nullptr,
+            nullptr);
+        
+        getBuilder()->addInst(staticAssertInst);
+        
+        return LoweredValInfo();
+    }
+
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
         auto inst = builder->getInsertLoc().getInst();

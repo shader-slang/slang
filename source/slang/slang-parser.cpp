@@ -1341,6 +1341,25 @@ static NodeBase* parseImplementingDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
+static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
+{
+    auto decl = parser->astBuilder->create<StaticAssertDecl>();
+    parser->FillPosition(decl);
+    
+    parser->ReadMatchingToken(TokenType::LParent);
+    
+    decl->condition = parser->ParseExpression();
+    
+    parser->ReadMatchingToken(TokenType::Comma);
+    
+    decl->message = parser->ParseExpression();
+    
+    parser->ReadMatchingToken(TokenType::RParent);
+    parser->ReadMatchingToken(TokenType::Semicolon);
+    
+    return decl;
+}
+
 static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<ModuleDeclarationDecl>();
@@ -9501,6 +9520,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__include", parseIncludeDecl),
     _makeParseDecl("module", parseModuleDeclarationDecl),
     _makeParseDecl("implementing", parseImplementingDecl),
+    _makeParseDecl("static_assert", parseStaticAssertDecl),
     _makeParseDecl("let", parseLetDecl),
     _makeParseDecl("var", parseVarDecl),
     _makeParseDecl("func", parseFuncDecl),
