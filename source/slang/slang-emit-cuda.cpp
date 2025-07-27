@@ -1023,6 +1023,7 @@ void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
+
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
     Super::emitSemanticsImpl(inst, allowOffsetLayout);

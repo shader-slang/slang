@@ -32,7 +32,6 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
-#include "slang-ir-header-export.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -773,10 +772,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-        break;
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDAHeader:
-        generateTransitiveExternCpp(irModule, sink);
         break;
     }
 
@@ -799,21 +796,14 @@ Result linkAndOptimizeIR(
     {
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
-        {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
-            generateDllExportFuncs(irModule, sink);
-            break;
-        }
-    // TODO: is this needed?
     case CodeGenTarget::CPPHeader:
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);
             generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
             generateDllExportFuncs(irModule, sink);
-            generateTransitiveExternCpp(irModule, sink);
             break;
         }
+
     default:
         break;
     }

@@ -1,7 +1,6 @@
 // slang-ir-dll-export.cpp
 #include "slang-ir-dll-export.h"
 
-#include "slang-ir-header-export.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
 #include "slang-ir-util.h"
