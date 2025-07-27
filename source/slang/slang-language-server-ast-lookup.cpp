@@ -7,6 +7,7 @@ namespace Slang
 {
 struct ASTLookupContext
 {
+    Linkage* linkage;
     DocumentVersion* doc;
     SourceManager* sourceManager;
     List<SyntaxNode*> nodePath;
@@ -62,9 +63,10 @@ static Index _getDeclNameLength(Name* name, Decl* optionalDecl = nullptr)
         return 0;
     }
     // HACK: our __subscript functions currently have a name "operator[]".
+    // and our operator() functions have a name "()".
     // Since this isn't the name that actually appears in user's code,
     // we need to shorten its reported length to 1 for now.
-    if (name->text.startsWith("operator"))
+    if (name->text.startsWith("operator") || name->text.startsWith("()"))
     {
         return 1;
     }
@@ -75,7 +77,7 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc loc, Int length)
 {
     auto humaneLoc = context->sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
     return humaneLoc.line == context->line && context->col >= humaneLoc.column &&
-           context->col <= humaneLoc.column + length &&
+           context->col < humaneLoc.column + length &&
            humaneLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
                context->sourceFileName);
 }
@@ -87,7 +89,7 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc start, SourceLoc end)
     Loc s{startLoc.line, startLoc.column};
     Loc e{endLoc.line, endLoc.column};
     Loc c{context->line, context->col};
-    return s <= c && c <= e &&
+    return s <= c && c < e &&
            startLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
                context->sourceFileName);
 }
@@ -147,6 +149,14 @@ public:
 
     bool visitParenExpr(ParenExpr* expr) { return dispatchIfNotNull(expr->base); }
 
+    bool visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            if (dispatchIfNotNull(element))
+                return true;
+        return false;
+    }
+
     bool visitBuiltinCastExpr(BuiltinCastExpr* expr) { return dispatchIfNotNull(expr->base); }
 
     bool visitAssignExpr(AssignExpr* expr)
@@ -158,6 +168,7 @@ public:
 
     bool visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
+        PushNode pushNodeRAII(context, genericAppExpr);
         if (dispatchIfNotNull(genericAppExpr->functionExpr))
             return true;
         for (auto arg : genericAppExpr->arguments)
@@ -222,18 +233,16 @@ public:
                 return true;
             }
         }
-
-        return dispatchIfNotNull(expr->originalExpr);
-    }
-
-    bool visitTypeCastExpr(TypeCastExpr* expr)
-    {
-        if (dispatchIfNotNull(expr->functionExpr))
+        if (this->context->findType == ASTLookupType::CompletionRequest &&
+            expr->name == context->linkage->getSessionImpl()->getCompletionRequestTokenName())
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
             return true;
-        for (auto arg : expr->arguments)
-            if (dispatchIfNotNull(arg))
-                return true;
-        return false;
+        }
+        return dispatchIfNotNull(expr->originalExpr);
     }
 
     bool visitDerefExpr(DerefExpr* expr) { return dispatchIfNotNull(expr->base); }
@@ -411,6 +420,8 @@ public:
     }
 
     bool visitThisTypeExpr(ThisTypeExpr*) { return false; }
+    bool visitThisInterfaceExpr(ThisInterfaceExpr*) { return false; }
+
     bool visitAndTypeExpr(AndTypeExpr* expr)
     {
         if (dispatchIfNotNull(expr->left.exp))
@@ -642,6 +653,19 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitReturnStmt(ReturnStmt* stmt) { return checkExpr(stmt->expression); }
 
+    bool visitDeferStmt(DeferStmt* stmt) { return dispatchIfNotNull(stmt->statement); }
+
+    bool visitThrowStmt(ThrowStmt* stmt) { return checkExpr(stmt->expression); }
+
+    bool visitCatchStmt(CatchStmt* stmt)
+    {
+        if (stmt->errorVar && _findAstNodeImpl(*context, stmt->errorVar))
+            return true;
+        if (dispatchIfNotNull(stmt->tryBody))
+            return true;
+        return dispatchIfNotNull(stmt->handleBody);
+    }
+
     bool visitWhileStmt(WhileStmt* stmt)
     {
         if (checkExpr(stmt->predicate))
@@ -665,17 +689,27 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         {
             if (_isLocInRange(&context, decl->nameAndLoc.loc, _getDeclNameLength(decl->getName())))
             {
+                bool isRealDeclName = true;
                 for (auto modifier : decl->modifiers)
                 {
                     if (as<SynthesizedModifier>(modifier))
-                        return false;
+                    {
+                        isRealDeclName = false;
+                        break;
+                    }
                     if (as<ImplicitParameterGroupElementTypeModifier>(modifier))
-                        return false;
+                    {
+                        isRealDeclName = false;
+                        break;
+                    }
                 }
-                ASTLookupResult result;
-                result.path = context.nodePath;
-                context.results.add(_Move(result));
-                return true;
+                if (isRealDeclName)
+                {
+                    ASTLookupResult result;
+                    result.path = context.nodePath;
+                    context.results.add(_Move(result));
+                    return true;
+                }
             }
         }
         if (auto funcDecl = as<FunctionDeclBase>(node))
@@ -803,7 +837,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             }
             if (shouldInspectChildren)
             {
-                for (auto member : container->members)
+                for (auto member : container->getDirectMemberDecls())
                 {
                     if (_findAstNodeImpl(context, member))
                         return true;
@@ -837,6 +871,7 @@ List<ASTLookupResult> findASTNodesAt(
     context.findType = findType;
     context.sourceFileName = fileName;
     context.doc = doc;
+    context.linkage = getModule(moduleDecl)->getLinkage();
     _findAstNodeImpl(context, moduleDecl);
     return context.results;
 }

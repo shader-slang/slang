@@ -79,7 +79,7 @@ SlangResult HexDumpUtil::dumpSourceBytes(
 
         // each byte is output as "0xAA, "
         // Ends with '\n"
-        const size_t lineBytes = count * (4 + 1 + 1) * count + 1;
+        const size_t lineBytes = count * 6 + 1;
 
         char* startDst = writer->beginAppendBuffer(lineBytes);
         char* dst = startDst;

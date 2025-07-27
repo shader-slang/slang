@@ -24,6 +24,11 @@ jobs:
                 "command": "regenerate-toc",
                 "permission": "none",
                 "issue_type": "pull-request"
+              },
+              {
+                "command": "regenerate-cmdline-ref",
+                "permission": "none",
+                "issue_type": "pull-request"
               }
             ]
 

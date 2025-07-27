@@ -16,27 +16,27 @@ buffer MyBlockName2
 
 layout(local_size_x = 1) in;
 
-//TEST_INPUT: set image_1d = RWTexture1D(format=R32_FLOAT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_1d = RWTexture1D(format=R32Float, size=4, content=one, mipMaps = 1)
 uniform layout(binding=0,r32f) image1D image_1d;
-//TEST_INPUT: set image_buffer = RWTextureBuffer(format=R32_FLOAT, stride=4, data=[1.0f 1.0f 1.0f 1.0f])
+//TEST_INPUT: set image_buffer = RWTextureBuffer(format=R32Float, stride=4, data=[1.0f 1.0f 1.0f 1.0f])
 uniform layout(binding=1,r32f) imageBuffer image_buffer;
-//TEST_INPUT: set image_1dArray = RWTexture1D(format=R32_FLOAT, size=4, content=one, mipMaps = 1, arrayLength=2)
+//TEST_INPUT: set image_1dArray = RWTexture1D(format=R32Float, size=4, content=one, mipMaps = 1, arrayLength=2)
 uniform layout(binding=2,r32f) image1DArray image_1dArray;
-//TEST_INPUT: set image_2d = RWTexture2D(format=R32_FLOAT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_2d = RWTexture2D(format=R32Float, size=4, content=one, mipMaps = 1)
 uniform layout(binding=3,r32f) image2D image_2d;
-//TEST_INPUT: set image_2dRect = RWTexture2D(format=R32_FLOAT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_2dRect = RWTexture2D(format=R32Float, size=4, content=one, mipMaps = 1)
 uniform layout(binding=4,r32f) image2DRect image_2dRect;
-//TEST_INPUT: set image_2dMultiSample = RWTexture2D(format=R32_FLOAT, size=4, content=one, mipMaps = 1, sampleCount = two)
+//TEST_INPUT: set image_2dMultiSample = RWTexture2D(format=R32Float, size=4, content=one, mipMaps = 1, sampleCount = two)
 uniform layout(binding=5,r32f) image2DMS image_2dMultiSample;
-//TEST_INPUT: set image_2dArray = RWTexture2D(format=R32_FLOAT, size=4, content=one, mipMaps = 1, arrayLength=2)
+//TEST_INPUT: set image_2dArray = RWTexture2D(format=R32Float, size=4, content=one, mipMaps = 1, arrayLength=2)
 uniform layout(binding=6,r32f) image2DArray image_2dArray;
-//TEST_INPUT: set image_3d = RWTexture3D(format=R32_FLOAT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_3d = RWTexture3D(format=R32Float, size=4, content=one, mipMaps = 1)
 uniform layout(binding=7,r32f) image3D image_3d;
-//TEST_INPUT: set image_cube = RWTextureCube(format=R32_FLOAT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_cube = RWTextureCube(format=R32Float, size=4, content=one, mipMaps = 1)
 uniform layout(binding=8,r32f) imageCube image_cube;
-//TEST_INPUT: set image_cubeArray = RWTextureCube(format=R32_FLOAT, size=4, content=one, mipMaps = 1, arrayLength=2)
+//TEST_INPUT: set image_cubeArray = RWTextureCube(format=R32Float, size=4, content=one, mipMaps = 1, arrayLength=2)
 uniform layout(binding=9,r32f) imageCubeArray image_cubeArray;
-//TEST_INPUT: set image_2dMultiSampleArray = RWTexture2D(format=R32_FLOAT, size=4, content=one, mipMaps = 1, arrayLength=2, sampleCount = two)
+//TEST_INPUT: set image_2dMultiSampleArray = RWTexture2D(format=R32Float, size=4, content=one, mipMaps = 1, arrayLength=2, sampleCount = two)
 uniform layout(binding=10,r32f) image2DMSArray image_2dMultiSampleArray;
 
 bool checkAllImageSize()

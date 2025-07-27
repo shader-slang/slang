@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
 
@@ -137,9 +138,9 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     {
     case SLANG_RESOURCE_ACCESS_READ:
         {
-            // Metal does not support access::sample for texture buffers, so we need to emit
-            // access::read instead.
-            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            // Metal does not support access::sample for texture buffers and multisampled textures,
+            // so we need to emit access::read instead.
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER || texType->isMultisample())
                 m_writer->emit("access::read");
             else
                 m_writer->emit("access::sample");
@@ -414,7 +415,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     switch (inst->getOp())
     {
-    case kIROp_discard:
+    case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
         return true;
     case kIROp_MetalAtomicCast:
@@ -1168,6 +1169,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             switch (ptrType->getAddressSpace())
             {
             case AddressSpace::Global:
+            case AddressSpace::UserPointer:
                 m_writer->emit(" device");
                 m_writer->emit("*");
                 break;
@@ -1186,6 +1188,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case AddressSpace::MetalObjectData:
                 m_writer->emit(" object_data");
                 m_writer->emit("*");
+                break;
+            default:
+                SLANG_UNEXPECTED("Unknown addressspace encountered.");
                 break;
             }
             return;
@@ -1267,15 +1272,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(", ");
         emitOperand(meshType->getNumPrimitives(), getInfo(EmitOp::General));
         m_writer->emit(", metal::topology::");
-        switch (meshType->getTopology()->getValue())
+        switch (OutputTopologyType(meshType->getTopology()->getValue()))
         {
-        case 1:
+        case OutputTopologyType::Point:
             m_writer->emit("point");
             break;
-        case 2:
+        case OutputTopologyType::Line:
             m_writer->emit("line");
             break;
-        case 3:
+        case OutputTopologyType::Triangle:
             m_writer->emit("triangle");
             break;
         }

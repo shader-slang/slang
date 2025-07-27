@@ -1,10 +1,10 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -dx12 -use-dxil -shaderobj
 
-//TEST_INPUT:RWTexture1D(format=R32_UINT, size=8, content = zero, mipMaps = 1):name=texture1D
+//TEST_INPUT:RWTexture1D(format=R32Uint, size=8, content = zero, mipMaps = 1):name=texture1D
 RWTexture1D<uint> texture1D;
 
-//TEST_INPUT:RWTexture2D(format=R32_UINT, size=8, content = zero, mipMaps = 1):name=texture2D
+//TEST_INPUT:RWTexture2D(format=R32Uint, size=8, content = zero, mipMaps = 1):name=texture2D
 RWTexture2D<uint> texture2D;
 
 //TEST_INPUT:ubuffer(data=[0]):out,name=outputBuffer

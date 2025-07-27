@@ -44,6 +44,13 @@ enum class SpawnType
     UseFullyIsolatedTestServer, ///< Uses a test server for each test (slow!)
 };
 
+enum class VerbosityLevel
+{
+    Failure, ///< Only show failures and errors
+    Info,    ///< Show test discovery and results (default)
+    Verbose, ///< Show detailed output including command lines
+};
+
 struct Options
 {
     char const* appName = "slang-test";
@@ -57,8 +64,8 @@ struct Options
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 
-    // generate extra output (notably: command lines we run)
-    bool shouldBeVerbose = false;
+    // verbosity level for output
+    VerbosityLevel verbosity = VerbosityLevel::Info;
 
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
@@ -72,6 +79,9 @@ struct Options
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
 
+    // Skip generation of reference images for render tests, assume they already exist
+    bool skipReferenceImageGeneration = false;
+
     // Whether to skip the step of creating test devices to check if an API is actually available.
     bool skipApiDetection = false;
 
@@ -79,6 +89,9 @@ struct Options
     // This is especially intended for use in continuous
     // integration builds.
     bool dumpOutputOnFailure = false;
+
+    // When true it will run with debug layer (e.g. vulkan validation layer)
+    bool enableDebugLayers = false;
 
     // Set the default spawn type to use
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
@@ -120,6 +133,7 @@ struct Options
 
     bool emitSPIRVDirectly = true;
 
+    Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
@@ -127,8 +141,12 @@ struct Options
         int argc,
         char** argv,
         TestCategorySet* categorySet,
+        Slang::WriterHelper stdOut,
         Slang::WriterHelper stdError,
         Options* optionsOut);
+
+    /// Display help message
+    static void showHelp(Slang::WriterHelper stdOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

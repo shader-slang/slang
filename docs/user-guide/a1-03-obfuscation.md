@@ -5,15 +5,15 @@ layout: user-guide
 Obfuscation
 ===========
 
-The Slang obfuscation feature allows developers to distribute shader code in a way where the implementation details are kept secret. For example let's say a developer has produced a novel way to render and wants to protect that intellectual property. If it is possible to compile all possible uses of the shader code into SPIR-V/DXIL the developer can ship their product with those binaries without debug information. This is similar to the protection achieved by shipping an executable - a determined person may with a good deal of effort work out how some algorithm in the executable works, but doing so requires a considerable amount of work, and certainly more work than reading the original source code.
+The Slang obfuscation feature allows developers to distribute shader code in a way where the implementation details are kept secret. For example, let's say a developer has produced a novel way to render and wants to protect that intellectual property. If it is possible to compile all possible uses of the shader code into SPIR-V/DXIL, the developer can ship their product with those binaries without debug information. This is similar to the protection achieved by shipping an executable - a determined person may with a good deal of effort work out how some algorithm in the executable works, but doing so requires a considerable amount of work, and certainly more work than reading the original source code.
 
-If a developer is not able to ship all shader binaries then there is a problem. The developer doesn't want to ship the source code as in doing so it is relatively straight forward to see how it works or even copy the implementation. A developer could provide some level of protection by encrypting the source, but when compilation occurs it will still be necessary to decrypt and so make it available to read. A developer could obfuscate their source before shipping it. In this scenario 
+If a developer is not able to ship all shader binaries then there is a problem. The developer doesn't want to ship the source code as in doing so it is relatively straightforward to see how it works or even copy the implementation. A developer could provide some level of protection by encrypting the source, but when compilation occurs it will still be necessary to decrypt and so make it available to read. A developer could obfuscate their source before shipping it. In this scenario:
 
 * Requires tooling to do the obfuscation of the source
-* Any source on the client that isn't obfuscated, needs to be able to call to the obfuscated code
+* Any source on the client that isn't obfuscated needs to be able to call to the obfuscated code
   * Depending on how the obfuscation takes place this could be hard - remapping symbols or obfuscating on the fly on the client
   * If "public" symbols keep their original names they leak information about the implementation
-* Obfuscated source, provides some protection but not typically as much as a binary format (like an object file without debug information)
+* Obfuscated source provides some protection but not typically as much as a binary format (like an object file without debug information)
 * How can you debug, or determine where a crash occurred without the original source? 
 * If a failure occurs - how is it possible to report meaningful errors?
 
@@ -179,7 +179,7 @@ Notice here that the `-r` module reference is to the `.zip` file rather than the
 
 It is also worth noticing that in this second compilation, using `module.zip`, we need the `-obfuscate` flag set. If this isn't set linking will not work correctly.
 
-NOTE! As previously discussed though you should *not* ship the .zip file with the obfuscated source map such that it's available on client machines, as doing so does leak some information about the original source. Not the original source itself, but the names of files and the locations in files. You could ship a .zip to client machines, but make sure the `.map` obfuscated source maps are stripped. Alternatively, and perhaps less riskily you could ship `.slang-module` files taken from the `.zip` file and then it is clear there is no source map information available.
+NOTE! As previously discussed, though you should *not* ship the .zip file with the obfuscated source map such that it's available on client machines, as doing so does leak some information about the original source. Not the original source itself, but the names of files and the locations in files. You could ship a .zip to client machines, but make sure the `.map` obfuscated source maps are stripped. Alternatively, and perhaps less riskily, you could ship `.slang-module` files taken from the `.zip` file and then it is clear there is no source map information available.
 
 ## Accessing Source Maps without Files
 

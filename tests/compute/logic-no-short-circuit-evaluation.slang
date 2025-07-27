@@ -1,4 +1,5 @@
 //TEST(compute):SIMPLE(filecheck=SM5):-target hlsl -profile cs_5_1 -entry computeMain
+//TEST(compute):SIMPLE(filecheck=HLSL2018):-target hlsl -profile cs_6_0 -capability hlsl_2018 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=SM6):-target hlsl -profile cs_6_0 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=WGS):-target wgsl -stage compute -entry computeMain
 //TEST(compute):SIMPLE(filecheck=MTL):-target metal -stage compute -entry computeMain
@@ -29,6 +30,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     // No short-circuiting for vector types
 
     //SM5:(all({{.*}}&&
+    //HLSL2018:(all({{.*}}&&
     //SM6:(all(and(
     //WGS:(all(select(vec2<bool>(false),
     //MTL:(all({{.*}}&&
@@ -40,6 +42,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     // Intentionally using non-boolean type for testing.
 
     //SM5:(all({{.*}}||
+    //HLSL2018:(all({{.*}}||
     //SM6:(or(vector<bool,2>(
     //WGS:(select({{.*}}, vec2<bool>(true), vec2<bool>(
     //MTL:(all(bool2({{.*}}||
@@ -49,6 +52,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     //SM5:(all({{.*}}?{{.*}}:
+    //HLSL2018:(all({{.*}}?{{.*}}:
     //SM6:(all(select(
     //WGS:(all(select(vec2<bool>(false),
     //MTL:(all(select(bool2(false)

@@ -70,7 +70,7 @@ bool AutoDiffTranscriberBase::shouldUseOriginalAsPrimal(IRInst* currentParent, I
 {
     if (as<IRGlobalValueWithCode>(origInst))
         return true;
-    if (origInst->parent && origInst->parent->getOp() == kIROp_Module)
+    if (origInst->parent && origInst->parent->getOp() == kIROp_ModuleInst)
         return true;
     if (isChildInstOf(currentParent, origInst->getParent()))
         return true;
@@ -390,6 +390,13 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
                     diffTypeList.getBuffer());
         }
 
+    case kIROp_OptionalType:
+        {
+            auto origOptionalType = as<IROptionalType>(primalType);
+            auto diffValueType = differentiateType(builder, origOptionalType->getValueType());
+            return builder->getOptionalType(diffValueType);
+        }
+
     default:
         return (IRType*)maybeCloneForPrimalInst(
             builder,
@@ -406,7 +413,7 @@ bool AutoDiffTranscriberBase::isExistentialType(IRType* type)
     case kIROp_ExtractExistentialType:
     case kIROp_InterfaceType:
     case kIROp_AssociatedType:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         return true;
     default:
         return false;
@@ -720,9 +727,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
 
     if (auto diffType = differentiateType(builder, originalType))
     {
-        IRInst* diffWitnessTable = nullptr;
-        IRType* diffOuterType = nullptr;
-        if (isExistentialType(diffType))
+        if (isExistentialType(diffType) && !as<IRLookupWitnessMethod>(diffType))
         {
             // Emit null differential & pack it into an IDifferentiable existential.
 
@@ -789,25 +794,8 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
             return result;
         }
 
-        // Since primalType has a corresponding differential type, we can lookup the
-        // definition for zero().
-        IRInst* zeroMethod = nullptr;
-        if (auto lookupInterface = as<IRLookupWitnessMethod>(diffType))
-        {
-            // if the differential type itself comes from a witness lookup, we can just lookup the
-            // zero method from the same witness table.
-            auto wt = lookupInterface->getWitnessTable();
-            zeroMethod = builder->emitLookupInterfaceMethodInst(
-                builder->getFuncType(List<IRType*>(), diffType),
-                wt,
-                autoDiffSharedContext->zeroMethodStructKey);
-            builder->markInstAsPrimal(zeroMethod);
-        }
-        else
-        {
-            zeroMethod =
-                differentiableTypeConformanceContext.getZeroMethodForType(builder, originalType);
-        }
+        auto zeroMethod =
+            differentiableTypeConformanceContext.getZeroMethodForType(builder, originalType);
         SLANG_RELEASE_ASSERT(zeroMethod);
 
         auto emptyArgList = List<IRInst*>();
@@ -815,16 +803,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
         auto callInst = builder->emitCallInst((IRType*)diffType, zeroMethod, emptyArgList);
         builder->markInstAsDifferential(callInst, primalType);
 
-        if (diffOuterType && isExistentialType(diffOuterType))
-        {
-            // Need to wrap the result back into an existential.
-            auto existentialZero =
-                builder->emitMakeExistential(diffOuterType, callInst, diffWitnessTable);
-            builder->markInstAsDifferential(existentialZero, primalType);
-            return existentialZero;
-        }
-        else
-            return callInst;
+        return callInst;
     }
     else
     {

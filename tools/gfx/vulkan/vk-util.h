@@ -130,6 +130,9 @@ struct VulkanUtil
     static VkStencilOpState translateStencilState(DepthStencilOpDesc desc);
 
     static VkSamplerReductionMode translateReductionOp(TextureReductionOp op);
+
+    static CooperativeVectorComponentType translateCooperativeVectorComponentType(
+        VkComponentTypeKHR type);
 };
 
 struct AccelerationStructureBuildGeometryInfoBuilder

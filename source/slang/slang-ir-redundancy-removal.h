@@ -7,8 +7,8 @@ namespace Slang
 struct IRModule;
 struct IRGlobalValueWithCode;
 
-bool removeRedundancy(IRModule* module);
-bool removeRedundancyInFunc(IRGlobalValueWithCode* func);
+bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts);
+bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariantInsts);
 
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
 

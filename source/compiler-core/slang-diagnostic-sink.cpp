@@ -612,9 +612,19 @@ bool DiagnosticSink::diagnoseImpl(
     return true;
 }
 
-Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
+Severity DiagnosticSink::getEffectiveMessageSeverity(
+    DiagnosticInfo const& info,
+    SourceLoc const& location)
 {
     Severity effectiveSeverity = info.severity;
+
+    if (effectiveSeverity <= Severity::Warning && m_sourceWarningStateTracker)
+    {
+        effectiveSeverity = m_sourceWarningStateTracker->consumeWarningSeverity(
+            location,
+            info.id,
+            effectiveSeverity);
+    }
 
     Severity* pSeverityOverride = m_severityOverrides.tryGetValue(info.id);
 
@@ -639,7 +649,7 @@ bool DiagnosticSink::diagnoseImpl(
     DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
-    info.severity = getEffectiveMessageSeverity(info);
+    info.severity = getEffectiveMessageSeverity(info, pos);
 
     if (info.severity == Severity::Disable)
         return false;
@@ -817,5 +827,46 @@ DiagnosticsLookup::DiagnosticsLookup(
 
     add(diagnostics, diagnosticsCount);
 }
+
+void outputExceptionDiagnostic(
+    const AbortCompilationException& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics)
+{
+    sink.diagnoseRaw(Severity::Error, exception.Message.getUnownedSlice());
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
+void outputExceptionDiagnostic(
+    const Exception& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics)
+{
+    try
+    {
+        sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Internal severity to prevent exception leak from loadModule
+    }
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
+void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
+{
+    try
+    {
+        sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    }
+    catch (const AbortCompilationException&)
+    {
+        // Catch and ignore the AbortCompilationException that diagnoseRaw throws
+        // for Fatal severity to prevent exception leak from loadModule
+    }
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
 
 } // namespace Slang

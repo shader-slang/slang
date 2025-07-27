@@ -126,6 +126,7 @@ void _barrier()
 #endif
 }
 
+[shader("compute")]
 void computeMain()
 {
     //seperate tests since testing concurrency

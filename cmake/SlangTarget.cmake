@@ -41,7 +41,7 @@ function(slang_add_target dir type)
         # building respectively
         EXPORT_MACRO_PREFIX
         # Ignore target type and use a particular style of export macro
-        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT
         # pass in STATIC or SHARED
         EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS
@@ -195,14 +195,89 @@ function(slang_add_target dir type)
     if(type STREQUAL "MODULE")
         set(library_subdir ${module_subdir})
     endif()
+
+    # Respect user-defined CMAKE_*_OUTPUT_DIRECTORY variables if they are set
+    if(DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+        set(archive_output_dir "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+    else()
+        set(archive_output_dir "${output_dir}/${archive_subdir}")
+    endif()
+
+    if(DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+        set(library_output_dir "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    else()
+        set(library_output_dir "${output_dir}/${library_subdir}")
+    endif()
+
+    if(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(runtime_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        set(pdb_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    else()
+        set(runtime_output_dir "${output_dir}/${runtime_subdir}")
+        set(pdb_output_dir "${output_dir}/${runtime_subdir}")
+    endif()
+
     set_target_properties(
         ${target}
         PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/${archive_subdir}"
-            LIBRARY_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
-            RUNTIME_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
-            PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
+            ARCHIVE_OUTPUT_DIRECTORY "${archive_output_dir}"
+            LIBRARY_OUTPUT_DIRECTORY "${library_output_dir}"
+            RUNTIME_OUTPUT_DIRECTORY "${runtime_output_dir}"
+            PDB_OUTPUT_DIRECTORY "${pdb_output_dir}"
     )
+
+    # For Multi-Config generators we also need to set per-config output directories
+    # if user-defined paths are provided
+    if(DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                ARCHIVE_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+        )
+    endif()
+
+    if(DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+        )
+    endif()
+
+    if(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+        )
+    endif()
 
     set(debug_configs "Debug,RelWithDebInfo")
     if(SLANG_ENABLE_RELEASE_DEBUG_INFO)
@@ -279,7 +354,22 @@ function(slang_add_target dir type)
                     COMMAND
                         ${CMAKE_OBJCOPY} --only-keep-debug
                         $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.dwarf
-                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+                # We may be building for Android on a Windows host, where chmod isn't available or needed.
+                if(NOT CMAKE_HOST_WIN32)
+                    add_custom_command(
+                        TARGET ${target}
+                        POST_BUILD
+                        COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                        WORKING_DIRECTORY ${output_dir}
+                        VERBATIM
+                    )
+                endif()
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
                     COMMAND
                         ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
                     COMMAND
@@ -324,7 +414,18 @@ function(slang_add_target dir type)
     #
     # Link and include from dependencies
     #
-    target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_LOCAL_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    else()
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    endif()
+
     target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -340,14 +441,14 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PRIVATE
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
     foreach(include_from ${ARG_INCLUDE_FROM_PUBLIC})
         target_include_directories(
             ${target}
             PUBLIC
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
 
@@ -358,15 +459,24 @@ function(slang_add_target dir type)
         get_filename_component(inc_abs ${inc} ABSOLUTE)
         target_include_directories(
             ${target}
-            PUBLIC "$<BUILD_INTERFACE:${inc_abs}>"
+            PUBLIC
+                "$<BUILD_INTERFACE:${inc_abs}>"
+                "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         )
     endforeach()
     foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
         get_filename_component(inc_abs ${inc} ABSOLUTE)
-        target_include_directories(
-            ${target}
-            PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_LOCAL_INTERFACE:${inc_abs}>"
+            )
+        else()
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
+            )
+        endif()
     endforeach()
 
     #

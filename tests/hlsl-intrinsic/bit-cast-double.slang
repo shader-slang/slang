@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx11 -shaderobj -render-feature double
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -shaderobj -render-feature double
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -shaderobj

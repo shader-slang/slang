@@ -15,9 +15,9 @@
 namespace Slang
 {
 
-class ZipFileSystemImpl : public ISlangMutableFileSystem,
-                          public IArchiveFileSystem,
-                          public ComBaseObject
+class ZipFileSystemImpl : public ComBaseObject,
+                          public ISlangMutableFileSystem,
+                          public IArchiveFileSystem
 {
 public:
     // ISlangUnknown

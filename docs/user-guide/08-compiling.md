@@ -179,6 +179,13 @@ we can compile the `computeMain()` entry point to SPIR-V using the following com
 slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
+> #### Note ####
+> Some targets require additional parameters. See [`slangc` Entry Points](#slangc-entry-points) for details. For example, to target HLSL, the equivalent command is:
+>
+> ```bat
+> slangc hello-world.slang -target hlsl -entry computeMain -o hello-world.hlsl
+> ```
+
 ### Source Files and Translation Units
 
 The `hello-world.slang` argument here is specifying an input file.
@@ -193,7 +200,7 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.slang-module` file forms its own translation unit.
 
-### Entry Points
+### `slangc` Entry Points
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
 The `-entry computeMain` option selects an entry point to be compiled to output code in this invocation of `slangc`.
@@ -210,7 +217,10 @@ In code that does not use `[shader(...)]` attributes, a `-entry` option should b
 slangc hello-world.slang -entry computeMain -stage compute -target spirv -o hello-world.spv
 ```
 
-### Targets
+> #### Note ####
+> The `slangc` CLI [currently](https://github.com/shader-slang/slang/issues/5541) cannot automatically deduce `-entrypoint` and `-stage`/`-profile` options from `[shader(...)]` attributes when generating code for targets other than SPIRV, Metal, CUDA, or Optix. For targets such as HLSL, please continue to specify `-entry` and `-stage` options, even when compiling a file with the `[shader(...)]` attribute on its entry point.
+
+### `slangc` Targets
 
 Our example uses the option `-target spirv` to introduce a compilation target; in this case, code will be generated as SPIR-V.
 The argument of a `-target` option specified the format to use for the target; common values are `dxbc`, `dxil`, and `spirv`.
@@ -223,7 +233,7 @@ Slang provides two main kinds of profiles for use with `slangc`:
 
 * GLSL versions can be used as profile with names like `glsl_430` and `glsl_460`
 
-### Kernels
+### `slangc` Kernels
 
 A `-o` option indicates that kernel code should be written to a file on disk.
 In our example, the SPIR-V kernel code for the `computeMain()` entry point will be written to the file `hello-world.spv`.
@@ -851,7 +861,7 @@ program->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
 ```
 
 The linking step is also used to perform link-time specialization, which is a recommended approach for shader specialization
-compared to preprocessor based specialization. Please see [Link-time Specialization and Precompiled Modules](link-time-specialization) for more details.
+compared to preprocessor based specialization. Please see [Link-time Specialization and Precompiled Modules](10-link-time-specialization.md) for more details.
 
 Any diagnostic messages related to linking (for example, if an external symbol cannot be resolved) will be written to `diagnosticBlob`.
 
@@ -891,14 +901,14 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
+All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely, functions and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronization enforces that only one thread can be in a Slang call at any one time.
 
-Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
 
 
 ## Compiler Options
 
-Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In additional,
+Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
 the `IComponentType::linkWithOptions()` method allow you to specify additional compiler options when linking a program. All these places accepts the same encoding of compiler options, which is
 documented in this section.
 
@@ -911,7 +921,7 @@ struct CompilerOptionEntry
 };
 ```
 Where `CompilerOptionName` is an `enum` specifying the compiler option to set, and `value` encodes the value of the option.
-`CompilerOptionValue` is a structure that allows you to end code up to two integer or string values for a compiler option:
+`CompilerOptionValue` is a structure that allows you to endcode up to two integer or string values for a compiler option:
 ```c++
 enum class CompilerOptionValueKind
 {

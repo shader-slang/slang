@@ -162,11 +162,15 @@ SlangResult FileStream::_init(
         SLANG_ASSERT(!"Invalid file share mode.");
         return SLANG_FAIL;
     }
+
     if (share == FileShare::None)
-#pragma warning(suppress : 4996)
-        m_handle = _wfopen(fileName.toWString(), wideMode);
+    {
+        m_handle = _wfsopen(fileName.toWString(), wideMode, _SH_DENYNO);
+    }
     else
+    {
         m_handle = _wfsopen(fileName.toWString(), wideMode, shFlag);
+    }
 #else
     m_handle = fopen(fileName.getBuffer(), mode);
 #endif

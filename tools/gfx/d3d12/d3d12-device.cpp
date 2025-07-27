@@ -17,12 +17,6 @@
 #include "d3d12-swap-chain.h"
 #include "d3d12-vertex-layout.h"
 
-#ifdef _DEBUG
-#define ENABLE_DEBUG_LAYER 1
-#else
-#define ENABLE_DEBUG_LAYER 0
-#endif
-
 #ifdef GFX_NVAPI
 #include "../nvapi/nvapi-include.h"
 #endif
@@ -75,7 +69,8 @@ static ShaderModelInfo kKnownShaderModels[] = {
     SHADER_MODEL_INFO_DXIL(6, 5),
     SHADER_MODEL_INFO_DXIL(6, 6),
     SHADER_MODEL_INFO_DXIL(6, 7),
-    SHADER_MODEL_INFO_DXIL(6, 8)
+    SHADER_MODEL_INFO_DXIL(6, 8),
+    SHADER_MODEL_INFO_DXIL(6, 9)
 #undef SHADER_MODEL_INFO_DXIL
 };
 
@@ -534,7 +529,7 @@ Result DeviceImpl::initialize(const Desc& desc)
 
 
     // If Aftermath is enabled, we can't enable the D3D12 debug layer as well
-    if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled() && !g_isAftermathEnabled)
+    if (isGfxDebugLayerEnabled() && !g_isAftermathEnabled)
     {
         m_D3D12GetDebugInterface =
             (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
@@ -569,10 +564,7 @@ Result DeviceImpl::initialize(const Desc& desc)
     if (desc.existingDeviceHandles.handles[0].handleValue == 0)
     {
         FlagCombiner combiner;
-        // TODO: we should probably provide a command-line option
-        // to override UseDebug of default rather than leave it
-        // up to each back-end to specify.
-        if (ENABLE_DEBUG_LAYER || isGfxDebugLayerEnabled())
+        if (isGfxDebugLayerEnabled())
         {
             combiner.add(
                 DeviceCheckFlag::UseDebug,

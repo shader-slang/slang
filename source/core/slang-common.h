@@ -4,42 +4,160 @@
 #include "slang.h"
 
 #include <assert.h>
+#include <cstddef>
+#include <cstring>
 #include <stdint.h>
+#include <type_traits>
 
 #define VARIADIC_TEMPLATE
 
 namespace Slang
 {
 
+/// Signed 32-bit integer.
+///
+/// This type should be used when the exact size
+/// in bits is important (e.g., when dealing with
+/// explicit binary file formats, etc.). Otherwise
+/// prefer the plain `Int` type or a semantically
+/// richer type like `Count` or `Index`.
+///
 typedef int32_t Int32;
+
+/// Unsigned 32-bit integer.
+///
+/// This type should be used when the exact size
+/// in bits is important (e.g., when dealing with
+/// explicit binary file formats, etc.). Otherwise
+/// prefer the plain `Int` type or a semantically
+/// richer type like `Count` or `Index`.
+///
 typedef uint32_t UInt32;
 
+/// Signed 64-bit integer.
+///
+/// This type should be used when the exact size
+/// in bits is important (e.g., when dealing with
+/// explicit binary file formats, etc.). Otherwise
+/// prefer the plain `Int` type or a semantically
+/// richer type like `Count` or `Index`.
+///
 typedef int64_t Int64;
+
+/// Unsigned 64-bit integer.
+///
+/// This type should be used when the exact size
+/// in bits is important (e.g., when dealing with
+/// explicit binary file formats, etc.). Otherwise
+/// prefer the plain `Int` type or a semantically
+/// richer type like `Count` or `Index`.
+///
 typedef uint64_t UInt64;
 
-// Define
-typedef SlangUInt UInt;
+/// "Default" integer type for the Slang codebase.
+///
+/// When there is not a clear reason to another
+/// integer type, use this one.
+///
+/// Note that this type is currently defined to be
+/// the same as the `SlangInt` type exposed through
+/// the public Slang API, but this may not be the
+/// case forever.
+///
 typedef SlangInt Int;
+
+/// "Default" unsigned integer type for the Slang codebase.
+///
+/// Only use this type when you explicitly need
+/// an unsigned type that's the same size as `Int`.
+/// Otherwise you should probably just be using `Int`.
+///
+/// Note that this type is currently defined to be
+/// the same as the `SlangUInt` type exposed through
+/// the public Slang API, but this may not be the
+/// case forever.
+///
+typedef SlangUInt UInt;
 
 static const UInt kMaxUInt = ~UInt(0);
 static const Int kMaxInt = Int(kMaxUInt >> 1);
 
-//	typedef unsigned short Word;
-
 typedef intptr_t PtrInt;
 
-// TODO(JS): It looks like Index is actually 64 bit on 64 bit targets(!)
-// Previous discussions landed on Index being int32_t.
-
-// Type used for indexing, in arrays/views etc. Signed.
+/// Default type for indices.
+///
+/// This is (and should always be) an alias for `Int`.
+///
+/// Use this type to document the intention that an
+/// integer parameter/variable/etc. represents an
+/// index into some kind of sequence, or any other
+/// kind of ordinal number.
+///
 typedef Int Index;
-typedef UInt UIndex;
-typedef Int Count;
-typedef UInt UCount;
 
 static const Index kMaxIndex = kMaxInt;
 
-typedef uint8_t Byte;
+/// Unsigned equivalent of `Index`.
+///
+/// Please don't use this unless you have a good reason.
+///
+typedef UInt UIndex;
+
+/// Default type for counts.
+///
+/// This is (and should always be) an alias for `Int`.
+///
+/// Use this type to document the intention that an
+/// integer parameter/variable/etc. represents a
+/// count of the number of elements in some container,
+/// or any other kind of cardinal number.
+///
+typedef Int Count;
+
+/// Unsigned equivalent of `Count`.
+///
+/// Please don't use this unless you have a good reason.
+///
+typedef UInt UCount;
+
+
+/// Explicit type for when manipulating bytes.
+///
+/// Use this type to document the intention that a
+/// parameter/variable/etc. represents an 8-bit byte, with
+/// no particular interpretation of that byte as
+/// any higher-level type.
+///
+/// Note that the `char` types have special semantics
+/// when it comes to "type punning" that are not shared
+/// with other types like `uint8_t`. Using a variation
+/// of `char` here helps avoid the possibility of undefined
+/// behavior when code reads other types to/from arrays
+/// of `Byte`s.
+///
+/// We are not using `std::byte` here because that is
+/// defined as an `enum class` and does not support
+/// mathematical or bitwise operations, which a lot
+/// of the Slang codebase does on `Byte`s.
+///
+typedef unsigned char Byte;
+
+/// Preferred integer type for sizes measured in bytes.
+///
+/// Use this type to document the intention that an
+/// integer parameter/variable/etc. represents the
+/// size of something, in bytes, rather than being
+/// some other kind of integer.
+///
+/// Note that this type is unsigned, despite the stated
+/// default in the Slang codebase being signed integer
+/// types. The reason for this is that variables
+/// holding sizes are often compared against the
+/// result of the `sizeof` operator, which yields
+/// a `size_t`. Our hands are, to some extent, tied
+/// on this matter.
+///
+using Size = size_t;
 
 // TODO(JS):
 // Perhaps these should be named Utf8, Utf16 and UnicodePoint/Rune/etc? For now, just keep it simple
@@ -83,6 +201,19 @@ inline bool isBitSet(T value, T bitToTest)
     static_assert(sizeof(T) <= sizeof(uint32_t), "Only support up to 32 bit enums");
     return (T)((uint32_t)value & (uint32_t)bitToTest) == bitToTest;
 }
+
+template<typename To, typename From>
+typename std::enable_if_t<
+    sizeof(To) == sizeof(From) && std::is_trivially_copyable_v<From> &&
+        std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>,
+    To>
+bitCast(const From& src)
+{
+    To dst;
+    std::memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
+
 } // namespace Slang
 
 // SLANG_DEFER
@@ -233,7 +364,7 @@ public:
 #define SLANG_ASSERT(VALUE)               \
     do                                    \
     {                                     \
-        if (!(VALUE))                     \
+        if (!(VALUE)) [[unlikely]]        \
             SLANG_ASSERT_FAILURE(#VALUE); \
     } while (0)
 #else
@@ -241,7 +372,7 @@ public:
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) \
-    if (VALUE)                      \
+    if (VALUE) [[likely]]           \
     {                               \
     }                               \
     else                            \

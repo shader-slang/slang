@@ -1,7 +1,7 @@
 Slang Language Guide
 ====================
 
-This document will try to describe the main characteristis of the Slang language that might make it different from other shading languages you have used.
+This document will try to describe the main characteristics of the Slang language that might make it different from other shading languages you have used.
 
 The Basics
 ----------
@@ -47,7 +47,7 @@ float4 someOtherFunc(float4 y) { return someFunc(y); }
 ```
 
 The simplest way to think of it is that the `import foo` declaration instructs the compiler to look for `foo.slang` (in the same search paths it uses for `#include` files), and give an error if it isn't found.
-If `foo.slang` is found, then the compiler will go ahead and parse and type-check that file, and make any declarations there visible to the original file (`bar.glsl` in this example).
+If `foo.slang` is found, then the compiler will go ahead and parse and type-check that file, and make any declarations there visible to the original file (`bar.slang` in this example).
 
 When it comes time to generate output code, Slang will output any declarations from `import`ed files that were actually used (it skips those that are never referenced), and it will cross-compile them as needed for the chosen target.
 
@@ -128,7 +128,7 @@ struct PointLight : ILight
 
 ### Generics
 
-Slang supports *generic* declarations, using the commong angle-brack (`<>`) syntax from languages like C#, Java, etc.
+Slang supports *generic* declarations, using the common angle-bracket (`<>`) syntax from languages like C#, Java, etc.
 For example, here is a generic function that works with any type of light:
 
 ```hlsl
@@ -253,7 +253,7 @@ Some features of the current HLSL language are not supported, but probably will 
 
 Some things from HLSL are *not* planned to be supported, unless there is significant outcry from users:
 
-* Pre-D3D10/11 syntax and operations
+* Pre-D3D10 and D3D11 syntax and operations
 * The "effect" system, and the related `<>` annotation syntax
 * Explicit `register` bindings on textures/samplers nested in `cbuffer`s
 * Any further work towards making HLSL a subset of C++ (simply because implementing a full C++ compiler is way out of scope for the Slang project)

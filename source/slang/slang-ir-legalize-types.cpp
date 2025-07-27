@@ -2134,14 +2134,14 @@ static LegalVal legalizeInst(
     case kIROp_DefaultConstruct:
         result = legalizeDefaultConstruct(context, type);
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
     case kIROp_Printf:
         result = legalizePrintf(context, args);
         break;
-    case kIROp_undefined:
+    case kIROp_Undefined:
         return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
@@ -2282,6 +2282,36 @@ static LegalVal legalizeGlobalParam(
     IRTypeLegalizationContext* context,
     IRGlobalParam* irGlobalParam);
 
+static LegalVal legalizeCoopMatMapElementIFunc(
+    IRTypeLegalizationContext* context,
+    IRCoopMatMapElementIFunc* inst)
+{
+    // When the functor object is a lambda with no captures,
+    // it will be removed as a part of the legalization process,
+    // because it is a zero-sized struct.
+    // We need to explicitly remove it from its user.
+    if (inst->hasIFuncThis())
+    {
+        // Check if `this` is valid.
+        auto legalArg = legalizeOperand(context, inst->getIFuncThis());
+        if (legalArg.flavor == LegalVal::Flavor::none)
+        {
+            // If `this` is not valid, remove it from IR.
+            IRBuilder builder{inst};
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitCoopMatMapElementFunc(
+                inst->getFullType(),
+                inst->getOperand(0),
+                inst->getOperand(1));
+
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return LegalVal::simple(newInst);
+        }
+    }
+    return LegalVal::simple(inst);
+}
+
 static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
 {
     // Any additional instructions we need to emit
@@ -2293,6 +2323,9 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     // Special-case certain operations
     switch (inst->getOp())
     {
+    case kIROp_CoopMatMapElementIFunc:
+        return legalizeCoopMatMapElementIFunc(context, cast<IRCoopMatMapElementIFunc>(inst));
+
     case kIROp_Var:
         return legalizeLocalVar(context, cast<IRVar>(inst));
 
@@ -3932,7 +3965,7 @@ struct IRTypeLegalizationPass
         // would not be a valid location at which to
         // store their replacements.
         //
-        if (!inst->getParent() && inst->getOp() != kIROp_Module)
+        if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
             return;
 
         // The main logic for legalizing an instruction is defined
@@ -4125,6 +4158,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType* type) override
     {
+        if (isMetalTarget(targetProgram->getTargetReq()))
+        {
+            return false;
+        }
+
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
@@ -4146,6 +4184,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {
         return LegalType();
+    }
+
+    virtual bool shouldLegalizeParameterBlockElementType() override
+    {
+        return isMetalTarget(targetProgram->getTargetReq());
     }
 };
 

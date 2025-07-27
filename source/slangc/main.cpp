@@ -6,6 +6,7 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 #include "../core/slang-io.h"
 #include "../core/slang-test-tool-util.h"
+#include "../slang/slang-internal.h"
 
 using namespace Slang;
 
@@ -102,7 +103,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
         // Just create the global session in the regular way if there isn't one set
         SlangGlobalSessionDesc desc = {};
         desc.enableGLSL = true;
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSession2(&desc, session.writeRef()));
+        Slang::GlobalSessionInternalDesc internalDesc = {};
+#ifdef SLANG_BOOTSTRAP
+        internalDesc.isBootstrap = true;
+#endif
+        SLANG_RETURN_ON_FAIL(
+            slang_createGlobalSessionImpl(&desc, &internalDesc, session.writeRef()));
     }
 
     if (!shouldEmbedPrelude(argv, argc))

@@ -8,10 +8,10 @@
 //METAL_ERROR: error 41402
 //METALLIB: error 41402
 
-//TEST_INPUT: RWTexture2D(format=R8G8B8A8_SINT, size=4, content = zero, sampleCount=two, mipMaps = 1):name outputTexture2DMS
+//TEST_INPUT: RWTexture2D(format=RGBA8Sint, size=4, content = zero, sampleCount=two, mipMaps = 1):name outputTexture2DMS
 RWTexture2DMS<int4> outputTexture2DMS;
 
-//TEST_INPUT: RWTexture2D(format=R8G8B8A8_SINT, size=4, content = zero, arrayLength=2, sampleCount=two, mipMaps = 1):name outputTexture2DMSArray
+//TEST_INPUT: RWTexture2D(format=RGBA8Sint, size=4, content = zero, arrayLength=2, sampleCount=two, mipMaps = 1):name outputTexture2DMSArray
 RWTexture2DMSArray<int4> outputTexture2DMSArray;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer

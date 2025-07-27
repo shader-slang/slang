@@ -32,7 +32,7 @@ IRInst* clonePatternValImpl(
             return result;
         }
     case kIROp_Specialize:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialWitnessTable:
         break;
@@ -83,7 +83,7 @@ IRInst* clonePatternVal(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, I
 // Translate a `IRExpandType` into an `IRExpand` where the `PatternType` is defined
 // inside the `IRExpand` body.
 //
-IRInst* lowerExpandTypeImpl(IRExpandType* expandType)
+IRInst* lowerExpandTypeImpl(IRExpandTypeOrVal* expandType)
 {
     // Turn `IRExpandType` into an `IRExpand` instruction.
     IRBuilder builder(expandType);
@@ -159,7 +159,7 @@ void lowerExpandType(IRModule* module)
         auto inst = workList.getLast();
         workList.removeLast();
 
-        if (auto expandType = as<IRExpandType>(inst))
+        if (auto expandType = as<IRExpandTypeOrVal>(inst))
         {
             inst = lowerExpandTypeImpl(expandType);
             if (inst != expandType)

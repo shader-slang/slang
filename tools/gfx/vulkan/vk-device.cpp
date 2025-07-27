@@ -214,7 +214,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #endif
         }
 
-        if (ENABLE_VALIDATION_LAYER || isGfxDebugLayerEnabled())
+        gfxEnableDebugLayer(useValidationLayer);
+        if (isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
         VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
@@ -716,7 +717,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         SIMPLE_EXTENSION_FEATURE(
             extendedFeatures.computeShaderDerivativeFeatures,
             computeDerivativeGroupLinear,
-            VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+            VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
             "computeDerivativeGroupLinear");
 
         // Only enable raytracing validation if both requested and supported
@@ -729,6 +730,12 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
                 VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
                 "ray-tracing-validation");
         }
+
+        SIMPLE_EXTENSION_FEATURE(
+            extendedFeatures.cooperativeVectorFeatures,
+            cooperativeVector,
+            VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME,
+            "cooperative-vector");
 
 #undef SIMPLE_EXTENSION_FEATURE
 
@@ -750,16 +757,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         {
             extendedFeatures.vulkan12Features.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.vulkan12Features;
-        }
-
-        if (extendedFeatures.cooperativeVectorFeatures.cooperativeVector)
-        {
-            deviceExtensions.add(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
-
-            extendedFeatures.cooperativeVectorFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.cooperativeVectorFeatures;
-
-            m_features.add("cooperative-vector");
         }
 
         VkPhysicalDeviceProperties2 extendedProps = {
@@ -1031,7 +1028,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
         descriptorSetAllocator.m_api = &m_api;
         initDeviceResult = initVulkanInstanceAndDevice(
             desc.existingDeviceHandles.handles,
-            ENABLE_VALIDATION_LAYER != 0 || isGfxDebugLayerEnabled());
+            isGfxDebugLayerEnabled());
         if (initDeviceResult == SLANG_OK)
             break;
     }
@@ -1546,6 +1543,47 @@ Result DeviceImpl::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = 1;
     return SLANG_OK;
+}
+
+Result DeviceImpl::getCooperativeVectorProperties(
+    CooperativeVectorProperties* properties,
+    uint32_t* propertyCount)
+{
+    if (!m_api.m_extendedFeatures.cooperativeVectorFeatures.cooperativeVector ||
+        !m_api.vkGetPhysicalDeviceCooperativeVectorPropertiesNV)
+        return SLANG_E_NOT_AVAILABLE;
+
+    if (m_cooperativeVectorProperties.empty())
+    {
+        uint32_t vkPropertyCount = 0;
+        m_api.vkGetPhysicalDeviceCooperativeVectorPropertiesNV(
+            m_api.m_physicalDevice,
+            &vkPropertyCount,
+            nullptr);
+        std::vector<VkCooperativeVectorPropertiesNV> vkProperties(vkPropertyCount);
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkGetPhysicalDeviceCooperativeVectorPropertiesNV(
+            m_api.m_physicalDevice,
+            &vkPropertyCount,
+            vkProperties.data()));
+        for (const auto& vkProps : vkProperties)
+        {
+            CooperativeVectorProperties props;
+            props.inputType =
+                VulkanUtil::translateCooperativeVectorComponentType(vkProps.inputType);
+            props.inputInterpretation =
+                VulkanUtil::translateCooperativeVectorComponentType(vkProps.inputInterpretation);
+            props.matrixInterpretation =
+                VulkanUtil::translateCooperativeVectorComponentType(vkProps.matrixInterpretation);
+            props.biasInterpretation =
+                VulkanUtil::translateCooperativeVectorComponentType(vkProps.biasInterpretation);
+            props.resultType =
+                VulkanUtil::translateCooperativeVectorComponentType(vkProps.resultType);
+            props.transpose = vkProps.transpose;
+            m_cooperativeVectorProperties.push_back(props);
+        }
+    }
+
+    return RendererBase::getCooperativeVectorProperties(properties, propertyCount);
 }
 
 Result DeviceImpl::createTextureResource(

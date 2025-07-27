@@ -189,7 +189,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // If we are looking up for completion suggestions,
         // return all the members that are available.
-        for (auto member : containerDecl->members)
+        for (auto member : containerDecl->getDirectMemberDecls())
         {
             if (!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(member))
                 continue;
@@ -204,15 +204,13 @@ static void _lookUpDirectAndTransparentMembers(
     }
     else
     {
-        // Look up the declarations with the chosen name in the container.
-        Decl* firstDecl = nullptr;
-        containerDecl->getMemberDictionary().tryGetValue(name, firstDecl);
-
-        // Now iterate over those declarations (if any) and see if
-        // we find any that meet our filtering criteria.
+        // Iterate over the declarations with the chosen name in the container
+        // (if any), and see if we find any that meet our filtering criteria.
+        //
         // For example, we might be filtering so that we only consider
         // type declarations.
-        for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+        //
+        for (auto m : containerDecl->getDirectMemberDeclsOfName(name))
         {
             // Skip this declaration if we are checking and this hasn't been
             // checked yet. Because we traverse block statements in order, if
@@ -247,12 +245,12 @@ static void _lookUpDirectAndTransparentMembers(
     if (((int)request.options & (int)LookupOptions::IgnoreTransparentMembers) != 0)
         return;
 
-    for (auto transparentInfo : containerDecl->getTransparentMembers())
+    for (auto transparentMemberDecl : containerDecl->getTransparentDirectMemberDecls())
     {
         // The reference to the transparent member should use the same
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef =
-            astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+            astBuilder->getMemberDeclRef(parentDeclRef, transparentMemberDecl);
         if (transparentMemberDeclRef.getDecl() == request.declToExclude)
             continue;
 
@@ -357,6 +355,32 @@ static Type* _maybeSpecializeSuperType(
     }
 
     return superType;
+}
+
+void FacetImpl::init(ASTBuilder* astBuilder)
+{
+    if (directness != Facet::Directness::Self)
+    {
+        // Depending on the type of the facet, we may want to specialize the
+        // declRef that we are going to lookup in. If the facet represents
+        // an extension, we should just lookup in the extension decl.
+        //
+        // If the facet is an extension to an interface type, we should
+        // specialize the interface declRef to the concrete type that this
+        // extension applied to.
+        //
+        // If the facet represents an implementation of interface type,
+        // we should also specialize the interface declRef with the concrete
+        // type info.
+        //
+        declRefForMemberLookup =
+            _maybeSpecializeSuperTypeDeclRef(astBuilder, origin.declRef, getType(), subtypeWitness)
+                .as<ContainerDecl>();
+    }
+    else
+    {
+        declRefForMemberLookup = origin.declRef.as<ContainerDecl>();
+    }
 }
 
 static void _lookUpMembersInType(
@@ -492,27 +516,9 @@ static void _lookupMembersInSuperTypeFacets(
 
         BreadcrumbInfo* newBreadcrumbs = inBreadcrumbs;
         BreadcrumbInfo subtypeInfo;
-        auto parentDeclRef = containerDeclRef;
+        auto parentDeclRef = facet->declRefForMemberLookup;
         if (facet->directness != Facet::Directness::Self)
         {
-            // Depending on the type of the facet, we may want to specialize the
-            // declRef that we are going to lookup in. If the facet represents
-            // an extension, we should just lookup in the extension decl.
-            //
-            // If the facet is an extension to an interface type, we should
-            // specialize the interface declRef to the concrete type that this
-            // extension applied to.
-            //
-            // If the facet represents an implementation of interface type,
-            // we should also specialize the interface declRef with the concrete
-            // type info.
-            //
-            parentDeclRef = _maybeSpecializeSuperTypeDeclRef(
-                                astBuilder,
-                                containerDeclRef,
-                                facet->getType(),
-                                facet->subtypeWitness)
-                                .as<ContainerDecl>();
             if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && getText(name) == "This")
             {
                 // If we are going looking for `This` in a `ThisType`, we just need to return the
@@ -961,7 +967,23 @@ static void _lookUpInScopes(
                     }
                 }
 
-                _lookUpMembersInType(astBuilder, name, type, request, result, breadcrumbPtr);
+                // When looking up in an extension declaration, we should not automatically
+                // dereference pointer types, as the 'This' type should refer to the
+                // extension target type itself, not the pointed-to type.
+                LookupRequest modifiedRequest = request;
+                if (aggTypeDeclBaseRef.as<ExtensionDecl>())
+                {
+                    modifiedRequest.options = (LookupOptions)((uint32_t)modifiedRequest.options |
+                                                              (uint32_t)LookupOptions::NoDeref);
+                }
+
+                _lookUpMembersInType(
+                    astBuilder,
+                    name,
+                    type,
+                    modifiedRequest,
+                    result,
+                    breadcrumbPtr);
             }
             else
             {
@@ -977,6 +999,35 @@ static void _lookUpInScopes(
                     request,
                     result,
                     nullptr);
+            }
+
+            if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
+            {
+                // If we are checking an interface default method implementation,
+                // we should look up members from implicit `this` whose type is the explicit `This`
+                // generic parameter, and skip looking up in the interface decl itself.
+
+                // Instead of looking up in the interface decl itself, we should
+                // look up in the `This` type instead.
+                if (getText(name) != "This")
+                {
+                    BreadcrumbInfo breadcrumb;
+                    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
+                    breadcrumb.thisParameterMode = thisParameterMode;
+                    breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
+                    breadcrumb.prev = nullptr;
+                    Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
+                    _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
+                }
+
+                // We need to skip looking up in the interface decl itself, since we are
+                // looking up in the implicit `this` type.
+                for (; scope && !as<InterfaceDecl>(scope->containerDecl); scope = scope->parent)
+                {
+                    // We need to skip looking up in the interface decl itself, since we are
+                    // looking up in the implicit `this` type.
+                }
+                break;
             }
 
             // Before we proceed up to the next outer scope to perform lookup

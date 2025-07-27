@@ -14,9 +14,9 @@ inline int calcMipSize(int size, int level)
     return size > 0 ? size : 1;
 }
 
-inline Extents calcMipSize(Extents size, int mipLevel)
+inline Extent3D calcMipSize(Extent3D size, int mipLevel)
 {
-    Extents rs;
+    Extent3D rs;
     rs.width = calcMipSize(size.width, mipLevel);
     rs.height = calcMipSize(size.height, mipLevel);
     rs.depth = calcMipSize(size.depth, mipLevel);
@@ -24,7 +24,7 @@ inline Extents calcMipSize(Extents size, int mipLevel)
 }
 
 /// Given the type works out the maximum dimension size
-inline int calcMaxDimension(Extents size, TextureType type)
+inline int calcMaxDimension(Extent3D size, TextureType type)
 {
     switch (type)
     {
@@ -43,7 +43,7 @@ inline int calcMaxDimension(Extents size, TextureType type)
 }
 
 /// Given the type, calculates the number of mip maps. 0 on error
-inline int calcNumMipLevels(TextureType type, Extents size)
+inline int calcNumMipLevels(TextureType type, Extent3D size)
 {
     const int maxDimensionSize = calcMaxDimension(size, type);
     return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
@@ -69,14 +69,22 @@ inline int calcNumMipLevels(TextureType type, Extents size)
 {
     TextureDesc textureDesc = {};
 
-    // Default to R8G8B8A8_UNORM
+    // Default to RGBA8Unorm
     const Format format =
-        (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
+        (inputDesc.format == Format::Undefined) ? Format::RGBA8Unorm : inputDesc.format;
+
+    const FormatInfo& formatInfo = getFormatInfo(format);
+
+    bool isArray = inputDesc.arrayLength > 1;
+    bool isMS = inputDesc.sampleCount > 1;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
-    textureDesc.mipLevelCount = texData.m_mipLevels;
-    textureDesc.arrayLength = inputDesc.arrayLength > 0 ? inputDesc.arrayLength : 1;
+    textureDesc.mipCount = texData.m_mipLevels;
+    if (isArray)
+    {
+        textureDesc.arrayLength = inputDesc.arrayLength;
+    }
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
     {
@@ -96,7 +104,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     {
     case 1:
         {
-            textureDesc.type = TextureType::Texture1D;
+            textureDesc.type = isArray ? TextureType::Texture1DArray : TextureType::Texture1D;
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = 1;
             textureDesc.size.depth = 1;
@@ -105,7 +113,14 @@ inline int calcNumMipLevels(TextureType type, Extents size)
         }
     case 2:
         {
-            textureDesc.type = inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D;
+            textureDesc.type =
+                isArray
+                    ? (inputDesc.isCube
+                           ? TextureType::TextureCubeArray
+                           : (isMS ? TextureType::Texture2DMSArray : TextureType::Texture2DArray))
+                    : (inputDesc.isCube
+                           ? TextureType::TextureCube
+                           : (isMS ? TextureType::Texture2DMS : TextureType::Texture2D));
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = inputDesc.size;
             textureDesc.size.depth = 1;
@@ -121,36 +136,52 @@ inline int calcNumMipLevels(TextureType type, Extents size)
         }
     }
 
-    if (textureDesc.mipLevelCount == 0)
+    if (textureDesc.mipCount == 0)
     {
-        textureDesc.mipLevelCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
+        textureDesc.mipCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
+    }
+
+    // Metal doesn't support mip maps for 1D textures.
+    if ((isMS) || (device->getDeviceType() == DeviceType::Metal &&
+                   (textureDesc.type == TextureType::Texture1D ||
+                    textureDesc.type == TextureType::Texture1DArray)))
+    {
+        textureDesc.mipCount = 1;
     }
 
     List<SubresourceData> initSubresources;
-    int arrayLayerCount =
-        textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
+    int layerCount = textureDesc.getLayerCount();
     int subResourceCounter = 0;
-    for (int a = 0; a < arrayLayerCount; ++a)
+    for (int a = 0; a < layerCount; ++a)
     {
-        for (int m = 0; m < textureDesc.mipLevelCount; ++m)
+        for (int m = 0; m < textureDesc.mipCount; ++m)
         {
             int subResourceIndex = subResourceCounter++;
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
             const int mipHeight = calcMipSize(textureDesc.size.height, m);
 
-            auto strideY = mipWidth * sizeof(uint32_t);
-            auto strideZ = mipHeight * strideY;
+            size_t rowPitch = mipWidth * formatInfo.blockSizeInBytes;
+            size_t slicePitch = mipHeight * rowPitch;
 
             SubresourceData subresourceData;
             subresourceData.data = texData.m_slices[subResourceIndex].values;
-            subresourceData.strideY = strideY;
-            subresourceData.strideZ = strideZ;
+            subresourceData.rowPitch = rowPitch;
+            subresourceData.slicePitch = slicePitch;
 
             initSubresources.add(subresourceData);
         }
     }
 
-    textureOut = device->createTexture(textureDesc, initSubresources.getBuffer());
+    if (isMS)
+    {
+        textureDesc.usage |= TextureUsage::RenderTarget;
+        textureOut = device->createTexture(textureDesc);
+        clearTexture(textureOut.get(), inputDesc.content, device);
+    }
+    else
+    {
+        textureOut = device->createTexture(textureDesc, initSubresources.getBuffer());
+    }
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
@@ -160,7 +191,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     size_t bufferSize,
     const void* initData,
     IDevice* device,
-    Slang::ComPtr<IBuffer>& bufferOut)
+    ComPtr<IBuffer>& bufferOut)
 {
     BufferDesc bufferDesc;
     bufferDesc.size = bufferSize;
@@ -180,6 +211,131 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     return SLANG_OK;
 }
 
+/* static */ Result ShaderRendererUtil::clearTexture(
+    ITexture* texture,
+    InputTextureContent content,
+    IDevice* device)
+{
+    SLANG_ASSERT(texture);
+    ComPtr<ICommandQueue> queue;
+    SLANG_RETURN_ON_FAIL(device->getQueue(QueueType::Graphics, queue.writeRef()));
+
+    ComPtr<ICommandEncoder> commandEncoder;
+    SLANG_RETURN_ON_FAIL(queue->createCommandEncoder(commandEncoder.writeRef()));
+
+    TextureDesc desc = texture->getDesc();
+    SubresourceRange range;
+    range.layer = 0;
+    range.layerCount = texture->getDesc().arrayLength;
+    range.mip = 0;
+    range.mipCount = texture->getDesc().mipCount;
+
+    FormatInfo formatInfo = getFormatInfo(desc.format);
+    switch (formatInfo.kind)
+    {
+    case FormatKind::Float:
+        {
+            float clearValue[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1.0f;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureFloat(texture, range, clearValue);
+            break;
+        }
+    case FormatKind::Integer:
+        {
+            uint32_t clearValue[4] = {0U, 0U, 0U, 0U};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1U;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureUint(texture, range, clearValue);
+            break;
+        }
+    case FormatKind::Normalized:
+        {
+            int32_t clearValue[4] = {0, 0, 0, 0};
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                clearValue[0] = clearValue[1] = clearValue[2] = clearValue[3] = 1;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder->clearTextureSint(texture, range, clearValue);
+            break;
+        }
+    case FormatKind::DepthStencil:
+        {
+            float depthValue = 0.f;
+            uint8_t stencilValue = 0U;
+            switch (content)
+            {
+            case InputTextureContent::Zero:
+                // clearValue is already all zeros
+                break;
+            case InputTextureContent::One:
+                depthValue = 1;
+                stencilValue = 1U;
+                break;
+            case InputTextureContent::ChessBoard:
+            case InputTextureContent::Gradient:
+                // For chessboard or gradient, we can't use a single clear value
+                // Instead, we should use a compute shader or multiple draw calls
+                SLANG_ASSERT(!"ChessBoard or Gradient content type is not supported for "
+                              "multisampled textures - requires compute shader implementation");
+                return SLANG_FAIL;
+            }
+            commandEncoder
+                ->clearTextureDepthStencil(texture, range, true, depthValue, true, stencilValue);
+            break;
+        }
+    default:
+        {
+            SLANG_ASSERT(!"Unsupported FormatKind type");
+            return SLANG_FAIL;
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(queue->submit(commandEncoder->finish()));
+
+    return SLANG_OK;
+}
+
 static SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
 {
     SamplerDesc samplerDesc;
@@ -188,6 +344,9 @@ static SamplerDesc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
         samplerDesc.reductionOp = TextureReductionOp::Comparison;
         samplerDesc.comparisonFunc = ComparisonFunc::Less;
     }
+    samplerDesc.minFilter = srcDesc.filteringMode;
+    samplerDesc.magFilter = srcDesc.filteringMode;
+    samplerDesc.mipFilter = srcDesc.filteringMode;
     return samplerDesc;
 }
 

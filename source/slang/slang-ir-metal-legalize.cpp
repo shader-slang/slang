@@ -32,10 +32,18 @@ void legalizeImageStoreValue(IRBuilder& builder, IRImageStore* imageStore)
             }
         }
         elementType = valueVectorType->getElementType();
-        auto vectorValue = as<IRMakeVector>(originalValue);
-        for (UInt i = 0; i < vectorValue->getOperandCount(); i++)
+
+        // Extract components using IRElementExtract to handle any vector instruction type
+        if (auto originalElementCount = as<IRIntLit>(valueVectorType->getElementCount()))
         {
-            components.add(vectorValue->getOperand(i));
+            for (UInt i = 0; i < (UInt)originalElementCount->getValue(); i++)
+            {
+                auto elementExtract = builder.emitElementExtract(
+                    elementType,
+                    originalValue,
+                    builder.getIntValue(builder.getIntType(), i));
+                components.add(elementExtract);
+            }
         }
     }
     else
@@ -181,7 +189,7 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
     }
 };
 
-static void processInst(IRInst* inst)
+static void processInst(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())
     {
@@ -204,7 +212,7 @@ static void processInst(IRInst* inst)
     case kIROp_Less:
     case kIROp_Geq:
     case kIROp_Leq:
-        legalizeBinaryOp(inst);
+        legalizeBinaryOp(inst, sink, CodeGenTarget::Metal);
         break;
     case kIROp_MetalCastToDepthTexture:
         {
@@ -220,7 +228,7 @@ static void processInst(IRInst* inst)
     default:
         for (auto child : inst->getModifiableChildren())
         {
-            processInst(child);
+            processInst(child, sink);
         }
     }
 }
@@ -248,7 +256,7 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
 
-    processInst(module->getModuleInst());
+    processInst(module->getModuleInst(), sink);
 }
 
 } // namespace Slang

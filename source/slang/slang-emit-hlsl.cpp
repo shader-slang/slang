@@ -577,9 +577,6 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             emitNumThreadsAttribute();
             if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {
-                // TODO: Ellie validate here/elsewhere, what's allowed here is
-                // different from the tesselator
-                // The naming here is plural, so add an 's'
                 _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
             }
             break;
@@ -788,6 +785,29 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     }
 }
 
+static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCaps, Stage stage)
+{
+    auto stageAtom = getAtomFromStage(stage);
+
+    // Cache the result of this function for easier lookup.
+    auto result = emitter->getCachedCapability(stageAtom);
+    if (result)
+        return *result;
+
+    // Here we check for presence of the `hlsl_2018` capability for the
+    // current target+stage.
+    auto capabilitySetForStageOfEntryPoint = CapabilitySet(CapabilityName(stageAtom));
+    auto hlsl2018CapabilitySet =
+        CapabilitySet(CapabilityName::hlsl_2018).join(capabilitySetForStageOfEntryPoint);
+    if (targetCaps.join(capabilitySetForStageOfEntryPoint).implies(hlsl2018CapabilitySet))
+    {
+        emitter->addCachedCapability(stageAtom, false);
+        return false;
+    }
+    emitter->addCachedCapability(stageAtom, true);
+    return true;
+}
+
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch (inst->getOp())
@@ -829,6 +849,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
+                return false;
 
             if (as<IRBasicType>(inst->getDataType()))
                 return false;
@@ -853,6 +876,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // operands are non-scalar.
             auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+                return false;
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
                 return false;
 
             if (as<IRBasicType>(inst->getDataType()))
@@ -1150,7 +1176,7 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     // although we should not expect to run into types that don't
     // have a sugared form.
     //
-    m_writer->emit("vector<");
+    m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
     emitType(elementType);
     m_writer->emit(",");
     m_writer->emit(elementCount);
@@ -1443,7 +1469,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopVectorType:
         {
             auto coopVecType = (IRCoopVectorType*)type;
-            m_writer->emit("CoopVector<");
+            m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
             emitType(coopVecType->getElementType());
             m_writer->emit(",");
             m_writer->emit(getIntVal(coopVecType->getElementCount()));
@@ -1666,12 +1692,18 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(
 
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
-    if (const auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>())
+
+    // Get the target profile to determine if PAQs are supported
+    bool enablePAQs = false;
+    auto profile = getTargetProgram()->getOptionSet().getProfile();
+    if (profile.getFamily() == ProfileFamily::DX)
     {
-        m_writer->emit("[payload] ");
+        // PAQs are default in Shader Model 6.7 and above when called with `--profile lib_6_7`
+
+        auto version = profile.getVersion();
+        enablePAQs = version >= ProfileVersion::DX_6_7;
     }
-    // This can be re-enabled when we add PAQs: https://github.com/shader-slang/slang/issues/3448
-    const bool enablePAQs = false;
+
     if (enablePAQs)
     {
         if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())

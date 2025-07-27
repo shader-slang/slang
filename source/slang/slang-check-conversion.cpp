@@ -1,4 +1,5 @@
 // slang-check-conversion.cpp
+#include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
 
 // This file contains semantic-checking logic for dealing
@@ -96,7 +97,17 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // we want to check for is whether a direct initialization
     // is possible (a type conversion exists).
     //
-    return canCoerce(toType, fromExpr->type, fromExpr);
+    ConversionCost cost;
+    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    {
+        if (cost >= kConversionCost_Explicit)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
@@ -137,6 +148,7 @@ bool SemanticsVisitor::_readValueFromInitializerList(
             outToExpr,
             firstInitExpr->type,
             firstInitExpr,
+            getSink(),
             nullptr);
     }
 
@@ -234,9 +246,17 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
 
     // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
     if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl() ||
+        as<PtrType>(type))
         return cacheResult(true);
 
+    // Slang 2026 language fix: an interface type is not C-style.
+    if (isSlang2026OrLater(this))
+    {
+        // TODO: some/dyn types are also not C-style.
+        if (isDeclRefTypeOf<InterfaceDecl>(type))
+            return cacheResult(false);
+    }
 
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
@@ -326,6 +346,8 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     auto* varExpr = getASTBuilder()->create<VarExpr>();
     varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
     varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+    varExpr->loc = loc;
+    varExpr->checked = true;
 
     auto* constructorExpr = getASTBuilder()->create<ExplicitCtorInvokeExpr>();
     constructorExpr->functionExpr = varExpr;
@@ -362,6 +384,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->args);
 
             DiagnosticSink tempSink(getSourceManager(), nullptr);
+            tempSink.setFlags(getSink()->getFlags());
+
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
@@ -375,6 +399,12 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                     getSink()->diagnoseRaw(
                         Severity::Error,
                         static_cast<char const*>(blob->getBufferPointer()));
+                    // For non-c-style types, we will always return true when there
+                    // is a ctor, so that we do not fallback to legacy initializer list logic
+                    // in `_coerceInitializerList()` and produce unrelated errors.
+                    if (outExpr)
+                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                    return true;
                 }
                 return false;
             }
@@ -396,14 +426,38 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
-    if (!structDecl || !_getSynthesizedConstructor(
-                           structDecl,
-                           ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
+    if (!structDecl)
         return false;
 
-    HashSet<Type*> isVisit;
-    bool isCStyle = isCStyleType(toType, isVisit);
+    if (!structDecl->checkState.isBeingChecked())
+        ensureDecl(structDecl, DeclCheckState::AttributesChecked);
 
+    HashSet<Type*> isVisit;
+    bool isCStyle = false;
+    if (!_getSynthesizedConstructor(
+            structDecl,
+            ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
+    {
+        // When a struct has no constructor and it's not a C-style type, the initializer list is
+        // invalid.
+        isCStyle = isCStyleType(toType, isVisit);
+
+        // WAR: We currently still has to allow legacy initializer list for array type until we have
+        // more proper solution for array initialization, so if the right hand side is an array
+        // type, we will not report error and fall-back to legacy initializer list logic.
+        bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
+        if (!isCStyle && !isArrayType)
+        {
+            getSink()->diagnose(
+                fromInitializerListExpr->loc,
+                Diagnostics::cannotUseInitializerListForType,
+                toType);
+        }
+
+        return false;
+    }
+
+    isCStyle = isCStyleType(toType, isVisit);
     // TODO: This is just a special case for a backwards-compatibility feature
     // for HLSL, this flag will imply that the initializer list is synthesized
     // for a type cast from a literal zero to a 'struct'. In this case, we will fall
@@ -470,7 +524,14 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         if (ioArgIndex < argCount)
         {
             auto arg = fromInitializerListExpr->args[ioArgIndex++];
-            return _coerce(CoercionSite::Initializer, toType, outToExpr, arg->type, arg, nullptr);
+            return _coerce(
+                CoercionSite::Initializer,
+                toType,
+                outToExpr,
+                arg->type,
+                arg,
+                getSink(),
+                nullptr);
         }
         else
         {
@@ -496,6 +557,19 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -592,19 +666,13 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             }
             else
             {
-                // We don't know the element count statically,
-                // so what are we supposed to be doing?
-                //
+                auto toMakeArrayFromElementExpr = m_astBuilder->create<MakeArrayFromElementExpr>();
+                toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
+                toMakeArrayFromElementExpr->type = QualType(toType);
                 if (outToExpr)
-                {
-                    getSink()->diagnose(
-                        fromInitializerListExpr,
-                        Diagnostics::cannotUseInitializerListForArrayOfUnknownSize,
-                        toElementCount);
-                }
-                return false;
+                    *outToExpr = toMakeArrayFromElementExpr;
+                return true;
             }
-
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 Expr* coercedArg = nullptr;
@@ -678,12 +746,26 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toRowType =
             createVectorType(toMatrixType->getElementType(), toMatrixType->getColumnCount());
 
-        if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
+        auto rowCountIntVal = toMatrixType->getRowCount();
+        if (auto constRowCount = as<ConstantIntVal>(rowCountIntVal))
         {
             rowCount = (UInt)constRowCount->getValue();
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+                if (outToExpr)
+                    *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -867,7 +949,7 @@ bool SemanticsVisitor::_coerceInitializerList(
     // composition this shouldn't fail.
     if (!as<InitializerListType>(fromInitializerListExpr->type) &&
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
-        return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
+        return _failedCoercion(toType, outToExpr, fromInitializerListExpr, getSink());
 
     // Try to invoke the user-defined constructor if it exists. This call will
     // report error diagnostics if the used-defined constructor exists but does not
@@ -884,13 +966,13 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // We will fall back to the legacy logic of initialize list.
+    Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
             toType,
-            outToExpr,
+            &outInitListExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
-
     if (argIndex != argCount)
     {
         if (outToExpr)
@@ -902,11 +984,17 @@ bool SemanticsVisitor::_coerceInitializerList(
                 argCount);
         }
     }
+    if (outToExpr)
+        *outToExpr = outInitListExpr;
 
     return true;
 }
 
-bool SemanticsVisitor::_failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr)
+bool SemanticsVisitor::_failedCoercion(
+    Type* toType,
+    Expr** outToExpr,
+    Expr* fromExpr,
+    DiagnosticSink* sink)
 {
     if (outToExpr)
     {
@@ -921,7 +1009,10 @@ bool SemanticsVisitor::_failedCoercion(Type* toType, Expr** outToExpr, Expr* fro
         }
         else
         {
-            getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+            if (sink)
+            {
+                sink->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+            }
         }
     }
     return false;
@@ -1093,6 +1184,7 @@ bool SemanticsVisitor::_coerce(
     Expr** outToExpr,
     QualType fromType,
     Expr* fromExpr,
+    DiagnosticSink* sink,
     ConversionCost* outCost)
 {
     // If we are about to try and coerce an overloaded expression,
@@ -1212,7 +1304,7 @@ bool SemanticsVisitor::_coerce(
                     //
                     if (!_canModifierBeAddedDuringCoercion(modifier))
                     {
-                        return _failedCoercion(toType, outToExpr, fromExpr);
+                        return _failedCoercion(toType, outToExpr, fromExpr, sink);
                     }
                 }
             }
@@ -1231,7 +1323,7 @@ bool SemanticsVisitor::_coerce(
                     //
                     if (!_canModifierBeDroppedDuringCoercion(modifier))
                     {
-                        return _failedCoercion(toType, outToExpr, fromExpr);
+                        return _failedCoercion(toType, outToExpr, fromExpr, sink);
                     }
                 }
             }
@@ -1350,7 +1442,26 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (outToExpr)
                 {
-                    *outToExpr = fromExpr;
+                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    castExpr->type = toType;
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->base = fromExpr;
+                    *outToExpr = castExpr;
+                }
+                return true;
+            }
+        }
+    }
+
+    if (auto toFuncType = as<FuncType>(toType))
+    {
+        if (auto fromLambdaType = isDeclRefTypeOf<StructDecl>(fromType))
+        {
+            if (tryCoerceLambdaToFuncType(fromLambdaType, toFuncType, fromExpr, outToExpr))
+            {
+                if (outCost)
+                {
+                    *outCost = kConversionCost_LambdaToFunc;
                 }
                 return true;
             }
@@ -1410,7 +1521,7 @@ bool SemanticsVisitor::_coerce(
     //
     if (as<ParameterGroupType>(toType))
     {
-        return _failedCoercion(toType, outToExpr, fromExpr);
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
 
     // We allow implicit conversion of a parameter group type like
@@ -1436,7 +1547,7 @@ bool SemanticsVisitor::_coerce(
             derefExpr->checked = true;
         }
 
-        if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, &subCost))
+        if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, sink, &subCost))
         {
             return false;
         }
@@ -1488,7 +1599,7 @@ bool SemanticsVisitor::_coerce(
             openRefExpr = maybeOpenRef(fromExpr);
         }
 
-        if (!_coerce(site, toType, outToExpr, fromValueType, openRefExpr, &subCost))
+        if (!_coerce(site, toType, outToExpr, fromValueType, openRefExpr, sink, &subCost))
         {
             return false;
         }
@@ -1497,7 +1608,6 @@ bool SemanticsVisitor::_coerce(
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
     }
-
 
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
@@ -1535,7 +1645,7 @@ bool SemanticsVisitor::_coerce(
         if (cachedMethod->conversionFuncOverloadCandidate.status !=
             OverloadCandidate::Status::Applicable)
         {
-            return _failedCoercion(toType, outToExpr, fromExpr);
+            return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
         overloadContext.bestCandidateStorage = cachedMethod->conversionFuncOverloadCandidate;
         overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
@@ -1579,7 +1689,7 @@ bool SemanticsVisitor::_coerce(
             {
                 getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
             }
-            return _failedCoercion(toType, outToExpr, fromExpr);
+            return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
 
         // If all of the candidates in `bestCandidates` are applicable,
@@ -1607,7 +1717,10 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr)
         {
-            getSink()->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+            if (sink)
+            {
+                sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+            }
 
             *outToExpr = CreateErrorExpr(fromExpr);
         }
@@ -1638,7 +1751,7 @@ bool SemanticsVisitor::_coerce(
             {
                 getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
             }
-            return _failedCoercion(toType, outToExpr, fromExpr);
+            return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
 
         // Next, we need to look at the implicit conversion
@@ -1660,12 +1773,15 @@ bool SemanticsVisitor::_coerce(
         {
             if (cost >= kConversionCost_Explicit)
             {
-                getSink()->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                getSink()->diagnoseWithoutSourceView(
-                    fromExpr,
-                    Diagnostics::noteExplicitConversionPossible,
-                    fromType,
-                    toType);
+                if (sink)
+                {
+                    sink->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
+                    sink->diagnoseWithoutSourceView(
+                        fromExpr,
+                        Diagnostics::noteExplicitConversionPossible,
+                        fromType,
+                        toType);
+                }
             }
             else if (cost >= kConversionCost_Default)
             {
@@ -1689,9 +1805,9 @@ bool SemanticsVisitor::_coerce(
                         }
                     }
                 }
-                if (shouldEmitGeneralWarning)
+                if (shouldEmitGeneralWarning && sink)
                 {
-                    getSink()->diagnose(
+                    sink->diagnose(
                         fromExpr,
                         Diagnostics::unrecommendedImplicitConversion,
                         fromType,
@@ -1699,14 +1815,14 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            if (site == CoercionSite::Argument)
+            if (site == CoercionSite::Argument && sink)
             {
                 auto builtinConversionKind = getImplicitConversionBuiltinKind(
                     overloadContext.bestCandidate->item.declRef.getDecl());
                 if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
                 {
                     if (!as<FloatingPointLiteralExpr>(fromExpr))
-                        getSink()->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
+                        sink->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
                 }
             }
         }
@@ -1764,16 +1880,156 @@ bool SemanticsVisitor::_coerce(
             castExpr->arguments.add(args[0]);
         }
         if (!cachedMethod)
-            getShared()->cacheImplicitCastMethod(
-                implicitCastKey,
-                ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+        {
+            // We can only cache the method if it is a public, otherwise we may not be able to
+            // use this method depending on where we are performing the coercion.
+            if (overloadContext.bestCandidate->item.declRef &&
+                getDeclVisibility(overloadContext.bestCandidate->item.declRef.getDecl()) ==
+                    DeclVisibility::Public)
+            {
+                getShared()->cacheImplicitCastMethod(
+                    implicitCastKey,
+                    ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+            }
+        }
         return true;
     }
     if (!cachedMethod)
     {
         getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
     }
-    return _failedCoercion(toType, outToExpr, fromExpr);
+    return _failedCoercion(toType, outToExpr, fromExpr, sink);
+}
+
+bool SemanticsVisitor::tryCoerceLambdaToFuncType(
+    DeclRef<StructDecl> lambdaStruct,
+    FuncType* toFuncType,
+    Expr* fromExpr,
+    Expr** outToExpr)
+{
+    FuncDecl* synStaticFunc = nullptr;
+    FuncDecl* invokeFunc = nullptr;
+
+    // First, check if `lambdaStruct` contains any fields.
+    // If it does, we can't convert it to a function type.
+    auto operatorName = getName("()");
+
+    for (auto member : lambdaStruct.getDecl()->getDirectMemberDecls())
+    {
+        if (auto field = as<VarDecl>(member))
+        {
+            if (!isEffectivelyStatic(field))
+                return false;
+        }
+        else if (auto inheritanceDecl = as<InheritanceDecl>(member))
+        {
+            // If the struct inherits from anything that is not an interface,
+            // we will consider it to be non-empty and not convertible to a function type.
+            if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                return false;
+        }
+        else if (auto funcDecl = as<FuncDecl>(member))
+        {
+            // If the struct already contains a synthesized static invoke member, use it.
+            if (isEffectivelyStatic(funcDecl) &&
+                funcDecl->findModifier<SynthesizedStaticLambdaFuncModifier>() &&
+                funcDecl->returnType.type == toFuncType->getResultType())
+                synStaticFunc = funcDecl;
+            if (funcDecl->getName() == operatorName)
+            {
+                // If we found operator(), keep it for later.
+                invokeFunc = funcDecl;
+            }
+        }
+    }
+
+    if (!invokeFunc)
+    {
+        return false;
+    }
+
+    auto invokeFuncDeclRef = m_astBuilder->getMemberDeclRef(lambdaStruct, invokeFunc);
+
+    // Verify that the function parameter types are exactly the same as toFuncType.
+    if (invokeFunc->getParameters().getCount() != toFuncType->getParamCount())
+    {
+        return false;
+    }
+    Index paramId = 0;
+    for (auto param : invokeFunc->getParameters())
+    {
+        auto paramType = getParamTypeWithDirectionWrapper(m_astBuilder, param);
+        auto toParamType = toFuncType->getParamType(paramId);
+        if (!paramType->equals(toParamType))
+        {
+            return false;
+        }
+        paramId++;
+    }
+
+    // Verify that the return type of the function is convertible to the function type.
+    if (!canCoerce(toFuncType->getResultType(), invokeFunc->returnType.type, nullptr))
+    {
+        return false;
+    }
+
+    if (!synStaticFunc)
+    {
+        // If the struct doesn't contain a static method for operator(), we try to synthesize one.
+        synStaticFunc = m_astBuilder->create<FuncDecl>();
+        synStaticFunc->nameAndLoc.name = getName("__syn_static_invoke");
+        addModifier(synStaticFunc, m_astBuilder->create<SynthesizedStaticLambdaFuncModifier>());
+        addModifier(synStaticFunc, m_astBuilder->create<HLSLStaticModifier>());
+        addModifier(synStaticFunc, m_astBuilder->create<SynthesizedModifier>());
+
+        synStaticFunc->ownedScope = m_astBuilder->create<Scope>();
+        synStaticFunc->ownedScope->containerDecl = synStaticFunc;
+        synStaticFunc->ownedScope->parent = getScope(lambdaStruct.getDecl());
+        synStaticFunc->parentDecl = lambdaStruct.getDecl();
+        synStaticFunc->returnType.type = toFuncType->getResultType();
+
+        List<Expr*> synArgs;
+        addRequiredParamsToSynthesizedDecl(invokeFuncDeclRef, synStaticFunc, synArgs);
+        ThisExpr* synThis = nullptr;
+        addModifiersToSynthesizedDecl(nullptr, invokeFuncDeclRef, synStaticFunc, synThis);
+
+        ASTSynthesizer synth(m_astBuilder, getNamePool());
+        synth.pushContainerScope(synStaticFunc);
+        auto blockStmt = m_astBuilder->create<BlockStmt>();
+        synStaticFunc->body = blockStmt;
+        auto seqStmt = synth.pushSeqStmtScope();
+        blockStmt->body = seqStmt;
+
+        synth.pushVarScope();
+
+        // emit `return LambdaStructType().operator()(args...)`.
+        auto tempThis = synth.emitInvokeExpr(
+            synth.emitStaticTypeExpr(DeclRefType::create(m_astBuilder, lambdaStruct)),
+            List<Expr*>());
+        tempThis = dispatchExpr(tempThis, *this);
+
+        Expr* operatorRefExpr = synth.emitMemberExpr(toFuncType, tempThis, invokeFuncDeclRef);
+
+        auto invokeExpr = synth.emitInvokeExpr(operatorRefExpr, _Move(synArgs));
+        invokeExpr = dispatchExpr(invokeExpr, *this);
+        auto resultValue =
+            coerce(CoercionSite::Return, toFuncType->getResultType(), invokeExpr, getSink());
+        synth.emitReturnStmt(resultValue);
+
+        lambdaStruct.getDecl()->addMember(synStaticFunc);
+    }
+
+    // If we have a static method for operator(), we can convert the lambda to a function type.
+    if (outToExpr)
+    {
+        VarExpr* expr = m_astBuilder->create<VarExpr>();
+        expr->loc = fromExpr->loc;
+        expr->declRef = m_astBuilder->getMemberDeclRef(lambdaStruct, synStaticFunc);
+        expr->type = QualType(toFuncType);
+        expr->checked = true;
+        *outToExpr = expr;
+    }
+    return true;
 }
 
 bool SemanticsVisitor::canCoerce(
@@ -1815,7 +2071,7 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
-    bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, &cost);
+    bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
 
     if (outCost)
         *outCost = cost;
@@ -1872,10 +2128,14 @@ Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
 }
 
 
-Expr* SemanticsVisitor::coerce(CoercionSite site, Type* toType, Expr* fromExpr)
+Expr* SemanticsVisitor::coerce(
+    CoercionSite site,
+    Type* toType,
+    Expr* fromExpr,
+    DiagnosticSink* sink)
 {
     Expr* expr = nullptr;
-    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, nullptr))
+    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, sink, nullptr))
     {
         // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
         // clobber the type on `fromExpr`, and an invariant here is that coercion

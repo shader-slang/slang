@@ -56,6 +56,10 @@ struct BindingContext
     virtual void setBuffer(MTL::Buffer* buffer, NS::UInteger index) = 0;
     virtual void setTexture(MTL::Texture* texture, NS::UInteger index) = 0;
     virtual void setSampler(MTL::SamplerState* sampler, NS::UInteger index) = 0;
+    virtual void useResources(
+        MTL::Resource const** resources,
+        NS::UInteger count,
+        MTL::ResourceUsage usage) = 0;
 };
 
 struct ComputeBindingContext : public BindingContext
@@ -82,6 +86,12 @@ struct ComputeBindingContext : public BindingContext
     void setSampler(MTL::SamplerState* sampler, NS::UInteger index) override
     {
         encoder->setSamplerState(sampler, index);
+    }
+
+    void useResources(MTL::Resource const** resources, NS::UInteger count, MTL::ResourceUsage usage)
+        override
+    {
+        encoder->useResources(resources, count, usage);
     }
 };
 
@@ -112,6 +122,12 @@ struct RenderBindingContext : public BindingContext
     {
         encoder->setVertexSamplerState(sampler, index);
         encoder->setFragmentSamplerState(sampler, index);
+    }
+
+    void useResources(MTL::Resource const** resources, NS::UInteger count, MTL::ResourceUsage usage)
+        override
+    {
+        encoder->useResources(resources, count, usage);
     }
 };
 

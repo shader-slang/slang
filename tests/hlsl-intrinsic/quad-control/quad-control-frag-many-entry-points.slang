@@ -27,6 +27,7 @@ float4 getFragColor(float2 uv) {
     return fragColor;
 }
 
+// CHECK_SPIRV: OpExtension "SPV_KHR_maximal_reconvergence"
 // CHECK_SPIRV: OpExecutionMode %fragmentMain1 MaximallyReconvergesKHR
 // CHECK_SPIRV: OpExecutionMode %fragmentMain1 QuadDerivativesKHR
 // CHECK_GLSL: layout(quad_derivatives) in

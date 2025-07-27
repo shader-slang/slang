@@ -20,20 +20,37 @@ endif()
 
 # Similarly, disable warnings for external projects
 if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
-    if(MSVC)
-        add_compile_options(/W0)
-    else()
+    if(NOT MSVC)
         add_compile_options(-w)
     endif()
 endif()
 
+# Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)
+        add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_UNORDERED_DENSE_PATH}/unordered_dense
+            unordered_dense
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # Miniz
 if(NOT ${SLANG_USE_SYSTEM_MINIZ})
-    add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_MINIZ_PATH)
+        add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_MINIZ_PATH}/miniz
+            miniz
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
     set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
     # Work around https://github.com/richgel999/miniz/pull/292
     get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
@@ -46,7 +63,16 @@ endif()
 # LZ4
 if(NOT ${SLANG_USE_SYSTEM_LZ4})
     set(LZ4_BUNDLED_MODE ON)
-    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_LZ4_PATH)
+        add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_LZ4_PATH}/lz4/build/cmake
+            lz4/build/cmake
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
     if(MSVC)
         target_compile_options(
             lz4_static
@@ -57,7 +83,16 @@ endif()
 
 # Vulkan headers
 if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-    add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+        add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
+            vulkan
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # metal-cpp headers
@@ -68,32 +103,88 @@ target_include_directories(
 )
 
 # SPIRV-Headers
-if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+        message(
+            WARNING
+            "SLANG_OVERRIDE_SPIRV_HEADERS_PATH does nothing when SLANG_USE_SPIRV_HEADERS is set"
+        )
+    endif()
+elseif(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+    add_subdirectory(
+        ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
+        spirv-headers
+        EXCLUDE_FROM_ALL
+        ${system}
+    )
+else()
     add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
+    # When using spirv headers via find_package, SPIRV-Headers_SOURCE_DIR is not set
+    # SPIRV-Tools requires that variable, as it uses it to detect if SPIRV-Headers is provided by the consumer.
+    # Fake a source build by setting it here. Ideally SPIRV-Tools should not depend on _SOURCE_DIR
+    if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+        get_target_property(
+            SPIRV-Headers_SOURCE_DIR
+            SPIRV-Headers::SPIRV-Headers
+            INTERFACE_INCLUDE_DIRECTORIES
+        )
+        cmake_path(
+            GET
+            SPIRV-Headers_SOURCE_DIR
+            PARENT_PATH SPIRV-Headers_SOURCE_DIR
+        )
+    endif()
+
     # SPIRV-Tools
     set(SPIRV_TOOLS_BUILD_STATIC ON)
     set(SPIRV_WERROR OFF)
-    set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
     set(SPIRV_SKIP_TESTS ON)
-    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+    # Tools
+    if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
+        add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
+            spirv-tools
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 
     # glslang
     set(SKIP_GLSLANG_INSTALL ON)
     set(ENABLE_OPT ON)
     set(ENABLE_PCH OFF)
-    add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
+        add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
+            glslang
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # imgui
 add_library(imgui INTERFACE)
-target_include_directories(
-    imgui
-    ${system}
-    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
-)
+if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+    target_include_directories(
+        imgui
+        ${system}
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
+    )
+else()
+    target_include_directories(
+        imgui
+        ${system}
+        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
+    )
+endif()
 
 # stb
 add_library(stb INTERFACE)
@@ -106,16 +197,24 @@ target_include_directories(
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_BUILD_FROM_SLANG_REPO ON)
+    set(SLANG_RHI_BUILD_TESTS ON)
+    set(SLANG_RHI_BUILD_TESTS_WITH_GLFW OFF)
+    set(SLANG_RHI_INSTALL OFF)
     set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_FETCH_SLANG OFF)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
-
-    # Not disabling these break tests (issue #5474)
-    set(SLANG_RHI_FETCH_DXC OFF)
-    set(SLANG_RHI_FETCH_AGILITY_SDK OFF)
-
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
+
+    # CoopVec requires 1.717.0-preview, but we cannot use the version until slang-rhi
+    # allow slang to override D3D12Version value
+    #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
+    #set(SLANG_RHI_FETCH_AGILITY_SDK_VERSION
+    #    "1.717.0-preview"
+    #    CACHE STRING
+    #    "Agility SDK version to fetch"
+    #    FORCE
+    #)
 
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)
@@ -127,7 +226,22 @@ if(SLANG_ENABLE_SLANG_RHI)
         set(SLANG_RHI_ENABLE_D3D11 OFF)
         set(SLANG_RHI_ENABLE_D3D12 OFF)
     endif()
-    add_subdirectory(slang-rhi)
+    if(NOT SLANG_OVERRIDE_SLANG_RHI_PATH)
+        add_subdirectory(slang-rhi)
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SLANG_RHI_PATH}/slang-rhi
+            slang-rhi
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
+
+    # Output slang-rhi-tests to the bin directory so we can run it easily.
+    set_target_properties(
+        slang-rhi-tests
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+    )
 endif()
 
 # Tidy things up:

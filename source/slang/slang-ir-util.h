@@ -78,6 +78,9 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
+// If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
+IRType* getVectorOrCoopMatrixElementType(IRType* type);
+
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
@@ -250,7 +253,7 @@ IRInst* emitLoopBlocks(
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Remove all linkage decorations from func.
-void removeLinkageDecorations(IRGlobalValueWithCode* func);
+void removeLinkageDecorations(IRInst* inst);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
@@ -324,6 +327,7 @@ IRBlock* getBlock(IRInst* inst);
 IRVarLayout* findVarLayout(IRInst* value);
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
 // Run an operation over every block in a module
 template<typename F>
@@ -384,6 +388,42 @@ void legalizeDefUse(IRGlobalValueWithCode* func);
 
 UnownedStringSlice getMangledName(IRInst* inst);
 
+bool isFirstBlock(IRInst* inst);
+
+bool isSpecConstRateType(IRType* type);
+void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+bool canOperationBeSpecConst(
+    IROp op,
+    IRType* resultType,
+    IRInst* const* fixedArgs,
+    IRUse* operands);
+bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
+
+// most of <algorithm> doesn't work on out non-const iterators, so define this
+// version
+template<typename Range, typename Predicate>
+constexpr bool anyOf(Range&& range, Predicate&& pred)
+{
+    // Handle both const and non-const ranges
+    auto first = range.begin();
+    auto last = range.end();
+
+    for (; first != last; ++first)
+    {
+        if (pred(*first))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
+
+bool isSignedType(IRType* type);
+
+bool isIROpaqueType(IRType* type);
 } // namespace Slang
 
 #endif

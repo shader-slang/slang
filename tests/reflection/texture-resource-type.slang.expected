@@ -49,8 +49,24 @@ standard output = {
             }
         },
         {
-            "name": "FloatFourTexture",
+            "name": "FloatThreeTexture",
             "binding": {"kind": "shaderResource", "index": 3},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 3,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "FloatFourTexture",
+            "binding": {"kind": "shaderResource", "index": 4},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -66,7 +82,8 @@ standard output = {
         },
         {
             "name": "IntTexture",
-            "binding": {"kind": "shaderResource", "index": 4},
+            "binding": {"kind": "shaderResource", "index": 5},
+            "format": "r32i",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -78,7 +95,8 @@ standard output = {
         },
         {
             "name": "IntTwoTexture",
-            "binding": {"kind": "shaderResource", "index": 5},
+            "binding": {"kind": "shaderResource", "index": 6},
+            "format": "rg32i",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -94,7 +112,8 @@ standard output = {
         },
         {
             "name": "IntFourTexture",
-            "binding": {"kind": "shaderResource", "index": 6},
+            "binding": {"kind": "shaderResource", "index": 7},
+            "format": "rgba32i",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -110,7 +129,8 @@ standard output = {
         },
         {
             "name": "UintTexture",
-            "binding": {"kind": "shaderResource", "index": 7},
+            "binding": {"kind": "shaderResource", "index": 8},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -122,7 +142,8 @@ standard output = {
         },
         {
             "name": "UintTwoTexture",
-            "binding": {"kind": "shaderResource", "index": 8},
+            "binding": {"kind": "shaderResource", "index": 9},
+            "format": "rg32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -138,13 +159,48 @@ standard output = {
         },
         {
             "name": "UintFourTexture",
-            "binding": {"kind": "shaderResource", "index": 9},
+            "binding": {"kind": "shaderResource", "index": 10},
+            "format": "rgba32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
                 "resultType": {
                     "kind": "vector",
                     "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "uint32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "R11G11B10Texture",
+            "binding": {"kind": "shaderResource", "index": 11},
+            "format": "r11f_g11f_b10f",
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "RGB10_A2_UI_Texture",
+            "binding": {"kind": "shaderResource", "index": 12},
+            "format": "rgb10_a2ui",
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 3,
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "uint32"
@@ -186,32 +242,52 @@ standard output = {
                     "binding": {"kind": "shaderResource", "index": 2, "used": 0}
                 },
                 {
-                    "name": "FloatFourTexture",
+                    "name": "FloatThreeTexture",
                     "binding": {"kind": "shaderResource", "index": 3, "used": 0}
                 },
                 {
-                    "name": "IntTexture",
+                    "name": "FloatFourTexture",
                     "binding": {"kind": "shaderResource", "index": 4, "used": 0}
                 },
                 {
+                    "name": "IntTexture",
+                    "binding": {"kind": "shaderResource", "index": 5, "used": 0},
+                    "format": "r32i"
+                },
+                {
                     "name": "IntTwoTexture",
-                    "binding": {"kind": "shaderResource", "index": 5, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 6, "used": 0},
+                    "format": "rg32i"
                 },
                 {
                     "name": "IntFourTexture",
-                    "binding": {"kind": "shaderResource", "index": 6, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 7, "used": 0},
+                    "format": "rgba32i"
                 },
                 {
                     "name": "UintTexture",
-                    "binding": {"kind": "shaderResource", "index": 7, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 8, "used": 0},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UintTwoTexture",
-                    "binding": {"kind": "shaderResource", "index": 8, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 9, "used": 0},
+                    "format": "rg32ui"
                 },
                 {
                     "name": "UintFourTexture",
-                    "binding": {"kind": "shaderResource", "index": 9, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 10, "used": 0},
+                    "format": "rgba32ui"
+                },
+                {
+                    "name": "R11G11B10Texture",
+                    "binding": {"kind": "shaderResource", "index": 11, "used": 0},
+                    "format": "r11f_g11f_b10f"
+                },
+                {
+                    "name": "RGB10_A2_UI_Texture",
+                    "binding": {"kind": "shaderResource", "index": 12, "used": 0},
+                    "format": "rgb10_a2ui"
                 }
             ]
         }

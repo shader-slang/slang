@@ -11,8 +11,8 @@ struct Test1
 StructuredBuffer<Test1> dp;
 RWStructuredBuffer<float4> outputBuffer;
 
-// CHECK-COUNT-2: unpackStorage
-// CHECK-NOT: unpackStorage
+// CHECK: outputBuffer{{.*}}._data[{{.*}}] =
+
 [numthreads(4, 4, 1)]
 void main(uint3 GTid : SV_GroupThreadID, 
           uint GI    : SV_GroupIndex)

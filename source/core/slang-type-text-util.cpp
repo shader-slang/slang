@@ -80,16 +80,14 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_METAL, "metal", "metal", "Metal shader source"},
     {SLANG_METAL_HEADER, "metal.hpp", "metal.hpp", "Metal shader header"},
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
-    {SLANG_METAL_LIB_ASM,
-     "metallib-asm"
-     "metallib-asm",
-     "Metal Library Bytecode assembly"},
+    {SLANG_METAL_LIB_ASM, "metallib-asm", "metallib-asm", "Metal Library Bytecode assembly"},
     {SLANG_WGSL, "wgsl", "wgsl", "WebGPU shading language source"},
     {SLANG_WGSL_SPIRV_ASM,
      "wgsl-spirv-asm",
      "wgsl-spirv-asm,wgsl-spirv-assembly",
      "SPIR-V assembly via WebGPU shading language"},
     {SLANG_WGSL_SPIRV, "wgsl-spirv", "wgsl-spirv", "SPIR-V via WebGPU shading language"},
+    {SLANG_HOST_VM, "slang-vm", "slangvm,slang-vm", "Slang VM byte code"},
 };
 
 static const NamesDescriptionValue s_languageInfos[] = {
@@ -99,6 +97,12 @@ static const NamesDescriptionValue s_languageInfos[] = {
     {SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language"},
     {SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language"},
     {SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA"},
+};
+
+static const NamesDescriptionValue s_languageVersionInfos[] = {
+    {SLANG_LANGUAGE_VERSION_LEGACY, "legacy,default,2018", "Legacy Slang language"},
+    {SLANG_LANGUAGE_VERSION_2025, "2025", "Slang language rules for 2025 and older"},
+    {SLANG_LANGUAGE_VERSION_2026, "2026,latest", "Slang language rules for 2026 and newer"},
 };
 
 static const NamesDescriptionValue s_compilerInfos[] = {
@@ -167,6 +171,14 @@ static const NamesDescriptionValue s_floatingPointModes[] = {
      "by the target."},
     {SLANG_FLOATING_POINT_MODE_DEFAULT, "default", "Default floating point mode"}};
 
+static const NamesDescriptionValue s_fpDenormalModes[] = {
+    {SLANG_FP_DENORM_MODE_ANY,
+     "any",
+     "Use any denormal handling mode (default). The mode used is implementation defined."},
+    {SLANG_FP_DENORM_MODE_PRESERVE, "preserve", "Preserve denormal values"},
+    {SLANG_FP_DENORM_MODE_FTZ, "ftz", "Flush denormals to zero"},
+};
+
 static const NamesDescriptionValue s_optimizationLevels[] = {
     {SLANG_OPTIMIZATION_LEVEL_NONE, "0,none", "Disable all optimizations"},
     {SLANG_OPTIMIZATION_LEVEL_DEFAULT,
@@ -219,6 +231,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
     return makeConstArrayView(s_languageInfos);
 }
 
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getLanguageVersionInfos()
+{
+    return makeConstArrayView(s_languageVersionInfos);
+}
+
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getCompilerInfos()
 {
     return makeConstArrayView(s_compilerInfos);
@@ -242,6 +259,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFloatingPointModeInfos()
 {
     return makeConstArrayView(s_floatingPointModes);
+}
+
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormalModeInfos()
+{
+    return makeConstArrayView(s_fpDenormalModes);
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()
@@ -317,6 +339,14 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
     return NameValueUtil::findValue(getLanguageInfos(), text, SLANG_SOURCE_LANGUAGE_UNKNOWN);
+}
+
+/* static */ SlangLanguageVersion TypeTextUtil::findLanguageVersion(const UnownedStringSlice& text)
+{
+    return NameValueUtil::findValue(
+        getLanguageVersionInfos(),
+        text,
+        SLANG_LANGUAGE_VERSION_UNKNOWN);
 }
 
 /* static */ SlangPassThrough TypeTextUtil::findPassThrough(const UnownedStringSlice& slice)

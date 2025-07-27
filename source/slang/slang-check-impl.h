@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -456,6 +458,12 @@ struct FacetImpl
     ///
     Facet::Origin origin;
 
+    // DeclRef to the container that represent this facet for member lookup.
+    // If the facet is for an interface decl, this declref will be a specialized `LookupDeclRef`
+    // containing the subtype witness that the type this facet belongs to is a subtype of interface
+    // represented by this facet.
+    DeclRef<ContainerDecl> declRefForMemberLookup;
+
     Type* getType() const { return origin.type; }
     DeclRef<Decl> getDeclRef() const { return origin.declRef; }
 
@@ -468,9 +476,18 @@ struct FacetImpl
     /// The next facet in the linearized inheritance list of the entity.
     Facet next;
 
+    void setSubtypeWitness(ASTBuilder* builder, SubtypeWitness* witness)
+    {
+        subtypeWitness = witness;
+        init(builder);
+    }
+
+    void init(ASTBuilder* builder);
+
     FacetImpl() {}
 
     FacetImpl(
+        ASTBuilder* astBuilder,
         Facet::Kind kind,
         Facet::Directness directness,
         DeclRef<Decl> declRef,
@@ -478,6 +495,7 @@ struct FacetImpl
         SubtypeWitness* subtypeWitness)
         : kind(kind), directness(directness), origin(declRef, type), subtypeWitness(subtypeWitness)
     {
+        init(astBuilder);
     }
 };
 
@@ -989,6 +1007,18 @@ public:
         return result;
     }
 
+    SemanticsContext withParentLambdaExpr(
+        LambdaExpr* expr,
+        LambdaDecl* decl,
+        Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedLambdaDecl)
+    {
+        SemanticsContext result(*this);
+        result.m_parentLambdaExpr = expr;
+        result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
+        result.m_parentLambdaDecl = decl;
+        return result;
+    }
+
     /// Information for tracking one or more outer statements.
     ///
     /// During checking of statements, we need to track what
@@ -1014,6 +1044,20 @@ public:
         SemanticsContext result(*this);
         result.m_outerStmts = outerStmts;
         return result;
+    }
+
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
     }
 
     // Setup the flag to indicate disabling the short-circuiting evaluation
@@ -1161,6 +1205,13 @@ protected:
     ExpandExpr* m_parentExpandExpr = nullptr;
 
     OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+
+    // If we are checking inside a lambda expression, we need
+    // to track the referenced variables that should be captured
+    // by the lambda.
+    LambdaExpr* m_parentLambdaExpr = nullptr;
+    LambdaDecl* m_parentLambdaDecl = nullptr;
+    Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
 };
 
 struct OuterScopeContextRAII
@@ -1217,8 +1268,8 @@ public:
     TypeExp TranslateTypeNode(TypeExp const& typeExp);
     Type* getRemovedModifierType(ModifiedType* type, ModifierVal* modifier);
     Type* getConstantBufferType(Type* elementType, Type* layoutType);
-
     DeclRefType* getExprDeclRefType(Expr* expr);
+    LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
@@ -1337,6 +1388,13 @@ public:
         SourceLoc loc,
         bool& outDiagnosed);
 
+    bool isWitnessUncheckedOptional(SubtypeWitness* witness);
+    LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
+    LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
+        const LookupResult& lookupResult,
+        SourceLoc loc,
+        bool& outDiagnosed);
+
     Val* resolveVal(Val* val)
     {
         if (!val)
@@ -1386,7 +1444,18 @@ public:
 
     Type* ExtractGenericArgType(Expr* exp);
 
-    IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType, DiagnosticSink* sink);
+    enum class ConstantFoldingKind
+    {
+        CompileTime,
+        LinkTime,
+        SpecializationConstant
+    };
+
+    IntVal* ExtractGenericArgInteger(
+        Expr* exp,
+        Type* genericParamType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
     Val* ExtractGenericArgVal(Expr* exp);
@@ -1431,6 +1500,17 @@ public:
     /// on each declaration in the group.
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
+
+    void ensureOuterGenericConstraints(Decl* decl, DeclCheckState state);
+
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
 
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
@@ -1512,7 +1592,7 @@ public:
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
     ///
-    void addDifferentiableTypeToDiffTypeRegistry(DeclRefType* type, SubtypeWitness* witness);
+    void addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness);
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
@@ -1627,7 +1707,7 @@ public:
         InitializerListExpr* fromInitializerListExpr);
 
     /// Report that implicit type coercion is not possible.
-    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr);
+    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
     /// Central engine for implementing implicit coercion logic
     ///
@@ -1655,6 +1735,7 @@ public:
         Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
+        DiagnosticSink* sink,
         ConversionCost* outCost);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -1679,7 +1760,7 @@ public:
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr);
+    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -1733,11 +1814,6 @@ public:
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
     void checkVisibility(Decl* decl);
 
-    bool doesSignatureMatchRequirement(
-        DeclRef<CallableDecl> satisfyingMemberDeclRef,
-        DeclRef<CallableDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool doesAccessorMatchRequirement(
         DeclRef<AccessorDecl> satisfyingMemberDeclRef,
         DeclRef<AccessorDecl> requiredMemberDeclRef);
@@ -1778,10 +1854,6 @@ public:
     //
     // If it does, then inserts a witness into `witnessTable`
     // and returns `true`, otherwise returns `false`
-    bool doesMemberSatisfyRequirement(
-        DeclRef<Decl> memberDeclRef,
-        DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     // State used while checking if a declaration (either a type declaration
     // or an extension of that type) conforms to the interfaces it claims
@@ -1792,15 +1864,47 @@ public:
         /// The type for which conformances are being checked
         Type* conformingType;
 
+        Witness* conformingWitness;
+
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
 
-        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
-        DiagnosticSink innerSink;
-
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
+
+    /// Reasons why witness synthesis can fail
+    enum class WitnessSynthesisFailureReason
+    {
+        General,                  // Generic failure (default)
+        MethodResultTypeMismatch, // Method return type doesn't match interface requirement
+        ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
+        GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
+    };
+
+    /// Details about method witness synthesis failure
+    struct MethodWitnessSynthesisFailureDetails
+    {
+        WitnessSynthesisFailureReason reason = WitnessSynthesisFailureReason::General;
+        DeclRef<Decl> candidateMethod; // The method that was considered but failed
+        Type* actualType = nullptr;    // For type mismatches: the actual type found
+        Type* expectedType = nullptr;  // For type mismatches: the expected type
+        ParameterDirection actualDir =
+            kParameterDirection_In; // For direction mismatches: the actual direction
+        ParameterDirection expectedDir =
+            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
+    };
+
+    bool doesSignatureMatchRequirement(
+        DeclRef<CallableDecl> satisfyingMemberDeclRef,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool doesMemberSatisfyRequirement(
+        DeclRef<Decl> memberDeclRef,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
 
     void addModifiersToSynthesizedDecl(
         ConformanceCheckingContext* context,
@@ -1845,16 +1949,23 @@ public:
         DeclRef<CallableDecl> requirement,
         DeclRef<CallableDecl> method);
 
+    void markOverridingDecl(
+        ConformanceCheckingContext* context,
+        Decl* memberDecl,
+        DeclRef<Decl> requiredMemberDeclRef);
+
     /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<FuncDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     bool trySynthesizeConstructorRequirementWitness(
         ConformanceCheckingContext* context,
@@ -1906,13 +2017,14 @@ public:
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized declaration in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
+        RefPtr<WitnessTable> witnessTable,
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     enum SynthesisPattern
     {
@@ -1982,6 +2094,15 @@ public:
     // Check and register a type if it is differentiable.
     void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
 
+    void maybeCheckMissingNoDiffThis(Expr* expr);
+
+    // Find the default implementation of an interface requirement,
+    // and insert it to the witness table, if it exists.
+    bool findDefaultInterfaceImpl(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
     // Find the appropriate member of a declared type to
     // satisfy a requirement of an interface the type
     // claims to conform to.
@@ -2041,12 +2162,23 @@ public:
 
     void checkExtensionConformance(ExtensionDecl* decl);
 
+    void calcOverridableCompletionCandidates(
+        Type* aggType,
+        ContainerDecl* aggTypeDecl,
+        Decl* memberDecl);
+
     void checkAggTypeConformance(AggTypeDecl* decl);
 
     bool isIntegerBaseType(BaseType baseType);
 
     /// Is `type` a scalar integer type.
     bool isScalarIntegerType(Type* type);
+
+    // This function is used to get the best integer type that matches the given type.
+    // If `type` is already an integer type, return it as is.
+    // If `type` is a enum type, return the tag type if it exists.
+    // Otherwise, return the 32-bit signed integer type.
+    Type* getMatchingIntType(Type* type);
 
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
@@ -2087,11 +2219,6 @@ public:
 
     Expr* checkPredicateExpr(Expr* expr);
 
-    enum class ConstantFoldingKind
-    {
-        CompileTime,
-        LinkTime,
-    };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
         IntVal** outIntVal,
@@ -2202,7 +2329,7 @@ public:
 
     /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived
     /// from `this`.
-    void maybeDiagnoseThisNotLValue(Expr* expr);
+    void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type
@@ -2233,6 +2360,11 @@ public:
         // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
         // not optional.
         bool isOptional = false;
+
+        // Is this constraint an equality? This tells us that "joining" types is meaningless, we
+        // know the result will be the sub type. If it is not, we will error once we start
+        // substituting types.
+        bool isEquality = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
@@ -2585,6 +2717,8 @@ public:
     struct ValUnificationContext
     {
         Index indexInTypePack = 0;
+        bool optionalConstraint = false;
+        bool equalityConstraint = false;
     };
 
     // Try to find a unification for two values
@@ -2835,6 +2969,10 @@ public:
     bool isCStyleType(Type* type, HashSet<Type*>& isVisit);
 
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
+
+    void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -2872,6 +3010,8 @@ public:
 
     Expr* visitParenExpr(ParenExpr* expr);
 
+    Expr* visitTupleExpr(TupleExpr* expr);
+
     Expr* visitAssignExpr(AssignExpr* expr);
 
     Expr* visitGenericAppExpr(GenericAppExpr* genericAppExpr);
@@ -2898,8 +3038,11 @@ public:
 
     Expr* visitEachExpr(EachExpr* expr);
 
+    Expr* visitLambdaExpr(LambdaExpr* expr);
+
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to
@@ -2930,9 +3073,11 @@ public:
     Expr* visitMemberExpr(MemberExpr* expr);
 
     Expr* visitInitializerListExpr(InitializerListExpr* expr);
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr);
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+    Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
@@ -2974,9 +3119,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
     void checkStmt(Stmt* stmt);
-
-    template<typename T>
-    T* FindOuterStmt();
 
     Stmt* findOuterStmtWithLabel(Name* label);
 
@@ -3020,6 +3162,12 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitReturnStmt(ReturnStmt* stmt);
 
+    void visitDeferStmt(DeferStmt* stmt);
+
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
+
     void visitWhileStmt(WhileStmt* stmt);
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt);
@@ -3033,6 +3181,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
 private:
     void validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink);
+
+    void generateUniqueIDForStmt(BreakableStmt* stmt);
 };
 
 struct SemanticsDeclVisitorBase : public SemanticsVisitor
@@ -3055,6 +3205,12 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+bool isImmutableBufferType(Type* type);
+
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 
@@ -3104,5 +3260,20 @@ bool getExtensionTargetDeclList(
     DeclRefType* targetDeclRefType,
     ExtensionDecl* extDeclRef,
     ShortList<AggTypeDecl*>& targetDecls);
+
+void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+RefPtr<ComponentType> createUnspecializedGlobalComponentType(
+    FrontEndCompileRequest* compileRequest);
+
+RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
+    FrontEndCompileRequest* compileRequest,
+    List<RefPtr<ComponentType>>& outUnspecializedEntryPoints);
+
+RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileRequest* endToEndReq);
+
+RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
+    EndToEndCompileRequest* endToEndReq,
+    List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
 
 } // namespace Slang

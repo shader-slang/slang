@@ -66,6 +66,21 @@ auto_option(
     CUDAToolkit
     "Enable CUDA tests using CUDA found in CUDA_PATH"
 )
+# Check if SLANG_ENABLE_OPTIX was explicitly set by user before auto_option
+set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED FALSE)
+get_property(
+    _SLANG_ENABLE_OPTIX_CACHE_TYPE
+    CACHE SLANG_ENABLE_OPTIX
+    PROPERTY TYPE
+)
+if(
+    DEFINED SLANG_ENABLE_OPTIX
+    AND NOT SLANG_ENABLE_OPTIX STREQUAL "AUTO"
+    AND _SLANG_ENABLE_OPTIX_CACHE_TYPE STREQUAL "BOOL"
+)
+    set(_SLANG_ENABLE_OPTIX_USER_SPECIFIED TRUE)
+endif()
+
 auto_option(
     SLANG_ENABLE_OPTIX
     OptiX
@@ -111,13 +126,14 @@ option(
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
-option(SLANG_ENABLE_IR_BREAK_ALLOC, "Enable _debugUID on IR allocation")
+option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
+option(SLANG_ENABLE_SLANGI "Enable Slang interpreter target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(
     SLANG_ENABLE_SLANG_GLSLANG
@@ -166,17 +182,85 @@ option(
 )
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
-if(${SLANG_USE_SYSTEM_LZ4})
-    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
-endif()
+# Options for user defined paths for external modules.
+#
+# Note that these paths point to a directory containing an subdirectory of the
+# dependency name, rather than to the dependency directory itself, for example
+# SLANG_OVERRIDE_LZ4_PATH points to a directory containing a directory called
+# `lz4` containing the lz4 source.
+#
+advanced_option(
+    SLANG_OVERRIDE_LZ4_PATH
+    "Build using user defined path for LZ4"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_MINIZ_PATH
+    "Build using user defined path for Miniz"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+    "Build using user defined path for unordered_dense"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_VULKAN_HEADERS_PATH
+    "Build using user defined path for Vulkan headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_HEADERS_PATH
+    "Build using user defined path for SPIR-V headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+    "Build using user defined path for SPIR-V tools"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_GLSLANG_PATH
+    "Build using user defined path for glslang"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_GLM_PATH
+    "Build using user defined path for glm"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_IMGUI_PATH
+    "Build using user defined path for imgui"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SLANG_RHI_PATH
+    "Build using user defined path for slang-rhi"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_TINYOBJLOADER_PATH
+    "Build using user defined path for tinyobjloader"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_LUA_PATH
+    "Build using user defined path for lua"
+    OFF
+)
 
-if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
-endif()
+advanced_option(
+    SLANG_EXCLUDE_DAWN
+    "Optionally exclude webgpu_dawn from the build"
+    OFF
+)
 
-if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
-endif()
+advanced_option(
+    SLANG_EXCLUDE_TINT
+    "Optionally exclude slang-tint from the build"
+    OFF
+)
 
 enum_option(
     SLANG_LIB_TYPE
@@ -196,7 +280,7 @@ option(
     ON
 )
 
-option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" ON)
+option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" OFF)
 
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
@@ -251,24 +335,28 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-set(webgpu_dawn_release_tag "webgpu_dawn-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_WEBGPU_DAWN_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(webgpu_dawn_release_tag "webgpu_dawn-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_WEBGPU_DAWN_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+        )
+    endif()
 endif()
 
-set(slang_tint_release_tag "slang-tint-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_SLANG_TINT_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_TINT)
+    set(slang_tint_release_tag "slang-tint-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_SLANG_TINT_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+        )
+    endif()
 endif()
 
 #
@@ -283,10 +371,18 @@ if(NOT SLANG_EMBED_CORE_MODULE AND NOT SLANG_EMBED_CORE_MODULE_SOURCE)
 endif()
 
 if(SLANG_ENABLE_OPTIX AND NOT SLANG_ENABLE_CUDA)
-    message(
-        SEND_ERROR
-        "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
-    )
+    if(_SLANG_ENABLE_OPTIX_USER_SPECIFIED)
+        message(
+            SEND_ERROR
+            "SLANG_ENABLE_OPTIX is not supported without SLANG_ENABLE_CUDA"
+        )
+    else()
+        message(
+            STATUS
+            "OptiX is not supported without CUDA. Automatically disabling SLANG_ENABLE_OPTIX."
+        )
+        set(SLANG_ENABLE_OPTIX OFF)
+    endif()
 endif()
 
 if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
@@ -308,19 +404,35 @@ if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
 endif()
 
+if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    find_package(SPIRV-Headers REQUIRED)
+endif()
+
 add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
 # trees are too large and onerous for us to depend on.
+# We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_WEBGPU_DAWN_BINARY_URL)
-    copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
+    copy_fetched_shared_library(
+        "webgpu_dawn"
+        "${SLANG_WEBGPU_DAWN_BINARY_URL}"
+        IGNORE_FAILURE
+        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
+    )
 endif()
 
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
 # repository, and Dawn's nested source trees are too large and onerous for us to depend
 # on.
+# We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_SLANG_TINT_BINARY_URL)
-    copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}")
+    copy_fetched_shared_library(
+        "slang-tint"
+        "${SLANG_SLANG_TINT_BINARY_URL}"
+        IGNORE_FAILURE
+        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
+    )
 endif()
 
 fetch_or_build_slang_llvm()
@@ -386,9 +498,9 @@ configure_package_config_file(
 
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
-# export the slang targets. 
+# export the slang targets.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_BUILD_TYPE} STREQUAL "STATIC")
+    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         install(
             EXPORT SlangTargets
             FILE ${PROJECT_NAME}Targets.cmake

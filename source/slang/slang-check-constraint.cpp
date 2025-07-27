@@ -360,9 +360,13 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
+        ValUnificationContext unificationContext;
+        unificationContext.optionalConstraint =
+            constraintDeclRef.getDecl()->hasModifier<OptionalConstraintModifier>();
+        unificationContext.equalityConstraint = constraintDeclRef.getDecl()->isEqualityConstraint;
         if (!TryUnifyTypes(
                 *system,
-                ValUnificationContext(),
+                unificationContext,
                 getSub(m_astBuilder, constraintDeclRef),
                 getSup(m_astBuilder, constraintDeclRef)))
             return DeclRef<Decl>();
@@ -487,8 +491,13 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    // failure!
-                    return DeclRef<Decl>();
+                    if (c.isOptional)
+                        joinType = type;
+                    else if (c.isEquality)
+                        joinType = type;
+                    else
+                        // failure!
+                        return DeclRef<Decl>();
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
@@ -541,7 +550,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // should have been filled with the resolved types and values for the
     // generic parameters. We can now verify if they are complete and consolidate
     // them into final argument list.
-    for (auto member : genericDeclRef.getDecl()->members)
+    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDeclBase>(member))
         {
@@ -696,11 +705,21 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 subTypeWitness = nullptr;
         }
 
-        if (subTypeWitness)
+        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
+
+        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
         {
             // We found a witness, so it will become an (implicit) argument.
             args.add(subTypeWitness);
             outBaseCost += subTypeWitness->getOverloadResolutionCost();
+        }
+        else if (!subTypeWitness && constraintIsOptional)
+        {
+            // Optional witness failed to resolve; not an error.
+            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            args.add(noneWitness);
+            outBaseCost += kConversionCost_FailedOptionalConstraint;
         }
         else
         {
@@ -819,7 +838,7 @@ bool SemanticsVisitor::TryUnifyVals(
         {
             if (const auto c = as<TypeCastIntVal>(i))
                 i = as<IntVal>(c->getBase());
-            return as<GenericParamIntVal>(i);
+            return as<DeclRefIntVal>(i);
         };
         auto fstParam = paramUnderCast(fstInt);
         auto sndParam = paramUnderCast(sndInt);
@@ -851,13 +870,20 @@ bool SemanticsVisitor::TryUnifyVals(
     // Two subtype witnesses can be unified if they exist (non-null) and
     // prove that some pair of types are subtypes of types that can be unified.
     //
-    if (auto fstWit = as<SubtypeWitness>(fst))
-    {
-        if (auto sndWit = as<SubtypeWitness>(snd))
-        {
-            return TryUnifyTypes(constraints, unifyCtx, fstWit->getSup(), sndWit->getSup());
-        }
-    }
+    const auto fstSubtypeWitness = as<SubtypeWitness>(fst);
+    const auto sndSubtypeWitness = as<SubtypeWitness>(snd);
+    const auto fstNoneWitness = as<NoneWitness>(fst);
+    const auto sndNoneWitness = as<NoneWitness>(snd);
+    if (fstSubtypeWitness && sndSubtypeWitness)
+        return TryUnifyTypes(
+            constraints,
+            unifyCtx,
+            fstSubtypeWitness->getSup(),
+            sndSubtypeWitness->getSup());
+    else if (fstNoneWitness && sndNoneWitness)
+        return true;
+    else if ((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
+        return false;
 
     SLANG_UNIMPLEMENTED_X("value unification case");
 
@@ -946,6 +972,8 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
+    constraint.isOptional = unificationContext.optionalConstraint;
+    constraint.isEquality = unificationContext.equalityConstraint;
     constraints.constraints.add(constraint);
 
     return true;
@@ -1196,7 +1224,7 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     {
         param = as<IntVal>(typeCastParam->getBase());
     }
-    auto intParam = as<GenericParamIntVal>(param);
+    auto intParam = as<DeclRefIntVal>(param);
     if (!intParam)
         return;
     for (auto c : constraints.constraints)
@@ -1208,6 +1236,191 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     c.val = arg;
     c.isOptional = true;
     constraints.constraints.add(c);
+}
+
+struct IndexSpan
+{
+    Index index;
+    Index count;
+
+    IndexSpan()
+        : index(0), count(0)
+    {
+    }
+    IndexSpan(Index idx, Index cnt)
+        : index(idx), count(cnt)
+    {
+    }
+};
+
+struct IndexSpanPair
+{
+    IndexSpan first;
+    IndexSpan second;
+
+    IndexSpanPair() {}
+    IndexSpanPair(IndexSpan f, IndexSpan s)
+        : first(f), second(s)
+    {
+    }
+};
+
+// Helper function to unwrap a type and count expandable types
+static void unwrapTypeAndCountExpandable(
+    Type* type,
+    ShortList<Type*>& outTypes,
+    int& outExpandableCount)
+{
+    if (auto concretePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            outTypes.add(concretePack->getElementType(i));
+            if (isAbstractTypePack(concretePack->getElementType(i)))
+                outExpandableCount++;
+        }
+    }
+    else if (isAbstractTypePack(type))
+    {
+        outTypes.add(type);
+        outExpandableCount++;
+    }
+}
+
+// Helper function to map type arguments between two types, handling expandable types
+static bool matchTypeArgMapping(
+    Type* firstType,
+    Type* secondType,
+    ShortList<Type*>& outFlattenedFirst,
+    ShortList<Type*>& outFlattenedSecond,
+    ShortList<IndexSpanPair>& outMapping)
+{
+    // Unwrap and flatten the types
+    ShortList<Type*>& firstTypes = outFlattenedFirst;
+    ShortList<Type*>& secondTypes = outFlattenedSecond;
+
+    // Count expandable types as we unwrap
+    int firstExpandableCount = 0;
+    int secondExpandableCount = 0;
+
+    // Unwrap both types using the helper function
+    unwrapTypeAndCountExpandable(firstType, firstTypes, firstExpandableCount);
+    unwrapTypeAndCountExpandable(secondType, secondTypes, secondExpandableCount);
+
+    // We need to figure out which side should be expanding.
+    // Consider the following cases,
+    //
+    //   left = [ expand, expand ]
+    //   right = [ int, float, expand ]
+    // when one side has more non-expandable types, the other side should expand to match it.
+    // in this case, "left" should expand to cover "int" and "float".
+    //
+    //   left = [ int, float, expand, expand ]
+    //   right = [ int, float, expand ]
+    // when the number of the non-expandable types are same, we want to expand side that has
+    // fewer expandable types. In this case, "right" should expand to cover the first "expand".
+    //
+    //   left = ConcreteTypePack(ExpandType, ExpandType)
+    //   right = ConcreteTypePack(int, bool, float, double).
+    // In this case, we shouldn't be mapping the first ExpandType to int and the second
+    // ExpandType to bool, float, double. Instead, they should evenly divide the second type
+    // pack, so we map first ExpandType with int, bool, and second ExpandType to float, double.
+    //
+    int firstCount = (int)firstTypes.getCount();
+    int secondCount = (int)secondTypes.getCount();
+    int countDifference =
+        (firstCount - firstExpandableCount) - (secondCount - secondExpandableCount);
+
+    bool shouldExpandFirst =
+        (firstExpandableCount > 0) &&
+        ((countDifference < 0) ||
+         (countDifference == 0 && firstExpandableCount < secondExpandableCount));
+
+    bool shouldExpandSecond =
+        (secondExpandableCount > 0) &&
+        ((countDifference > 0) ||
+         (countDifference == 0 && firstExpandableCount > secondExpandableCount));
+
+    // We need to figure out how much types should match per each expandable type.
+    int typesPerExpand = 0;
+    if (shouldExpandSecond)
+    {
+        // More types on first, need to expand second
+        int countToMatch = countDifference + firstExpandableCount;
+        SLANG_ASSERT(secondExpandableCount != 0);
+        if (countToMatch % secondExpandableCount != 0)
+            return false;
+        typesPerExpand = countToMatch / secondExpandableCount;
+    }
+    else if (shouldExpandFirst)
+    {
+        // More types on second, need to expand first
+        int countToMatch = -countDifference + secondExpandableCount;
+        SLANG_ASSERT(firstExpandableCount != 0);
+        if (countToMatch % firstExpandableCount != 0)
+            return false;
+        typesPerExpand = countToMatch / firstExpandableCount;
+    }
+    // If countDifference == 0, no expansion needed
+
+    // Generate the mapping
+    Index firstIndex = 0;
+    Index secondIndex = 0;
+
+    while (firstIndex < firstCount && secondIndex < secondCount)
+    {
+        IndexSpanPair mapping;
+
+        // Determine spans based on expandable types and count difference
+        if (shouldExpandFirst)
+        {
+            // Expanding first to match second
+            if (isAbstractTypePack(firstTypes[firstIndex]))
+            {
+                mapping.first = IndexSpan(firstIndex, 1);
+                mapping.second = IndexSpan(secondIndex, typesPerExpand);
+                secondIndex += typesPerExpand;
+            }
+            else
+            {
+                mapping.first = IndexSpan(firstIndex, 1);
+                mapping.second = IndexSpan(secondIndex, 1);
+                secondIndex++;
+            }
+            firstIndex++;
+        }
+        else if (shouldExpandSecond)
+        {
+            // Expanding second to match first
+            if (isAbstractTypePack(secondTypes[secondIndex]))
+            {
+                mapping.first = IndexSpan(firstIndex, typesPerExpand);
+                mapping.second = IndexSpan(secondIndex, 1);
+                firstIndex += typesPerExpand;
+            }
+            else
+            {
+                mapping.first = IndexSpan(firstIndex, 1);
+                mapping.second = IndexSpan(secondIndex, 1);
+                firstIndex++;
+            }
+            secondIndex++;
+        }
+        else
+        {
+            // No expansion needed
+            mapping.first = IndexSpan(firstIndex, 1);
+            mapping.second = IndexSpan(secondIndex, 1);
+            firstIndex++;
+            secondIndex++;
+        }
+
+        outMapping.add(mapping);
+    }
+
+    SLANG_ASSERT(!shouldExpandSecond || firstIndex == firstCount);
+    SLANG_ASSERT(!shouldExpandFirst || secondIndex == secondCount);
+    return true;
 }
 
 bool SemanticsVisitor::TryUnifyTypes(
@@ -1244,7 +1457,63 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyConjunctionType(constraints, unifyCtx, fst, snd);
     }
 
-    // If one of the types is a type pack, we need to recursively unify the element types.
+    // Unwrap ConcreteTypePack and call TryUnifyTypes recursively.
+    ShortList<IndexSpanPair> typeMapping;
+    ShortList<Type*> flattenedFirst;
+    ShortList<Type*> flattenedSecond;
+    if (matchTypeArgMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&
+        typeMapping.getCount() > 1)
+    {
+        // Apply unification based on the mapping
+        for (const auto& mapping : typeMapping)
+        {
+            // Make sure it is one of three cases: 1:1, 1:N or N:1
+            SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
+            SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
+
+            // Helper function to create QualType from mapping span
+            auto mayPackAndGetQualType = [this](
+                                             const IndexSpan& span,
+                                             ShortList<Type*>& typeList,
+                                             bool isLeftValue,
+                                             Type* otherType) -> QualType
+            {
+                // When the `otherType` is GenericTypePackParamDecl or ExpandType,
+                // we need to create a ConcreteTypePack so that we can handle them
+                // recursively.
+                if (isDeclRefTypeOf<GenericTypePackParamDecl>(otherType) ||
+                    as<ExpandType>(otherType))
+                {
+                    // Multiple types: create ConcreteTypePack
+                    auto typesView = makeArrayView(&typeList[span.index], span.count);
+                    auto typePack = m_astBuilder->getTypePack(typesView);
+                    return QualType(typePack, isLeftValue);
+                }
+
+                SLANG_ASSERT(span.count == 1);
+                return QualType(typeList[span.index], isLeftValue);
+            };
+
+            // Get the types directly from the mapping
+            QualType firstArg = mayPackAndGetQualType(
+                mapping.first,
+                flattenedFirst,
+                fst.isLeftValue,
+                flattenedSecond[mapping.second.index]);
+            QualType secondArg = mayPackAndGetQualType(
+                mapping.second,
+                flattenedSecond,
+                snd.isLeftValue,
+                flattenedFirst[mapping.first.index]);
+
+            // Perform the unification
+            if (!TryUnifyTypes(constraints, unifyCtx, firstArg, secondArg))
+                return false;
+        }
+
+        return true;
+    }
+
     if (auto fstTypePack = as<ConcreteTypePack>(fst))
     {
         if (auto sndTypePack = as<ConcreteTypePack>(snd))

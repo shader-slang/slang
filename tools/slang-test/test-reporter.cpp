@@ -3,6 +3,7 @@
 
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "options.h"
 
 #include <mutex>
 #include <stdio.h>
@@ -91,7 +92,7 @@ TestReporter::TestReporter()
 
     m_inTest = false;
     m_dumpOutputOnFailure = false;
-    m_isVerbose = false;
+    m_verbosity = VerbosityLevel::Info;
 }
 
 Result TestReporter::init(
@@ -158,6 +159,11 @@ void TestReporter::addResult(TestResult result)
         result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
+}
+
+TestResult TestReporter::getResult() const
+{
+    return m_currentInfo.testResult;
 }
 
 void TestReporter::addExecutionTime(double time)
@@ -366,8 +372,17 @@ void TestReporter::_addResult(TestInfo info)
 
     m_testInfos.add(info);
 
-    auto defaultOutputFunc = [](const TestInfo& info)
+    auto defaultOutputFunc = [this](const TestInfo& info)
     {
+        // Skip output for passed/ignored tests if verbosity < Info
+        if (m_verbosity < VerbosityLevel::Info)
+        {
+            if (info.testResult == TestResult::Pass || info.testResult == TestResult::Ignored)
+            {
+                return;
+            }
+        }
+
         char const* resultString = "UNEXPECTED";
         switch (info.testResult)
         {
@@ -584,7 +599,7 @@ void TestReporter::message(TestMessageType type, const String& message)
 
     if (type == TestMessageType::Info)
     {
-        if (m_isVerbose && canWriteStdError())
+        if (m_verbosity == VerbosityLevel::Verbose && canWriteStdError())
         {
             fputs(message.getBuffer(), stderr);
         }
@@ -688,7 +703,7 @@ void TestReporter::outputSummary()
             printf("\n===\n\n");
             if (m_failedTestCount)
             {
-                printf("failing tests:\n");
+                printf("%d failing tests:\n", m_failedTestCount);
                 printf("---\n");
                 for (const auto& testInfo : m_testInfos)
                 {

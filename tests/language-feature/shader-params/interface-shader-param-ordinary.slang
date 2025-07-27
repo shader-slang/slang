@@ -23,6 +23,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 //TEST_INPUT:set delta = 65536
 uniform int delta;
 
+//TEST_INPUT: globalSpecializationArg MyModifier
 //TEST_INPUT:set gModifier = new MyModifier{ ubuffer(data=[4 3 2 1], stride=4), 3 } }
 uniform IModifier gModifier;
 

@@ -283,16 +283,6 @@ struct DeadCodeEliminationContext
     }
 };
 
-bool isFirstBlock(IRInst* inst)
-{
-    auto block = as<IRBlock>(inst);
-    if (!block)
-        return false;
-    if (!block->getParent())
-        return false;
-    return block->getParent()->getFirstBlock() == block;
-}
-
 bool isPtrUsed(IRInst* ptrInst)
 {
     for (auto use = ptrInst->firstUse; use; use = use->nextUse)

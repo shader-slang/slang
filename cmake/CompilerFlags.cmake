@@ -112,10 +112,13 @@ function(set_default_compile_options target)
             -Wno-invalid-offsetof
             -Wno-newline-eof
             -Wno-return-std-move
-            # Enabled warnings:
+            # Allowed warnings:
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
+            # Allow unused variables with a pattern of `if (auto v = as<...>(...))`.
+            # This pattern is very common in Slang code base.
+            -Wno-error=unused-but-set-variable
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )
@@ -152,14 +155,17 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
-    add_supported_cxx_linker_flags(
-        ${target}
-        PRIVATE
-        # Don't assume that symbols will be resolved at runtime
-        "-Wl,--no-undefined"
-        # No reason not to do this? Useful when using split debug info
-        "-Wl,--build-id"
-    )
+    if(NOT WIN32)
+        # these options are for ELF specific and not for Windows
+        add_supported_cxx_linker_flags(
+            ${target}
+            PRIVATE
+            # Don't assume that symbols will be resolved at runtime
+            "-Wl,--no-undefined"
+            # No reason not to do this? Useful when using split debug info
+            "-Wl,--build-id"
+        )
+    endif()
 
     set_target_properties(
         ${target}
@@ -172,7 +178,7 @@ function(set_default_compile_options target)
             ON
             # C++ standard
             CXX_STANDARD
-            17
+            20
             # pic
             POSITION_INDEPENDENT_CODE
             ON

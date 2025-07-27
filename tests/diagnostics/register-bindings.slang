@@ -3,9 +3,6 @@
 
 // Various bad forms for register bindings
 
-// Not a valid register class:
-Texture2D	a : register(DOESNT_EXIST);
-
 // No register index given:
 TextureCube b : register(t);
 

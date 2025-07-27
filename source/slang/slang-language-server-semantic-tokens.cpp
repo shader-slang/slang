@@ -39,6 +39,20 @@ SemanticToken _createSemanticToken(SourceManager* manager, SourceLoc loc, Name* 
     return token;
 }
 
+// We don't want to semantic highlight a synthetic name, like $init, () etc,
+// because they aren't actually appearing in the source code.
+bool isHighlightableName(Name* name)
+{
+    if (!name)
+        return false;
+    for (auto ch : name->text)
+    {
+        if (!CharUtil::isAlphaOrDigit(ch) && ch != '_')
+            return false;
+    }
+    return true;
+}
+
 List<SemanticToken> getSemanticTokens(
     Linkage* linkage,
     Module* module,
@@ -67,7 +81,7 @@ List<SemanticToken> getSemanticTokens(
             return;
         if (!name)
             name = declRef.getDecl()->getName();
-        if (!name)
+        if (!isHighlightableName(name))
             return;
         // Don't look at the expr if it is defined in a different file.
         if (!manager->getHumaneLoc(loc, SourceLocType::Actual)
@@ -221,7 +235,7 @@ List<SemanticToken> getSemanticTokens(
             }
             else if (auto funcDecl = as<FuncDecl>(node))
             {
-                if (funcDecl->getName())
+                if (isHighlightableName(funcDecl->getName()))
                 {
                     SemanticToken token =
                         _createSemanticToken(manager, funcDecl->getNameLoc(), funcDecl->getName());

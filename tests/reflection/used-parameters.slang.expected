@@ -137,6 +137,7 @@ standard output = {
         {
             "name": "UsedBuffer",
             "binding": {"kind": "shaderResource", "index": 2},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer"
@@ -145,6 +146,7 @@ standard output = {
         {
             "name": "UnusedBuffer",
             "binding": {"kind": "shaderResource", "index": 3},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer"
@@ -211,6 +213,7 @@ standard output = {
         {
             "name": "UsedRWBuffer",
             "binding": {"kind": "unorderedAccess", "index": 2},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
@@ -220,6 +223,7 @@ standard output = {
         {
             "name": "UnusedRWBuffer",
             "binding": {"kind": "unorderedAccess", "index": 3},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
@@ -321,11 +325,13 @@ standard output = {
                 },
                 {
                     "name": "UsedBuffer",
-                    "binding": {"kind": "shaderResource", "index": 2, "used": 1}
+                    "binding": {"kind": "shaderResource", "index": 2, "used": 1},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UnusedBuffer",
-                    "binding": {"kind": "shaderResource", "index": 3, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 3, "used": 0},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UsedStructuredBuffer",
@@ -345,11 +351,13 @@ standard output = {
                 },
                 {
                     "name": "UsedRWBuffer",
-                    "binding": {"kind": "unorderedAccess", "index": 2, "used": 1}
+                    "binding": {"kind": "unorderedAccess", "index": 2, "used": 1},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UnusedRWBuffer",
-                    "binding": {"kind": "unorderedAccess", "index": 3, "used": 0}
+                    "binding": {"kind": "unorderedAccess", "index": 3, "used": 0},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UsedRWStructuredBuffer",

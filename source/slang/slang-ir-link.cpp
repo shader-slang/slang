@@ -40,9 +40,6 @@ struct IRSpecEnv
 
 struct IRSharedSpecContext
 {
-    // The code-generation target in use
-    CodeGenTarget target;
-
     // The API-level target request
     TargetRequest* targetReq = nullptr;
 
@@ -141,7 +138,7 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
 
     switch (clonedValue->getOp())
     {
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
 
         // If `originalVal` represents a witness table entry key, add the key
         // to witnessTableEntryWorkList.
@@ -705,7 +702,8 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_KnownBuiltinDecoration:
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr"))
+                if (name == KnownBuiltinDeclName::IDifferentiable ||
+                    name == KnownBuiltinDeclName::IDifferentiablePtr)
                     return context->getShared()->useAutodiff;
                 break;
             }
@@ -732,6 +730,8 @@ IRWitnessTable* cloneWitnessTableImpl(
         clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
+        if (clonedTable->hasDecorationOrChild())
+            return clonedTable;
     }
     else
     {
@@ -1221,6 +1221,9 @@ bool isBetterForTarget(IRSpecContext* context, IRInst* newVal, IRInst* oldVal)
         return true;
     }
 
+    if (!context->getShared()->targetReq)
+        return false;
+
     // For right now every declaration might have zero or more
     // decorations, representing the capabilities for which it is specialized.
     // Each decorations has a `CapabilitySet` to represent what it requires of a target.
@@ -1329,6 +1332,11 @@ IRInst* cloneInst(
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues)
 {
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugSetInstBeingCloned(originalInst->_debugUID);
+    SLANG_DEFER(_debugResetInstBeingCloned());
+#endif
+
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1424,7 +1432,6 @@ IRInst* cloneInst(
     }
     auto funcType = cloneType(context, originalInst->getFullType());
     context->builder = oldBuilder;
-
     IRInst* clonedInst = builder->createIntrinsicInst(
         funcType,
         originalInst->getOp(),
@@ -1602,7 +1609,6 @@ void initializeSharedSpecContext(
     IRSharedSpecContext* sharedContext,
     Session* session,
     IRModule* inModule,
-    CodeGenTarget target,
     TargetRequest* targetReq)
 {
     RefPtr<IRModule> module = inModule;
@@ -1614,7 +1620,6 @@ void initializeSharedSpecContext(
     sharedContext->builderStorage = IRBuilder(module);
 
     sharedContext->module = module;
-    sharedContext->target = target;
     sharedContext->targetReq = targetReq;
 }
 
@@ -2040,7 +2045,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     auto& irModules = stateStorage.contextStorage.irModules;
 
     auto sharedContext = state->getSharedContext();
-    initializeSharedSpecContext(sharedContext, session, nullptr, target, targetReq);
+    initializeSharedSpecContext(sharedContext, session, nullptr, targetReq);
 
     state->irModule = sharedContext->module;
 
@@ -2147,26 +2152,39 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
-    // Bindings for global generic parameters are currently represented
-    // as stand-alone global-scope instructions in the IR module for
-    // `SpecializedComponentType`s. These instructions are required for
-    // correct codegen, and so we must make sure to copy them all over,
-    // even though they are not directly referenced.
-    //
-    // TODO: We should change these to decorations, akin to how
-    // `[bindExistentialSlots(...)]` works, so that they can be attached
-    // to the relevant parameters and cloned via `cloneExtraDecorations`.
-    // In the long run we do not want to *ever* iterate over all the
-    // instructions in all the input modules.
-    //
-
+    // Clone additional insts that should be included in the linked IR module
+    // even if they are not being directly referenced.
     for (IRModule* irModule : userModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            if (auto bindInst = as<IRBindGlobalGenericParam>(inst))
+            switch (inst->getOp())
             {
-                cloneValue(context, bindInst);
+            default:
+                break;
+            case kIROp_BindGlobalGenericParam:
+                // Bindings for global generic parameters are currently represented
+                // as stand-alone global-scope instructions in the IR module for
+                // `SpecializedComponentType`s. These instructions are required for
+                // correct codegen, and so we must make sure to copy them all over,
+                // even though they are not directly referenced.
+                //
+                // TODO: We should change these to decorations, akin to how
+                // `[bindExistentialSlots(...)]` works, so that they can be attached
+                // to the relevant parameters and cloned via `cloneExtraDecorations`.
+                // In the long run we do not want to *ever* iterate over all the
+                // instructions in all the input modules.
+                [[fallthrough]];
+            case kIROp_DebugSource:
+                // Need to list all source files in the debug source file list,
+                // regardless if the source files participate in the line table or not.
+                cloneValue(context, inst);
+                break;
+            case kIROp_DebugBuildIdentifier:
+                // The debug build identifier won't be referenced by anything,
+                // but we still need to keep it around if it is in the IR.
+                cloneValue(context, inst);
+                break;
             }
         }
     }
@@ -2275,6 +2293,181 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     linkedIR.globalScopeVarLayout = irGlobalScopeVarLayout;
     linkedIR.entryPoints = irEntryPoints;
     return linkedIR;
+}
+
+
+struct IRPrelinkContext : IRSpecContext
+{
+    // The overriding logic for cloning an external symbol during prelinking stage.
+    // We only want to clone the body of a function if it is marked as unsafeForceInlineEarly.
+    // For anything else, we just clone a declaration without body, and mark it as [Import].
+    //
+    virtual IRInst* maybeCloneValue(IRInst* originalVal) override
+    {
+        // If `originalVal` has a linkage, and the current module already contains
+        // a symbol with the same mangled name, then we will skip and return that
+        // prexisting val.
+        if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
+        {
+            RefPtr<IRSpecSymbol> symbol;
+            if (shared->symbols.tryGetValue(linkage->getMangledName()), symbol)
+            {
+                return symbol->irGlobalValue;
+            }
+        }
+
+        // If this is referencing a global value with linkage but that global value does not
+        // exist in the current module, then we will clone a declaration of it and mark it
+        // [Import].
+        //
+        auto completeClonedInst = [&](IRInst* inst)
+        {
+            String mangledName;
+            ShortList<IRInst*> decorsToRemove;
+            bool hasImportDecor = false;
+            for (auto decor : inst->getDecorations())
+            {
+                if (auto exportDecor = as<IRExportDecoration>(decor))
+                {
+                    mangledName = exportDecor->getMangledName();
+                    decorsToRemove.add(exportDecor);
+                }
+                else if (as<IRImportDecoration>(decor))
+                {
+                    hasImportDecor = true;
+                }
+            }
+            if (mangledName.getLength() && !hasImportDecor)
+            {
+                builder->addImportDecoration(inst, mangledName.getUnownedSlice());
+            }
+            for (auto decor : decorsToRemove)
+            {
+                decor->removeFromParent();
+            }
+            if (mangledName.getLength())
+            {
+                // Register the symbol in the shared context, so we don't
+                // clone any symbols with the same mangled name again.
+                RefPtr<IRSpecSymbol> symbol = new IRSpecSymbol();
+                symbol->nextWithSameName = nullptr;
+                symbol->irGlobalValue = inst;
+                shared->symbols[mangledName] = symbol;
+            }
+            return inst;
+        };
+
+        auto builderForClone = builder;
+        if (as<IRModuleInst>(originalVal->getParent()))
+        {
+            // If we are cloning a global value, we will use the module builder.
+            builderForClone = &shared->builderStorage;
+        }
+        IRInst* clonedInst = nullptr;
+        switch (originalVal->getOp())
+        {
+        case kIROp_Generic:
+        case kIROp_GlobalVar:
+        case kIROp_GlobalParam:
+        case kIROp_GlobalConstant:
+        case kIROp_StructKey:
+        case kIROp_InterfaceRequirementEntry:
+        case kIROp_GlobalGenericParam:
+        case kIROp_InterfaceType:
+            return completeClonedInst(
+                cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
+        case kIROp_WitnessTable:
+            {
+                auto witnessTable = as<IRWitnessTable>(originalVal);
+                clonedInst = builder->createWitnessTable(
+                    cloneType(this, (IRType*)witnessTable->getConformanceType()),
+                    cloneType(this, witnessTable->getConcreteType()));
+                break;
+            }
+        case kIROp_Func:
+            // For functions, we will clone the full body only if it is [unsafeForceInlineEarly].
+            if (originalVal->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+            {
+                return completeClonedInst(
+                    cloneGlobalValueImpl(this, originalVal, IROriginalValuesForClone(originalVal)));
+            }
+            else
+            {
+                clonedInst = builderForClone->createFunc();
+            }
+            break;
+        case kIROp_StructType:
+            clonedInst = builderForClone->createStructType();
+            break;
+        case kIROp_ClassType:
+            clonedInst = builderForClone->createClassType();
+            break;
+        default:
+            return completeClonedInst(IRSpecContext::maybeCloneValue(originalVal));
+        }
+
+        // Clone without body.
+        registerClonedValue(this, clonedInst, IROriginalValuesForClone(originalVal));
+        clonedInst->setFullType(cloneType(this, originalVal->getFullType()));
+
+        // Clone decorations
+        cloneDecorations(this, clonedInst, originalVal);
+        completeClonedInst(clonedInst);
+        return clonedInst;
+    }
+};
+
+void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& externalSymbolsToLink)
+{
+    // Setup environment.
+    IRSharedSpecContext sharedContext;
+    sharedContext.builderStorage = IRBuilder(irModule->getModuleInst());
+    sharedContext.module = irModule;
+
+    IRPrelinkContext specContext;
+    specContext.builder = &sharedContext.builderStorage;
+    specContext.env = &sharedContext.globalEnv;
+    specContext.shared = &sharedContext;
+    specContext.irModules.add(module->getIRModule());
+    for (auto importedModule : module->getModuleDependencies())
+    {
+        if (importedModule->getIRModule())
+            specContext.irModules.add(importedModule->getIRModule());
+    }
+    auto linkage = module->getLinkage();
+    auto globalSession = static_cast<Session*>(linkage->getGlobalSession());
+    List<IRModule*> builtinModules;
+    for (auto& m : globalSession->coreModules)
+        builtinModules.add(m->getIRModule());
+
+    // First, register all external symbols in the current module.
+    insertGlobalValueSymbols(&sharedContext, irModule);
+
+    List<KeyValuePair<IRInst*, IRInst*>> pendingReplacements;
+    for (auto originalInst : externalSymbolsToLink)
+    {
+        // originalInst is the function in the imported module to clone.
+        // We should lookup the inst in the current module with the same mangled name,
+        // that's the inst we want to remove and replace with the cloned inst.
+        auto mangledName = getMangledName(originalInst);
+        auto existingInst = specContext.findSymbols(mangledName)->irGlobalValue;
+        specContext.shared->symbols.remove(mangledName);
+        specContext.builder->setInsertBefore(existingInst);
+
+        // Remove existing inst from the module before cloning so our duplication-check
+        // (`checkIRDuplicate`) doesn't complain.
+        existingInst->removeFromParent();
+
+        auto cloned = cloneValue(&specContext, originalInst);
+        pendingReplacements.add(KeyValuePair<IRInst*, IRInst*>(existingInst, cloned));
+    }
+
+    // Now we can replace all the inlined extern symbols with the cloned values.
+    for (auto kv : pendingReplacements)
+    {
+        kv.key->replaceUsesWith(kv.value);
+        kv.key->removeAndDeallocate();
+    }
 }
 
 struct ReplaceGlobalConstantsPass

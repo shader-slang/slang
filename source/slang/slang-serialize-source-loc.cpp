@@ -385,78 +385,64 @@ SlangResult SerialSourceLocReader::read(
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ Result SerialSourceLocData::writeContainer(
-    SerialCompressionType moduleCompressionType,
-    RiffContainer* container)
+/* static */ Result SerialSourceLocData::writeTo(RIFF::BuildCursor& cursor)
 {
-    RiffContainer::ScopeChunk debugChunkScope(
-        container,
-        RiffContainer::Chunk::Kind::List,
-        SerialSourceLocData::kDebugFourCc);
+    SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, SerialSourceLocData::kDebugFourCc);
 
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
         SerialSourceLocData::kDebugStringFourCc,
         m_stringTable,
-        container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(
+        cursor));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
         SerialSourceLocData::kDebugLineInfoFourCc,
         m_lineInfos,
-        container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(
+        cursor));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
         SerialSourceLocData::kDebugAdjustedLineInfoFourCc,
         m_adjustedLineInfos,
-        container));
+        cursor));
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        moduleCompressionType,
         SerialSourceLocData::kDebugSourceInfoFourCc,
         m_sourceInfos,
-        container));
+        cursor));
 
     return SLANG_OK;
 }
 
-/* static */ Result SerialSourceLocData::readContainer(
-    SerialCompressionType moduleCompressionType,
-    RiffContainer::ListChunk* listChunk)
+/* static */ Result SerialSourceLocData::readFrom(RIFF::ListChunk const* listChunk)
 {
-    SLANG_ASSERT(listChunk->getSubType() == SerialSourceLocData::kDebugFourCc);
+    SLANG_ASSERT(listChunk->getType() == SerialSourceLocData::kDebugFourCc);
 
     clear();
-    for (RiffContainer::Chunk* chunk = listChunk->m_containedChunks; chunk; chunk = chunk->m_next)
+    for (auto chunk : listChunk->getChildren())
     {
-        RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(chunk);
+        auto dataChunk = as<RIFF::DataChunk>(chunk);
         if (!dataChunk)
         {
             continue;
         }
 
-        switch (dataChunk->m_fourCC)
+        switch (dataChunk->getType())
         {
         case SerialSourceLocData::kDebugStringFourCc:
             {
-                SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_stringTable));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_stringTable));
                 break;
             }
         case SerialSourceLocData::kDebugLineInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_lineInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_lineInfos));
                 break;
             }
         case SerialSourceLocData::kDebugAdjustedLineInfoFourCc:
             {
                 SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_adjustedLineInfos));
+                    SerialRiffUtil::readArrayChunk(dataChunk, m_adjustedLineInfos));
                 break;
             }
-        case SLANG_MAKE_COMPRESSED_FOUR_CC(SerialSourceLocData::kDebugSourceInfoFourCc):
         case SerialSourceLocData::kDebugSourceInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    moduleCompressionType,
-                    dataChunk,
-                    m_sourceInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_sourceInfos));
                 break;
             }
         }

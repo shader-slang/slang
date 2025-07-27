@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
@@ -211,10 +212,14 @@ public:
     Stmt* parseIfLetStatement();
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
-    DoWhileStmt* ParseDoWhileStatement();
+    DoWhileStmt* ParseDoWhileStatement(Stmt* body);
+    CatchStmt* ParseDoCatchStatement(Stmt* body);
+    Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
+    DeferStmt* ParseDeferStatement();
+    ThrowStmt* ParseThrowStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -840,22 +845,6 @@ bool AdvanceIfMatch(Parser* parser, MatchedTokenType type)
     return AdvanceIfMatch(parser, type, &ignored);
 }
 
-NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
-{
-    TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
-
-    // TODO(tfoley): parse an actual declarator
-    auto type = parser->ParseTypeExp();
-
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
-    typeDefDecl->loc = nameToken.loc;
-
-    typeDefDecl->nameAndLoc = NameLoc(nameToken);
-    typeDefDecl->type = type;
-
-    return typeDefDecl;
-}
-
 // Add a modifier to a list of modifiers being built
 static void AddModifier(Modifier*** ioModifierLink, Modifier* modifier)
 {
@@ -1197,6 +1186,14 @@ bool tryParseUsingSyntaxDecl(
     return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
 }
 
+static void maybeUpgradeLanguageVersionFromLegacy(SlangLanguageVersion& ver)
+{
+    if (ver == SLANG_LANGUAGE_VERSION_LEGACY)
+    {
+        ver = SLANG_LANGUAGE_VERSION_2025;
+    }
+}
+
 static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = LookupMask::Default)
 {
     Modifiers modifiers;
@@ -1228,7 +1225,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     if (as<VisibilityModifier>(parsedModifier))
                     {
                         if (auto currentModule = parser->getCurrentModuleDecl())
-                            currentModule->isInLegacyLanguage = false;
+                            maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
                     }
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
@@ -1333,7 +1330,7 @@ static NodeBase* parseIncludeDecl(Parser* parser, void* /*userData*/)
     auto decl = parser->astBuilder->create<IncludeDecl>();
     parseFileReferenceDeclBase(parser, decl);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -1373,7 +1370,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     }
     parser->ReadToken(TokenType::Semicolon);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -1446,8 +1443,7 @@ static NameLoc ParseDeclName(Parser* parser)
     }
     else
     {
-        nameToken = parser->ReadToken(TokenType::Identifier);
-        return NameLoc(nameToken);
+        return expectIdentifier(parser);
     }
 }
 
@@ -1696,6 +1692,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
+        bool optional = AdvanceIf(parser, "optional", &whereToken);
+
         auto subType = parser->ParseTypeExp();
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1706,6 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 parser->FillPosition(constraint);
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
+                if (optional)
+                {
+                    addModifier(
+                        constraint,
+                        parser->astBuilder->create<OptionalConstraintModifier>());
+                }
                 AddMember(genericParent, constraint);
                 if (!AdvanceIf(parser, TokenType::Comma))
                     break;
@@ -1719,6 +1723,10 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->FillPosition(constraint);
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
             AddMember(genericParent, constraint);
         }
         else if (AdvanceIf(parser, TokenType::LParent))
@@ -1786,46 +1794,46 @@ public:
     void visitDeclRefExpr(DeclRefExpr* expr) { expr->scope = scope; }
     void visitGenericAppExpr(GenericAppExpr* expr)
     {
-        expr->functionExpr->accept(this, nullptr);
+        dispatch(expr->functionExpr);
         for (auto arg : expr->arguments)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitIndexExpr(IndexExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         for (auto arg : expr->indexExprs)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitMemberExpr(MemberExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         expr->scope = scope;
     }
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         expr->scope = scope;
     }
     void visitAppExprBase(AppExprBase* expr)
     {
-        expr->functionExpr->accept(this, nullptr);
+        dispatch(expr->functionExpr);
         for (auto arg : expr->arguments)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitIsTypeExpr(IsTypeExpr* expr)
     {
         if (expr->typeExpr.exp)
-            expr->typeExpr.exp->accept(this, nullptr);
+            dispatch(expr->typeExpr.exp);
     }
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         if (expr->typeExpr)
-            expr->typeExpr->accept(this, nullptr);
+            dispatch(expr->typeExpr);
     }
     void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
     {
         if (expr->value)
-            expr->value->accept(this, nullptr);
+            dispatch(expr->value);
     }
     void visitExpr(Expr* /*expr*/) {}
 };
@@ -1851,53 +1859,46 @@ static Stmt* parseOptBody(Parser* parser)
         }
     }
 
-    if (parser->getStage() == ParsingStage::Decl)
+    // If we are at the initial parsing stage, just collect the tokens
+    // without actually parsing them.
+    if (peekTokenType(parser) != TokenType::LBrace)
     {
-        // If we are at the initial parsing stage, just collect the tokens
-        // without actually parsing them.
-        if (peekTokenType(parser) != TokenType::LBrace)
-        {
-            return parser->parseBlockStatement();
-        }
-        auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
-        unparsedStmt->currentScope = parser->currentScope;
-        unparsedStmt->outerScope = parser->outerScope;
-        unparsedStmt->sourceLanguage = parser->getSourceLanguage();
-        unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
-        parser->FillPosition(unparsedStmt);
-        List<Token>& tokens = unparsedStmt->tokens;
-        int braceDepth = 0;
-        for (;;)
-        {
-            auto token = parser->ReadToken();
-            if (token.type == TokenType::EndOfFile)
-            {
-                break;
-            }
-            if (token.type == TokenType::LBrace)
-            {
-                braceDepth++;
-            }
-            else if (token.type == TokenType::RBrace)
-            {
-                braceDepth--;
-            }
-            tokens.add(token);
-            if (braceDepth == 0)
-            {
-                break;
-            }
-        }
-        Token eofToken;
-        eofToken.type = TokenType::EndOfFile;
-        eofToken.loc = parser->tokenReader.peekLoc();
-        tokens.add(eofToken);
-        return unparsedStmt;
+        return parser->parseBlockStatement();
     }
-
-    // If we are in the second stage of parsing, then we need to actually
-    // parse the block statement for real.
-    return parser->parseBlockStatement();
+    auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
+    unparsedStmt->currentScope = parser->currentScope;
+    unparsedStmt->outerScope = parser->outerScope;
+    unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+    unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
+    parser->FillPosition(unparsedStmt);
+    List<Token>& tokens = unparsedStmt->tokens;
+    int braceDepth = 0;
+    for (;;)
+    {
+        auto token = parser->ReadToken();
+        if (token.type == TokenType::EndOfFile)
+        {
+            break;
+        }
+        if (token.type == TokenType::LBrace)
+        {
+            braceDepth++;
+        }
+        else if (token.type == TokenType::RBrace)
+        {
+            braceDepth--;
+        }
+        tokens.add(token);
+        if (braceDepth == 0)
+        {
+            break;
+        }
+    }
+    Token eofToken;
+    eofToken.type = TokenType::EndOfFile;
+    eofToken.loc = parser->tokenReader.peekLoc();
+    tokens.add(eofToken);
+    return unparsedStmt;
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -1925,7 +1926,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             //
             ReplaceScopeVisitor replaceScopeVisitor;
             replaceScopeVisitor.scope = parser->currentScope;
-            declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
+            replaceScopeVisitor.dispatch(declaratorInfo.typeSpec);
 
             decl->returnType = TypeExp(declaratorInfo.typeSpec);
 
@@ -2040,6 +2041,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
     switch (parser->tokenReader.peekTokenType())
     {
     case TokenType::Identifier:
+    case TokenType::CompletionRequest:
         {
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
@@ -2438,8 +2440,8 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             for (auto candidate : overloadedExpr->lookupResult2)
             {
                 if (candidate.declRef.is<GenericDecl>() ||
-                    declRefExpr->declRef.is<FunctionDeclBase>() ||
-                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                    candidate.declRef.is<FunctionDeclBase>() ||
+                    candidate.declRef.is<AggTypeDeclBase>())
                 {
                     baseKind = BaseGenericKind::Generic;
                     break;
@@ -3576,7 +3578,34 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
+    // Check for GLSL layout qualifiers when GLSL input is allowed
+    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    {
+        auto getLayoutArg = [&](const char* defaultLayout)
+        {
+            if (auto dataLayoutMod =
+                    parser->pendingModifiers->findModifier<GLSLBufferDataLayoutModifier>())
+            {
+                if (as<GLSLStd140Modifier>(dataLayoutMod))
+                    return "Std140DataLayout";
+                else if (as<GLSLStd430Modifier>(dataLayoutMod))
+                    return "Std430DataLayout";
+                else if (as<GLSLScalarModifier>(dataLayoutMod))
+                    return "ScalarDataLayout";
+            }
+            return defaultLayout;
+        };
+
+        String layoutType = getLayoutArg("Std140DataLayout");
+        return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
+    }
+
     return ParseBufferBlockDecl(parser, "ConstantBuffer");
+}
+
+static NodeBase* parseHLSLCBufferDeclWithLayout(Parser* parser, String layoutType)
+{
+    return ParseBufferBlockDecl(parser, "ConstantBuffer", &layoutType);
 }
 
 static NodeBase* parseHLSLTBufferDecl(Parser* parser, void* /*userData*/)
@@ -3640,7 +3669,7 @@ static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
 
             // substitution needs to be filled during check
             Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl))
+            if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl))
             {
                 paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
 
@@ -3789,9 +3818,6 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // function `foo` has been defined), and direct member
             // lookup will only give us the first.
             //
-            Decl* firstDecl = nullptr;
-            parentDecl->getMemberDictionary().tryGetValue(nameAndLoc.name, firstDecl);
-            //
             // We will search through the declarations of the name
             // and find the first that is a namespace (if any).
             //
@@ -3801,7 +3827,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             // as possible in the parser, and we'd rather be
             // as permissive as possible right now.
             //
-            for (Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+            for (auto d : parentDecl->getDirectMemberDeclsOfName(nameAndLoc.name))
             {
                 namespaceDecl = as<NamespaceDecl>(d);
                 if (namespaceDecl)
@@ -4114,6 +4140,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
+                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
@@ -4348,6 +4375,24 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         });
 }
 
+NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
+{
+    TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
+
+    // TODO(tfoley): parse an actual declarator
+    auto type = parser->ParseTypeExp();
+
+    auto nameToken = parser->ReadToken(TokenType::Identifier);
+    typeDefDecl->loc = nameToken.loc;
+
+    typeDefDecl->nameAndLoc = NameLoc(nameToken);
+    typeDefDecl->type = type;
+
+    AdvanceIf(parser, TokenType::Semicolon);
+
+    return typeDefDecl;
+}
+
 static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
 {
     TypeAliasDecl* decl = parser->astBuilder->create<TypeAliasDecl>();
@@ -4374,7 +4419,7 @@ static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
 // the class of AST node to construct.
 NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
 {
-    SyntaxClassBase syntaxClass((ReflectClassInfo*)userData);
+    SyntaxClassBase syntaxClass((SyntaxClassInfo*)userData);
     return (NodeBase*)syntaxClass.createInstanceImpl(parser->astBuilder);
 }
 
@@ -4408,7 +4453,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     // to the `parseSimpleSyntax` callback that will just construct
     // an instance of that type to represent the keyword in the AST.
     SyntaxParseCallback parseCallback = &parseSimpleSyntax;
-    void* parseUserData = (void*)syntaxClass.classInfo;
+    void* parseUserData = (void*)syntaxClass.getInfo();
 
     // Next we look for an initializer that will make this keyword
     // an alias for some existing keyword.
@@ -4432,7 +4477,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
             // If we don't already have a syntax class specified, then
             // we will crib the one from the existing syntax, to ensure
             // that we are creating a drop-in alias.
-            if (!syntaxClass.classInfo)
+            if (!syntaxClass)
                 syntaxClass = existingSyntax->syntaxClass;
         }
     }
@@ -4442,7 +4487,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     //
     // TODO: down the line this should be expanded so that the user can reference
     // an existing *function* to use to parse the chosen syntax.
-    if (!syntaxClass.classInfo)
+    if (!syntaxClass)
     {
         // TODO: diagnose: either a type or an existing keyword needs to be specified
     }
@@ -4754,7 +4799,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass.classInfo);
+        assert(syntaxClass);
     }
     else
     {
@@ -4816,6 +4861,31 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
         }
     }
 }
+
+static EnumDecl* isUnscopedEnum(Decl* decl)
+{
+    EnumDecl* enumDecl = as<EnumDecl>(decl);
+    if (!enumDecl)
+        return nullptr;
+    for (auto mod : enumDecl->modifiers)
+    {
+        if (as<UnscopedEnumAttribute>(mod))
+        {
+            return enumDecl;
+        }
+        else if (auto uncheckedAttribute = as<UncheckedAttribute>(mod))
+        {
+            // We have to perform an ugly string comparison here, because the attributes
+            // haven't been checked during parsing.
+            if (getText(uncheckedAttribute->keywordName) == "UnscopedEnum")
+            {
+                return enumDecl;
+            }
+        }
+    }
+    return nullptr;
+}
+
 // Finish up work on a declaration that was parsed
 static void CompleteDecl(
     Parser* parser,
@@ -4891,6 +4961,33 @@ static void CompleteDecl(
         {
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
+
+            // As a special case, if we are adding an unscoped enum to container, we should also
+            // create static const decls for each enum case and add them to the container.
+            if (auto enumDecl = isUnscopedEnum(decl))
+            {
+                for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
+                {
+                    auto staticConstDecl = parser->astBuilder->create<LetDecl>();
+                    staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
+                    addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
+                    addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+
+                    // Copy visibility modifiers from the enum declaration
+                    if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
+                    {
+                        auto newVisibilityModifier = as<VisibilityModifier>(
+                            parser->astBuilder->createByNodeType(visibilityModifier->astNodeType));
+                        addModifier(staticConstDecl, newVisibilityModifier);
+                    }
+
+                    auto valueExpr = parser->astBuilder->create<VarExpr>();
+                    valueExpr->declRef = DeclRef<Decl>(enumCase);
+                    staticConstDecl->initExpr = valueExpr;
+                    staticConstDecl->loc = enumCase->loc;
+                    AddMember(containerDecl, staticConstDecl);
+                }
+            }
         }
     }
 
@@ -4962,8 +5059,9 @@ static DeclBase* ParseDeclWithModifiers(
                 };
                 if (AdvanceIf(parser, "buffer"))
                 {
-                    decl = as<Decl>(
-                        parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                    decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
+                        parser,
+                        getLayoutArg("DefaultDataLayout")));
                     break;
                 }
                 else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
@@ -4975,7 +5073,9 @@ static DeclBase* ParseDeclWithModifiers(
 
                     if (as<HLSLUniformModifier>(mod))
                     {
-                        decl = as<Decl>(parseHLSLCBufferDecl(parser, nullptr));
+                        decl = as<Decl>(parseHLSLCBufferDeclWithLayout(
+                            parser,
+                            getLayoutArg("Std140DataLayout")));
                         break;
                     }
                     else
@@ -5032,6 +5132,20 @@ static DeclBase* ParseDeclWithModifiers(
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
+        }
+        break;
+    case TokenType::CompletionRequest:
+        {
+            if (modifiers.hasModifier<OverrideModifier>())
+            {
+                auto resultDecl = parser->astBuilder->create<EmptyDecl>();
+                resultDecl->nameAndLoc = expectIdentifier(parser);
+                decl = resultDecl;
+            }
+            else
+            {
+                decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
+            }
         }
         break;
     // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
@@ -5110,9 +5224,103 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
+static void parseInterfaceDefaultMethodAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* interfaceDecl)
+{
+    // If we parsed an interface method with a body,
+    // parse it again as an explicit generic decl on ThisType.
+    auto astBuilder = parser->astBuilder;
+    InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
+    parser->PushScope(genericDecl);
+
+    // Create GenericTypeParamDecl for `This`.
+    auto thisTypeDecl = astBuilder->create<GenericTypeParamDecl>();
+    thisTypeDecl->nameAndLoc.name = getName(parser, "This");
+    thisTypeDecl->parameterIndex = 0;
+    genericDecl->thisTypeDecl = thisTypeDecl;
+    AddMember(genericDecl, thisTypeDecl);
+
+    // Create GenericTypeConstraintDecl for `This:IFoo`.
+    auto thisTypeConstraint = astBuilder->create<GenericTypeConstraintDecl>();
+    auto thisTypeVarExpr = astBuilder->create<VarExpr>();
+    thisTypeVarExpr->name = getName(parser, "This");
+    thisTypeVarExpr->scope = parser->currentScope;
+    thisTypeConstraint->sub.exp = thisTypeVarExpr;
+
+    // Since we can't form a DeclRef to the parent interface decl yet (because we are still parsing
+    // it), we will use a `ThisInterfaceExpr` here to represent the interface type.
+    auto thisInterfaceExpr = astBuilder->create<ThisInterfaceExpr>();
+    thisInterfaceExpr->scope = parser->currentScope;
+    thisTypeConstraint->sup.exp = thisInterfaceExpr;
+    genericDecl->thisTypeConstraintDecl = thisTypeConstraint;
+    AddMember(genericDecl, thisTypeConstraint);
+
+    parser->FillPosition(genericDecl);
+    parser->genericDepth++;
+    auto newInnerDecl = as<Decl>(ParseDecl(parser, genericDecl));
+    genericDecl->inner = newInnerDecl;
+    newInnerDecl->parentDecl = genericDecl;
+    parser->genericDepth--;
+    parser->PopScope();
+    AddMember(interfaceDecl, genericDecl);
+
+    // Mark the requirement decl with `HasInterfaceDefaultImplModifier`.
+    auto hasDefaultImplModifier = astBuilder->create<HasInterfaceDefaultImplModifier>();
+    hasDefaultImplModifier->defaultImplDecl = genericDecl;
+    addModifier(parsedDecl, hasDefaultImplModifier);
+
+    // Update the name of the generic and newly parsed func, to ensure
+    // the mangled name of the default impl func doesn't clash with the
+    // requirement.
+    StringBuilder sb;
+    sb << getText(newInnerDecl->getName()) << "$defaultImpl";
+    genericDecl->nameAndLoc.name = getName(parser, sb.produceString());
+
+    newInnerDecl->nameAndLoc.name = genericDecl->getName();
+    if (auto newInnerGenDecl = as<GenericDecl>(newInnerDecl))
+    {
+        // If the method itself is generic, continue to update the inner function's name.
+        if (newInnerGenDecl->inner)
+        {
+            newInnerGenDecl->inner->nameAndLoc.name = genericDecl->getName();
+        }
+    }
+
+    // Remove the body from the requirement decl.
+    auto requirementFunc = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementFunc))
+        funcDecl->body = nullptr;
+}
+
+static void maybeReparseInterfaceFuncAsExplicitGeneric(
+    Parser* parser,
+    Decl* parsedDecl,
+    ContainerDecl* containerDecl,
+    TokenReader tokenReader)
+{
+    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
+    if (!funcDecl || !funcDecl->body)
+        return;
+
+    auto interfaceDecl = as<InterfaceDecl>(containerDecl);
+    if (!interfaceDecl)
+        return;
+
+    if (parser->sink->getErrorCount() != 0)
+        return;
+
+    Parser newParser(*parser);
+    newParser.tokenReader = tokenReader;
+    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+}
+
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
 {
+    TokenReader tokenReader;
     Token closingBraceToken;
+    bool parentIsInterface = containerDecl->astNodeType == ASTNodeType::InterfaceDecl;
     while (!AdvanceIfMatch(parser, matchType, &closingBraceToken))
     {
         if (parser->options.allowGLSLInput)
@@ -5120,7 +5328,58 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             if (parseGLSLGlobalDecl(parser, containerDecl))
                 continue;
         }
-        ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+            tokenReader = parser->tokenReader;
+        auto decl = ParseDecl(parser, containerDecl);
+        if (parentIsInterface)
+        {
+            // If we parsed an interface method with a body (for the default implementation),
+            // we will create a duplicate decl where it is nested inside an explicit generic
+            // decl, such that `ThisType` is a generic type parameter.
+            // For an example, if the user writes:
+            // ```
+            // interface IFoo {
+            //  int getVal();
+            //  int getGreaterVal() { return getVal() + 1; }
+            // }
+            // ```
+            // We will represent `IFoo` as:
+            // ```
+            // interface IFoo {
+            //     int getVal();
+            //
+            //     [HasInterfaceDefaultImplModifier(getGreaterVal_defaultImpl)]
+            //     int getGreaterVal();
+            //
+            //     __interface_default_impl_generic<This:IFoo>
+            //     int getGreaterVal_defaultImpl() {
+            //        // `this` here will have type `This` (generic param).
+            //        return this.getVal() + 1;
+            //     }
+            // }
+            // ```
+            // Where `__interface_default_impl_generic` is a sub-class of `__generic`, and
+            // acts exactly like a generic. The sub-class is just to make it easy to
+            // identify a default impl. An interface default impl decl will not be treated
+            // as an interface requirement and lowered as an entry in the witness table,
+            // instead it is just an ordinary member decl that will be lowered into an
+            // `IRGeneric`.
+            //
+            // Ideally we would achieve the same result by parsing the function once, and
+            // then clone the AST nodes to represent `getGreaterVal_defaultImpl`, but we
+            // don't have the infrastructure to do that just yet. So we will play a dirty
+            // trick to achieve the same effect by re-parsing the method body as an
+            // explicit generic decl. Fortunately, this redundant parsing won't actually
+            // cause too much redundant work, because the function bodies are only parsed
+            // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
+            // process. Once we have the functionality to systematically clone AST nodes,
+            // we can eliminate this reparsing hack.
+            maybeReparseInterfaceFuncAsExplicitGeneric(
+                parser,
+                as<Decl>(decl),
+                containerDecl,
+                tokenReader);
+        }
     }
     containerDecl->closingSourceLoc = closingBraceToken.loc;
 }
@@ -5147,7 +5406,20 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    // If the program already has a scope, then reuse it instead of overwriting it!
+    // Verify that the language version is valid.
+    if (sourceLanguage == SourceLanguage::Slang)
+    {
+        if (!isValidSlangLanguageVersion(currentModule->languageVersion))
+        {
+            sink->diagnose(
+                program->loc,
+                Diagnostics::unknownLanguageVersion,
+                currentModule->languageVersion);
+        }
+    }
+
+    // If the program already has a scope, then
+    // reuse it instead of overwriting it!
     if (program->ownedScope)
         PushScope(program->ownedScope);
     else
@@ -5302,7 +5574,6 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 static Decl* parseEnumDecl(Parser* parser)
 {
     EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
-
     parser->ReadToken("enum");
 
     // HACK: allow the user to write `enum class` in case
@@ -5337,17 +5608,16 @@ static Decl* parseEnumDecl(Parser* parser)
         decl->nameAndLoc = expectIdentifier(parser);
     }
 
-    // If the type needs to be unscoped, insert modifiers to make it so.
-    if (isUnscoped)
-    {
-        addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
-        addModifier(decl, parser->astBuilder->create<TransparentModifier>());
-    }
 
     return parseOptGenericDecl(
         parser,
         [&](GenericDecl* genericParent)
         {
+            // If the type needs to be unscoped, insert modifiers to make it so.
+            if (isUnscoped && !genericParent)
+            {
+                addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
+            }
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);
@@ -5601,7 +5871,7 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
 
             auto lookupResult = lookUpDirectAndTransparentMembers(
                 parser->astBuilder,
-                nullptr, // no semantics visitor available yet
+                parser->semanticsVisitor,
                 staticMemberExpr->name,
                 aggTypeDecl,
                 declRef);
@@ -5621,7 +5891,7 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
         // Do the lookup in the current scope
         auto lookupResult = lookUp(
             parser->astBuilder,
-            nullptr, // no semantics visitor available yet
+            parser->semanticsVisitor,
             varExpr->name,
             parser->currentScope);
         if (!lookupResult.isValid() || lookupResult.isOverloaded())
@@ -5635,11 +5905,8 @@ static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
 
 static bool isTypeName(Parser* parser, Name* name)
 {
-    auto lookupResult = lookUp(
-        parser->astBuilder,
-        nullptr, // no semantics visitor available yet
-        name,
-        parser->currentScope);
+    auto lookupResult =
+        lookUp(parser->astBuilder, parser->semanticsVisitor, name, parser->currentScope);
     if (!lookupResult.isValid() || lookupResult.isOverloaded())
         return false;
 
@@ -5738,7 +6005,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("while"))
         statement = ParseWhileStatement();
     else if (LookAheadToken("do"))
-        statement = ParseDoWhileStatement();
+        statement = ParseDoStatement();
     else if (LookAheadToken("break"))
         statement = ParseBreakStatement();
     else if (LookAheadToken("continue"))
@@ -5770,9 +6037,17 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = parseCompileTimeStmt(this);
     }
+    else if (LookAheadToken("defer"))
+    {
+        statement = ParseDeferStatement();
+    }
     else if (LookAheadToken("try"))
     {
         statement = ParseExpressionStatement();
+    }
+    else if (LookAheadToken("throw"))
+    {
+        statement = ParseThrowStatement();
     }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
@@ -5934,7 +6209,6 @@ Stmt* Parser::parseBlockStatement()
 
     Stmt* body = nullptr;
 
-
     if (!tokenReader.isAtEnd())
     {
         FillPosition(blockStatement);
@@ -6091,11 +6365,6 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
-    if (semanticsVisitor)
-        semanticsVisitor->ensureDecl(
-            (Decl*)tempVarDecl,
-            DeclCheckState::DefinitionChecked,
-            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
@@ -6252,18 +6521,73 @@ WhileStmt* Parser::ParseWhileStatement()
     return whileStatement;
 }
 
-DoWhileStmt* Parser::ParseDoWhileStatement()
+DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
 {
     DoWhileStmt* doWhileStatement = astBuilder->create<DoWhileStmt>();
     FillPosition(doWhileStatement);
-    ReadToken("do");
-    doWhileStatement->statement = ParseStatement();
+    doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
     doWhileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     return doWhileStatement;
+}
+
+CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
+{
+    for (;;)
+    {
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(scopeDecl);
+
+        CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
+        FillPosition(catchStatement);
+        ReadToken("catch");
+
+        // Optional error parameter. If not given, the catch catches all error
+        // types.
+        if (AdvanceIf(this, TokenType::LParent))
+        {
+            ParamDecl* errorVar = parseModernParamDecl(this);
+            catchStatement->errorVar = errorVar;
+            AddMember(scopeDecl, errorVar);
+            ReadToken(TokenType::RParent);
+        }
+
+        catchStatement->tryBody = body;
+        catchStatement->handleBody = ParseStatement();
+
+        PopScope();
+
+        if (!LookAheadToken("catch"))
+            return catchStatement;
+
+        // Use this catch as the body for the next one, if multiple are chained.
+        body = catchStatement;
+    }
+}
+
+Stmt* Parser::ParseDoStatement()
+{
+    SourceLoc position = tokenReader.peekLoc();
+    ReadToken("do");
+    Stmt* statement = ParseStatement();
+    if (LookAheadToken("while"))
+    {
+        Stmt* whileStatement = ParseDoWhileStatement(statement);
+        whileStatement->loc = position;
+        return whileStatement;
+    }
+    else if (LookAheadToken("catch"))
+    {
+        return ParseDoCatchStatement(statement);
+    }
+    else
+    {
+        Unexpected(this, "while' or 'catch");
+        return statement;
+    }
 }
 
 BreakStmt* Parser::ParseBreakStatement()
@@ -6297,6 +6621,24 @@ ReturnStmt* Parser::ParseReturnStatement()
         returnStatement->expression = ParseExpression();
     ReadToken(TokenType::Semicolon);
     return returnStatement;
+}
+
+DeferStmt* Parser::ParseDeferStatement()
+{
+    DeferStmt* deferStatement = astBuilder->create<DeferStmt>();
+    FillPosition(deferStatement);
+    ReadToken("defer");
+    deferStatement->statement = ParseStatement();
+    return deferStatement;
+}
+
+ThrowStmt* Parser::ParseThrowStatement()
+{
+    ThrowStmt* throwStatement = astBuilder->create<ThrowStmt>();
+    FillPosition(throwStatement);
+    ReadToken("throw");
+    throwStatement->expression = ParseExpression();
+    return throwStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()
@@ -7115,22 +7457,58 @@ static bool _isCast(Parser* parser, Expr* expr)
     return false;
 }
 
-static bool tryParseExpression(Parser* parser, Expr*& outExpr, TokenType tokenTypeAfter)
+template<typename FIsValidFollowToken>
+static bool tryParseExpression(
+    Parser* parser,
+    Expr*& outExpr,
+    Precedence exprLevel,
+    const FIsValidFollowToken& isValidFollowToken)
 {
     auto cursor = parser->tokenReader.getCursor();
     auto isRecovering = parser->isRecovering;
     auto oldSink = parser->sink;
     DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
     parser->sink = &newSink;
-    outExpr = parser->ParseExpression();
+    outExpr = parser->ParseExpression(exprLevel);
     parser->sink = oldSink;
     parser->isRecovering = isRecovering;
-    if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
+    if (outExpr && newSink.getErrorCount() == 0 &&
+        isValidFollowToken(parser->tokenReader.peekTokenType()))
     {
         return true;
     }
     parser->tokenReader.setCursor(cursor);
     return false;
+}
+
+static Expr* parseLambdaExpr(Parser* parser)
+{
+    auto lambdaExpr = parser->astBuilder->create<LambdaExpr>();
+    parser->ReadToken(TokenType::LParent);
+    lambdaExpr->paramScopeDecl = parser->astBuilder->create<ScopeDecl>();
+    parser->pushScopeAndSetParent(lambdaExpr->paramScopeDecl);
+    while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+    {
+        AddMember(lambdaExpr->paramScopeDecl, parser->ParseParameter());
+        if (AdvanceIf(parser, TokenType::RParent))
+            break;
+        parser->ReadToken(TokenType::Comma);
+    }
+    parser->FillPosition(lambdaExpr);
+    parser->ReadToken(TokenType::DoubleRightArrow);
+    if (parser->LookAheadToken(TokenType::LBrace))
+    {
+        lambdaExpr->bodyStmt = parser->parseBlockStatement();
+    }
+    else
+    {
+        auto returnStmt = parser->astBuilder->create<ReturnStmt>();
+        parser->FillPosition(returnStmt);
+        returnStmt->expression = parser->ParseArgExpr();
+        lambdaExpr->bodyStmt = returnStmt;
+    }
+    parser->PopScope();
+    return lambdaExpr;
 }
 
 static Expr* parseAtomicExpr(Parser* parser)
@@ -7145,12 +7523,22 @@ static Expr* parseAtomicExpr(Parser* parser)
     // Either:
     // - parenthesized expression `(exp)`
     // - cast `(type) exp`
+    // - lambda expressions (paramList)=>x
     //
     // Proper disambiguation requires mixing up parsing
     // and semantic checking (which we should do eventually)
     // but for now we will follow some heuristics.
     case TokenType::LParent:
         {
+            // Disambiguate between a lambda expression and other cases.
+            auto tokenReader = parser->tokenReader;
+            SkipBalancedToken(&tokenReader);
+            auto nextTokenAfterParent = tokenReader.peekTokenType();
+            if (nextTokenAfterParent == TokenType::DoubleRightArrow)
+            {
+                return parseLambdaExpr(parser);
+            }
+
             Token openParen = parser->ReadToken(TokenType::LParent);
 
             // Only handles cases of `(type)`, where type is a single identifier,
@@ -7171,9 +7559,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 tcexpr->loc = openParen.loc;
 
                 tcexpr->functionExpr = varExpr;
-
-                auto arg = parsePrefixExpr(parser);
-                tcexpr->arguments.add(arg);
+                tcexpr->arguments.add(parsePrefixExpr(parser));
 
                 return tcexpr;
             }
@@ -7187,45 +7573,99 @@ static Expr* parseAtomicExpr(Parser* parser)
                 Expr* base = nullptr;
                 if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    // We don't support empty parentheses `()` as a valid expression.
-                    parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
-                    base = parser->astBuilder->create<IncompleteExpr>();
-                    base->type = parser->astBuilder->getErrorType();
+                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        // We support empty parentheses `()` as a valid expression to construct an
+                        // empty tuple in Slang 2026.
+                        base = parser->astBuilder->create<TupleExpr>();
+                        base->loc = openParen.loc;
+                    }
+                    else
+                    {
+                        // We don't support empty parentheses `()` as a valid expression prior to
+                        // Slang 2026.
+                        parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                        base = parser->astBuilder->create<IncompleteExpr>();
+                        base->type = parser->astBuilder->getErrorType();
+                    }
                 }
                 else
                 {
-                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    // When language version is 2026 or later, we no longer parse comma as a
+                    // C/C++-style comma operator when it is inside a paranthesis,
+                    // but rather as a tuple element separator.
+                    //
+                    Precedence exprLevel = Precedence::Comma;
+                    if (parser->sourceLanguage == SourceLanguage::Slang &&
+                        parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        // Setting exprLevel to Assignment here will allow the following
+                        // tryParseExpression call to parse the expression until the next `)` or
+                        // `,`, instead of consuming any ',' as a comma operator.
+                        exprLevel = Precedence::Assignment;
+                    }
+                    auto isValidFollowToken = [=](TokenType tokenType)
+                    {
+                        if (tokenType == TokenType::RParent)
+                            return true;
+                        if (exprLevel == Precedence::Assignment && tokenType == TokenType::Comma)
+                            return true;
+                        return false;
+                    };
+                    if (!tryParseExpression(parser, base, exprLevel, isValidFollowToken))
                     {
                         base = parser->ParseType();
                     }
                 }
 
-                parser->ReadToken(TokenType::RParent);
-
-                // We now try and determine by what base is, if this is actually a cast or an
-                // expression in parentheses
-                if (_isCast(parser, base))
+                if (parser->LookAheadToken(TokenType::Comma))
                 {
-                    // Parse as a cast
-
-                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    tcexpr->loc = openParen.loc;
-
-                    tcexpr->functionExpr = base;
-
-                    auto arg = parsePrefixExpr(parser);
-                    tcexpr->arguments.add(arg);
-
-                    return tcexpr;
+                    // We have a comma, so we are not done yet.
+                    // If we reach here, the language version must be 2026 or later,
+                    // where we allow (a,b,c,...) syntax as a tuple, otherwise we would have
+                    // parsed it into `base`.
+                    //
+                    List<Expr*> elementExprs;
+                    elementExprs.add(base);
+                    while (AdvanceIf(parser, TokenType::Comma))
+                    {
+                        if (parser->LookAheadToken(TokenType::RParent))
+                            break;
+                        auto elementExpr = parser->ParseArgExpr();
+                        elementExprs.add(elementExpr);
+                    }
+                    parser->ReadToken(TokenType::RParent);
+                    TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
+                    tupleExpr->loc = openParen.loc;
+                    tupleExpr->elements = _Move(elementExprs);
+                    return tupleExpr;
                 }
                 else
                 {
-                    // Pass as an expression in parentheses
+                    // We parsed an expression in the form of (expr), without
+                    // any commas in `expr`.
+                    // We now try and determine by what base is, if this is actually a cast or an
+                    // expression in parentheses.
+                    //
+                    parser->ReadToken(TokenType::RParent);
+                    if (_isCast(parser, base))
+                    {
+                        // Parse as a cast
+                        TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                        tcexpr->loc = openParen.loc;
 
-                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                    parenExpr->loc = openParen.loc;
-                    parenExpr->base = base;
-                    return parenExpr;
+                        tcexpr->functionExpr = base;
+                        tcexpr->arguments.add(parsePrefixExpr(parser));
+
+                        return tcexpr;
+                    }
+                    else
+                    {
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
+                    }
                 }
             }
         }
@@ -7528,6 +7968,21 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             return constExpr;
         }
+
+    case TokenType::CharLiteral:
+        {
+            IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+            parser->FillPosition(constExpr);
+
+            auto token = parser->tokenReader.advanceToken();
+            constExpr->token = token;
+
+            IntegerLiteralValue value = getCharLiteralValue(token);
+            constExpr->value = value;
+            constExpr->suffixType = BaseType::UInt;
+            return constExpr;
+        }
+
     case TokenType::CompletionRequest:
         {
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
@@ -7719,6 +8174,30 @@ static Expr* parsePostfixExpr(Parser* parser)
                     expr = maybeParseGenericApp(parser, memberExpr);
                 else
                     expr = memberExpr;
+            }
+            break;
+        case TokenType::OpMul:
+            {
+                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
+                // We can easily disambiguate by looking ahead of `*`, if the token after it
+                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
+                auto lookahead = peekTokenType(parser, 1);
+                switch (lookahead)
+                {
+                case TokenType::Comma:
+                case TokenType::RParent:
+                case TokenType::OpGreater:
+                case TokenType::OpRsh:
+                case TokenType::Colon:
+                case TokenType::Semicolon:
+                case TokenType::LBracket:
+                case TokenType::OpMul:
+                case TokenType::Dot:
+                    expr = parsePostfixTypeSuffix(parser, expr);
+                    break;
+                default:
+                    return expr;
+                }
             }
             break;
         }
@@ -8058,7 +8537,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == SpvOp(0xffffffff))
+        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -8354,7 +8833,7 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = translationUnit->sourceLanguage;
+    parser.sourceLanguage = sourceLanguage;
 
     return parser.parseSourceFile(parentDecl);
 }
@@ -8388,20 +8867,20 @@ static void addBuiltinSyntax(
     SyntaxParseCallback callback,
     void* userData = nullptr)
 {
-    addBuiltinSyntaxImpl(session, scope, name, callback, userData, getClass<T>());
+    addBuiltinSyntaxImpl(session, scope, name, callback, userData, getSyntaxClass<T>());
 }
 
 template<typename T>
 static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* name)
 {
-    auto syntaxClass = getClass<T>();
+    auto syntaxClass = getSyntaxClass<T>();
     addBuiltinSyntaxImpl(
         session,
         scope,
         name,
         &parseSimpleSyntax,
         (void*)syntaxClass.classInfo,
-        getClass<T>());
+        getSyntaxClass<T>());
 }
 
 static IROp parseIROp(Parser* parser, Token& outToken)
@@ -8891,10 +9370,10 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto classInfo = parser->astBuilder->findClassInfo(getName(parser, modifier->magicName));
-    if (classInfo)
+    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
+    if (syntaxClass)
     {
-        modifier->magicNodeType = ASTNodeType(classInfo->m_classId);
+        modifier->magicNodeType = syntaxClass;
     }
     // TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
     parser->ReadToken(TokenType::RParent);
@@ -8966,7 +9445,7 @@ static NodeBase* parseAttributeTargetModifier(Parser* parser, void* /*userData*/
 static SyntaxParseInfo _makeParseExpr(const char* keywordName, SyntaxParseCallback callback)
 {
     SyntaxParseInfo entry;
-    entry.classInfo = &Expr::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Expr>();
     entry.keywordName = keywordName;
     entry.callback = callback;
     return entry;
@@ -8976,18 +9455,18 @@ static SyntaxParseInfo _makeParseDecl(const char* keywordName, SyntaxParseCallba
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = callback;
-    entry.classInfo = &Decl::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Decl>();
     return entry;
 }
 static SyntaxParseInfo _makeParseModifier(
     const char* keywordName,
-    const ReflectClassInfo& classInfo)
+    SyntaxClass<NodeBase> const& syntaxClass)
 {
     // If we just have class info - use simple parser
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = &parseSimpleSyntax;
-    entry.classInfo = &classInfo;
+    entry.classInfo = syntaxClass;
     return entry;
 }
 static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCallback callback)
@@ -8995,7 +9474,7 @@ static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCa
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = callback;
-    entry.classInfo = &Modifier::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Modifier>();
     return entry;
 }
 
@@ -9042,68 +9521,71 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     // and which can be represented just by creating
     // a new AST node of the corresponding type.
 
-    _makeParseModifier("in", InModifier::kReflectClassInfo),
-    _makeParseModifier("out", OutModifier::kReflectClassInfo),
-    _makeParseModifier("inout", InOutModifier::kReflectClassInfo),
-    _makeParseModifier("__ref", RefModifier::kReflectClassInfo),
-    _makeParseModifier("__constref", ConstRefModifier::kReflectClassInfo),
-    _makeParseModifier("const", ConstModifier::kReflectClassInfo),
-    _makeParseModifier("__builtin", BuiltinModifier::kReflectClassInfo),
-    _makeParseModifier("highp", GLSLPrecisionModifier::kReflectClassInfo),
-    _makeParseModifier("lowp", GLSLPrecisionModifier::kReflectClassInfo),
-    _makeParseModifier("mediump", GLSLPrecisionModifier::kReflectClassInfo),
+    _makeParseModifier("in", getSyntaxClass<InModifier>()),
+    _makeParseModifier("out", getSyntaxClass<OutModifier>()),
+    _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
+    _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
+    _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
+    _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
+    _makeParseModifier("lowp", getSyntaxClass<GLSLPrecisionModifier>()),
+    _makeParseModifier("mediump", getSyntaxClass<GLSLPrecisionModifier>()),
 
-    _makeParseModifier("__global", ActualGlobalModifier::kReflectClassInfo),
+    _makeParseModifier("__global", getSyntaxClass<ActualGlobalModifier>()),
 
-    _makeParseModifier("inline", InlineModifier::kReflectClassInfo),
-    _makeParseModifier("public", PublicModifier::kReflectClassInfo),
-    _makeParseModifier("private", PrivateModifier::kReflectClassInfo),
-    _makeParseModifier("internal", InternalModifier::kReflectClassInfo),
+    _makeParseModifier("inline", getSyntaxClass<InlineModifier>()),
+    _makeParseModifier("public", getSyntaxClass<PublicModifier>()),
+    _makeParseModifier("private", getSyntaxClass<PrivateModifier>()),
+    _makeParseModifier("internal", getSyntaxClass<InternalModifier>()),
 
-    _makeParseModifier("require", RequireModifier::kReflectClassInfo),
-    _makeParseModifier("param", ParamModifier::kReflectClassInfo),
-    _makeParseModifier("extern", ExternModifier::kReflectClassInfo),
+    _makeParseModifier("require", getSyntaxClass<RequireModifier>()),
+    _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
+    _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
 
-    _makeParseModifier("row_major", HLSLRowMajorLayoutModifier::kReflectClassInfo),
-    _makeParseModifier("column_major", HLSLColumnMajorLayoutModifier::kReflectClassInfo),
+    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
 
-    _makeParseModifier("nointerpolation", HLSLNoInterpolationModifier::kReflectClassInfo),
-    _makeParseModifier("noperspective", HLSLNoPerspectiveModifier::kReflectClassInfo),
-    _makeParseModifier("linear", HLSLLinearModifier::kReflectClassInfo),
-    _makeParseModifier("sample", HLSLSampleModifier::kReflectClassInfo),
-    _makeParseModifier("centroid", HLSLCentroidModifier::kReflectClassInfo),
-    _makeParseModifier("precise", PreciseModifier::kReflectClassInfo),
+    _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
+    _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
+
+    _makeParseModifier("nointerpolation", getSyntaxClass<HLSLNoInterpolationModifier>()),
+    _makeParseModifier("noperspective", getSyntaxClass<HLSLNoPerspectiveModifier>()),
+    _makeParseModifier("linear", getSyntaxClass<HLSLLinearModifier>()),
+    _makeParseModifier("sample", getSyntaxClass<HLSLSampleModifier>()),
+    _makeParseModifier("centroid", getSyntaxClass<HLSLCentroidModifier>()),
+    _makeParseModifier("precise", getSyntaxClass<PreciseModifier>()),
     _makeParseModifier("shared", parseSharedModifier),
-    _makeParseModifier("groupshared", HLSLGroupSharedModifier::kReflectClassInfo),
-    _makeParseModifier("static", HLSLStaticModifier::kReflectClassInfo),
-    _makeParseModifier("uniform", HLSLUniformModifier::kReflectClassInfo),
+    _makeParseModifier("groupshared", getSyntaxClass<HLSLGroupSharedModifier>()),
+    _makeParseModifier("static", getSyntaxClass<HLSLStaticModifier>()),
+    _makeParseModifier("uniform", getSyntaxClass<HLSLUniformModifier>()),
     _makeParseModifier("volatile", parseVolatileModifier),
     _makeParseModifier("coherent", parseCoherentModifier),
     _makeParseModifier("restrict", parseRestrictModifier),
     _makeParseModifier("readonly", parseReadonlyModifier),
     _makeParseModifier("writeonly", parseWriteonlyModifier),
-    _makeParseModifier("export", HLSLExportModifier::kReflectClassInfo),
-    _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
+    _makeParseModifier("export", getSyntaxClass<HLSLExportModifier>()),
+    _makeParseModifier("dynamic_uniform", getSyntaxClass<DynamicUniformModifier>()),
+    _makeParseModifier("override", getSyntaxClass<OverrideModifier>()),
 
     // Modifiers for geometry shader input
-    _makeParseModifier("point", HLSLPointModifier::kReflectClassInfo),
-    _makeParseModifier("line", HLSLLineModifier::kReflectClassInfo),
-    _makeParseModifier("triangle", HLSLTriangleModifier::kReflectClassInfo),
-    _makeParseModifier("lineadj", HLSLLineAdjModifier::kReflectClassInfo),
-    _makeParseModifier("triangleadj", HLSLTriangleAdjModifier::kReflectClassInfo),
+    _makeParseModifier("point", getSyntaxClass<HLSLPointModifier>()),
+    _makeParseModifier("line", getSyntaxClass<HLSLLineModifier>()),
+    _makeParseModifier("triangle", getSyntaxClass<HLSLTriangleModifier>()),
+    _makeParseModifier("lineadj", getSyntaxClass<HLSLLineAdjModifier>()),
+    _makeParseModifier("triangleadj", getSyntaxClass<HLSLTriangleAdjModifier>()),
 
     // Modifiers for mesh shader parameters
-    _makeParseModifier("vertices", HLSLVerticesModifier::kReflectClassInfo),
-    _makeParseModifier("indices", HLSLIndicesModifier::kReflectClassInfo),
-    _makeParseModifier("primitives", HLSLPrimitivesModifier::kReflectClassInfo),
-    _makeParseModifier("payload", HLSLPayloadModifier::kReflectClassInfo),
+    _makeParseModifier("vertices", getSyntaxClass<HLSLVerticesModifier>()),
+    _makeParseModifier("indices", getSyntaxClass<HLSLIndicesModifier>()),
+    _makeParseModifier("primitives", getSyntaxClass<HLSLPrimitivesModifier>()),
+    _makeParseModifier("payload", getSyntaxClass<HLSLPayloadModifier>()),
 
     // Modifiers for unary operator declarations
-    _makeParseModifier("__prefix", PrefixModifier::kReflectClassInfo),
-    _makeParseModifier("__postfix", PostfixModifier::kReflectClassInfo),
+    _makeParseModifier("__prefix", getSyntaxClass<PrefixModifier>()),
+    _makeParseModifier("__postfix", getSyntaxClass<PostfixModifier>()),
 
     // Modifier to apply to `import` that should be re-exported
-    _makeParseModifier("__exported", ExportedModifier::kReflectClassInfo),
+    _makeParseModifier("__exported", getSyntaxClass<ExportedModifier>()),
 
     // Add syntax for more complex modifiers, which allow
     // or expect more tokens after the initial keyword.
@@ -9168,7 +9650,7 @@ ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope)
             scope,
             info.keywordName,
             info.callback,
-            const_cast<ReflectClassInfo*>(info.classInfo),
+            info.classInfo.getInfo(),
             info.classInfo);
     }
 

@@ -1,5 +1,6 @@
 #include "slang-emit-wgsl.h"
 
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 
 // A note on row/column "terminology reversal".
@@ -65,16 +66,24 @@ void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     // "case 2, 3, 4: ...;" instead of the C-like syntax
     // "case 2: case 3: case 4: ...;".
 
-    m_writer->emit("case ");
-    for (auto caseVal : currentCase->values)
+    if (!isDefault)
     {
-        emitOperand(caseVal, getInfo(EmitOp::General));
-        m_writer->emit(", ");
+        m_writer->emit("case ");
+        auto& values = currentCase->values;
+        for (Index i = 0; i < values.getCount(); ++i)
+        {
+            emitOperand(values[i], getInfo(EmitOp::General));
+            if (i < values.getCount() - 1)
+            {
+                m_writer->emit(", ");
+            }
+        }
     }
-    if (isDefault)
+    else
     {
-        m_writer->emit("default, ");
+        m_writer->emit("default ");
     }
+
     m_writer->emit(":\n");
 }
 
@@ -279,8 +288,13 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
     }
 }
 
-void WGSLSourceEmitter::emitStructFieldAttributes(IRStructType* structType, IRStructField* field)
+void WGSLSourceEmitter::emitStructFieldAttributes(
+    IRStructType* structType,
+    IRStructField* field,
+    bool allowOffsetLayout)
 {
+    SLANG_UNUSED(allowOffsetLayout);
+
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
     IRSizeAndAlignmentDecoration* const sizeAndAlignmentDecoration =
@@ -501,8 +515,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+        return;
     case kIROp_UInt16Type:
-        SLANG_UNEXPECTED("16 bit integer value emitted");
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -655,6 +671,11 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_ConstantBufferType:
+        {
+            emitType((IRType*)type->getOperand(0));
+            return;
+        }
     default:
         break;
     }
@@ -715,15 +736,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    if (inst->getParent()->getOp() == kIROp_Module)
+    if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
     }
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
-    case kIROp_swizzle:
-    case kIROp_swizzleSet:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_CastFloatToInt:
@@ -769,6 +790,13 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     if (as<IRGroupSharedRate>(varDecl->getRate()))
     {
         m_writer->emit("<workgroup>");
+    }
+    else if (
+        type->getOp() == kIROp_ArrayType &&
+        type->getOperand(0)->getOp() == kIROp_ConstantBufferType)
+    {
+        // Arrays of constant buffers should use the uniform keyword.
+        m_writer->emit("<uniform>");
     }
     else if (
         type->getOp() == kIROp_HLSLRWStructuredBufferType ||
@@ -950,9 +978,13 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         break;
                     }
                 case BaseType::Int16:
+                    {
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+                        break;
+                    }
                 case BaseType::UInt16:
                     {
-                        SLANG_UNEXPECTED("16 bit integer value emitted");
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
                         break;
                     }
                 case BaseType::Int:
@@ -1238,6 +1270,35 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("), ");
             emitType(inst->getDataType());
             m_writer->emit("(1));\n");
+            return true;
+        }
+    case kIROp_StructuredBufferGetDimensions:
+        {
+            IRIntegerValue strideValue;
+            auto dataType = inst->getOperand(0)->getDataType();
+            auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(dataType);
+            if (structuredBufferType)
+            {
+                auto elementType = structuredBufferType->getElementType();
+                auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+                SLANG_ASSERT(sizeDecor);
+                strideValue = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+            }
+            else
+            {
+                SLANG_ASSERT(as<IRByteAddressBufferTypeBase>(dataType));
+                // ByteAddressBuffer(s) are an array of 32 bit integers, stride is 4 bytes.
+                strideValue = 4;
+            }
+
+            emitInstResultDecl(inst);
+            m_writer->emit("vec2<u32>(");
+            m_writer->emit("arrayLength(&");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            m_writer->emit(", ");
+            m_writer->emit(strideValue);
+            m_writer->emit(");\n");
             return true;
         }
     }

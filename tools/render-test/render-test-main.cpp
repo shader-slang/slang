@@ -15,6 +15,8 @@
 
 #if defined(_WIN32)
 #include <d3d12.h>
+#include <windows.h>
+#pragma comment(lib, "advapi32")
 #endif
 
 #include <slang-rhi.h>
@@ -28,6 +30,121 @@
 #include "external/renderdoc_app.h"
 
 #include <windows.h>
+#endif
+
+#if defined(_WIN32)
+// Check if Windows Developer mode is enabled
+// Developer mode is required for D3D12 experimental features
+static bool isWindowsDeveloperModeEnabled()
+{
+    // Helper function to check a specific registry key with detailed logging
+    auto checkRegistryKey = [](HKEY rootKey,
+                               const char* rootName,
+                               const char* path,
+                               const char* valueName,
+                               bool try32BitView = false) -> bool
+    {
+        HKEY key;
+        DWORD accessFlags = KEY_READ | (try32BitView ? KEY_WOW64_32KEY : KEY_WOW64_64KEY);
+        LONG ret = RegOpenKeyExA(rootKey, path, 0, accessFlags, &key);
+
+        if (ret != ERROR_SUCCESS)
+        {
+            return false;
+        }
+
+        DWORD value = 0;
+        DWORD size = sizeof(DWORD);
+        DWORD type = REG_DWORD;
+
+        ret = RegQueryValueExA(key, valueName, nullptr, &type, (LPBYTE)&value, &size);
+
+        RegCloseKey(key);
+
+        if (ret != ERROR_SUCCESS || type != REG_DWORD)
+        {
+            return false;
+        }
+
+        return value == 1;
+    };
+
+    // Method 1: Check multiple registry locations with different views
+    struct RegistryLocation
+    {
+        HKEY rootKey;
+        const char* rootName;
+        const char* path;
+        const char* valueName;
+    };
+
+    RegistryLocation locations[] = {
+        // Windows 10+ main location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Alternative user location
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Windows 11 alternative
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+         "AllowAllTrustedApps"},
+
+        // Policy location
+        {HKEY_LOCAL_MACHINE,
+         "HKLM",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+
+        // Additional alternative locations
+        {HKEY_CURRENT_USER,
+         "HKCU",
+         "SOFTWARE\\Policies\\Microsoft\\Windows\\Appx",
+         "AllowDevelopmentWithoutDevLicense"},
+    };
+
+    for (const auto& location : locations)
+    {
+        // Try 64-bit view first
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                false))
+        {
+            return true;
+        }
+
+        // Try 32-bit view as fallback
+        if (checkRegistryKey(
+                location.rootKey,
+                location.rootName,
+                location.path,
+                location.valueName,
+                true))
+        {
+            return true;
+        }
+    }
+
+    printf("*** Developer Mode NOT DETECTED ***\n");
+    printf("To enable Developer Mode:\n");
+    printf("1. Open Windows Settings (Windows key + I)\n");
+    printf("2. Go to 'System' -> 'For developers'\n");
+    printf("3. Turn on 'Developer Mode'\n");
+    printf("4. Restart the application\n");
+    printf("==========================================\n");
+
+    return false;
+}
 #endif
 
 namespace renderer_test
@@ -267,7 +384,7 @@ struct AssignValsFromLayoutContext
                     InputBufferType::StorageBuffer,
                     sizeof(uint32_t),
                     1,
-                    Format::Unknown,
+                    Format::Undefined,
                 };
                 SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBuffer(
                     counterBufferDesc,
@@ -613,13 +730,13 @@ SlangResult RenderTestApp::initialize(
                 // fixed/known set of attributes.
                 //
                 const InputElementDesc inputElements[] = {
-                    {"A", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
-                    {"A", 1, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
-                    {"A", 2, Format::R32G32_FLOAT, offsetof(Vertex, uv)},
-                    {"A", 3, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData0)},
-                    {"A", 4, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData1)},
-                    {"A", 5, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData2)},
-                    {"A", 6, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData3)},
+                    {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
+                    {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
+                    {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
+                    {"A", 3, Format::RGBA32Float, offsetof(Vertex, customData0)},
+                    {"A", 4, Format::RGBA32Float, offsetof(Vertex, customData1)},
+                    {"A", 5, Format::RGBA32Float, offsetof(Vertex, customData2)},
+                    {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
                 ComPtr<IInputLayout> inputLayout;
@@ -639,13 +756,13 @@ SlangResult RenderTestApp::initialize(
                     device->createBuffer(vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
                 ColorTargetDesc colorTarget;
-                colorTarget.format = Format::R8G8B8A8_UNORM;
+                colorTarget.format = Format::RGBA8Unorm;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
                 desc.inputLayout = inputLayout;
                 desc.targets = &colorTarget;
                 desc.targetCount = 1;
-                desc.depthStencil.format = Format::D32_FLOAT;
+                desc.depthStencil.format = Format::D32Float;
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
@@ -654,12 +771,12 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::GraphicsTaskMeshCompute:
             {
                 ColorTargetDesc colorTarget;
-                colorTarget.format = Format::R8G8B8A8_UNORM;
+                colorTarget.format = Format::RGBA8Unorm;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
                 desc.targets = &colorTarget;
                 desc.targetCount = 1;
-                desc.depthStencil.format = Format::D32_FLOAT;
+                desc.depthStencil.format = Format::D32Float;
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
@@ -721,9 +838,9 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.size.width = gWindowWidth;
     depthBufferDesc.size.height = gWindowHeight;
     depthBufferDesc.size.depth = 1;
-    depthBufferDesc.mipLevelCount = 1;
-    depthBufferDesc.format = Format::D32_FLOAT;
-    depthBufferDesc.usage = TextureUsage::DepthWrite;
+    depthBufferDesc.mipCount = 1;
+    depthBufferDesc.format = Format::D32Float;
+    depthBufferDesc.usage = TextureUsage::DepthStencil;
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
     m_depthBuffer = m_device->createTexture(depthBufferDesc, nullptr);
     SLANG_ASSERT(m_depthBuffer);
@@ -735,8 +852,8 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.size.width = gWindowWidth;
     colorBufferDesc.size.height = gWindowHeight;
     colorBufferDesc.size.depth = 1;
-    colorBufferDesc.mipLevelCount = 1;
-    colorBufferDesc.format = Format::R8G8B8A8_UNORM;
+    colorBufferDesc.mipCount = 1;
+    colorBufferDesc.format = Format::RGBA8Unorm;
     colorBufferDesc.usage = TextureUsage::RenderTarget | TextureUsage::CopySource;
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
     m_colorBuffer = m_device->createTexture(colorBufferDesc, nullptr);
@@ -765,17 +882,17 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     // Build bottom level acceleration structure.
     {
-        AccelerationStructureBuildInputTriangles triangles = {};
-        BufferWithOffset vertexBufferWithOffset = vertexBuffer;
-        triangles.vertexBuffers = &vertexBufferWithOffset;
-        triangles.vertexBufferCount = 1;
-        triangles.vertexFormat = Format::R32G32B32_FLOAT;
-        triangles.vertexCount = kVertexCount;
-        triangles.vertexStride = sizeof(Vertex);
-        triangles.preTransformBuffer = transformBuffer;
-        triangles.flags = AccelerationStructureGeometryFlags::Opaque;
+        AccelerationStructureBuildInput buildInput = {};
+        buildInput.type = AccelerationStructureBuildInputType::Triangles;
+        buildInput.triangles.vertexBuffers[0] = vertexBuffer;
+        buildInput.triangles.vertexBufferCount = 1;
+        buildInput.triangles.vertexFormat = Format::RGB32Float;
+        buildInput.triangles.vertexCount = kVertexCount;
+        buildInput.triangles.vertexStride = sizeof(Vertex);
+        buildInput.triangles.preTransformBuffer = transformBuffer;
+        buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
-        buildDesc.inputs = &triangles;
+        buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
         buildDesc.flags = AccelerationStructureBuildFlags::AllowCompaction;
 
@@ -838,7 +955,7 @@ void RenderTestApp::_initializeAccelerationStructure()
     {
         AccelerationStructureInstanceDescType nativeInstanceDescType =
             getAccelerationStructureInstanceDescType(m_device);
-        Size nativeInstanceDescSize =
+        rhi::Size nativeInstanceDescSize =
             getAccelerationStructureInstanceDescSize(nativeInstanceDescType);
 
         List<AccelerationStructureInstanceDescGeneric> genericInstanceDescs;
@@ -871,12 +988,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         ComPtr<IBuffer> instanceBuffer =
             m_device->createBuffer(instanceBufferDesc, nativeInstanceDescs.getBuffer());
 
-        AccelerationStructureBuildInputInstances instances = {};
-        instances.instanceBuffer = instanceBuffer;
-        instances.instanceCount = 1;
-        instances.instanceStride = nativeInstanceDescSize;
+        AccelerationStructureBuildInput buildInput = {};
+        buildInput.type = AccelerationStructureBuildInputType::Instances;
+        buildInput.instances.instanceBuffer = instanceBuffer;
+        buildInput.instances.instanceCount = 1;
+        buildInput.instances.instanceStride = nativeInstanceDescSize;
         AccelerationStructureBuildDesc buildDesc = {};
-        buildDesc.inputs = &instances;
+        buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
 
         // Query buffer size for acceleration structure build.
@@ -910,11 +1028,13 @@ void RenderTestApp::_initializeAccelerationStructure()
 
 void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 {
-    auto info = m_device->getDeviceInfo();
+    float kIdentity[16] =
+        {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
+    auto info = m_device->getInfo();
     ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()
-        .setData(info.identityProjectionMatrix, sizeof(float) * 16);
+        .setData(kIdentity, sizeof(kIdentity));
 }
 
 void RenderTestApp::finalize()
@@ -971,14 +1091,15 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
 Result RenderTestApp::writeScreen(const String& filename)
 {
-    size_t rowPitch, pixelSize;
+    rhi::SubresourceLayout layout;
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(
-        m_device->readTexture(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
-    auto bufferSize = blob->getBufferSize();
-    uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
-    uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
-    return PngSerializeUtil::write(filename.getBuffer(), blob, width, height);
+    SLANG_RETURN_ON_FAIL(m_device->readTexture(m_colorBuffer, 0, 0, blob.writeRef(), &layout));
+    return PngSerializeUtil::write(
+        filename.getBuffer(),
+        blob,
+        layout.size.width,
+        layout.size.height,
+        layout.rowPitch);
 }
 
 Result RenderTestApp::update()
@@ -1395,10 +1516,8 @@ static SlangResult _innerMain(
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
-#if _DEBUG
-        desc.enableValidation = true;
+        desc.enableValidation = options.enableDebugLayers;
         desc.debugCallback = &debugCallback;
-#endif
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1424,7 +1543,14 @@ static SlangResult _innerMain(
         experimentalFD.configurationStructSizes = nullptr;
 
         if (options.dx12Experimental)
+        {
+            // Check if Windows Developer mode is enabled
+            if (!isWindowsDeveloperModeEnabled())
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
             desc.next = &experimentalFD;
+        }
 #endif
 
         // Look for args going to slang
@@ -1489,7 +1615,7 @@ static SlangResult _innerMain(
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)
     {
-        auto info = device->getDeviceInfo();
+        auto info = device->getInfo();
         auto out = stdWriters->getOut();
         out.print("Using graphics adapter: %s\n", info.adapterName);
     }

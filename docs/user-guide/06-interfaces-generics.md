@@ -6,7 +6,7 @@ permalink: /user-guide/interfaces-generics
 Interfaces and Generics
 ===========================
 
-This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how do they relate to similar features in other languages, how are they parsed and translated by the compiler, and show examples on how these features simplifies and modularizes shader code.
+This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how they relate to similar features in other languages, how they are parsed and translated by the compiler, and show examples on how these features simplify and modularize shader code.
 
 Interfaces
 ----------
@@ -43,7 +43,31 @@ struct MyType : IFoo, IBar
     uint myMethod2(uint2 x) {...}
 }
 ```
+
 In this case, the definition of `MyType` must satisfy the requirements from both the `IFoo` and `IBar` interfaces by providing both the `myMethod` and `myMethod2` methods.
+
+Interface methods can have a default implementation, which will be used if a conforming type doesn't provide an overriding implementation. For example:
+
+```slang
+interface IFoo
+{
+    int getVal() { return 0; }
+}
+
+// OK, MyType.getVal() will use the default implementation provided in `IFoo`.
+struct MyType : IFoo {}
+```
+
+A concrete type that provides its overriding implementation to an interface method requirement that has a default implementation must be explicitly marked as 'override'. For example:
+
+```slang
+struct MyType2 : IFoo
+{
+    // Explicitly mark `getVal` as `override` is needed
+    // because `IFoo.getVal` has a body.
+    override int getVal() { return 1; }
+}
+```
 
 Generics
 ---------------------
@@ -117,6 +141,28 @@ struct MyType<T, U>
     where T : IBar
     where U : IBaz<T>
 {
+}
+```
+
+Optional conformances can be expressed compactly using the `where optional` syntax:
+```csharp
+// Together, these two overloads...
+int myGenericMethod<T>(T arg)
+{
+}
+
+int myGenericMethod<T>(T arg) where T: IFoo
+{
+    arg.myMethod(1.0);
+}
+
+// ... are equivalent to:
+int myGenericMethod<T>(T arg) where optional T: IFoo
+{
+    if (T is IFoo)
+    {
+        arg.myMethod(1.0); // OK in a block that checks for T: IFoo conformance.
+    }
 }
 ```
 
@@ -423,7 +469,7 @@ struct MultiArrayFloatContainer : IFloatContainer
     }
     float getElementAt(Iterator iter)
     {
-        if (ite.indexr.x == 0) return firstBuffer[iter.index.y];
+        if (iter.index.x == 0) return firstBuffer[iter.index.y];
         else return secondBuffer[iter.index.y];
     }
 }
@@ -806,7 +852,7 @@ void main()
 }
 
 ```
-See  [if-let syntax](convenience-features.html#if_let-syntax) for more details.
+See  [if-let syntax](03-convenience-features.md#if_let-syntax) for more details.
 
 
 Generic Interfaces
@@ -979,7 +1025,7 @@ void printNumbers<each T>(expand each T args) where T == int
 }
 void compute<each T>(expand each T args) where T == int
 {
-    // Maps every element in `args` to `elementValue + 1`, and forward the
+    // Maps every element in `args` to `elementValue + 1`, and forwards the
     // new values as arguments to `printNumber`.
     printNumber(expand (each args) + 1);
 

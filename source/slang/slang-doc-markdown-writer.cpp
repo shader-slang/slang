@@ -17,12 +17,9 @@ namespace Slang
 template<typename T>
 static void _getDecls(ContainerDecl* containerDecl, List<T*>& out)
 {
-    for (Decl* decl : containerDecl->members)
+    for (auto decl : containerDecl->getDirectMemberDeclsOfType<T>())
     {
-        if (T* declAsType = as<T>(decl))
-        {
-            out.add(declAsType);
-        }
+        out.add(decl);
     }
 }
 
@@ -32,7 +29,7 @@ static void _getDeclsOfType(
     ContainerDecl* containerDecl,
     List<Decl*>& out)
 {
-    for (Decl* decl : containerDecl->members)
+    for (Decl* decl : containerDecl->getDirectMemberDecls())
     {
         if (as<T>(decl))
         {
@@ -100,6 +97,15 @@ String getDocPath(const DocumentationConfig& config, String path)
     return config.rootDir + Path::getPathWithoutExt(path);
 }
 
+String getTocTreeEntry(const String& name, const String& fromPath, const String& toPath)
+{
+    StringBuilder sb;
+    // Format: name <path>
+    sb << name;
+    sb << " <" << Path::getPathWithoutExt(Path::getRelativePath(fromPath, toPath)) << ">\n";
+    return sb.produceString();
+}
+
 void DocMarkdownWriter::_appendAsBullets(
     const List<NameAndText>& values,
     bool insertLinkForName,
@@ -109,6 +115,18 @@ void DocMarkdownWriter::_appendAsBullets(
     for (const auto& value : values)
     {
         out << "#### ";
+        if (value.decl)
+        {
+            // Add anchor ID for the decl.
+            if (as<GenericTypeParamDeclBase>(value.decl))
+            {
+                out << " <a id=\"typeparam-" << getText(value.decl->getName()) << "\"></a>";
+            }
+            else
+            {
+                out << " <a id=\"decl-" << getText(value.decl->getName()) << "\"></a>";
+            }
+        }
         const String& name = value.name;
         auto path = findLinkForToken(m_currentPage, name);
         if (name.getLength())
@@ -124,7 +142,7 @@ void DocMarkdownWriter::_appendAsBullets(
                 out.appendChar(wrapChar);
                 if (path.getLength())
                 {
-                    out << "](" << getDocPath(m_config, path) << ")";
+                    out << "](" << Path::getPathWithoutExt(path) << ")";
                 }
             }
             else
@@ -144,18 +162,6 @@ void DocMarkdownWriter::_appendAsBullets(
                         out << translateToMarkdownWithLinks(rest);
                     }
                 }
-            }
-        }
-        if (value.decl)
-        {
-            // Add anchor ID for the decl.
-            if (as<GenericTypeParamDeclBase>(value.decl))
-            {
-                out << " {#typeparam-" << getText(value.decl->getName()) << "}";
-            }
-            else
-            {
-                out << " {#decl-" << getText(value.decl->getName()) << "}";
             }
         }
         if (value.text.getLength())
@@ -208,7 +214,10 @@ void DocMarkdownWriter::_appendAsBullets(const List<String>& values, char wrapCh
         }
         if (path.getLength())
         {
-            out << "](" << getDocPath(m_config, path) << ")";
+            out << "]("
+                << Path::getPathWithoutExt(
+                       Path::getRelativePath(Path::getParentDirectory(m_currentPage->path), path))
+                << ")";
         }
         out << "\n";
     }
@@ -373,24 +382,21 @@ DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(
     else if (auto typeParam = as<GenericTypeParamDeclBase>(decl))
     {
         bool isFirst = true;
-        for (auto member : decl->parentDecl->members)
+        for (auto constraint : decl->parentDecl->getDirectMemberDeclsOfType<TypeConstraintDecl>())
         {
-            if (auto constraint = as<TypeConstraintDecl>(member))
+            if (isDeclRefTypeOf<Decl>(getSub(m_astBuilder, constraint)).getDecl() == typeParam)
             {
-                if (isDeclRefTypeOf<Decl>(getSub(m_astBuilder, constraint)).getDecl() == typeParam)
+                if (isFirst)
                 {
-                    if (isFirst)
-                    {
-                        sb << ": ";
-                        isFirst = false;
-                    }
-                    else
-                    {
-                        sb << ", ";
-                    }
-                    sb << constraint->getSup().type->toString();
-                    break;
+                    sb << ": ";
+                    isFirst = false;
                 }
+                else
+                {
+                    sb << ", ";
+                }
+                sb << constraint->getSup().type->toString();
+                break;
             }
         }
         if (auto genericTypeParam = as<GenericTypeParamDecl>(decl))
@@ -622,19 +628,23 @@ void DocMarkdownWriter::writeProperty(const ASTMarkup::Entry& entry, PropertyDec
     propertyDecl->type->toText(typeSB);
     out << translateToHTMLWithLinks(propertyDecl, typeSB.produceString());
     out << "\n{\n";
-    for (auto member : propertyDecl->members)
+    for (auto accessor : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
     {
-        if (as<GetterDecl>(member))
+        if (as<GetterDecl>(accessor))
         {
             out << "    get;\n";
         }
-        else if (as<SetterDecl>(member))
+        else if (as<SetterDecl>(accessor))
         {
             out << "    set;\n";
         }
-        else if (as<RefAccessorDecl>(member))
+        else if (as<RefAccessorDecl>(accessor))
         {
             out << "    ref;\n";
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unhandled accessor type");
         }
     }
     out << "}\n</pre>\n\n";
@@ -770,7 +780,7 @@ void DocMarkdownWriter::writeExtensionConditions(
             {
                 genericParamDecl = extTypeParamDecl.getDecl();
             }
-            else if (auto extValueParamVal = as<GenericParamIntVal>(arg))
+            else if (auto extValueParamVal = as<DeclRefIntVal>(arg))
             {
                 genericParamDecl = extValueParamVal->getDeclRef().getDecl();
             }
@@ -780,7 +790,7 @@ void DocMarkdownWriter::writeExtensionConditions(
             if (auto targetTypeParentGenericDecl =
                     as<GenericDecl>(targetTypeDeclRef.getDecl()->parentDecl))
             {
-                for (auto member : targetTypeParentGenericDecl->members)
+                for (auto member : targetTypeParentGenericDecl->getDirectMemberDecls())
                 {
                     if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
                     {
@@ -815,20 +825,19 @@ void DocMarkdownWriter::writeExtensionConditions(
                 // `T`.
 
                 // Find constraints on the originalParamDecl.
-                for (auto member : genericParamDecl->parentDecl->members)
+                for (auto typeConstraint :
+                     genericParamDecl->parentDecl
+                         ->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
                 {
-                    if (auto typeConstraint = as<GenericTypeConstraintDecl>(member))
+                    if (isDeclRefTypeOf<Decl>(typeConstraint->sub.type).getDecl() ==
+                        genericParamDecl)
                     {
-                        if (isDeclRefTypeOf<Decl>(typeConstraint->sub.type).getDecl() ==
-                            genericParamDecl)
+                        if (typeConstraint->isEqualityConstraint)
                         {
-                            if (typeConstraint->isEqualityConstraint)
-                            {
-                                isEqualityConstraint = true;
-                            }
-                            constraintVal = typeConstraint->getSup().type;
-                            break;
+                            isEqualityConstraint = true;
                         }
+                        constraintVal = typeConstraint->getSup().type;
+                        break;
                     }
                 }
             }
@@ -970,22 +979,20 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
 
         if (auto genericParent = as<GenericDecl>(parentDecl->parentDecl))
         {
-            for (auto member : genericParent->members)
+            for (auto typeConstraint :
+                 genericParent->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
-                if (auto typeConstraint = as<GenericTypeConstraintDecl>(member))
-                {
-                    out << toSlice("\n    <span class='code_keyword'>where</span> ");
-                    out << translateToHTMLWithLinks(
-                        parentDecl,
-                        getSub(m_astBuilder, typeConstraint)->toString());
-                    if (typeConstraint->isEqualityConstraint)
-                        out << " == ";
-                    else
-                        out << toSlice(" : ");
-                    out << translateToHTMLWithLinks(
-                        parentDecl,
-                        getSup(m_astBuilder, typeConstraint)->toString());
-                }
+                out << toSlice("\n    <span class='code_keyword'>where</span> ");
+                out << translateToHTMLWithLinks(
+                    parentDecl,
+                    getSub(m_astBuilder, typeConstraint)->toString());
+                if (typeConstraint->isEqualityConstraint)
+                    out << " == ";
+                else
+                    out << toSlice(" : ");
+                out << translateToHTMLWithLinks(
+                    parentDecl,
+                    getSup(m_astBuilder, typeConstraint)->toString());
             }
         }
         parentDecl = getParentDecl(parentDecl);
@@ -1224,29 +1231,6 @@ void DocMarkdownWriter::_maybeAppendRequirements(
     }
 
     out << toSlice("\n");
-}
-
-static Decl* _getSameNameDecl(ContainerDecl* parentDecl, Decl* decl)
-{
-    Decl* result = nullptr;
-    parentDecl->getMemberDictionary().tryGetValue(decl->getName(), result);
-    return result;
-}
-
-static bool _isFirstOverridden(Decl* decl)
-{
-    decl = _getSameNameDecl(as<ContainerDecl>(getParentDecl(decl)), decl);
-
-    ContainerDecl* parentDecl = decl->parentDecl;
-
-    Name* declName = decl->getName();
-    if (declName)
-    {
-        Decl** firstDeclPtr = parentDecl->getMemberDictionary().tryGetValue(declName);
-        return (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
-    }
-
-    return false;
 }
 
 void ParsedDescription::write(DocMarkdownWriter* writer, Decl* decl, StringBuilder& out)
@@ -1538,12 +1522,10 @@ void DocMarkdownWriter::writeCallableOverridable(
     {
         for (auto& entry : page->entries)
         {
-            Decl* sameNameDecl = _getSameNameDecl(
-                as<ContainerDecl>(getParentDecl((Decl*)entry->m_node)),
-                callableDecl);
+            auto entryDecl = (Decl*)entry->m_node;
+            auto parentDecl = getParentDecl(entryDecl);
 
-            for (Decl* curDecl = sameNameDecl; curDecl;
-                 curDecl = curDecl->nextInContainerWithSameName)
+            for (auto curDecl : parentDecl->getDirectMemberDeclsOfName(entryDecl->getName()))
             {
                 CallableDecl* sig = nullptr;
                 if (GenericDecl* genericDecl = as<GenericDecl>(curDecl))
@@ -1631,7 +1613,7 @@ void DocMarkdownWriter::writeCallableOverridable(
                 // associated with this callable.
                 if (genericDecl)
                 {
-                    for (Decl* decl : genericDecl->members)
+                    for (Decl* decl : genericDecl->getDirectMemberDecls())
                     {
                         if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
                         {
@@ -1881,15 +1863,13 @@ void DocMarkdownWriter::writeAggType(
         baseTypes = _getAsStringList(inheritanceDecls);
         for (auto entry : page->entries)
         {
-            for (auto member : as<ContainerDecl>(entry->m_node)->members)
+            for (auto inheritanceDecl :
+                 as<ContainerDecl>(entry->m_node)->getDirectMemberDeclsOfType<InheritanceDecl>())
             {
-                if (auto inheritanceDecl = as<InheritanceDecl>(member))
+                if (auto extDecl = as<ExtensionDecl>(entry->m_node))
                 {
-                    if (auto extDecl = as<ExtensionDecl>(entry->m_node))
-                    {
-                        conditionalConformanceExts.add(extDecl);
-                        conditionalBaseTypes.add(inheritanceDecl->base->toString());
-                    }
+                    conditionalConformanceExts.add(extDecl);
+                    conditionalBaseTypes.add(inheritanceDecl->base->toString());
                 }
             }
         }
@@ -1926,7 +1906,7 @@ void DocMarkdownWriter::writeAggType(
 
         if (assocTypeDecls.getCount())
         {
-            out << toSlice("# Associated types\n\n");
+            out << toSlice("## Associated types\n\n");
 
             for (AssocTypeDecl* assocTypeDecl : assocTypeDecls)
             {
@@ -2004,11 +1984,8 @@ void DocMarkdownWriter::writeAggType(
         out << "## Conditional Conformances\n\n";
         for (auto ext : conditionalConformanceExts)
         {
-            for (auto member : ext->members)
+            for (auto inheritanceDecl : ext->getDirectMemberDeclsOfType<InheritanceDecl>())
             {
-                auto inheritanceDecl = as<InheritanceDecl>(member);
-                if (!inheritanceDecl)
-                    continue;
                 out << "### Conformance to ";
                 out << escapeMarkdownText(inheritanceDecl->base.type->toString());
                 out << "\n";
@@ -2024,7 +2001,7 @@ void DocMarkdownWriter::writeAggType(
                 ASTPrinter printer(m_astBuilder);
                 printer.addDeclPath(aggTypeDecl->getDefaultDeclRef());
                 out << "`" << printer.getString() << "` additionally conforms to `";
-                out << escapeMarkdownText(inheritanceDecl->base.type->toString());
+                out << inheritanceDecl->base.type->toString();
                 if (nonEmptyLines.getCount() != 0)
                 {
                     out << "` when the following conditions are met:\n\n";
@@ -2151,7 +2128,10 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append("[");
                 sb << escapeMarkdownText(tokenContent.getUnownedSlice());
                 sb.append("](");
-                sb.append(getDocPath(m_config, page->path));
+                sb.append(Path::getPathWithoutExt(Path::getRelativePath(
+                    Path::getParentDirectory(m_currentPage->path),
+                    page->path)));
+                sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append(")");
@@ -2239,7 +2219,10 @@ String DocMarkdownWriter::translateToHTMLWithLinks(Decl* decl, String text)
             if (page)
             {
                 sb.append("<a href=\"");
-                sb.append(getDocPath(m_config, page->path));
+                sb.append(Path::getPathWithoutExt(Path::getRelativePath(
+                    Path::getParentDirectory(m_currentPage->path),
+                    page->path)));
+                sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append("\"");
@@ -2344,7 +2327,7 @@ void DeclDocumentation::writeGenericParameters(
 
     // The parameters, in order
     List<Decl*> params;
-    for (Decl* member : genericDecl->members)
+    for (Decl* member : genericDecl->getDirectMemberDecls())
     {
         if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
         {
@@ -2431,12 +2414,9 @@ void DocMarkdownWriter::createPage(ASTMarkup::Entry& entry, Decl* decl)
         return;
     }
 
-    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
+    if (as<CallableDecl>(decl))
     {
-        if (_isFirstOverridden(callableDecl))
-        {
-            ensureDeclPageCreated(entry);
-        }
+        ensureDeclPageCreated(entry);
     }
     else if (as<EnumDecl>(decl))
     {
@@ -2520,7 +2500,7 @@ DocumentPage* DocMarkdownWriter::findPageForToken(
                     continue;
                 if (auto genericParent = as<GenericDecl>(containerDecl->parentDecl))
                 {
-                    for (auto member : genericParent->members)
+                    for (auto member : genericParent->getDirectMemberDecls())
                     {
                         if (getText(member->getName()) == token)
                         {
@@ -2533,7 +2513,7 @@ DocumentPage* DocMarkdownWriter::findPageForToken(
                         }
                     }
                 }
-                for (auto member : containerDecl->members)
+                for (auto member : containerDecl->getDirectMemberDecls())
                 {
                     if (as<ParamDecl>(member) || as<EnumCaseDecl>(member))
                     {
@@ -2698,7 +2678,9 @@ void DocMarkdownWriter::generateSectionIndexPage(DocumentPage* page)
     for (auto child : page->children)
     {
         sb << "- [" << escapeMarkdownText(child->shortName) << "]("
-           << getDocPath(m_config, child->path) << ")\n";
+           << Path::getPathWithoutExt(
+                  Path::getRelativePath(Path::getParentDirectory(page->path), child->path))
+           << ")\n";
     }
 }
 
@@ -2872,6 +2854,34 @@ void writeTOCChildren(
     categoryNames.sort();
     auto parentPath = Path::getParentDirectory(page->path);
     parentPath.append("/");
+
+    // Create toctree for index pages
+    if (page->path.endsWith("index.md"))
+    {
+        StringBuilder& tocSB = page->get();
+        tocSB << "\n<!-- RTD-TOC-START\n";
+        tocSB << "```{toctree}\n:titlesonly:\n:hidden:\n\n";
+
+        // Add category landing pages to the toctree
+        for (auto& cat : categoryNames)
+        {
+            // Skip non-categorized pages
+            if (cat.getLength() == 0)
+                continue;
+
+            String landingPagePath = parentPath + cat + ".md";
+            tocSB << getTocTreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
+        }
+
+        // Add uncategorized pages to the toctree
+        for (auto child : categories[""])
+        {
+            tocSB << getTocTreeEntry(child->shortName, parentPath, child->path);
+        }
+        tocSB << "```\n";
+        tocSB << "RTD-TOC-END -->\n";
+    }
+
     for (auto& cat : categoryNames)
     {
         // Skip non-categorized pages first.
@@ -2900,9 +2910,23 @@ void writeTOCChildren(
                                << "\n\nThis category contains the following declarations:\n\n";
         for (auto child : categories[cat])
         {
-            landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "]("
-                                   << getDocPath(config, child->path) << ")\n\n";
+            landingPage->contentSB
+                << "#### [" << writer->escapeMarkdownText(child->title) << "]("
+                << Path::getPathWithoutExt(
+                       Path::getRelativePath(Path::getParentDirectory(page->path), child->path))
+                << ")\n\n";
         }
+
+        // Add the toctree for the category landing page.
+        landingPage->contentSB << "\n<!-- RTD-TOC-START\n";
+        landingPage->contentSB << "```{toctree}\n:titlesonly:\n:hidden:\n\n";
+        for (auto child : categories[cat])
+        {
+            landingPage->contentSB << getTocTreeEntry(child->shortName, parentPath, child->path);
+        }
+        landingPage->contentSB << "```\n";
+        landingPage->contentSB << "RTD-TOC-END -->\n";
+
         page->children.add(landingPage);
     }
 

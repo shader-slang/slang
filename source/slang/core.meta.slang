@@ -89,7 +89,7 @@ syntax __extern_cpp : ExternCppModifier;
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::DefaultInitializableConstructor))
+    __builtin_requirement($((int)BuiltinRequirementKind::DefaultInitializableConstructor))
     __init();
 }
 
@@ -99,15 +99,15 @@ interface IDefaultInitializable
 interface IComparable
 {
     /// Returns true if two values of the conforming type are equal.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Equals))
+    __builtin_requirement($((int)BuiltinRequirementKind::Equals))
     bool equals(This other);
 
     /// Returns true if `this` is less than `other`.
-    __builtin_requirement($( (int)BuiltinRequirementKind::LessThan))
+    __builtin_requirement($((int)BuiltinRequirementKind::LessThan))
     bool lessThan(This other);
 
     /// Returns true if `this` is less than or equal to `other`.
-    __builtin_requirement($( (int)BuiltinRequirementKind::LessThanOrEquals))
+    __builtin_requirement($((int)BuiltinRequirementKind::LessThanOrEquals))
     bool lessThanOrEquals(This other);
 }
 
@@ -169,42 +169,42 @@ interface IArithmetic : IComparable
 interface ILogical : IComparable
 {
     /// Shifts the bits of this value to the left by the specified number of positions.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Shl) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Shl))
     This shl(int value);
 
     /// Shifts the bits of this value to the right by the specified number of positions.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Shr) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Shr))
     This shr(int value);
 
     /// Performs a bitwise AND operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitAnd) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitAnd))
     This bitAnd(This other);
 
     /// Performs a bitwise OR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitOr) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitOr))
     This bitOr(This other);
 
     /// Performs a bitwise XOR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitXor) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitXor))
     This bitXor(This other);
 
     /// Performs a bitwise NOT operation on this value, flipping all bits.
-    __builtin_requirement($( (int)BuiltinRequirementKind::BitNot) )
+    __builtin_requirement($((int)BuiltinRequirementKind::BitNot))
     This bitNot();
 
     /// Performs a logical AND operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::And) )
+    __builtin_requirement($((int)BuiltinRequirementKind::And))
     This and(This other);
 
     /// Performs a logical OR operation on this value with another value of the same type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Or) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Or))
     This or(This other);
 
     /// Performs a logical NOT operation on this value, returning the logical negation.
-    __builtin_requirement($( (int)BuiltinRequirementKind::Not) )
+    __builtin_requirement($((int)BuiltinRequirementKind::Not))
     This not();
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
+    __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(int val);
 }
 
@@ -603,25 +603,25 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///
 /// 
 __magic_type(DifferentiableType)
-[KnownBuiltin("IDifferentiable")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiable))]
 interface IDifferentiable
 {
     // Note: the compiler implementation requires the `Differential` associated type to be defined
     // before anything else.
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialType) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialType))
     associatedtype Differential : IDifferentiable;
 
     /// Returns a zero-initialized value of the differential type.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DZeroFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DZeroFunc))
     static Differential dzero();
 
     /// Adds two differential values and returns the result.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DAddFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DAddFunc))
     static Differential dadd(Differential, Differential);
 
     /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
-    __builtin_requirement($( (int)BuiltinRequirementKind::DMulFunc) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DMulFunc))
     __generic<T : __BuiltinRealType>
     static Differential dmul(T, Differential);
 };
@@ -646,10 +646,10 @@ interface IDifferentiable
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
 __magic_type(DifferentiablePtrType)
-[KnownBuiltin("IDifferentiablePtr")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::IDifferentiablePtr))]
 interface IDifferentiablePtrType
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
+    __builtin_requirement($((int)BuiltinRequirementKind::DifferentialPtrType))
     associatedtype Differential : IDifferentiablePtrType;
 };
 
@@ -831,7 +831,7 @@ interface __EnumType : ILogical
     // conflict if a user had an `enum` case called `Tag`
     associatedtype __Tag : __BuiltinIntegerType;
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::InitLogicalFromInt) )
+    __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(__Tag value);
 };
 
@@ -1185,7 +1185,7 @@ ${{{{
          __intrinsic_op($(kIROp_FRem)) This mod(This other);
          __intrinsic_op($(kIROp_Neg))  This neg();
          __intrinsic_op($(kIROp_FloatCast)) float toFloat();
-         __intrinsic_op($(kIROp_Mul)) This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         [__unsafeForceInlineEarly] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
     
         [__unsafeForceInlineEarly]
@@ -1256,7 +1256,7 @@ struct __none_t
 /// Represents a pointer type.
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
-__generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
+__generic<T, let addrSpace : uint64_t = $((uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
 struct Ptr
@@ -1444,7 +1444,7 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
+typealias __Addr<T> = Ptr<T, $((uint64_t)AddressSpace::Generic)ULL>;
 
 //@public:
 
@@ -1463,7 +1463,7 @@ typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 __generic<T>
 __magic_type(OptionalType)
 __intrinsic_type($(kIROp_OptionalType))
-struct Optional
+struct Optional : IDefaultInitializable
 {
     /// Return `true` iff this `Optional` contains a value of type `T`
     property bool hasValue
@@ -1482,6 +1482,9 @@ struct Optional
     __implicit_conversion($(kConversionCost_ValToOptional))
     __intrinsic_op($(kIROp_MakeOptionalValue))
     __init(T val);
+
+    [__unsafeForceInlineEarly]
+    __init() { this = none; }
 };
 
 //@hidden:
@@ -1508,6 +1511,50 @@ __generic<T>
 bool operator!=(__none_t noneVal, Optional<T> val)
 {
     return val.hasValue;
+}
+
+struct Conditional<T, bool hasValue>
+{
+    internal T storage[hasValue];
+
+    __implicit_conversion($(kConversionCost_ValToOptional))
+    [__unsafeForceInlineEarly]
+    __init(T val) { if (hasValue) storage[0] = val;}
+
+    [__unsafeForceInlineEarly]
+    public Optional<T> get()
+    {
+        if (hasValue)
+        {
+            return Optional<T>(storage[0]);
+        }
+        else
+        {
+            return none;
+        }
+    }
+
+    [__unsafeForceInlineEarly]
+    [mutating]
+    public void set(T value)
+    {
+        if (hasValue)
+            storage[0] = value;
+    }
+}
+
+extension<T> Optional<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    __generic<bool condHasValue>
+    [__unsafeForceInlineEarly]
+    __init(Conditional<T, condHasValue> condVal)
+    {
+        if (condHasValue)
+            this = Optional<T>(condVal.storage[0]);
+        else
+            this = none;
+    }
 }
 
 //@public:
@@ -1749,7 +1796,7 @@ struct NativeString
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
     __implicit_conversion($(kConversionCost_None))
-    __intrinsic_op($(kIROp_getNativeStr))
+    __intrinsic_op($(kIROp_GetNativeStr))
     __init(String value);
 
     __init() { this = NativeString(""); }
@@ -1762,12 +1809,12 @@ extension Ptr<void>
     __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
 
     __generic<T, let addrSpace : uint64_t>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(Ptr<T, addrSpace> ptr);
 
     __generic<T>
-    __intrinsic_op(0)
+    __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init(NativeRef<T> ptr);
 }
@@ -1973,7 +2020,7 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Div)) This div(This other);
     __intrinsic_op($(kIROp_FRem)) This mod(This other);
     __intrinsic_op($(kIROp_Neg)) This neg();
-    __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
     [OverloadRank(-1)]
@@ -2041,8 +2088,7 @@ extension matrix<T,N,M,L> : IFloat
     [TreatAsDifferentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
     [TreatAsDifferentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
     [TreatAsDifferentiable] __intrinsic_op($(kIROp_Neg)) This neg();
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul)) This scale<T1:__BuiltinFloatingPointType>(T1 s);
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s);
+    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
     [OverloadRank(-1)]
@@ -2537,8 +2583,9 @@ __prefix Ref<T> operator*(Ptr<T, addrSpace> value);
 
 __generic<T>
 __intrinsic_op(0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::OperatorAddressOf))]
 [require(cpp_cuda_spirv)]
-__prefix Ptr<T, $( (uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
+__prefix Ptr<T, $((uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
 
 __generic<T>
 __intrinsic_op(0)
@@ -3020,7 +3067,7 @@ int __alignOf()
     {
     case cuda :
     case cpp :
-        __intrinsic_asm "SLANG_ALIGN_OF($[0])", T;
+        __intrinsic_asm "alignof($[0])", T;
     }
 }
 
@@ -3031,8 +3078,8 @@ int __alignOf(T v)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
-    case cuda: __intrinsic_asm "SLANG_ALIGN_OF($T0)";
+    case cpp: __intrinsic_asm "alignof($T0)";
+    case cuda: __intrinsic_asm "alignof($T0)";
     }
 }
 
@@ -3312,7 +3359,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_undefined))
+__intrinsic_op($(kIROp_Undefined))
 T __declVal();
 
 __generic<T>
@@ -3477,6 +3524,18 @@ enum MemoryOrder
     /// Provides the strongest ordering: total order exists between all SeqCst operations
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+enum MemoryScope
+{
+    CrossDevice = 0,
+    Device = 1,
+    Workgroup = 2,
+    Subgroup = 3,
+    Invocation = 4,
+    QueueFamily = 5,
+    ShaderCallKHR = 6,
+};
 
 /// Represents types that can be used in any atomic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
@@ -3709,6 +3768,13 @@ attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 /// Declare the Vulkan binding index of a global variable.
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
+
+/// Declare offset for a struct field. Applies to all kinds of structs when targeting Vulkan.
+/// Applies only to structs that are directly used as interface blocks (such as push constants and uniforms)
+/// when targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
+/// This attribute has no effect on other targets.
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_offset(index: int)] : VkStructOffsetAttribute;
 
 /// @deprecated
 /// Use `spirv_asm` instead for inline SPIR-V assembly.
@@ -3975,10 +4041,10 @@ attribute_syntax [__readNone] : ReadNoneAttribute;
 /// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {
-    Struct = $( (int) UserDefinedAttributeTargets::Struct), /// Struct types.
-    Var = $( (int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
-    Function = $( (int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
-    Param = $( (int) UserDefinedAttributeTargets::Param), /// Function parameters.
+    Struct = $((int) UserDefinedAttributeTargets::Struct), /// Struct types.
+    Var = $((int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
+    Function = $((int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
+    Param = $((int) UserDefinedAttributeTargets::Param), /// Function parameters.
 };
 
 /// Mark a struct type as a user defined attribute type.
@@ -4139,8 +4205,6 @@ attribute_syntax [__AlwaysFoldIntoUseSiteAttribute] : AlwaysFoldIntoUseSiteAttri
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
 
-__attributeTarget(StructDecl)
-attribute_syntax [payload] : PayloadAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
@@ -4170,7 +4234,7 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 
 // @hidden:
 __attributeTarget(DeclBase)
-attribute_syntax [KnownBuiltin(name : String)] : KnownBuiltinAttribute;
+attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
@@ -4212,5 +4276,8 @@ __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
 __generic<T>
-typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+typealias NodePayloadPtr = Ptr<T, $((uint64_t)AddressSpace::NodePayloadAMDX)>;
+
+__attributeTarget(StructDecl)
+attribute_syntax [raypayload] : RayPayloadAttribute;
 

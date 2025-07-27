@@ -11,7 +11,7 @@ buffer MyBlockName2
 
 layout(local_size_x = 1) in;
 
-//TEST_INPUT: set image_1d = RWTexture1D(format=R32_SINT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set image_1d = RWTexture1D(format=R32Sint, size=4, content=one, mipMaps = 1)
 uniform layout(binding=0,r32i) iimage1D image_1d;
 
 bool checkAllImageAtomicAdd()

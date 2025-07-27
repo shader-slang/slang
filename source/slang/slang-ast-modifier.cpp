@@ -5,7 +5,7 @@
 
 namespace Slang
 {
-const OrderedDictionary<DeclRefBase*, SubtypeWitness*>& DifferentiableAttribute::
+const OrderedDictionary<Type*, SubtypeWitness*>& DifferentiableAttribute::
     getMapTypeToIDifferentiableWitness()
 {
     for (Index i = m_mapToIDifferentiableWitness.getCount();

@@ -45,7 +45,7 @@ the list [`int`, `int64_t`] which can represent the specified literal value. If 
 an `uint64_t` and a warning is given. The type of hexadecimal non-suffixed integer literal is the first type from the list 
 [`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64 bit integer literals see the documentation on [64 bit type support](../64bit-type-support.md).
 
-The following floating-point type are provided:
+The following floating-point types are provided:
 
 | Name          | Description                  |
 |---------------|------------------------------|
@@ -57,7 +57,7 @@ All targets support the 32-bit `float`, but support for the other types depends 
 
 ### Boolean Type
 
-The type `bool` is used to represent Boolean truth value: `true` and `false`. 
+The type `bool` is used to represent Boolean truth values: `true` and `false`. 
 
 For compatibility reasons, the `sizeof(bool)` depends on the target. 
 
@@ -208,8 +208,23 @@ void test()
 }
 ```
 
-> #### Note ####
-> Slang currently does not allow default values on struct members, but we intend to support them in the future.
+### Default Values for Struct Members
+
+Alternatively, you can specify default values of members in the struct like so: 
+
+```hlsl
+struct MyData
+{
+     int a = 1;
+     float3 b = float3(0.5);
+}
+void test()
+{
+     MyData data = {}; // will initialize data.a to 1 and data.b to {0.5, 0.5, 0.5}
+     MyData data2 = MyData(); // equivalent to MyData data2 = {};
+     MyData data3; // data3.a and data3.b will be undefined !    
+}
+```
 
 ### Enumeration Types
 
@@ -435,6 +450,12 @@ Slang supports the following statement forms with nearly identical syntax to HLS
 
 * `return` statements
 
+* `defer` statements
+
+> #### Note ####
+> The `defer` statement in Slang is tied to scope. The deferred statement runs at the end of the scope like in Swift, not just at the end of the function like in Go.
+> `defer` supports but does not require block statements: both `defer f();` and `defer { f(); g(); }` are legal.
+
 > #### Note ####
 > Slang does not support the C/C++ `goto` keyword.
 
@@ -500,7 +521,7 @@ Variadic macros are supported by the Slang preprocessor.
 > #### Note ####
 > The use of `#include` in new code is discouraged as this functionality has
 > been superseded by the module system, please refer to
-> [./04-modules-and-access-control.md](./04-modules-and-access-control.md)
+> [Modules and Access Control](04-modules-and-access-control.md)
 
 Attributes
 ----------
@@ -949,7 +970,7 @@ Slang has the following rules:
 
 Initializer Lists
 ----------
-Initializer List's are an expression of the form `{...}`.
+Initializer Lists are an expression of the form `{...}`.
 
 ```csharp
 int myFunc()
@@ -958,35 +979,36 @@ int myFunc()
 }
 ```
 
-### Initializer List's - Scalar
+### Initializer Lists - Scalar
 
 ```csharp
 // Equivalent to `int a = 1`
 int a = {1};
 ```
 
-### Initializer List's - Vectors
+### Initializer Lists - Vectors
 
 ```csharp
 // Equivalent to `float3 a = float3(1,2,3)`
 float3 a = {1, 2, 3};
 ```
 
-### Initializer List's - Arrays/Matrixes
+### Initializer Lists - Arrays/Matrices
 
-#### Array Of Scalar's
+#### Array Of Scalars
 
 ```csharp
 // Equivalent to `int[2] a; a[0] = 1; a[1] = 2;`
 int a[2] = {1, 2}
 ```
 
-#### Array Of Aggregate's
+#### Array Of Aggregates
 
 ```csharp
 // Equivalent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
 float3 a[2] = { {1,2,3}, {4,5,6} };
 ```
+
 #### Flattened Array Initializer
 
 ```csharp
@@ -1058,7 +1080,7 @@ struct GenerateCtor1 : GenerateCtorInner1
 GenerateCtor1 val[2] = { { 3 }, { 2 } };
 ```
 
-In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-List's) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Struct)
+In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-Lists) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Structs)
 
 A struct is considered a C-style struct if:
 1. User never defines a custom constructor with **more than** 0 parameters

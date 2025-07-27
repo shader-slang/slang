@@ -1,4 +1,4 @@
-// test-context.cpp
+// options.cpp
 #include "options.h"
 
 #include "../../source/core/slang-io.h"
@@ -59,10 +59,59 @@ static bool _isSubCommand(const char* arg)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+/* static */ void Options::showHelp(WriterHelper stdOut)
+{
+    stdOut.print(
+        "Usage: slang-test [options] [test-prefix...]\n"
+        "\n"
+        "Options:\n"
+        "  -h, --help                     Show this help message\n"
+        "  -bindir <path>                 Set directory for binaries (default: the path to the "
+        "slang-test executable)\n"
+        "  -test-dir <path>               Set directory for test files (default: tests/)\n"
+        "  -v [level]                     Set verbosity level (verbose, info, failure)\n"
+        "                                 Default: verbose when -v used, info otherwise\n"
+        "  -hide-ignored                  Hide results from ignored tests\n"
+        "  -api-only                      Only run tests that use specified APIs\n"
+        "  -verbose-paths                 Use verbose paths in output\n"
+        "  -category <name>               Only run tests in specified category\n"
+        "  -exclude <name>                Exclude tests in specified category\n"
+        "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
+        "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
+        "  -skip-api-detection            Skip API availability detection\n"
+        "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -show-adapter-info             Show detailed adapter information\n"
+        "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
+        "  -skip-reference-image-generation Skip generating reference images for render tests\n"
+        "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
+        "  -expected-failure-list <file>  Specify file containing expected failures\n"
+        "  -use-shared-library            Run tests in-process using shared library\n"
+        "  -use-test-server               Run tests using test server\n"
+        "  -use-fully-isolated-test-server  Run each test in isolated server\n"
+        "  -capability <name>             Compile with the given capability\n"
+        "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
+        "                                 and Debug Device for DX\n"
+#if _DEBUG
+        "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
+        "build)\n"
+#endif
+        "\n"
+        "Output modes:\n"
+        "  -appveyor                      Use AppVeyor output format\n"
+        "  -travis                        Use Travis CI output format\n"
+        "  -teamcity                      Use TeamCity output format\n"
+        "  -xunit                         Use xUnit output format\n"
+        "  -xunit2                        Use xUnit 2 output format\n"
+        "\n"
+        "Test prefixes are used to filter which tests to run. If no prefix is specified,\n"
+        "all tests will be run.\n");
+}
+
 /* static */ Result Options::parse(
     int argc,
     char** argv,
     TestCategorySet* categorySet,
+    Slang::WriterHelper stdOut,
     Slang::WriterHelper stdError,
     Options* optionsOut)
 {
@@ -75,10 +124,33 @@ static bool _isSubCommand(const char* arg)
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
 
+#if _DEBUG
+    // Enabling debug layers by default in debug builds.
+    // For DX12 it will use the debug layer, for Vulkan it will enable validation layers.
+    //
+    // CI/CD will explicitly disable this until we address all of VUID errors.
+    // https://github.com/shader-slang/slang/issues/4798
+    //
+    // When you run the Debug build locally, you may see more errors if not disabled with
+    // '-enable-debug-layers false'.
+    //
+    optionsOut->enableDebugLayers = true;
+#endif
+
     // first argument is the application name
     if (argCursor != argEnd)
     {
         optionsOut->appName = *argCursor++;
+    }
+
+    // Check for help flags first
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        {
+            showHelp(stdOut);
+            return SLANG_FAIL;
+        }
     }
 
     // now iterate over arguments to collect options
@@ -126,6 +198,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->binDir = *argCursor++;
@@ -144,7 +217,35 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-v") == 0)
         {
-            optionsOut->shouldBeVerbose = true;
+            if (argCursor == argEnd)
+            {
+                // Default to verbose if no argument provided (backward compatibility)
+                optionsOut->verbosity = VerbosityLevel::Verbose;
+            }
+            else
+            {
+                const char* verbosityArg = *argCursor;
+                if (strcmp(verbosityArg, "verbose") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Verbose;
+                    argCursor++;
+                }
+                else if (strcmp(verbosityArg, "info") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Info;
+                    argCursor++;
+                }
+                else if (strcmp(verbosityArg, "failure") == 0)
+                {
+                    optionsOut->verbosity = VerbosityLevel::Failure;
+                    argCursor++;
+                }
+                else
+                {
+                    // Not a verbosity level, treat as old-style -v
+                    optionsOut->verbosity = VerbosityLevel::Verbose;
+                }
+            }
         }
         else if (strcmp(arg, "-hide-ignored") == 0)
         {
@@ -175,6 +276,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             argCursor++;
@@ -185,6 +287,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             argCursor++;
@@ -195,6 +298,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->serverCount = stringToInt(*argCursor++);
@@ -230,6 +334,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -243,6 +348,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -258,6 +364,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -279,6 +386,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -301,11 +409,22 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->emitSPIRVDirectly = false;
         }
+        else if (strcmp(arg, "-capability") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            optionsOut->capabilities.add(*argCursor++);
+        }
         else if (strcmp(arg, "-expected-failure-list") == 0)
         {
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto fileName = *argCursor++;
@@ -315,7 +434,20 @@ static bool _isSubCommand(const char* arg)
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
             for (auto line : lines)
             {
-                optionsOut->expectedFailureList.add(line);
+                // Remove comments (everything after '#' character)
+                auto trimmedLine = line;
+                auto commentIndex = line.indexOf('#');
+                if (commentIndex != -1)
+                {
+                    trimmedLine = line.head(commentIndex);
+                }
+
+                // Trim whitespace and skip empty lines
+                trimmedLine = trimmedLine.trim();
+                if (trimmedLine.getLength() > 0)
+                {
+                    optionsOut->expectedFailureList.add(trimmedLine);
+                }
             }
         }
         else if (strcmp(arg, "-test-dir") == 0)
@@ -323,6 +455,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->testDir = *argCursor++;
@@ -331,9 +464,42 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->showAdapterInfo = true;
         }
+        else if (strcmp(arg, "-skip-reference-image-generation") == 0)
+        {
+            optionsOut->skipReferenceImageGeneration = true;
+        }
+        else if (strcmp(arg, "-enable-debug-layers") == 0)
+        {
+            optionsOut->enableDebugLayers = true;
+
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+
+            // Check for false variants
+            const char* value = *argCursor++;
+            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                value[0] == '0' ||
+                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+            {
+                optionsOut->enableDebugLayers = false;
+            }
+        }
+#if _DEBUG
+        else if (strcmp(arg, "-disable-debug-layers") == 0)
+        {
+            stdError.print("warning: '-disable-debug-layers' is deprecated, use "
+                           "'-enable-debug-layers false'\n");
+            optionsOut->enableDebugLayers = false;
+        }
+#endif
         else
         {
             stdError.print("unknown option '%s'\n", arg);
+            showHelp(stdError);
             return SLANG_FAIL;
         }
     }

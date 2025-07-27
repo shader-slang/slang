@@ -5,11 +5,11 @@ permalink: /user-guide/get-started
 
 # Getting Started with Slang
 
-Slang enables you to do many powerful things with shader code, including compiling shader code to many different platforms, obtaining reflection information, organizing your shader library in a modern modular fashion, controlling specialization and more. The following sections help you getting started with the basics of Slang in a simple example. We will assume Windows as the operating system, but the steps performed here are similar for other platforms.
+Slang enables you to do many powerful things with shader code, including compiling shader code to many different platforms, obtaining reflection information, organizing your shader library in a modern modular fashion, controlling specialization and more. The following sections help you get started with the basics of Slang in a simple example. We will assume Windows as the operating system, but the steps performed here are similar for other platforms.
 
 ## Installation
 
-The easiest way to start using Slang is to download a [binary release](https://github.com/shader-slang/slang/releases/) from the github repository. Once you have downloaded and extracted the files from a release package, you can find the `slangc.exe` executable under `/bin/windows-x64/release/`. In this tutorial we will use the `slangc` standalone Slang compiler included in a release package. Note that `slang.dll` and `slang-glslang.dll` must be placed in the same directory as `slangc.exe` as they are required by the standalone executable.
+The easiest way to start using Slang is to download a [binary release](https://github.com/shader-slang/slang/releases/) from the GitHub repository. Once you have downloaded and extracted the files from a release package, you can find the `slangc.exe` executable under `/bin/windows-x64/release/`. In this tutorial we will use the `slangc` standalone Slang compiler included in a release package. Note that `slang.dll` and `slang-glslang.dll` must be placed in the same directory as `slangc.exe` as they are required by the standalone executable.
 
 If you are interested in building from source, please refer to the [documentation on building Slang](../building.md). 
 
@@ -99,4 +99,4 @@ Note that in the generated GLSL code, all shader parameters are qualified with e
 
 ## The full example
 
-The full Vulkan example that sets up and runs the `hello-world.slang` shader in located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/master/examples/hello-world) directory of the Slang repository. The example code initializes a Vulkan context and runs the compiled SPIRV code. The example code demonstrates how to use the Slang API to load and compile shaders.
+The full Vulkan example that sets up and runs the `hello-world.slang` shader is located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/master/examples/hello-world) directory of the Slang repository. The example code initializes a Vulkan context and runs the compiled SPIRV code. The example code demonstrates how to use the Slang API to load and compile shaders.

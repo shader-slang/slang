@@ -1,7 +1,6 @@
 #ifndef SLANG_CORE_DICTIONARY_H
 #define SLANG_CORE_DICTIONARY_H
 
-#include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
 #include "slang-common.h"
 #include "slang-exception.h"
 #include "slang-hash.h"
@@ -10,6 +9,7 @@
 #include "slang-math.h"
 #include "slang-uint-set.h"
 
+#include <ankerl/unordered_dense.h>
 #include <initializer_list>
 
 namespace Slang
@@ -147,6 +147,25 @@ public:
 
     // Erases the value at the specified key if it exists
     void remove(const TKey& key) { map.erase(key); }
+
+    // Removes all values satifying the predicate:
+    // bool predicate(pair<Key, Value>)
+    template<typename Predicate>
+    void removeIf(Predicate&& predicate)
+    {
+        auto it = begin();
+        while (it != end())
+        {
+            if (predicate(*it))
+            {
+                it = map.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
 
     // Reserves enough space for the specified number of values
     void reserve(Index size) { map.reserve(std::size_t(size)); };
@@ -320,6 +339,7 @@ protected:
     DictionaryType dict;
 
 private:
+    void init() {} // Base case for recursion
     template<typename... Args>
     void init(const T& v, Args... args)
     {
@@ -387,6 +407,8 @@ public:
 template<typename T>
 class HashSet : public HashSetBase<T, Dictionary<T, _DummyClass>>
 {
+public:
+    using HashSetBase<T, Dictionary<T, _DummyClass>>::HashSetBase;
 };
 
 template<typename TKey, typename TValue>

@@ -14,10 +14,13 @@
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-link.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
 #include "slang-ir-missing-return.h"
@@ -484,11 +487,17 @@ struct SharedIRGenContext
     // Map from an AST-level statement that can be
     // used as the target of a `break` or `continue`
     // to the appropriate basic block to jump to.
-    Dictionary<Stmt*, IRBlock*> breakLabels;
-    Dictionary<Stmt*, IRBlock*> continueLabels;
+    Dictionary<BreakableStmt::UniqueID, IRBlock*> breakLabels;
+    Dictionary<BreakableStmt::UniqueID, IRBlock*> continueLabels;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
+
+    Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
+    // External (imported) unsafeForceInline functions that need to
+    // prelink into the current module after lowering.
+    List<IRInst*> externalSymbolsToPrelink;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -526,6 +535,8 @@ struct SharedIRGenContext
     //   in the source code.
     //
     List<IRInst*> m_stringLiterals;
+
+    DebugValueStoreContext debugValueContext;
 };
 
 struct IRGenContext;
@@ -549,6 +560,17 @@ struct AstOrIRType
         return *this;
     }
     explicit operator bool() { return astType || irType; }
+};
+
+struct CatchHandler
+{
+    // 'nullptr' implies catch-all.
+    IRType* errorType = nullptr;
+
+    // Block of the handler statement. Takes a value of errorType as parameter.
+    IRBlock* errorHandler = nullptr;
+
+    CatchHandler* prev = nullptr;
 };
 
 struct IRGenContext
@@ -591,6 +613,12 @@ struct IRGenContext
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
+
+    // The current scope end for use with `defer`.
+    IRBlock* scopeEndBlock = nullptr;
+
+    // A chain of nested `catch` handlers for `try` and `throw.
+    CatchHandler* catchHandler = nullptr;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -747,6 +775,19 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
     return int32_t(irOp);
 }
 
+static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
+{
+    for (auto handler = context->catchHandler; handler != nullptr;
+         handler = context->catchHandler->prev)
+    {
+        if (!handler->errorType || handler->errorType == type)
+        {
+            return *handler;
+        }
+    }
+    return CatchHandler();
+}
+
 struct TryClauseEnvironment
 {
     TryClauseType clauseType = TryClauseType::None;
@@ -802,18 +843,28 @@ LoweredValInfo emitCallToVal(
         case TryClauseType::Standard:
             {
                 auto callee = getSimpleVal(context, funcVal);
-                auto succBlock = builder->createBlock();
-                auto failBlock = builder->createBlock();
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
                 assert(throwAttr);
+
+                auto handler = findErrorHandler(context, throwAttr->getErrorType());
+                auto succBlock = builder->createBlock();
+                auto failBlock =
+                    handler.errorHandler ? handler.errorHandler : builder->createBlock();
+
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
-                builder->insertBlock(failBlock);
-                auto errParam = builder->emitParam(throwAttr->getErrorType());
-                builder->emitThrow(errParam);
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
+
+                if (!handler.errorHandler)
+                {
+                    // We have to create a default fail block, which just re-throws.
+                    builder->insertBlock(failBlock);
+                    auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    builder->emitThrow(errParam);
+                    builder->setInsertInto(succBlock);
+                }
                 return LoweredValInfo::simple(value);
             }
             break;
@@ -870,8 +921,15 @@ LoweredValInfo emitCallToDeclRef(
             return LoweredValInfo::simple(args[0]);
         }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        switch (IROp(intrinsicOp))
+        {
+        case kIROp_GetOffsetPtr:
+            SLANG_ASSERT(argCount == 2);
+            return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        default:
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        }
     }
 
     // Fallback case is to emit an actual call.
@@ -1140,6 +1198,13 @@ top:
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
                 goto top;
             }
+            else if (auto methodDeclRef = declRef.as<CallableDecl>())
+            {
+                auto funcVal = emitDeclRef(context, declRef, boundMemberInfo->type);
+                SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+                lowered = funcVal;
+                goto top;
+            }
             else
             {
 
@@ -1386,9 +1451,12 @@ static void addLinkageDecoration(
             // We add this to the internal instruction, like other name-like
             // decorations, for instance "nameHint". This prevents it becoming
             // lost during specialization.
-            builder->addKnownBuiltinDecoration(
-                inInst,
-                knownBuiltinModifier->name.getUnownedSlice());
+            auto constantIntVal = as<ConstantIntVal>(knownBuiltinModifier->name);
+            if (constantIntVal)
+            {
+                auto enumValue = constantIntVal->getValue();
+                builder->addKnownBuiltinDecoration(inInst, KnownBuiltinDeclName(enumValue));
+            }
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
@@ -1437,6 +1505,15 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     else if (const auto varDecl = as<VarDeclBase>(requirementDecl))
     {
     }
+    else if (as<AccessorDecl>(requirementDecl))
+    {
+    }
+    else if (as<InterfaceDefaultImplDecl>(requirementDecl))
+    {
+        // A default impl stub function represents a concrete function, not
+        // a requirement.
+        return false;
+    }
     else if (const auto genericDecl = as<GenericDecl>(requirementDecl))
     {
         return shouldDeclBeTreatedAsInterfaceRequirement(genericDecl->inner);
@@ -1453,17 +1530,17 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 
 IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
+    // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
+    // Other types of decls are allowed but not regarded as a requirement.
+    if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
+        return nullptr;
+
     // TODO: this special case logic can be removed if we also clean up
     // `doesGenericSignatureMatchRequirement` Currently `doesGenericSignatureMatchRequirement` will
     // use the inner func decl as the key in AST WitnessTable. Therefore we need to match this
     // behavior by always using the inner decl as the requirement key.
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
-
-    // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
-    // Other types of decls are allowed but not regarded as a requirement.
-    if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
-        return nullptr;
 
     IRStructKey* requirementKey = nullptr;
     if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
@@ -1538,9 +1615,6 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
-
-//
-
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -1553,7 +1627,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
+    LoweredValInfo visitDeclRefIntVal(DeclRefIntVal* val)
     {
         return emitDeclRef(
             context,
@@ -1565,27 +1639,33 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         TryClauseEnvironment tryEnv;
         List<IRInst*> args;
+        IRType* specConstRateType = nullptr;
         for (auto arg : val->getArgs())
         {
             auto loweredArg = lowerVal(context, arg);
             args.add(loweredArg.val);
+            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
+                specConstRateType = loweredArg.val->getFullType();
         }
         auto funcType = lowerType(context, val->getFuncType());
-        return emitCallToDeclRef(
-            context,
-            as<IRFuncType>(funcType)->getResultType(),
-            val->getFuncDeclRef(),
-            funcType,
-            args,
-            tryEnv);
+        auto funcResType = maybeAddRateType(
+            getBuilder(),
+            specConstRateType,
+            as<IRFuncType>(funcType)->getResultType());
+        auto resVal =
+            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
+        return resVal;
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
+
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
-        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        return resVal;
     }
 
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
@@ -1611,12 +1691,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
+                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
                 }
             }
-            resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
+            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
+    }
+
+    LoweredValInfo visitSizeOfIntVal(SizeOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitSizeOf(typeArg);
+        return LoweredValInfo::simple(count);
+    }
+
+    LoweredValInfo visitAlignOfIntVal(AlignOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitAlignOf(typeArg);
+        return LoweredValInfo::simple(count);
     }
 
     LoweredValInfo visitCountOfIntVal(CountOfIntVal* val)
@@ -1693,7 +1789,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto supType = lowerType(context, witness->getSup());
         auto witnessTableType = irBuilder->getWitnessTableType(supType);
         ShortList<IRInst*> captures;
-        if (auto expandType = as<IRExpandType>(subType))
+        if (auto expandType = as<IRExpandTypeOrVal>(subType))
         {
             for (UInt i = 0; i < expandType->getCaptureCount(); i++)
             {
@@ -1904,11 +2000,39 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
+    LoweredValInfo visitNoneWitness(NoneWitness*)
+    {
+        auto builder = getBuilder();
+        auto voidType = builder->getVoidType();
+        return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
+    }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
         auto type = lowerType(context, val->getType());
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->getValue()));
+    }
+
+    IRType* visitDifferentialPairType(DifferentialPairType* pairType)
+    {
+        IRType* primalType = lowerType(context, pairType->getPrimalType());
+        if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
+        {
+            List<IRInst*> operands;
+            SubstitutionSet(pairType->getDeclRef())
+                .forEachSubstitutionArg(
+                    [&](Val* arg)
+                    {
+                        auto argVal = lowerVal(context, arg).val;
+                        SLANG_ASSERT(argVal);
+                        operands.add(argVal);
+                    });
+
+            auto undefined = getBuilder()->emitUndefined(operands[1]->getFullType());
+            return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
+        }
+        else
+            return lowerSimpleIntrinsicType(pairType);
     }
 
     IRFuncType* visitFuncType(FuncType* type)
@@ -1927,8 +2051,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         else
         {
             auto errorType = lowerType(context, type->getErrorType());
+            IRInst* operands[] = {errorType};
             auto irThrowFuncTypeAttribute =
-                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, operands);
             return getBuilder()->getFuncType(
                 paramCount,
                 paramTypes.getBuffer(),
@@ -2022,8 +2147,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         if (!type->isUnsized())
         {
-            auto elementCount = lowerSimpleVal(context, type->getElementCount());
-            return getBuilder()->getArrayType(elementType, elementCount);
+            return getBuilder()->getArrayType(
+                elementType,
+                lowerSimpleVal(context, type->getElementCount()));
         }
         else
         {
@@ -2326,6 +2452,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 kIROp_GLSLOffsetDecoration,
                 builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
         }
+        else if (auto glslStructOffsetMod = as<VkStructOffsetAttribute>(mod))
+        {
+            builder->addDecoration(
+                inst,
+                kIROp_VkStructOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslStructOffsetMod->value));
+        }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
@@ -2404,6 +2537,13 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     {
         inst->setFullType(
             builder->getRateQualifiedType(builder->getActualGlobalRate(), inst->getFullType()));
+    }
+    else if (
+        decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+    {
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
     }
 }
 
@@ -2931,6 +3071,14 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
         return thisType;
     }
 
+    if (auto defaultImplDeclRef = parentDeclRef.as<InterfaceDefaultImplDecl>())
+    {
+        auto thisType = DeclRefType::create(
+            context->astBuilder,
+            DeclRef<Decl>(defaultImplDeclRef.getDecl()->thisTypeDecl));
+        return thisType;
+    }
+
     return nullptr;
 }
 
@@ -2979,9 +3127,10 @@ struct StmtLoweringVisitor;
 
 void maybeEmitDebugLine(
     IRGenContext* context,
-    StmtLoweringVisitor& visitor,
+    StmtLoweringVisitor* visitor,
     Stmt* stmt,
-    SourceLoc loc = SourceLoc());
+    SourceLoc loc = SourceLoc(),
+    bool allowNullStmt = false);
 
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
@@ -3141,6 +3290,10 @@ void collectParameterLists(
     ParameterListCollectMode mode,
     ParameterDirection thisParamDirection)
 {
+    // Don't collect any parameters beyond certain decls.
+    if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
+        return;
+
     // The parameters introduced by any "parent" declarations
     // will need to come first, so we'll deal with that
     // logic here.
@@ -3379,9 +3532,9 @@ void _lowerFuncDeclBaseTypeInfo(
     if (!getErrorCodeType(context->astBuilder, declRef)
              ->equals(context->astBuilder->getBottomType()))
     {
-        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
-        IRAttr* throwTypeAttr = nullptr;
-        throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+        auto irErrorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        IRInst* operands[] = {irErrorType};
+        IRAttr* throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, operands);
         outInfo.type = builder->getFuncType(
             paramTypes.getCount(),
             paramTypes.getBuffer(),
@@ -3742,7 +3895,7 @@ struct ExprLoweringContext
             auto genDecl = genSubst->getGenericDecl();
 
             Index argCounter = 0;
-            for (auto memberDecl : genDecl->members)
+            for (auto memberDecl : genDecl->getDirectMemberDecls())
             {
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
                 {
@@ -3753,12 +3906,10 @@ struct ExprLoweringContext
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
                 }
             }
-            for (auto memberDecl : genDecl->members)
+            for (auto constraintDecl :
+                 genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
-                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
-                }
+                _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
             }
         }
         // TODO: also need to handle this-type substitution here?
@@ -4227,6 +4378,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitLambdaExpr(LambdaExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an LambdaExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // Although the surface syntax can have an empty ASM block, the IR asm
@@ -4470,9 +4627,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
             RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type = nullptr;
+            boundMemberInfo->type =
+                lowerType(context, getResultType(context->astBuilder, callableDeclRef));
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
+
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -4552,6 +4712,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitParenExpr(ParenExpr* expr) { return lowerSubExpr(expr->base); }
 
+    LoweredValInfo visitTupleExpr(TupleExpr* expr)
+    {
+        List<IRInst*> elements;
+        for (auto element : expr->elements)
+        {
+            auto elementVal = getSimpleVal(context, lowerSubExpr(element));
+            if (auto makeValPack = as<IRMakeValuePack>(elementVal))
+            {
+                // If the element is a value pack, we need to flatten it out
+                // into the tuple.
+                for (UInt i = 0; i < makeValPack->getOperandCount(); ++i)
+                {
+                    elements.add(makeValPack->getOperand(i));
+                }
+                continue;
+            }
+            elements.add(elementVal);
+        }
+        auto irMakeTuple =
+            getBuilder()->emitMakeTuple((UInt)elements.getCount(), elements.getBuffer());
+        return LoweredValInfo::simple(irMakeTuple);
+    }
+
     LoweredValInfo visitPackExpr(PackExpr* expr)
     {
         List<IRInst*> irArgs;
@@ -4580,7 +4763,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto irBuilder = getBuilder();
         auto irType = lowerType(context, expr->type);
         List<IRInst*> irCapturedPacks;
-        if (auto expandType = as<IRExpandType>(irType))
+        if (auto expandType = as<IRExpandTypeOrVal>(irType))
         {
             for (UInt i = 0; i < expandType->getCaptureCount(); i++)
             {
@@ -4776,6 +4959,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             SLANG_ASSERT(type);
             return getDefaultVal(type);
         }
+    }
+
+    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irDefaultElement = getSimpleVal(
+            context,
+            getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
     }
 
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
@@ -5065,6 +5259,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto afterBlock = builder->createBlock();
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
 
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+
         // ifElse(<first param>, %true-block, %false-block, %after-block)
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
@@ -5292,23 +5488,37 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitIsTypeExpr(IsTypeExpr* expr)
     {
+        auto builder = getBuilder();
         if (expr->constantVal)
         {
-            return LoweredValInfo::simple(getBuilder()->getBoolValue(expr->constantVal->value));
+            return LoweredValInfo::simple(builder->getBoolValue(expr->constantVal->value));
         }
-        // If expr is a witness, then this is a run-time type check from for an existential type.
         if (expr->witnessArg)
         {
-            auto value = lowerLValueExpr(context, expr->value);
             auto type = lowerType(context, expr->typeExpr.type);
             auto witness = lowerSimpleVal(context, expr->witnessArg);
-            auto existentialInfo = value.getExtractedExistentialValInfo();
-            auto irVal = getBuilder()->emitIsType(
-                existentialInfo->extractedVal,
-                existentialInfo->witnessTable,
-                type,
-                witness);
-            return LoweredValInfo::simple(irVal);
+            auto declWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
+
+            if (declWitness && declWitness->isOptional())
+            {
+                // Optional constraint check. NoneWitness lowers to a specific
+                // ID, so that we can check for that here.
+                auto witnessID = builder->emitGetSequentialIDInst(witness);
+                auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
+                auto irVal = builder->emitNeq(witnessID, noneWitnessID);
+                return LoweredValInfo::simple(irVal);
+            }
+            else
+            { // This is a run-time type check from for an existential type.
+                auto value = lowerLValueExpr(context, expr->value);
+                auto existentialInfo = value.getExtractedExistentialValInfo();
+                auto irVal = builder->emitIsType(
+                    existentialInfo->extractedVal,
+                    existentialInfo->witnessTable,
+                    type,
+                    witness);
+                return LoweredValInfo::simple(irVal);
+            }
         }
         // For all other cases, we map to a simple type equality check in the IR.
         IRType* leftType = nullptr;
@@ -5322,8 +5532,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         auto rightType = lowerType(context, expr->typeExpr.type);
         IRInst* args[] = {leftType, rightType};
-        auto irVal =
-            getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
+        auto irVal = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 
@@ -5802,13 +6011,19 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 
     /// Emit code for a `try` invoke.
-    LoweredValInfo visitTryExpr(TryExpr* expr)
+    void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        if (rValue.flavor != LoweredValInfo::Flavor::None)
+        {
+            // If we weren't able to fuse the destination write during lowering rvalue,
+            // we should insert the assign operation now.
+            assign(context, destination, rValue);
+        }
     }
 };
 
@@ -5991,6 +6206,53 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlock();
     }
 
+    /// Create a new scope end block and return the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `preallocated` can
+    /// be specified if you already have a block at the end of the scope, like
+    /// in `for` loops.
+    IRBlock* pushScopeBlock(IRBlock* preallocated = nullptr)
+    {
+        IRBlock* prevScopeEndBlock = context->scopeEndBlock;
+
+        auto builder = getBuilder();
+        context->scopeEndBlock = preallocated ? preallocated : builder->createBlock();
+        return prevScopeEndBlock;
+    }
+
+    /// Pop the current scope end block and restore the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `previous` should be
+    /// the block returned from the corresponding pushScopeBlock. `preallocated`
+    /// should be true if the corresponding pushScopeBlock was given a block
+    /// as a parameter.
+    void popScopeBlock(IRBlock* previous, bool preallocated)
+    {
+        if (!preallocated)
+        {
+            // If pushScopeBlock actually created the block, we have to insert
+            // or deallocate it here. Otherwise, we assume that the caller
+            // handles the end block.
+            auto builder = getBuilder();
+            if (context->scopeEndBlock->hasUses())
+            {
+                // The end of the scope was referenced, so we need to actually
+                // keep it around and jump through it.
+                // Move the terminator to the scope end block.
+                emitBranchIfNeeded(context->scopeEndBlock);
+                builder->insertBlock(context->scopeEndBlock);
+                builder->setInsertInto(context->scopeEndBlock);
+            }
+            else
+            {
+                // Scope end block was left unused, so we may as well delete it.
+                context->scopeEndBlock->removeAndDeallocate();
+            }
+        }
+
+        context->scopeEndBlock = previous;
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
@@ -6001,6 +6263,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto elseStmt = stmt->negativeStatement;
 
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+
+        maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
 
@@ -6013,11 +6277,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
             insertBlock(thenBlock);
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
 
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6029,7 +6295,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
             insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6095,8 +6364,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6109,7 +6378,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (const auto condExpr = stmt->predicateExpression)
         {
-            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition =
                 getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
@@ -6120,7 +6389,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         if (auto inferredMaxIters = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -6167,7 +6438,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(continueLabel);
         if (auto incrExpr = stmt->sideEffectExpression)
         {
-            maybeEmitDebugLine(context, *this, stmt, incrExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, incrExpr->loc);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -6200,8 +6471,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6216,7 +6487,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
@@ -6226,7 +6497,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
@@ -6257,8 +6530,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6270,7 +6543,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(loopHead);
 
         // Emit the body of the loop
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         insertBlock(testLabel);
 
@@ -6278,7 +6553,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            maybeEmitDebugLine(context, *this, stmt, stmt->predicate->loc);
+            maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
@@ -6399,10 +6674,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitBlockStmt(BlockStmt* stmt)
     {
-        // To lower a block (scope) statement,
-        // just lower its body. The IR doesn't
-        // need to reflect the scoping of the AST.
+        IRBlock* prevScopeEndBlock = pushScopeBlock(nullptr);
+
+        // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
+
+        popScopeBlock(prevScopeEndBlock, false);
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
@@ -6493,6 +6770,140 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
+    void visitDeferStmt(DeferStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        IRBlock* deferBlock = builder->createBlock();
+        IRBlock* mergeBlock = builder->createBlock();
+
+        builder->emitDefer(deferBlock, mergeBlock, context->scopeEndBlock);
+
+        builder->insertBlock(deferBlock);
+        builder->setInsertInto(deferBlock);
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
+        lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
+
+        builder->emitBranch(mergeBlock);
+
+        builder->insertBlock(mergeBlock);
+        builder->setInsertInto(mergeBlock);
+    }
+
+    void visitThrowStmt(ThrowStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        auto loweredExpr = lowerRValueExpr(context, stmt->expression);
+        auto loweredVal = getSimpleVal(context, loweredExpr);
+        auto throwType = lowerType(context, stmt->expression->type);
+
+        CatchHandler handler;
+        if (loweredVal && throwType)
+        {
+            handler = findErrorHandler(context, throwType);
+        }
+
+        if (handler.errorHandler)
+        {
+            builder->emitBranch(handler.errorHandler, 1, &loweredVal);
+        }
+        else
+        {
+            builder->emitThrow(getSimpleVal(context, loweredExpr));
+        }
+    }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        // The mental model here is that the below Catch statement:
+        //
+        // let val = try MayThrowFunc();
+        // // Do stuff with val
+        // catch(err: Error)
+        // {
+        //     catchBlock(err);
+        // }
+        //
+        // lowers similarly to:
+        //
+        // handlerLoop: for(;;)
+        // {
+        //     E err; // Actually just a parameter for the catchBlock, not a real variable.
+        //     bodyLoop: for(;;)
+        //     {
+        //         // Body goes here
+        //         Result<T, E> r = mayThrowFunc();
+        //         if(isResultError(r))
+        //         {
+        //             err = r.error;
+        //             break bodyLoop;
+        //         }
+        //         let val = r.getSuccessValue();
+        //         // Do stuff with val
+        //         break handlerLoop;
+        //     }
+        //     catchBlock(err);
+        //     break handlerLoop;
+        // }
+        //
+        // This approach allows for it to generate valid SPIR-V. Just jumping
+        // around with unstructured conditional jumps doesn't work there.
+
+        IRBlock* handlerLoopHead = createBlock();
+        IRBlock* handlerBreakLabel = createBlock();
+        IRBlock* bodyLoopHead = createBlock();
+        IRBlock* bodyBreakLabel = createBlock();
+
+        builder->emitLoop(handlerLoopHead, handlerBreakLabel, handlerLoopHead);
+        insertBlock(handlerLoopHead);
+
+        builder->emitLoop(bodyLoopHead, bodyBreakLabel, bodyLoopHead);
+        insertBlock(bodyLoopHead);
+
+        CatchHandler catchHandler;
+        catchHandler.errorType =
+            stmt->errorVar ? lowerType(context, stmt->errorVar->getType()) : nullptr;
+        catchHandler.errorHandler = bodyBreakLabel;
+        catchHandler.prev = context->catchHandler;
+        context->catchHandler = &catchHandler;
+
+        // Note that the tryBody doesn't actually have to have it's own scope or
+        // block. If there's a `defer` in the tryBody, it can run after the
+        // catch statement.
+        lowerStmt(context, stmt->tryBody);
+
+        // Put break; at the end of the body if there's nothing else there yet.
+        // This prevents the catch handler from running.
+        emitBranchIfNeeded(handlerBreakLabel);
+
+        context->catchHandler = catchHandler.prev;
+
+        insertBlock(bodyBreakLabel);
+
+        if (catchHandler.errorType)
+        {
+            auto irParam = builder->emitParam(catchHandler.errorType);
+            auto paramVal = LoweredValInfo::simple(irParam);
+            context->setGlobalValue(stmt->errorVar, paramVal);
+        }
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(handlerBreakLabel);
+        lowerStmt(context, stmt->handleBody);
+        popScopeBlock(prevScopeEndBlock, true);
+
+        emitBranchIfNeeded(handlerBreakLabel);
+
+        insertBlock(handlerBreakLabel);
+    }
+
     void visitDiscardStmt(DiscardStmt* stmt)
     {
         startBlockIfNeeded(stmt);
@@ -6505,14 +6916,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Semantic checking is responsible for finding
         // the statement taht this `break` breaks out of
-        auto parentStmt = stmt->parentStmt;
-        SLANG_ASSERT(parentStmt);
+        auto targetStmtID = stmt->targetOuterStmtID;
+        SLANG_ASSERT(targetStmtID != BreakableStmt::kInvalidUniqueID);
 
         // We just need to look up the basic block that
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->breakLabels.tryGetValue(parentStmt, targetBlock);
+        context->shared->breakLabels.tryGetValue(targetStmtID, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
     }
@@ -6523,15 +6934,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Semantic checking is responsible for finding
         // the loop that this `continue` statement continues
-        auto parentStmt = stmt->parentStmt;
-        SLANG_ASSERT(parentStmt);
+        auto targetStmtID = stmt->targetOuterStmtID;
+        SLANG_ASSERT(targetStmtID != BreakableStmt::kInvalidUniqueID);
 
 
         // We just need to look up the basic block that
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->continueLabels.tryGetValue(parentStmt, targetBlock);
+        context->shared->continueLabels.tryGetValue(targetStmtID, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
     }
@@ -6677,7 +7088,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBuilder subBuilder = *getBuilder();
             subBuilder.setInsertInto(info->initialBlock);
             subContext.irBuilder = &subBuilder;
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
+
+            auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
+            SLANG_ASSERT(constVal);
+            auto caseType = lowerType(context, constVal->getType());
+            auto caseValInfo =
+                LoweredValInfo::simple(getBuilder()->getIntValue(caseType, constVal->getValue()));
+            auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
@@ -6747,7 +7164,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -6818,7 +7235,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
     }
 
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -6830,7 +7247,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
         auto initialBlock = builder->getBlock();
         auto breakLabel = builder->createBlock();
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
         builder->setInsertInto(initialBlock->getParent());
         List<IRInst*> args;
         args.add(breakLabel);
@@ -6849,7 +7266,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             args.add(builder->getIntValue(builder->getIntType(), targetCase->capability));
             args.add(caseBlock);
         }
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
         builder->setInsertInto(initialBlock);
 
         auto parentFunc = initialBlock->getParent();
@@ -6949,7 +7366,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -7002,7 +7419,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
 
         // If there is the branch attribute output the IR decoration
         if (stmt->hasModifier<BranchAttribute>())
@@ -7036,24 +7453,29 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 
 void maybeEmitDebugLine(
     IRGenContext* context,
-    StmtLoweringVisitor& visitor,
+    StmtLoweringVisitor* visitor,
     Stmt* stmt,
-    SourceLoc loc)
+    SourceLoc loc,
+    bool allowNullStmt)
 {
     if (!context->includeDebugInfo)
         return;
-    if (as<EmptyStmt>(stmt))
-        return;
-    if (!loc.isValid())
-        loc = stmt->loc;
+
+    if (!allowNullStmt)
+    {
+        if (as<EmptyStmt>(stmt))
+            return;
+        if (!loc.isValid())
+            loc = stmt->loc;
+    }
+
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(loc);
+    auto sourceView = sourceManager->findSourceView(loc);
     if (!sourceView)
         return;
 
     IRInst* debugSourceInst = nullptr;
-    auto humaneLoc =
-        context->getLinkage()->getSourceManager()->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
 
     // Do a best-effort attempt to retrieve the nominal source file.
     auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
@@ -7072,7 +7494,8 @@ void maybeEmitDebugLine(
     {
         debugSourceInst = getOrEmitDebugSource(context, pathInfo);
     }
-    visitor.startBlockIfNeeded(stmt);
+    if (visitor)
+        visitor->startBlockIfNeeded(stmt);
     context->irBuilder->emitDebugLine(
         debugSourceInst,
         humaneLoc.line,
@@ -7109,7 +7532,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
 
     try
     {
-        maybeEmitDebugLine(context, visitor, stmt, stmt->loc);
+        maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
@@ -7461,6 +7884,14 @@ top:
                     // we simply form a pointer to each of the vector
                     // elements and write to them individually.
                     IRInst* irRightVal = getSimpleVal(context, right);
+
+                    // If there is a mismatch between the signedness of the left and rigth values
+                    // then emit a cast
+                    if (isSignedType(swizzleInfo->type) != isSignedType(irRightVal->getDataType()))
+                    {
+                        irRightVal = builder->emitCast(swizzleInfo->type, irRightVal);
+                    }
+
                     swizzledStore(
                         loweredBase.val,
                         irRightVal,
@@ -7751,7 +8182,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto& member : decl->members)
+        for (auto& member : decl->getDirectMemberDecls())
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -7849,10 +8280,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
         auto inst = builder->getInsertLoc().getInst();
-        if (inst->getOp() == kIROp_Module)
+        if (inst->getOp() == kIROp_ModuleInst)
             return;
 
-        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_Module)
+        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_ModuleInst)
         {
             inst = inst->getParent();
         }
@@ -8012,30 +8443,40 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType =
                             lowerType(subContext, astReqWitnessTable->baseType);
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(
-                            irWitnessTableBaseType,
-                            irWitnessTable->getConcreteType());
-                        auto mangledName = getMangledNameForConformanceWitness(
-                            subContext->astBuilder,
-                            astReqWitnessTable->witnessedType,
-                            astReqWitnessTable->baseType);
-                        subBuilder->addExportDecoration(
-                            irSatisfyingWitnessTable,
-                            mangledName.getUnownedSlice());
-                        if (isExportedType(astReqWitnessTable->witnessedType))
+
+                        auto concreteType = irWitnessTable->getConcreteType();
+
+                        irSatisfyingWitnessTable =
+                            subBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
+
+                        // Avoid adding same decorations and child more than once.
+                        if (!irSatisfyingWitnessTable->hasDecorationOrChild())
                         {
-                            subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
-                            subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            auto mangledName = getMangledNameForConformanceWitness(
+                                subContext->astBuilder,
+                                astReqWitnessTable->witnessedType,
+                                astReqWitnessTable->baseType,
+                                concreteType->getOp());
+
+                            subBuilder->addExportDecoration(
+                                irSatisfyingWitnessTable,
+                                mangledName.getUnownedSlice());
+
+                            if (isExportedType(astReqWitnessTable->witnessedType))
+                            {
+                                subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
+                                subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            }
+
+                            // Recursively lower the sub-table.
+                            lowerWitnessTable(
+                                subContext,
+                                astReqWitnessTable,
+                                irSatisfyingWitnessTable,
+                                mapASTToIRWitnessTable);
+
+                            irSatisfyingWitnessTable->moveToEnd();
                         }
-
-                        // Recursively lower the sub-table.
-                        lowerWitnessTable(
-                            subContext,
-                            astReqWitnessTable,
-                            irSatisfyingWitnessTable,
-                            mapASTToIRWitnessTable);
-
-                        irSatisfyingWitnessTable->moveToEnd();
                     }
                     irSatisfyingVal = irSatisfyingWitnessTable;
                 }
@@ -8096,6 +8537,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subType = DeclRefType::create(context->astBuilder, makeDeclRef(parentDecl));
         }
+        bool isGenericExtension = false;
+        // Test if we are in a generic extension context
+        if (parentDecl->parentDecl)
+        {
+            auto genDecl = as<GenericDecl>(parentDecl->parentDecl);
+            if (genDecl)
+            {
+                isGenericExtension = true;
+            }
+        }
 
         // What is the super-type that we have declared we inherit from?
         Type* superType = inheritanceDecl->base.type;
@@ -8118,14 +8569,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        // Construct the mangled name for the witness table, which depends
-        // on the type that is conforming, and the type that it conforms to.
-        //
-        // TODO: This approach doesn't really make sense for generic `extension` conformances.
-        auto mangledName =
-            getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
-
-
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -8144,58 +8587,84 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
-        // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
+        // Register a dummy value to avoid infinite recursions.
+        // Without this, the call to lowerType() can get into an infinite recursion.
+        //
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
 
-        // Register the value now, rather than later, to avoid any possible infinite recursion.
+        auto irSubType = lowerType(subContext, subType);
+
+        // Create the IR-level witness table
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+
+        // Override with the correct witness-table
         context->setGlobalValue(
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
-        auto irSubType = lowerType(subContext, subType);
-        irWitnessTable->setConcreteType(irSubType);
-
-        // TODO(JS):
-        // Should the mangled name take part in obfuscation if enabled?
-
-        addLinkageDecoration(
-            context,
-            irWitnessTable,
-            inheritanceDecl,
-            mangledName.getUnownedSlice());
-
-        // If the witness table is for a COM interface, always keep it alive.
-        if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
+        // Avoid adding same decorations and child more than once.
+        if (!irWitnessTable->hasDecorationOrChild())
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-        }
+            // Construct the mangled name for the witness table, which depends
+            // on the type that is conforming, and the type that it conforms to.
+            String mangledName;
+            if (isGenericExtension)
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, parentDecl, superType);
+            }
+            else
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
+            }
 
-        for (auto mod : parentDecl->modifiers)
-        {
-            if (as<HLSLExportModifier>(mod))
+            // TODO(JS):
+            // Should the mangled name take part in obfuscation if enabled?
+
+            addLinkageDecoration(
+                context,
+                irWitnessTable,
+                inheritanceDecl,
+                mangledName.getUnownedSlice());
+
+            // If the witness table is for a COM interface, always keep it alive.
+            if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
             {
                 subBuilder->addHLSLExportDecoration(irWitnessTable);
-                subBuilder->addKeepAliveDecoration(irWitnessTable);
             }
-            else if (as<AutoDiffBuiltinAttribute>(mod))
-            {
-                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
-            }
-        }
 
-        // Make sure that all the entries in the witness table have been filled in,
-        // including any cases where there are sub-witness-tables for conformances
-        bool isExplicitExtern = false;
-        if (!isImportedDecl(context, parentDecl, isExplicitExtern))
-        {
-            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-            lowerWitnessTable(
-                subContext,
-                inheritanceDecl->witnessTable,
-                irWitnessTable,
-                mapASTToIRWitnessTable);
+            for (auto mod : parentDecl->modifiers)
+            {
+                if (as<HLSLExportModifier>(mod))
+                {
+                    subBuilder->addHLSLExportDecoration(irWitnessTable);
+                    subBuilder->addKeepAliveDecoration(irWitnessTable);
+                }
+                else if (as<AutoDiffBuiltinAttribute>(mod))
+                {
+                    subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+                }
+            }
+
+            // Make sure that all the entries in the witness table have been filled in,
+            // including any cases where there are sub-witness-tables for conformances
+            bool isExplicitExtern = false;
+            bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
+            if (!isImported || isExplicitExtern)
+            {
+                Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+                lowerWitnessTable(
+                    subContext,
+                    inheritanceDecl->witnessTable,
+                    irWitnessTable,
+                    mapASTToIRWitnessTable);
+            }
+
+            irWitnessTable->moveToEnd();
         }
-        irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(
             finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
@@ -8314,6 +8783,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
+            subContextStorage.catchHandler = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -8687,6 +9157,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
+
+                // For debug builds, still create debug information for let variables
+                // even though we're not creating an actual variable
+                if (context->includeDebugInfo && decl->loc.isValid() &&
+                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                {
+                    // Create a debug variable for this let declaration
+                    auto builder = context->irBuilder;
+                    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
+                        decl->loc,
+                        SourceLocType::Emit);
+
+                    // Find the debug source for this file
+                    auto sourceView =
+                        context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
+                    if (sourceView)
+                    {
+                        auto source = sourceView->getSourceFile();
+                        IRInst* debugSourceInst = nullptr;
+                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                                source,
+                                debugSourceInst))
+                        {
+                            auto debugVar = builder->emitDebugVar(
+                                varType,
+                                debugSourceInst,
+                                builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                                builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                                nullptr);
+
+                            // Copy name hint from the declaration
+                            addNameHint(context, debugVar, decl);
+
+                            // Emit debug value to associate the constant with the debug variable
+                            builder->emitDebugValue(debugVar, initVal.val);
+                        }
+                    }
+                }
+
                 context->setGlobalValue(decl, initVal);
                 return initVal;
             }
@@ -8807,29 +9316,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
+            auto innerRequirementDecl = requirementDecl;
+            if (as<InterfaceDefaultImplDecl>(requirementDecl))
+                continue;
             if (as<GenericDecl>(requirementDecl))
-                requirementDecl = getInner(requirementDecl);
+                innerRequirementDecl = getInner(requirementDecl);
 
-            if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
+            if (as<SubscriptDecl>(innerRequirementDecl) || as<PropertyDecl>(innerRequirementDecl))
             {
-                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
+                for (auto accessorDecl : as<ContainerDecl>(innerRequirementDecl)
+                                             ->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
-                    if (as<AccessorDecl>(accessorDecl))
-                        operandCount++;
+                    SLANG_UNUSED(accessorDecl);
+                    operandCount++;
                 }
             }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
-            {
                 continue;
-            }
 
             operandCount++;
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
             // into requirement keys for this interface.
-            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
+            if (auto associatedTypeDecl = as<AssocTypeDecl>(innerRequirementDecl))
             {
                 operandCount +=
                     associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
@@ -8879,6 +9390,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 switch (requirementVal->getOp())
                 {
                 default:
+                    // Remove linkage decorations from the requirement value to prevent
+                    // duplicate mangled names and allow DCE to clean up unused functions.
+                    // Interface requirements only need the type information, not the linkage.
+                    removeLinkageDecorations(requirementVal);
+
                     // For the majority of requirements, we only care about its type in an
                     // interface definition, so we store only the type from the lowered IR
                     // in the interface entry.
@@ -8956,11 +9472,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
             }
         };
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
             {
+                if (as<InterfaceDefaultImplDecl>(requirementDecl))
+                    continue;
                 if (auto genericDecl = as<GenericDecl>(requirementDecl))
                 {
                     // We need to form a declref into the inner decls in case of a generic
@@ -8970,19 +9488,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
-                    for (auto member : as<ContainerDecl>(requirementDecl)->members)
+                    for (auto accessorDecl : as<ContainerDecl>(requirementDecl)
+                                                 ->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (auto accessorDecl = as<AccessorDecl>(member))
+                        auto accessorKey = getInterfaceRequirementKey(accessorDecl);
+                        if (accessorKey)
                         {
-                            auto accessorKey = getInterfaceRequirementKey(accessorDecl);
-                            if (accessorKey)
-                            {
-                                auto accessorDeclRef = createDefaultSpecializedDeclRef(
-                                    subContext,
-                                    nullptr,
-                                    accessorDecl);
-                                addEntry(accessorKey, accessorDeclRef);
-                            }
+                            auto accessorDeclRef =
+                                createDefaultSpecializedDeclRef(subContext, nullptr, accessorDecl);
+                            addEntry(accessorKey, accessorDeclRef);
                         }
                     }
                 }
@@ -9067,18 +9581,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContext.getContext();
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // An `enum` declaration will currently lower directly to its "tag"
-        // type, so that any references to the `enum` become referenes to
-        // the tag type instead.
-        //
         // TODO: if we ever support `enum` types with payloads, we would
         // need to make the `enum` lower to some kind of custom "tagged union"
         // type.
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
+        IRType* enumType = subBuilder->createEnumType(loweredTagType);
+        addLinkageDecoration(context, enumType, decl);
 
-        return LoweredValInfo::simple(
-            finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, enumType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
@@ -9171,9 +9682,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
-        if (const auto payloadAttribute = decl->findModifier<PayloadAttribute>())
+
+        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
         {
-            subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
+            subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
         }
 
         subBuilder->setInsertInto(irAggType);
@@ -9509,7 +10021,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->members)
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
             if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
             {
@@ -9532,12 +10044,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->members)
+        for (auto constraintDecl :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
-            {
-                emitGenericConstraintDecl(subContext, constraintDecl);
-            }
+            emitGenericConstraintDecl(subContext, constraintDecl);
         }
 
         return irGeneric;
@@ -10172,6 +10682,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         FunctionDeclBase* decl,
         bool emitBody = true)
     {
+        bool isFromDifferentModule = isDeclInDifferentModule(context, decl);
+        if (isFromDifferentModule && isForceInlineEarly(decl))
+        {
+            // If a function is imported from another module then
+            // we usually don't want to emit it as a definition, and
+            // will instead only emit a declaration for it with an
+            // appropriate `[import(...)]` linkage decoration.
+            //
+            // However, if the function is marked with `[__unsafeForceInlineEarly]`
+            // then we need to make sure the IR for its definition is available
+            // to the mandatory optimization passes.
+            //
+            // We do so by finding the IR function from the imported module, and clone
+            // the body of the IRFunc from the imported module to the current module.
+            //
+            auto importedModule = getModule(decl);
+            auto irModule = importedModule->getIRModule();
+            SLANG_ASSERT(irModule && "Module containing imported decl does not have an IRModule.");
+            String mangledName = getMangledName(context->astBuilder, decl);
+            auto importedFunc = irModule->findSymbolByMangledName(mangledName);
+            SLANG_ASSERT(importedFunc.getCount() > 0);
+            subContext->shared->externalSymbolsToPrelink.add(importedFunc[0]);
+        }
+
         IRGeneric* outerGeneric = nullptr;
         subContext->funcDecl = decl;
 
@@ -10186,15 +10720,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If our function is differentiable, register a callback so the derivative
         // annotations for types can be lowered.
         //
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
         {
+            auto diffAttr = decl->findModifier<DifferentiableAttribute>();
+
             auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
-            OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
+            OrderedDictionary<Type*, SubtypeWitness*> resolveddiffTypeWitnessMap;
 
             // Go through each entry in the map and resolve the key.
             for (auto& entry : diffTypeWitnessMap)
             {
-                auto resolvedKey = as<DeclRefBase>(entry.key->resolve());
+                auto resolvedKey = as<Type>(entry.key->resolve());
                 resolveddiffTypeWitnessMap[resolvedKey] =
                     as<SubtypeWitness>(as<Val>(entry.value)->resolve());
             }
@@ -10202,14 +10738,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->registerTypeCallback(
                 [=](IRGenContext* context, Type* type, IRType* irType)
                 {
-                    if (!as<DeclRefType>(type))
-                        return irType;
-
-                    DeclRefBase* declRefBase = as<DeclRefType>(type)->getDeclRefBase();
-                    if (resolveddiffTypeWitnessMap.containsKey(declRefBase))
+                    if (resolveddiffTypeWitnessMap.containsKey(type))
                     {
-                        auto irWitness =
-                            lowerVal(subContext, resolveddiffTypeWitnessMap[declRefBase]).val;
+                        auto irWitness = lowerVal(subContext, resolveddiffTypeWitnessMap[type]).val;
                         if (irWitness)
                         {
                             IRInst* args[] = {irType, irWitness};
@@ -10265,32 +10796,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irFunc);
 
-        // If a function is imported from another module then
-        // we usually don't want to emit it as a definition, and
-        // will instead only emit a declaration for it with an
-        // appropriate `[import(...)]` linkage decoration.
-        //
-        // However, if the function is marked with `[__unsafeForceInlineEarly]`
-        // then we need to make sure the IR for its definition is available
-        // to the mandatory optimization passes.
-        //
-        // TODO: The design here means that we will re-emit the inline
-        // function from its AST in every module that uses it. We should
-        // instead have logic to clone the target function in from the
-        // pre-generated IR for the module that defines it (or do some kind
-        // of minimal linking to bring in the inline functions).
-        //
-        if (!decl->body)
-        {
-            // This is a function declaration without a body.
-            // In Slang we currently try not to support forward declarations
-            // (although we might have to give in eventually), so
-            // this case should really only occur for builtin declarations.
-        }
-        else if (isDeclInDifferentModule(context, decl) && !isForceInlineEarly(decl))
-        {
-        }
-        else if (emitBody)
+        if (emitBody && decl->body && !isFromDifferentModule)
         {
             // This is a function definition, so we need to actually
             // construct IR for the body...
@@ -10665,7 +11171,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto outputTopAttr = as<OutputTopologyAttribute>(modifier))
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+                const auto topologyType =
+                    convertOutputTopologyStringToEnum(stringLit->getStringSlice());
+                IRInst* topologyTypeInst = getBuilder()->getIntValue(
+                    getBuilder()->getIntType(),
+                    IRIntegerValue(topologyType));
+
+                auto outputTopologyDecoration = getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_OutputTopologyDecoration,
+                    stringLit,
+                    topologyTypeInst);
+                outputTopologyDecoration->sourceLoc = outputTopAttr->loc;
             }
             else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
             {
@@ -10827,6 +11344,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // Add debugfunction decoration and emit debug function. This
+        // is needed for emitting debug information
+        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+        if (nameOperand)
+        {
+            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+            IRInst* debugType = irFunc->getDataType();
+
+            if (locationDecor && debugType)
+            {
+                auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                    nameOperand,
+                    locationDecor->getLine(),
+                    locationDecor->getCol(),
+                    locationDecor->getSource(),
+                    debugType);
+
+                // Add a decoration to link the function to its debug function
+                getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
+            }
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
@@ -10919,33 +11461,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericDecl(GenericDecl* genDecl)
     {
-        // TODO: Should this just always visit/lower the inner decl?
-
-        if (auto innerFuncDecl = as<FunctionDeclBase>(genDecl->inner))
-            return ensureDecl(context, innerFuncDecl);
-        else if (auto innerStructDecl = as<StructDecl>(genDecl->inner))
-        {
-            ensureDecl(context, innerStructDecl);
-            return LoweredValInfo();
-        }
-        else if (auto extensionDecl = as<ExtensionDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, extensionDecl);
-        }
-        else if (auto interfaceDecl = as<InterfaceDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, interfaceDecl);
-        }
-        else if (auto typedefDecl = as<TypeDefDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, typedefDecl);
-        }
-        else if (auto subscriptDecl = as<SubscriptDecl>(genDecl->inner))
-        {
-            return ensureDecl(context, subscriptDecl);
-        }
-        SLANG_RELEASE_ASSERT(false);
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return ensureDecl(context, genDecl->inner);
     }
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
@@ -11308,7 +11824,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
                 // interface definitions.
                 return emitDeclRef(
                     context,
-                    createDefaultSpecializedDeclRef(context, nullptr, decl),
+                    decl->getDefaultDeclRef(),
                     context->irBuilder->getTypeKind());
             }
 
@@ -11496,21 +12012,21 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
     //
     if (auto containerDecl = as<AggTypeDeclBase>(decl))
     {
-        for (auto memberDecl : containerDecl->members)
+        for (auto memberDecl : containerDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto namespaceDecl = as<NamespaceDecl>(decl))
     {
-        for (auto memberDecl : namespaceDecl->members)
+        for (auto memberDecl : namespaceDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto fileDecl = as<FileDecl>(decl))
     {
-        for (auto memberDecl : fileDecl->members)
+        for (auto memberDecl : fileDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
@@ -11587,7 +12103,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->getModuleDecl()->members)
+    for (auto decl : translationUnit->getModuleDecl()->getDirectMemberDecls())
     {
         ensureAllDeclsRec(context, decl);
     }
@@ -11618,14 +12134,19 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     }
 
 #if 0
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
-
 
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:
@@ -11645,11 +12166,18 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     //      dumpIR(module);
 
+    // Before we can do any validation, we need to prelink [unsafeForceInlineEarly]
+    // functions.
+    prelinkIR(translationUnit->module, module, context->shared->externalSymbolsToPrelink);
+
     // First, lower error handling logic into normal control flow.
     // This includes lowering throwing functions into functions that
     // returns a `Result<T,E>` value, translating `tryCall` into
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
+
+    // Lower `defer` so that later passes need not be aware of it.
+    lowerDefer(module, compileRequest->getSink());
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);
@@ -11665,7 +12193,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // if debug symbols are enabled.
     if (context->includeDebugInfo)
     {
-        insertDebugValueStore(module);
+        insertDebugValueStore(context->shared->debugValueContext, module);
     }
 
 
@@ -11772,7 +12300,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
-        checkForMissingReturns(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::None, true);
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 

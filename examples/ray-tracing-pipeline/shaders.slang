@@ -19,9 +19,9 @@ struct Primitive
     float3 getColor() { return color.xyz; }
 };
 
-struct RayPayload
+struct [raypayload] RayPayload
 {
-    float4 color;
+    float4 color : read(caller) : write(caller, closesthit, miss);
 };
 
 uniform RWTexture2D resultTexture;
@@ -104,5 +104,5 @@ float4 fragmentMain(
     uniform RWTexture2D t)
     : SV_Target
 {
-    return t.Load(sv_position.xy);
+    return t.Load(uint2(sv_position.xy));
 }

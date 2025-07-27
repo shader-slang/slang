@@ -32,11 +32,12 @@
 
 // DXIL: main
 
+// DXIL: call float @dx.op.worldRayOrigin.f32
+// DXIL: call float @dx.op.worldRayDirection.f32
+
 // DXIL: call i32 @dx.op.dispatchRaysIndex.i32
 // DXIL: call i32 @dx.op.dispatchRaysDimensions.i32
 
-// DXIL: call float @dx.op.worldRayOrigin.f32
-// DXIL: call float @dx.op.worldRayDirection.f32
 // DXIL: call float @dx.op.rayTMin.f32
 // DXIL: call float @dx.op.rayTCurrent.f32
 // DXIL: call i32 @dx.op.rayFlags.i32
@@ -50,8 +51,6 @@
 // DXIL: call float @dx.op.objectToWorld.f32
 // DXIL: call float @dx.op.worldToObject.f32
 
-// DXIL: call float @dx.op.rayTMin.f32
-// DXIL: call float @dx.op.rayTCurrent.f32
 // DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
 
 float CheckRayDispatchValues() // all

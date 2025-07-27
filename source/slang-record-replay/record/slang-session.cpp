@@ -92,6 +92,39 @@ SLANG_NO_THROW slang::IModule* SessionRecorder::loadModuleFromIRBlob(
     return static_cast<slang::IModule*>(pModuleRecorder);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL SessionRecorder::loadModuleInfoFromIRBlob(
+    slang::IBlob* source,
+    SlangInt& outModuleVersion,
+    const char*& outModuleCompilerVersion,
+    const char*& outModuleName)
+{
+    slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::ISession_loadModuleFromIRBlob,
+            m_sessionHandle);
+        recorder->recordPointer(source);
+        recorder = m_recordManager->endMethodRecord();
+    }
+
+    const auto result = m_actualSession->loadModuleInfoFromIRBlob(
+        source,
+        outModuleVersion,
+        outModuleCompilerVersion,
+        outModuleName);
+
+    {
+        recorder->recordInt64(outModuleVersion);
+        recorder->recordString(outModuleCompilerVersion);
+        recorder->recordString(outModuleName);
+        m_recordManager->apendOutput();
+    }
+
+    return result;
+}
+
 SLANG_NO_THROW slang::IModule* SessionRecorder::loadModuleFromSource(
     const char* moduleName,
     const char* path,
@@ -366,6 +399,22 @@ SLANG_NO_THROW SlangResult SessionRecorder::getTypeConformanceWitnessMangledName
         m_recordManager->apendOutput();
     }
 
+    return result;
+}
+
+SLANG_NO_THROW SlangResult SessionRecorder::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outRTTIDataBuffer,
+    uint32_t bufferSizeInBytes)
+{
+    // No need to record this function, it's just a query.
+
+    SlangResult result = m_actualSession->getDynamicObjectRTTIBytes(
+        type,
+        interfaceType,
+        outRTTIDataBuffer,
+        bufferSizeInBytes);
     return result;
 }
 

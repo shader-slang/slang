@@ -1,5 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature hardware-device
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -use-dxil -shaderobj -render-feature hardware-device
 //TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
@@ -10,7 +9,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0
 
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature hardware-device -xslang -DUSE_SLANG_SYNTAX
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -use-dxil -shaderobj -render-feature hardware-device -xslang -DUSE_SLANG_SYNTAX
 //TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX

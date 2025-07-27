@@ -3,7 +3,7 @@ layout: user-guide
 permalink: /user-guide/spirv-target-specific
 ---
 
-SPIR-V specific functionalities
+SPIR-V-Specific Functionalities
 ===============================
 
 This chapter provides information for SPIR-V specific functionalities and behaviors.
@@ -11,9 +11,24 @@ This chapter provides information for SPIR-V specific functionalities and behavi
 Experimental support for the older versions of SPIR-V
 -----------------------------------------------------
 
-Slang's SPIRV backend is stable when emitting SPIRV 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
+Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
 When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
+Memory model
+------------
+By default, the Slang compiler produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
+```
+    slang::CompilerOptionEntry entry;
+    entry.name = slang::CompilerOptionName::Capability;
+    entry.value.kind = slang::CompilerOptionValueKind::String;
+    entry.value.stringValue0 = "vk_mem_model";
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntries = &entry;
+    sessionDesc.compilerOptionEntryCount = 1;
+```
+
+If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler will automatically use `vk_mem_model` capability.
 
 Combined texture sampler
 ------------------------
@@ -26,7 +41,7 @@ For SPIR-V targets, explicit bindings may be provided through a single `vk::bind
 Sampler2D explicitBindingSampler;
 ```
 
-For other targets (HLSL or others) where combined texture samplers are _not_ supported intrinsicly, they are emulated by Slang using separate objects for Texture and Sampler.
+For other targets (HLSL or others) where combined texture samplers are _not_ supported intrinsically, they are emulated by Slang using separate objects for Texture and Sampler.
 For explicit binding on such targets, you can specify two different register numbers for each: one for the texture register and another for the sampler register.
 ```
 Sampler2D explicitBindingSampler : register(t4): register(s3);
@@ -38,7 +53,7 @@ System-Value semantics
 
 The system-value semantics are translated to the following SPIR-V code.
 
-| SV semantic name              | SPIR-V code                       |
+| SV semantic name              | SPIR-V Code                       |
 |-------------------------------|-----------------------------------|
 | `SV_Barycentrics`             | `BuiltIn BaryCoordKHR`            |
 | `SV_ClipDistance<N>`          | `BuiltIn ClipDistance`            |
@@ -50,18 +65,20 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_DepthLessEqual`           | `BuiltIn FragDepth`               |
 | `SV_DispatchThreadID`         | `BuiltIn GlobalInvocationId`      |
 | `SV_DomainLocation`           | `BuiltIn TessCoord`               |
-| `SV_DrawIndex`                | `Builtin DrawIndex`               |
+| `SV_DrawIndex`<sup>*</sup>    | `Builtin DrawIndex`               |
+| `SV_DeviceIndex`              | `Builtin DeviceIndex`             |
 | `SV_GSInstanceID`             | `BuiltIn InvocationId`            |
 | `SV_GroupID`                  | `BuiltIn WorkgroupId`             |
 | `SV_GroupIndex`               | `BuiltIn LocalInvocationIndex`    |
 | `SV_GroupThreadID`            | `BuiltIn LocalInvocationId`       |
 | `SV_InnerCoverage`            | `BuiltIn FullyCoveredEXT`         |
 | `SV_InsideTessFactor`         | `BuiltIn TessLevelInner`          |
-| `SV_InstanceID`               | `BuiltIn InstanceIndex`           |
+| `SV_InstanceID`<sup>**</sup>  | `BuiltIn InstanceIndex` - `Builtin BaseInstance`  |
 | `SV_IntersectionAttributes`   | *Not supported*                   |
 | `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
 | `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
-| `SV_PointSize<sup>note</sup>` | `BuiltIn PointSize`               |
+| `SV_PointSize`<sup>*</sup>    | `BuiltIn PointSize`               |
+| `SV_PointCoord`<sup>*</sup>   | `BuiltIn PointCoord`              |
 | `SV_Position`                 | `BuiltIn Position/FragCoord`      |
 | `SV_PrimitiveID`              | `BuiltIn PrimitiveId`             |
 | `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
@@ -72,12 +89,37 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_StencilRef`               | `BuiltIn FragStencilRefEXT`       |
 | `SV_Target<N>`                | `Location`                        |
 | `SV_TessFactor`               | `BuiltIn TessLevelOuter`          |
-| `SV_VertexID`                 | `BuiltIn VertexIndex`             |
+| `SV_VertexID`<sup>**</sup>    | `BuiltIn VertexIndex` - `Builtin BaseVertex`    |
 | `SV_ViewID`                   | `BuiltIn ViewIndex`               |
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
+| `SV_VulkanInstanceID`         | `BuiltIn InstanceIndex`           |
+| `SV_VulkanVertexID`           | `BuiltIn VertexIndex`             |
 
-*Note* that `SV_DrawIndex` and `SV_PointSize` are Slang-specific semantics that are not defined in HLSL.
+*Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
+Also *Note* that `SV_InstanceID`/`SV_VertexID` counts all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
+See [Using SV_InstanceID/SV_VertexID with SPIR-V target](#using-sv_instanceid-and-sv_vertexid-with-spir-v-target)
 
+Using SV_InstanceID and SV_VertexID with SPIR-V target
+--------------------------------------
+
+When using `SV_InstanceID` and `SV_VertexID` with SPIR-V target, it is equivalent to the difference between the index and base builtins.
+This matches the behavior of D3D where `SV_InstanceID` and `SV_VertexID` starts from zero for each draw call, while in SPIR-V, 
+`InstanceIndex` and `VertexIndex` includes the base instance.
+
+If you need direct access to `InstanceIndex` and `VertexIndex` values, use `SV_VulkanInstanceID` and `SV_VulkanVertexID` semantic names. These are supported for all targets except HLSL.
+Alternatively you can use parameters with `SV_InstanceID`(or `SV_VertexID`) and `SV_StartInstanceLocation`(or `SV_StartVertexLocation`) semantics:
+
+```slang
+void myVertexShader(
+    uint instanceID : SV_InstanceID,               // InstanceIndex - BaseInstance
+    uint baseInstance : SV_StartInstanceLocation)   // BaseInstance
+{
+    // If you need InstanceIndex, just add them:
+    uint instanceIndex = instanceID + baseInstance;
+
+    // Use instanceID, baseInstance, or instanceIndex as needed
+}
+```
 
 Behavior of `discard` after SPIR-V 1.6
 --------------------------------------
@@ -87,9 +129,9 @@ You can use OpDemoteToHelperInvocation by explicitly specifying the capability, 
 
 As an example, the following command-line arguments can control the behavior of `discard` when targeting SPIR-V.
 ```
-slangc.exe test.slang -target spirv -profile spirv_1_5 # emits OpKill 
-slangc.exe test.slang -target spirv -profile spirv_1_6 # emits OpDemoteToHelperInvocation 
-slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocation -profile spirv_1_5 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spir-v -profile spir-v_1_5 # emits OpKill 
+slangc.exe test.slang -target spir-v -profile spir-v_1_6 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spir-v -capability SPV_EXT_demote_to_helper_invocation -profile spir-v_1_5 # emits OpDemoteToHelperInvocation 
 ```
 
 
@@ -245,7 +287,7 @@ To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-
 Global memory pointers
 ------------------------------
 
-Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
+Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](03-convenience-features.md#pointers-limited).
 
 `float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
 When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.
@@ -413,7 +455,7 @@ Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
 Uses the entrypoint name from the source instead of 'main' in the spirv output.
 
 ### -fspv-reflect
-Include reflection decorations in the resulting SPIRV for shader parameters.
+Include reflection decorations in the resulting SPIR-V for shader parameters.
 
 ### -spirv-core-grammar
 A path to a specific spirv.core.grammar.json to use when generating SPIR-V output

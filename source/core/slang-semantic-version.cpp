@@ -93,6 +93,28 @@ void SemanticVersion::append(StringBuilder& buf) const
     return bestVersion;
 }
 
+bool SemanticVersion::isBackwardsCompatibleWith(const ThisType& otherVersion) const
+{
+    // Compatibility is not guaranteed across major revisions.
+    //
+    if (m_major != otherVersion.m_major)
+        return false;
+
+    // Within a given major revision, a version with a higher
+    // minor revision is backwards-compatible with one that
+    // has a lower minor revision, but not vice-versa.
+    //
+    if (m_minor < otherVersion.m_minor)
+        return false;
+
+    // If the major and minor revisions pass our check, then
+    // we consider it a match. Note that this intentionally
+    // doesn't check the path version at all.
+    //
+    return true;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MatchSemanticVersion !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */ SemanticVersion MatchSemanticVersion::findAnyBest(

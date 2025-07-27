@@ -6,7 +6,7 @@ Slang has preliminary support for producing CPU source and binaries.
 # Features
 
 * Can compile C/C++/Slang source to binaries (executables, shared libraries or [directly executable](#host-callable))
-* Does *not* require a C/C++ be installed if [slang-llvm](#slang-llvm) is available (as distributed with slang binary distributions)
+* Does *not* require a C/C++ compiler to be installed if [slang-llvm](#slang-llvm) is available (as distributed with slang binary distributions)
 * Can compile Slang source into C++ source code
 * Supports compute style shaders 
 

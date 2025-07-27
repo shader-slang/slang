@@ -1,157 +1,125 @@
 # Slang Test
 
-Slang Test is a command line tool that is used to coordinate tests via other tools. The actual executable is 'slang-test'. It is typically run from the test.bat script in the root directory of the project.
+Slang Test (`slang-test`) is a command-line tool that coordinates and runs the Slang test suite. It acts as a test runner hub, executing various types of tests and collecting their results.
 
-Slang Test can be thought of as the 'hub' running multiple tests and accumulating the results. In the distribution tests are held in the 'tests' directory. Inside this directory there are tests grouped together via other directories. Inside those directories are the actual tests themselves. The tests exist as .hlsl, .slang and .glsl and other file extensions. The top line of each of these files describe what kind of test will be performed with a specialized comment '//TEST'. 
+## Basic Usage
 
-Most command line options are prefixed by - for both switches and parameter options. On the command line you can specify a 'free parameter', and this value specifies the prefix of the name of the test to run. Note that such a prefix includes the path, with each directory separated via '/'.
-
-An example command line:
-
-```
-slang-test -bindir E:\slang\build\Debug\bin -category full tests/compute/array-param
+```bash
+slang-test [options] [test-prefix...]
 ```
 
-* The -bindir value means that the tools slang-test will use the binaries found in this directory. 
-* The -category full means that all tests can be run.
-* The final 'free parameter' is 'tests/compute/array-param' and means only tests starting with this string will run.
+If no test prefix is specified, all tests will be run. Test prefixes can be used to filter which tests to run, and include the path with directories separated by '/'.
 
-Most types of test use 'test tools' to implement actual tests. There are currently 3 'tools' that are typically used 
-
-* slangc
-* render-test
-* slang-reflection-test
-
-These are typically implemeted as dlls/shared libraries that are loaded when a test is needed. Sometimes it is necessary or useful to just call one of these test tools directly with the parameters the tool takes. This can be achieved by giving the tool as a 'sub command' name on the command line. All of the parameters after the tool name will be passed directly to the tool. For example
-
-```
-slang-test -bindir E:\slang\build\Debug\bin slangc tests/compute/array-param.slang
+Example:
+```bash
+slang-test -bindir path/to/bin -category full tests/compute/array-param
 ```
 
-Will run the 'slangc' tool with the parameters listed after 'slangc' on the command line. Any parameters before the sub command will be parsed as usual by slang-test, and if not applicable to invoking the tool will be ignored. bindir will be used for finding the tool directory. This is by design so that the sub command invocation can just be placed after the normal slang-test commands, and removed when no longer needed. 
+## Command Line Options
 
-The command line can control which tests are run with a couple of switches
+### Core Options
+- `-h, --help`: Show help message
+- `-bindir <path>`: Set directory for binaries (default: the path to the slang-test executable)
+- `-test-dir <path>`: Set directory for test files (default: tests/)
+- `-v`: Enable verbose output
+- `-verbose-paths`: Use verbose paths in output
+- `-hide-ignored`: Hide results from ignored tests
 
-* -api - Overall controls over which apis will be tested against 
-* -synthesizedTestApi - Controls which apis will have tests synthesized for them from other apis. Tests can be synthesized for dx12 and vulkan.
+### Test Selection and Categories
+- `-category <name>`: Only run tests in specified category
+- `-exclude <name>`: Exclude tests in specified category
 
-The parameter afterwards is an 'api expression' used to control which apis will or wont be used. This is somewhat like a mathematical expression with only + and - operations and api names. If the first operation is + or - it will be applied to whatever the default is, otherwise the defaults are ignored.
+Available test categories:
+- `full`: All tests
+- `quick`: Quick tests
+- `smoke`: Basic smoke tests
+- `render`: Rendering-related tests
+- `compute`: Compute shader tests
+- `vulkan`: Vulkan-specific tests
+- `compatibility-issue`: Tests for compatibility issues
 
-* vk - just for vulkan
-* +vk - Whatever the defaults are including vulkan
-* -dx12 - Whatever the defaults are excluding vulkan
-* all - for all apis, none - for no apis
-* all-vk - all apis but not vulkan (vk)
-* all-vk-dx12 - all apis but not vulkan (vk) or directx12 (dx12)
-* gl+dx11 - just on opengl (gl) and directx11 (dx11)
-* +none - same as defaults 
+A test may be in one or more categories. The categories are specified on top of a test, for example: //TEST(smoke,compute):COMPARE_COMPUTE:
 
-So if you wanted to test for all apis, except opengl you'd put on the command line '-api all-gl'
+### API Control Options
+- `-api <expr>`: Enable specific APIs (e.g., 'vk+dx12' or '+dx11')
+- `-api-only`: Only run tests that use specified APIs
+- `-synthesizedTestApi <expr>`: Set APIs for synthesized tests
+- `-skip-api-detection`: Skip API availability detection
 
-The different APIs are 
+API expression syntax:
+- Use `+` or `-` to add or remove APIs from defaults
+- Examples: 
+  - `vk`: Vulkan only
+  - `+vk`: Add Vulkan to defaults
+  - `-dx12`: Remove DirectX 12 from defaults
+  - `all`: All APIs
+  - `all-vk`: All APIs except Vulkan
+  - `gl+dx11`: Only OpenGL and DirectX 11
 
-* OpenGL - gl,ogl,opengl
-* Vulkan - vk,vulkan
-* DirectD3D12 - dx12,d3d12
-* DirectD3D11 -dx11,d3d11
+Available APIs:
+- OpenGL: `gl`, `ogl`, `opengl`
+- Vulkan: `vk`, `vulkan`
+- DirectX 12: `dx12`, `d3d12`
+- DirectX 11: `dx11`, `d3d11`
 
+### Test Execution Options
+- `-server-count <n>`: Set number of test servers (default: 1)
+- `-use-shared-library`: Run tests in-process using shared library
+- `-use-test-server`: Run tests using test server
+- `-use-fully-isolated-test-server`: Run each test in isolated server
 
-It may also be necessary to have the working directory the root directory of the slang distribution - in the example above this would be "E:\slang\".
+### Output Options
+- `-appveyor`: Use AppVeyor output format
+- `-travis`: Use Travis CI output format
+- `-teamcity`: Use TeamCity output format
+- `-xunit`: Use xUnit output format
+- `-xunit2`: Use xUnit 2 output format
+- `-show-adapter-info`: Show detailed adapter information
 
-## Unit tests
-
-In addition to the above test tools, there is also `slang-unit-test-tool`, which is invoked as in the following example.
-
-```
-slang-test slang-unit-test-tool/byteEncode
-```
-
-This will run the `byteEncode` test. The unit tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
-
-There are also graphics unit tests, which are run as follows:
-
-```
-slang-test gfx-unit-test-tool/precompiledTargetModule2Vulkan
-```
-
-This will run the `precompiledTargetModule2Vulkan` test. These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.
-
-## Test Categories
-
-There are the following test categories
-
-* full
-* quick
-* smoke
-* render
-* compute
-* vulkan
-* compatibility-issue
-
-A test may be in one or more categories. The categories are specified in the test line, for example: 
-//TEST(smoke,compute):COMPARE_COMPUTE:
-
-## Command line options
-
-### bindir 
-
-Specifies the directory where executables will be found. 
-
-Eg -bindir "path/to/slang/output/directory/bin"
-
-### category 
-
-The parameter controls what kinds of tests will be run. Categories are listed at the 'test categories' section.
-
-### exclude 
-
-Used to specify categories to be excluded during a test.
-
-### appveyor
-
-A flag that makes output suitable for the appveyor automated test suite.
-
-### travis 
-
-A flag that makes output suitable for the travis automated test suite.
-
-### Other Command Line Options
-
-The following flags/paramteres can be passed but will be ignored by the tool
-
-* debug (flag)
-* release (flag)
-* platform (parameter)
+### Other Options
+- `-generate-hlsl-baselines`: Generate HLSL test baselines
+- `-emit-spirv-via-glsl`: Emit SPIR-V through GLSL instead of directly
+- `-expected-failure-list <file>`: Specify file containing expected failures
 
 ## Test Types
 
-Test types are controlled via a comment at the top of a test file, that starts with //TEST:
-This is then immediately followed by the test type which is one of the following
+Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`
 
-* SIMPLE 
-	* Calls the slangc compiler with options after the comment 
-* REFLECTION
-	* Runs 'slang-reflection-test' passing in the options as given after the command
-* COMPARE_HLSL
-	* Runs the slangc compiler, forcing dxbc output and compares with file post fixed with '.expected'
-* COMPARE_HLSL_RENDER
-	* Runs 'render-test' rendering two images - one for hlsl (expected), and one for slang saving to .png files. The images must match for the test to pass. 
-* COMPARE_HLSL_CROSS_COMPILE_RENDER
-	* Runs 'render-test' rendering two images - one from slag, and the other -glsl-cross. The images must match for the test to pass.
-* COMPARE_HLSL_GLSL_RENDER
-	* Runs 'render-test' rendering two images - one with -hlsl-rewrite and the other -glsl-rewrite. The images must match for test to pass.
-* COMPARE_COMPUTE
-	* Runs 'render-test' producing a compute result written as a text file. Text file contents must be identical.
-* COMPARE_COMPUTE_EX
-	* Same as COMPARE_COMPUTE, but allows specific parameters to be specified.
-* HLSL_COMPUTE
-	* Runs 'render-test' with "-hlsl-rewrite -compute" options. Text files are compared. 
-* COMPARE_RENDER_COMPUTE
-	* Runs 'render-test' with "-slang -gcompute" options. Text files are compared. 
-* COMPARE_GLSL
-	* Runs the slangc compiler compiling through slang, and without and comparing output in spirv assembly.
-* CROSS_COMPILE
-	* Compiles as glsl pass through and then through slang and comparing output
-* EVAL
-	* Runs 'slang-eval-test' - which runs code on slang VM
+Available test types:
+- `SIMPLE`: Runs the slangc compiler with specified options after the command
+- `REFLECTION`: Runs slang-reflection-test with the options specified after the command
+- `COMPARE_COMPUTE`: Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content
+- `COMPARE_COMPUTE_EX`: Same as COMPARE_COMPUTE, but supports additional parameter specifications
+- `COMPARE_RENDER_COMPUTE`: Runs render-test with "-slang -gcompute" options and compares text file outputs
+- `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs
 
+Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(_EX) or COMPARE_RENDER_COMPUTE instead):
+- `COMPARE_HLSL`: Runs the slangc compiler with forced DXBC output and compares with a file having the '.expected' extension
+- `COMPARE_HLSL_RENDER`: Runs render-test to generate two images - one using HLSL (expected) and one using Slang, saving both as .png files. The test passes if the images match
+- `COMPARE_HLSL_CROSS_COMPILE_RENDER`: Runs render-test to generate two images - one using Slang and one using -glsl-cross. The test passes if the images match
+- `COMPARE_HLSL_GLSL_RENDER`: Runs render-test to generate two images - one using -hlsl-rewrite and one using -glsl-rewrite. The test passes if the images match
+- `COMPARE_GLSL`: Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output
+- `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
+- `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
+
+## Unit Tests
+In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples.
+
+### slang-unit-test-tool
+```bash
+# Regular unit tests
+slang-test slang-unit-test-tool/<test-name>
+# e.g. run the `byteEncode` test.
+slang-test slang-unit-test-tool/byteEncode
+```
+These tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
+
+### gfx-unit-test-tool
+```bash
+# Graphics unit tests
+slang-test gfx-unit-test-tool/<test-name>
+
+# e.g. run the `precompiledTargetModule2Vulkan` test.
+slang-test gfx-unit-test-tool/precompiledTargetModule2Vulkan
+```
+These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.

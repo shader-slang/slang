@@ -11,12 +11,7 @@
 #include "slang-ir.h"
 
 #include <functional>
-
-#ifdef SLANG_USE_SYSTEM_SPIRV_HEADER
 #include <spirv/unified1/spirv.h>
-#else
-#include "../../external/spirv-headers/include/spirv/unified1/spirv.h"
-#endif
 
 namespace Slang
 {
@@ -627,7 +622,15 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_InstanceIndex";
         targetVarName = IRTargetBuiltinVarName::HlslInstanceID;
         context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+    }
+    else if (semanticName == "sv_vulkaninstanceid")
+    {
+        // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-input-assembler-stage-using#instanceid
+        // uint in hlsl, int in glsl
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_InstanceIndex";
     }
     else if (semanticName == "sv_isfrontface")
     {
@@ -651,10 +654,23 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_PointSize";
         requiredType = builder->getBasicType(BaseType::Float);
     }
+    else if (semanticName == "sv_pointcoord")
+    {
+        name = "gl_PointCoord";
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
+    }
     else if (semanticName == "sv_drawindex")
     {
         name = "gl_DrawID";
         requiredType = builder->getBasicType(BaseType::Int);
+    }
+    else if (semanticName == "sv_deviceindex")
+    {
+        name = "gl_DeviceIndex";
+        requiredType = builder->getBasicType(BaseType::Int);
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_device_group"));
     }
     else if (semanticName == "sv_primitiveid")
     {
@@ -766,6 +782,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_vertexid")
+    {
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_VertexIndex";
+        targetVarName = IRTargetBuiltinVarName::HlslVertexID;
+        context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+        context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+    }
+    else if (semanticName == "sv_vulkanvertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
         requiredType = builder->getBasicType(BaseType::Int);
@@ -1243,6 +1269,12 @@ void invokePathConstantFuncInHullShader(
     fixUpFuncType(constantFunc);
 }
 
+static bool targetBuiltinRequiresLegalization(IRTargetBuiltinVarName builtinVarName)
+{
+    return (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID) ||
+           (builtinVarName == IRTargetBuiltinVarName::HlslVertexID);
+}
+
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -1276,7 +1308,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // Validate the system value, convert to a regular parameter if this is not a valid system
         // value for a given target.
         if (systemSemantic && systemValueInfo && isSPIRV(codeGenContext->getTargetFormat()) &&
-            systemValueInfo->targetVarName == IRTargetBuiltinVarName::HlslInstanceID &&
+            targetBuiltinRequiresLegalization(systemValueInfo->targetVarName) &&
             ((stage == Stage::Fragment) ||
              (stage == Stage::Vertex &&
               inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
@@ -2033,10 +2065,12 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
-                SLANG_ASSERT(fromSize <= toSize);
 
-                // Extract elements one at a time up to the source array size
-                for (Index i = 0; i < fromSize; i++)
+                // Extract elements one at a time up to the minimum
+                // size, between the source and destination.
+                //
+                auto limit = fromSize < toSize ? fromSize : toSize;
+                for (Index i = 0; i < limit; i++)
                 {
                     auto element = builder->emitElementExtract(
                         fromArray->getElementType(),
@@ -2058,6 +2092,18 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
 
                 val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());
             }
+        }
+    }
+    else if (auto toArray = as<IRArrayType>(toType))
+    {
+        // Handle scalar-to-array conversion for tessellation factors
+        if (as<IRBasicType>(fromType))
+        {
+            // Convert the scalar value to the array's element type first
+            auto arrayElementType = toArray->getElementType();
+            auto convertedVal = builder->emitCast(arrayElementType, val);
+            val = builder->emitMakeArrayFromElement(toType, convertedVal);
+            return ScalarizedVal::value(val);
         }
     }
     // TODO: actually consider what needs to go on here...
@@ -2800,6 +2846,16 @@ static void legalizeMeshOutputParam(
                     builder->setInsertAfter(c);
                     assign(builder, d, ScalarizedVal::value(builder->emitLoad(tmp)));
                 }
+                else if (const auto load = as<IRLoad>(s))
+                {
+                    // Handles the case where a `this` points to a IRMeshOutputRef.
+                    auto t = as<IRPtrType>(load->getPtr()->getDataType())->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    assign(builder, ScalarizedVal::address(tmp), d);
+
+                    s->replaceUsesWith(builder->emitLoad(tmp));
+                    s->removeAndDeallocate();
+                }
                 else if (const auto swiz = as<IRSwizzledStore>(s))
                 {
                     SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
@@ -3322,8 +3378,7 @@ void legalizeEntryPointParameterForGLSL(
                     if (callee->getOp() != kIROp_Func)
                         continue;
 
-                    if (getBuiltinFuncName(callee) !=
-                        UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    if (getBuiltinFuncEnum(callee) != KnownBuiltinDeclName::GeometryStreamAppend)
                     {
                         // If we are calling a function that takes a output stream as a parameter,
                         // we need to add it to the work list to be processed.
@@ -3532,19 +3587,40 @@ void legalizeEntryPointParameterForGLSL(
 
                 auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-                if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-                    continue;
-                if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+
+                // When we relate a "global variable" to a "global parameter" using
+                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
+                // is dependent on the global parameter's type. Struct types for example will relate
+                // to the tuple flavor, while vector types will be related to the address flavor.
+                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
                 {
-                    for (auto elem : tupleVal->elements)
+                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
                     {
-                        if (elem.key == key)
+                        for (auto elem : tupleVal->elements)
                         {
-                            realGlobalVar = elem.val.irValue;
-                            break;
+                            if (elem.key == key)
+                            {
+                                realGlobalVar = elem.val.irValue;
+                                if (!realGlobalVar &&
+                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
+                                {
+                                    if (auto typeAdapterVal =
+                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                    {
+                                        realGlobalVar = typeAdapterVal->val.irValue;
+                                    }
+                                }
+                                break;
+                            }
                         }
                     }
                 }
+                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                {
+                    realGlobalVar = globalValue.irValue;
+                }
+                else
+                    continue;
                 SLANG_ASSERT(realGlobalVar);
 
                 // Remove all stores into the global var introduced during
@@ -3889,12 +3965,13 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     return result;
 }
 
+
 void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
 {
     List<KeyValuePair<IRTargetBuiltinVarName, IRInst*>> workItems;
     for (auto [builtinVarName, varInst] : context.builtinVarMap)
     {
-        if (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID)
+        if (targetBuiltinRequiresLegalization(builtinVarName))
         {
             workItems.add(KeyValuePair(builtinVarName, varInst));
         }
@@ -3940,6 +4017,44 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(
+                varInst,
+                IRTargetBuiltinVarName::SpvInstanceIndex);
+        }
+        // Repalce SV_VertexID with gl_VertexIndex - gl_BaseVertex.
+        else if (builtinVarName == IRTargetBuiltinVarName::HlslVertexID)
+        {
+            auto vertexIndex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvVertexIndex,
+                varInst->getDataType());
+            auto baseVertex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvBaseVertex,
+                varInst->getDataType());
+            traverseUses(
+                varInst,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        IRBuilder builder(use->getUser());
+                        builder.setInsertBefore(use->getUser());
+                        auto sub = builder.emitSub(
+                            tryGetPointedToType(&builder, varInst->getDataType()),
+                            builder.emitLoad(vertexIndex),
+                            builder.emitLoad(baseVertex));
+                        user->replaceUsesWith(sub);
+                    }
+                });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(varInst, IRTargetBuiltinVarName::SpvVertexIndex);
         }
     }
 }
@@ -4282,7 +4397,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         {
             if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
             {
-                if (dec->getName() == "DispatchMesh")
+                if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                 {
                     SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                     dispatchMeshFunc = func;

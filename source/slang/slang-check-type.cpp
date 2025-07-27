@@ -146,6 +146,7 @@ Type* SemanticsVisitor::ExtractGenericArgType(Expr* exp)
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     Expr* exp,
     Type* genericParamType,
+    ConstantFoldingKind kind,
     DiagnosticSink* sink)
 {
     IntVal* val = CheckIntegerConstantExpression(
@@ -153,7 +154,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
         genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
-        ConstantFoldingKind::LinkTime,
+        kind,
         sink);
     if (val)
         return val;
@@ -168,7 +169,11 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
 
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
 {
-    return ExtractGenericArgInteger(exp, genericParamType, getSink());
+    return ExtractGenericArgInteger(
+        exp,
+        genericParamType,
+        ConstantFoldingKind::LinkTime,
+        getSink());
 }
 
 Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
@@ -266,8 +271,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
-                auto info = ASTClassInfo::getInfo(originalExpr->astNodeType);
-                diagSink->diagnose(originalExpr, Diagnostics::expectedAType, info->m_name);
+                diagSink->diagnose(
+                    originalExpr,
+                    Diagnostics::expectedAType,
+                    originalExpr->getClass().getName());
             }
         }
 
@@ -292,11 +299,16 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
         List<Val*> args;
         List<Val*> witnessArgs;
-        for (Decl* member : genericDeclRef.getDecl()->members)
+        for (Decl* member : genericDeclRef.getDecl()->getDirectMemberDecls())
         {
             if (auto typeParam = as<GenericTypeParamDecl>(member))
             {
-                if (!typeParam->initType.exp)
+                if (auto defaultArg = typeParam->initType.type)
+                {
+                    if (outProperType)
+                        args.add(defaultArg);
+                }
+                else
                 {
                     if (diagSink)
                     {
@@ -305,10 +317,6 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     }
                     return false;
                 }
-
-                // TODO: this is one place where syntax should get cloned!
-                if (outProperType)
-                    args.add(ExtractGenericArgVal(typeParam->initType.exp));
             }
             else if (auto valParam = as<GenericValueParamDecl>(member))
             {
@@ -328,35 +336,38 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 if (outProperType)
                     args.add(ExtractGenericArgVal(valParam->initExpr));
             }
-            else if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
+        }
+
+        for (auto constraintParam :
+             genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        {
+            auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
+            if (!genericParam)
+                return false;
+            auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
+            if (!genericTypeParamDecl)
             {
-                auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
-                if (!genericParam)
-                    return false;
-                auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
-                if (!genericTypeParamDecl)
-                    return false;
-                auto defaultType = CheckProperType(genericTypeParamDecl->initType);
-                if (!defaultType)
-                    return false;
-                auto witness =
-                    tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
-                if (!witness)
-                {
-                    // diagnose
-                    getSink()->diagnose(
-                        genericTypeParamDecl->initType.exp,
-                        Diagnostics::typeArgumentDoesNotConformToInterface,
-                        defaultType,
-                        constraintParam->sup);
-                    return false;
-                }
-                witnessArgs.add(witness);
+                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                return false;
             }
-            else
+            auto defaultType = CheckProperType(genericTypeParamDecl->initType);
+            if (!defaultType)
             {
-                // ignore non-parameter members
+                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                return false;
             }
+            auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
+            if (!witness)
+            {
+                // diagnose
+                getSink()->diagnose(
+                    genericTypeParamDecl->initType.exp,
+                    Diagnostics::typeArgumentDoesNotConformToInterface,
+                    defaultType,
+                    constraintParam->sup);
+                return false;
+            }
+            witnessArgs.add(witness);
         }
         // Combine args and witnessArgs
         args.addRange(witnessArgs);
@@ -450,9 +461,9 @@ bool SemanticsVisitor::ValuesAreEqual(IntVal* left, IntVal* right)
         }
     }
 
-    if (auto leftVar = as<GenericParamIntVal>(left))
+    if (auto leftVar = as<DeclRefIntVal>(left))
     {
-        if (auto rightVar = as<GenericParamIntVal>(right))
+        if (auto rightVar = as<DeclRefIntVal>(right))
         {
             return leftVar->getDeclRef().equals(rightVar->getDeclRef());
         }

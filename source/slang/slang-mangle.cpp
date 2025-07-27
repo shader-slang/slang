@@ -31,7 +31,7 @@ void emit(ManglingContext* context, String const& value)
     context->sb.append(value);
 }
 
-void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+void emitNameForLinkage(StringBuilder& sb, UnownedStringSlice str)
 {
     Index length = str.getLength();
     // If the name consists of only traditional "identifer characters"
@@ -61,8 +61,8 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
         // code points and the number of extended grapheme clusters,
         // since the entire name is within the ASCII subset.
         //
-        emit(context, length);
-        context->sb.append(str);
+        sb.append(length);
+        sb.append(str);
     }
     else
     {
@@ -98,9 +98,9 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
             }
         }
 
-        context->sb.append("R");
-        emit(context, encoded.getLength());
-        context->sb.append(encoded);
+        sb.append("R");
+        sb.append(encoded.getLength());
+        sb.append(encoded);
     }
 
     // TODO: This logic does not rule out consecutive underscores,
@@ -109,6 +109,11 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
     //
     // Realistically, that is best dealt with as a quirk of tha particular
     // target, rather than adding complexity here.
+}
+
+void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+{
+    emitNameForLinkage(context->sb, str);
 }
 
 void emitName(ManglingContext* context, Name* name)
@@ -318,7 +323,7 @@ void emitVal(ManglingContext* context, Val* val)
         // to mangle in the constraints even when
         // the whole thing is specialized...
     }
-    else if (auto genericParamIntVal = dynamicCast<GenericParamIntVal>(val))
+    else if (auto genericParamIntVal = dynamicCast<DeclRefIntVal>(val))
     {
         // TODO: we shouldn't be including the names of generic parameters
         // anywhere in mangled names, since changing parameter names
@@ -352,6 +357,21 @@ void emitVal(ManglingContext* context, Val* val)
         emitVal(context, lookupIntVal->getWitness());
         emitName(context, lookupIntVal->getKey()->getName());
     }
+    else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
+    {
+        emitRaw(context, "KSO");
+        emitVal(context, sizeOfIntVal->getTypeArg());
+    }
+    else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
+    {
+        emitRaw(context, "KAO");
+        emitVal(context, alignOfIntVal->getTypeArg());
+    }
+    else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
+    {
+        emitRaw(context, "KCO");
+        emitVal(context, countOfIntVal->getTypeArg());
+    }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
         emitRaw(context, "KX");
@@ -376,7 +396,7 @@ void emitVal(ManglingContext* context, Val* val)
     }
     else if (auto modifier = as<ModifierVal>(val))
     {
-        emitNameImpl(context, UnownedStringSlice(modifier->getClassInfo().m_name));
+        emitNameImpl(context, UnownedStringSlice(modifier->getClass().getName()));
     }
     else
     {
@@ -386,6 +406,7 @@ void emitVal(ManglingContext* context, Val* val)
 
 void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool includeModuleName)
 {
+    bool ignoreName = false;
     if (!includeModuleName)
     {
         if (as<ModuleDecl>(declRef))
@@ -440,19 +461,6 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         return;
     }
 
-    // Inheritance declarations don't have meaningful names,
-    // and so we should emit them based on the type
-    // that is doing the inheriting.
-    if (auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
-    {
-        emit(context, "I");
-        emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
-        return;
-    }
-
-    // Similarly, an extension doesn't have a name worth
-    // emitting, and we should base things on its target
-    // type instead.
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
         // TODO: as a special case, an "unconditional" extension
@@ -466,7 +474,25 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             emit(context, "I");
             emitType(context, getSup(context->astBuilder, inheritanceDecl));
         }
-        return;
+        // A non generic extension doesn't have a name worth
+        // emitting, and we should base things on its target
+        // type instead.
+        if (parentGenericDeclRef)
+        {
+            ignoreName = true;
+        }
+    }
+    // Inheritance declarations don't have meaningful names,
+    // and so we should emit them based on the type
+    // that is doing the inheriting.
+    else if (auto inheritanceDeclRef = declRef.as<TypeConstraintDecl>())
+    {
+        emit(context, "I");
+        emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
+        if (parentGenericDeclRef)
+        {
+            ignoreName = true;
+        }
     }
 
     // TODO: we should special case GenericTypeParamDecl and GenericValueParamDecl nodes
@@ -475,7 +501,10 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     // For each generic parameter, we should assign it a unique ID (i, j), where i is the
     // nesting level of the generic, and j is the sequential order of the parameter within
     // its generic parent, and use this 2D ID to refer to such a parameter.
-    emitName(context, declRef.getName());
+    if (!ignoreName)
+    {
+        emitName(context, declRef.getName());
+    }
 
     // Special case: accessors need some way to distinguish themselves
     // so that a getter/setter/ref-er don't all compile to the same name.
@@ -571,14 +600,23 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             }
 
             auto canonicalizedConstraints =
-                getCanonicalGenericConstraints(context->astBuilder, parentGenericDeclRef);
+                getCanonicalGenericConstraints2(context->astBuilder, parentGenericDeclRef);
             for (auto& constraint : canonicalizedConstraints)
             {
-                for (auto type : constraint.value)
+                if (constraint.value.getCount() > 0)
                 {
                     emitRaw(context, "C");
-                    emitQualifiedName(context, makeDeclRef(constraint.key), true);
-                    emitType(context, type);
+                    emitType(context, constraint.key);
+                    int counter = 0;
+                    for (auto type : constraint.value)
+                    {
+                        if (counter > 0)
+                        {
+                            emitRaw(context, "_");
+                        }
+                        ++counter;
+                        emitType(context, type);
+                    }
                 }
             }
         }
@@ -820,6 +858,37 @@ String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Ty
     ManglingContext context(astBuilder);
     emitRaw(&context, "_SW");
     emitType(&context, sub);
+    emitType(&context, sup);
+    return context.sb.produceString();
+}
+
+// This function takes an additional parameter to get a simplified
+// mangled name when the witness-table is for enum-type.
+//
+// In order to deduplicate the witness-tables, we need to apply a little different
+// rule for the mangled name when the `superType` is `enum` type.
+// All witness-table for enum types whose underlying type is same should get the same
+// manged name.
+//
+// TODO: We should remove this function and have a new IR for enum-type. The "option 2"
+// described on the issue 6364 is more proper and ideal solution for the issue.
+//
+String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Type* sup, IROp subOp)
+{
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    ManglingContext context(astBuilder);
+    emitRaw(&context, "_SW");
+
+    if (as<EnumTypeType>(sup))
+    {
+        emitRaw(&context, getIROpInfo(subOp).name);
+    }
+    else
+    {
+        emitType(&context, sub);
+    }
+
     emitType(&context, sup);
     return context.sb.produceString();
 }

@@ -9,8 +9,10 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
@@ -37,6 +39,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVEmitSharedContext* m_sharedContext;
 
     IRModule* m_module;
+
+    CodeGenContext* m_codeGenContext;
 
     DiagnosticSink* m_sink;
 
@@ -132,6 +136,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->getElementType(),
             builder.getIntValue(builder.getIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
@@ -200,8 +205,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     SPIRVLegalizationContext(
         SPIRVEmitSharedContext* sharedContext,
         IRModule* module,
+        CodeGenContext* codeGenContext,
         DiagnosticSink* sink)
-        : m_sharedContext(sharedContext), m_module(module), m_sink(sink)
+        : m_sharedContext(sharedContext)
+        , m_module(module)
+        , m_codeGenContext(codeGenContext)
+        , m_sink(sink)
     {
     }
 
@@ -213,6 +222,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";
@@ -633,6 +643,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
             case IRTargetBuiltinVarName::SpvInstanceIndex:
             case IRTargetBuiltinVarName::SpvBaseInstance:
+            case IRTargetBuiltinVarName::SpvVertexIndex:
+            case IRTargetBuiltinVarName::SpvBaseVertex:
                 return AddressSpace::BuiltinInput;
             }
         }
@@ -978,13 +990,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            if (x->getParent()->getOp() == kIROp_Module)
+            if (x->getParent()->getOp() == kIROp_ModuleInst)
                 builder.setInsertBefore(inst);
             else
                 setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), AddressSpace::Function);
             builder.emitStore(y, x);
-            if (x->getParent()->getOp() != kIROp_Module)
+            if (x->getParent()->getOp() != kIROp_ModuleInst)
                 m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
@@ -1392,7 +1404,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         maybeHoistConstructInstToGlobalScope(inst);
 
-        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_Module &&
+        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_ModuleInst &&
             inst->getOperandCount() !=
                 (UInt)getIntVal(as<IRVectorType>(inst->getDataType())->getElementCount()))
         {
@@ -1465,6 +1477,115 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 child->insertBefore(inst);
             else if (child->getOp() == kIROp_SPIRVAsmOperandConvertTexel)
                 processConvertTexel(inst, child);
+        }
+    }
+
+    // TODO: Currently SPIRV doesn't support non-32-bit integer types for bitfield extract and
+    // insert. We will relax this restriction once this is done:
+    // https://github.com/shader-slang/slang/issues/7015.
+    void processBitFieldOp(IRInst* inst)
+    {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
+        if (vectorType)
+            elementType = vectorType->getElementType();
+
+        const IntInfo i = getIntTypeInfo(elementType);
+
+        // SPIRV doesn't support non-32bit integer types, so we need to convert
+        if (i.width < 32)
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            IRType* intType = i.isSigned ? builder.getIntType() : builder.getUIntType();
+            auto targetType = vectorType
+                                  ? builder.getVectorType(intType, vectorType->getElementCount())
+                                  : intType;
+            auto baseInst = builder.emitCast(targetType, inst->getOperand(0));
+            builder.replaceOperand(inst->getOperands(), baseInst);
+            if (inst->getOp() == kIROp_BitfieldInsert)
+            {
+                auto insertInst = builder.emitCast(targetType, inst->getOperand(1));
+                builder.replaceOperand(inst->getOperands() + 1, insertInst);
+            }
+            inst->setFullType(intType);
+        }
+    }
+
+    // Creates a new function with a different parameter order.
+    // OpCooperativeMatrixPerElementOpNV expects a callback function to have the parameter
+    // in the following order:
+    //   return-type CallbackFunction(uint, uint, coopmat1, functorThis, coopmat2, coopmat3, ...)
+    // But what we have by default is:
+    //   return-type CallbackFunction(functorThis, uint, uint, coopmat1, coopmat2, coopmat3, ...)
+    //
+    // The new function will do the following,
+    //   return-type newCallback(uint a, uint b, T mat1, TFunc f, T mat2, T mat3, ...)
+    //   { return targetFunc(f, a, b, mat1, mat2, mat3, ...); }
+    IRFunc* createWrapperFunctionForPerElement(IRBuilder& builder, IRFunc* targetFunc)
+    {
+        List<IRType*> paramTypes;
+        for (UInt i = 0; i < targetFunc->getParamCount(); i++)
+        {
+            paramTypes.add(targetFunc->getParamType(i));
+        }
+
+        SLANG_ASSERT(paramTypes.getCount() >= 4);
+
+        IRType* tempTypes[4];
+        tempTypes[3] = builder.getPtrType(paramTypes[0]);
+        tempTypes[0] = paramTypes[1];
+        tempTypes[1] = paramTypes[2];
+        tempTypes[2] = paramTypes[3];
+        paramTypes[0] = tempTypes[0];
+        paramTypes[1] = tempTypes[1];
+        paramTypes[2] = tempTypes[2];
+        paramTypes[3] = tempTypes[3];
+
+        IRType* returnType = targetFunc->getDataType()->getResultType();
+
+        IRBuilderInsertLocScope insertLocScope(&builder);
+        auto wrapperFunc = builder.createFunc();
+        builder.setDataType(wrapperFunc, builder.getFuncType(paramTypes, returnType));
+        builder.setInsertInto(wrapperFunc);
+        auto block = builder.emitBlock();
+        builder.setInsertInto(block);
+
+        List<IRInst*> params;
+        for (Index i = 0; i < paramTypes.getCount(); i++)
+        {
+            params.add(builder.emitParam(paramTypes[i]));
+        }
+
+        IRInst* tempParams[4];
+        tempParams[0] = builder.emitLoad(params[3]);
+        tempParams[1] = params[0];
+        tempParams[2] = params[1];
+        tempParams[3] = params[2];
+        params[0] = tempParams[0];
+        params[1] = tempParams[1];
+        params[2] = tempParams[2];
+        params[3] = tempParams[3];
+
+        auto result = builder.emitCallInst(returnType, targetFunc, params);
+        builder.emitReturn(result);
+        return wrapperFunc;
+    }
+
+    void processCoopMatMapElementIFunc(IRCoopMatMapElementIFunc* inst)
+    {
+        IRBuilder builder{inst};
+        builder.setInsertBefore(inst);
+
+        auto ifuncCall = inst->getIFuncCall();
+
+        // `this` of the functor is optional.
+        // Skip the synthesis if `this` is not passed.
+        if (ifuncCall->getParamCount() > 3)
+        {
+            auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
+            inst->setIFuncCall(funcSynth);
         }
     }
 
@@ -1658,10 +1779,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_NonUniformResourceIndex:
                 processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
-            case kIROp_loop:
+            case kIROp_Loop:
                 processLoop(as<IRLoop>(inst));
                 break;
-            case kIROp_ifElse:
+            case kIROp_IfElse:
                 processIfElse(as<IRIfElse>(inst));
                 break;
             case kIROp_Switch:
@@ -1695,12 +1816,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
-            case kIROp_unconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 processBranch(inst);
                 break;
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
+            case kIROp_BitfieldExtract:
+            case kIROp_BitfieldInsert:
+                processBitFieldOp(inst);
+                break;
+            case kIROp_CoopMatMapElementIFunc:
+                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFunc>(inst));
+                break;
+
             case kIROp_DebugValue:
                 if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
                     inst->removeAndDeallocate();
@@ -1765,9 +1894,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
         }
+
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
+            switch (globalInst->getOp())
+            {
+            case kIROp_CoopVectorType:
+            case kIROp_CoopMatrixType:
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+                break;
+            }
+
             for (auto decor : globalInst->getDecorations())
             {
                 switch (decor->getOp())
@@ -1800,6 +1938,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto globalInst : m_module->getGlobalInsts())
         {
             processInst(globalInst);
+        }
+
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
+        {
+            m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
         }
 
         if (m_sharedContext->m_spvVersion < 0x10300)
@@ -1849,6 +1992,219 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             return getAddressSpaceFromVarType(type);
         }
     };
+
+    void propagateAddressAlignment()
+    {
+        // Work list of load/store insts to add Aligned attribute to.
+        List<IRInst*> loadStoreInsts;
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    switch (inst->getOp())
+                    {
+                    case kIROp_GetElementPtr:
+                    case kIROp_FieldAddress:
+                        {
+                            auto base = inst->getOperand(0);
+                            auto ptrType = as<IRPtrTypeBase>(base->getDataType());
+                            if (!ptrType)
+                                break;
+                            // Propagate address alignment if possible.
+                            auto alignDecor = base->findDecoration<IRAlignedAddressDecoration>();
+                            if (!alignDecor)
+                                break;
+                            auto valueType = ptrType->getValueType();
+                            auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
+                            if (!layout)
+                                break;
+                            auto alignment = getIntVal(alignDecor->getAlignment());
+                            if (inst->getOp() == kIROp_GetElementPtr)
+                            {
+                                if (alignment >= layout->getAlignment())
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
+                            }
+                            else
+                            {
+                                IRTypeLayoutRuleName layoutRuleName = layout->getLayoutName();
+                                auto field = findStructField(
+                                    valueType,
+                                    (IRStructKey*)as<IRFieldAddress>(inst)->getField());
+                                if (!field)
+                                    break;
+                                IRIntegerValue offset = 0;
+                                if (getOffset(
+                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        IRTypeLayoutRules::get(layoutRuleName),
+                                        field,
+                                        &offset) != SLANG_OK)
+                                    break;
+                                if (offset % alignment == 0)
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
+                            }
+                        }
+                        break;
+                    case kIROp_Load:
+                    case kIROp_Store:
+                        {
+                            if (inst->findAttr<IRAlignedAttr>())
+                                break;
+                            loadStoreInsts.add(inst);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Process the work list.
+        // If load/store doesn't have Aligned attribute, and the ptr has
+        // a IRAlignedAddress decoration, we should create a load/store
+        // with a Aligned attribute.
+        for (auto inst : loadStoreInsts)
+        {
+
+            if (auto load = as<IRLoad>(inst))
+            {
+                auto ptr = load->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    auto newLoad =
+                        builder.emitLoad(load->getFullType(), ptr, decor->getAlignment());
+                    load->replaceUsesWith(newLoad);
+                    load->removeAndDeallocate();
+                }
+            }
+            else if (auto store = as<IRStore>(inst))
+            {
+                auto ptr = store->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    builder.emitStore(ptr, store->getVal(), decor->getAlignment());
+                    store->removeAndDeallocate();
+                }
+            }
+        }
+    }
+
+    void legalizeStructBlocks()
+    {
+        // SPIRV does not allow using a struct with a block declaration as a field
+        // of another struct. Only top-level usage (e.g., global parameter blocks) should
+        // have the block decoration. If a struct is used both as a field and as a block,
+        // we must move the top-level usage to a wrapper struct, and move the block
+        // decoration to the wrapper struct.
+
+        HashSet<IRStructType*> embeddedBlockStructs;
+        List<IRGlobalParam*> structGlobalParams;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            if (auto outerStruct = as<IRStructType>(globalInst))
+            {
+                for (auto field : outerStruct->getFields())
+                {
+                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
+                    {
+                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                        {
+                            embeddedBlockStructs.add(innerStruct);
+                        }
+                    }
+                }
+            }
+            else if (auto globalParam = as<IRGlobalParam>(globalInst))
+            {
+                if (auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType()))
+                {
+                    if (as<IRStructType>(ptrType->getValueType()))
+                    {
+                        structGlobalParams.add(globalParam);
+                    }
+                }
+            }
+        }
+
+        for (auto globalParam : structGlobalParams)
+        {
+            auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+            auto structType = as<IRStructType>(ptrType->getValueType());
+
+            if (!embeddedBlockStructs.contains(structType))
+                continue;
+
+            // Create a wrapper struct type
+            IRBuilder builder(globalParam);
+            builder.setInsertBefore(globalParam);
+
+            auto wrapperStruct = builder.createStructType();
+            auto key = builder.createStructKey();
+            builder.createStructField(wrapperStruct, key, structType);
+
+            // Copy the block decoration from the inner struct to the wrapper
+            if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBlockDecoration);
+            }
+            if (structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                builder.addDecorationIfNotExist(wrapperStruct, kIROp_SPIRVBufferBlockDecoration);
+            }
+
+            // Update the global param's type to use the wrapper struct
+            auto newPtrType =
+                builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+            globalParam->setFullType(newPtrType);
+
+            // Traverse all uses of the global param and insert a FieldAddress to access the
+            // inner struct
+            traverseUses(
+                globalParam,
+                [&](IRUse* use)
+                {
+                    builder.setInsertBefore(use->getUser());
+                    auto addr = builder.emitFieldAddress(
+                        builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
+                        globalParam,
+                        key);
+                    use->set(addr);
+                });
+        }
+
+        // Remove block/buffer block decorations from all embedded block structs
+        for (auto structType : embeddedBlockStructs)
+        {
+            if (auto blockDecor = structType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+            {
+                blockDecor->removeAndDeallocate();
+            }
+            if (auto bufferBlockDecor =
+                    structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                bufferBlockDecor->removeAndDeallocate();
+            }
+        }
+    }
 
     void processModule()
     {
@@ -1914,8 +2270,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
                 }
                 // SPIRV requires a dominator block to appear before dominated blocks.
-                // After legalizing the control flow, we need to sort our blocks to ensure this is
-                // true.
+                // After legalizing the control flow, we need to sort our blocks to ensure this
+                // is true.
                 sortBlocksInFunc(func);
             }
         }
@@ -1939,17 +2295,34 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_module,
             bufferElementTypeLoweringOptions);
 
-        // The above step may produce empty struct types, so we need to lower them out of existence.
+        // Look for structs that are both used as fields and marked with Block
+        // decorations, and move the Block decoration to a wrapper struct.
+        legalizeStructBlocks();
+
+        // Inline all pack/unpack storage type functions generated during buffer element
+        // lowering pass.
+        performForceInlining(m_module);
+
+        // The above step may produce empty struct types, so we need to lower them out of
+        // existence.
         legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+
+        // Propagate alignment hints on address instructions.
+        propagateAddressAlignment();
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
 
-        // For SPIR-V, we don't skip this validation, because we might then be generating invalid
-        // SPIR-V.
+        // For SPIR-V, we don't skip this validation, because we might then be generating
+        // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+
+        // If older than spirv 1.4, legalize OpSelect returning non-vector-composites
+        if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect &&
+            !m_sharedContext->isSpirv14OrLater())
+            legalizeNonVectorCompositeSelect(m_module);
     }
 
     void updateFunctionTypes()
@@ -2023,9 +2396,16 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module, DiagnosticSink* sink)
+void legalizeSPIRV(
+    SPIRVEmitSharedContext* sharedContext,
+    IRModule* module,
+    CodeGenContext* codeGenContext)
 {
-    SPIRVLegalizationContext context(sharedContext, module, sink);
+    SPIRVLegalizationContext context(
+        sharedContext,
+        module,
+        codeGenContext,
+        codeGenContext->getSink());
     context.processModule();
 }
 
@@ -2058,7 +2438,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
                 funcChanged = false;
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                 funcChanged |= peepholeOptimize(target, func);
-                funcChanged |= removeRedundancyInFunc(func);
+                funcChanged |= removeRedundancyInFunc(func, false);
                 CFGSimplificationOptions options;
                 options.removeTrivialSingleIterationLoops = true;
                 options.removeSideEffectFreeLoops = false;
@@ -2149,7 +2529,7 @@ void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* mo
             if (auto inst = block->getTerminator())
             {
                 if (inst->getOp() == kIROp_Return ||
-                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_discard)
+                    !context->isSpirv16OrLater() && inst->getOp() == kIROp_Discard)
                 {
                     builder.setInsertBefore(inst);
                     builder.emitEndFragmentShaderInterlock();
@@ -2166,7 +2546,7 @@ void legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module, codeGenContext->getSink());
+    legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);

@@ -145,159 +145,44 @@ struct ByteReader
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialRiffUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */ Result SerialRiffUtil::writeArrayChunk(
-    SerialCompressionType compressionType,
     FourCC chunkId,
     const void* data,
     size_t numEntries,
     size_t typeSize,
-    RiffContainer* container)
+    RIFF::BuildCursor& cursor)
 {
-    typedef RiffContainer::Chunk Chunk;
-    typedef RiffContainer::ScopeChunk ScopeChunk;
-
     if (numEntries == 0)
     {
         return SLANG_OK;
     }
 
-    // Make compressed fourCC
-    chunkId = (compressionType != SerialCompressionType::None)
-                  ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId)
-                  : chunkId;
+    SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, chunkId);
 
-    ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
+    SerialBinary::ArrayHeader header;
+    header.numEntries = uint32_t(numEntries);
 
-    switch (compressionType)
-    {
-    case SerialCompressionType::None:
-        {
-            SerialBinary::ArrayHeader header;
-            header.numEntries = uint32_t(numEntries);
-
-            container->write(&header, sizeof(header));
-            container->write(data, typeSize * numEntries);
-            break;
-        }
-    case SerialCompressionType::VariableByteLite:
-        {
-            List<uint8_t> compressedPayload;
-
-            size_t numCompressedEntries = (numEntries * typeSize) / sizeof(uint32_t);
-            ByteEncodeUtil::encodeLiteUInt32(
-                (const uint32_t*)data,
-                numCompressedEntries,
-                compressedPayload);
-
-            SerialBinary::CompressedArrayHeader header;
-            header.numEntries = uint32_t(numEntries);
-            header.numCompressedEntries = uint32_t(numCompressedEntries);
-
-            container->write(&header, sizeof(header));
-            container->write(compressedPayload.getBuffer(), compressedPayload.getCount());
-            break;
-        }
-    default:
-        {
-            return SLANG_FAIL;
-        }
-    }
+    cursor.addData(&header, sizeof(header));
+    cursor.addData(data, typeSize * numEntries);
     return SLANG_OK;
 }
 
 /* static */ Result SerialRiffUtil::readArrayChunk(
-    SerialCompressionType compressionType,
-    RiffContainer::DataChunk* dataChunk,
+    RIFF::DataChunk const* dataChunk,
     ListResizer& listOut)
 {
     typedef SerialBinary Bin;
 
-    RiffReadHelper read = dataChunk->asReadHelper();
-    const size_t typeSize = listOut.getTypeSize();
+    MemoryReader reader(dataChunk->getPayload(), dataChunk->getPayloadSize());
+    const Size typeSize = listOut.getTypeSize();
 
-    switch (compressionType)
-    {
-    case SerialCompressionType::VariableByteLite:
-        {
-            Bin::CompressedArrayHeader header;
-            SLANG_RETURN_ON_FAIL(read.read(header));
+    Bin::ArrayHeader header;
+    SLANG_RETURN_ON_FAIL(reader.read(header));
+    const Size payloadSize = header.numEntries * typeSize;
+    SLANG_ASSERT(payloadSize == reader.getRemainingSize());
+    void* dst = listOut.setSize(header.numEntries);
+    ::memcpy(dst, reader.getRemainingData(), payloadSize);
 
-            void* dst = listOut.setSize(header.numEntries);
-            SLANG_ASSERT(
-                header.numCompressedEntries ==
-                uint32_t((header.numEntries * typeSize) / sizeof(uint32_t)));
-
-            // Decode..
-            ByteEncodeUtil::decodeLiteUInt32(
-                read.getData(),
-                header.numCompressedEntries,
-                (uint32_t*)dst);
-            break;
-        }
-    case SerialCompressionType::None:
-        {
-            // Read uncompressed
-            Bin::ArrayHeader header;
-            SLANG_RETURN_ON_FAIL(read.read(header));
-            const size_t payloadSize = header.numEntries * typeSize;
-            SLANG_ASSERT(payloadSize == read.getRemainingSize());
-            void* dst = listOut.setSize(header.numEntries);
-            ::memcpy(dst, read.getData(), payloadSize);
-            break;
-        }
-    }
     return SLANG_OK;
 }
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialParseUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-// clang-format off
-#define SLANG_SERIAL_BINARY_COMPRESSION_TYPE(x) \
-    x(None, none) \
-    x(VariableByteLite, lite)
-// clang-format on
-
-/* static */ SlangResult SerialParseUtil::parseCompressionType(
-    const UnownedStringSlice& text,
-    SerialCompressionType& outType)
-{
-    struct Pair
-    {
-        UnownedStringSlice name;
-        SerialCompressionType type;
-    };
-
-    // clang-format off
-#define SLANG_SERIAL_BINARY_PAIR(type, name) \
-    {UnownedStringSlice::fromLiteral(#name), SerialCompressionType::type},
-    // clang-format on
-
-    static const Pair s_pairs[] = {SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_PAIR)};
-
-    for (const auto& pair : s_pairs)
-    {
-        if (pair.name == text)
-        {
-            outType = pair.type;
-            return SLANG_OK;
-        }
-    }
-    return SLANG_FAIL;
-}
-
-/* static */ UnownedStringSlice SerialParseUtil::getText(SerialCompressionType type)
-{
-#define SLANG_SERIAL_BINARY_CASE(type, name) \
-    case SerialCompressionType::type:        \
-        return UnownedStringSlice::fromLiteral(#name);
-    switch (type)
-    {
-        SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_CASE)
-    default:
-        break;
-    }
-    SLANG_ASSERT(!"Unknown compression type");
-    return UnownedStringSlice::fromLiteral("unknown");
-}
-
 
 } // namespace Slang

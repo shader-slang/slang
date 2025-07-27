@@ -10,6 +10,7 @@ struct MyStructAttribute
 {
     int iParam;
     float fParam;
+    string sParam;
 };
 
 [__AttributeUsage(_AttributeTargets.Var)]
@@ -19,7 +20,7 @@ struct DefaultValueAttribute
     int iParam;
 };
 
-[MyStruct(0, 1.0)]
+[MyStruct(0, 1.0, "A")]
 struct A
 {
     float x;
@@ -27,7 +28,7 @@ struct A
     float y;
 };
 
-[MyStruct(0, 2.0)]
+[MyStruct(0, 2.0, "\"")]
 struct B
 {
     float x;
@@ -59,7 +60,8 @@ D param3;
 [StructVarParam(1)] int globalInt2;
 
 
-[MyStruct(2, 3.0)]
+[MyStruct(2, 3.0, "main")]
+[MyStruct(-2, -3.0, "")]
 [numthreads(1, 1, 1)]
 void main(
     uint3 dispatchThreadID : SV_DispatchThreadID,

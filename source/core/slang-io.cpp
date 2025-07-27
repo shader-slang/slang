@@ -752,7 +752,7 @@ String Path::getRelativePath(String base, String path)
     auto result = std::filesystem::relative(p2, p1, ec);
     if (ec)
         return path;
-    return String(UnownedStringSlice(result.generic_u8string().c_str()));
+    return String(reinterpret_cast<const char*>(result.generic_u8string().c_str()));
 }
 
 SlangResult Path::remove(const String& path)
@@ -1331,7 +1331,7 @@ SlangResult LockFile::tryLock(LockType lockType)
 
     SlangResult result = SLANG_OK;
 #if SLANG_WINDOWS_FAMILY
-    OVERLAPPED overlapped = {0};
+    OVERLAPPED overlapped = {};
     DWORD flags = lockType == LockType::Shared
                       ? LOCKFILE_FAIL_IMMEDIATELY
                       : (LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY);
@@ -1356,7 +1356,7 @@ SlangResult LockFile::lock(LockType lockType)
 
     SlangResult result = SLANG_OK;
 #if SLANG_WINDOWS_FAMILY
-    OVERLAPPED overlapped = {0};
+    OVERLAPPED overlapped = {};
     overlapped.hEvent = ::CreateEvent(NULL, TRUE, FALSE, NULL);
     DWORD flags = lockType == LockType::Shared ? 0 : LOCKFILE_EXCLUSIVE_LOCK;
     if (::LockFileEx(m_fileHandle, flags, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
@@ -1392,7 +1392,7 @@ SlangResult LockFile::unlock()
         return SLANG_E_CANNOT_OPEN;
 
 #if SLANG_WINDOWS_FAMILY
-    OVERLAPPED overlapped = {0};
+    OVERLAPPED overlapped = {};
     if (::UnlockFileEx(m_fileHandle, DWORD(0), ~DWORD(0), ~DWORD(0), &overlapped) == 0)
     {
         return SLANG_E_INTERNAL_FAIL;

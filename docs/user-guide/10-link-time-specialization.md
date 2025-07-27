@@ -5,10 +5,10 @@ permalink: /user-guide/link-time-specialization
 
 # Link-time Specialization and Module Precompilation
 
-Traditionally, graphics developers have been relying on the preprocessor defines to specialize their shader code for high-performance GPU execution.
+Traditionally, graphics developers have been relying on preprocessor defines to specialize their shader code for high-performance GPU execution.
 While functioning systems can be built around preprocessor macros, overusing them leads to many problems:
-- Long compilation time. With preprocessors defines, specialization happens before parsing, which is a very early stage in the compilation flow.
-  This means that the compiler must redo almost all work from the scratch with every specialized variant, including parsing, type checking, IR generation
+- Long compilation time. With preprocessor defines, specialization happens before parsing, which is a very early stage in the compilation flow.
+  This means that the compiler must redo almost all work from scratch with every specialized variant, including parsing, type checking, IR generation
   and optimization, even when two specialized variants only differ in one constant value. The lack of reuse of compiler front-end work between
   different shader specializations contributes a significant portion to long shader compile times.
 - Reduced code readability and maintainability. The compiler cannot enforce any structures on preprocessor macros and cannot offer static checks to
@@ -22,7 +22,7 @@ While functioning systems can be built around preprocessor macros, overusing the
 Slang approaches the problem of shader specialization by supporting generics as a first class feature that allow most specializable code to be
 written in strongly typed code, and by allowing specialization to be triggered through link-time constants or types.
 
-As discussed in the [Compiling code with Slang](compiling) chapter, Slang provides a three-step compilation model: precompiling, linking and target code generation.
+As discussed in the [Compiling code with Slang](08-compiling.md) chapter, Slang provides a three-step compilation model: precompiling, linking and target code generation.
 Assuming the user shader is implemented as three Slang modules: `a.slang`, `b.slang`, and `c.slang`, the user can precompile all three modules to binary IR and store
 them as `a.slang-module`, `b.slang-module`, and `c.slang-module` in a complete offline process that is independent to any specialization arguments.
 Next, these three IR modules are linked together to form a self-contained program that will then go through a set of compiler optimizations for target code generation.
@@ -238,7 +238,7 @@ bool ISession::isBinaryModuleUpToDate(
     slang::IBlob* binaryModuleBlob);
 ```
 
-If the compiler options or source files has been changed since the module was last compiled, the `isBinaryModuleUpToDate` will return false.
+If the compiler options or source files have been changed since the module was last compiled, the `isBinaryModuleUpToDate` will return false.
 
 The compiler can be setup to automatically use the precompiled modules when they exist and up-to-date. When loading a module,
 either triggered via the `ISession::loadModule` call or via transitive `import`s in the modules being loaded, the compiler will look in the

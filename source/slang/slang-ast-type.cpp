@@ -1,7 +1,9 @@
 // slang-ast-type.cpp
+#include "slang-ast-type.h"
+
 #include "slang-ast-builder.h"
+#include "slang-ast-dispatch.h"
 #include "slang-ast-modifier.h"
-#include "slang-generated-ast-macro.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -394,8 +396,7 @@ Type* TypeType::_createCanonicalTypeOverride()
 
 void GenericDeclRefType::_toTextOverride(StringBuilder& out)
 {
-    // TODO: what is appropriate here?
-    out << toSlice("<DeclRef<GenericDecl>>");
+    out << getDeclRef();
 }
 
 Type* GenericDeclRefType::_createCanonicalTypeOverride()
@@ -577,7 +578,19 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     List<Type*> substParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        substParamTypes.add(as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff)));
+        auto substParamType = as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff));
+        if (auto typePack = as<ConcreteTypePack>(substParamType))
+        {
+            // Unwrap the ConcreteTypePack and add each element as a parameter
+            for (Index i = 0; i < typePack->getTypeCount(); ++i)
+            {
+                substParamTypes.add(typePack->getElementType(i));
+            }
+        }
+        else
+        {
+            substParamTypes.add(substParamType);
+        }
     }
 
     // early exit for no change...
@@ -773,7 +786,18 @@ Val* ConcreteTypePack::_substituteImplOverride(
     for (Index i = 0; i < getTypeCount(); i++)
     {
         auto substType = as<Type>(getElementType(i)->substituteImpl(astBuilder, subst, &diff));
-        substElementTypes.add(substType);
+        if (auto typePack = as<ConcreteTypePack>(substType))
+        {
+            // Unwrap the ConcreteTypePack and add each element as a parameter
+            for (Index j = 0; j < typePack->getTypeCount(); ++j)
+            {
+                substElementTypes.add(typePack->getElementType(j));
+            }
+        }
+        else
+        {
+            substElementTypes.add(substType);
+        }
     }
     if (!diff)
         return this;
@@ -839,13 +863,7 @@ DeclRef<ThisTypeDecl> ExtractExistentialType::getThisTypeDeclRef()
 
     SubtypeWitness* openedWitness = getSubtypeWitness();
 
-    ThisTypeDecl* thisTypeDecl = nullptr;
-    for (auto member : interfaceDecl->members)
-        if (as<ThisTypeDecl>(member))
-        {
-            thisTypeDecl = as<ThisTypeDecl>(member);
-            break;
-        }
+    ThisTypeDecl* thisTypeDecl = interfaceDecl->getThisTypeDecl();
     SLANG_ASSERT(thisTypeDecl);
 
     DeclRef<ThisTypeDecl> specialiedInterfaceDeclRef =
@@ -1100,6 +1118,8 @@ SlangResourceShape ResourceType::getShape()
         baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_SHADOW_FLAG);
     if (isFeedback())
         baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_FEEDBACK_FLAG);
+    if (isCombined())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_COMBINED_FLAG);
     return baseShape;
 }
 

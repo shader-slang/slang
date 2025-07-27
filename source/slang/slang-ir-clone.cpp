@@ -2,7 +2,10 @@
 #include "slang-ir-clone.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-mangle.h"
+
 
 namespace Slang
 {
@@ -51,6 +54,10 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
 
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugSetInstBeingCloned(oldInst->_debugUID);
+    SLANG_DEFER(_debugResetInstBeingCloned());
+#endif
     // We start by mapping the type of the orignal instruction
     // to its replacement value, if any.
     //
@@ -76,6 +83,12 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     //
     SLANG_ASSERT(!as<IRConstant>(oldInst));
 
+    const auto canBeSpecConst = canOperationBeSpecConst(
+        oldInst->getOp(),
+        oldInst->getDataType(),
+        nullptr,
+        oldInst->getOperands());
+
     // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
     // the operands of `newInst`.
@@ -90,6 +103,9 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
         auto newOperand = findCloneForOperand(env, oldOperand);
 
         newOperands[ii] = newOperand;
+
+        if (canBeSpecConst)
+            newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
     }
 
     // Finally we create the inst with the updated operands.
@@ -102,6 +118,61 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     newInst->sourceLoc = oldInst->sourceLoc;
 
     return newInst;
+}
+
+// Copy the linkage decoration of oldInst (if present) and specialize it for target.
+static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
+{
+    auto gen = as<IRGeneric>(oldInst->getBase());
+    if (gen)
+    {
+        auto genLinkage = gen->findDecoration<IRLinkageDecoration>();
+        if (genLinkage)
+        {
+            bool isExport = as<IRExportDecoration>(genLinkage);
+            StringBuilder sb;
+            sb.append(genLinkage->getMangledName());
+            sb.append("G");
+            IRSpecialize* specializationProvider = oldInst;
+            if (auto targetAsSpec = as<IRSpecialize>(target))
+            {
+                specializationProvider = targetAsSpec;
+            }
+            for (UInt i = 0; i < specializationProvider->getArgCount(); ++i)
+            {
+                auto arg = specializationProvider->getArg(i);
+                sb.append(i);
+                if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
+                {
+                    sb.append(typeLinkage->getMangledName());
+                }
+                else
+                {
+                    // getTypeNameHint may produce a name with characters that can't
+                    // be part of an identifier, so we need to filter it afterward.
+                    StringBuilder tmp;
+                    getTypeNameHint(tmp, arg);
+                    emitNameForLinkage(sb, tmp.getUnownedSlice());
+                }
+            }
+            if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())
+            {
+                // Overwrite the previous linkage decoration, since it was not specialized
+                previousLinkage->setOperand(0, builder->getStringValue(sb.getUnownedSlice()));
+            }
+            else
+            {
+                if (isExport)
+                {
+                    builder->addExportDecoration(target, sb.getUnownedSlice());
+                }
+                else
+                {
+                    builder->addImportDecoration(target, sb.getUnownedSlice());
+                }
+            }
+        }
+    }
 }
 
 // The complexity of the second phase of cloning (the
@@ -225,6 +296,11 @@ static void _cloneInstDecorationsAndChildren(
         auto newType = (IRType*)findCloneForOperand(env, oldType);
         newParam->setFullType(newType);
         newParam->sourceLoc = oldParam->sourceLoc;
+    }
+
+    if (auto oldAsSpec = as<IRSpecialize>(oldInst))
+    {
+        specializeLinkageDecoration(newInst, oldAsSpec, builder);
     }
 }
 

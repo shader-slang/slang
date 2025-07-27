@@ -197,6 +197,13 @@ struct DownstreamCompileOptions
         Precise,
     };
 
+    enum class FloatingPointDenormalMode : uint8_t
+    {
+        Any,
+        Preserve,
+        FlushToZero,
+    };
+
     enum PipelineType : uint8_t
     {
         Unknown,
@@ -260,6 +267,9 @@ struct DownstreamCompileOptions
     /// Profile name to use, only required for compiles that need to compile against a a specific
     /// profiles. Profile names are tied to compilers and targets.
     TerminatedCharSlice profileName;
+    // According to DirectX Raytracing Specification, PAQs are supported in Shader Model 6.7 and
+    // above
+    bool enablePAQ = false;
 
     /// The stage being compiled for
     SlangStage stage = SLANG_STAGE_NONE;
@@ -274,6 +284,11 @@ struct DownstreamCompileOptions
 
     // The debug info format to use.
     SlangDebugInfoFormat m_debugInfoFormat = SLANG_DEBUG_INFO_FORMAT_DEFAULT;
+
+    // The floating point denormal handling mode to use for each floating point precision
+    FloatingPointDenormalMode denormalModeFp16 = FloatingPointDenormalMode::Any;
+    FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
+    FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
@@ -340,6 +355,9 @@ public:
     /// Disassemble and print to stdout
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) = 0;
+    /// Disassemble and return the result as a string
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    disassembleWithResult(const uint32_t* contents, int contentsSize, String& outString) = 0;
 
     /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
@@ -395,6 +413,17 @@ public:
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
+        return SLANG_FAIL;
+    }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
+        const uint32_t* contents,
+        int contentsSize,
+        String& outString) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(contents);
+        SLANG_UNUSED(contentsSize);
+        SLANG_UNUSED(outString);
         return SLANG_FAIL;
     }
 
@@ -465,6 +494,7 @@ struct DownstreamCompilerUtilBase
     typedef CompileOptions::DebugInfoType DebugInfoType;
 
     typedef CompileOptions::FloatingPointMode FloatingPointMode;
+    typedef CompileOptions::FloatingPointDenormalMode FloatingPointDenormalMode;
 
     typedef DownstreamProductFlag ProductFlag;
     typedef DownstreamProductFlags ProductFlags;

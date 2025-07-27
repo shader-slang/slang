@@ -6,12 +6,12 @@ permalink: /user-guide/modules
 Modules and Access Control
 ===========================
 
-While the preprocessor `#include`s is still supported, Slang provides a _module_ system for software engineering benefits such as clean expression of sub component boundaries and dependencies, hiding implementation details, and providing a path towards true separate compilation.
+While the preprocessor `#include` is still supported, Slang provides a _module_ system for software engineering benefits such as clean expression of subcomponent boundaries and dependencies, hiding implementation details, and providing a path towards true separate compilation.
 
 
 ## Defining a Module
 
-A module in Slang comprises one or more files. A module must have one and only one primary file that is used as the source-of-truth to uniquely identify the module. The primary file must start with `module` declaration. For example, the following code defines a module named `scene`:
+A module in Slang comprises one or more files. A module must have one and only one primary file that is used as the source-of-truth to uniquely identify the module. The primary file must start with a `module` declaration. For example, the following code defines a module named `scene`:
 
 ```
 // scene.slang

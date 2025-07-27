@@ -31,6 +31,8 @@ struct SPIRVEmitSharedContext
     unsigned int m_spvVersion = 0x10000;
     bool m_useDemoteToHelperInvocationExtension = false;
 
+    SpvMemoryModel m_memoryModel = SpvMemoryModelGLSL450;
+
     bool isSpirv14OrLater() { return m_spvVersion >= 0x10400; }
     bool isSpirv15OrLater() { return m_spvVersion >= 0x10500; }
     bool isSpirv16OrLater() { return m_spvVersion >= 0x10600; }

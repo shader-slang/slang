@@ -102,7 +102,7 @@ public:
             col = Index(offset - getLineStart(lines[line - 1])) + 1;
         }
         if (line > 0 && line <= lines.getCount())
-            col = UTF8Util::calcCodePointCount(lines[line - 1].head(col));
+            col = UTF8Util::calcCodePointCount(lines[line - 1].head(col - 1)) + 1;
     }
 
     // Get line from 1-based index.
@@ -159,7 +159,7 @@ struct OwnedPreprocessorMacroDefinition
     String name;
     String value;
 };
-class Workspace : public ISlangFileSystem, public ComObject
+class Workspace : public ComObject, public ISlangFileSystem
 {
 private:
     RefPtr<WorkspaceVersion> currentVersion;

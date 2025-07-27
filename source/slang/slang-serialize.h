@@ -2,726 +2,1040 @@
 #ifndef SLANG_SERIALIZE_H
 #define SLANG_SERIALIZE_H
 
-// #include <type_traits>
+// This file defines an API for serialization.
+//
+// The API is intended to support multiple serialization formats,
+// and to work with complicated object graphs that may include
+// shared pointers, circular references, and so on.
+//
+// For anybody who don't want to dig into the details, the short
+// version is that if you have a user-defined type like:
+//
+//      // my-thing.h
+//      ...
+//
+//      struct MyThing
+//      {
+//          float a;
+//          List<OtherThing> otherThings;
+//          SomeObject* object;
+//      };
+//
+// then you can declare serialization support for your type
+// with something like:
+//
+//      // my-thing.h
+//      ...
+//      #include "slang-serialize.h"
+//      ...
+//
+//      struct MyThing { ... }
+//
+//      void serialize(Serializer const& serializer, MyThing& value);
+//
+// and then implement that support with something like:
+//
+//      // my-thing.cpp
+//      #include "my-thing.h"
+//
+//      ...
+//
+//      void serialize(Serializer const& serializer, MyThing& value)
+//      {
+//          SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+//          serialize(serializer, value.a);
+//          serialize(serializer, value.otherThings);
+//          serialize(serializer, value.object);
+//      }
+//
+// That's it. So long as the `OtherThing` and `SomeObject` types used
+// in the declaration of `MyType` already implemented serialization
+// support, your new type should be fully serializable.
+//
 
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-byte-encode-util.h"
-#include "../core/slang-riff.h"
-#include "../core/slang-stream.h"
-#include "slang-serialize-types.h"
+#include "../core/slang-basic.h"
+
+#include <optional>
 
 namespace Slang
 {
 
-class Linkage;
+//
+// A central design choice of this serialization system is that
+// both reading and writing of serialized data for a type are
+// implemented using a single function. This choice makes it
+// easier for a developer to be certain that the reading and
+// writing code for a type are consistent with one another.
+//
+// In some cases, however, a serialization function may need
+// to know whether it is reading or writing serialized data.
+// For that reason, we define a simple `enum` to represent
+// the different modes of operation.
+//
 
-/*
-A discussion of the serialization system design can be found in
-
-docs/design/serialization.md
-*/
-
-// Predeclare
-typedef uint32_t SerialSourceLoc;
-class NodeBase;
-class Val;
-struct ValNodeDesc;
-
-// Pre-declare
-class SerialClasses;
-class SerialWriter;
-class SerialReader;
-
-struct SerialClass;
-struct SerialField;
-
-// Type used to implement mechanisms to convert to and from serial types.
-template<typename T, typename /*enumTypeSFINAE*/ = void>
-struct SerialTypeInfo;
-
-enum class SerialTypeKind : uint8_t
+/// Whether serialized data is being read or written.
+enum class SerializationMode
 {
-    Unknown,
-
-    String,       ///< String
-    Array,        ///< Array
-    ImportSymbol, ///< Holds the name of the import symbol. Represented in exactly the same way as a
-                  ///< string
-
-    NodeBase,  ///< NodeBase derived
-    RefObject, ///< RefObject derived types
-
-    CountOf,
-};
-typedef uint16_t SerialSubType;
-
-struct SerialInfo
-{
-    enum
-    {
-        // Data held in serialized format, the maximally allowed alignment
-        MAX_ALIGNMENT = 8,
-    };
-
-    // We only allow up to MAX_ALIGNMENT bytes of alignment. We store alignments as shifts, so 2
-    // bits needed for 1 - 8
-    enum class EntryInfo : uint8_t
-    {
-        Alignment1 = 0,
-    };
-
-    static EntryInfo makeEntryInfo(int alignment, int nextAlignment)
-    {
-        // Make sure they are power of 2
-        SLANG_ASSERT((alignment & (alignment - 1)) == 0);
-        SLANG_ASSERT((nextAlignment & (nextAlignment - 1)) == 0);
-
-        const int alignmentShift = ByteEncodeUtil::calcMsb8(alignment);
-        const int nextAlignmentShift = ByteEncodeUtil::calcMsb8(nextAlignment);
-        return EntryInfo((nextAlignmentShift << 2) | alignmentShift);
-    }
-    static EntryInfo makeEntryInfo(int alignment)
-    {
-        // Make sure they are power of 2
-        SLANG_ASSERT((alignment & (alignment - 1)) == 0);
-        return EntryInfo(ByteEncodeUtil::calcMsb8(alignment));
-    }
-    /// Apply with the next alignment
-    static EntryInfo combineWithNext(EntryInfo cur, EntryInfo next)
-    {
-        return EntryInfo((int(cur) & ~0xc0) | ((int(next) & 3) << 2));
-    }
-
-    static int getAlignment(EntryInfo info) { return 1 << (int(info) & 3); }
-    static int getNextAlignment(EntryInfo info) { return 1 << ((int(info) >> 2) & 3); }
-
-    /* Alignment is a little tricky. We have a 'Entry' header before the payload. The payload
-    alignment may change. If we only align on the Entry header, then it's size *must* be some modulo
-    of the maximum alignment allowed.
-
-    We could hold Entry separate from payload. We could make the header not require the alignment of
-    the payload - but then we'd need payload alignment separate from entry alignment.
-    */
-    struct Entry
-    {
-        SerialTypeKind typeKind;
-        EntryInfo info;
-
-        size_t calcSize(SerialClasses* serialClasses) const;
-    };
-
-    struct StringEntry : Entry
-    {
-        char sizeAndChars[1];
-    };
-
-    struct ObjectEntry : Entry
-    {
-        SerialSubType
-            subType;    ///< Can be ASTType or other subtypes (as used for RefObjects for example)
-        uint32_t _pad0; ///< Necessary, because a node *can* have MAX_ALIGNEMENT
-    };
-
-    struct ValEntry : Entry
-    {
-        SerialSubType subType;
-        uint32_t operandCount;
-    };
-
-    struct ArrayEntry : Entry
-    {
-        uint16_t elementSize;
-        uint32_t elementCount;
-    };
-
-    struct SerialValOperand
-    {
-        int type;
-        uint64_t payload;
-    };
+    Read,
+    Write,
 };
 
-typedef uint32_t SerialIndexRaw;
-enum class SerialIndex : SerialIndexRaw;
+//
+// In order to support different serialized formats, and to
+// abstract over the difference between reading and writing,
+// we define a base interface for serialization. This interface
+// is somewhat user-unfriendly, and is *not* intended for
+// ordinary code to interface with directly.
+//
 
-/* A type to convert pointers into types such that they can be passed around to readers/writers
-without having to know the specific type. If there was a base class that all the serialized types
-derived from, that was dynamically castable this would not be necessary */
-struct SerialPointer
+/// Base interface for serialization.
+///
+/// Can be used for both reading and writing of serialized data.
+///
+struct ISerializerImpl
 {
-    // Helpers so we can choose what kind of pointer we have based on the (unused) type of the
-    // pointer passed in
-    SLANG_FORCE_INLINE RefObject* _get(const RefObject*)
-    {
-        return m_kind == SerialTypeKind::RefObject ? reinterpret_cast<RefObject*>(m_ptr) : nullptr;
-    }
-    SLANG_FORCE_INLINE NodeBase* _get(const NodeBase*)
-    {
-        return m_kind == SerialTypeKind::NodeBase ? reinterpret_cast<NodeBase*>(m_ptr) : nullptr;
-    }
+    /// Get the mode that this serializer is operating in (reading or writing).
+    virtual SerializationMode getMode() = 0;
 
-    template<typename T>
-    T* dynamicCast()
-    {
-        return Slang::dynamicCast<T>(_get((T*)nullptr));
-    }
+    /// Handle a boolean value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleBool(bool& value) = 0;
 
-    SerialPointer()
-        : m_kind(SerialTypeKind::Unknown), m_ptr(nullptr)
-    {
-    }
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleInt8(int8_t& value) = 0;
 
-    SerialPointer(RefObject* in)
-        : m_kind(SerialTypeKind::RefObject), m_ptr((void*)in)
-    {
-    }
-    SerialPointer(NodeBase* in)
-        : m_kind(SerialTypeKind::NodeBase), m_ptr((void*)in)
-    {
-    }
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleInt16(int16_t& value) = 0;
 
-    /// True if the ptr is set
-    SLANG_FORCE_INLINE operator bool() const { return m_ptr != nullptr; }
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleInt32(Int32& value) = 0;
 
-    /// Directly set pointer/kind
-    void set(SerialTypeKind kind, void* ptr)
-    {
-        m_kind = kind;
-        m_ptr = ptr;
-    }
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleInt64(Int64& value) = 0;
 
-    static SerialTypeKind getKind(const RefObject*) { return SerialTypeKind::RefObject; }
-    static SerialTypeKind getKind(const NodeBase*) { return SerialTypeKind::NodeBase; }
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleUInt8(uint8_t& value) = 0;
 
-    SerialTypeKind m_kind;
-    void* m_ptr;
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleUInt16(uint16_t& value) = 0;
+
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleUInt32(UInt32& value) = 0;
+
+    /// Handle an integer value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleUInt64(UInt64& value) = 0;
+
+    /// Handle a floating-point value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleFloat32(float& value) = 0;
+
+    /// Handle a floating-point value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleFloat64(double& value) = 0;
+
+    /// Handle a string value.
+    ///
+    /// If the serializer is writing, then `value` will be
+    /// written to the serialized format.
+    ///
+    /// If the serializer is reading, then `value` will be
+    /// set to the value read from the serialized format.
+    ///
+    virtual void handleString(String& value) = 0;
+
+    /// Begin serializing an array value.
+    ///
+    /// An array should be used to serialize an
+    /// unkeyed homogeneous collection of a varying
+    /// number of elements.
+    ///
+    /// This operation must be properly paired with a
+    /// call to `endArray()`.
+    ///
+    /// When writing, the values serialized between `beginArray()`
+    /// and `endArray()` will be written as the elements of a
+    /// serialized array.
+    ///
+    /// When reading, the user should call `hasElements()` to
+    /// test whether there are elements remaining to be read,
+    /// and serialize values in a loop until `hasElements()`
+    /// returns `false`.
+    ///
+    virtual void beginArray() = 0;
+
+    /// End serializing an array value.
+    virtual void endArray() = 0;
+
+    /// Begin serializing an optional value.
+    ///
+    /// An optional should be used to serialize a
+    /// collection that logically has either zero
+    /// or one element.
+    ///
+    /// This operation must be properly paired with a
+    /// call to `endOptional()`.
+    ///
+    /// When writing, a value serialized between `beginOptional()`
+    /// and `endOptional()` will be written as the value of
+    /// the serialized optional. If no value is serialized,
+    /// then the optional will be empty.
+    ///
+    /// When reading, the user should call `hasElements()` to
+    /// test whether the serialized optional has a value and,
+    /// if it does, read the value before calling `endOptional()`.
+    ///
+    virtual void beginOptional() = 0;
+
+    /// End serializing an optional value.
+    virtual void endOptional() = 0;
+
+    /// Begin serializing a dictionary value.
+    ///
+    /// A dictionary should be used to serialize a
+    /// keyed homogeneous collection of a varying
+    /// number of elements. The elements of a dictioanry
+    /// are key-value pairs (that is, two-element tuples).
+    ///
+    /// Formats are required to support dictionaries with
+    /// any serializable type as the key, not just strings.
+    ///
+    /// This operation must be properly paired with a
+    /// call to `endDictionary()`.
+    ///
+    /// When writing, the values serialized between `beginDictionary()`
+    /// and `endDictionary()` will be written as the elements of a
+    /// serialized dictionary.
+    ///
+    /// When reading, the user should call `hasElements()` to
+    /// test whether there are elements remaining to be read,
+    /// and serialize values in a loop until `hasElements()`
+    /// returns `false`.
+    ///
+    virtual void beginDictionary() = 0;
+
+    /// End serializing a dictionary value.
+    virtual void endDictionary() = 0;
+
+    /// Check whether there are elements remaining to be read
+    /// from a serialized container.
+    ///
+    /// It is invalid to call this function except between paired
+    /// `beginArray()`/`endArray()`, beginDictionary()`/`endDictionary()`,
+    /// or `beginOptional()`/`endOptional()` calls.
+    ///
+    virtual bool hasElements() = 0;
+
+    /// Begin serializing a tuple value.
+    ///
+    /// A tuple should be used to serialize an
+    /// unkeyed heterogeneous collection of a fixed
+    /// number of elements.
+    ///
+    /// It is up to the concrete implementation whether calls
+    /// to `hasElements()` are allowed between `beginTuple()`
+    /// and `endTuple()`.
+    ///
+    virtual void beginTuple() = 0;
+
+    /// End serializing a tuple value.
+    virtual void endTuple() = 0;
+
+
+    /// Begin serializing a struct value.
+    ///
+    /// A struct should be used to serialize an
+    /// keyed heterogeneous collection of a fixed
+    /// number of elements.
+    ///
+    /// The value of each struct field should be
+    /// preceded by a call to `handleFieldKey()`,
+    /// which specifies the field being serialized.
+    ///
+    /// It is up to the concrete implementation whether
+    /// a fields can be read in a different order than
+    /// they were written, and how to handle attempts
+    /// to read a field that was not written.
+    ///
+    virtual void beginStruct() = 0;
+
+    /// End serializing a struct value.
+    virtual void endStruct() = 0;
+
+    /// Begin serializing a variant value.
+    ///
+    /// A variant should be used to serialize any type
+    /// that behaves like a "tagged union," where different
+    /// instances may have different sequences of members,
+    /// of different types.
+    ///
+    /// User code reading from a variant must be able to
+    /// use the members read so far to determine what
+    /// members it should read next (e.g., by serializing
+    /// a tag enumerant first, followed by the tag-dependent
+    /// members).
+    ///
+    /// A variant is otherwise like a struct. Some serializer
+    /// implementations may treat variants just like structs,
+    /// while others may rely on any type serialized as a
+    /// struct always including the same members in the same
+    /// order.
+    ///
+    virtual void beginVariant() = 0;
+
+    /// End serializing a variant value.
+    virtual void endVariant() = 0;
+
+    /// Set the key for the next struct field to be serialized.
+    ///
+    /// If no name is available for the field, `name` may be `nullptr`.
+    ///
+    /// If no index is available for the field, `index` may be `-1`.
+    ///
+    /// A user must pass either a valid `name` or `index.
+    ///
+    virtual void handleFieldKey(char const* name, Int index) = 0;
+
+    /// A callback function used to handle serialization of pointers.
+    typedef void (*Callback)(void* valuePtr, void* impl, void* context);
+
+    /// Handle a pointer value that is expected to be unique.
+    ///
+    /// A unique pointer is logically similar to an optional value.
+    ///
+    /// If the pointer value being read/written is null, then
+    /// the function returns without invoking `callback`.
+    ///
+    /// When reading, if the serialized value is non-null,
+    /// then the callback will be invoked as `callback(&value, userData)`.
+    /// The callback is expected to read the members of the pointed-to
+    /// type and set `value` to some object (whether newly constructed
+    /// or looked up).
+    ///
+    /// When writing, if the `value` is non-null, then the callback
+    /// will be invoked, either immediately or at some later point,
+    /// as `callback(&ptr, this, context)` where `ptr` is a variable
+    /// holding a copy of the `value` that was passed in. The callback
+    /// is expected to write the members of the pointed-to type.
+    ///
+    /// If the `callback` is invoked at some later point, rather than
+    /// immediately, the concrete serializer implementation is responsible
+    /// for ensuring that its internal state has been restored to
+    /// be compatible with what it was when `handleUniquePtr` was called.
+    ///
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) = 0;
+
+    /// Handle a pointer value that may have multiple references.
+    ///
+    /// This operation is similar to `handleUniquePtr` with the following
+    /// differences:
+    ///
+    /// * When writing, if the same pointer value has been seen before,
+    ///   the `callback` will not be invoked, and instead an additional
+    ///   reference to the previously-serialized value will be written.
+    ///
+    /// * When reading, if the serialized value has been read before,
+    ///   the `callback` will not be invoked, and instead `value` will
+    ///   be set to the pointer that was previously read.
+    ///
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) = 0;
+
+    /// Defer serialization of the contents of an object.
+    ///
+    /// Used to delay serialization of members of an object that
+    /// could cause infinite recursion if serialized eagerly.
+    ///
+    /// This operation should only be used in the body of a callback
+    /// passed to `handleUniquePtr()` or `handleSharedPtr()`.
+    ///
+    /// This operation schedules the given `callback` to be called
+    /// at some later point a `callback(value, this, context)`, with
+    /// the state of the serializer implementation restored to what
+    /// it was when `handleDeferredObjectContents()` was called.
+    ///
+    /// Some concrete serializer implementations might implement
+    /// this operation by invoking `callback` immediately.
+    ///
+    virtual void handleDeferredObjectContents(void* value, Callback callback, void* context) = 0;
 };
 
-class SerialFilter
+//
+// Rather than interact with instances of `ISerializerImpl` directly,
+// most client code will use a wrapper type that amounts to a kind
+// of smart pointer.
+//
+// While the `ISerializerImpl` interface can cover a wide range of
+// types that need to be serialized, it is common for types to require
+// more specific *context* to be available in order to perform serialization.
+// For example, code might need access to a factory object in order
+// to construct objects of a type being read.
+//
+// To support more specialized serializer implementations, the smart
+// pointer type used for a serializer actually wraps *two* pointers:
+// one for an `ISerializerImpl`-derived type, and one for a context
+// type. The smart pointer is templated on both of these types.
+//
+
+/// Base type for serialization contexts.
+///
+/// The type parameter `Impl` should be a type that derives from
+/// `ISerializerImpl`, and the `Context` type parameter can be any
+/// type that passes along additional context information needed.
+///
+template<typename Impl, typename Context>
+struct SerializerBase
 {
 public:
-    virtual SerialIndex writePointer(SerialWriter* writer, const NodeBase* ptr) = 0;
-    virtual SerialIndex writePointer(SerialWriter* writer, const RefObject* ptr) = 0;
+    SerializerBase() = default;
+    SerializerBase(Impl* impl, Context* context = nullptr)
+        : _impl(impl), _context(context)
+    {
+    }
+
+    template<typename I, typename C>
+    SerializerBase(
+        SerializerBase<I, C> const& serializer,
+        std::enable_if_t<
+            std::is_convertible_v<I*, Impl*> && std::is_convertible_v<C*, Context*>,
+            void>* = nullptr)
+        : _impl(serializer.getImpl()), _context(serializer.getContext())
+    {
+    }
+
+    Impl* getImpl() const { return _impl; }
+    Context* getContext() const { return _context; }
+
+    Impl* get() const { return _impl; }
+    Impl* operator->() const { return get(); }
+
+
+private:
+    Impl* _impl = nullptr;
+    Context* _context = nullptr;
 };
 
-class SerialObjectFactory
+/// A serialization context.
+///
+/// The type parameter `Impl` should be a type that derives from
+/// `ISerializerImpl`, and the `Context` type parameter can be any
+/// type that passes along additional context information needed.
+///
+template<typename Impl, typename Context>
+struct Serializer_ : SerializerBase<Impl, Context>
+{
+    using SerializerBase<Impl, Context>::SerializerBase;
+};
+
+/// Default serialization context.
+using Serializer = Serializer_<ISerializerImpl, void>;
+
+//
+// We define namespace-scope functions that mirror some
+// of the operations of `ISerializerImpl`, so that they
+// can be invoked on any type that is contextually
+// convertible to a `Serializer`. This allows users
+// to define their own serialization context types while
+// still being able to take advantage of the utility
+// operations in this file for serializing basic types,
+// arrays, dictionaries, etc.
+//
+
+
+/// Get the mode of `serializer`.
+inline SerializationMode getMode(Serializer const& serializer)
+{
+    return serializer->getMode();
+}
+
+/// Check if `serializer` is reading serialized data.
+inline bool isReading(Serializer const& serializer)
+{
+    return getMode(serializer) == SerializationMode::Read;
+}
+
+/// Check if `serializer` is writing serialized data.
+inline bool isWriting(Serializer const& serializer)
+{
+    return getMode(serializer) == SerializationMode::Write;
+}
+
+/// Check if `serializer` has more container elements.
+inline bool hasElements(Serializer const& serializer)
+{
+    return serializer->hasElements();
+}
+
+inline void serialize(Serializer const& serializer, bool& value)
+{
+    serializer->handleBool(value);
+}
+
+inline void serialize(Serializer const& serializer, int8_t& value)
+{
+    serializer->handleInt8(value);
+}
+
+inline void serialize(Serializer const& serializer, int16_t& value)
+{
+    serializer->handleInt16(value);
+}
+
+inline void serialize(Serializer const& serializer, Int32& value)
+{
+    serializer->handleInt32(value);
+}
+
+inline void serialize(Serializer const& serializer, Int64& value)
+{
+    serializer->handleInt64(value);
+}
+
+inline void serialize(Serializer const& serializer, uint8_t& value)
+{
+    serializer->handleUInt8(value);
+}
+
+inline void serialize(Serializer const& serializer, uint16_t& value)
+{
+    serializer->handleUInt16(value);
+}
+
+inline void serialize(Serializer const& serializer, UInt32& value)
+{
+    serializer->handleUInt32(value);
+}
+
+inline void serialize(Serializer const& serializer, UInt64& value)
+{
+    serializer->handleUInt64(value);
+}
+
+inline void serialize(Serializer const& serializer, float& value)
+{
+    serializer->handleFloat32(value);
+}
+
+inline void serialize(Serializer const& serializer, double& value)
+{
+    serializer->handleFloat64(value);
+}
+
+inline void serialize(Serializer const& serializer, String& value)
+{
+    serializer->handleString(value);
+}
+
+/// Serialize an `enum` value via an intermediate integer type.
+///
+/// This function serializes a value of `EnumType`, by
+/// converting it to/from the given `RawType` for storage
+/// in the serialized format.
+///
+template<typename RawType = Int32, typename EnumType>
+void serializeEnum(Serializer const& serializer, EnumType& value)
+{
+    auto raw = RawType(value);
+    serialize(serializer, raw);
+    value = EnumType(raw);
+}
+
+//
+// We define a suite of simple RAII types to help users
+// maintain the proper pairing of begin/end operations
+// when interacting with an `ISerializerImpl`, and for
+// each of those types we define a macro to simplify
+// introducing a coresponding scope.
+//
+
+struct ScopedSerializerArray
 {
 public:
-    virtual void* create(SerialTypeKind typeKind, SerialSubType subType) = 0;
-    virtual void* getOrCreateVal(ValNodeDesc&& desc) = 0;
+    ScopedSerializerArray(Serializer const& serializer)
+        : _serializer(serializer)
+    {
+        serializer->beginArray();
+    }
+
+    ~ScopedSerializerArray() { _serializer->endArray(); }
+
+private:
+    Serializer _serializer;
 };
 
-class SerialExtraObjects
+struct ScopedSerializerDictionary
 {
 public:
-    template<typename T>
-    void set(T* obj)
+    ScopedSerializerDictionary(Serializer const& serializer)
+        : _serializer(serializer)
     {
-        m_objects[Index(T::kExtraType)] = obj;
-    }
-    template<typename T>
-    void set(const RefPtr<T>& obj)
-    {
-        m_objects[Index(T::kExtraType)] = obj.Ptr();
+        serializer->beginDictionary();
     }
 
-    /// Get the extra type
-    template<typename T>
-    T* get()
-    {
-        return reinterpret_cast<T*>(m_objects[Index(T::kExtraType)]);
-    }
+    ~ScopedSerializerDictionary() { _serializer->endDictionary(); }
 
-    SerialExtraObjects()
-    {
-        for (auto& obj : m_objects)
-            obj = nullptr;
-    }
-
-protected:
-    void* m_objects[Index(SerialExtraType::CountOf)];
+private:
+    Serializer _serializer;
 };
 
-enum class PostSerializationFixUpKind
-{
-    ValPtr,
-};
-
-/* This class is the interface used by toNative implementations to recreate a type. */
-class SerialReader : public RefObject
+struct ScopedSerializerStruct
 {
 public:
-    typedef SerialInfo::Entry Entry;
-
-    template<typename T>
-    void getArray(SerialIndex index, List<T>& out);
-
-    template<typename T, int n>
-    void getArray(SerialIndex index, ShortList<T, n>& out);
-
-    const void* getArray(SerialIndex index, Index& outCount);
-
-    SerialPointer getPointer(SerialIndex index);
-    SerialPointer getValPointer(SerialIndex index);
-
-    String getString(SerialIndex index);
-    Name* getName(SerialIndex index);
-    UnownedStringSlice getStringSlice(SerialIndex index);
-
-    SlangResult loadEntries(const uint8_t* data, size_t dataCount)
+    ScopedSerializerStruct(Serializer const& serializer)
+        : _serializer(serializer)
     {
-        return loadEntries(data, dataCount, m_classes, m_entries);
-    }
-    /// For each entry construct an object. Does *NOT* deserialize them
-    SlangResult constructObjects(NamePool* namePool);
-    /// Entries must be loaded (with loadEntries), and objects constructed (with constructObjects)
-    /// before deserializing
-    SlangResult deserializeObjects();
-
-    /// NOTE! data must stay ins scope when reading takes place
-    SlangResult load(const uint8_t* data, size_t dataCount, NamePool* namePool);
-
-    /// Get the entries list
-    const List<const Entry*>& getEntries() const { return m_entries; }
-
-    /// Access the objects list
-    /// NOTE that if a SerialObject holding a RefObject and needs to be kept in scope, add the
-    /// RefObject* via addScope
-    List<SerialPointer>& getObjects() { return m_objects; }
-    const List<SerialPointer>& getObjects() const { return m_objects; }
-
-    /// Add an object to be kept in scope
-    void addScopeWithoutAddRef(const RefObject* obj) { m_scope.add(obj); }
-    /// Add obj with a reference
-    void addScope(const RefObject* obj)
-    {
-        const_cast<RefObject*>(obj)->addReference();
-        m_scope.add(obj);
+        serializer->beginStruct();
     }
 
-    /// Used for attaching extra objects necessary for serializing
-    SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
+    ~ScopedSerializerStruct() { _serializer->endStruct(); }
 
-    /// Ctor
-    SerialReader(SerialClasses* classes, SerialObjectFactory* objectFactory)
-        : m_classes(classes), m_objectFactory(objectFactory)
-    {
-    }
-    ~SerialReader();
-
-    /// Load the entries table (without deserializing anything)
-    /// NOTE! data must stay ins scope for outEntries to be valid
-    static SlangResult loadEntries(
-        const uint8_t* data,
-        size_t dataCount,
-        SerialClasses* serialClasses,
-        List<const Entry*>& outEntries);
-
-protected:
-    List<const Entry*> m_entries; ///< The entries
-
-    List<SerialPointer> m_objects; ///< The constructed objects
-    NamePool* m_namePool;          ///< Pool names are added to
-
-    List<const RefObject*> m_scope; ///< Keeping objects in scope
-
-    SerialExtraObjects m_extraObjects;
-
-    SerialObjectFactory* m_objectFactory;
-    SerialClasses* m_classes; ///< Information used to deserialize
+private:
+    Serializer _serializer;
 };
 
-// ---------------------------------------------------------------------------
-template<typename T>
-void SerialReader::getArray(SerialIndex index, List<T>& out)
+struct ScopedSerializerVariant
 {
-    typedef SerialTypeInfo<T> ElementTypeInfo;
-    typedef typename ElementTypeInfo::SerialType ElementSerialType;
-
-    Index count;
-    auto serialElements = (const ElementSerialType*)getArray(index, count);
-
-    if (count == 0)
+public:
+    ScopedSerializerVariant(Serializer const& serializer)
+        : _serializer(serializer)
     {
-        out.clear();
-        return;
+        serializer->beginVariant();
     }
 
-    if (std::is_same<T, ElementSerialType>::value)
+    ~ScopedSerializerVariant() { _serializer->endVariant(); }
+
+private:
+    Serializer _serializer;
+};
+
+struct ScopedSerializerTuple
+{
+public:
+    ScopedSerializerTuple(Serializer const& serializer)
+        : _serializer(serializer)
     {
-        // If they are the same we can just write out
-        out.clear();
-        out.insertRange(0, (const T*)serialElements, count);
+        serializer->beginTuple();
+    }
+
+    ~ScopedSerializerTuple() { _serializer->endTuple(); }
+
+private:
+    Serializer _serializer;
+};
+
+struct ScopedSerializerOptional
+{
+public:
+    ScopedSerializerOptional(Serializer const& serializer)
+        : _serializer(serializer)
+    {
+        serializer->beginOptional();
+    }
+
+    ~ScopedSerializerOptional() { _serializer->endOptional(); }
+
+private:
+    Serializer _serializer;
+};
+
+
+#define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER) \
+    ::Slang::ScopedSerializerArray SLANG_CONCAT(_scopedSerializerArray, __LINE__)(SERIALIZER)
+
+#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                       \
+    ::Slang::ScopedSerializerDictionary SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)( \
+        SERIALIZER)
+
+#define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER) \
+    ::Slang::ScopedSerializerOptional SLANG_CONCAT(_scopedSerializerOptional, __LINE__)(SERIALIZER)
+
+#define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER) \
+    ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
+
+#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER) \
+    ::Slang::ScopedSerializerVariant SLANG_CONCAT(_scopedSerializerVariant, __LINE__)(SERIALIZER)
+
+#define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER) \
+    ::Slang::ScopedSerializerTuple SLANG_CONCAT(_scopedSerializerTuple, __LINE__)(SERIALIZER)
+
+//
+// Containers like arrays and dictionaries are more
+// difficult to serialize than typical user-defined
+// types for a few reasons:
+//
+// * They typically need to have distinct code paths
+//   for reading and writing, so they don't benefit
+//   much from having a unified read/write abstraction.
+//
+// * They need to be written as templates, to abstract
+//   over the element type, and thus need to be
+//   defined in headers.
+//
+// * Because the element type might require a more
+//   specialized type of serialization context, they
+//   also need to be templated on the type of the
+//   serializer itself.
+//
+// With all that said, the definitions themselves
+// are fairly straightforward. All we have to do is
+// branch on whether we are reading or writing and
+// either iterate over the serialized data to fill
+// the collection (when reading), or iterate over
+// the collection to serialize its elements (when
+// writing).
+//
+
+template<typename S, typename T>
+void serialize(S const& serializer, List<T>& value)
+{
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    if (isWriting(serializer))
+    {
+        for (auto element : value)
+            serialize(serializer, element);
     }
     else
     {
-        // Else we need to convert
-        out.setCount(count);
-        for (Index i = 0; i < count; ++i)
+        value.clear();
+        while (hasElements(serializer))
         {
-            ElementTypeInfo::toNative(this, (const void*)&serialElements[i], (void*)&out[i]);
+            T element;
+            serialize(serializer, element);
+            value.add(element);
         }
     }
 }
 
-template<typename T, int n>
-void SerialReader::getArray(SerialIndex index, ShortList<T, n>& out)
+template<typename S, typename T, size_t N>
+void serialize(S const& serializer, T (&value)[N])
 {
-    typedef SerialTypeInfo<T> ElementTypeInfo;
-    typedef typename ElementTypeInfo::SerialType ElementSerialType;
-
-    Index count;
-    auto serialElements = (const ElementSerialType*)getArray(index, count);
-
-    if (count == 0)
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    if (isWriting(serializer))
     {
-        out.clear();
-        return;
-    }
-
-    if (std::is_same<T, ElementSerialType>::value)
-    {
-        // If they are the same we can just write out
-        out.clear();
-        out.addRange((const T*)serialElements, count);
+        for (auto element : value)
+            serialize(serializer, element);
     }
     else
     {
-        // Else we need to convert
-        out.setCount(count);
-        for (Index i = 0; i < count; ++i)
+        size_t index = 0;
+        while (hasElements(serializer))
         {
-            ElementTypeInfo::toNative(this, (const void*)&serialElements[i], (void*)&out[i]);
+            T element;
+            serialize(serializer, element);
+
+            if (index >= N)
+            {
+                SLANG_UNEXPECTED("serialized array too large");
+            }
+            value[index++] = element;
         }
     }
 }
 
-/* This is a class used tby toSerial implementations to turn native type into the serial type */
-class SerialWriter : public RefObject
+template<typename S, typename T, int N>
+void serialize(S const& serializer, ShortList<T, N>& value)
 {
-public:
-    typedef uint32_t Flags;
-    struct Flag
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    if (isWriting(serializer))
     {
-        enum Enum : Flags
-        {
-            /// If set will zero initialize backing memory. This is slower but
-            /// is desirable to make two serializations of the same thing produce the
-            /// identical serialized result.
-            ZeroInitialize = 0x1,
-
-            /// If set will not serialize function body.
-            SkipFunctionBody = 0x2,
-        };
-    };
-
-    SerialIndex addPointer(const NodeBase* ptr);
-    SerialIndex addPointer(const RefObject* ptr);
-
-    /// Write the object at ptr of type serialCls
-    SerialIndex writeObject(const SerialClass* serialCls, const void* ptr);
-
-    /// Write the object at the pointer
-    SerialIndex writeObject(const NodeBase* ptr);
-    SerialIndex writeObject(const RefObject* ptr);
-    SerialIndex writeValObject(const Val* ptr);
-
-    /// Add an array - may need to convert to serialized format
-    template<typename T>
-    SerialIndex addArray(const T* in, Index count);
-
-    template<typename NATIVE_TYPE>
-    /// Add an array where all the elements are already in serialized format (ie there is no need to
-    /// do a conversion)
-    SerialIndex addSerialArray(const void* elements, Index elementCount)
-    {
-        typedef SerialTypeInfo<NATIVE_TYPE> TypeInfo;
-        return addSerialArray(
-            sizeof(typename TypeInfo::SerialType),
-            SerialTypeInfo<NATIVE_TYPE>::SerialAlignment,
-            elements,
-            elementCount);
-    }
-
-    /// Add an array where all the elements are already in serialized format (ie there is no need to
-    /// do a conversion)
-    SerialIndex addSerialArray(
-        size_t elementSize,
-        size_t alignment,
-        const void* elements,
-        Index elementCount);
-
-    /// Add the string
-    SerialIndex addString(const UnownedStringSlice& slice)
-    {
-        return _addStringSlice(SerialTypeKind::String, m_sliceMap, slice);
-    }
-    SerialIndex addString(const String& in);
-    SerialIndex addName(const Name* name);
-
-    /// Adding import symbols
-    SerialIndex addImportSymbol(const UnownedStringSlice& slice)
-    {
-        return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, slice);
-    }
-    SerialIndex addImportSymbol(const String& string)
-    {
-        return _addStringSlice(
-            SerialTypeKind::ImportSymbol,
-            m_importSymbolMap,
-            string.getUnownedSlice());
-    }
-
-    /// Set a the ptr associated with an index.
-    /// NOTE! That there cannot be a pre-existing setting.
-    void setPointerIndex(const NodeBase* ptr, SerialIndex index);
-    void setPointerIndex(const RefObject* ptr, SerialIndex index);
-
-    /// Get the entries table holding how each index maps to an entry
-    const List<SerialInfo::Entry*>& getEntries() const { return m_entries; }
-
-    /// Write to a stream
-    SlangResult write(Stream* stream);
-
-    /// Write a data chunk with fourCC
-    SlangResult writeIntoContainer(FourCC fourCC, RiffContainer* container);
-
-    /// Used for attaching extra objects necessary for serializing
-    SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
-
-    /// Get the flag
-    Flags getFlags() const { return m_flags; }
-
-    /// Ctor
-    SerialWriter(SerialClasses* classes, SerialFilter* filter, Flags flags = Flag::ZeroInitialize);
-
-protected:
-    typedef Dictionary<UnownedStringSlice, Index> SliceMap;
-
-    SerialIndex _addStringSlice(
-        SerialTypeKind typeKind,
-        SliceMap& sliceMap,
-        const UnownedStringSlice& slice);
-
-    SerialIndex _add(const void* nativePtr, SerialInfo::Entry* entry)
-    {
-        m_entries.add(entry);
-        // Okay I need to allocate space for this
-        SerialIndex index = SerialIndex(m_entries.getCount() - 1);
-        // Add to the map
-        m_ptrMap.add(nativePtr, Index(index));
-        return index;
-    }
-
-    Dictionary<const void*, Index> m_ptrMap; // Maps a pointer to an entry index
-
-    // NOTE! Assumes the content stays in scope!
-    SliceMap m_sliceMap;
-    SliceMap m_importSymbolMap;
-
-    SerialExtraObjects m_extraObjects; ///< Extra objects
-
-    List<SerialInfo::Entry*> m_entries; ///< The entries
-    MemoryArena m_arena;                ///< Holds the payloads
-    SerialClasses* m_classes;
-    SerialFilter* m_filter; ///< Filter to control what is serialized
-
-    Flags m_flags; ///< Flags to control behavior
-};
-
-// ---------------------------------------------------------------------------
-template<typename T>
-SerialIndex SerialWriter::addArray(const T* in, Index count)
-{
-    typedef SerialTypeInfo<T> ElementTypeInfo;
-    typedef typename ElementTypeInfo::SerialType ElementSerialType;
-
-    if (std::is_same<T, ElementSerialType>::value)
-    {
-        // If they are the same we can just write out
-        return addSerialArray(sizeof(T), SLANG_ALIGN_OF(ElementSerialType), in, count);
+        for (auto element : value)
+            serialize(serializer, element);
     }
     else
     {
-        // Else we need to convert
-        List<ElementSerialType> work;
-        work.setCount(count);
-
-        if (getFlags() & Flag::ZeroInitialize)
+        value.clear();
+        while (hasElements(serializer))
         {
-            ::memset(work.getBuffer(), 0, sizeof(ElementSerialType) * count);
+            T element;
+            serialize(serializer, element);
+            value.add(element);
         }
+    }
+}
 
-        for (Index i = 0; i < count; ++i)
+template<typename S, typename T>
+void serialize(S const& serializer, std::optional<T>& value)
+{
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (isWriting(serializer))
+    {
+        if (value.has_value())
         {
-            ElementTypeInfo::toSerial(this, &in[i], &work[i]);
+            serialize(serializer, *value);
         }
-        return addSerialArray(
-            sizeof(ElementSerialType),
-            SLANG_ALIGN_OF(ElementSerialType),
-            work.getBuffer(),
-            count);
+    }
+    else
+    {
+        value.reset();
+        if (hasElements(serializer))
+        {
+            value.emplace();
+            serialize(serializer, *value);
+        }
     }
 }
 
-/* A SerialFieldType describes the size of field, it's alignment, and contains the
-functions that convert between serial and native data */
-struct SerialFieldType
+template<typename S, typename K, typename V>
+void serialize(S const& serializer, KeyValuePair<K, V>& value)
 {
-    typedef void (*ToSerialFunc)(SerialWriter* writer, const void* src, void* dst);
-    typedef void (*ToNativeFunc)(SerialReader* reader, const void* src, void* dst);
-
-    size_t serialSizeInBytes;
-    uint8_t serialAlignment;
-    ToSerialFunc toSerialFunc;
-    ToNativeFunc toNativeFunc;
-};
-
-/* Describes a field in a SerialClass. */
-struct SerialField
-{
-    /// Returns a suitable ptr for use in make.
-    /// NOTE! Sets to 1 so it's constant and not 0 (and so nullptr)
-    template<typename T>
-    static T* getPtr()
-    {
-        return (T*)1;
-    }
-
-    template<typename T>
-    static SerialField make(const char* name, T* in);
-
-    const char* name;            ///< The name of the field
-    const SerialFieldType* type; ///< The type of the field
-    uint32_t nativeOffset;       ///< Offset to field from base of type
-    uint32_t serialOffset;       ///< Offset in serial type
-};
-
-typedef uint8_t SerialClassFlags;
-
-struct SerialClassFlag
-{
-    enum Enum : SerialClassFlags
-    {
-        DontSerialize =
-            0x01, ///< If set the type is not serialized, so can turn into SerialIndex(0)
-    };
-};
-
-/* SerialClass defines the type (typeKind/subType) and the fields in just this class definition (ie
-not it's super class). Also contains a pointer to the super type if there is one */
-struct SerialClass
-{
-    SerialTypeKind typeKind; ///< The type kind
-    SerialSubType subType;   ///< Subtype - meaning depends on typeKind
-
-    uint8_t alignment;      ///< Alignment of this type
-    SerialClassFlags flags; ///< Flags
-
-    uint32_t size; ///< Size of the field in bytes
-
-    Index fieldsCount;
-    const SerialField* fields;
-
-    const SerialClass* super; ///< The super class
-};
-
-// An instance could be shared across Sessions, but for simplicity of life time
-// here we don't deal with that
-class SerialClasses : public RefObject
-{
-public:
-    /// Will add it's own copy into m_classesByType
-    /// In process will calculate alignment, offset etc for fields
-    /// NOTE! the super set, *must* be an already added to this SerialClasses
-    const SerialClass* add(const SerialClass* cls);
-
-    const SerialClass* add(
-        SerialTypeKind kind,
-        SerialSubType subType,
-        const SerialField* fields,
-        Index fieldsCount,
-        const SerialClass* superCls);
-
-    /// Add a type which will not serialize
-    const SerialClass* addUnserialized(SerialTypeKind kind, SerialSubType subType);
-
-    /// Returns true if this cls is *owned* by this SerialClasses
-    bool isOwned(const SerialClass* cls) const;
-
-    /// Returns true if the SerialClasses structure appears ok
-    bool isOk() const;
-
-    /// Get a serial class based on its type/subType
-    const SerialClass* getSerialClass(SerialTypeKind typeKind, SerialSubType subType) const
-    {
-        const auto& classes = m_classesByTypeKind[Index(typeKind)];
-        return (subType < classes.getCount()) ? classes[subType] : nullptr;
-    }
-
-    /// Ctor
-    SerialClasses();
-
-protected:
-    SerialClass* _createSerialClass(const SerialClass* cls);
-
-    MemoryArena m_arena;
-
-    List<const SerialClass*> m_classesByTypeKind[Index(SerialTypeKind::CountOf)];
-};
-
-// !!!!!!!!!!!!!!!!!!!!! SerialGetFieldType<T> !!!!!!!!!!!!!!!!!!!!!!!!!!!
-// Getting the type info, let's use a static variable to hold the state to keep simple
-
-template<typename T>
-struct SerialGetFieldType
-{
-    static const SerialFieldType* getFieldType()
-    {
-        typedef SerialTypeInfo<T> Info;
-        static const SerialFieldType type = {
-            sizeof(typename Info::SerialType),
-            uint8_t(Info::SerialAlignment),
-            &Info::toSerial,
-            &Info::toNative};
-        return &type;
-    }
-};
-
-// !!!!!!!!!!!!!!!!!!!!! SerialGetFieldType<T> !!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-template<typename T>
-/* static */ SerialField SerialField::make(const char* name, T* in)
-{
-    uint8_t* ptr = reinterpret_cast<uint8_t*>(in);
-
-    SerialField field;
-    field.name = name;
-    field.type = SerialGetFieldType<T>::getFieldType();
-    // This only works because we in is an offset from 1
-    field.nativeOffset = uint32_t(size_t(ptr) - 1);
-    field.serialOffset = 0;
-    return field;
+    SLANG_SCOPED_SERIALIZER_TUPLE(serializer);
+    serialize(serializer, value.key);
+    serialize(serializer, value.value);
 }
 
-// !!!!!!!!!!!!!!!!!!!!! Convenience functions !!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-template<typename NATIVE_TYPE, typename SERIAL_TYPE>
-SLANG_FORCE_INLINE void toSerialValue(
-    SerialWriter* writer,
-    const NATIVE_TYPE& src,
-    SERIAL_TYPE& dst)
+template<typename S, typename K, typename V>
+void serialize(S const& serializer, std::pair<K, V>& value)
 {
-    SerialTypeInfo<NATIVE_TYPE>::toSerial(writer, &src, &dst);
+    SLANG_SCOPED_SERIALIZER_TUPLE(serializer);
+    serialize(serializer, value.first);
+    serialize(serializer, value.second);
 }
 
-template<typename SERIAL_TYPE, typename NATIVE_TYPE>
-SLANG_FORCE_INLINE void toNativeValue(
-    SerialReader* reader,
-    const SERIAL_TYPE& src,
-    NATIVE_TYPE& dst)
+template<typename S, typename K, typename V>
+void serialize(S const& serializer, Dictionary<K, V>& value)
 {
-    SerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
+    SLANG_SCOPED_SERIALIZER_DICTIONARY(serializer);
+    if (isWriting(serializer))
+    {
+        for (auto pair : value)
+            serialize(serializer, pair);
+    }
+    else
+    {
+        value.clear();
+        while (hasElements(serializer))
+        {
+            KeyValuePair<K, V> pair{K(), V()};
+            serialize(serializer, pair);
+            value.add(pair.key, pair.value);
+        }
+    }
+}
+
+template<typename S, typename K, typename V>
+void serialize(S const& serializer, OrderedDictionary<K, V>& value)
+{
+    SLANG_SCOPED_SERIALIZER_DICTIONARY(serializer);
+    if (isWriting(serializer))
+    {
+        for (auto pair : value)
+            serialize(serializer, pair);
+    }
+    else
+    {
+        value.clear();
+        while (hasElements(serializer))
+        {
+            KeyValuePair<K, V> pair{K(), V()};
+            serialize(serializer, pair);
+            value.add(pair.key, pair.value);
+        }
+    }
+}
+
+//
+// Serialization of pointers is the most complicated part of
+// the whole system. Dealing with pointers means contending with:
+//
+// * Multiply-referenced objects, or even cycles in the object graph.
+//
+// * Polymoprhic types, where a `Derived*` might get serialized
+//   through a `Base*` pointer.
+//
+// * Types that require going through a factory function of
+//   some kind as part of their creation (perhaps to implement
+//   deduplication/caching).
+//
+// Our handling of pointers is thus broken down into several
+// different steps/layers:
+//
+// * An ordinary overload of `serialize(s,v)` is used to intercept
+//   pointer types `T*` and dispatched out to `serializePtr(s,v,(T*)nullptr)`.
+//   Passing the additional `T*` argument allows different overloads
+//   of `serializePtr` to intercept entire type hierarchies, while
+//   still allowing for a fallback case.
+//
+// * Implementations of `serializePtr` are typically expected to
+//   invoke either `serializeUniquePtr` or `serializeSharedPtr`, which
+//   handle calling into the `ISerializerImpl` methods with appropriate
+//   callbacks.
+//
+// * The `handleUniquePtr()` or `handleSharedPtr()` operation on
+//   `ISerializerImpl` is expected to handle null pointers, or previously-
+//   encountered pointers in the shared case, and then invoke the
+//   callback to handle things when it can't early-out.
+//
+// * The callbacks will end up calling `serializeObject(s,v,(T*)nullptr)`,
+//   which is another customization point. The default implementation
+//   will call `new T()` when reading, so types that need more complicated
+//   creation logic should intercept this specialization point.
+//
+// * An implementation of `serializeObject()` should strive to serialize
+//   the bare minimum of members required to actually allocate the object
+//   (in the case where serialized data is being read), and then call
+//   `deferSerializeObjectContents()` to schedule the remainder of
+//   the data to be serialized. Maintaining that policy helps ensure
+//   that cycles in the object graph don't create problems.
+//
+// * `serializeObjectContents()` is the final customization point. By
+//   default it simply takes a `T* value` and does `serialize(..., *value)`
+//   to serialize the pointed-to `T` value. A custom implementation
+//   should serialize whatever members of the object weren't handled
+//   as part of the corresponding `serializeObject()` implementation.
+//
+
+template<typename S, typename T>
+void serializeObjectContents(S const& serializer, T* value, void*)
+{
+    serialize(serializer, *value);
+}
+
+template<typename I, typename C, typename T>
+void _serializeObjectContentsCallback(void* valuePtr, void* impl, void* context)
+{
+    Serializer_<I, C> serializer((I*)impl, (C*)context);
+    auto value = (T*)valuePtr;
+    serializeObjectContents(serializer, value, (T*)nullptr);
+}
+
+template<typename I, typename C, typename T>
+void deferSerializeObjectContents(Serializer_<I, C> const& serializer, T* value)
+{
+    ((Serializer)serializer)
+        ->handleDeferredObjectContents(
+            value,
+            _serializeObjectContentsCallback<I, C, T>,
+            serializer.getContext());
+}
+
+template<typename S, typename T>
+void serializeObject(S const& serializer, T*& value, void*)
+{
+    if (isReading(serializer))
+    {
+        value = new T();
+    }
+    deferSerializeObjectContents(serializer, value);
+}
+
+template<typename I, typename C, typename T>
+void _serializeObjectCallback(void* valuePtr, void* impl, void* context)
+{
+    Serializer_<I, C> serializer((I*)impl, (C*)context);
+    auto& value = *(T**)valuePtr;
+    serializeObject(serializer, value, (T*)nullptr);
+}
+
+template<typename I, typename C, typename T>
+void serializeSharedPtr(Serializer_<I, C> const& serializer, T*& value)
+{
+    ((Serializer)serializer)
+        ->handleSharedPtr(
+            *(void**)&value,
+            _serializeObjectCallback<I, C, T>,
+            serializer.getContext());
+}
+
+template<typename I, typename C, typename T>
+void serializeUniquePtr(Serializer_<I, C> const& serializer, T*& value)
+{
+    ((Serializer)serializer)
+        ->handleUniquePtr(
+            *(void**)&value,
+            _serializeObjectCallback<I, C, T>,
+            serializer.getContext());
+}
+
+template<typename S, typename T>
+void serializePtr(S const& serializer, T*& value, void*)
+{
+    serializeSharedPtr(serializer, value);
+}
+
+template<typename S, typename T>
+void serialize(S const& serializer, T*& value)
+{
+    serializePtr(serializer, value, (T*)nullptr);
+}
+
+template<typename S, typename T>
+void serialize(S const& serializer, RefPtr<T>& value)
+{
+    T* raw = value;
+    serialize(serializer, raw);
+    value = raw;
 }
 
 } // namespace Slang

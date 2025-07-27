@@ -21,11 +21,11 @@ Some of the benefits of Slang include:
 
 * _Parameter blocks_ allow shader parameters to be grouped by update rate in order to take advantage of Direct3D 12 descriptor tables and Vulkan descriptor sets, without verbose and error-prone per-parameter markup
 
-* _Interfaces_ and _generics_ provide first-class alternative to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feature already used in Rust, Swift, C#, Java, and more.
+* _Interfaces_ and _generics_ provide first-class alternatives to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feature already used in Rust, Swift, C#, Java, and more.
 
 * _Automatic differentiation_ greatly simplifies the implementation of learning-based techniques in shaders. Slang supports automatically generating both forward derivative and backward derivative propagation functions from forward computation code.
 
-* Slang supports a first class _module_ system, which enables true separate compilation and semantic checking of shader code. 
+* Slang supports a first-class _module_ system, which enables true separate compilation and semantic checking of shader code. 
 
 * Slang supports compute, rasterization, and ray-tracing shaders
 

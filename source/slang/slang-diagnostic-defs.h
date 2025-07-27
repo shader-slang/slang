@@ -72,23 +72,7 @@ DIAGNOSTIC(
     seeDeclarationOfInterfaceRequirement,
     "see interface requirement declaration of '$0'")
 
-DIAGNOSTIC(
-    -1,
-    Note,
-    genericSignatureDoesNotMatchRequirement,
-    "generic signature of '$0' does not match interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    cannotResolveOverloadForMethodRequirement,
-    "none of the overloads of '$0' match the interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    parameterDirectionDoesNotMatchRequirement,
-    "parameter '$0' is '$1' in the implementing member, but the interface requires '$2'.")
+DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
@@ -138,6 +122,12 @@ DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
 DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
+DIAGNOSTIC(
+    18,
+    Warning,
+    separateDebugInfoUnsupportedForTarget,
+    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
+    "SPIR-V binary targets.")
 DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(
@@ -146,6 +136,7 @@ DIAGNOSTIC(
     entryPointsNeedToBeAssociatedWithTranslationUnits,
     "when using multiple source files, entry points must be specified after their corresponding "
     "source file(s)")
+
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
@@ -248,6 +239,17 @@ DIAGNOSTIC(
     cannotMatchOutputFileToEntryPoint,
     "the output path '$0' is not associated with any entry point; a '-o' option for a compiled "
     "kernel must follow the '-entry' option for its corresponding entry point")
+DIAGNOSTIC(
+    71,
+    Error,
+    invalidTypeConformanceOptionString,
+    "syntax error in type conformance option '$0'.")
+DIAGNOSTIC(
+    72,
+    Error,
+    invalidTypeConformanceOptionNoType,
+    "invalid conformance option '$0', type '$0' is not found.")
+DIAGNOSTIC(73, Error, cannotCreateTypeConformance, "cannot create type conformance '$0'.")
 
 DIAGNOSTIC(
     80,
@@ -368,7 +370,13 @@ DIAGNOSTIC(
     undefinedIdentifierInPreprocessorExpression,
     "undefined identifier '$0' in preprocessor expression will evaluate to zero")
 DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
-
+DIAGNOSTIC(15207, Error, unknownLanguageVersion, "unknown language version '$0'.")
+DIAGNOSTIC(15208, Error, unknownLanguage, "unknown language '$0'.")
+DIAGNOSTIC(
+    15208,
+    Error,
+    languageVersionDiffersFromIncludingModule,
+    "the source file declares a different language version than the including module.")
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include
@@ -429,6 +437,34 @@ DIAGNOSTIC(
     Warning,
     pragmaOnceIgnored,
     "pragma once was ignored - this is typically because is not placed in an include")
+DIAGNOSTIC(15610, Error, pragmaWarningGenericError, "Error in #pragma warning processing: $0")
+DIAGNOSTIC(
+    15611,
+    Warning,
+    pragmaWarningPopEmpty,
+    "Detected #pragma warning(pop) with no corresponding #pragma warning(push)")
+DIAGNOSTIC(
+    15612,
+    Warning,
+    pragmaWarningPushNotPopped,
+    "Detected #pragma warning(push) with no corresponding #pragma warning(pop)")
+DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma warning specifier '$0'")
+DIAGNOSTIC(
+    15614,
+    Warning,
+    pragmaWarningSuppressCannotIdentifyNextLine,
+    "Cannot identify the next line to suppress in #pragma warning suppress")
+DIAGNOSTIC(
+    15615,
+    Warning,
+    pragmaWarningCannotInsertHere,
+    "Cannot insert #pragma warning here for id '$0'")
+DIAGNOSTIC(
+    15616,
+    Note,
+    pragmaWarningPointSuppress,
+    "#pragma warning for id '$0' was suppressed here")
+
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error, userDefinedError, "#error: $0")
@@ -611,7 +647,12 @@ DIAGNOSTIC(
     Error,
     cannotConvertArrayOfSmallerToLargerSize,
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
-DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
+DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
+DIAGNOSTIC(
+    30029,
+    Error,
+    arrayIndexOutOfBounds,
+    "array index '$0' is out of bounds for array of size '$1'.")
 DIAGNOSTIC(
     30026,
     Error,
@@ -655,6 +696,11 @@ DIAGNOSTIC(
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(
+    30078,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
+DIAGNOSTIC(
     30048,
     Error,
     argumentHasMoreMemoryQualifiersThanParam,
@@ -663,9 +709,10 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30049,
     Note,
-    thisIsImmutableByDefault,
-    "a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` "
-    "attribute to the function declaration to opt in to a mutable `this`")
+    attemptingToAssignToConstVariable,
+    "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on "
+    "the containing method to allow modification")
+
 DIAGNOSTIC(
     30050,
     Error,
@@ -761,6 +808,13 @@ DIAGNOSTIC(
     "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(
+    30077,
+    Error,
+    concreteArgumentToOutputInterface,
+    "argument passed to parameter '$0' is of concrete type '$1', but interface-typed output "
+    "parameters require interface-typed arguments. To allow passing a concrete type to this "
+    "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
 
@@ -789,8 +843,78 @@ DIAGNOSTIC(
     isOperatorValueMustBeInterfaceType,
     "'is'/'as' operator requires an interface-typed expression.")
 
+DIAGNOSTIC(
+    30301,
+    Error,
+    isOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'is' operator with an interface type as the right-hand "
+    "side without a corresponding optional constraint. Use a concrete type "
+    "instead, or add an optional constraint for the interface type.")
+
+DIAGNOSTIC(
+    30302,
+    Error,
+    asOperatorCannotUseInterfaceAsRHS,
+    "cannot use 'as' operator with an interface type as the right-hand "
+    "side. Use a concrete type instead. If you want to use an optional "
+    "constraint, use an 'if (T is IInterface)' block instead.")
+
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
+
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
+
+// `dyn` and `some` errors
+DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(
+    33073,
+    Error,
+    cannotHaveAssociatedTypeInDynInterface,
+    "dyn interfaces cannot have associatedType members.")
+DIAGNOSTIC(
+    33074,
+    Error,
+    cannotHaveGenericMethodInDynInterface,
+    "dyn interfaces cannot have generic methods.")
+DIAGNOSTIC(
+    33075,
+    Error,
+    cannotHaveMutatingMethodInDynInterface,
+    "dyn interfaces cannot have [mutating] methods.")
+DIAGNOSTIC(
+    33076,
+    Error,
+    cannotHaveDifferentiableMethodInDynInterface,
+    "dyn interfaces cannot have [Differentiable] methods.")
+DIAGNOSTIC(
+    33077,
+    Error,
+    DynInterfaceCannotInheritNonDynInterface,
+    "dyn interface '$0' may only inherit 'dyn' interfaces. '$1' is not a dyn interface.")
+DIAGNOSTIC(
+    33078,
+    Error,
+    cannotUseExtensionToMakeTypeConformToDynInterface,
+    "cannot use a extension to conform to a dyn interface '$0'.")
+DIAGNOSTIC(
+    33079,
+    Error,
+    cannotHaveUnsizedMemberWhenInheritingDynInterface,
+    "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33080,
+    Error,
+    cannotHaveOpaqueMemberWhenInheritingDynInterface,
+    "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33081,
+    Error,
+    cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+    "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33082,
+    Error,
+    cannotConformGenericToDynInterface,
+    "cannot conform generic type '$0' to dyn interface '$1'.")
 
 DIAGNOSTIC(
     -1,
@@ -890,6 +1014,52 @@ DIAGNOSTIC(
 DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
 DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
 
+DIAGNOSTIC(30108, Error, breakInsideDefer, "'break' must not appear inside a defer statement.")
+DIAGNOSTIC(
+    30109,
+    Error,
+    continueInsideDefer,
+    "'continue' must not appear inside a defer statement.")
+DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
+DIAGNOSTIC(
+    30111,
+    Error,
+    returnTypeMismatchInsideLambda,
+    "returned values must have the same type among all 'return' statements inside a lambda "
+    "expression: returned '$0' here, but '$1' previously.")
+
+DIAGNOSTIC(
+    30112,
+    Error,
+    nonCopyableTypeCapturedInLambda,
+    "cannot capture non-copyable type '$0' in a lambda expression.")
+
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
+    Error,
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
+DIAGNOSTIC(
+    30116,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+DIAGNOSTIC(
+    30117,
+    Error,
+    forwardReferenceInGenericConstraint,
+    "generic constraint for parameter '$0' references type parameter '$1' before it is declared")
 
 // Include
 DIAGNOSTIC(
@@ -925,6 +1095,12 @@ DIAGNOSTIC(
     implementingMustReferencePrimaryModuleFile,
     "the source file referenced by 'implementing' must be a primary module file starting with a "
     "'module' declaration.")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    moduleImplementationHasFileExtension,
+    "implementing directive contains file extension in module name '$0'. Module names should not "
+    "include extensions. The compiler will use '$1' as the module name.")
 
 // Visibilty
 DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
@@ -1224,6 +1400,15 @@ DIAGNOSTIC(
     primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
     "primal substitute function for differentiable method must also be differentiable. Use "
     "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
+DIAGNOSTIC(
+    31159,
+    Warning,
+    noDerivativeOnNonDifferentiableThisType,
+    "There is no derivative calculated for member '$0' because the parent struct is not "
+    "differentiable. "
+    "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
+    "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
+    "derivatives.")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
@@ -1306,6 +1491,24 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
+DIAGNOSTIC(31221, Error, invalidHLSLRegisterName, "invalid HLSL register name '$0'.")
+DIAGNOSTIC(
+    31222,
+    Error,
+    invalidHLSLRegisterNameForType,
+    "invalid HLSL register name '$0' for type '$1'.")
+DIAGNOSTIC(
+    31223,
+    Error,
+    ExternAndExportVarDeclMustBeConst,
+    "extern and export variables must be static const: '$0'")
+
+DIAGNOSTIC(
+    31224,
+    Error,
+    constGlobalVarWithInitRequiresStatic,
+    "global const variable with initializer must be declared static: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -1333,6 +1536,17 @@ DIAGNOSTIC(
     valueRequirementMustBeCompileTimeConst,
     "requirement in the form of a simple value must be declared as 'static const'.")
 DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
+
+DIAGNOSTIC(
+    30311,
+    Error,
+    nonMethodInterfaceRequirementCannotHaveBody,
+    "non-method interface requirement cannot have a body.")
+DIAGNOSTIC(
+    30312,
+    Error,
+    interfaceRequirementCannotBeOverride,
+    "interface requirement cannot override a base declaration.")
 
 // Interop
 DIAGNOSTIC(
@@ -1394,6 +1608,14 @@ DIAGNOSTIC(
     switchDuplicateCases,
     "duplicate cases not allowed within a 'switch' statement")
 
+// 310xx: link time specializaion
+DIAGNOSTIC(
+    31000,
+    Warning,
+    linkTimeConstantArraySize,
+    "Link-time constant sized arrays are a work in progress feature, some aspects of the "
+    "reflection API may not work")
+
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(
@@ -1426,6 +1648,17 @@ DIAGNOSTIC(
     Error,
     invalidConstraintSubType,
     "type '$0' is not a valid left hand side of a type constraint.")
+DIAGNOSTIC(
+    30403,
+    Error,
+    requiredConstraintIsNotChecked,
+    "the constraint providing '$0' is optional and must be checked with an 'is' statement before "
+    "usage.")
+DIAGNOSTIC(
+    30404,
+    Error,
+    invalidEqualityConstraintSupType,
+    "type '$0' is not a proper type to use in a generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -1472,6 +1705,11 @@ DIAGNOSTIC(
     Error,
     genericValueParameterMustHaveType,
     "a generic value parameter must be given an explicit type")
+DIAGNOSTIC(
+    30624,
+    Error,
+    genericValueParameterTypeNotSupported,
+    "generic value parameter type '$0' is not supported; only integer and enum types are allowed")
 
 // 307xx: parameters
 DIAGNOSTIC(
@@ -1489,8 +1727,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30811,
     Error,
-    baseOfStructMustBeStructOrInterface,
-    "struct '$0' cannot inherit from type '$1' that is neither a struct nor an interface")
+    baseOfStructMustBeInterface,
+    "struct '$0' cannot inherit from non-interface type '$1'")
 DIAGNOSTIC(
     30812,
     Error,
@@ -1508,7 +1746,12 @@ DIAGNOSTIC(
     baseOfClassMustBeClassOrInterface,
     "class '$0' cannot inherit from type '$1' that is neither a class nor an interface")
 DIAGNOSTIC(30815, Error, circularityInExtension, "circular extension is not allowed.")
-
+DIAGNOSTIC(
+    30816,
+    Warning,
+    inheritanceUnstable,
+    "support for inheritance is unstable and will be removed in future language versions, consider "
+    "using composition instead.")
 DIAGNOSTIC(
     30820,
     Error,
@@ -1553,13 +1796,39 @@ DIAGNOSTIC(
     invalidExtensionOnInterface,
     "cannot extend interface type '$0'. consider using a generic extension: `extension<T:$0> T "
     "{...}`.")
-
+DIAGNOSTIC(
+    30853,
+    Error,
+    missingOverride,
+    "missing 'override' keyword for methods that overrides the default implementation in the "
+    "interface.")
+DIAGNOSTIC(
+    30854,
+    Error,
+    overrideModifierNotOverridingBaseDecl,
+    "'$0' marked as 'override' is not overriding any base declarations.")
+DIAGNOSTIC(
+    30855,
+    Error,
+    unreferencedGenericParamInExtension,
+    "generic parameter '$0' is not referenced by extension target type '$1'.")
+DIAGNOSTIC(
+    30856,
+    Warning,
+    genericParamInExtensionNotReferencedByTargetType,
+    "the extension is non-standard and may not work as intended because the generic parameter '$0' "
+    "is not referenced by extension target type '$1'.")
 // 309xx: subscripts
 DIAGNOSTIC(
     30900,
     Error,
     multiDimensionalArrayNotSupported,
     "multi-dimensional array is not supported.")
+DIAGNOSTIC(
+    30901,
+    Error,
+    subscriptMustHaveReturnType,
+    "__subscript declaration must have a return type specified after '->'")
 // 310xx: properties
 
 // 311xx: accessors
@@ -1792,6 +2061,22 @@ DIAGNOSTIC(
     memberDoesNotMatchRequirementSignature,
     "member '$0' does not match interface requirement.")
 DIAGNOSTIC(
+    38106,
+    Error,
+    memberReturnTypeMismatch,
+    "member '$0' return type '$1' does not match interface requirement return type '$2'.")
+DIAGNOSTIC(
+    38107,
+    Error,
+    genericSignatureDoesNotMatchRequirement,
+    "generic signature of '$0' does not match interface requirement.")
+DIAGNOSTIC(
+    38108,
+    Error,
+    parameterDirectionDoesNotMatchRequirement,
+    "parameter '$0' direction '$1' does not match interface requirement '$2'.")
+
+DIAGNOSTIC(
     38101,
     Error,
     thisExpressionOutsideOfTypeDecl,
@@ -1899,6 +2184,12 @@ DIAGNOSTIC(
     nonUniformEntryPointParameterTreatedAsUniform,
     "parameter '$0' is treated as 'uniform' because it does not have a system-value semantic.")
 
+DIAGNOSTIC(
+    38041,
+    Error,
+    intValFromNonIntSpecConstEncountered,
+    "cannot cast non-integer specialization constant to compile-time integer")
+
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(
@@ -1914,6 +2205,18 @@ DIAGNOSTIC(
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithDisallowedElementTypeEncountered,
+    "vector with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithInvalidElementCountEncountered,
+    "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -2146,6 +2449,11 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
+DIAGNOSTIC(
+    41009,
+    Error,
+    missingReturnError,
+    "non-void function must return in all cases for target '$0'")
 DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(
     41011,
@@ -2299,12 +2607,6 @@ DIAGNOSTIC(
     notEqualBitCastSize,
     "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size "
     "'$3'")
-DIAGNOSTIC(
-    41203,
-    Warning,
-    notEqualReinterpretCastSize,
-    "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size "
-    "'$3'")
 
 DIAGNOSTIC(
     41300,
@@ -2436,6 +2738,12 @@ DIAGNOSTIC(
     Error,
     invalidTessellationDomain,
     "'Domain' should be either 'triangles' or 'quads'.")
+
+DIAGNOSTIC(
+    50060,
+    Error,
+    invalidMeshStageOutputTopology,
+    "Invalid mesh stage output topology '$0' for target '$1', must be one of: $2")
 
 DIAGNOSTIC(
     50082,
@@ -2584,6 +2892,17 @@ DIAGNOSTIC(
     resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
     "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
     "supported on Metal, please use 'ParameterBlock' instead.")
+DIAGNOSTIC(
+    56102,
+    Error,
+    divisionByMatrixNotSupported,
+    "division by matrix is not supported for Metal and WGSL targets.")
+
+DIAGNOSTIC(
+    56103,
+    Error,
+    int16NotSupportedInWGSL,
+    "16-bit integer type '$0' is not supported by the WGSL backend.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
@@ -2676,5 +2995,27 @@ DIAGNOSTIC(
     Internal,
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
+
+DIAGNOSTIC(
+    40100,
+    Warning,
+    mainEntryPointRenamed,
+    "entry point '$0' is not allowed, and has been renamed to '$1'")
+
+//
+// Ray tracing
+//
+
+DIAGNOSTIC(
+    40000,
+    Error,
+    rayPayloadFieldMissingAccessQualifiers,
+    "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+DIAGNOSTIC(
+    40001,
+    Error,
+    rayPayloadInvalidStageInAccessQualifier,
+    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
+    "'closesthit', 'miss', and 'caller'")
 
 #undef DIAGNOSTIC

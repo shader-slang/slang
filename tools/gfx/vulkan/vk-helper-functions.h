@@ -7,13 +7,6 @@
 
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
-#ifndef ENABLE_VALIDATION_LAYER
-#if _DEBUG
-#define ENABLE_VALIDATION_LAYER 1
-#else
-#define ENABLE_VALIDATION_LAYER 0
-#endif
-#endif
 
 #ifdef _MSC_VER
 #include <stddef.h>

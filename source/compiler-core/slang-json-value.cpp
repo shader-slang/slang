@@ -655,6 +655,9 @@ bool JSONContainer::asBool(const JSONValue& value)
         return asInteger(value) != 0;
     case JSONValue::Type::FloatLexeme:
         return asFloat(value) != 0.0;
+    case JSONValue::Type::StringLexeme:
+        return getTransientString(value).caseInsensitiveEquals(toSlice("true")) ||
+               getTransientString(value).caseInsensitiveEquals(toSlice("1"));
     default:
         return value.asBool();
     }
@@ -869,8 +872,8 @@ void JSONContainer::_removeKey(JSONValue& obj, Index globalIndex)
     {
         auto localBuf = m_objectValues.getBuffer() + range.startIndex;
         ::memmove(
-            localBuf + localIndex,
-            localBuf + localIndex + 1,
+            (void*)(localBuf + localIndex),
+            (void*)(localBuf + localIndex + 1),
             sizeof(*localBuf) * (range.count - (localIndex + 1)));
     }
 
@@ -925,7 +928,10 @@ template<typename T>
     ioList.growToCount(newStartIndex + ioRange.count + 1);
 
     auto buffer = ioList.getBuffer();
-    ::memmove(buffer + newStartIndex, buffer + ioRange.startIndex, sizeof(*buffer) * ioRange.count);
+    ::memmove(
+        (void*)(buffer + newStartIndex),
+        (void*)(buffer + ioRange.startIndex),
+        sizeof(*buffer) * ioRange.count);
 
     buffer[newStartIndex + ioRange.count] = value;
 

@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/raypayload-missing-access-qualifiers.slang(10): error 40000: field 'colorMissingQualifiers' in ray payload struct must have either 'read' OR 'write' access qualifiers
+    float4 colorMissingQualifiers; // Error expected here
+           ^~~~~~~~~~~~~~~~~~~~~~
+}
+standard output = {
+}

@@ -1,21 +1,15 @@
 #include "core/slang-basic.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
+#include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
 void createBufferFromHandleTestImpl(IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<ITransientResourceHeap> transientHeap;
-    ITransientResourceHeap::Desc transientHeapDesc = {};
-    transientHeapDesc.constantBufferSize = 4096;
-    GFX_CHECK_CALL_ABORT(
-        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -25,79 +19,66 @@ void createBufferFromHandleTestImpl(IDevice* device, UnitTestContext* context)
         "computeMain",
         slangReflection));
 
-    ComputePipelineStateDesc pipelineDesc = {};
+    ComputePipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-    ComPtr<gfx::IPipelineState> pipelineState;
-    GFX_CHECK_CALL_ABORT(
-        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+    ComPtr<IComputePipeline> pipelineState;
+    GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipelineState.writeRef()));
 
     const int numberCount = 4;
     float initialData[] = {0.0f, 1.0f, 2.0f, 3.0f};
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = numberCount * sizeof(float);
-    bufferDesc.format = gfx::Format::Unknown;
+    BufferDesc bufferDesc = {};
+    bufferDesc.size = numberCount * sizeof(float);
+    bufferDesc.format = Format::Undefined;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::ShaderResource,
-        ResourceState::UnorderedAccess,
-        ResourceState::CopyDestination,
-        ResourceState::CopySource);
+    bufferDesc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                       BufferUsage::CopyDestination | BufferUsage::CopySource;
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    ComPtr<IBufferResource> originalNumbersBuffer;
-    GFX_CHECK_CALL_ABORT(device->createBufferResource(
-        bufferDesc,
-        (void*)initialData,
-        originalNumbersBuffer.writeRef()));
+    ComPtr<IBuffer> originalNumbersBuffer;
+    GFX_CHECK_CALL_ABORT(
+        device->createBuffer(bufferDesc, (void*)initialData, originalNumbersBuffer.writeRef()));
 
-    InteropHandle handle;
-    originalNumbersBuffer->getNativeResourceHandle(&handle);
-    ComPtr<IBufferResource> numbersBuffer;
+    NativeHandle handle;
+    originalNumbersBuffer->getNativeHandle(&handle);
+    ComPtr<IBuffer> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
         device->createBufferFromNativeHandle(handle, bufferDesc, numbersBuffer.writeRef()));
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(0.0f, 1.0f, 2.0f, 3.0f));
-
-    ComPtr<IResourceView> bufferView;
-    IResourceView::Desc viewDesc = {};
-    viewDesc.type = IResourceView::Type::UnorderedAccess;
-    viewDesc.format = Format::Unknown;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
+    compareComputeResult(device, numbersBuffer, std::array{0.0f, 1.0f, 2.0f, 3.0f});
 
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
+        auto commandEncoder = queue->createCommandEncoder();
+        {
+            auto encoder = commandEncoder->beginComputePass();
+            auto rootObject = encoder->bindPipeline(pipelineState);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto encoder = commandBuffer->encodeComputeCommands();
+            ShaderCursor rootCursor(rootObject);
+            // Bind buffer directly to the entry point.
+            rootCursor.getPath("buffer").setBinding(Binding(numbersBuffer));
 
-        auto rootObject = encoder->bindPipeline(pipelineState);
+            encoder->dispatchCompute(1, 1, 1);
+            encoder->end();
+        }
 
-        ShaderCursor rootCursor(rootObject);
-        // Bind buffer view to the entry point.
-        rootCursor.getPath("buffer").setResource(bufferView);
-
-        encoder->dispatchCompute(1, 1, 1);
-        encoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        auto commandBuffer = commandEncoder->finish();
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
-    compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(1.0f, 2.0f, 3.0f, 4.0f));
+    compareComputeResult(device, numbersBuffer, std::array{1.0f, 2.0f, 3.0f, 4.0f});
 }
 
 SLANG_UNIT_TEST(createBufferFromHandleD3D12)
 {
-    runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(createBufferFromHandleTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
 SLANG_UNIT_TEST(createBufferFromHandleVulkan)
 {
-    runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(createBufferFromHandleTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test

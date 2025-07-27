@@ -10,88 +10,240 @@
 #include "slang-mangled-lexer.h"
 #include "slang-parser.h"
 #include "slang-serialize-ast.h"
-#include "slang-serialize-factory.h"
 #include "slang-serialize-ir.h"
 #include "slang-serialize-source-loc.h"
+#include "slang-serialize-types.h"
 
 namespace Slang
 {
-
-/* static */ SlangResult SerialContainerUtil::write(
-    Module* module,
-    const WriteOptions& options,
-    Stream* stream)
+struct ModuleEncodingContext
 {
-    RiffContainer container;
+private:
+    Stream* _stream = nullptr;
+
+    // The string pool used across the whole of the container
+    StringSlicePool _containerStringPool;
+    RefPtr<SerialSourceLocWriter> _sourceLocWriter;
+
+    RIFF::Builder _riff;
+    RIFF::BuildCursor _cursor;
+
+public:
+    ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
+        : _stream(stream), _containerStringPool(StringSlicePool::Style::Default)
     {
-        SerialContainerData data;
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addModuleToData(module, options, data));
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-    }
-    // We now write the RiffContainer to the stream
-    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    return SLANG_OK;
-}
-
-/* static */ SlangResult SerialContainerUtil::write(
-    FrontEndCompileRequest* frontEndReq,
-    const WriteOptions& options,
-    Stream* stream)
-{
-    RiffContainer container;
-    {
-        SerialContainerData data;
-        SLANG_RETURN_ON_FAIL(
-            SerialContainerUtil::addFrontEndRequestToData(frontEndReq, options, data));
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-    }
-    // We now write the RiffContainer to the stream
-    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    return SLANG_OK;
-}
-
-/* static */ SlangResult SerialContainerUtil::write(
-    EndToEndCompileRequest* request,
-    const WriteOptions& options,
-    Stream* stream)
-{
-    RiffContainer container;
-    {
-        SerialContainerData data;
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addEndToEndRequestToData(request, options, data));
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-    }
-    // We now write the RiffContainer to the stream
-    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    return SLANG_OK;
-}
-
-/* static */ SlangResult SerialContainerUtil::addModuleToData(
-    Module* module,
-    const WriteOptions& options,
-    SerialContainerData& outData)
-{
-    if (options.optionFlags & (SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule))
-    {
-        SerialContainerData::Module dstModule;
-
-        // NOTE: The astBuilder is not set here, as not needed to be scoped for serialization (it is
-        // assumed the TranslationUnitRequest stays in scope)
-
-        if (options.optionFlags & SerialOptionFlag::ASTModule)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            // Root AST node
-            auto moduleDecl = module->getModuleDecl();
-            SLANG_ASSERT(moduleDecl);
+            _sourceLocWriter =
+                new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
+        }
 
-            dstModule.astRootNode = moduleDecl;
-        }
-        if (options.optionFlags & SerialOptionFlag::IRModule)
+        _cursor = RIFF::BuildCursor(_riff);
+    }
+
+    ~ModuleEncodingContext()
+    {
+        _cursor = RIFF::BuildCursor(_riff.getRootChunk());
+        encodeFinalPieces();
+        _riff.writeTo(_stream);
+    }
+
+    SlangResult encodeModuleList(FrontEndCompileRequest* frontEndReq)
+    {
+        // Encoding a front-end compile request into a RIFF
+        // is simply a matter of encoding the module for each
+        // of the translation units that got compiled.
+        //
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleListFourCc);
+        for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
         {
-            // IR module
-            dstModule.irModule = module->getIRModule();
-            SLANG_ASSERT(dstModule.irModule);
+            SLANG_RETURN_ON_FAIL(encode(translationUnit->module));
         }
+        return SLANG_OK;
+    }
+
+    SlangResult encode(FrontEndCompileRequest* frontEndReq)
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kContainerFourCc);
+        SLANG_RETURN_ON_FAIL(encodeModuleList(frontEndReq));
+        return SLANG_OK;
+    }
+
+    SlangResult encode(EndToEndCompileRequest* request)
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kContainerFourCc);
+
+        // Encoding an end-to-end compile request starts with the same
+        // work as for a front-end request: we encode each of
+        // the modules for the translation units.
+        //
+        SLANG_RETURN_ON_FAIL(encodeModuleList(request->getFrontEndReq()));
+        //
+        // If code generation is disabled, then we can skip all further
+        // steps, and the encoding process is no different
+        // than for a front-end request.
+        //
+        if (request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
+        {
+            return SLANG_OK;
+        }
+
+        // If code generation is enabled, then we need to encode
+        // information on each of the code generation targets, as well
+        // as the entry points.
+        //
+        // We start with the targets, each of which will have a Slang IR
+        // representation of the layout information for the program
+        // on that target.
+        //
+        auto linkage = request->getLinkage();
+        auto sink = request->getSink();
+        auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kArrayFourCC);
+
+            for (auto target : linkage->targets)
+            {
+                auto targetProgram = program->getTargetProgram(target);
+                encode(targetProgram, sink);
+            }
+        }
+
+        // The compiled `program` may also have zero or more entry points,
+        // and we need to encode information about each of them.
+        //
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kEntryPointListFourCc);
+
+            auto entryPointCount = program->getEntryPointCount();
+            for (Index ii = 0; ii < entryPointCount; ++ii)
+            {
+                auto entryPoint = program->getEntryPoint(ii);
+                auto entryPointMangledName = program->getEntryPointMangledName(ii);
+                encode(entryPoint, entryPointMangledName);
+            }
+        }
+
+        return SLANG_OK;
+    }
+
+    SlangResult encode(TargetProgram* targetProgram, DiagnosticSink* sink)
+    {
+        // TODO:
+        // Serialization of target component IR is causing the embedded precompiled binary
+        // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
+        // one module header. Yong suggested to ignore the TC IR for now, though also that
+        // OV was using the feature, so disabling this might cause problems.
+
+        IRModule* irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
+
+        // Okay, we need to serialize this target program and its IR too...
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
+        }
+
+        return SLANG_OK;
+    }
+
+    void encodeData(void const* data, size_t size, FourCC type)
+    {
+        _cursor.addDataChunk(type, data, size);
+    }
+
+    void encode(String const& value, FourCC type = SerialBinary::kStringFourCC)
+    {
+        encodeData(value.getBuffer(), value.getLength(), type);
+    }
+
+    void encode(Name* name, FourCC type = SerialBinary::kNameFourCC) { encode(name->text, type); }
+
+
+    void encode(uint32_t value, FourCC type = SerialBinary::kUInt32FourCC)
+    {
+        encodeData(&value, sizeof(value), type);
+    }
+
+    SlangResult encode(EntryPoint* entryPoint, String const& entryPointMangledName)
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kEntryPointFourCc);
+
+        {
+            encode(entryPoint->getName(), SerialBinary::kNameFourCC);
+        }
+        {
+            encode(entryPoint->getProfile().raw, SerialBinary::kProfileFourCC);
+        }
+        {
+            encode(entryPointMangledName, SerialBinary::kMangledNameFourCC);
+        }
+
+        return SLANG_OK;
+    }
+
+
+    SlangResult encode(Module* module)
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleFourCC);
+
+        // The first piece that we write for a module is its header.
+        // The header is intended to provide information that can be
+        // used to determine if a precompiled module is up-to-date.
+        //
+        // Update(tfoley): Okay, let's skip the whole header idea and just
+        // serialize these things as properties of the module itself...
+        {
+            // So many things need the module name, that it makes
+            // sense to serialize it separately from all the rest.
+            //
+            {
+                encode(module->getNameObj(), SerialBinary::kNameFourCC);
+            }
+
+            // The header includes a digest of all the compile options and
+            // the files that the compiled result depended on.
+            //
+            auto digest = module->computeDigest();
+            _cursor.addDataChunk(PropertyKeys<Module>::Digest, digest.data, sizeof(digest.data));
+
+            // The header includes an array of the paths of all of the
+            // files that the compiled result depended on.
+            //
+            encodeModuleDependencyPaths(module);
+        }
+
+        // If there is IR available for this module, then we we encode it.
+        //
+        if (auto irModule = module->getIRModule())
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(_cursor, irModule, _sourceLocWriter);
+        }
+
+        // If we have AST information available, then we serialize it here.
+        //
+        if (auto moduleDecl = module->getModuleDecl())
+        {
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
+            writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
+        }
+
+        return SLANG_OK;
+    }
+
+    SlangResult encodeModuleDependencyPaths(Module* module)
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::FileDependencies);
+
+        // TODO(tfoley): This is some of the most complicated logic
+        // in the encoding system, because it tries to translate
+        // the file dependency paths into something that isn't
+        // specific to the machine on which a module was built.
+        //
+        // The comments that follow are from the original implementation
+        // of this logic, because I cannot state with confidence
+        // that I know what's happening in all of this.
+
 
         // Here we assume that the first file in the file dependencies is the module's file path.
         // We store the module's file path as a relative path with respect to the first search
@@ -170,759 +322,267 @@ namespace Slang
                     {
                         auto relativeModulePath =
                             Path::getRelativePath(linkageRoot, canonicalModulePath);
-                        dstModule.dependentFiles.add(relativeModulePath);
+
+                        encode(relativeModulePath);
                     }
                     else
                     {
                         // For all other dependnet files, store them as relative paths with respect
                         // to the module's path.
                         canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
-                        dstModule.dependentFiles.add(canonicalFilePath);
+                        encode(canonicalFilePath);
                     }
                 }
                 else
                 {
                     // If the module is coming from string instead of an actual file, store it as
                     // is.
-                    dstModule.dependentFiles.add(canonicalModulePath);
+                    encode(canonicalModulePath);
                 }
             }
             else
             {
-                dstModule.dependentFiles.add(file->getPathInfo().getMostUniqueIdentity());
+                encode(file->getPathInfo().getMostUniqueIdentity());
             }
         }
-        dstModule.digest = module->computeDigest();
-        outData.modules.add(dstModule);
-    }
 
-    return SLANG_OK;
-}
-
-/* static */ SlangResult SerialContainerUtil::addFrontEndRequestToData(
-    FrontEndCompileRequest* frontEndReq,
-    const WriteOptions& options,
-    SerialContainerData& outData)
-{
-    // Go through translation units, adding modules
-    for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
-    {
-        SLANG_RETURN_ON_FAIL(addModuleToData(translationUnit->module, options, outData));
-    }
-
-    return SLANG_OK;
-}
-
-/* static */ SlangResult SerialContainerUtil::addEndToEndRequestToData(
-    EndToEndCompileRequest* request,
-    const WriteOptions& options,
-    SerialContainerData& out)
-{
-    auto linkage = request->getLinkage();
-    auto sink = request->getSink();
-
-    // Output the parsed modules.
-    addFrontEndRequestToData(request->getFrontEndReq(), options, out);
-
-    // If we are skipping code generation, then we are done.
-    if (request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
-    {
         return SLANG_OK;
     }
-    //
-    auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
 
-    // Add all the target modules
+    SlangResult encodeFinalPieces()
     {
-        for (auto target : linkage->targets)
+        // We can now output the debug information. This is for all IR and AST
+        if (_sourceLocWriter)
         {
-            auto targetProgram = program->getTargetProgram(target);
-            auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
+            // Write out the debug info
+            SerialSourceLocData debugData;
+            _sourceLocWriter->write(&debugData);
 
-            SerialContainerData::TargetComponent targetComponent;
-
-            targetComponent.irModule = irModule;
-
-            auto& dstTarget = targetComponent.target;
-
-            dstTarget.floatingPointMode = target->getOptionSet().getFloatingPointMode();
-            dstTarget.profile = target->getOptionSet().getProfile();
-            dstTarget.flags = target->getOptionSet().getTargetFlags();
-            dstTarget.codeGenTarget = target->getTarget();
-
-            out.targetComponents.add(targetComponent);
+            debugData.writeTo(_cursor);
         }
-    }
 
-    // Entry points
-    {
-        auto entryPointCount = program->getEntryPointCount();
-        for (Index ii = 0; ii < entryPointCount; ++ii)
+        // Write the container string table
+        if (_containerStringPool.getAdded().getCount() > 0)
         {
-            auto entryPoint = program->getEntryPoint(ii);
-            auto entryPointMangledName = program->getEntryPointMangledName(ii);
+            List<char> encodedTable;
+            SerialStringTableUtil::encodeStringTable(_containerStringPool, encodedTable);
 
-            SerialContainerData::EntryPoint dstEntryPoint;
-
-            dstEntryPoint.name = entryPoint->getName();
-            dstEntryPoint.mangledName = entryPointMangledName;
-            dstEntryPoint.profile = entryPoint->getProfile();
-
-            out.entryPoints.add(dstEntryPoint);
+            _cursor.addDataChunk(
+                SerialBinary::kStringTableFourCc,
+                encodedTable.getBuffer(),
+                encodedTable.getCount());
         }
-    }
 
+        return SLANG_OK;
+    }
+};
+
+//
+// To serialize a module (or compile request) to a stream, we first
+// construct a RIFF container from it, and then serialize that
+// container out to a byte stream.
+//
+
+/* static */ SlangResult SerialContainerUtil::write(
+    Module* module,
+    const WriteOptions& options,
+    Stream* stream)
+{
+    ModuleEncodingContext context(options, stream);
+    SLANG_RETURN_ON_FAIL(context.encode(module));
     return SLANG_OK;
 }
 
 /* static */ SlangResult SerialContainerUtil::write(
-    const SerialContainerData& data,
+    FrontEndCompileRequest* request,
     const WriteOptions& options,
-    RiffContainer* container)
+    Stream* stream)
 {
-    RefPtr<SerialSourceLocWriter> sourceLocWriter;
-
-    // The string pool used across the whole of the container
-    StringSlicePool containerStringPool(StringSlicePool::Style::Default);
-
-    RiffContainer::ScopeChunk scopeModule(
-        container,
-        RiffContainer::Chunk::Kind::List,
-        SerialBinary::kContainerFourCc);
-
-    // Write the header
-    {
-        SerialBinary::ContainerHeader containerHeader;
-        // Save the compression type if used - as can only serialize with a single compression type
-        containerHeader.compressionType = uint32_t(options.compressionType);
-
-        RiffContainer::ScopeChunk scopeHeader(
-            container,
-            RiffContainer::Chunk::Kind::Data,
-            SerialBinary::kContainerHeaderFourCc);
-        container->write(&containerHeader, sizeof(containerHeader));
-    }
-
-    if (data.modules.getCount() &&
-        (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
-    {
-        // Module list
-        RiffContainer::ScopeChunk moduleListScope(
-            container,
-            RiffContainer::Chunk::Kind::List,
-            SerialBinary::kModuleListFourCc);
-
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
-        {
-            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
-        }
-
-        RefPtr<SerialClasses> serialClasses;
-
-        for (const auto& module : data.modules)
-        {
-            // Okay, we need to serialize this module to our container file.
-            // We currently don't serialize it's name..., but support for that could be added.
-
-            // First, we write a header that can be used to verify if the precompiled module is
-            // up-to-date. The header has: 1) a digest of all compile options and dependent source
-            // files. 2) a list of source file paths.
-            //
-            {
-                RiffContainer::ScopeChunk scopeHeader(
-                    container,
-                    RiffContainer::Chunk::Kind::Data,
-                    SerialBinary::kModuleHeaderFourCc);
-                OwnedMemoryStream headerMemStream(FileAccess::Write);
-                StringBuilder filePathsSB;
-                for (auto fileDependency : module.dependentFiles)
-                    filePathsSB << fileDependency << "\n";
-                headerMemStream.write(module.digest.data, sizeof(module.digest.data));
-                uint32_t fileListLength = (uint32_t)filePathsSB.getLength();
-                headerMemStream.write(&fileListLength, sizeof(uint32_t));
-                headerMemStream.write(filePathsSB.getBuffer(), fileListLength);
-                container->write(
-                    headerMemStream.getContents().getBuffer(),
-                    headerMemStream.getContents().getCount());
-            }
-
-            // Write the IR information
-            if ((options.optionFlags & SerialOptionFlag::IRModule) && module.irModule)
-            {
-                IRSerialData serialData;
-                IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(
-                    module.irModule,
-                    sourceLocWriter,
-                    options.optionFlags,
-                    &serialData));
-                SLANG_RETURN_ON_FAIL(
-                    IRSerialWriter::writeContainer(serialData, options.compressionType, container));
-            }
-
-            // Write the AST information
-
-            if (options.optionFlags & SerialOptionFlag::ASTModule)
-            {
-                if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
-                {
-                    // Put in AST module
-                    RiffContainer::ScopeChunk scopeASTModule(
-                        container,
-                        RiffContainer::Chunk::Kind::List,
-                        ASTSerialBinary::kSlangASTModuleFourCC);
-
-                    if (!serialClasses)
-                    {
-                        SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
-                    }
-
-                    ModuleSerialFilter filter(moduleDecl);
-                    auto astWriterFlag = SerialWriter::Flag::ZeroInitialize;
-                    if ((options.optionFlags & SerialOptionFlag::ASTFunctionBody) == 0)
-                        astWriterFlag = (SerialWriter::Flag::Enum)(
-                            astWriterFlag | SerialWriter::Flag::SkipFunctionBody);
-
-                    SerialWriter writer(serialClasses, &filter, astWriterFlag);
-
-                    writer.getExtraObjects().set(sourceLocWriter);
-
-                    // Add the module and everything that isn't filtered out in the filter.
-                    writer.addPointer(moduleDecl);
-
-
-                    // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(
-                        ASTSerialBinary::kSlangASTModuleDataFourCC,
-                        container));
-                }
-            }
-        }
-
-        // TODO:
-        // Serialization of target component IR is causing the embedded precompiled binary
-        // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
-        // one module header. Yong suggested to ignore the TC IR for now, though also that
-        // OV was using the feature, so disabling this might cause problems.
-#if 0
-        if (data.targetComponents.getCount() && (options.optionFlags & SerialOptionFlag::IRModule))
-        {
-            // TODO: in the case where we have specialization, we might need
-            // to serialize IR related to `program`...
-
-            for (const auto& targetComponent : data.targetComponents)
-            {
-                IRModule* irModule = targetComponent.irModule;
-
-                // Okay, we need to serialize this target program and its IR too...
-                IRSerialData serialData;
-                IRSerialWriter writer;
-
-                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceLocWriter, options.optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
-            }
-        }
-#endif
-    }
-
-    if (data.entryPoints.getCount())
-    {
-        for (const auto& entryPoint : data.entryPoints)
-        {
-            RiffContainer::ScopeChunk entryPointScope(
-                container,
-                RiffContainer::Chunk::Kind::Data,
-                SerialBinary::kEntryPointFourCc);
-
-            SerialContainerBinary::EntryPoint dst;
-
-            dst.name = uint32_t(containerStringPool.add(entryPoint.name->text));
-            dst.profile = entryPoint.profile.raw;
-            dst.mangledName = uint32_t(containerStringPool.add(entryPoint.mangledName));
-
-            container->write(&dst, sizeof(dst));
-        }
-    }
-
-    // We can now output the debug information. This is for all IR and AST
-    if (sourceLocWriter)
-    {
-        // Write out the debug info
-        SerialSourceLocData debugData;
-        sourceLocWriter->write(&debugData);
-
-        debugData.writeContainer(options.compressionType, container);
-    }
-
-    // Write the container string table
-    if (containerStringPool.getAdded().getCount() > 0)
-    {
-        RiffContainer::ScopeChunk stringTableScope(
-            container,
-            RiffContainer::Chunk::Kind::Data,
-            SerialBinary::kStringTableFourCc);
-
-        List<char> encodedTable;
-        SerialStringTableUtil::encodeStringTable(containerStringPool, encodedTable);
-
-        container->write(encodedTable.getBuffer(), encodedTable.getCount());
-    }
-
+    ModuleEncodingContext context(options, stream);
+    SLANG_RETURN_ON_FAIL(context.encode(request));
     return SLANG_OK;
 }
 
-
-static List<ExtensionDecl*>& _getCandidateExtensionList(
-    AggTypeDecl* typeDecl,
-    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
+/* static */ SlangResult SerialContainerUtil::write(
+    EndToEndCompileRequest* request,
+    const WriteOptions& options,
+    Stream* stream)
 {
-    RefPtr<CandidateExtensionList> entry;
-    if (!mapTypeToCandidateExtensions.tryGetValue(typeDecl, entry))
-    {
-        entry = new CandidateExtensionList();
-        mapTypeToCandidateExtensions.add(typeDecl, entry);
-    }
-    return entry->candidateExtensions;
+    ModuleEncodingContext context(options, stream);
+    SLANG_RETURN_ON_FAIL(context.encode(request));
+    return SLANG_OK;
 }
 
-/* static */ Result SerialContainerUtil::read(
-    RiffContainer* container,
-    const ReadOptions& options,
-    const LoadedModuleDictionary* additionalLoadedModules,
-    SerialContainerData& out)
+String StringChunk::getValue() const
 {
-    out.clear();
+    return String(UnownedStringSlice((char const*)getPayload(), getPayloadSize()));
+}
 
-    RiffContainer::ListChunk* containerChunk =
-        container->getRoot()->findListRec(SerialBinary::kContainerFourCc);
-    if (!containerChunk)
+RIFF::ChunkList<StringChunk> ModuleChunk::getFileDependencies() const
+{
+    auto found = findListChunk(PropertyKeys<Module>::FileDependencies);
+    if (!found)
+        return RIFF::ChunkList<StringChunk>();
+    return found->getChildren().cast<StringChunk>();
+}
+
+ModuleChunk const* ModuleChunk::find(RIFF::ListChunk const* baseChunk)
+{
+    auto found = baseChunk->findListChunkRec(SerialBinary::kModuleFourCC);
+    return static_cast<ModuleChunk const*>(found);
+}
+
+SHA1::Digest ModuleChunk::getDigest() const
+{
+    auto foundChunk = findDataChunk(PropertyKeys<Module>::Digest);
+    if (!foundChunk)
     {
-        // Must be a container
+        SLANG_UNEXPECTED("module chunk had no digest");
+    }
+    return foundChunk->readPayloadAs<SHA1::Digest>();
+}
+
+String ModuleChunk::getName() const
+{
+    auto found = findDataChunk(SerialBinary::kNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("module chunk had no name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
+}
+
+
+IRModuleChunk const* ModuleChunk::findIR() const
+{
+    auto foundProperty = findListChunk(PropertyKeys<IRModule>::IRModule);
+    if (!foundProperty)
+        return nullptr;
+
+    return static_cast<IRModuleChunk const*>(foundProperty->getFirstChild().get());
+}
+
+ASTModuleChunk const* ModuleChunk::findAST() const
+{
+    auto foundProperty = findListChunk(PropertyKeys<Module>::ASTModule);
+    if (!foundProperty)
+        return nullptr;
+
+    return static_cast<ASTModuleChunk const*>(foundProperty->getFirstChild().get());
+}
+
+ContainerChunk const* ContainerChunk::find(RIFF::ListChunk const* baseChunk)
+{
+    auto found = baseChunk->findListChunkRec(SerialBinary::kContainerFourCc);
+    return static_cast<ContainerChunk const*>(found);
+}
+
+RIFF::ChunkList<ModuleChunk> ContainerChunk::getModules() const
+{
+    auto found = findListChunk(SerialBinary::kModuleListFourCc);
+    if (!found)
+        return RIFF::ChunkList<ModuleChunk>();
+    return found->getChildren().cast<ModuleChunk>();
+}
+
+RIFF::ChunkList<EntryPointChunk> ContainerChunk::getEntryPoints() const
+{
+    auto found = findListChunk(SerialBinary::kEntryPointListFourCc);
+    if (!found)
+        return RIFF::ChunkList<EntryPointChunk>();
+    return found->getChildren().cast<EntryPointChunk>();
+}
+
+String EntryPointChunk::getMangledName() const
+{
+    auto found = findDataChunk(SerialBinary::kMangledNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no mangled name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
+}
+
+String EntryPointChunk::getName() const
+{
+    auto found = findDataChunk(SerialBinary::kNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
+}
+
+Profile EntryPointChunk::getProfile() const
+{
+    auto found = findDataChunk(SerialBinary::kProfileFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no profile");
+    }
+    auto rawVal = found->readPayloadAs<Profile::RawVal>();
+    return Profile(rawVal);
+}
+
+
+DebugChunk const* DebugChunk::find(RIFF::ListChunk const* baseChunk)
+{
+    auto found = baseChunk->findListChunkRec(SerialSourceLocData::kDebugFourCc);
+    return static_cast<DebugChunk const*>(found);
+}
+
+DebugChunk const* DebugChunk::find(
+    RIFF::ListChunk const* baseChunk,
+    RIFF::ListChunk const* containerChunk)
+{
+    if (auto found = find(baseChunk))
+        return found;
+    if (containerChunk)
+        return find(containerChunk);
+    return nullptr;
+}
+
+SlangResult readSourceLocationsFromDebugChunk(
+    DebugChunk const* debugChunk,
+    SourceManager* sourceManager,
+    RefPtr<SerialSourceLocReader>& outReader)
+{
+    if (!debugChunk)
         return SLANG_FAIL;
-    }
 
-    SerialBinary::ContainerHeader* containerHeader =
-        containerChunk->findContainedData<SerialBinary::ContainerHeader>(
-            SerialBinary::kContainerHeaderFourCc);
-    if (!containerHeader)
-    {
-        // Didn't find the header
-        return SLANG_FAIL;
-    }
+    // Source location serialization uses the old approach where
+    // there is an intermediate in-memory data structure that the
+    // raw data from the RIFF gets deserialized into, before that
+    // intermediate representation gets transformed into something
+    // more directly usable.
+    //
+    // Thus we start with a first step where we simply read the data
+    // from the RIFF into the intermediate structure.
+    //
+    SerialSourceLocData intermediateData;
+    SLANG_RETURN_ON_FAIL(intermediateData.readFrom(debugChunk));
 
-    const SerialCompressionType containerCompressionType =
-        SerialCompressionType(containerHeader->compressionType);
+    // After reading the data into the intermediate representation,
+    // we turn it into a `SerialSourceLocReader`, which vends source
+    // location information to other deserialization tasks (both IR
+    // and AST deserialization).
+    //
+    auto reader = RefPtr(new SerialSourceLocReader());
+    SLANG_RETURN_ON_FAIL(reader->read(&intermediateData, sourceManager));
 
-    StringSlicePool containerStringPool(StringSlicePool::Style::Default);
-
-    if (RiffContainer::Data* stringTableData =
-            containerChunk->findContainedData(SerialBinary::kStringTableFourCc))
-    {
-        SerialStringTableUtil::decodeStringTable(
-            (const char*)stringTableData->getPayload(),
-            stringTableData->getSize(),
-            containerStringPool);
-    }
-
-    RefPtr<SerialSourceLocReader> sourceLocReader;
-    RefPtr<SerialClasses> serialClasses;
-
-    // Debug information
-    if (auto debugChunk = containerChunk->findContainedList(SerialSourceLocData::kDebugFourCc))
-    {
-        // Read into data
-        SerialSourceLocData sourceLocData;
-        SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(containerCompressionType, debugChunk));
-
-        // Turn into DebugReader
-        sourceLocReader = new SerialSourceLocReader;
-        SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, options.sourceManager));
-    }
-
-    // Create a source loc representing the binary module.
-    SourceLoc binaryModuleLoc = SourceLoc();
-
-    if (options.modulePath.getLength())
-    {
-        auto srcManager = options.linkage->getSourceManager();
-        auto modulePathInfo = PathInfo::makePath(options.modulePath);
-        auto srcFile = srcManager->findSourceFileByPathRecursively(modulePathInfo.foundPath);
-        if (!srcFile)
-        {
-            srcFile = srcManager->createSourceFileWithString(modulePathInfo, String());
-            srcManager->addSourceFile(options.modulePath, srcFile);
-        }
-        auto srcView = srcManager->createSourceView(srcFile, &modulePathInfo, SourceLoc());
-        binaryModuleLoc = srcView->getRange().begin;
-    }
-
-    // Add modules
-    if (RiffContainer::ListChunk* moduleList =
-            containerChunk->findContainedList(SerialBinary::kModuleListFourCc))
-    {
-        RiffContainer::Chunk* chunk = moduleList->getFirstContainedChunk();
-        while (chunk)
-        {
-            auto startChunk = chunk;
-
-            RefPtr<ASTBuilder> astBuilder = options.astBuilder;
-            NodeBase* astRootNode = nullptr;
-            RefPtr<IRModule> irModule;
-            SerialContainerData::Module module;
-            if (auto headerChunk =
-                    as<RiffContainer::DataChunk>(chunk, SerialBinary::kModuleHeaderFourCc))
-            {
-                MemoryStreamBase memStream(
-                    FileAccess::Read,
-                    headerChunk->getSingleData()->getPayload(),
-                    headerChunk->getSingleData()->getSize());
-                size_t readSize = 0;
-                memStream.read(module.digest.data, sizeof(SHA1::Digest), readSize);
-                if (readSize != sizeof(SHA1::Digest))
-                    return SLANG_FAIL;
-                uint32_t fileListLength = 0;
-                memStream.read(&fileListLength, sizeof(uint32_t), readSize);
-                if (readSize != sizeof(uint32_t))
-                    return SLANG_FAIL;
-                List<uint8_t> fileListContent;
-                fileListContent.setCount(fileListLength);
-                memStream.read(fileListContent.getBuffer(), fileListContent.getCount(), readSize);
-                if (readSize != (size_t)fileListContent.getCount())
-                    return SLANG_FAIL;
-                UnownedStringSlice fileListString(
-                    (const char*)fileListContent.getBuffer(),
-                    fileListContent.getCount());
-                List<UnownedStringSlice> fileList;
-                StringUtil::split(fileListString, '\n', fileList);
-                for (auto file : fileList)
-                {
-                    if (file.getLength())
-                    {
-                        module.dependentFiles.add(file);
-                    }
-                }
-                // Onto next chunk
-                chunk = chunk->m_next;
-            }
-
-            if (auto irChunk = as<RiffContainer::ListChunk>(chunk, IRSerialBinary::kIRModuleFourCc))
-            {
-                if (!options.readHeaderOnly)
-                {
-                    IRSerialData serialData;
-                    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(
-                        irChunk,
-                        containerCompressionType,
-                        &serialData));
-
-                    // Read IR back from serialData
-                    IRSerialReader reader;
-                    SLANG_RETURN_ON_FAIL(
-                        reader.read(serialData, options.session, sourceLocReader, irModule));
-                }
-
-                // Onto next chunk
-                chunk = chunk->m_next;
-            }
-
-            if (auto astChunk =
-                    as<RiffContainer::ListChunk>(chunk, ASTSerialBinary::kSlangASTModuleFourCC))
-            {
-                if (!options.readHeaderOnly)
-                {
-                    RiffContainer::Data* astData =
-                        astChunk->findContainedData(ASTSerialBinary::kSlangASTModuleDataFourCC);
-
-                    if (astData)
-                    {
-                        if (!serialClasses)
-                        {
-                            SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
-                        }
-
-                        // TODO(JS): We probably want to store off better information about each of
-                        // the translation unit including some kind of 'name'. For now we just
-                        // generate a name.
-
-                        StringBuilder buf;
-                        buf << "tu" << out.modules.getCount();
-                        if (!astBuilder)
-                        {
-                            astBuilder =
-                                new ASTBuilder(options.sharedASTBuilder, buf.produceString());
-                        }
-
-                        /// We need to make the current ASTBuilder available for access via
-                        /// thread_local global.
-                        SetASTBuilderContextRAII astBuilderRAII(astBuilder);
-
-                        DefaultSerialObjectFactory objectFactory(astBuilder);
-
-                        SerialReader reader(serialClasses, &objectFactory);
-
-                        // Sets up the entry table - one entry for each 'object'.
-                        // No native objects are constructed. No objects are deserialized.
-                        SLANG_RETURN_ON_FAIL(reader.loadEntries(
-                            (const uint8_t*)astData->getPayload(),
-                            astData->getSize()));
-
-                        // Construct a native object for each table entry (where appropriate).
-                        // Note that this *doesn't* set all object pointers - some are special cased
-                        // and created on demand (strings) and imported symbols will have their
-                        // object pointers unset (they are resolved in next step)
-                        SLANG_RETURN_ON_FAIL(reader.constructObjects(options.namePool));
-
-                        // Resolve external references if the linkage is specified
-                        if (options.linkage)
-                        {
-                            const auto& entries = reader.getEntries();
-                            auto& objects = reader.getObjects();
-                            const Index entriesCount = entries.getCount();
-
-                            String currentModuleName;
-                            Module* currentModule = nullptr;
-
-                            // Index from 1 (0 is null)
-                            for (Index i = 1; i < entriesCount; ++i)
-                            {
-                                const SerialInfo::Entry* entry = entries[i];
-                                if (entry->typeKind == SerialTypeKind::ImportSymbol)
-                                {
-                                    // Import symbols are always serialized with a mangled name in
-                                    // the form of <module_name>!<symbol_mangled_name>. As
-                                    // symbol_mangled_name may not contain the name of its parent
-                                    // module in the case of an `extern` or `export` symbol.
-                                    //
-                                    UnownedStringSlice mangledName =
-                                        reader.getStringSlice(SerialIndex(i));
-                                    List<UnownedStringSlice> slicesOut;
-                                    StringUtil::split(mangledName, '!', slicesOut);
-                                    if (slicesOut.getCount() != 2)
-                                        return SLANG_FAIL;
-                                    auto moduleName = slicesOut[0];
-                                    mangledName = slicesOut[1];
-
-                                    // If we already have looked up this module and it has the same
-                                    // name just use what we have
-                                    Module* readModule = nullptr;
-                                    if (currentModule &&
-                                        moduleName == currentModuleName.getUnownedSlice())
-                                    {
-                                        readModule = currentModule;
-                                    }
-                                    else
-                                    {
-                                        // The modules are loaded on the linkage.
-                                        Linkage* linkage = options.linkage;
-
-                                        NamePool* namePool = linkage->getNamePool();
-                                        Name* moduleNameName = namePool->getName(moduleName);
-                                        readModule = linkage->findOrImportModule(
-                                            moduleNameName,
-                                            binaryModuleLoc,
-                                            options.sink,
-                                            additionalLoadedModules);
-                                        if (!readModule)
-                                        {
-                                            return SLANG_FAIL;
-                                        }
-
-                                        // Set the current module and name
-                                        currentModule = readModule;
-                                        currentModuleName = moduleName;
-                                    }
-
-                                    // Look up the symbol
-                                    NodeBase* nodeBase =
-                                        readModule->findExportFromMangledName(mangledName);
-
-                                    if (!nodeBase)
-                                    {
-                                        if (options.sink)
-                                        {
-                                            options.sink->diagnose(
-                                                SourceLoc::fromRaw(0),
-                                                Diagnostics::unableToFindSymbolInModule,
-                                                mangledName,
-                                                moduleName);
-                                        }
-
-                                        // If didn't find the export then we create an
-                                        // UnresolvedDecl node to represent the error.
-                                        auto unresolved = astBuilder->create<UnresolvedDecl>();
-                                        unresolved->nameAndLoc.name =
-                                            options.linkage->getNamePool()->getName(mangledName);
-                                        nodeBase = unresolved;
-                                    }
-
-                                    // set the result
-                                    objects[i] = nodeBase;
-                                }
-                            }
-                        }
-
-                        // Set the sourceLocReader before doing de-serialize, such can lookup the
-                        // remapped sourceLocs
-                        reader.getExtraObjects().set(sourceLocReader);
-
-                        // TODO(JS):
-                        // If modules can have more complicated relationships (like a two modules
-                        // can refer to symbols from each other), then we can make this work by 1)
-                        // deserialize *without* the external symbols being set up 2) calculate the
-                        // symbols 3) deserialize the other module (in the same way) 4) run
-                        // deserializeObjects *again* on each module This is less efficient than it
-                        // might be (because deserialize phase is done twice) so if this is
-                        // necessary may want a mechanism that *just* does reference lookups.
-                        //
-                        // For now if we assume a module can only access symbols from another
-                        // module, and not the reverse. So we just need to deserialize and we are
-                        // done
-                        SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
-
-                        // Get the root node. It's at index 1 (0 is the null value).
-                        astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
-
-                        // Go through all AST nodes:
-                        // 1) Add the extensions to the module mapTypeToCandidateExtensions cache
-                        // 2) We need to fix the callback pointers for parsing
-                        // 3) Register all `Val`s to the ASTBuilder's deduplication map.
-
-                        {
-                            ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
-
-                            // Maps from keyword name name to index in (syntaxParseInfos)
-                            // Will be filled in lazily if needed (for SyntaxDecl setup)
-                            Dictionary<Name*, Index> syntaxKeywordDict;
-
-                            OrderedDictionary<Val*, List<Val**>> valUses;
-
-                            // Get the parse infos
-                            const auto syntaxParseInfos = getSyntaxParseInfos();
-                            SLANG_ASSERT(syntaxParseInfos.getCount());
-
-                            for (auto& obj : reader.getObjects())
-                            {
-
-                                if (obj.m_kind == SerialTypeKind::NodeBase)
-                                {
-                                    NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
-                                    SLANG_ASSERT(nodeBase);
-
-                                    if (ExtensionDecl* extensionDecl =
-                                            dynamicCast<ExtensionDecl>(nodeBase))
-                                    {
-                                        if (auto targetDeclRefType =
-                                                as<DeclRefType>(extensionDecl->targetType))
-                                        {
-                                            ShortList<AggTypeDecl*> baseDecls;
-                                            getExtensionTargetDeclList(
-                                                astBuilder,
-                                                targetDeclRefType,
-                                                extensionDecl,
-                                                baseDecls);
-                                            for (auto baseDecl : baseDecls)
-                                            {
-                                                _getCandidateExtensionList(
-                                                    baseDecl,
-                                                    moduleDecl->mapTypeToCandidateExtensions)
-                                                    .add(extensionDecl);
-                                            }
-                                        }
-                                    }
-                                    else if (
-                                        SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
-                                    {
-                                        // Set up the dictionary lazily
-                                        if (syntaxKeywordDict.getCount() == 0)
-                                        {
-                                            NamePool* namePool = options.session->getNamePool();
-                                            for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
-                                            {
-                                                const auto& entry = syntaxParseInfos[i];
-                                                syntaxKeywordDict.add(
-                                                    namePool->getName(entry.keywordName),
-                                                    i);
-                                            }
-                                            // Must have something in it at this point
-                                            SLANG_ASSERT(syntaxKeywordDict.getCount());
-                                        }
-
-                                        // Look up the index
-                                        Index* entryIndexPtr =
-                                            syntaxKeywordDict.tryGetValue(syntaxDecl->getName());
-                                        if (entryIndexPtr)
-                                        {
-                                            // Set up SyntaxDecl based on the ParseSyntaxIndo
-                                            auto& info = syntaxParseInfos[*entryIndexPtr];
-                                            syntaxDecl->parseCallback = *info.callback;
-                                            syntaxDecl->parseUserData =
-                                                const_cast<ReflectClassInfo*>(info.classInfo);
-                                        }
-                                        else
-                                        {
-                                            // If we don't find a setup entry, we use
-                                            // `parseSimpleSyntax`, and set the parseUserData to the
-                                            // ReflectClassInfo (as parseSimpleSyntax needs this)
-                                            syntaxDecl->parseCallback = &parseSimpleSyntax;
-                                            SLANG_ASSERT(syntaxDecl->syntaxClass.classInfo);
-                                            syntaxDecl->parseUserData =
-                                                const_cast<ReflectClassInfo*>(
-                                                    syntaxDecl->syntaxClass.classInfo);
-                                        }
-                                    }
-                                    else if (Val* val = dynamicCast<Val>(nodeBase))
-                                    {
-                                        val->_setUnique();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Onto next chunk
-                chunk = chunk->m_next;
-            }
-
-            if (astBuilder || irModule)
-            {
-                module.astBuilder = astBuilder;
-                module.astRootNode = astRootNode;
-                module.irModule = irModule;
-
-                out.modules.add(module);
-            }
-
-            // If no progress, step to next chunk
-            chunk = (chunk == startChunk) ? chunk->m_next : chunk;
-        }
-    }
-
-    // Add all the entry points
-    {
-        List<RiffContainer::DataChunk*> entryPointChunks;
-        containerChunk->findContained(SerialBinary::kEntryPointFourCc, entryPointChunks);
-
-        for (auto entryPointChunk : entryPointChunks)
-        {
-            auto reader = entryPointChunk->asReadHelper();
-
-            SerialContainerBinary::EntryPoint srcEntryPoint;
-            SLANG_RETURN_ON_FAIL(reader.read(srcEntryPoint));
-
-            SerialContainerData::EntryPoint dstEntryPoint;
-
-            dstEntryPoint.name = options.namePool->getName(
-                containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.name)));
-            dstEntryPoint.profile.raw = srcEntryPoint.profile;
-            dstEntryPoint.mangledName =
-                containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.mangledName));
-
-            out.entryPoints.add(dstEntryPoint);
-        }
-    }
-
+    outReader = reader;
     return SLANG_OK;
+}
+
+static void calcModuleInstructionList(IRModule* module, List<IRInst*>& instsOut)
+{
+    // We reserve 0 for null
+    instsOut.setCount(1);
+    instsOut[0] = nullptr;
+
+    IRModuleInst* moduleInst = module->getModuleInst();
+
+    traverseInstsInSerializationOrder(moduleInst, [&](IRInst* inst) { instsOut.add(inst); });
 }
 
 /* static */ SlangResult SerialContainerUtil::verifyIRSerialize(
@@ -933,36 +593,28 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     // Verify if we can stream out with raw source locs
 
     List<IRInst*> originalInsts;
-    IRSerialWriter::calcInstructionList(module, originalInsts);
-
-    IRSerialData irData;
+    calcModuleInstructionList(module, originalInsts);
 
     OwnedMemoryStream memoryStream(FileAccess::ReadWrite);
 
     {
-        RiffContainer riffContainer;
+        RIFF::Builder builder;
+        RIFF::BuildCursor cursor(builder);
 
-        // Need to put all of this in a container
-        RiffContainer::ScopeChunk containerScope(
-            &riffContainer,
-            RiffContainer::Chunk::Kind::List,
-            SerialBinary::kContainerFourCc);
-
+        // Need to put all of this in a module chunk
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, SerialBinary::kModuleFourCC);
         RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
+            sourceLocWriter =
+                new SerialSourceLocWriter(options.sourceManagerToUseWhenSerializingSourceLocs);
         }
 
         {
-            // Write IR out to serialData - copying over SourceLoc information directly
-            IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(
-                writer.write(module, sourceLocWriter, options.optionFlags, &irData));
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, PropertyKeys<IRModule>::IRModule);
+            writeSerializedModuleIR(cursor, module, sourceLocWriter);
         }
-        SLANG_RETURN_ON_FAIL(
-            IRSerialWriter::writeContainer(irData, options.compressionType, &riffContainer));
 
         // Write the debug info Riff container
         if (sourceLocWriter)
@@ -970,73 +622,67 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             SerialSourceLocData serialData;
             sourceLocWriter->write(&serialData);
 
-            SLANG_RETURN_ON_FAIL(
-                serialData.writeContainer(options.compressionType, &riffContainer));
+            SLANG_RETURN_ON_FAIL(serialData.writeTo(cursor));
         }
 
-        SLANG_RETURN_ON_FAIL(RiffUtil::write(&riffContainer, &memoryStream));
+        SLANG_RETURN_ON_FAIL(builder.writeTo(&memoryStream));
     }
 
     // Reset stream
     memoryStream.seek(SeekOrigin::Start, 0);
 
     SourceManager workSourceManager;
-    workSourceManager.initialize(options.sourceManager, nullptr);
+    workSourceManager.initialize(options.sourceManagerToUseWhenSerializingSourceLocs, nullptr);
 
     // The read ir module
     RefPtr<IRModule> irReadModule;
     {
-        RiffContainer riffContainer;
-        SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
+        auto streamContents = memoryStream.getContents();
 
-        RiffContainer::ListChunk* rootList = riffContainer.getRoot();
+        auto rootChunk =
+            RIFF::RootChunk::getFromBlob(streamContents.getBuffer(), streamContents.getCount());
+        if (!rootChunk)
+        {
+            return SLANG_FAIL;
+        }
+
+        auto moduleChunk = ModuleChunk::find(rootChunk);
+        if (!moduleChunk)
+        {
+            return SLANG_FAIL;
+        }
 
         RefPtr<SerialSourceLocReader> sourceLocReader;
 
         // If we have debug info then find and read it
-        if (options.optionFlags & SerialOptionFlag::SourceLocation)
+        if (options.sourceManagerToUseWhenSerializingSourceLocs)
         {
-            RiffContainer::ListChunk* debugList =
-                rootList->findContainedList(SerialSourceLocData::kDebugFourCc);
-            if (!debugList)
+            auto debugChunk = DebugChunk::find(moduleChunk);
+            if (!debugChunk)
             {
                 return SLANG_FAIL;
             }
             SerialSourceLocData sourceLocData;
-            SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(options.compressionType, debugList));
+            SLANG_RETURN_ON_FAIL(sourceLocData.readFrom(debugChunk));
 
             sourceLocReader = new SerialSourceLocReader;
             SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, &workSourceManager));
         }
 
         {
-            RiffContainer::ListChunk* irList =
-                rootList->findContainedList(IRSerialBinary::kIRModuleFourCc);
-            if (!irList)
+            auto irChunk = moduleChunk->findIR();
+            if (!irChunk)
             {
                 return SLANG_FAIL;
             }
 
-            {
-                IRSerialData irReadData;
-                IRSerialReader reader;
-                SLANG_RETURN_ON_FAIL(
-                    reader.readContainer(irList, options.compressionType, &irReadData));
-
-                // Check the stream read data is the same
-                if (irData != irReadData)
-                {
-                    SLANG_ASSERT(!"Streamed in data doesn't match");
-                    return SLANG_FAIL;
-                }
-
-                SLANG_RETURN_ON_FAIL(reader.read(irData, session, sourceLocReader, irReadModule));
-            }
+            SLANG_RETURN_ON_FAIL(
+                readSerializedModuleIR(irChunk, session, sourceLocReader, irReadModule));
         }
     }
 
     List<IRInst*> readInsts;
-    IRSerialWriter::calcInstructionList(irReadModule, readInsts);
+    calcModuleInstructionList(irReadModule, readInsts);
 
     if (readInsts.getCount() != originalInsts.getCount())
     {
@@ -1044,23 +690,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         return SLANG_FAIL;
     }
 
-    if (options.optionFlags & SerialOptionFlag::RawSourceLocation)
-    {
-        SLANG_ASSERT(readInsts[0] == originalInsts[0]);
-        // All the source locs should be identical
-        for (Index i = 1; i < readInsts.getCount(); ++i)
-        {
-            IRInst* origInst = originalInsts[i];
-            IRInst* readInst = readInsts[i];
-
-            if (origInst->sourceLoc.getRaw() != readInst->sourceLoc.getRaw())
-            {
-                SLANG_ASSERT(!"Source locs don't match");
-                return SLANG_FAIL;
-            }
-        }
-    }
-    else if (options.optionFlags & SerialOptionFlag::SourceLocation)
+    if (options.sourceManagerToUseWhenSerializingSourceLocs)
     {
         // They should be on the same line nos
         for (Index i = 1; i < readInsts.getCount(); ++i)
@@ -1074,7 +704,9 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             }
 
             // Work out the
-            SourceView* origSourceView = options.sourceManager->findSourceView(origInst->sourceLoc);
+            SourceView* origSourceView =
+                options.sourceManagerToUseWhenSerializingSourceLocs->findSourceView(
+                    origInst->sourceLoc);
             SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
 
             // if both are null we are done

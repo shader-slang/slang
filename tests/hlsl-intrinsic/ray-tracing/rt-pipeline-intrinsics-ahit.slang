@@ -47,15 +47,13 @@
 // DXIL: call i32 @dx.op.instanceID.i32
 // DXIL: call i32 @dx.op.geometryIndex.i32
 // DXIL: call i32 @dx.op.primitiveIndex.i32
+
 // DXIL: call float @dx.op.objectRayOrigin.f32
 // DXIL: call float @dx.op.objectRayDirection.f32
 // DXIL: call float @dx.op.objectToWorld.f32
 // DXIL: call float @dx.op.worldToObject.f32
 // DXIL: call i32 @dx.op.hitKind.i32
 
-// DXIL: call float @dx.op.objectRayOrigin.f32
-// DXIL: call float @dx.op.objectRayDirection.f32
-// DXIL: call float @dx.op.rayTCurrent.f32
 // DXIL: call void @dx.op.acceptHitAndEndSearch
 // DXIL: call void @dx.op.ignoreHit
 

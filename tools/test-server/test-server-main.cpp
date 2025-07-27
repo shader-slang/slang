@@ -19,17 +19,8 @@
 #include <string.h>
 
 #if defined(_WIN32)
-// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
-
-extern "C"
-{
-    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
-}
-
-extern "C"
-{
-    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
-}
+#include <slang-rhi/agility-sdk.h>
+SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 namespace TestServer
@@ -188,6 +179,9 @@ SlangResult innerMain(
 
 } // namespace SlangCTool
 
+// SlangITool
+#include "../slang-test/slangi-tool-impl.h"
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult TestServer::init(int argc, const char* const* argv)
@@ -307,6 +301,10 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     if (name == "slangc")
     {
         return &SlangCTool::innerMain;
+    }
+    else if (name == "slangi")
+    {
+        return &SlangITool::innerMain;
     }
 
     StringBuilder sharedLibToolBuilder;
@@ -439,6 +437,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
+    unitTestContext.enableDebugLayers = args.enableDebugLayers;
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);

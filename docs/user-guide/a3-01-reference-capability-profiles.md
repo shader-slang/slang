@@ -5,9 +5,9 @@ layout: user-guide
 Capability Profiles
 ============================
 
-### Accepted values of `-profile`:
+### Accepted Values of `-profile`:
 
-> Note: To 'make' your own 'profile's, try mixing capabilities with `-capability`.
+> Note: To create your own profiles, try mixing capabilities with `-capability`.
 
 `sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7}`
 * HLSL shader model
@@ -43,7 +43,7 @@ Capability Profiles
 * GLSL versions
 
 `spirv_1_{1,2,3,4,5,6}`
-* SPIRV versions
+* SPIR-V versions
 
 `metallib_2_{3,4}`
 * Metal versions

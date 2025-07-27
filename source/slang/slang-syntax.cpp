@@ -9,6 +9,41 @@
 
 namespace Slang
 {
+bool SyntaxClassBase::isSubClassOf(SyntaxClassBase const& other) const
+{
+    auto selfInfo = getInfo();
+    auto otherInfo = other.getInfo();
+    if (!selfInfo || !otherInfo)
+        return false;
+    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) <
+           unsigned(otherInfo->tagCount);
+}
+
+UnownedTerminatedStringSlice SyntaxClassBase::getName() const
+{
+    return _info ? UnownedTerminatedStringSlice(_info->name) : UnownedTerminatedStringSlice();
+}
+
+void* SyntaxClassBase::createInstanceImpl(ASTBuilder* astBuilder) const
+{
+    if (!_info)
+        return nullptr;
+    if (!_info->createFunc)
+        return nullptr;
+
+    return _info->createFunc(astBuilder);
+}
+
+void SyntaxClassBase::destructInstanceImpl(void* instance) const
+{
+    if (!_info)
+        return;
+    if (!_info->destructFunc)
+        return;
+
+    return _info->destructFunc(instance);
+}
+
 
 /* static */ const TypeExp TypeExp::empty;
 
@@ -227,13 +262,13 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         sb << "discard";
         break;
     default:
-        if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Expr))
+        if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Expr>())
             sb << "expression";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Stmt))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Stmt>())
             sb << "statement";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Decl))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Decl>())
             sb << "decl";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Val))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Val>())
             sb << "val";
         else
             sb << "node";
@@ -326,7 +361,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                if (decl->getClass().isSubClassOf(clsInfo))
                 {
                     return ptr;
                 }
@@ -338,7 +373,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
@@ -351,7 +386,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
@@ -378,7 +413,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                if (decl->getClass().isSubClassOf(clsInfo))
                 {
                     if (index <= 0)
                     {
@@ -394,7 +429,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
@@ -411,7 +446,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
@@ -428,7 +463,7 @@ Decl* const* getFilterCursorByIndexImpl(
 }
 
 Index getFilterCountImpl(
-    const ReflectClassInfo& clsInfo,
+    const SyntaxClassBase& clsInfo,
     MemberFilterStyle filterStyle,
     Decl* const* ptr,
     Decl* const* end)
@@ -442,7 +477,7 @@ Index getFilterCountImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo));
+                count += Index(decl->getClass().isSubClassOf(clsInfo));
             }
             break;
         }
@@ -452,7 +487,7 @@ Index getFilterCountImpl(
             {
                 Decl* decl = *ptr;
                 count += Index(
-                    decl->getClassInfo().isSubClassOf(clsInfo) &&
+                    decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>());
             }
             break;
@@ -463,7 +498,7 @@ Index getFilterCountImpl(
             {
                 Decl* decl = *ptr;
                 count += Index(
-                    decl->getClassInfo().isSubClassOf(clsInfo) &&
+                    decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>());
             }
             break;
@@ -701,7 +736,7 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
     {
-        if (magicMod->magicNodeType == ASTNodeType(-1))
+        if (!magicMod->magicNodeType)
         {
             SLANG_UNEXPECTED("unhandled type");
         }
@@ -877,11 +912,19 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
 {
     List<Type*> paramTypes;
     auto resultType = getResultType(astBuilder, declRef);
+
+    if (!resultType)
+        resultType = astBuilder->getErrorType();
+
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
         auto paramDecl = paramDeclRef.getDecl();
         auto paramType = getParamType(astBuilder, paramDeclRef);
+        if (!paramType)
+        {
+            paramType = astBuilder->getErrorType();
+        }
         if (paramDecl->findModifier<RefModifier>())
         {
             paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
@@ -1058,44 +1101,44 @@ ModuleDecl* getModuleDecl(Scope* scope)
     return nullptr;
 }
 
-Decl* getParentDecl(Decl* decl)
+ContainerDecl* getParentDecl(Decl* decl)
 {
-    decl = decl->parentDecl;
-    while (as<GenericDecl>(decl))
-        decl = decl->parentDecl;
-    return decl;
+    auto parentDecl = decl->parentDecl;
+    while (auto genericDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericDecl->parentDecl;
+    return parentDecl;
 }
 
-Decl* getParentAggTypeDecl(Decl* decl)
+AggTypeDecl* getParentAggTypeDecl(Decl* decl)
 {
     decl = decl->parentDecl;
     while (decl)
     {
-        if (as<AggTypeDecl>(decl))
-            return decl;
-        decl = decl->parentDecl;
-    }
-    return nullptr;
-}
-
-Decl* getParentAggTypeDeclBase(Decl* decl)
-{
-    decl = decl->parentDecl;
-    while (decl)
-    {
-        if (as<AggTypeDeclBase>(decl))
-            return decl;
+        if (auto found = as<AggTypeDecl>(decl))
+            return found;
         decl = decl->parentDecl;
     }
     return nullptr;
 }
 
-Decl* getParentFunc(Decl* decl)
+AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (auto found = as<AggTypeDeclBase>(decl))
+            return found;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
+FunctionDeclBase* getParentFunc(Decl* decl)
 {
     while (decl)
     {
-        if (as<FunctionDeclBase>(decl))
-            return decl;
+        if (auto found = as<FunctionDeclBase>(decl))
+            return found;
         decl = decl->parentDecl;
     }
     return nullptr;
@@ -1150,8 +1193,15 @@ bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFor
     if (name.endsWith(kSNorm))
     {
         StringBuilder buf;
-        //  format names end with snormal after a '_', so replace with that
-        buf << name.head(name.getLength() - kSNorm.getLength()) << "_" << kSNorm;
+        auto prefix = name.head(name.getLength() - kSNorm.getLength());
+        buf << prefix;
+        // format names end with snormal after a '_', so add an underscore
+        // if the prefix doesn't already end with one
+        if (prefix.getLength() == 0 || prefix[prefix.getLength() - 1] != '_')
+        {
+            buf << "_";
+        }
+        buf << kSNorm;
         return findImageFormatByName(buf.getUnownedSlice(), outFormat);
     }
 

@@ -9,7 +9,7 @@
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> resultBuffer;
 
-// TEST_INPUT: set tex = RWTexture2D(format=R32_UINT, size=4, content=zero, mipMaps = 1)
+// TEST_INPUT: set tex = RWTexture2D(format=R32Uint, size=4, content=zero, mipMaps = 1)
 [vk::image_format("r32ui")]
 RWTexture2D<uint> tex;
 

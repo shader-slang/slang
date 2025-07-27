@@ -151,6 +151,8 @@ static Result _calcSizeAndAlignment(
             auto structType = cast<IRStructType>(type);
             IRSizeAndAlignment structLayout;
             IRIntegerValue offset = 0;
+            IRIntegerValue lastFieldAlignment = 0;
+            IRType* lastFieldType = NULL;
             bool seenFinalUnsizedArrayField = false;
             for (auto field : structType->getFields())
             {
@@ -164,6 +166,20 @@ static Result _calcSizeAndAlignment(
                     getSizeAndAlignment(optionSet, rules, field->getFieldType(), &fieldTypeLayout));
                 seenFinalUnsizedArrayField =
                     fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
+
+                if (auto offsetDecor =
+                        field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+                {
+                    offset = offsetDecor->getOffset()->getValue();
+                }
+                else
+                {
+                    offset = rules->adjustOffset(
+                        offset,
+                        fieldTypeLayout.size,
+                        lastFieldType,
+                        lastFieldAlignment);
+                }
 
                 structLayout.size = align(offset, fieldTypeLayout.alignment);
                 structLayout.alignment =
@@ -186,17 +202,11 @@ static Result _calcSizeAndAlignment(
                         builder.getIntValue(intType, (IRIntegerValue)rules->ruleName),
                         builder.getIntValue(intType, fieldOffset));
                 }
-
-                structLayout.size += fieldTypeLayout.size;
+                if (!seenFinalUnsizedArrayField)
+                    structLayout.size += fieldTypeLayout.size;
                 offset = structLayout.size;
-                if (as<IRMatrixType>(field->getFieldType()) ||
-                    as<IRArrayTypeBase>(field->getFieldType()) ||
-                    as<IRStructType>(field->getFieldType()))
-                {
-                    offset = rules->adjustOffsetForNextAggregateMember(
-                        offset,
-                        fieldTypeLayout.alignment);
-                }
+                lastFieldType = field->getFieldType();
+                lastFieldAlignment = fieldTypeLayout.alignment;
             }
             *outSizeAndAlignment = rules->alignCompositeElement(structLayout);
             return SLANG_OK;
@@ -265,15 +275,26 @@ static Result _calcSizeAndAlignment(
         {
             auto tupleType = cast<IRTupleType>(type);
             IRSizeAndAlignment resultLayout;
+            IRIntegerValue lastFieldAlignment = 0;
+            IRType* lastFieldType = NULL;
             for (UInt i = 0; i < tupleType->getOperandCount(); i++)
             {
                 auto elementType = tupleType->getOperand(i);
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
                     getSizeAndAlignment(optionSet, rules, (IRType*)elementType, &fieldTypeLayout));
+                resultLayout.size = rules->adjustOffset(
+                    resultLayout.size,
+                    fieldTypeLayout.size,
+                    lastFieldType,
+                    lastFieldAlignment);
                 resultLayout.size = align(resultLayout.size, fieldTypeLayout.alignment);
                 resultLayout.alignment =
                     std::max(resultLayout.alignment, fieldTypeLayout.alignment);
+
+                resultLayout.size += fieldTypeLayout.size;
+                lastFieldType = as<IRType>(elementType);
+                lastFieldAlignment = fieldTypeLayout.alignment;
             }
             *outSizeAndAlignment = rules->alignCompositeElement(resultLayout);
             return SLANG_OK;
@@ -340,8 +361,8 @@ static Result _calcSizeAndAlignment(
     case kIROp_NativePtrType:
     case kIROp_ComPtrType:
     case kIROp_NativeStringType:
-    case kIROp_HLSLConstBufferPointerType:
     case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_FuncType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;
@@ -371,6 +392,13 @@ static Result _calcSizeAndAlignment(
                 attributedType->getBaseType(),
                 outSizeAndAlignment);
         }
+    case kIROp_EnumType:
+        {
+            auto enumType = cast<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return _calcSizeAndAlignment(optionSet, rules, tagType, outSizeAndAlignment);
+        }
+        break;
     default:
         break;
     }
@@ -485,17 +513,23 @@ Result getOffset(
 struct NaturalLayoutRules : IRTypeLayoutRules
 {
     NaturalLayoutRules() { ruleName = IRTypeLayoutRuleName::Natural; }
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment)
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
     {
-        SLANG_UNUSED(lastElementAlignment);
-        return currentSize;
+        SLANG_UNUSED(elementSize);
+        SLANG_UNUSED(lastFieldType);
+        SLANG_UNUSED(lastFieldAlignment);
+        return offset;
     }
+
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
     {
         return elementSize;
     }
+
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count)
@@ -515,22 +549,30 @@ struct ConstantBufferLayoutRules : IRTypeLayoutRules
         return IRSizeAndAlignment(currentSize.size, 16);
     }
 
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment)
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
     {
-        SLANG_UNUSED(lastElementAlignment);
-        return currentSize;
+        SLANG_UNUSED(lastFieldType);
+        SLANG_UNUSED(lastFieldAlignment);
+
+        // If the element would cross a 16-byte boundary, align to the next boundary
+        auto currentChunk = offset / 16;
+        auto endChunk = (offset + elementSize - 1) / 16;
+        if (currentChunk != endChunk)
+        {
+            return align(offset, 16);
+        }
+        return offset;
     }
 
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count)
     {
-        IRIntegerValue countForAlignment = count;
-        return IRSizeAndAlignment(
-            (int)(element.size * count),
-            (int)(element.size * countForAlignment));
+        return IRSizeAndAlignment(element.size * count, element.alignment);
     }
 };
 
@@ -538,15 +580,24 @@ struct Std430LayoutRules : IRTypeLayoutRules
 {
     Std430LayoutRules() { ruleName = IRTypeLayoutRuleName::Std430; }
 
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
+    {
+        SLANG_UNUSED(elementSize);
+        if (as<IRMatrixType>(lastFieldType) || as<IRArrayTypeBase>(lastFieldType) ||
+            as<IRStructType>(lastFieldType))
+        {
+            return align(offset, (int)lastFieldAlignment);
+        }
+        return offset;
+    }
+
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
     {
         return elementSize;
-    }
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment)
-    {
-        return align(currentSize, (int)lastElementAlignment);
     }
 
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
@@ -566,18 +617,28 @@ struct Std140LayoutRules : IRTypeLayoutRules
 {
     Std140LayoutRules() { ruleName = IRTypeLayoutRuleName::Std140; }
 
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment)
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
     {
-        return align(currentSize, (int)lastElementAlignment);
+        SLANG_UNUSED(elementSize);
+        if (as<IRMatrixType>(lastFieldType) || as<IRArrayTypeBase>(lastFieldType) ||
+            as<IRStructType>(lastFieldType))
+        {
+            return align(offset, (int)lastFieldAlignment);
+        }
+        return offset;
     }
+
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
     {
         elementSize.alignment = (int)align(elementSize.alignment, 16);
         elementSize.size = align(elementSize.size, elementSize.alignment);
         return elementSize;
     }
+
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count)

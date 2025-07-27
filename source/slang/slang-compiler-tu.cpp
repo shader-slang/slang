@@ -95,6 +95,18 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
 {
     CodeGenTarget targetEnum = CodeGenTarget(target);
 
+    // Don't precompile twice for the same target
+    for (auto globalInst : getIRModule()->getModuleInst()->getChildren())
+    {
+        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+        {
+            if (inst->getTarget() == targetEnum)
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
     auto module = getIRModule();
     auto linkage = getLinkage();
     auto builder = IRBuilder(module);

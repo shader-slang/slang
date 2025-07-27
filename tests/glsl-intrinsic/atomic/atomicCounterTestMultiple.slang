@@ -20,15 +20,15 @@ void computeMain()
 {
 
     outputBuffer.data[0] = true
-// CHECK_GLSL: one_0._data_0[3]
+// CHECK_GLSL: one_0._data_{{.*}}[3]
         && atomicCounter(one) == 0
-// CHECK_GLSL: one_0._data_0[4]
+// CHECK_GLSL: one_0._data_{{.*}}[4]
         && atomicCounter(two) == 0
-// CHECK_GLSL: one_0._data_0[1]
+// CHECK_GLSL: one_0._data_{{.*}}[1]
         && atomicCounter(three) == 0
-// CHECK_GLSL: one_0._data_0[2]
+// CHECK_GLSL: one_0._data_{{.*}}[2]
         && atomicCounter(four) == 0
-// CHECK_GLSL: five_0._data_1[0]
+// CHECK_GLSL: five_0._data_{{.*}}[0]
         && atomicCounter(five) == 0
         
         ;

@@ -1,6 +1,6 @@
 //TEST(smoke):COMPARE_HLSL_RENDER:
 //DISABLE_TEST(smoke):COMPARE_HLSL_RENDER:-mtl
-//TEST_INPUT: Texture2D(size=16, content=chessboard, format=R32_FLOAT):name g_texture
+//TEST_INPUT: Texture2D(size=16, content=chessboard, format=R32Float):name g_texture
 //TEST_INPUT: Sampler :name g_sampler
 
 Texture2D<float> g_texture;
@@ -31,6 +31,7 @@ struct VertexStageOutput
 	float4			position		: SV_Position;
 };
 
+[shader("vertex")]
 VertexStageOutput vertexMain(VertexStageInput input) 
 {
     VertexStageOutput output;
@@ -41,7 +42,7 @@ VertexStageOutput vertexMain(VertexStageInput input)
     return output;
 }
 
-// Fragment Shader
+[shader("fragment")]
 float4 fragmentMain(VertexStageOutput input) : SV_Target
 {
     return g_texture.GatherRed(g_sampler, input.color.xy);

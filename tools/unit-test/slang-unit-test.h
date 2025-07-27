@@ -43,6 +43,7 @@ struct UnitTestContext
     const char* workDirectory;
     const char* executableDirectory;
     Slang::RenderApiFlags enabledApis;
+    bool enableDebugLayers;
 };
 
 typedef void (*UnitTestFunc)(UnitTestContext*);
