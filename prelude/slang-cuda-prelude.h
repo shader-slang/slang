@@ -4327,3 +4327,5 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
         : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return make_int4(result_x, result_y, result_z, result_w);
 }
+
+#endif

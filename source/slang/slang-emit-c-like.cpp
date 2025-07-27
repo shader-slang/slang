@@ -1293,20 +1293,7 @@ String CLikeSourceEmitter::getName(IRInst* inst)
     String name;
     if (!m_mapInstToName.tryGetValue(inst, name))
     {
-        // unmangle names, when emitting header
-        if (shouldEmitOnlyHeader())
-        {
-            if (auto nameHintDecor = inst->findDecoration<IRNameHintDecoration>())
-            {
-                StringBuilder sb;
-                appendScrubbedName(nameHintDecor->getName(), sb);
-                name = sb.produceString();
-            }
-        }
-        else
-        {
-            name = generateName(inst);
-        }
+        name = generateName(inst);
         m_mapInstToName.add(inst, name);
     }
     return name;
