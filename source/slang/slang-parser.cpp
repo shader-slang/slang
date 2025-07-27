@@ -1350,9 +1350,9 @@ static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
     // Note: the "static_assert" token has already been consumed by the dispatcher
     
     parser->ReadMatchingToken(TokenType::LParent);
-    decl->condition = parser->ParseExpression();
+    decl->condition = parser->ParseArgExpr();  // Use ParseArgExpr to avoid comma operator issues
     parser->ReadMatchingToken(TokenType::Comma);  
-    decl->message = parser->ParseExpression();
+    decl->message = parser->ParseArgExpr();    // Use ParseArgExpr to avoid comma operator issues
     parser->ReadMatchingToken(TokenType::RParent);
     parser->ReadMatchingToken(TokenType::Semicolon);
     

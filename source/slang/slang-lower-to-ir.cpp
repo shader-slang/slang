@@ -8289,18 +8289,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getSimpleVal(context, message)
         };
         
-        // Emit the static assert IR instruction
-        auto staticAssertInst = getBuilder()->_createInst(
-            sizeof(IRStaticAssert),
+        // Emit the static assert IR instruction using emitIntrinsicInst
+        getBuilder()->emitIntrinsicInst(
             getBuilder()->getVoidType(),
             kIROp_StaticAssert,
             2,
-            operands,
-            0,
-            nullptr,
-            nullptr);
-        
-        getBuilder()->addInst(staticAssertInst);
+            operands);
         
         return LoweredValInfo();
     }
