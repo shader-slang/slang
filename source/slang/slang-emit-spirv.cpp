@@ -5869,23 +5869,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         SpvBuiltIn builtinName;
         SpvStorageClass storageClass = SpvStorageClassInput;
-        bool flat = false;
+        IRInterpolationMode interpolationMode = IRInterpolationMode::Linear;
         BuiltinSpvVarKey() = default;
-        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat)
-            : builtinName(builtin), storageClass(storageClass), flat(isFlat)
+        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, IRInterpolationMode mode)
+            : builtinName(builtin), storageClass(storageClass), interpolationMode(mode)
         {
         }
         bool operator==(const BuiltinSpvVarKey& other) const
         {
             return builtinName == other.builtinName && storageClass == other.storageClass &&
-                   flat == other.flat;
+                   interpolationMode == other.interpolationMode;
         }
         HashCode getHashCode() const
         {
             return combineHash(
                 Slang::getHashCode(builtinName),
                 Slang::getHashCode(storageClass),
-                Slang::getHashCode(flat));
+                Slang::getHashCode(interpolationMode));
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
@@ -5907,25 +5907,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
-    bool needFlatDecorationForBuiltinVar(IRInst* irInst)
+    IRInterpolationMode getInterpolationModeForBuiltinVar(IRInst* irInst)
     {
         if (!irInst)
-            return false;
-        if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
-            return false;
-        auto ptrType = as<IRPtrType>(irInst->getDataType());
-        if (!ptrType)
-            return false;
-        auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
+            return IRInterpolationMode::Linear;
+            
+        // Check for explicit interpolation mode decoration
+        if (auto interpolationModeDecor = irInst->findDecoration<IRInterpolationModeDecoration>())
         {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            return interpolationModeDecor->getMode();
+        }
+        
+        // Check if we need to apply default flat decoration for integer types
+        if (irInst->getOp() == kIROp_GlobalVar || irInst->getOp() == kIROp_GlobalParam)
+        {
+            auto ptrType = as<IRPtrType>(irInst->getDataType());
+            if (ptrType)
             {
-                if (isInstUsedInStage(irInst, Stage::Fragment))
-                    return true;
+                auto addrSpace = ptrType->getAddressSpace();
+                if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
+                {
+                    if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+                    {
+                        if (isInstUsedInStage(irInst, Stage::Fragment))
+                            return IRInterpolationMode::NoInterpolation; // flat
+                    }
+                }
             }
         }
-        return false;
+        
+        return IRInterpolationMode::Linear; // default
     }
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
@@ -5934,8 +5945,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto ptrType = as<IRPtrTypeBase>(type);
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
-        bool isFlat = needFlatDecorationForBuiltinVar(irInst);
-        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat);
+        IRInterpolationMode interpolationMode = getInterpolationModeForBuiltinVar(irInst);
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass, interpolationMode);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
@@ -5965,12 +5976,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         m_builtinGlobalVars[key] = varInst;
 
-        if (isFlat)
-        {
-            _maybeEmitInterpolationModifierDecoration(
-                IRInterpolationMode::NoInterpolation,
-                getID(varInst));
-        }
+        // Apply interpolation decoration based on the mode
+        _maybeEmitInterpolationModifierDecoration(interpolationMode, getID(varInst));
 
         return varInst;
     }
@@ -6218,11 +6225,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
-
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    
+                    // Check if noperspective modifier has been applied
+                    IRInterpolationMode interpolationMode = getInterpolationModeForBuiltinVar(inst);
+                    if (interpolationMode == IRInterpolationMode::NoPerspective)
+                    {
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNoPerspKHR, inst);
+                    }
+                    else
+                    {
+                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
+                    }
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
