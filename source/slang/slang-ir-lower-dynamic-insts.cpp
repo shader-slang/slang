@@ -1,6 +1,7 @@
 #include "slang-ir-lower-dynamic-insts.h"
 
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -400,9 +401,13 @@ struct DynamicInstLoweringContext
 
     PropagationInfo tryGetInfo(IRInst* context, IRInst* inst)
     {
+        if (!inst->getParent())
+            return none();
+
         // If this is a global instruction (parent is module), return concrete info
         if (as<IRModuleInst>(inst->getParent()))
-            if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))
+            if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst) ||
+                as<IRGeneric>(inst))
                 return makeSingletonSet(inst);
             else
                 return none();
@@ -939,9 +944,8 @@ struct DynamicInstLoweringContext
                     switch (argInfo.judgment)
                     {
                     case PropagationJudgment::None:
+                        return PropagationJudgment::None; // Can't determine the result just yet.
                     case PropagationJudgment::Unbounded:
-                        SLANG_UNEXPECTED(
-                            "Unexpected PropagationJudgment for specialization argument");
                     case PropagationJudgment::Existential:
                         SLANG_UNEXPECTED(
                             "Unexpected Existential operand in specialization argument. Should be "
@@ -1121,7 +1125,7 @@ struct DynamicInstLoweringContext
             discoverContext(callee, workQueue);
 
             this->funcCallSites.addIfNotExists(callee, HashSet<Element>());
-            if (this->funcCallSites[callee].add(inst))
+            if (this->funcCallSites[callee].add(Element(context, inst)))
             {
                 // If this is a new call site, add a propagation task to the queue (in case there's
                 // already information about this function)
@@ -1357,7 +1361,7 @@ struct DynamicInstLoweringContext
             return none(); // Default case, no propagation info
     }
 
-    bool performDynamicInstLowering()
+    bool lowerInstsInFunc(IRFunc* func)
     {
         // Collect all instructions that need lowering
         List<Element> typeInstsToLower;
@@ -1366,72 +1370,72 @@ struct DynamicInstLoweringContext
         List<IRFunc*> funcTypesToProcess;
 
         bool hasChanges = false;
-        for (auto globalInst : module->getGlobalInsts())
+        auto context = func;
+        // Process each function's instructions
+        for (auto block : func->getBlocks())
         {
-            if (auto func = as<IRFunc>(globalInst))
+            for (auto child : block->getChildren())
             {
-                auto context = func;
-                // Process each function's instructions
-                for (auto block : func->getBlocks())
+                if (as<IRTerminatorInst>(child))
+                    continue; // Skip parameters and terminators
+
+                switch (child->getOp())
                 {
-                    for (auto child : block->getChildren())
+                case kIROp_LookupWitnessMethod:
                     {
-                        if (as<IRTerminatorInst>(child))
-                            continue; // Skip parameters and terminators
-
-                        switch (child->getOp())
-                        {
-                        case kIROp_LookupWitnessMethod:
-                            {
-                                if (child->getDataType()->getOp() == kIROp_TypeKind)
-                                    typeInstsToLower.add(Element(context, child));
-                                else
-                                    valueInstsToLower.add(Element(context, child));
-                                break;
-                            }
-                        case kIROp_ExtractExistentialType:
+                        if (child->getDataType()->getOp() == kIROp_TypeKind)
                             typeInstsToLower.add(Element(context, child));
-                            break;
-                        case kIROp_ExtractExistentialWitnessTable:
-                        case kIROp_ExtractExistentialValue:
-                        case kIROp_MakeExistential:
-                        case kIROp_CreateExistentialObject:
+                        else
                             valueInstsToLower.add(Element(context, child));
-                            break;
-                        case kIROp_Call:
-                            {
-                                if (auto info = tryGetInfo(context, child))
-                                    if (info.judgment == PropagationJudgment::Existential)
-                                        instWithReplacementTypes.add(Element(context, child));
-
-                                if (auto calleeInfo =
-                                        tryGetInfo(context, as<IRCall>(child)->getCallee()))
-                                    if (calleeInfo.judgment == PropagationJudgment::Set)
-                                        valueInstsToLower.add(Element(context, child));
-                            }
-                            break;
-                        default:
-                            if (auto info = tryGetInfo(context, child))
-                                if (info.judgment == PropagationJudgment::Existential)
-                                    // If this instruction has a set of types, tables, or funcs,
-                                    // we need to lower it to a unified type.
-                                    instWithReplacementTypes.add(Element(context, child));
-                        }
+                        break;
                     }
-                }
+                case kIROp_ExtractExistentialType:
+                    typeInstsToLower.add(Element(context, child));
+                    break;
+                case kIROp_ExtractExistentialWitnessTable:
+                case kIROp_ExtractExistentialValue:
+                case kIROp_MakeExistential:
+                case kIROp_CreateExistentialObject:
+                    valueInstsToLower.add(Element(context, child));
+                    break;
+                case kIROp_Call:
+                    {
+                        auto callee = as<IRCall>(child)->getCallee();
+                        if (auto info = tryGetInfo(context, child))
+                            if (info.judgment == PropagationJudgment::Existential)
+                                instWithReplacementTypes.add(Element(context, child));
 
-                funcTypesToProcess.add(func);
+                        if (auto calleeInfo = tryGetInfo(context, callee))
+                            if (calleeInfo.judgment == PropagationJudgment::Set)
+                                valueInstsToLower.add(Element(context, child));
+
+                        if (as<IRSpecialize>(callee))
+                            valueInstsToLower.add(Element(context, child));
+                    }
+                    break;
+                default:
+                    if (auto info = tryGetInfo(context, child))
+                        if (info.judgment == PropagationJudgment::Existential)
+                            // If this instruction has a set of types, tables, or funcs,
+                            // we need to lower it to a unified type.
+                            instWithReplacementTypes.add(Element(context, child));
+                }
             }
         }
 
         for (auto instWithCtx : typeInstsToLower)
+        {
+            if (instWithCtx.inst->getParent() == nullptr)
+                continue;
             hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
-
-        for (auto func : funcTypesToProcess)
-            hasChanges |= replaceFuncType(func, this->funcReturnInfo[func]);
+        }
 
         for (auto instWithCtx : valueInstsToLower)
+        {
+            if (instWithCtx.inst->getParent() == nullptr)
+                continue;
             hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
+        }
 
         for (auto instWithCtx : instWithReplacementTypes)
         {
@@ -1439,6 +1443,54 @@ struct DynamicInstLoweringContext
                 continue;
             hasChanges |= replaceType(instWithCtx.context, instWithCtx.inst);
         }
+
+        return hasChanges;
+    }
+
+    bool performDynamicInstLowering()
+    {
+        List<IRFunc*> funcsForTypeReplacement;
+        List<IRFunc*> funcsToProcess;
+
+        for (auto globalInst : module->getGlobalInsts())
+            if (auto func = as<IRFunc>(globalInst))
+            {
+                funcsForTypeReplacement.add(func);
+                funcsToProcess.add(func);
+            }
+
+        bool hasChanges = false;
+        do
+        {
+            while (funcsForTypeReplacement.getCount() > 0)
+            {
+                auto func = funcsForTypeReplacement.getLast();
+                funcsForTypeReplacement.removeLast();
+
+                // Replace the function type with a concrete type if it has existential return types
+                hasChanges |= replaceFuncType(func, this->funcReturnInfo[func]);
+            }
+
+            while (funcsToProcess.getCount() > 0)
+            {
+                auto func = funcsToProcess.getLast();
+                funcsToProcess.removeLast();
+
+                // Lower the instructions in the function
+                hasChanges |= lowerInstsInFunc(func);
+            }
+
+            // The above loops might have added new contexts to lower.
+            for (auto context : this->contextsToLower)
+            {
+                hasChanges |= lowerContext(context);
+                auto newFunc = cast<IRFunc>(this->loweredContexts[context]);
+                funcsForTypeReplacement.add(newFunc);
+                funcsToProcess.add(newFunc);
+            }
+            this->contextsToLower.clear();
+
+        } while (funcsForTypeReplacement.getCount() > 0 || funcsToProcess.getCount() > 0);
 
         return hasChanges;
     }
@@ -1717,6 +1769,239 @@ struct DynamicInstLoweringContext
         return builder.getFuncType(argTypes, resultType);
     }
 
+    bool isDynamicGeneric(IRInst* callee)
+    {
+        // If the callee is a specialization, and at least one of its arguments
+        // is a type-flow-collection, then it is a dynamic generic.
+        //
+        if (auto specialize = as<IRSpecialize>(callee))
+        {
+            for (UInt i = 0; i < specialize->getArgCount(); i++)
+            {
+                auto arg = specialize->getArg(i);
+                if (as<IRTypeFlowCollection>(arg))
+                    return true; // Found a type-flow-collection argument
+            }
+            return false; // No type-flow-collection arguments found
+        }
+
+        return false;
+    }
+
+    bool lowerContext(IRInst* context)
+    {
+        auto specializeInst = cast<IRSpecialize>(context);
+        auto generic = cast<IRGeneric>(specializeInst->getBase());
+        auto genericReturnVal = findGenericReturnVal(generic);
+
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+
+        // Let's start by creating the function itself.
+        auto loweredFunc = builder.createFunc();
+        builder.setInsertInto(loweredFunc);
+        builder.setInsertInto(builder.emitBlock());
+        // loweredFunc->setFullType(context->getFullType());
+
+        IRCloneEnv cloneEnv;
+        Index argIndex = 0;
+        UCount extraIndices = 0;
+        // Map the generic's parameters to the specialized arguments.
+        for (auto param : generic->getFirstBlock()->getParams())
+        {
+            auto specArg = specializeInst->getArg(argIndex++);
+            if (as<IRTypeFlowCollection>(specArg))
+            {
+                // We're dealing with a set of types.
+                if (as<IRTypeType>(param->getDataType()))
+                {
+                    HashSet<IRInst*> collectionSet;
+                    for (auto index = 0; index < specArg->getOperandCount(); index++)
+                    {
+                        auto operand = specArg->getOperand(index);
+                        collectionSet.add(operand);
+                    }
+
+                    auto unionType = createAnyValueTypeFromInsts(collectionSet);
+                    cloneEnv.mapOldValToNew[param] = unionType;
+                }
+                else if (as<IRWitnessTableType>(param->getDataType()))
+                {
+                    // Add an integer param to the func.
+                    cloneEnv.mapOldValToNew[param] = builder.emitParam(builder.getUIntType());
+                    extraIndices++;
+                }
+            }
+            else
+            {
+                // For everything else, just set the parameter type to the argument;
+                SLANG_ASSERT(specArg->getParent()->getOp() == kIROp_ModuleInst);
+                cloneEnv.mapOldValToNew[param] = specArg;
+            }
+        }
+
+        // Clone in the rest of the generic's body including the blocks of the returned func.
+        for (auto inst = generic->getFirstBlock()->getFirstOrdinaryInst(); inst;
+             inst = inst->getNextInst())
+        {
+            if (inst == genericReturnVal)
+            {
+                auto returnedFunc = cast<IRFunc>(inst);
+                auto funcFirstBlock = returnedFunc->getFirstBlock();
+
+                // cloneEnv.mapOldValToNew[funcFirstBlock] = loweredFunc->getFirstBlock();
+                builder.setInsertInto(loweredFunc);
+                for (auto block : returnedFunc->getBlocks())
+                {
+                    // Merge the first block of the generic with the first block of the
+                    // returned function to merge the parameter lists.
+                    //
+                    // if (block != funcFirstBlock)
+                    //{
+                    cloneEnv.mapOldValToNew[block] =
+                        cloneInstAndOperands(&cloneEnv, &builder, block);
+                    //}
+                }
+
+                builder.setInsertInto(loweredFunc->getFirstBlock());
+                builder.emitBranch(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
+
+                for (auto param : funcFirstBlock->getParams())
+                {
+                    // Clone the parameters of the first block.
+                    builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
+                    cloneInst(&cloneEnv, &builder, param);
+                }
+
+                builder.setInsertInto(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
+                for (auto inst = funcFirstBlock->getFirstOrdinaryInst(); inst;
+                     inst = inst->getNextInst())
+                {
+                    // Clone the instructions in the first block.
+                    cloneInst(&cloneEnv, &builder, inst);
+                }
+
+                for (auto block : returnedFunc->getBlocks())
+                {
+                    if (block == funcFirstBlock)
+                        continue; // Already cloned the first block
+                    cloneInstDecorationsAndChildren(
+                        &cloneEnv,
+                        builder.getModule(),
+                        block,
+                        cloneEnv.mapOldValToNew[block]);
+                }
+
+                builder.setInsertInto(builder.getModule());
+                auto loweredFuncType = as<IRFuncType>(
+                    cloneInst(&cloneEnv, &builder, as<IRFuncType>(returnedFunc->getFullType())));
+
+                // Add extra indices to the func-type parameters
+                List<IRType*> funcTypeParams;
+                for (Index i = 0; i < extraIndices; i++)
+                    funcTypeParams.add(builder.getUIntType());
+
+                for (auto paramType : loweredFuncType->getParamTypes())
+                    funcTypeParams.add(paramType);
+
+                // Set the new function type with the extra indices
+                loweredFunc->setFullType(
+                    builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
+            }
+            else if (!as<IRReturn>(inst))
+            {
+                // Keep cloning insts in the generic
+                cloneInst(&cloneEnv, &builder, inst);
+            }
+        }
+
+        // Transfer propagation info.
+        for (auto& [oldVal, newVal] : cloneEnv.mapOldValToNew)
+        {
+            if (propagationMap.containsKey(Element(context, oldVal)))
+            {
+                // If we have propagation info for the old value, transfer it to the new value
+                if (auto info = propagationMap[Element(context, oldVal)])
+                {
+                    if (newVal->getParent()->getOp() != kIROp_ModuleInst)
+                        propagationMap[Element(loweredFunc, newVal)] = info;
+                }
+            }
+        }
+
+        // Transfer func-return value info.
+        if (this->funcReturnInfo.containsKey(context))
+        {
+            this->funcReturnInfo[loweredFunc] = this->funcReturnInfo[context];
+        }
+
+        context->replaceUsesWith(loweredFunc);
+        // context->removeAndDeallocate();
+        this->loweredContexts[context] = loweredFunc;
+        return true;
+    }
+
+    IRInst* getCalleeForContext(IRInst* context)
+    {
+        if (this->contextsToLower.contains(context))
+            return context; // Not lowered yet.
+
+        if (this->loweredContexts.containsKey(context))
+            return this->loweredContexts[context];
+        else
+            this->contextsToLower.add(context);
+
+        return context;
+    }
+
+    bool lowerCallToDynamicGeneric(IRInst* context, IRCall* inst)
+    {
+        auto specializedCallee = as<IRSpecialize>(inst->getCallee());
+        auto targetContext = tryGetInfo(context, specializedCallee).getSingletonValue();
+
+        List<IRInst*> callArgs;
+        for (auto ii = 0; ii < specializedCallee->getArgCount(); ii++)
+        {
+            auto specArg = specializedCallee->getArg(ii);
+            auto argInfo = tryGetInfo(context, specArg);
+            if (argInfo.judgment == PropagationJudgment::Set)
+            {
+                auto collection = as<IRTypeFlowCollection>(argInfo.collection);
+                if (as<IRWitnessTable>(collection->getOperand(0)))
+                {
+                    // Needs an index (spec-arg will carry an index, we'll
+                    // just need to append it to the call)
+                    //
+                    callArgs.add(specArg);
+                }
+                else if (as<IRType>(collection->getOperand(0)))
+                {
+                    // Needs no dynamic information. Skip.
+                }
+                else
+                {
+                    // If it's a witness table, we need to handle it differently
+                    // For now, we will not lower this case.
+                    SLANG_UNEXPECTED("Unhandled type-flow-collection in dynamic generic call");
+                }
+            }
+        }
+
+        for (auto ii = 0; ii < inst->getArgCount(); ii++)
+            callArgs.add(inst->getArg(ii));
+
+        IRBuilder builder(inst->getModule());
+        // builder.replaceOperand(inst->getCalleeUse(), specializedCallee);
+        builder.setInsertBefore(inst);
+        auto newCallInst = builder.emitCallInst(
+            as<IRFuncType>(targetContext->getDataType())->getResultType(),
+            getCalleeForContext(targetContext),
+            callArgs);
+        inst->replaceUsesWith(newCallInst);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
     bool lowerCall(IRInst* context, IRCall* inst)
     {
         auto callee = inst->getCallee();
@@ -1727,6 +2012,9 @@ struct DynamicInstLoweringContext
 
         if (calleeInfo.isSingleton())
         {
+            if (isDynamicGeneric(calleeInfo.getSingletonValue()))
+                return lowerCallToDynamicGeneric(context, inst);
+
             if (calleeInfo.getSingletonValue() == callee)
                 return false;
 
@@ -2201,6 +2489,12 @@ struct DynamicInstLoweringContext
 
     // Set of open contexts
     HashSet<IRInst*> availableContexts;
+
+    // Contexts requiring lowering
+    HashSet<IRInst*> contextsToLower;
+
+    // Lowered contexts.
+    Dictionary<IRInst*, IRInst*> loweredContexts;
 };
 
 // Main entry point
