@@ -9556,7 +9556,7 @@ uint __metal_clz(uint value)
     }
 }
 
-int __metal_ctz(int value)
+internal int __metal_ctz(int value)
 {
     __target_switch
     {
