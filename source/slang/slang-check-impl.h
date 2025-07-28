@@ -2652,7 +2652,10 @@ public:
 
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for
     /// overloading.
-    int CompareLookupResultItems(LookupResultItem const& left, LookupResultItem const& right, bool deferExtensionPrefs = false);
+    int CompareLookupResultItems(
+        LookupResultItem const& left,
+        LookupResultItem const& right,
+        bool deferExtensionPrefs = false);
 
     /// Compare items `left` and `right` being considered as overload candidates, and determine if
     /// one should be favored for structural reasons.
