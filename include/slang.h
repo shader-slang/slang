@@ -2246,6 +2246,7 @@ struct TypeReflection
         Feedback = SLANG_TYPE_KIND_FEEDBACK,
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
