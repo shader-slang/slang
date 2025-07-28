@@ -1345,17 +1345,14 @@ static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<StaticAssertDecl>();
     parser->FillPosition(decl);
-    
-    // Parse: static_assert(condition, message);
-    // Note: the "static_assert" or "test_static_assert" token has already been consumed by the dispatcher
-    
+
     parser->ReadMatchingToken(TokenType::LParent);
-    decl->condition = parser->ParseArgExpr();  // Use ParseArgExpr to avoid comma operator issues
-    parser->ReadMatchingToken(TokenType::Comma);  
-    decl->message = parser->ParseArgExpr();    // Use ParseArgExpr to avoid comma operator issues
+    decl->condition = parser->ParseArgExpr();
+    parser->ReadMatchingToken(TokenType::Comma);
+    decl->message = parser->ParseArgExpr();
     parser->ReadMatchingToken(TokenType::RParent);
     parser->ReadMatchingToken(TokenType::Semicolon);
-    
+
     return decl;
 }
 
@@ -5111,6 +5108,16 @@ static DeclBase* ParseDeclWithModifiers(
                     }
                 }
             endOfGlslBufferBlock:;
+            }
+
+            // Special handling for static_assert which may not be found via normal lookup
+            auto nameToken = peekToken(parser);
+            if (nameToken.getContent() == "static_assert")
+            {
+                // Consume the token
+                advanceToken(parser);
+                decl = as<Decl>(parseStaticAssertDecl(parser, nullptr));
+                break;
             }
 
             // Our final fallback case is to assume that the user is
@@ -9520,8 +9527,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("module", parseModuleDeclarationDecl),
     _makeParseDecl("implementing", parseImplementingDecl),
     _makeParseDecl("static_assert", parseStaticAssertDecl),
-    _makeParseDecl("test_static_assert", parseStaticAssertDecl),
-    _makeParseDecl("static", parseStaticKeyword),  // Handle compound static_assert parsing
     _makeParseDecl("let", parseLetDecl),
     _makeParseDecl("var", parseVarDecl),
     _makeParseDecl("func", parseFuncDecl),
