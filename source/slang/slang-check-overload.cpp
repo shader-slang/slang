@@ -1356,7 +1356,7 @@ DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
 int SemanticsVisitor::CompareLookupResultItems(
     LookupResultItem const& left,
     LookupResultItem const& right,
-    bool deferExtensionPrefs)
+    LookupResultComparisonFlavor flavor)
 {
     auto leftDeclRefParent = getParentDeclRef(left.declRef);
     auto rightDeclRefParent = getParentDeclRef(right.declRef);
@@ -1423,7 +1423,7 @@ int SemanticsVisitor::CompareLookupResultItems(
     // to allow different overloads to be considered.
     if (leftIsExtension != rightIsExtension)
     {
-        if (deferExtensionPrefs)
+        if (flavor == LookupResultComparisonFlavor::BeforeOverloadResolution)
         {
             // Defer extension preferences to overload resolution
             // by treating them as equal during lookup filtering
@@ -1451,7 +1451,7 @@ int SemanticsVisitor::CompareLookupResultItems(
             return int(leftIsExtension) - int(rightIsExtension);
         }
     }
-    else if (leftIsExtension && !deferExtensionPrefs)
+    else if (leftIsExtension && flavor == LookupResultComparisonFlavor::AfterOverloadResolution)
     {
         // If both are declared in extensions, prefer the one that is least generic.
         bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
@@ -3021,9 +3021,7 @@ void SemanticsVisitor::AddGenericOverloadCandidates(Expr* baseExpr, OverloadReso
         // We are referring to a bunch of declarations, each of which might be generic
         // Apply the same filtering logic used for regular overload resolution to ensure
         // extension preferences are handled correctly.
-        printf("DEBUG: Applying resolveOverloadedLookup to generic candidates, count=%d\n", (int)overloadedExpr->lookupResult2.items.getCount());
         auto filteredLookupResult = resolveOverloadedLookup(overloadedExpr->lookupResult2);
-        printf("DEBUG: After filtering, count=%d\n", (int)filteredLookupResult.items.getCount());
         for (auto item : filteredLookupResult)
         {
             AddGenericOverloadCandidate(item, context);

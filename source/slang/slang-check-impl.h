@@ -2650,12 +2650,19 @@ public:
     ///
     Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
 
+    /// Enumeration to control when extension preferences are applied during lookup result comparison
+    enum class LookupResultComparisonFlavor
+    {
+        BeforeOverloadResolution,  ///< Extension preferences are deferred to overload resolution
+        AfterOverloadResolution,   ///< Extension preferences are applied immediately
+    };
+
     /// Compare items `left` and `right` produced by lookup, to see if one should be favored for
     /// overloading.
     int CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right,
-        bool deferExtensionPrefs = false);
+        LookupResultComparisonFlavor flavor = LookupResultComparisonFlavor::AfterOverloadResolution);
 
     /// Compare items `left` and `right` being considered as overload candidates, and determine if
     /// one should be favored for structural reasons.

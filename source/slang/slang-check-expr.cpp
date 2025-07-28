@@ -1150,7 +1150,7 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
         bool shouldAdd = true;
         for (Index ii = 0; ii < items.getCount(); ++ii)
         {
-            int cmp = CompareLookupResultItems(item, items[ii], true); // defer extension prefs
+            int cmp = CompareLookupResultItems(item, items[ii], LookupResultComparisonFlavor::BeforeOverloadResolution);
             if (cmp < 0)
             {
                 // The new `item` is strictly better
