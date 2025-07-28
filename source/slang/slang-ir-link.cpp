@@ -1334,6 +1334,11 @@ IRInst* cloneInst(
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues)
 {
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    _debugSetInstBeingCloned(originalInst->_debugUID);
+    SLANG_DEFER(_debugResetInstBeingCloned());
+#endif
+
     switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
@@ -1429,7 +1434,6 @@ IRInst* cloneInst(
     }
     auto funcType = cloneType(context, originalInst->getFullType());
     context->builder = oldBuilder;
-
     IRInst* clonedInst = builder->createIntrinsicInst(
         funcType,
         originalInst->getOp(),
