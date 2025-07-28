@@ -3019,7 +3019,12 @@ void SemanticsVisitor::AddGenericOverloadCandidates(Expr* baseExpr, OverloadReso
     else if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
     {
         // We are referring to a bunch of declarations, each of which might be generic
-        for (auto item : overloadedExpr->lookupResult2)
+        // Apply the same filtering logic used for regular overload resolution to ensure
+        // extension preferences are handled correctly.
+        printf("DEBUG: Applying resolveOverloadedLookup to generic candidates, count=%d\n", (int)overloadedExpr->lookupResult2.items.getCount());
+        auto filteredLookupResult = resolveOverloadedLookup(overloadedExpr->lookupResult2);
+        printf("DEBUG: After filtering, count=%d\n", (int)filteredLookupResult.items.getCount());
+        for (auto item : filteredLookupResult)
         {
             AddGenericOverloadCandidate(item, context);
         }
