@@ -233,6 +233,10 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "none";
     }
+    else if (as<IRSizeLiteralExpr>(expr))
+    {
+        sb << "__ir_size";
+    }
     else if (const auto stringLit = as<StringLiteralExpr>(expr))
     {
         sb << "\"" << stringLit->value << "\"";

@@ -7007,6 +7007,11 @@ static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
     return parser->astBuilder->create<NoneLiteralExpr>();
 }
 
+static NodeBase* parseIRSizeLiteralExpr(Parser* parser, void* /*userData*/)
+{
+    return parser->astBuilder->create<IRSizeLiteralExpr>();
+}
+
 static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -9618,6 +9623,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__return_val", parseReturnValExpr),
     _makeParseExpr("nullptr", parseNullPtrExpr),
     _makeParseExpr("none", parseNoneExpr),
+    _makeParseExpr("__ir_size", parseIRSizeLiteralExpr),
     _makeParseExpr("try", parseTryExpr),
     _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
     _makeParseExpr("__fwd_diff", parseForwardDifferentiate),

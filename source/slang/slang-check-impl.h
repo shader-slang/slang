@@ -3002,6 +3002,7 @@ public:
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
     Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
     Expr* visitNoneLiteralExpr(NoneLiteralExpr* expr);
+    Expr* visitIRSizeLiteralExpr(IRSizeLiteralExpr* expr);
     Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
     Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
     Expr* visitStringLiteralExpr(StringLiteralExpr* expr);

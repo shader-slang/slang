@@ -697,6 +697,15 @@ Result linkAndOptimizeIR(
     auto targetProgram = codeGenContext->getTargetProgram();
     auto targetCompilerOptions = targetRequest->getOptionSet();
 
+    List<ComPtr<ISlangBlob>> moduleBlobs;
+    codeGenContext->getProgram()->enumerateModules(
+        [&](Module* module)
+        {
+            ComPtr<ISlangBlob> blob;
+            module->serialize(blob.writeRef());
+            moduleBlobs.add(blob);
+        });
+
     // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
@@ -1047,6 +1056,13 @@ Result linkAndOptimizeIR(
     }
 
     finalizeSpecialization(irModule);
+
+    // Insert the pre-linking IR modules as blobs in the post-linking IR.
+    for (auto& blob : moduleBlobs)
+    {
+        IRBuilder builder(irModule);
+        builder.getBlobValue(blob);
+    }
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered

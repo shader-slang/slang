@@ -126,6 +126,12 @@ class NoneLiteralExpr : public LiteralExpr
 };
 
 FIDDLE()
+class IRSizeLiteralExpr : public LiteralExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
 class StringLiteralExpr : public LiteralExpr
 {
     FIDDLE(...)

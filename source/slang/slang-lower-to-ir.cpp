@@ -5171,6 +5171,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(context->irBuilder->getVoidValue());
     }
 
+    LoweredValInfo visitIRSizeLiteralExpr(IRSizeLiteralExpr*)
+    {
+        auto builder = getBuilder();
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(builder->getUIntType(), kIROp_IRSize, 1, args));
+    }
+
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerType(context, expr->type);
