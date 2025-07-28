@@ -783,34 +783,33 @@ private:
 };
 
 
-#define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER) \
-    ::Slang::ScopedSerializerArray<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT(_scopedSerializerArray, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerArray<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerArray,                                                                 \
+        __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                       \
+#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                 \
     ::Slang::ScopedSerializerDictionary<std::remove_reference_t<decltype(SERIALIZER)>> \
-    SLANG_CONCAT( \
-        _scopedSerializerDictionary,                                        \
-        __LINE__)( \
-        SERIALIZER)
+    SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER) \
+#define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER)                                               \
     ::Slang::ScopedSerializerOptional<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
-        _scopedSerializerOptional,                                        \
+        _scopedSerializerOptional,                                                                 \
         __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER) \
+#define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER)                                               \
     ::Slang::ScopedSerializerStruct<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
-        _scopedSerializerStruct,                                        \
+        _scopedSerializerStruct,                                                                 \
         __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER) \
+#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER)                                               \
     ::Slang::ScopedSerializerVariant<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
-        _scopedSerializerVariant,                                        \
+        _scopedSerializerVariant,                                                                 \
         __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER) \
+#define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER)                                               \
     ::Slang::ScopedSerializerTuple<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
-        _scopedSerializerTuple,                                        \
+        _scopedSerializerTuple,                                                                 \
         __LINE__)(SERIALIZER)
 
 //
@@ -1046,9 +1045,9 @@ template<typename S, typename T>
 SLANG_FORCE_INLINE void deferSerializeObjectContents(S const& serializer, T* value)
 {
     serializer->handleDeferredObjectContents(
-            value,
-            _serializeObjectContentsCallback<S, T>,
-            serializer.getContext());
+        value,
+        _serializeObjectContentsCallback<S, T>,
+        serializer.getContext());
 }
 
 template<typename S, typename T>
@@ -1073,18 +1072,18 @@ template<typename S, typename T>
 SLANG_FORCE_INLINE void serializeSharedPtr(S const& serializer, T*& value)
 {
     serializer->handleSharedPtr(
-            *(void**)&value,
-            _serializeObjectCallback<S, T>,
-            serializer.getContext());
+        *(void**)&value,
+        _serializeObjectCallback<S, T>,
+        serializer.getContext());
 }
 
 template<typename S, typename T>
 SLANG_FORCE_INLINE void serializeUniquePtr(S const& serializer, T*& value)
 {
     serializer->handleUniquePtr(
-            *(void**)&value,
-            _serializeObjectCallback<S, T>,
-            serializer.getContext());
+        *(void**)&value,
+        _serializeObjectCallback<S, T>,
+        serializer.getContext());
 }
 
 template<typename S, typename T>

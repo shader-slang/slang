@@ -36,15 +36,14 @@ namespace Fossil
 #define SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS 1
 
 #if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
-#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)          \
-    do                                                      \
-    {                                                       \
-        if (!(CONDITION))                                   \
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
             SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
     } while (0)
 #else
-#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) \
-    SLANG_ASSERT(CONDITION)
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
 #endif
 
 // A commonly-occuring kind of validation check when reading
@@ -87,7 +86,6 @@ SLANG_FORCE_INLINE ValPtr<T> expectPossiblyNullValOfType(AnyValPtr valPtr)
 struct SerialWriter
 {
 public:
-
     SerialWriter(ChunkBuilder* chunk);
     SerialWriter(BlobBuilder& blobBuilder);
 
@@ -635,11 +633,7 @@ public:
     void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
     void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
 
-    void handleDeferredObjectContents(
-        void* valuePtr,
-        SerializerCallback callback,
-        void* context)
-       ;
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 /// Serializer implementation for reading objects from a fossil-format blob.
@@ -744,7 +738,6 @@ private:
     SLANG_FORCE_INLINE State& getState() { return _state; }
 
 public:
-
     //
     // The serialization protocol allows the back-end
     // implementation to define a `Scope` type that will
@@ -766,7 +759,6 @@ public:
     };
 
 private:
-
     //
     // Like other serializer implementations for reading, we track objects
     // that are in the process of being read in, to avoid possible

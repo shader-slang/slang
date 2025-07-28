@@ -4,6 +4,7 @@
 #include "core/slang-blob-builder.h"
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
@@ -13,8 +14,6 @@
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
 #include "slang.h"
-
-#include "core/slang-performance-profiler.h"
 
 //
 #include "slang-serialize-ir.cpp.fiddle"

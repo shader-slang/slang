@@ -69,7 +69,10 @@ public:
 
     using Layout = FossilizedPtrLikeLayout;
 
-    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind) { return kind == FossilizedValKind::Ptr; }
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
+    {
+        return kind == FossilizedValKind::Ptr;
+    }
 };
 
 static_assert(sizeof(FossilizedPtr<void>) == sizeof(uint32_t));
@@ -493,30 +496,22 @@ SLANG_FORCE_INLINE int compare(FossilizedString const& lhs, UnownedStringSlice c
     return compare(lhs.get(), rhs);
 }
 
-SLANG_FORCE_INLINE bool operator==(
-    FossilizedString const& left,
-    UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator==(FossilizedString const& left, UnownedStringSlice const& right)
 {
     return left.get() == right;
 }
 
-SLANG_FORCE_INLINE bool operator!=(
-    FossilizedString const& left,
-    UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator!=(FossilizedString const& left, UnownedStringSlice const& right)
 {
     return left.get() != right;
 }
 
-SLANG_FORCE_INLINE bool operator==(
-    FossilizedStringObj const& left,
-    UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator==(FossilizedStringObj const& left, UnownedStringSlice const& right)
 {
     return left.get() == right;
 }
 
-SLANG_FORCE_INLINE bool operator!=(
-    FossilizedStringObj const& left,
-    UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator!=(FossilizedStringObj const& left, UnownedStringSlice const& right)
 {
     return left.get() != right;
 }
@@ -1099,8 +1094,8 @@ public:
 template<typename T>
 SLANG_FORCE_INLINE ValPtr<T> cast(AnyValPtr valPtr)
 {
-//    if (!valPtr)
-//        return ValPtr<T>();
+    //    if (!valPtr)
+    //        return ValPtr<T>();
     return ValPtr<T>(
         static_cast<T*>(valPtr.getDataPtr()),
         (typename T::Layout*)(valPtr.getLayout()));

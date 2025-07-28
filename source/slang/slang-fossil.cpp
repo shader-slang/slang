@@ -77,8 +77,7 @@ Fossil::AnyValPtr getRootValue(void const* data, Size size)
 
 } // namespace Fossil
 
-Fossil::AnyValRef Fossil::ValRef<FossilizedContainerObjBase>::getElement(
-    Index index) const
+Fossil::AnyValRef Fossil::ValRef<FossilizedContainerObjBase>::getElement(Index index) const
 {
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < getElementCount());
@@ -92,8 +91,7 @@ Fossil::AnyValRef Fossil::ValRef<FossilizedContainerObjBase>::getElement(
     return Fossil::AnyValRef(elementPtr, elementLayout);
 }
 
-FossilizedRecordElementLayout* FossilizedRecordLayout::getField(
-    Index index) const
+FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < fieldCount);
@@ -102,8 +100,7 @@ FossilizedRecordElementLayout* FossilizedRecordLayout::getField(
     return fieldsPtr + index;
 }
 
-Fossil::AnyValRef Fossil::ValRef<FossilizedRecordVal>::getField(
-    Index index) const
+Fossil::AnyValRef Fossil::ValRef<FossilizedRecordVal>::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < getFieldCount());

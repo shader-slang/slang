@@ -1,6 +1,7 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-dispatch.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -9,8 +10,6 @@
 #include "slang-parser.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
-
-#include "core/slang-performance-profiler.h"
 
 //
 #include "slang-serialize-ast.cpp.fiddle"
@@ -540,7 +539,7 @@ private:
     ModuleDecl* _module = nullptr;
     SerialSourceLocWriter* _sourceLocWriter = nullptr;
 
-    public:
+public:
     //
     // For the most part, this type just implements the methods
     // of the `IASTSerializerImpl` interface, and then has some
@@ -556,8 +555,7 @@ private:
         ContainerDeclDirectMemberDecls& value);
     SerialSourceLocWriter* getSourceLocWriter() { return _sourceLocWriter; }
 
-    private:
-
+private:
     void _writeImportedModule(ASTSerializer const& serializer, ModuleDecl* moduleDecl);
     void _writeImportedDecl(
         ASTSerializer const& serializer,
@@ -687,7 +685,7 @@ private:
     Count _deserializedTopLevelDeclCount = 0;
 #endif
 
-    public:
+public:
     //
     // Much like the `ASTSerialWriter`, for the most part this
     // type just implements the `IASTSerializer` interface,
@@ -704,8 +702,7 @@ private:
         ContainerDeclDirectMemberDecls& value);
     SerialSourceLocReader* getSourceLocReader() { return _sourceLocReader; }
 
-    private:
-
+private:
     ModuleDecl* _readImportedModule(ASTSerializer const& serializer);
     NodeBase* _readImportedDecl(ASTSerializer const& serializer);
 
