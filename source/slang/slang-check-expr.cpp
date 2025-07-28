@@ -15,6 +15,7 @@
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
+#include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -1632,6 +1633,31 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 }
 
+// This checks that if a differentiable function access a non-diff type "This", in such case we
+// want to provide a non-error diagnostic to the user to notify that there could be an unexpected
+// behavior because every member access will not have derivative computed for it. User can use
+// [NoDiffThis] to clarify that this is intended.
+void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
+{
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
+        if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
+        {
+            if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
+                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+            {
+                return;
+            }
+
+            getSink()->diagnose(
+                memberExpr->loc,
+                Diagnostics::noDerivativeOnNonDifferentiableThisType,
+                memberExpr->declRef.getDecl(),
+                this->m_parentFunc);
+        }
+    }
+}
 
 Expr* SemanticsVisitor::CheckTerm(Expr* term)
 {
@@ -1649,7 +1675,13 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
         maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+
+        if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            maybeCheckMissingNoDiffThis(checkedTerm);
+        }
     }
+
     return checkedTerm;
 }
 
@@ -2458,13 +2490,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     {
         expr = CheckExpr(expr);
     }
-    auto indexExpr = subscriptExpr->indexExprs[0];
+    auto& indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!isScalarIntegerType(indexExpr->type.type))
-    {
-        getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
-        return CreateErrorExpr(subscriptExpr);
-    }
+    auto intTargetType = getMatchingIntType(indexExpr->type.type);
+    indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
@@ -2631,7 +2660,7 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
-void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
+void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
     //
@@ -2656,15 +2685,11 @@ void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
             break;
         }
     }
-    //
-    // Now we check to see if we have a `this` expression,
-    // and if it is immutable.
-    if (auto thisExpr = as<ThisExpr>(e))
+
+    // Check if we're trying to assign to a non-l-value (const variable, immutable member, etc.)
+    if (!expr->type.isLeftValue)
     {
-        if (!thisExpr->type.isLeftValue)
-        {
-            getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
-        }
+        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::attemptingToAssignToConstVariable);
     }
 }
 
@@ -2690,14 +2715,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         }
         else
         {
-            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+            // Provide a more helpful diagnostic about const variable assignment
+            maybeDiagnoseConstVariableAssignment(expr->left);
 
-            // As a special case, check if the LHS expression is derived
-            // from a `this` parameter (implicitly or explicitly), which
-            // is immutable. We can give the user a bit more context into
-            // what is going on.
-            //
-            maybeDiagnoseThisNotLValue(expr->left);
+            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
         }
     }
     expr->type = type;
@@ -2824,6 +2845,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
+        if (!invoke->functionExpr)
+            return rs;
+
         // if this is still an invoke expression, test arguments passed to inout/out parameter are
         // LValues
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
@@ -2931,6 +2955,29 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
+                                // Emit additional diagnostic for invalid pointer taking operations
+                                auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+                                if (funcDeclRef)
+                                {
+                                    auto knownBuiltinAttr =
+                                        funcDeclRef.getDecl()
+                                            ->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr)
+                                    {
+                                        if (auto constantIntVal =
+                                                as<ConstantIntVal>(knownBuiltinAttr->name))
+                                        {
+                                            if (constantIntVal->getValue() ==
+                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
+                                            {
+                                                getSink()->diagnose(
+                                                    argExpr,
+                                                    Diagnostics::cannotTakeConstantPointers);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 getSink()->diagnose(
                                     argExpr,
                                     Diagnostics::argumentExpectedLValue,
@@ -2968,7 +3015,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                         implicitCastExpr->type);
                                 }
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                maybeDiagnoseConstVariableAssignment(argExpr);
                             }
                         }
                     }
@@ -4493,29 +4540,32 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
     if (!knownBuiltinAttr)
         return;
-    if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
     {
-        if (checkedInvokeExpr->arguments.getCount() != 2)
-            return;
-        auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
-        auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
-        if (!vertexAttributeArgDeclRefExpr)
+        if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::GetAttributeAtVertex)
         {
-            getSink()->diagnose(
-                invokeExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
-        }
-        auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
-        if (!vertexAttributeArgDecl)
-            return;
-        if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
-            !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
-        {
-            getSink()->diagnose(
-                vertexAttributeArgDeclRefExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(
+                    invokeExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(
+                    vertexAttributeArgDeclRefExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
         }
     }
 }

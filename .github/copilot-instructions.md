@@ -1,13 +1,20 @@
 ## Configure CMake and Build
 
-To configure cmake, run `cmake --preset default --fresh`.
-To build, run `cmake --workflow --preset debug` or `cmake --workflow --preset release`.
-Build instructions can be found in docs/building.md
+Slang is already built in debug configuration, so you should be able to run targets
+like `slangc`, `slang-test`, `slangi` etc. right away.
+
+If you made some changes and need to rebuild Slang, follow these steps:
+
+1. Configure cmake with `cmake --preset default`.
+2. Run `cmake --workflow --preset debug` to build.
+
+Detailed build instructions can be found in docs/building.md
 
 ## Formatting
 
+DO THIS BEFORE COMMITING YOUR CHANGES:
+    RUN `./extras/formatting.sh` to format your changes first!!
 Your PR needs to be formatted according to our coding style.
-Run `./extras/formatting.sh` script to format your changes before submitting them.
 
 ## Labeling your PR
 
@@ -15,6 +22,17 @@ All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking".
 Add the "pr: breaking" label to  your PR if you are introducing public API changes that breaks ABI compabibility,
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
+
+## Debugging
+
+If you encounter a bug related to a problematic instruction, it is often useful to trace the location where the instruction is created.
+You can use the `extras/insttrace.py` script to do this. For example, during debugging you find that an instruction with `_debugUID=1234`
+is wrong, you can run the following command to trace the callstack where the instruction is created:
+
+```bash
+# From workspace root:
+python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang -target spirv
+```
 
 ## Testing
 

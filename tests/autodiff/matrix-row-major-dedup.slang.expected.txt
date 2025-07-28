@@ -1,0 +1,20 @@
+#pragma pack_matrix(column_major)
+#ifdef SLANG_HLSL_ENABLE_NVAPI
+#include "nvHLSLExtns.h"
+#endif
+
+#ifndef __DXC_VERSION_MAJOR
+// warning X3557: loop doesn't seem to do anything, forcing loop to unroll
+#pragma warning(disable : 3557)
+#endif
+
+
+#line 15 "tests/autodiff/matrix-row-major-dedup.slang"
+[numthreads(1, 1, 1)]
+void computeMain(int3 dispathThreadID_0 : SV_DispatchThreadID)
+{
+
+#line 22
+    return;
+}
+

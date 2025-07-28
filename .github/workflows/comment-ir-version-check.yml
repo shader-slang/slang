@@ -1,0 +1,73 @@
+name: Comment IR Version Check Results
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Download artifacts
+        id: download
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+
+            const matchArtifact = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "ir-version-check-results"
+            })[0];
+
+            if (!matchArtifact) {
+              console.log('No IR version check artifacts found - nothing to comment');
+              return false;
+            }
+
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
+            });
+
+            const fs = require('fs');
+            fs.writeFileSync('${{github.workspace}}/ir-version-check-results.zip', Buffer.from(download.data));
+            return true;
+
+      - name: Extract artifacts
+        if: steps.download.outputs.result == 'true'
+        run: unzip ir-version-check-results.zip
+
+      - name: Read PR number
+        if: steps.download.outputs.result == 'true'
+        id: pr
+        run: |
+          echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
+
+      - name: Find existing comment
+        if: steps.download.outputs.result == 'true'
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          issue-number: ${{ steps.pr.outputs.number }}
+          body-includes: "<!-- slang-ir-version-check -->"
+
+      - name: Create or update comment
+        if: steps.download.outputs.result == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          issue-number: ${{ steps.pr.outputs.number }}
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          body-path: comment-body.txt
+          edit-mode: replace

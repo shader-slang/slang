@@ -6,11 +6,11 @@ public interface ITest {
 };
 
 public struct TestImpl : ITest {
-    // CHECK: ([[# @LINE + 1]]): error 38105
+    // CHECK: ([[# @LINE + 1]]): error 38108
     public void testIn(out int a) {
         a = 5;
     }
-    // CHECK: ([[# @LINE + 1]]): error 38105
+    // CHECK: ([[# @LINE + 1]]): error 38108
     public void testOut(int b) {
         b = 6;
     }

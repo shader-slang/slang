@@ -5,6 +5,7 @@
 #include "../core/slang-array-view.h"
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
+#include "slang-ir.h"
 
 // #include "slang-name.h"
 // #include "slang-source-loc.h"
@@ -107,6 +108,12 @@ struct PropertyKeys<Module>
     static const FourCC::RawValue Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
     static const FourCC::RawValue ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
     static const FourCC::RawValue FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
+};
+
+template<>
+struct PropertyKeys<IRModule>
+{
+    static const FourCC::RawValue IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
 };
 
 // For types/FourCC that work for serializing in general (not just IR).

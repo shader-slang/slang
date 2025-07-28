@@ -138,9 +138,9 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     {
     case SLANG_RESOURCE_ACCESS_READ:
         {
-            // Metal does not support access::sample for texture buffers, so we need to emit
-            // access::read instead.
-            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            // Metal does not support access::sample for texture buffers and multisampled textures,
+            // so we need to emit access::read instead.
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER || texType->isMultisample())
                 m_writer->emit("access::read");
             else
                 m_writer->emit("access::sample");
@@ -1163,6 +1163,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             switch (ptrType->getAddressSpace())
             {
             case AddressSpace::Global:
+            case AddressSpace::UserPointer:
                 m_writer->emit(" device");
                 m_writer->emit("*");
                 break;
@@ -1181,6 +1182,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case AddressSpace::MetalObjectData:
                 m_writer->emit(" object_data");
                 m_writer->emit("*");
+                break;
+            default:
+                SLANG_UNEXPECTED("Unknown addressspace encountered.");
                 break;
             }
             return;

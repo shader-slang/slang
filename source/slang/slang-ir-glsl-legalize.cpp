@@ -2094,6 +2094,18 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
             }
         }
     }
+    else if (auto toArray = as<IRArrayType>(toType))
+    {
+        // Handle scalar-to-array conversion for tessellation factors
+        if (as<IRBasicType>(fromType))
+        {
+            // Convert the scalar value to the array's element type first
+            auto arrayElementType = toArray->getElementType();
+            auto convertedVal = builder->emitCast(arrayElementType, val);
+            val = builder->emitMakeArrayFromElement(toType, convertedVal);
+            return ScalarizedVal::value(val);
+        }
+    }
     // TODO: actually consider what needs to go on here...
     return ScalarizedVal::value(builder->emitCast(toType, val));
 }
@@ -3366,8 +3378,7 @@ void legalizeEntryPointParameterForGLSL(
                     if (callee->getOp() != kIROp_Func)
                         continue;
 
-                    if (getBuiltinFuncName(callee) !=
-                        UnownedStringSlice::fromLiteral("GeometryStreamAppend"))
+                    if (getBuiltinFuncEnum(callee) != KnownBuiltinDeclName::GeometryStreamAppend)
                     {
                         // If we are calling a function that takes a output stream as a parameter,
                         // we need to add it to the work list to be processed.
@@ -4006,6 +4017,13 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(
+                varInst,
+                IRTargetBuiltinVarName::SpvInstanceIndex);
         }
         // Repalce SV_VertexID with gl_VertexIndex - gl_BaseVertex.
         else if (builtinVarName == IRTargetBuiltinVarName::HlslVertexID)
@@ -4032,6 +4050,11 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                         user->replaceUsesWith(sub);
                     }
                 });
+
+            // For unused parameters (like with -preserve-params), also update the builtin
+            // decoration to ensure SPIR-V emitter sees the correct builtin
+            IRBuilder builder(varInst);
+            builder.addTargetBuiltinVarDecoration(varInst, IRTargetBuiltinVarName::SpvVertexIndex);
         }
     }
 }
@@ -4374,7 +4397,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         {
             if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
             {
-                if (dec->getName() == "DispatchMesh")
+                if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                 {
                     SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                     dispatchMeshFunc = func;

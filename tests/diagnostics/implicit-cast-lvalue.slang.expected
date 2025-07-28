@@ -7,6 +7,7 @@ tests/diagnostics/implicit-cast-lvalue.slang(19): error 30047: argument passed t
     a(y);
       ^
 tests/diagnostics/implicit-cast-lvalue.slang(19): note 30063: argument was implicitly cast from 'double' to 'float', and Slang does not support using an implicit cast as an l-value with this type
+tests/diagnostics/implicit-cast-lvalue.slang(19): note 30049: attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
 }
 standard output = {
 }

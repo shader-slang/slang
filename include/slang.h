@@ -263,7 +263,6 @@ convention for interface methods.
     #define SLANG_NO_INLINE __attribute__((noinline))
     #define SLANG_FORCE_INLINE inline __attribute__((always_inline))
     #define SLANG_BREAKPOINT(id) __builtin_trap();
-    #define SLANG_ALIGN_OF(T) __alignof__(T)
 #endif // SLANG_GCC_FAMILY
 
 #if SLANG_GCC_FAMILY || defined(__clang__)
@@ -280,7 +279,6 @@ convention for interface methods.
     #define SLANG_NO_INLINE __declspec(noinline)
     #define SLANG_FORCE_INLINE __forceinline
     #define SLANG_BREAKPOINT(id) __debugbreak();
-    #define SLANG_ALIGN_OF(T) __alignof(T)
 
     #define SLANG_INT64(x) (x##i64)
     #define SLANG_UINT64(x) (x##ui64)
@@ -1035,6 +1033,9 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+
+        GetModuleInfo,              // Print serialized module version and name
+        GetSupportedModuleVersions, // Print the min and max module versions this compiler supports
 
         EmitSeparateDebug, // bool
 
@@ -1921,12 +1922,13 @@ public:                                                              \
         SLANG_ACCELERATION_STRUCTURE = 0x09,
         SLANG_TEXTURE_SUBPASS = 0x0A,
 
-        SLANG_RESOURCE_EXT_SHAPE_MASK = 0xF0,
+        SLANG_RESOURCE_EXT_SHAPE_MASK = 0x1F0,
 
         SLANG_TEXTURE_FEEDBACK_FLAG = 0x10,
         SLANG_TEXTURE_SHADOW_FLAG = 0x20,
         SLANG_TEXTURE_ARRAY_FLAG = 0x40,
         SLANG_TEXTURE_MULTISAMPLE_FLAG = 0x80,
+        SLANG_TEXTURE_COMBINED_FLAG = 0x100,
 
         SLANG_TEXTURE_1D_ARRAY = SLANG_TEXTURE_1D | SLANG_TEXTURE_ARRAY_FLAG,
         SLANG_TEXTURE_2D_ARRAY = SLANG_TEXTURE_2D | SLANG_TEXTURE_ARRAY_FLAG,
@@ -2244,6 +2246,7 @@ struct TypeReflection
         Feedback = SLANG_TYPE_KIND_FEEDBACK,
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
@@ -4169,6 +4172,16 @@ struct ISession : public ISlangUnknown
         slang::TypeReflection* interfaceType,
         uint32_t* outRTTIDataBuffer,
         uint32_t bufferSizeInBytes) = 0;
+
+    /** Read module info (name and version) from a module blob
+     *
+     * The returned pointers are valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
+        slang::IBlob* source,
+        SlangInt& outModuleVersion,
+        const char*& outModuleCompilerVersion,
+        const char*& outModuleName) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4190,7 +4203,7 @@ struct IMetadata : public ISlangCastable
     /*
     Returns the debug build identifier for a base and debug spirv pair.
     */
-    virtual const char* getDebugBuildIdentifier() = 0;
+    virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
@@ -4206,9 +4219,9 @@ struct ICompileResult : public ISlangCastable
         0x41e5,
         {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
 
-    virtual uint32_t getItemCount() = 0;
-    virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
-    virtual SlangResult getMetadata(IMetadata** outMetadata) = 0;
+    virtual uint32_t SLANG_MCALL getItemCount() = 0;
+    virtual SlangResult SLANG_MCALL getItemData(uint32_t index, IBlob** outblob) = 0;
+    virtual SlangResult SLANG_MCALL getMetadata(IMetadata** outMetadata) = 0;
 };
     #define SLANG_UUID_ICompileResult ICompileResult::getTypeGuid()
 
