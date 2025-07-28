@@ -523,11 +523,12 @@ public:
     {
     }
 
-    template<typename I, typename C>
+    template<typename SourceImpl, typename SourceContext>
     SLANG_FORCE_INLINE Serializer(
-        Serializer<I, C> const& serializer,
+        Serializer<SourceImpl, SourceContext> const& serializer,
         std::enable_if_t<
-            std::is_convertible_v<I*, Impl*> && std::is_convertible_v<C*, Context*>,
+            std::is_convertible_v<SourceImpl*, Impl*> &&
+                std::is_convertible_v<SourceContext*, Context*>,
             void>* = nullptr)
         : _impl(serializer.getImpl()), _context(serializer.getContext())
     {
