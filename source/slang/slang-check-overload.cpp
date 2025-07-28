@@ -1417,38 +1417,10 @@ int SemanticsVisitor::CompareLookupResultItems(
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
         return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
-    // Prefer non-extension declarations over extension declarations.
-    if (leftIsExtension != rightIsExtension)
-    {
-        // Add a special case for constructors, where we prefer the one that is not synthesized,
-        if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
-        {
-            if (auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl()))
-            {
-                bool leftIsSynthesized = leftCtor->containsFlavor(
-                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-                bool rightIsSynthesized = rightCtor->containsFlavor(
-                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-
-                if (leftIsSynthesized != rightIsSynthesized)
-                {
-                    return int(leftIsSynthesized) - int(rightIsSynthesized);
-                }
-            }
-        }
-
-        return int(leftIsExtension) - int(rightIsExtension);
-    }
-    else if (leftIsExtension)
-    {
-        // If both are declared in extensions, prefer the one that is least generic.
-        bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
-        bool rightIsGeneric = rightDeclRefParent.getParent().as<GenericDecl>() != nullptr;
-        if (leftIsGeneric != rightIsGeneric)
-        {
-            return int(leftIsGeneric) - int(rightIsGeneric);
-        }
-    }
+    // Extension preference logic moved to CompareOverloadCandidates
+    // to be applied after candidate verification instead of during lookup.
+    // This fixes issue #7931 where generic method extensions were incorrectly
+    // filtered out during lookup before argument matching verification.
 
     // Any decl is strictly better than a module decl.
     bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
@@ -1783,6 +1755,8 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
         auto itemDiff = CompareLookupResultItems(left->item, right->item);
         if (itemDiff)
             return itemDiff;
+
+
 
         // If one candidate is an implicit conversion, and other candidate is not,
         // then we should prefer the implicit conversion.
