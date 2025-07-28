@@ -1045,11 +1045,9 @@ Result linkAndOptimizeIR(
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
-        specOptions.lowerWitnessLookups = false;
+        specOptions.lowerWitnessLookups = true;
         specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
     }
-
-    lowerDynamicInsts(irModule, sink);
 
     finalizeSpecialization(irModule);
 
@@ -2205,10 +2203,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
