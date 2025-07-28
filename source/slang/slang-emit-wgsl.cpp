@@ -1477,62 +1477,6 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Rsh:
     case kIROp_Lsh:
         {
-            // Handle bit shift operations for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
-                
-                const char* opStr = (inst->getOp() == kIROp_Lsh) ? " << " : " >> ";
-                
-                emitType(resultType);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    auto left = inst->getOperand(0);
-                    auto right = inst->getOperand(1);
-                    
-                    // Left operand should be the lowered matrix (array of vectors)
-                    emitOperand(left, getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("]");
-                    
-                    m_writer->emit(opStr);
-                    
-                    // Right operand is the shift amount - broadcast to vector if it's a scalar
-                    auto rightArrayType = as<IRArrayType>(right->getDataType());
-                    if (rightArrayType && as<IRVectorType>(rightArrayType->getElementType()))
-                    {
-                        // Right is also an array of vectors
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Right is a scalar - broadcast to vector
-                        m_writer->emit("vec");
-                        m_writer->emit(colCount);
-                        m_writer->emit("<");
-                        emitType(right->getDataType());
-                        m_writer->emit(">(");
-                        emitOperand(right, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                }
-                
-                m_writer->emit(")");
-                return true;
-            }
-            
             // Shift amounts must be an unsigned type in WGSL.
             // We ensure this during legalization.
             // https://www.w3.org/TR/WGSL/#bit-expr
@@ -1637,165 +1581,36 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
 
-    case kIROp_Not:
-        {
-            // Handle logical NOT operation for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            
-            // Check if this is a lowered matrix operation (result is array of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                emitType(resultType);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    m_writer->emit("!");
-                    emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("]");
-                }
-                
-                m_writer->emit(")");
-                return true;
-            }
-            
-            return false;
-        }
-
-    case kIROp_Add:
-    case kIROp_Sub:
     case kIROp_Mul:
-    case kIROp_Less:
-    case kIROp_Greater:
-    case kIROp_Leq:
-    case kIROp_Geq:
-    case kIROp_Eql:
-    case kIROp_Neq:
         {
-            // Handle arithmetic operations for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            
-            // Check if this is a lowered matrix operation (result is array of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
+            if (!as<IRMatrixType>(inst->getOperand(0)->getDataType()) ||
+                !as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto elementType = vectorType->getElementType();
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                auto colCount = getIntVal(vectorType->getElementCount());
-                
-                const char* opStr = nullptr;
-                switch (inst->getOp())
-                {
-                case kIROp_Add: opStr = " + "; break;
-                case kIROp_Sub: opStr = " - "; break;
-                case kIROp_Mul: opStr = " * "; break;
-                case kIROp_Less: opStr = " < "; break;
-                case kIROp_Greater: opStr = " > "; break;
-                case kIROp_Leq: opStr = " <= "; break;
-                case kIROp_Geq: opStr = " >= "; break;
-                case kIROp_Eql: opStr = " == "; break;
-                case kIROp_Neq: opStr = " != "; break;
-                }
-                
-                emitType(resultType);
-                m_writer->emit("(");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    auto left = inst->getOperand(0);
-                    auto right = inst->getOperand(1);
-                    
-                    // Check if operands are arrays (matrices) or scalars
-                    bool leftIsArray = as<IRArrayType>(left->getDataType()) && 
-                                      as<IRVectorType>(as<IRArrayType>(left->getDataType())->getElementType());
-                    bool rightIsArray = as<IRArrayType>(right->getDataType()) && 
-                                       as<IRVectorType>(as<IRArrayType>(right->getDataType())->getElementType());
-                    
-                    if (leftIsArray)
-                    {
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        m_writer->emit("vec");
-                        m_writer->emit(colCount);
-                        m_writer->emit("<");
-                        emitType(elementType);
-                        m_writer->emit(">(");
-                        emitOperand(left, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                    
-                    m_writer->emit(opStr);
-                    
-                    if (rightIsArray)
-                    {
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        m_writer->emit("vec");
-                        m_writer->emit(colCount);
-                        m_writer->emit("<");
-                        emitType(elementType);
-                        m_writer->emit(">(");
-                        emitOperand(right, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                }
-                
-                m_writer->emit(")");
-                return true;
+                return false;
             }
-            
-            // Handle original matrix * matrix case (not lowered)
-            if (inst->getOp() == kIROp_Mul && 
-                as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
-                as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            // Mul(m1, m2) should be translated to component-wise multiplication in WGSL.
+            auto matrixType = as<IRMatrixType>(inst->getDataType());
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            for (IRIntegerValue i = 0; i < rowCount; i++)
             {
-                // Mul(m1, m2) should be translated to component-wise multiplication in WGSL.
-                auto matrixType = as<IRMatrixType>(resultType);
-                auto rowCount = getIntVal(matrixType->getRowCount());
-                emitType(resultType);
-                m_writer->emit("(");
-                for (IRIntegerValue i = 0; i < rowCount; i++)
+                if (i != 0)
                 {
-                    if (i != 0)
-                    {
-                        m_writer->emit(", ");
-                    }
-                    emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("] * ");
-                    emitOperand(inst->getOperand(1), getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("]");
+                    m_writer->emit(", ");
                 }
-                m_writer->emit(")");
-                return true;
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("] * ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::Postfix));
+                m_writer->emit("[");
+                m_writer->emit(i);
+                m_writer->emit("]");
             }
-            
-            return false;
+            m_writer->emit(")");
+
+            return true;
         }
 
     case kIROp_Select:

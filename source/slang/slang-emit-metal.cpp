@@ -46,8 +46,6 @@ vec<T,A> _slang_vectorReshape(vec<T,N> v)
 }
 )";
 
-
-
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
     IRFunc* entryPoint,
@@ -671,6 +669,7 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
     case kIROp_MakeVectorFromScalar:
         {
             if (inst->getOperandCount() == 1)
@@ -735,96 +734,17 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             // because Metal uses infix `*` to express inner product
             // when working with matrices.
 
-            auto left = inst->getOperand(0);
-            auto right = inst->getOperand(1);
-            auto resultType = inst->getDataType();
-
-            // Handle native matrix-matrix multiplication
-            if (as<IRMatrixType>(left->getDataType()) &&
-                as<IRMatrixType>(right->getDataType()))
+            // Are both operands matrices?
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
+                as<IRMatrixType>(inst->getOperand(1)->getDataType()))
             {
                 ensurePrelude(kMetalBuiltinPreludeMatrixCompMult);
                 m_writer->emit("_slang_matrixCompMult(");
-                emitOperand(left, getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(", ");
-                emitOperand(right, getInfo(EmitOp::General));
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit(")");
                 return true;
-            }
-
-            // Handle lowered matrix multiplication (arrays of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                // Check operand types
-                bool leftIsArray = as<IRArrayType>(left->getDataType()) && 
-                                  as<IRVectorType>(as<IRArrayType>(left->getDataType())->getElementType());
-                bool rightIsArray = as<IRArrayType>(right->getDataType()) && 
-                                   as<IRVectorType>(as<IRArrayType>(right->getDataType())->getElementType());
-                
-                if (!leftIsArray && rightIsArray)
-                {
-                    // Scalar * Matrix: broadcast scalar to each vector
-                    emitType(resultType);
-                    m_writer->emit("{");
-                    for (IRIntegerValue i = 0; i < rowCount; i++)
-                    {
-                        if (i != 0) m_writer->emit(", ");
-                        emitOperand(left, getInfo(EmitOp::General));
-                        m_writer->emit(" * ");
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    m_writer->emit("}");
-                    return true;
-                }
-                else if (leftIsArray && !rightIsArray)
-                {
-                    // Matrix * Scalar: multiply each vector by scalar
-                    emitType(resultType);
-                    m_writer->emit("{");
-                    for (IRIntegerValue i = 0; i < rowCount; i++)
-                    {
-                        if (i != 0) m_writer->emit(", ");
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("] * ");
-                        emitOperand(right, getInfo(EmitOp::General));
-                    }
-                    m_writer->emit("}");
-                    return true;
-                }
-                else if (leftIsArray && rightIsArray)
-                {
-                    // Matrix * Matrix: implement component-wise multiplication (Hadamard product)
-                    // In Slang/HLSL, the * operator between matrices is component-wise, not mathematical matrix multiplication
-                    emitType(resultType);
-                    m_writer->emit("{");
-                    
-                    for (IRIntegerValue i = 0; i < rowCount; i++)
-                    {
-                        if (i != 0) m_writer->emit(", ");
-                        
-                        // Component-wise multiplication: left[i] * right[i]
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("] * ");
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    
-                    m_writer->emit("}");
-                    return true;
-                }
-                // If neither case above applies, fall through to default handling
             }
             break;
         }
@@ -1017,101 +937,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             return true;
         }
-    case kIROp_Less:
-    case kIROp_Greater:
-    case kIROp_Leq:
-    case kIROp_Geq:
-    case kIROp_Eql:
-    case kIROp_Neq:
-        {
-            // Handle arithmetic and logical operations for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            
-            // Check if this is a lowered matrix operation (result is array of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto vectorType = as<IRVectorType>(arrayType->getElementType());
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                const char* opStr = "";
-                switch (inst->getOp())
-                {
-                case kIROp_Add: opStr = " + "; break;
-                case kIROp_Sub: opStr = " - "; break;
-                case kIROp_Lsh: opStr = " << "; break;
-                case kIROp_Rsh: opStr = " >> "; break;
-                case kIROp_And: opStr = " && "; break;
-                case kIROp_Or: opStr = " || "; break;
-                case kIROp_BitAnd: opStr = " & "; break;
-                case kIROp_BitOr: opStr = " | "; break;
-                case kIROp_BitXor: opStr = " ^ "; break;
-                case kIROp_Less: opStr = " < "; break;
-                case kIROp_Greater: opStr = " > "; break;
-                case kIROp_Leq: opStr = " <= "; break;
-                case kIROp_Geq: opStr = " >= "; break;
-                case kIROp_Eql: opStr = " == "; break;
-                case kIROp_Neq: opStr = " != "; break;
-                default: break;
-                }
-                
-                emitType(resultType);
-                m_writer->emit("{");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    auto left = inst->getOperand(0);
-                    auto right = inst->getOperand(1);
-                    
-                    // Check if operands are arrays (matrices) or scalars
-                    bool leftIsArray = as<IRArrayType>(left->getDataType()) && 
-                                      as<IRVectorType>(as<IRArrayType>(left->getDataType())->getElementType());
-                    bool rightIsArray = as<IRArrayType>(right->getDataType()) && 
-                                       as<IRVectorType>(as<IRArrayType>(right->getDataType())->getElementType());
-                    
-                    if (leftIsArray)
-                    {
-                        emitOperand(left, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        emitType(vectorType);
-                        m_writer->emit("(");
-                        emitOperand(left, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                    
-                    m_writer->emit(opStr);
-                    
-                    if (rightIsArray)
-                    {
-                        emitOperand(right, getInfo(EmitOp::Postfix));
-                        m_writer->emit("[");
-                        m_writer->emit(i);
-                        m_writer->emit("]");
-                    }
-                    else
-                    {
-                        // Scalar operand - broadcast to vector
-                        emitType(vectorType);
-                        m_writer->emit("(");
-                        emitOperand(right, getInfo(EmitOp::General));
-                        m_writer->emit(")");
-                    }
-                }
-                
-                m_writer->emit("}");
-                return true;
-            }
-            break;
-        }
-
     default:
         break;
     }

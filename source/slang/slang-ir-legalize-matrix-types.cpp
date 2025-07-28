@@ -179,7 +179,7 @@ struct MatrixTypeLoweringContext
             
             // Apply the binary operation to the vectors
             IRInst* args[] = {vectorA, vectorB};
-            auto resultVector = builder.emitIntrinsicInst(vectorType, (IROp)binaryOp, 2, args);
+            auto resultVector = builder.emitIntrinsicInst(vectorType, binaryOp, 2, args);
             
             resultVectors.add(resultVector);
         }
@@ -187,6 +187,8 @@ struct MatrixTypeLoweringContext
         // Create the result array from the vectors
         return builder.emitMakeArray(arrayType, resultVectors.getCount(), resultVectors.getBuffer());
     }
+
+
 
     template<bool matrixIsFirst>
     IRInst* legalizeMatrixMixedBinaryOperation(
@@ -232,7 +234,7 @@ struct MatrixTypeLoweringContext
                 args[0] = legalizedOther;
                 args[1] = matrixRowVector;
             }
-            auto resultVector = builder.emitIntrinsicInst(vectorType, (IROp)binaryOp, 2, args);
+            auto resultVector = builder.emitIntrinsicInst(vectorType, binaryOp, 2, args);
             
             resultVectors.add(resultVector);
         }
@@ -282,7 +284,66 @@ struct MatrixTypeLoweringContext
         return inst;
     }
 
-    IRInst* legalizeElementWiseUnaryOperation(IRInst* inst, IROp unaryOp)
+    IRInst* legalizeComparisonOperation(IRInst* inst, IROp comparisonOp)
+    {
+        IRInst* opdA = inst->getOperand(0);
+        IRInst* opdB = inst->getOperand(1);
+
+        // Check what types we're dealing with
+        auto typeA = opdA->getDataType();
+        auto typeB = opdB->getDataType();
+        
+        auto matrixTypeA = as<IRMatrixType>(typeA);
+        auto matrixTypeB = as<IRMatrixType>(typeB);
+        
+        bool shouldLowerA = matrixTypeA && shouldLowerMatrixType(matrixTypeA);
+        bool shouldLowerB = matrixTypeB && shouldLowerMatrixType(matrixTypeB);
+
+        // Only matrix-matrix comparisons are supported
+        SLANG_ASSERT(shouldLowerA && shouldLowerB && "Comparison operations only supported between matrices that need lowering");
+
+        // Create IRBuilder at the top level
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        
+        // Get legalized operands
+        IRInst* legalizedA = getReplacement(opdA);
+        IRInst* legalizedB = getReplacement(opdB);
+        
+        auto rowCount = as<IRIntLit>(matrixTypeA->getRowCount());
+        auto columnCount = as<IRIntLit>(matrixTypeA->getColumnCount());
+        
+        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+
+        // Create boolean vector type for rows: vector<bool, C>
+        auto boolType = builder.getBoolType();
+        auto boolVectorType = builder.getVectorType(boolType, columnCount);
+
+        // Create array type: vector<bool, C>[R]
+        auto boolArrayType = builder.getArrayType(boolVectorType, rowCount);
+
+        // Extract vectors from both arrays and apply comparison operation
+        List<IRInst*> resultVectors;
+        
+        for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
+        {
+            // Extract the row vector from each operand array
+            auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
+            auto vectorA = builder.emitElementExtract(legalizedA, rowIndexInst);
+            auto vectorB = builder.emitElementExtract(legalizedB, rowIndexInst);
+            
+            // Apply the comparison operation to the vectors
+            IRInst* args[] = {vectorA, vectorB};
+            auto resultVector = builder.emitIntrinsicInst(boolVectorType, comparisonOp, 2, args);
+            
+            resultVectors.add(resultVector);
+        }
+        
+        // Create the result array from the vectors
+        return builder.emitMakeArray(boolArrayType, resultVectors.getCount(), resultVectors.getBuffer());
+    }
+
+    IRInst* legalizeUnaryOperation(IRInst* inst, IROp unaryOp)
     {
         IRInst* operand = inst->getOperand(0);
 
@@ -320,7 +381,7 @@ struct MatrixTypeLoweringContext
             
             // Apply the unary operation to the vector
             IRInst* args[] = {vector};
-            auto resultVector = builder.emitIntrinsicInst(vectorType, (IROp)unaryOp, 1, args);
+            auto resultVector = builder.emitIntrinsicInst(vectorType, unaryOp, 1, args);
             
             resultVectors.add(resultVector);
         }
@@ -329,7 +390,7 @@ struct MatrixTypeLoweringContext
         return builder.emitMakeArray(arrayType, resultVectors.getCount(), resultVectors.getBuffer());
     }
 
-    IRInst* legalizeMatrixResultInstruction(IRInst* inst)
+    IRInst* legalizeMatrixProducingInstruction(IRInst* inst)
     {
         switch (inst->getOp())
         {
@@ -347,10 +408,17 @@ struct MatrixTypeLoweringContext
         case kIROp_BitOr:
         case kIROp_BitXor:
             return legalizeBinaryOperation(inst, inst->getOp());
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+            return legalizeComparisonOperation(inst, inst->getOp());
         case kIROp_Not:
         case kIROp_BitNot:
         case kIROp_Neg:
-            return legalizeElementWiseUnaryOperation(inst, inst->getOp());
+            return legalizeUnaryOperation(inst, inst->getOp());
         default:
             break;
         }
@@ -370,19 +438,8 @@ struct MatrixTypeLoweringContext
         IRType* resultType = inst->getDataType();
         if (auto matrixType = as<IRMatrixType>(resultType)) {
             if (shouldLowerMatrixType(matrixType))
-                newInst = legalizeMatrixResultInstruction(inst);
+                newInst = legalizeMatrixProducingInstruction(inst);
         }
-
-        if (newInst != inst)
-        {
-            // printf("Original instruction\n");
-            // inst->dump();
-            // printf("Replacing with instruction:\n");
-            // newInst->dump();
-        }
-
-        // TODO: otherwise, check if the result type is a matrix type that needs
-        // to be legalized into an array -- if so, then print the instruction
 
         replacements[inst] = newInst;
         return newInst;
