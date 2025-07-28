@@ -2250,7 +2250,6 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
             return &kCPULayoutRulesFamilyImpl;
         }
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         return &kMetalLayoutRulesFamilyImpl;
@@ -2492,7 +2491,6 @@ bool isMetalTarget(TargetRequest* targetReq)
         return false;
 
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         return true;
@@ -2584,7 +2582,6 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             return SourceLanguage::HLSL;
         }
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {

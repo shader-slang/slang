@@ -31,10 +31,6 @@ protected:
         return true;
     }
 
-    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE
-    {
-        return m_target == CodeGenTarget::MetalHeader;
-    }
     void emitMemoryOrderOperand(IRInst* inst);
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;

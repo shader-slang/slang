@@ -1252,7 +1252,6 @@ Result linkAndOptimizeIR(
         [[fallthrough]];
     case CodeGenTarget::HLSL:
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::WGSL:
@@ -1326,7 +1325,6 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         case CodeGenTarget::Metal:
-        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             legalizeEmptyTypes(targetProgram, irModule, sink);
@@ -1479,7 +1477,6 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions.translateToStructuredBufferOps = true;
             break;
         case CodeGenTarget::Metal:
-        case CodeGenTarget::MetalHeader:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
@@ -1614,7 +1611,6 @@ Result linkAndOptimizeIR(
         }
         break;
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {
@@ -1671,7 +1667,6 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
@@ -1719,7 +1714,6 @@ Result linkAndOptimizeIR(
 #endif
         break;
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:

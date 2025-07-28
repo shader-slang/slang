@@ -192,7 +192,6 @@ void Session::_initCodeGenTransitionMap()
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
-    map.addTransition(CodeGenTarget::MetalHeader, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
     map.addTransition(CodeGenTarget::WGSL, CodeGenTarget::WGSLSPIRV, PassThroughMode::Tint);
     // To assembly
     map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);

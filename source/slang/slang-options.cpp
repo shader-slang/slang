@@ -3747,7 +3747,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
              m_rawTargets[0].format == CodeGenTarget::SPIRV ||
              m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
              m_rawTargets[0].format == CodeGenTarget::Metal ||
-             m_rawTargets[0].format == CodeGenTarget::MetalHeader ||
              m_rawTargets[0].format == CodeGenTarget::MetalLib ||
              m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
              ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind ==
@@ -3831,7 +3830,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::MetalLib:
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
-                    case CodeGenTarget::MetalHeader:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
                         rawOutput.isWholeProgram = true;

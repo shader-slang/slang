@@ -319,8 +319,6 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
     case SLANG_METAL:
         return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
-    case SLANG_METAL_HEADER:
-        return Desc::make(Kind::Source, Payload::Metal, Style::Kernel, 0);
     case SLANG_METAL_LIB:
         return Desc::make(Kind::ObjectCode, Payload::MetalAIR, Style::Kernel, 0);
     case SLANG_METAL_LIB_ASM:

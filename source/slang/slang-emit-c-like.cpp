@@ -91,7 +91,6 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::CUDA;
         }
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
         {
             return SourceLanguage::Metal;
         }

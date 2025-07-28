@@ -1224,7 +1224,6 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::CSource:
     case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalHeader:
     case CodeGenTarget::WGSL:
         {
             RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
