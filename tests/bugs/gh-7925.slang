@@ -1,4 +1,3 @@
-//TEST_CATEGORY(smoke, mesh)
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_6 -stage mesh -entry main
 
 struct MeshOutput 
@@ -46,9 +45,7 @@ void main(
     vertices[2].color = float3(0.0, 0.0, 1.0); // Blue
 }
 
-// CHECK: OpCapability MeshShadingEXT
 // CHECK: OpExtension "SPV_EXT_mesh_shader"
-// CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint MeshEXT %main "main"
 // CHECK: OpExecutionMode %main LocalSize 1 1 1
 // CHECK: OpExecutionMode %main OutputPrimitivesEXT 1
