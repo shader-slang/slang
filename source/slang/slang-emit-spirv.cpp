@@ -3877,6 +3877,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!scope)
             return nullptr;
 
+        // Check if this debug variable has an associated DebugValue instruction that connects
+        // it to a global variable (like entry point parameters that have been legalized).
+        // If so, we shouldn't create a local backing variable.
+        for (auto use = debugVar->firstUse; use; use = use->nextUse)
+        {
+            if (auto debugValue = as<IRDebugValue>(use->getUser()))
+            {
+                if (debugValue->getDebugVar() == debugVar)
+                {
+                    auto valueInst = debugValue->getValue();
+                    // Check if the value is a global parameter (entry point parameter that was legalized)
+                    if (as<IRGlobalParam>(valueInst))
+                    {
+                        // Don't create a backing variable for this debug variable.
+                        // The DebugValue instruction will handle the connection directly.
+                        return nullptr;
+                    }
+                }
+            }
+        }
+
         IRBuilder builder(debugVar);
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
