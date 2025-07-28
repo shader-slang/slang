@@ -247,10 +247,7 @@ private:
     void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
     void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
 
-    void handleDeferredObjectContents(
-        void* valuePtr,
-        SerializerCallback callback,
-        void* context);
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 /// Serializer implementation for reading from a tree of RIFF chunks.

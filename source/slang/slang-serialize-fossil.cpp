@@ -2,7 +2,6 @@
 #include "slang-serialize-fossil.h"
 
 #include "../core/slang-blob.h"
-
 #include "core/slang-performance-profiler.h"
 
 namespace Slang
@@ -324,7 +323,10 @@ void SerialWriter::handleUniquePtr(void*& value, SerializerCallback callback, vo
     handleSharedPtr(value, callback, context);
 }
 
-void SerialWriter::handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context)
+void SerialWriter::handleDeferredObjectContents(
+    void* valuePtr,
+    SerializerCallback callback,
+    void* context)
 {
     // Because we are already deferring writing of the *entirety* of
     // an object's members as part of how `handleSharedPtr()` works,
@@ -1367,7 +1369,10 @@ void SerialReader::handleSharedPtr(void*& value, SerializerCallback callback, vo
     value = objectInfo->resurrectedObjectPtr;
 }
 
-void SerialReader::handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context)
+void SerialReader::handleDeferredObjectContents(
+    void* valuePtr,
+    SerializerCallback callback,
+    void* context)
 {
     // Unlike the case in `SerialWriter::handleDeferredObjectContents()`,
     // we very much *do* want to delay invoking the callback until later.
@@ -1577,7 +1582,7 @@ void SerialReader::_pushContainerState(
     auto containerDataPtr = containerObjPtr.getDataPtr();
     auto containerLayout = containerObjPtr.getLayout();
 
-    auto elementCount = (uint32_t) containerObjPtr->getElementCount();
+    auto elementCount = (uint32_t)containerObjPtr->getElementCount();
 
     FossilizedValLayout const* elementLayout = containerLayout->elementLayout;
     auto elementStride = containerLayout->elementStride;
