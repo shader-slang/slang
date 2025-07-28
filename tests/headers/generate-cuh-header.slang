@@ -3,6 +3,7 @@
 //CHECK: #pragma once
 //CHECK: #include "{{.*}}slang-cuda-prelude.h"
 
+// see "sharedMemory" below
 //CHECK: __device__ __shared__ FixedArray<float, 4>  sharedMemory;
 
 //CHECK: struct Struct
