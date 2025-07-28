@@ -3019,10 +3019,7 @@ void SemanticsVisitor::AddGenericOverloadCandidates(Expr* baseExpr, OverloadReso
     else if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
     {
         // We are referring to a bunch of declarations, each of which might be generic
-        // Apply the same filtering logic used for regular overload resolution to ensure
-        // extension preferences are handled correctly.
-        auto filteredLookupResult = resolveOverloadedLookup(overloadedExpr->lookupResult2);
-        for (auto item : filteredLookupResult)
+        for (auto item : overloadedExpr->lookupResult2)
         {
             AddGenericOverloadCandidate(item, context);
         }
