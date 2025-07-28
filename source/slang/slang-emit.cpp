@@ -926,7 +926,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::CUDAHeader: // TODO: required?
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         {
             // Generate any requested derivative wrappers
