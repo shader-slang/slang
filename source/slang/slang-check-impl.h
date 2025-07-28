@@ -3002,7 +3002,6 @@ public:
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
     Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
     Expr* visitNoneLiteralExpr(NoneLiteralExpr* expr);
-    Expr* visitIRSizeLiteralExpr(IRSizeLiteralExpr* expr);
     Expr* visitIntegerLiteralExpr(IntegerLiteralExpr* expr);
     Expr* visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr);
     Expr* visitStringLiteralExpr(StringLiteralExpr* expr);
@@ -3081,6 +3080,7 @@ public:
     Expr* visitThisInterfaceExpr(ThisInterfaceExpr* expr);
     Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr);
     Expr* visitReturnValExpr(ReturnValExpr* expr);
+    Expr* visitIRSizeExpr(IRSizeExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);

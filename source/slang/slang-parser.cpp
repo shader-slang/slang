@@ -6980,6 +6980,13 @@ static NodeBase* parseReturnValExpr(Parser* parser, void* /*userData*/)
     return expr;
 }
 
+static NodeBase* parseIRSizeExpr(Parser* parser, void* /*userData*/)
+{
+    IRSizeExpr* expr = parser->astBuilder->create<IRSizeExpr>();
+    expr->scope = parser->currentScope;
+    return expr;
+}
+
 static Expr* parseBoolLitExpr(Parser* parser, bool value)
 {
     BoolLiteralExpr* expr = parser->astBuilder->create<BoolLiteralExpr>();
@@ -7005,11 +7012,6 @@ static NodeBase* parseNullPtrExpr(Parser* parser, void* /*userData*/)
 static NodeBase* parseNoneExpr(Parser* parser, void* /*userData*/)
 {
     return parser->astBuilder->create<NoneLiteralExpr>();
-}
-
-static NodeBase* parseIRSizeLiteralExpr(Parser* parser, void* /*userData*/)
-{
-    return parser->astBuilder->create<IRSizeLiteralExpr>();
 }
 
 static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
@@ -9621,9 +9623,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("true", parseTrueExpr),
     _makeParseExpr("false", parseFalseExpr),
     _makeParseExpr("__return_val", parseReturnValExpr),
+    _makeParseExpr("__ir_size", parseIRSizeExpr),
     _makeParseExpr("nullptr", parseNullPtrExpr),
     _makeParseExpr("none", parseNoneExpr),
-    _makeParseExpr("__ir_size", parseIRSizeLiteralExpr),
     _makeParseExpr("try", parseTryExpr),
     _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
     _makeParseExpr("__fwd_diff", parseForwardDifferentiate),

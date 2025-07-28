@@ -47,10 +47,6 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
         void visitNoneLiteralExpr(NoneLiteralExpr* expr) { iterator->maybeDispatchCallback(expr); }
-        void visitIRSizeLiteralExpr(IRSizeLiteralExpr* expr)
-        {
-            iterator->maybeDispatchCallback(expr);
-        }
         void visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -255,6 +251,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitIRSizeExpr(IRSizeExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
         {

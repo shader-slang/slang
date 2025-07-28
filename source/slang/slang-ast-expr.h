@@ -126,12 +126,6 @@ class NoneLiteralExpr : public LiteralExpr
 };
 
 FIDDLE()
-class IRSizeLiteralExpr : public LiteralExpr
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
 class StringLiteralExpr : public LiteralExpr
 {
     FIDDLE(...)
@@ -609,6 +603,14 @@ class ThisExpr : public Expr
 // functions whose result type is non-copyable.
 FIDDLE()
 class ReturnValExpr : public Expr
+{
+    FIDDLE(...)
+
+    Scope* scope = nullptr;
+};
+
+FIDDLE()
+class IRSizeExpr : public Expr
 {
     FIDDLE(...)
 

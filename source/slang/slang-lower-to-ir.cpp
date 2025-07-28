@@ -4610,6 +4610,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitReturnValExpr(ReturnValExpr*) { return context->returnDestination; }
 
+    LoweredValInfo visitIRSizeExpr(IRSizeExpr*)
+    {
+        auto builder = getBuilder();
+        IRInst* args[] = {context->getMainModuleDecl()->module->getIRModule()->getModuleInst()};
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(builder->getUIntType(), kIROp_IRSize, 1, args));
+    }
+
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
@@ -5169,13 +5177,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitNoneLiteralExpr(NoneLiteralExpr*)
     {
         return LoweredValInfo::simple(context->irBuilder->getVoidValue());
-    }
-
-    LoweredValInfo visitIRSizeLiteralExpr(IRSizeLiteralExpr*)
-    {
-        auto builder = getBuilder();
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(builder->getUIntType(), kIROp_IRSize, 1, args));
     }
 
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)

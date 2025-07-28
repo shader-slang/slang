@@ -1805,12 +1805,6 @@ Expr* SemanticsExprVisitor::visitNoneLiteralExpr(NoneLiteralExpr* expr)
     return expr;
 }
 
-Expr* SemanticsExprVisitor::visitIRSizeLiteralExpr(IRSizeLiteralExpr* expr)
-{
-    expr->type = m_astBuilder->getUIntType();
-    return expr;
-}
-
 Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
 {
     // The expression might already have a type, determined by its suffix.
@@ -5635,6 +5629,12 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
     }
     getSink()->diagnose(expr, Diagnostics::returnValNotAvailable);
     expr->type = getASTBuilder()->getErrorType();
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitIRSizeExpr(IRSizeExpr* expr)
+{
+    expr->type = m_astBuilder->getUIntType();
     return expr;
 }
 

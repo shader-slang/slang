@@ -233,10 +233,6 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "none";
     }
-    else if (as<IRSizeLiteralExpr>(expr))
-    {
-        sb << "__ir_size";
-    }
     else if (const auto stringLit = as<StringLiteralExpr>(expr))
     {
         sb << "\"" << stringLit->value << "\"";
@@ -677,6 +673,10 @@ void ASTPrinter::addExpr(Expr* expr)
     else if (as<ReturnValExpr>(expr))
     {
         sb << "__return_val";
+    }
+    else if (as<IRSizeExpr>(expr))
+    {
+        sb << "__ir_size";
     }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
