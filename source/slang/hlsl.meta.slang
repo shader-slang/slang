@@ -9540,7 +9540,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 // Helper functions for Metal target
-int __metal_clz(int value)
+internal int __metal_clz(int value)
 {
     __target_switch
     {
