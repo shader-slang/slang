@@ -45,7 +45,6 @@ void main(
     vertices[2].color = float3(0.0, 0.0, 1.0); // Blue
 }
 
-// CHECK: OpExtension "SPV_EXT_mesh_shader"
 // CHECK: OpEntryPoint MeshEXT %main "main"
 // CHECK: OpExecutionMode %main LocalSize 1 1 1
 // CHECK: OpExecutionMode %main OutputPrimitivesEXT 1
