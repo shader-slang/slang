@@ -91,6 +91,12 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
 
         # literal values
         value: list[tuple[str, lldb.SBValue]] = []
+        # Using `Cast` here seems to work just fine in the LLDB CLI with
+        # `v`, as well as in CodeLLDB, but for some reason it does not
+        # work correctly with `p`, causing the `[value]` child to be
+        # missing in that case. It is possible to fix that by using
+        # `EvaluateExpression` instead, but that significantly degrades
+        # performance, so we choose not to do it here.
         match op.value:
             case "kIROp_StringLit":
                 string_lit_t = target.FindFirstType("Slang::IRStringLit")
