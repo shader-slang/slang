@@ -1017,15 +1017,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             return true;
         }
-    case kIROp_Add:
-    case kIROp_Sub:
-    case kIROp_Lsh:
-    case kIROp_Rsh:
-    case kIROp_And:
-    case kIROp_Or:
-    case kIROp_BitAnd:
-    case kIROp_BitOr:
-    case kIROp_BitXor:
     case kIROp_Less:
     case kIROp_Greater:
     case kIROp_Leq:
@@ -1113,45 +1104,6 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
                         emitOperand(right, getInfo(EmitOp::General));
                         m_writer->emit(")");
                     }
-                }
-                
-                m_writer->emit("}");
-                return true;
-            }
-            break;
-        }
-    case kIROp_Not:
-    case kIROp_BitNot:
-        {
-            // Handle unary operations for lowered matrices (arrays of vectors)
-            auto resultType = inst->getDataType();
-            
-            // Check if this is a lowered matrix operation (result is array of vectors)
-            auto arrayType = as<IRArrayType>(resultType);
-            if (arrayType && as<IRVectorType>(arrayType->getElementType()))
-            {
-                auto rowCount = getIntVal(arrayType->getElementCount());
-                
-                const char* opStr = "";
-                switch (inst->getOp())
-                {
-                case kIROp_Not: opStr = "!"; break;
-                case kIROp_BitNot: opStr = "~"; break;
-                default: break;
-                }
-                
-                emitType(resultType);
-                m_writer->emit("{");
-                
-                for (IRIntegerValue i = 0; i < rowCount; i++)
-                {
-                    if (i != 0) m_writer->emit(", ");
-                    
-                    m_writer->emit(opStr);
-                    emitOperand(inst->getOperand(0), getInfo(EmitOp::Postfix));
-                    m_writer->emit("[");
-                    m_writer->emit(i);
-                    m_writer->emit("]");
                 }
                 
                 m_writer->emit("}");

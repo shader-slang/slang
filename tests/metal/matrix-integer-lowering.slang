@@ -12,8 +12,10 @@ typealias m2x3 = matrix<TYPE, 2, 3>;
 typealias m3x3 = matrix<TYPE, 3, 3>;
 typealias m2x4 = matrix<TYPE, 2, 4>;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[-1 4], stride=4):name expectedBuffer
 RWStructuredBuffer<TYPE> outputBuffer;
+RWStructuredBuffer<TYPE> expectedBuffer;
 
 struct matrixWrapper {
     m2x2 mat1 = m2x2(1, 2, 3, 4);
@@ -108,6 +110,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     matrix<bool, 2, 2> equal_to = comp_mat1 == comp_mat2;
     matrix<bool, 2, 2> not_equal = comp_mat1 != comp_mat2;
     
+    // Test matrix negation operations
+    m2x2 neg_mat = m2x2(1, -2, 3, -4);
+    m2x2 negated = -neg_mat;
+    
     // Store results
     outputBuffer[0] = val1;
     // CHECK: 1
@@ -189,4 +195,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 0
     outputBuffer[36] = TYPE(equal_to[0][0]);
     // CHECK-NEXT: 0
+    outputBuffer[37] = TYPE(negated[0][0] == expectedBuffer[0]);
+    // CHECK-NEXT: 1
+    outputBuffer[38] = TYPE(negated[1][1] == expectedBuffer[1]);
+    // CHECK-NEXT: 1
 } 
