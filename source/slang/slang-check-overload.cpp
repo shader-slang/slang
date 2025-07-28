@@ -1355,7 +1355,8 @@ DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
 //
 int SemanticsVisitor::CompareLookupResultItems(
     LookupResultItem const& left,
-    LookupResultItem const& right)
+    LookupResultItem const& right,
+    bool deferExtensionPrefs)
 {
     auto leftDeclRefParent = getParentDeclRef(left.declRef);
     auto rightDeclRefParent = getParentDeclRef(right.declRef);
@@ -1418,28 +1419,39 @@ int SemanticsVisitor::CompareLookupResultItems(
         return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
     // Prefer non-extension declarations over extension declarations.
+    // However, during lookup filtering, defer this preference to overload resolution
+    // to allow different overloads to be considered.
     if (leftIsExtension != rightIsExtension)
     {
-        // Add a special case for constructors, where we prefer the one that is not synthesized,
-        if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
+        if (deferExtensionPrefs)
         {
-            if (auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl()))
+            // Defer extension preferences to overload resolution
+            // by treating them as equal during lookup filtering
+            // (but continue with other checks)
+        }
+        else
+        {
+            // Add a special case for constructors, where we prefer the one that is not synthesized,
+            if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
             {
-                bool leftIsSynthesized = leftCtor->containsFlavor(
-                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-                bool rightIsSynthesized = rightCtor->containsFlavor(
-                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-
-                if (leftIsSynthesized != rightIsSynthesized)
+                if (auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl()))
                 {
-                    return int(leftIsSynthesized) - int(rightIsSynthesized);
+                    bool leftIsSynthesized = leftCtor->containsFlavor(
+                        ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+                    bool rightIsSynthesized = rightCtor->containsFlavor(
+                        ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+
+                    if (leftIsSynthesized != rightIsSynthesized)
+                    {
+                        return int(leftIsSynthesized) - int(rightIsSynthesized);
+                    }
                 }
             }
-        }
 
-        return int(leftIsExtension) - int(rightIsExtension);
+            return int(leftIsExtension) - int(rightIsExtension);
+        }
     }
-    else if (leftIsExtension)
+    else if (leftIsExtension && !deferExtensionPrefs)
     {
         // If both are declared in extensions, prefer the one that is least generic.
         bool leftIsGeneric = leftDeclRefParent.getParent().as<GenericDecl>() != nullptr;
