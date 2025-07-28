@@ -19,7 +19,7 @@ Profile Profile::lookUp(UnownedStringSlice const& name)
 
 Profile Profile::lookUp(char const* name)
 {
-    return lookUp(UnownedTerminatedStringSlice(name));
+    return lookUp(UnownedStringSlice(name));
 }
 
 CapabilitySet Profile::getCapabilityName()
