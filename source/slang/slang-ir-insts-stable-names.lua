@@ -669,5 +669,5 @@ return {
 	["SPIRVAsmOperand.__sampledType"] = 665,
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
-	["IRInst"] = 668,
+	["IRSize"] = 668,
 }
