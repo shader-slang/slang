@@ -151,12 +151,46 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     case OverloadCandidate::Flavor::Generic:
         paramCounts = CountParameters(candidate.item.declRef.as<GenericDecl>());
 
-        // A generic can be applied to any number of arguments less
-        // than or equal to the number of explicitly declared parameters.
-        // When a program provides fewer arguments than their are parameters,
-        // the rest will be inferred.
-        //
-        paramCounts.required = 0;
+        // For generic method calls, we need to check the function parameters of the inner callable,
+        // not just the generic parameters. The generic parameters are handled separately during
+        // generic application, but the function call still needs to match the function parameters.
+        if (auto genericDecl = candidate.item.declRef.as<GenericDecl>())
+        {
+            CallableDecl* innerCallable = nullptr;
+            
+            // Look for the inner callable declaration within the generic
+            for (auto member : genericDecl.getDecl()->getDirectMemberDecls())
+            {
+                if (auto callableDecl = as<CallableDecl>(member))
+                {
+                    // Only handle the case where there's exactly one callable member
+                    if (innerCallable)
+                    {
+                        innerCallable = nullptr; // Multiple callables, fall back to original logic
+                        break;
+                    }
+                    innerCallable = callableDecl;
+                }
+            }
+            
+            if (innerCallable)
+            {
+                // Use the function parameter count, not the generic parameter count
+                auto funcParamCounts = CountParameters(getParameters(m_astBuilder, DeclRef<CallableDecl>(innerCallable)));
+                paramCounts.allowed = funcParamCounts.allowed;
+                paramCounts.required = funcParamCounts.required;
+            }
+            else
+            {
+                // Fall back to original logic for generic parameters
+                paramCounts.required = 0;
+            }
+        }
+        else
+        {
+            // Fall back to original logic
+            paramCounts.required = 0;
+        }
         break;
 
     case OverloadCandidate::Flavor::Expr:
