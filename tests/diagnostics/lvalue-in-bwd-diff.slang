@@ -15,7 +15,9 @@ void main()
 
     // Backward mode differentiation
     let dLdSquare = 1.0f;
+    // CHECK-NOT: error 30049
     // CHECK: error 30047
+    // CHECK-NOT: error 30049
     bwd_diff(square)(x, y, dLdSquare);
     printf("dL/dx: %f, dL/dy: %f\n", x.d, y.d);
 }
