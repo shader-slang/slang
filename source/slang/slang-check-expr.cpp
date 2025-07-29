@@ -2703,7 +2703,7 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
         {
             e = subscriptExpr->baseExpression;
         }
-        else if (auto thisExpr = as<ThisExpr>(e))
+        else if (as<ThisExpr>(e))
         {
             break;
         }
