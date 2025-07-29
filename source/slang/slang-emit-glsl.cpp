@@ -1246,6 +1246,14 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
     }
+    else if (name == "gl_FragmentSizeNV")
+    {
+        _requireGLSLExtension(toSlice("GL_NV_shading_rate_image"));
+    }
+    else if (name == "gl_InvocationsPerPixelNV")
+    {
+        _requireGLSLExtension(toSlice("GL_NV_shading_rate_image"));
+    }
     else if (name == "gl_DrawID")
     {
         _requireGLSLVersion(460);
