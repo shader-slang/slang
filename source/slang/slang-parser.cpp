@@ -129,6 +129,10 @@ public:
     Modifiers* pendingModifiers = nullptr;
     int genericDepth = 0;
 
+    SourceLoc savedSourceLoc;
+    SourceLoc getSavedSourceLoc() { return savedSourceLoc; }
+    void saveNextSourceLoc() { savedSourceLoc = tokenReader.peekLoc(); }
+
     // Is the parser in a "recovering" state?
     // During recovery we don't emit additional errors, until we find
     // a token that we expected, when we exit recovery.
@@ -712,6 +716,29 @@ bool AdvanceIf(Parser* parser, char const* text)
     return false;
 }
 
+// This is an N token lookahead, step Y token if sucsess.
+// This is not a good idea to use unless left
+// without any other option.
+bool AdvanceIf(Parser* parser, List<char const*> text, uint32_t tokensToAdvance)
+{
+    TokenReader startState = parser->tokenReader;
+    for (int i = 0; i < text.getCount(); i++)
+    {
+        if (startState.peekToken().getName()->text.equals(text[i]))
+        {
+            startState.advanceToken();
+            continue;
+        }
+        return false;
+    }
+    while (tokensToAdvance > 0)
+    {
+        tokensToAdvance--;
+        parser->ReadToken();
+    }
+    return true;
+}
+
 bool AdvanceIf(Parser* parser, char const* text, Token* outToken)
 {
     if (parser->LookAheadToken(text))
@@ -1248,6 +1275,29 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
+                }
+                else if (AdvanceIf(parser, {"dyn", "interface"}, 1))
+                {
+                    // TODO:
+                    // This is non-idomatic code for the Slang parser.
+                    // We should be using SyntaxDecl's for all cases of
+                    // parsing "dyn".
+                    // We have this case to currently work around the ambiguous case of:
+                    // "dyn" with `_makeParsePrefixWithTypeExpr` for `dyn Type` parsing;
+                    // "dyn" with `_makeParseDecl` to support `dyn interface` parsing.
+                    //
+                    // To support the following feature these 2 things must be done first:
+                    // 1. Change `tryLookUpSyntaxDecl` to `tryLookUpSyntaxDecl<T>`. Additionally,
+                    //    allow overloading syntaxes we look-up, filtering based on type `T`
+                    //    (erroring if multiple valid results are found).
+                    //    [logic already implemented in `ArielG-NV`->`implement-SP024-some-support`
+                    // 2. Fully reset state if we fail `tryParseUsingSyntaxDeclImpl`. This is
+                    //    important because currently if we just implement #1, parser-context
+                    //    will still be changed, breaking parsing.
+                    parsedModifier = parser->astBuilder->create<DynModifier>();
+                    parsedModifier->loc = nameToken.loc;
+                    AddModifier(&modifierLink, parsedModifier);
+                    continue;
                 }
                 // If there was no match for a modifier keyword, then we
                 // must be at the end of the modifier sequence
@@ -2862,6 +2912,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     // closing `}` is at the end of its line, as a bit of a special case
     // to allow the common idiom.
     //
+    PrefixWithTypeExpr* parsedExpr = nullptr;
+    parser->saveNextSourceLoc();
     if (parser->LookAheadToken("struct"))
     {
         auto decl = parser->ParseStruct();
@@ -2883,11 +2935,6 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
     }
-    else if (parser->LookAheadToken("expand") || parser->LookAheadToken("each"))
-    {
-        typeSpec.expr = parsePrefixExpr(parser);
-        return typeSpec;
-    }
     // Uncomment should we decide to enable (a,b,c) tuple types
     // else if(parser->LookAheadToken(TokenType::LParent))
     // {
@@ -2898,6 +2945,16 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     {
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
+    }
+    else
+    {
+        TokenReader beforeParsingSyntax = parser->tokenReader;
+        if (tryParseUsingSyntaxDecl<PrefixWithTypeExpr>(parser, &parsedExpr))
+        {
+            typeSpec.expr = parsedExpr;
+            return typeSpec;
+        }
+        parser->tokenReader = beforeParsingSyntax;
     }
 
     bool inGlobalScope = false;
@@ -7054,6 +7111,22 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     return alignOfExpr;
 }
 
+static NodeBase* parseSomeTypeExpr(Parser* parser, void* /*userData*/)
+{
+    SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
+    parser->FillPosition(expr);
+    expr->base = parser->ParseTypeExp();
+    return expr;
+}
+
+static NodeBase* parseDynTypeExpr(Parser* parser, void* /*userData*/)
+{
+    DynTypeExpr* expr = parser->astBuilder->create<DynTypeExpr>();
+    parser->FillPosition(expr);
+    expr->base = parser->ParseTypeExp();
+    return expr;
+}
+
 static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -8600,18 +8673,22 @@ static Expr* parseSPIRVAsmExpr(Parser* parser, SourceLoc loc)
     return asmExpr;
 }
 
-static Expr* parseExpandExpr(Parser* parser, SourceLoc loc)
+static NodeBase* parseExpandExpr(Parser* parser, void*)
 {
+    if (!parser->isInVariadicGenerics)
+        return nullptr;
     ExpandExpr* expandExpr = parser->astBuilder->create<ExpandExpr>();
-    expandExpr->loc = loc;
+    expandExpr->loc = parser->getSavedSourceLoc();
     expandExpr->baseExpr = parser->ParseArgExpr();
     return expandExpr;
 }
 
-static Expr* parseEachExpr(Parser* parser, SourceLoc loc)
+static NodeBase* parseEachExpr(Parser* parser, void*)
 {
+    if (!parser->isInVariadicGenerics)
+        return nullptr;
     EachExpr* eachExpr = parser->astBuilder->create<EachExpr>();
-    eachExpr->loc = loc;
+    eachExpr->loc = parser->getSavedSourceLoc();
     eachExpr->baseExpr = parsePostfixExpr(parser);
     return eachExpr;
 }
@@ -8623,11 +8700,12 @@ static Expr* parsePrefixExpr(Parser* parser)
     {
     case TokenType::Identifier:
         {
-            auto tokenLoc = peekToken(parser).getLoc();
+            PrefixWithTypeExpr* prefixWithTypeExpr = nullptr;
+            parser->saveNextSourceLoc();
             if (AdvanceIf(parser, "new"))
             {
                 NewExpr* newExpr = parser->astBuilder->create<NewExpr>();
-                newExpr->loc = tokenLoc;
+                newExpr->loc = parser->getSavedSourceLoc();
                 auto subExpr = parsePostfixExpr(parser);
                 if (as<VarExpr>(subExpr) || as<GenericAppExpr>(subExpr))
                 {
@@ -8648,21 +8726,18 @@ static Expr* parsePrefixExpr(Parser* parser)
             }
             else if (AdvanceIf(parser, "spirv_asm"))
             {
-                return parseSPIRVAsmExpr(parser, tokenLoc);
+                return parseSPIRVAsmExpr(parser, parser->getSavedSourceLoc());
             }
-            else if (parser->isInVariadicGenerics)
+            else
             {
-                // If we are inside a variadic generic, we also need to recognize
-                // the new `expand` and `each` keyword for dealing with variadic packs.
-                if (AdvanceIf(parser, "expand"))
+                TokenReader beforeParsingSyntax = parser->tokenReader;
+                if (tryParseUsingSyntaxDecl<PrefixWithTypeExpr>(parser, &prefixWithTypeExpr))
                 {
-                    return parseExpandExpr(parser, tokenLoc);
+                    return prefixWithTypeExpr;
                 }
-                else if (AdvanceIf(parser, "each"))
-                {
-                    return parseEachExpr(parser, tokenLoc);
-                }
+                parser->tokenReader = beforeParsingSyntax;
             }
+
             return parsePostfixExpr(parser);
         }
     default:
@@ -9491,6 +9566,18 @@ static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCa
     return entry;
 }
 
+static SyntaxParseInfo _makeParsePrefixWithTypeExpr(
+    const char* keywordName,
+    SyntaxParseCallback callback)
+{
+    // If we just have class info - use simple parser
+    SyntaxParseInfo entry;
+    entry.keywordName = keywordName;
+    entry.callback = callback;
+    entry.classInfo = getSyntaxClass<PrefixWithTypeExpr>();
+    return entry;
+}
+
 // Maps a keyword to the associated parsing function
 static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     // !!!!!!!!!!!!!!!!!!!! Decls !!!!!!!!!!!!!!!!!!
@@ -9555,8 +9642,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("require", getSyntaxClass<RequireModifier>()),
     _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
     _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
-
-    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
 
     _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
     _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
@@ -9641,6 +9726,12 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+
+    // !!!!!!!!!!!!!!!!!!!!!!! PrefixWithTypeExpr !!!!!!!!!!!!!!!!!!!!!!!!!!!
+    _makeParsePrefixWithTypeExpr("dyn", parseDynTypeExpr),
+    _makeParsePrefixWithTypeExpr("some", parseSomeTypeExpr),
+    _makeParsePrefixWithTypeExpr("expand", parseExpandExpr),
+    _makeParsePrefixWithTypeExpr("each", parseEachExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

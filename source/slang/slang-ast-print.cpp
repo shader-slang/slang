@@ -865,6 +865,30 @@ void ASTPrinter::addExpr(Expr* expr)
 
         sb << "*";
     }
+    else if (const auto someTypeExpr = as<SomeTypeExpr>(expr))
+    {
+        sb << "some ";
+        if (someTypeExpr->base.type)
+        {
+            addType(someTypeExpr->base.type);
+        }
+        else
+        {
+            sb << "<unknown-type>";
+        }
+    }
+    else if (const auto dynTypeExpr = as<DynTypeExpr>(expr))
+    {
+        sb << "dyn ";
+        if (dynTypeExpr->base.type)
+        {
+            addType(dynTypeExpr->base.type);
+        }
+        else
+        {
+            sb << "<unknown-type>";
+        }
+    }
     else if (const auto funcTypeExpr = as<FuncTypeExpr>(expr))
     {
         sb << "(";
@@ -1555,6 +1579,10 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     else if (as<InterfaceDecl>(decl))
     {
         m_builder << "interface ";
+    }
+    else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+    {
+        m_builder << "some " << getInterfaceType(getCurrentASTBuilder(), someTypeDecl);
     }
     else if (as<ClassDecl>(decl))
     {
