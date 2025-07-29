@@ -60,17 +60,8 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // any parameters that use structured or byte-addressed
         // buffers or images with format qualifiers.
         //
-        if (isKhronosTarget(targetRequest))
-        {
-            if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
-                return isIllegalSPIRVParameterType(type, isArray);
-            else
-                return isIllegalGLSLParameterType(type);
-        }
-        else if (isWGPUTarget(targetRequest))
-        {
-            return isIllegalWGSLParameterType(type);
-        }
+        if(isIllegalParameterType(targetRequest, type, isArray))
+            return true;
 
         // For now, we will not treat any other parameters as
         // needing specialization, even if they use resource
@@ -873,10 +864,16 @@ struct ResourceOutputSpecializationPass
 
             if (auto constRefType = as<IRConstRefType>(pseudoOutType))
             {
-                // Pointer-like ref types should never need to be deref'ed
-                // we are trying to eliminate the Loads from the pointer-like
-                // type.
-                if(as<IRPointerLikeType>(constRefType->getValueType()))
+                // illegal-as-param types should never need to be deref'ed,
+                // since these types do not make sense to pass as a pointer
+                // (they are already a 'pointer-like-type' or treated like one)
+                valueType = pseudoOutType->getValueType();
+                auto unwrappedValueType = unwrapArray(valueType);
+                auto isArray = valueType == unwrappedValueType;
+                if (isIllegalParameterType(
+                        codeGenContext->getTargetReq(),
+                        unwrappedValueType,
+                        false))
                     outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
                 else
                     outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
@@ -1397,6 +1394,21 @@ bool isIllegalGLSLParameterType(IRType* type)
     if (as<IRHLSLOutputPatchType>(type))
         return true;
     return false;
+}
+
+bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray)
+{
+    if (isKhronosTarget(targetRequest))
+    {
+        if (targetRequest->getOptionSet().shouldEmitSPIRVDirectly())
+            return isIllegalSPIRVParameterType(type, isArray);
+        else
+            return isIllegalGLSLParameterType(type);
+    }
+    else if (isWGPUTarget(targetRequest))
+    {
+        return isIllegalWGSLParameterType(type);
+    }
 }
 
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
