@@ -24461,7 +24461,7 @@ extension<
     CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
 
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
-    static CoopMat<T, S, M, N, R> __MapElement<
+    internal static CoopMat<T, S, M, N, R> __MapElement<
         TOperator,
         TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
     >(This tuple, TOperator mapOp, TFunc mapObj);

@@ -1317,12 +1317,34 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         else if (depth > 0)
         {
             // Write out the generic parameters (only if the depth allows it)
-            addGenericParams(parentGenericDeclRef);
+            addGenericParams(parentGenericDeclRef, nullptr);
         }
     }
 }
 
-void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+struct ParamScope
+{
+    StringBuilder* sb;
+    List<Range<Index>>* paramRanges;
+    Index rangeStart;
+    ParamScope(StringBuilder* inSb, List<Range<Index>>* outParamRanges)
+        : sb(inSb), paramRanges(outParamRanges)
+    {
+        rangeStart = sb->getLength();
+    }
+    ~ParamScope()
+    {
+        if (paramRanges)
+        {
+            Index rangeEnd = sb->getLength();
+            paramRanges->add(makeRange<Index>(rangeStart, rangeEnd));
+        }
+    }
+};
+
+void ASTPrinter::addGenericParams(
+    const DeclRef<GenericDecl>& genericDeclRef,
+    List<Range<Index>>* outParamRanges)
 {
     auto& sb = m_builder;
 
@@ -1335,7 +1357,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
-
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << getText(genericTypeParam.getName());
@@ -1346,7 +1368,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
-
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamValueType);
                 addType(getType(m_astBuilder, genericValParam));
@@ -1362,6 +1384,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
@@ -1387,8 +1410,6 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         bool first = true;
         for (auto paramDeclRef : getParameters(m_astBuilder, funcDeclRef))
         {
-            auto rangeStart = sb.getLength();
-
             ParamDecl* paramDecl = paramDeclRef.getDecl();
             auto paramType = getType(m_astBuilder, paramDeclRef);
 
@@ -1397,8 +1418,9 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                 if (!first)
                 {
                     sb << ", ";
-                    rangeStart += 2;
                 }
+
+                ParamScope paramScope(&sb, outParamRange);
 
                 // Type part.
                 {
@@ -1446,11 +1468,6 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                     sb << " = ";
                     addExpr(paramDecl->initExpr);
                 }
-
-                auto rangeEnd = sb.getLength();
-
-                if (outParamRange)
-                    outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
                 first = false;
             };
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -1471,11 +1488,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        addGenericParams(genericDeclRef);
-
-        addDeclParams(
-            m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner),
-            outParamRange);
+        addGenericParams(genericDeclRef, outParamRange);
     }
     else
     {
