@@ -3582,22 +3582,22 @@ __forceinline__ __device__ void* optixTraverse(
 
 static __forceinline__ __device__ bool optixHitObjectIsHit(OptixTraversableHandle* hitObj)
 {
-    return optixHitObjectIsHit();
+    return ::optixHitObjectIsHit();
 }
 
 static __forceinline__ __device__ bool optixHitObjectIsMiss(OptixTraversableHandle* hitObj)
 {
-    return optixHitObjectIsMiss();
+    return ::optixHitObjectIsMiss();
 }
 
 static __forceinline__ __device__ bool optixHitObjectIsNop(OptixTraversableHandle* hitObj)
 {
-    return optixHitObjectIsNop();
+    return ::optixHitObjectIsNop();
 }
 
 static __forceinline__ __device__ uint optixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
 {
-    return optixHitObjectGetClusterId();
+    return ::optixHitObjectGetClusterId();
 }
 
 static __forceinline__ __device__ void optixMakeMissHitObject(
@@ -3747,7 +3747,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
 
 static __forceinline__ __device__ void optixMakeNopHitObject(OptixTraversableHandle* Obj)
 {
-    optixMakeNopHitObject();
+    ::optixMakeNopHitObject();
 }
 
 template<typename T>
@@ -3772,22 +3772,22 @@ static __forceinline__ __device__ RayDesc optixHitObjectGetRayDesc(OptixTraversa
 
 static __forceinline__ __device__ uint optixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 {
-    return optixHitObjectGetInstanceIndex();
+    return ::optixHitObjectGetInstanceIndex();
 }
 
 static __forceinline__ __device__ uint optixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
-    return optixHitObjectGetInstanceId();
+    return ::optixHitObjectGetInstanceId();
 }
 
 static __forceinline__ __device__ uint optixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
 {
-    return optixHitObjectGetSbtGASIndex();
+    return ::optixHitObjectGetSbtGASIndex();
 }
 
 static __forceinline__ __device__ uint optixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
 {
-    return optixHitObjectGetPrimitiveIndex();
+    return ::optixHitObjectGetPrimitiveIndex();
 }
 
 template<typename T>
@@ -3826,21 +3826,9 @@ static __forceinline__ __device__ T optixHitObjectGetAttribute(OptixTraversableH
 
 static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 {
-    return optixHitObjectGetSbtRecordIndex();
+    return ::optixHitObjectGetSbtRecordIndex();
 }
 
-static __forceinline__ __device__ uint
-optixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
-{
-    optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return 0;
-}
-static __forceinline__ __device__ uint
-optixHitObjectGetSbtDataPointer(OptixTraversableHandle* Obj, uint sbtRecordIndex)
-{
-    optixHitObjectGetSbtDataPointer(); // returns void
-    return 0;
-}
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
 

@@ -18,20 +18,33 @@ struct SomeValues
 uint calcValue(HitObject hit)
 {
     uint r = 0;
-    
+
+    // CHECK: optixHitObjectIsHit
     if (hit.IsHit())
     {
+        // CHECK: optixHitObjectGetInstanceIndex
         uint instanceIndex = hit.GetInstanceIndex();
+        // CHECK: optixHitObjectGetInstanceId
         uint instanceID = hit.GetInstanceID();
+        // CHECK: optixHitObjectGetSbtGASIndex
         uint geometryIndex = hit.GetGeometryIndex();
+
+        // CHECK: optixHitObjectGetPrimitiveIndex
         uint primitiveIndex = hit.GetPrimitiveIndex();
+        // CHECK: optixHitObjectGetClusterId
         int clusterID = hit.GetClusterID();
+        // CHECK: optixHitObjectGetSbtRecordIndex
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
+        // CHECK: optixHitObjectSetSbtRecordIndex((0U));
         uint setShaderTableIndex = hit.SetShaderTableIndex(0);
+
+        // CHECK: optixHitObjectGetSbtDataPointer()+(0U);
         uint ialbedo = hit.LoadLocalRootTableConstant(0);
+
+        // CHECK: optixHitObjectGetAttribute
         SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
-        
+
         r += instanceIndex;
         r += instanceID;
         r += geometryIndex;
@@ -42,42 +55,44 @@ uint calcValue(HitObject hit)
         r += setShaderTableIndex;
         r += ialbedo;
     }
-    
+
     return r;
 }
 
-void rayGenerationMain() 
+void rayGenerationMain()
 {
     int2 launchID = int2(DispatchRaysIndex().xy);
     int2 launchSize = int2(DispatchRaysDimensions().xy);
 
     int idx = launchID.x;
-    
+
     SomeValues someValues = { idx, idx * 2.0f };
 
-    RayDesc ray;  
+    RayDesc ray;
     ray.Origin = float3(idx, 0, 0);
     ray.TMin = 0.01f;
     ray.Direction = float3(0, 1, 0);
     ray.TMax = 1e4f;
-    
-    RAY_FLAG rayFlags = RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+
+    RAY_FLAG rayFlags =
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
     uint instanceInclusionMask = 0xff;
     uint rayContributionToHitGroupIndex = 0;
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
     // SPIRV: OpHitObjectTraceRayNV
     // CHECK: optixTraverse
-    HitObject hit = HitObject::TraceRay(scene, 
-        rayFlags, 
-        instanceInclusionMask, 
-        rayContributionToHitGroupIndex, 
-        multiplierForGeometryContributionToHitGroupIndex, 
-        missShaderIndex, 
-        ray, 
+    HitObject hit = HitObject::TraceRay(
+        scene,
+        rayFlags,
+        instanceInclusionMask,
+        rayContributionToHitGroupIndex,
+        multiplierForGeometryContributionToHitGroupIndex,
+        missShaderIndex,
+        ray,
         someValues);
-    
-    ReorderThread( hit );
+
+    ReorderThread(hit);
     ReorderThread(hit, uint(idx & 3), 2);
     ReorderThread(uint(idx & 1), 1);
 
@@ -91,9 +106,11 @@ void rayGenerationMain()
     uint geometryIndex = 0;
     uint primitiveIndex = 0;
     uint hitKind = 0;
-    BuiltInTriangleIntersectionAttributes attr = {0.01f, 0.2f};
+    BuiltInTriangleIntersectionAttributes attr = { 0.01f, 0.2f };
 
-    HitObject hitObj = HitObject::MakeHit(hitGroupRecordIndex, scene,
+    HitObject hitObj = HitObject::MakeHit(
+        hitGroupRecordIndex,
+        scene,
         instanceIndex,
         geometryIndex,
         primitiveIndex,
@@ -112,7 +129,7 @@ void rayGenerationMain()
     // Change the payload
     SomeValues otherValues = { idx * -2, idx * 8.0f };
 
-    HitObject::Invoke( scene, hit, otherValues );
+    HitObject::Invoke(scene, hit, otherValues);
     HitObject motionHitObj[2];
     motionHitObj[0] = HitObject::MakeMotionHit(
         scene,
@@ -142,5 +159,4 @@ void rayGenerationMain()
 
     outputBuffer[idx] += uint(rayD.TMin > 0);
     outputBuffer[idx] += uint(rayD.TMax < ray.TMin);
-
 }
