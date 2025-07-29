@@ -7,7 +7,6 @@ tests/diagnostics/methods/mutating-method-on-rvalue.slang(13): note 30049: attem
 tests/diagnostics/methods/mutating-method-on-rvalue.slang(25): error 30050: mutating method 'increment' cannot be called on an immutable value
     gCounter.increment();
                       ^
-tests/diagnostics/methods/mutating-method-on-rvalue.slang(25): note 30049: attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
 }
 standard output = {
 }
