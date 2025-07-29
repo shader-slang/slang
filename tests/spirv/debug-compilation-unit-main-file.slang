@@ -32,7 +32,6 @@ float4 main(VertexOutput input) : SV_Target
 }
 
 // Verify that DebugCompilationUnit references this main shader file
-// and not the included header file (shader-utils.slang)
-// CHECK: OpExtInst %void {{.*}} DebugSource %{{.*}} [[MAIN_FILE_NAME:"debug-compilation-unit-main-file.slang"]]
-// CHECK: OpExtInst %void {{.*}} DebugCompilationUnit {{.*}} [[MAIN_FILE_NAME]]
-// CHECK-NOT: OpExtInst %void {{.*}} DebugCompilationUnit {{.*}} "shader-utils.slang"
+// CHECK: [[MAIN_FILE:%[0-9]+]] = OpString "{{.*}}debug-compilation-unit-main-file.slang"
+// CHECK: [[SOURCE_ID:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugSource [[MAIN_FILE]] %{{[0-9]+}}
+// CHECK: OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_ID]] %uint_{{[0-9]+}}
