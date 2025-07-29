@@ -1811,9 +1811,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     builder.setInsertBefore(valueType);
                     valueTypeId = getID(ensureInst(builder.getUIntType()));
                 }
-                else if (as<IRStructType>(valueType) && storageClass == SpvStorageClassPhysicalStorageBuffer)
+                else if (
+                    as<IRStructType>(valueType) &&
+                    storageClass == SpvStorageClassPhysicalStorageBuffer)
                 {
-                    // We need to emit a forward declaration if the struct type contains a pointer to itself.
+                    // We need to emit a forward declaration if the struct type contains a pointer
+                    // to itself.
                     if (m_emittingTypes.add(ptrType))
                     {
                         auto spvValueType = ensureInst(valueType);
