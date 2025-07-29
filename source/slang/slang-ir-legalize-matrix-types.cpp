@@ -280,8 +280,7 @@ struct MatrixTypeLoweringContext
         }
         
         // Neither operand is a matrix that needs lowering, shouldn't reach here
-        SLANG_ASSERT(false && "legalizeBinaryOperation called but no matrix operand needs lowering");
-        return inst;
+        SLANG_UNREACHABLE("legalizeBinaryOperation called but no matrix operand needs lowering");
     }
 
     IRInst* legalizeComparisonOperation(IRInst* inst, IROp comparisonOp)

@@ -6481,15 +6481,10 @@ bool all(T x)
 {
     __target_switch
     {
-    default:
-        __intrinsic_asm "bool($0)";
     case hlsl:
         __intrinsic_asm "all";
     case metal:
         __intrinsic_asm "all";
-    case wgsl:
-        // For scalars, all() doesn't exist in WGSL, just convert to bool
-        __intrinsic_asm "bool($0)";
     case spirv:
         let zero = __default<T>();
         if (__isInt<T>())
@@ -6506,6 +6501,8 @@ bool all(T x)
             return __slang_noop_cast<bool>(x);
         else
             return false;
+    default:
+        __intrinsic_asm "bool($0)";
     }
 }
 
