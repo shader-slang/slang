@@ -6,6 +6,7 @@ namespace Slang
 struct CodeGenContext;
 struct IRModule;
 struct IRType;
+struct TargetRequest;
 
 /// Specialize calls to functions with resource-type parameters.
 ///
@@ -27,5 +28,6 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 bool isIllegalGLSLParameterType(IRType* type);
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray);
 bool isIllegalWGSLParameterType(IRType* type);
+bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray);
 
 } // namespace Slang
