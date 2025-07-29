@@ -39,7 +39,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         type = unwrapArray(type);
         bool isArray = type != param->getDataType();
 
-        if(isIllegalParameterType(targetRequest, type, isArray, as<IRPtrTypeBase>(type)))
+        if(isIllegalParameterType(targetRequest, type, isArray))
             return true;
 
         // For now, we will not treat any other parameters as
@@ -308,11 +308,10 @@ struct ResourceOutputSpecializationPass
         {
             auto valueType = constRefType->getValueType();
             auto unwrappedValueType = unwrapArray(valueType);
-            if (isIllegalParameterType(
+            if (isIllegalRefValueTypeParameterType(
                 targetRequest,
                 constRefType->getValueType(),
-                unwrappedValueType != valueType,
-                true))
+                unwrappedValueType != valueType))
             {
                 return constRefType;
             }
@@ -843,7 +842,7 @@ struct ResourceOutputSpecializationPass
             //
             bodyBuilder.emitStore(newVar, newParam);
 
-            if (auto constRefType = as<IRConstRefType>(pseudoOutType))
+            if (as<IRConstRefType>(pseudoOutType))
             {
                 // illegal-as-param types should never need to be deref'ed,
                 // since these types do not make sense to pass as a pointer.
@@ -1367,7 +1366,7 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
-bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray, bool fullTypeIsPointer)
+bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray)
 {
     // On all of our (current) targets, a function that
     // takes a `ConstantBuffer<T>` parameter requires
@@ -1385,16 +1384,6 @@ bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isA
     //
     if (as<IRUniformParameterGroupType>(type))
     {
-        // If type is a pointer<T>, we don't need to 
-        // specialize since these targets allow
-        // pointer to ConstantBuffer/ParameterBlock.
-        if(fullTypeIsPointer
-            && (isCPUTarget(targetRequest) ||
-                isCUDATarget(targetRequest) ||
-                isMetalTarget(targetRequest) ||
-                isWGPUTarget(targetRequest)))
-            return false;
-
         return true;
     }
 
@@ -1415,6 +1404,25 @@ bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isA
     }
 
     return false;
+}
+
+bool isIllegalRefValueTypeParameterType(TargetRequest* targetRequest, IRType* type, bool isArray)
+{
+    // For GL/Vulkan targets, we also need to specialize
+    // any parameters that use structured or byte-addressed
+    // buffers or images with format qualifiers.
+    //
+    if (isKhronosTarget(targetRequest))
+    {
+        if (targetRequest->getOptionSet().shouldEmitSPIRVDirectly())
+            return isIllegalSPIRVParameterType(type, isArray);
+        else
+            return isIllegalGLSLParameterType(type);
+    }
+    else if (isWGPUTarget(targetRequest))
+    {
+        return isIllegalWGSLParameterType(type);
+    }
 }
 
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
