@@ -746,17 +746,16 @@ struct ByteAddressBufferLegalizationContext
                     kIROp_ByteAddressBufferLoad,
                     2,
                     loadHiArgs);
-                    auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
-                    auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
-                    auto shift = m_builder.emitShl(
-                        m_builder.getUInt64Type(),
-                        hi64,
-                        m_builder.getIntValue(m_builder.getUInt64Type(), 32));
-                    auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
+                auto lo64 = m_builder.emitCast(m_builder.getUInt64Type(), loLoad);
+                auto hi64 = m_builder.emitCast(m_builder.getUInt64Type(), hiLoad);
+                auto shift = m_builder.emitShl(
+                    m_builder.getUInt64Type(),
+                    hi64,
+                    m_builder.getIntValue(m_builder.getUInt64Type(), 32));
+                auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
                 // For pointer types, Metal doesn't allow as_type casts from integers to pointers,
                 // so we use proper cast operations instead of bit casts.
-                if (type->getOp() == kIROp_PtrType || 
-                    type->getOp() == kIROp_RawPointerType)
+                if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_RawPointerType)
                 {
                     // Use proper cast operation instead of bit cast for pointers
                     return m_builder.emitCastIntToPtr(type, fullValue);
@@ -1422,8 +1421,7 @@ struct ByteAddressBufferLegalizationContext
                 IRInst* loVal;
                 IRInst* hiVal;
                 IRInst* uint64Val;
-                if (type->getOp() == kIROp_PtrType || 
-                    type->getOp() == kIROp_RawPointerType)
+                if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_RawPointerType)
                 {
                     // Use proper cast operation instead of bit cast for pointers
                     uint64Val = m_builder.emitCastPtrToInt(value);
