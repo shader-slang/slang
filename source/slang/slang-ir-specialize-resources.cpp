@@ -39,11 +39,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         type = unwrapArray(type);
         bool isArray = type != param->getDataType();
 
-        // For GL/Vulkan targets, we also need to specialize
-        // any parameters that use structured or byte-addressed
-        // buffers or images with format qualifiers.
-        //
-        if(isIllegalParameterType(targetRequest, type, isArray))
+        if(isIllegalParameterType(targetRequest, type, isArray, as<IRPtrTypeBase>(type)))
             return true;
 
         // For now, we will not treat any other parameters as
@@ -306,16 +302,8 @@ struct ResourceOutputSpecializationPass
         if (auto outTypeBase = as<IROutTypeBase>(type))
             return outTypeBase;
 
-        // Illegal parameter types should never be left 
-        // as a constref<T>, we should be removing-and-directly
-        // referencing so that `T` is not in the parameter
-        // list (although `constref<T>` is not `T`, we treat it
-        // as such in many senarios).
-        //
-        // We only remove illegal-parameter instances since some 
-        // uses of constref<T> is fine as a parameter; HitObject 
-        // is an example.
-        //
+        // Illegal pointer parameter types should never be left 
+        // as a constref<T> since constref<T> will become a pointer<T>
         if (auto constRefType = as<IRConstRefType>(type))
         {
             auto valueType = constRefType->getValueType();
@@ -323,7 +311,8 @@ struct ResourceOutputSpecializationPass
             if (isIllegalParameterType(
                 targetRequest,
                 constRefType->getValueType(),
-                unwrappedValueType != valueType))
+                unwrappedValueType != valueType,
+                true))
             {
                 return constRefType;
             }
@@ -857,11 +846,7 @@ struct ResourceOutputSpecializationPass
             if (auto constRefType = as<IRConstRefType>(pseudoOutType))
             {
                 // illegal-as-param types should never need to be deref'ed,
-                // since these types do not make sense to pass as a pointer
-                // (they are already a 'pointer-like-type' or treated like one)
-                valueType = pseudoOutType->getValueType();
-                auto unwrappedValueType = unwrapArray(valueType);
-                auto isArray = valueType == unwrappedValueType;
+                // since these types do not make sense to pass as a pointer.
                 outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
             }
             else
@@ -1382,7 +1367,7 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
-bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray)
+bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray, bool fullTypeIsPointer)
 {
     // On all of our (current) targets, a function that
     // takes a `ConstantBuffer<T>` parameter requires
@@ -1399,8 +1384,24 @@ bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isA
     // carefully.
     //
     if (as<IRUniformParameterGroupType>(type))
-        return true;
+    {
+        // If type is a pointer<T>, we don't need to 
+        // specialize since these targets allow
+        // pointer to ConstantBuffer/ParameterBlock.
+        if(fullTypeIsPointer
+            && (isCPUTarget(targetRequest) ||
+                isCUDATarget(targetRequest) ||
+                isMetalTarget(targetRequest) ||
+                isWGPUTarget(targetRequest)))
+            return false;
 
+        return true;
+    }
+
+    // For GL/Vulkan targets, we also need to specialize
+    // any parameters that use structured or byte-addressed
+    // buffers or images with format qualifiers.
+    //
     if (isKhronosTarget(targetRequest))
     {
         if (targetRequest->getOptionSet().shouldEmitSPIRVDirectly())
@@ -1412,6 +1413,8 @@ bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isA
     {
         return isIllegalWGSLParameterType(type);
     }
+
+    return false;
 }
 
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
