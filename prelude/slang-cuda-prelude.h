@@ -204,8 +204,14 @@ struct __align__(1) bool1
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(2) bool2
@@ -218,8 +224,14 @@ struct __align__(2) bool2
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(1) bool3
@@ -232,8 +244,14 @@ struct __align__(1) bool3
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(4) bool4
@@ -246,8 +264,14 @@ struct __align__(4) bool4
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 // Vector element pointer functions for boolean vectors
