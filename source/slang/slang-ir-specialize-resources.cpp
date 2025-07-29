@@ -323,6 +323,32 @@ struct ResourceOutputSpecializationPass
         return true;
     }
 
+    IRPtrTypeBase* getTypeToLegalizeLikeAnOutPointer(IRType* type)
+    {
+        // The overall goal of this logic is that certain targets do not allow
+        // passing resource-objects as pointers to functions with varying limitatins
+        if (isKhronosTarget(this->targetRequest) || isWGPUTarget(this->targetRequest))
+        {
+            // We treat out, in out, ref, and const_ref, all as "output" parameters
+            // since in terms of legalization, we need to do the same task
+            // for all of these params (even if they are not all exactly used
+            // as an output). Specifically, the shared goal here is that we need
+            // to discard the "pointer-ness" of these resources.
+            //
+            // This logic is not the default since this is the worst-case senario
+            // and easy to change in-case new targets are added.
+            if (as<IROutTypeBase>(type) || as<IRConstRefType>(type))
+                return as<IRPtrTypeBase>(type);
+            return nullptr;
+        }
+
+        // If any of the parameters of the function are `out`
+        // or `inout` parameters of a resource type, then we
+        // should specialize the function.
+        //
+        return as<IROutTypeBase>(type);
+    }
+
     // With the overall flow of the pass described, we can now drill down
     // to the subroutines and data structures that make the whole task possible.
     //
@@ -341,17 +367,14 @@ struct ResourceOutputSpecializationPass
         if (findTargetIntrinsicDefinition(func, targetRequest->getTargetCaps(), def, intrinsicInst))
             return false;
 
-        // If any of the parameters of the function are `out`
-        // or `inout` parameters of a resource type, then we
-        // should specialize the function.
-        //
         for (auto param : func->getParams())
         {
             auto paramType = param->getDataType();
-            auto outType = as<IROutTypeBase>(paramType);
-            if (!outType)
+
+            auto pseudoOutType = getTypeToLegalizeLikeAnOutPointer(paramType);
+            if (!pseudoOutType)
                 continue;
-            auto valueType = outType->getValueType();
+            auto valueType = pseudoOutType->getValueType();
             if (isResourceType(valueType))
                 return true;
         }
@@ -801,15 +824,11 @@ struct ResourceOutputSpecializationPass
         ParamInfo& outParamInfo,
         FuncInfo& ioFuncInfo)
     {
-        // We only want to specialize in the case where the parameter
-        // is an `out` or `inout` (both inherit from `IROutTypeBase`),
-        // and the pointed-to type is a resource.
-        //
         auto paramType = param->getDataType();
-        auto outType = as<IROutTypeBase>(paramType);
-        if (!outType)
+        auto pseudoOutType = getTypeToLegalizeLikeAnOutPointer(paramType);
+        if (!pseudoOutType)
             return SpecializeFuncResult::Ok;
-        auto valueType = outType->getValueType();
+        auto valueType = pseudoOutType->getValueType();
         if (!isResourceType(valueType))
             return SpecializeFuncResult::Ok;
 
@@ -834,7 +853,8 @@ struct ResourceOutputSpecializationPass
         //
         IRVar* newVar = bodyBuilder.emitVar(valueType);
 
-        if (as<IRInOutType>(outType))
+        if (as<IRInOutType>(pseudoOutType) ||
+            as<IRConstRefType>(pseudoOutType))
         {
             // If the parameter is an `inout` rather than just
             // an `out`, then we still need a parameter to
@@ -851,12 +871,20 @@ struct ResourceOutputSpecializationPass
             //
             bodyBuilder.emitStore(newVar, newParam);
 
-            // We also need call sites to pass in an argument
-            // for the new `in` parameter, which will have to
-            // be dereferenced by one level from the original
-            // argument they were passing.
-            //
-            outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
+            if (as<IRConstRefType>(pseudoOutType))
+            {
+                // ref types should not be deref'ing since there is nothing to deref
+                outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
+            }
+            else
+            {
+                // We also need call sites to pass in an argument
+                // for the new `in` parameter, which will have to
+                // be dereferenced by one level from the original
+                // argument they were passing.
+                //
+                outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
+            }
         }
         else
         {
