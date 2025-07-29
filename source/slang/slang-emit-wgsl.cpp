@@ -1630,8 +1630,10 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
             {
                 // WGSL does not support negate operator on matrices and vectors,
-                // we should emit "(-1) * op0" instead.
-                m_writer->emit("((-1) * ");
+                // we should emit "(type(0) - op0)" instead.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("(0) - ");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
                 return true;
