@@ -6952,16 +6952,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // It should return a reference (address) to the element at that index
         auto base = inst->getOperand(0);
         auto index = inst->getOperand(1);
-        
+
         const SpvWord baseId = getID(ensureInst(base));
-        
+
         // Use OpAccessChain to get the address of the element
-        return emitOpAccessChain(
-            parent,
-            inst,
-            inst->getFullType(),
-            baseId,
-            makeArray(index));
+        return emitOpAccessChain(parent, inst, inst->getFullType(), baseId, makeArray(index));
     }
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
