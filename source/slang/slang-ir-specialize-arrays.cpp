@@ -4,6 +4,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir.h"
+#include "slang-legalize-types.h"
 
 namespace Slang
 {
@@ -50,23 +51,29 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     {
         auto paramType = param->getDataType();
         auto argType = arg->getDataType();
-        if (auto outTypeBase = as<IROutTypeBase>(paramType))
+        if (as<IROutTypeBase>(paramType) || as<IRRefType>(paramType) ||
+            as<IRConstRefType>(paramType))
         {
-            paramType = outTypeBase->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
-        }
-        else if (auto refType = as<IRRefType>(paramType))
-        {
-            paramType = refType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
-        }
-        else if (auto constRefType = as<IRConstRefType>(paramType))
-        {
-            paramType = constRefType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            paramType = as<IRPtrTypeBase>(paramType)->getValueType();
+            if(auto argPtrTypeBase = as<IRPtrTypeBase>(argType))
+                argType = argPtrTypeBase->getValueType();
+
+            // Handle types which "auto-unwrap" and are ptr-like
+            else if (as<IRParameterBlockType>(argType) || as<IRConstantBufferType>(argType))
+            {
+                auto parameterGroupType = as<IRUniformParameterGroupType>(argType);
+                argType = parameterGroupType->getElementType();
+            }
+            // All types which we generally hoist out of a struct
+            // can be ignored.
+            else if (isResourceType(argType))
+            {
+                return false;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Did not expect the given param<->arg pair.");
+            }
         }
         auto arrayType = as<IRUnsizedArrayType>(paramType);
         if (!arrayType)

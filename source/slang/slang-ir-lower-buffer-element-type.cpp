@@ -1273,7 +1273,8 @@ struct LoweredElementTypeContext
                             {
                                 // If a structured buffer or pointer typed value is used directly as
                                 // an argument, we don't need to do any marshalling here.
-                                if (as<IRHLSLStructuredBufferTypeBase>(ptrVal->getDataType()))
+                                auto ptrValDataType = ptrVal->getDataType();
+                                if (as<IRHLSLStructuredBufferTypeBase>(ptrValDataType))
                                     break;
                                 if (options.lowerBufferPointer &&
                                     as<IRPtrType>(ptrVal->getDataType()))
@@ -1290,6 +1291,13 @@ struct LoweredElementTypeContext
                                 auto var = builder.emitVar((IRType*)originalElementType);
                                 builder.emitStore(var, unpackedVal);
                                 use->set(var);
+
+                                // If we have an immutable resource, do not emit a store & load
+                                // into the original location.
+                                if (as<IRConstantBufferType>(ptrValDataType) ||
+                                    as<IRParameterBlockType>(ptrValDataType))
+                                    break;
+
                                 builder.setInsertAfter(user);
                                 auto newVal = builder.emitLoad(var);
                                 loweredElementTypeInfo.convertOriginalToLowered

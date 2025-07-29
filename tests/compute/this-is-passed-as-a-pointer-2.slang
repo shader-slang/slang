@@ -1,0 +1,35 @@
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain
+//TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain
+
+// CUDA: fetch{{.*}}Data_0{{.*}}* this
+// CPP: fetch{{.*}}Data_0{{.*}}* this
+// METAL: fetch{{.*}}const Data_0 constant* this
+
+struct Data {
+    StructuredBuffer<float> input[2];
+    RWStructuredBuffer<float> output;
+    uint input_tensor_count;
+    StructuredBuffer<uint> index_buffer;
+    uint index_count;
+
+    [constref]
+    float fetch(int buffer, int index)
+    {
+        return input[buffer][index];
+    }
+};
+
+ParameterBlock<Data> data;
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void computeMain(uint3 tid: SV_DispatchThreadID)
+{
+    float result = 0.0;
+    for (int i = 0; i < data.index_count; ++i) {
+        uint buffer = data.index_buffer[i];
+        result += data.fetch(buffer, tid.x * 1024 + tid.y);
+    }
+    data.output[tid.x * 1024 + tid.y] = result;
+}
