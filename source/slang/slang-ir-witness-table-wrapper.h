@@ -4,6 +4,9 @@
 namespace Slang
 {
 struct SharedGenericsLoweringContext;
+struct IRFunc;
+struct IRInst;
+struct IRModule;
 
 /// This pass generates wrapper functions for witness table function entries.
 ///
@@ -18,5 +21,10 @@ struct SharedGenericsLoweringContext;
 /// pointer for arguments whose type is unknown at call sites, and convert them
 /// to concrete types and calls the actual implementation.
 void generateWitnessTableWrapperFunctions(SharedGenericsLoweringContext* sharedContext);
+
+IRFunc* emitWitnessTableWrapper(
+    IRModule* module,
+    IRInst* funcInst,
+    IRInst* interfaceRequirementVal);
 
 } // namespace Slang
