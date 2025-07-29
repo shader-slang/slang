@@ -1372,15 +1372,6 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
     }
     else if (auto structType = as<IRStructType>(type))
     {
-        // If we should not legalize param-block elements, we
-        // don't need to hoist our of our struct textures either.
-        if (isMetalTarget(context->targetProgram->getTargetReq()) &&
-            !context->shouldLegalizeParameterBlockElementType())
-        {
-            auto legalElementType = LegalType::simple(structType);
-            return legalElementType;
-        }
-
         // Look at the (non-static) fields, and
         // see if anything needs to be cleaned up.
         // The things that need to be "cleaned up" for
