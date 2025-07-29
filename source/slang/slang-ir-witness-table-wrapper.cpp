@@ -140,10 +140,8 @@ struct ArgumentPackWorkItem
 
 bool isAnyValueType(IRType* type)
 {
-    if (as<IRAnyValueType>(type))
+    if (as<IRAnyValueType>(type) || as<IRTypeCollection>(type))
         return true;
-    if (auto collection = as<IRTypeFlowCollection>(type))
-        return as<IRType>(collection->getOperand(0)) != nullptr;
     return false;
 }
 
@@ -301,8 +299,8 @@ IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* inte
         auto anyValType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
         auto concreteVal = builder->emitLoad(item.concreteArg);
         auto packedVal = (item.kind == ArgumentPackWorkItem::Kind::Pack)
-            ? builder->emitPackAnyValue(anyValType, concreteVal)
-            : builder->emitReinterpret(anyValType, concreteVal);
+                             ? builder->emitPackAnyValue(anyValType, concreteVal)
+                             : builder->emitReinterpret(anyValType, concreteVal);
         builder->emitStore(item.dstArg, packedVal);
     }
 
