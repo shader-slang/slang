@@ -871,10 +871,15 @@ struct ResourceOutputSpecializationPass
             //
             bodyBuilder.emitStore(newVar, newParam);
 
-            if (as<IRConstRefType>(pseudoOutType))
+            if (auto constRefType = as<IRConstRefType>(pseudoOutType))
             {
-                // ref types should not be deref'ing since there is nothing to deref
-                outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
+                // Pointer-like ref types should never need to be deref'ed
+                // we are trying to eliminate the Loads from the pointer-like
+                // type.
+                if(as<IRPointerLikeType>(constRefType->getValueType()))
+                    outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
+                else
+                    outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
             }
             else
             {
