@@ -486,7 +486,7 @@ struct ISerializerImpl
 };
 
 //
-// Rather than interace with serialization back-ends directly,
+// Rather than interface with serialization back-ends directly,
 // most client code will use a wrapper type that amounts to a kind
 // of smart pointer.
 //
