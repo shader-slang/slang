@@ -386,6 +386,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // and given a type of `(Test) -> float` to indicate
             // that it is an "unbound" instance method.
             //
+            auto expr = m_astBuilder->create<StaticMemberExpr>();
+            expr->loc = loc;
+            expr->type = type;
             if (!isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
@@ -393,11 +396,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     Diagnostics::staticRefToNonStaticMember,
                     typeType->getType(),
                     declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
             }
 
-            auto expr = m_astBuilder->create<StaticMemberExpr>();
-            expr->loc = loc;
-            expr->type = type;
             expr->baseExpression = baseExpr;
             expr->name = name;
             expr->declRef = declRef;
@@ -1184,6 +1185,20 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     return result;
 }
 
+bool SemanticsVisitor::maybeDiagnoseAmbiguousReference(Expr* expr)
+{
+    if (auto overloadExpr = as<OverloadedExpr>(expr))
+    {
+        if (overloadExpr->lookupResult2.isValid() &&
+            !as<NamespaceDecl>(overloadExpr->lookupResult2.item.declRef.getDecl()))
+        {
+            diagnoseAmbiguousReference(overloadExpr);
+            return true;
+        }
+    }
+    return false;
+}
+
 void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
@@ -1210,6 +1225,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
     {
         getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
     }
+    expr->type = m_astBuilder->getErrorType();
 }
 
 Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
@@ -1761,6 +1777,10 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     if (auto memberExpr = as<MemberExpr>(expr))
     {
         return memberExpr->baseExpression;
+    }
+    else if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+    {
+        return staticMemberExpr->baseExpression;
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
@@ -2607,7 +2627,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     if (!lookupResult.isValid())
     {
         if (!diagnosed)
-            getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        {
+            if (!maybeDiagnoseAmbiguousReference(baseExpr))
+                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        }
         return CreateErrorExpr(subscriptExpr);
     }
     auto subscriptFuncExpr = createLookupResultExpr(
@@ -5228,9 +5251,12 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     // Check it's a member expression
     SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-    if (!supressDiagnostic)
-        getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
     expr->type = QualType(m_astBuilder->getErrorType());
+    if (!supressDiagnostic)
+    {
+        if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+    }
     return expr;
 }
 
@@ -5279,11 +5305,9 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
                 shouldRemove = true;
             if (!shouldRemove)
             {
-                filteredLookupResult.items.add(lookupResult);
+                AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
-        if (filteredLookupResult.items.getCount() == 1)
-            filteredLookupResult.item = filteredLookupResult.items.getFirst();
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
             filteredLookupResult,

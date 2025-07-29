@@ -9539,6 +9539,39 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
     }
 }
 
+// Helper functions for Metal target
+internal int __metal_clz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+internal uint __metal_clz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+internal int __metal_ctz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
+internal uint __metal_ctz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
 /// Find first set bit starting at high bit and working down.
 /// @param value The value to find set bits in.
 /// @return The bit index number of the most significant bit,
@@ -9559,7 +9592,14 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -9576,7 +9616,6 @@ vector<int, N> firstbithigh(vector<int, N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
     };
@@ -9596,7 +9635,14 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
@@ -9613,7 +9659,6 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
     };
@@ -9639,7 +9684,7 @@ int firstbitlow(int value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindILsb $value
     };
@@ -9656,7 +9701,6 @@ vector<int,N> firstbitlow(vector<int,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int,N> result glsl450 FindILsb $value
     };
@@ -9676,7 +9720,7 @@ uint firstbitlow(uint value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindILsb $value
     };
@@ -9693,7 +9737,6 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
     };
@@ -20614,17 +20657,6 @@ struct HitObject
         case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
         }
     }
-
-    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
-    [ForceInline]
-    [require(cuda, ser_raygen_closesthit_miss)]
-    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
-    {
-        __target_switch
-        {
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
-        }
-    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
@@ -21007,11 +21039,13 @@ struct HitObject
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [__requiresNVAPI]
     [require(hlsl, ser)]
+    [require(cuda, ser)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".LoadLocalRootTableConstant";
+        case cuda: __intrinsic_asm "(*(uint32_t*)((char*)optixHitObjectGetSbtDataPointer()+$1))";
         }
     }
 

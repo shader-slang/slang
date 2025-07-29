@@ -1436,7 +1436,7 @@ public:
         OverloadedExpr* overloadedExpr,
         LookupResult const& lookupResult);
     void diagnoseAmbiguousReference(Expr* overloadedExpr);
-
+    bool maybeDiagnoseAmbiguousReference(Expr* overloadedExpr);
 
     Expr* ExpectATypeRepr(Expr* expr);
 
