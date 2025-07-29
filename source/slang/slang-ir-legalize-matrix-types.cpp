@@ -1,10 +1,10 @@
 #include "slang-ir-legalize-matrix-types.h"
 
 #include "slang-compiler.h"
+#include "slang-ir-insts-enum.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-ir-insts-enum.h"
 
 namespace Slang
 {
@@ -100,15 +100,18 @@ struct MatrixTypeLoweringContext
         auto matrixType = as<IRMatrixType>(makeMatrix->getDataType());
 
         SLANG_ASSERT(matrixType && "Matrix type is expected");
-        SLANG_ASSERT(shouldLowerMatrixType(matrixType) && "Matrix type is expected to need legalization");
-        
+        SLANG_ASSERT(
+            shouldLowerMatrixType(matrixType) && "Matrix type is expected to need legalization");
+
         // Lower makeMatrix to makeArray of makeVectors
         auto elementType = matrixType->getElementType();
         auto rowCount = as<IRIntLit>(matrixType->getRowCount());
         auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
-        
-        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
-        
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
+
         IRBuilder builder(makeMatrix);
         builder.setInsertBefore(makeMatrix);
 
@@ -121,36 +124,39 @@ struct MatrixTypeLoweringContext
         // Group operands into rows and create vectors
         List<IRInst*> rowVectors;
         UInt operandIndex = 0;
-        
+
         // Assert that we have the expected number of operands
-        SLANG_ASSERT(makeMatrix->getOperandCount() == UInt(rowCount->getValue() * columnCount->getValue()) && 
-                    "makeMatrix operand count must match matrix dimensions");
-        
+        SLANG_ASSERT(
+            makeMatrix->getOperandCount() == UInt(rowCount->getValue() * columnCount->getValue()) &&
+            "makeMatrix operand count must match matrix dimensions");
+
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
             List<IRInst*> rowElements;
             for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
             {
-                SLANG_ASSERT(operandIndex < makeMatrix->getOperandCount() &&
-                    "Operand index out of bounds");
+                SLANG_ASSERT(
+                    operandIndex < makeMatrix->getOperandCount() && "Operand index out of bounds");
                 rowElements.add(getReplacement(makeMatrix->getOperand(operandIndex)));
                 operandIndex++;
             }
-            
-            SLANG_ASSERT(rowElements.getCount() == columnCount->getValue() &&
+
+            SLANG_ASSERT(
+                rowElements.getCount() == columnCount->getValue() &&
                 "Row elements count must match column count");
             auto rowVector = builder.emitMakeVector(vectorType, rowElements);
             rowVectors.add(rowVector);
         }
-        
-        SLANG_ASSERT(rowVectors.getCount() == rowCount->getValue() &&
+
+        SLANG_ASSERT(
+            rowVectors.getCount() == rowCount->getValue() &&
             "Row vectors count must match matrix row count");
         return builder.emitMakeArray(arrayType, rowVectors.getCount(), rowVectors.getBuffer());
     }
 
     IRInst* legalizeMatrixMatrixBinaryOperation(
         IRBuilder& builder,
-        IRInst* legalizedA, 
+        IRInst* legalizedA,
         IRInst* legalizedB,
         IRMatrixType* resultMatrixType,
         IROp binaryOp)
@@ -158,8 +164,10 @@ struct MatrixTypeLoweringContext
         auto elementType = resultMatrixType->getElementType();
         auto rowCount = as<IRIntLit>(resultMatrixType->getRowCount());
         auto columnCount = as<IRIntLit>(resultMatrixType->getColumnCount());
-        
-        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
 
         // Create vector type for rows: vector<T, C>
         auto vectorType = builder.getVectorType(elementType, columnCount);
@@ -169,25 +177,27 @@ struct MatrixTypeLoweringContext
 
         // Extract vectors from both arrays and apply binary operation
         List<IRInst*> resultVectors;
-        
+
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
             // Extract the row vector from each operand array
             auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
             auto vectorA = builder.emitElementExtract(legalizedA, rowIndexInst);
             auto vectorB = builder.emitElementExtract(legalizedB, rowIndexInst);
-            
+
             // Apply the binary operation to the vectors
             IRInst* args[] = {vectorA, vectorB};
             auto resultVector = builder.emitIntrinsicInst(vectorType, binaryOp, 2, args);
-            
+
             resultVectors.add(resultVector);
         }
-        
-        // Create the result array from the vectors
-        return builder.emitMakeArray(arrayType, resultVectors.getCount(), resultVectors.getBuffer());
-    }
 
+        // Create the result array from the vectors
+        return builder.emitMakeArray(
+            arrayType,
+            resultVectors.getCount(),
+            resultVectors.getBuffer());
+    }
 
 
     template<bool matrixIsFirst>
@@ -202,13 +212,16 @@ struct MatrixTypeLoweringContext
         auto otherType = legalizedOther->getDataType();
         auto otherVectorType = as<IRVectorType>(otherType);
         auto otherBasicType = as<IRBasicType>(otherType);
-        SLANG_ASSERT((otherVectorType || otherBasicType) && "Other operand must be vector or scalar type");
+        SLANG_ASSERT(
+            (otherVectorType || otherBasicType) && "Other operand must be vector or scalar type");
 
         auto elementType = resultMatrixType->getElementType();
         auto rowCount = as<IRIntLit>(resultMatrixType->getRowCount());
         auto columnCount = as<IRIntLit>(resultMatrixType->getColumnCount());
-        
-        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
 
         // Create vector type for rows: vector<T, C>
         auto vectorType = builder.getVectorType(elementType, columnCount);
@@ -218,29 +231,35 @@ struct MatrixTypeLoweringContext
 
         // Extract vectors from matrix array and apply binary operation with other operand
         List<IRInst*> resultVectors;
-        
+
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
             // Extract the row vector from matrix array
             auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
             auto matrixRowVector = builder.emitElementExtract(legalizedMatrix, rowIndexInst);
-            
+
             // Apply the binary operation between matrix row vector and other operand
             IRInst* args[2];
-            if constexpr (matrixIsFirst) {
+            if constexpr (matrixIsFirst)
+            {
                 args[0] = matrixRowVector;
                 args[1] = legalizedOther;
-            } else {
+            }
+            else
+            {
                 args[0] = legalizedOther;
                 args[1] = matrixRowVector;
             }
             auto resultVector = builder.emitIntrinsicInst(vectorType, binaryOp, 2, args);
-            
+
             resultVectors.add(resultVector);
         }
-        
+
         // Create the result array from the vectors
-        return builder.emitMakeArray(arrayType, resultVectors.getCount(), resultVectors.getBuffer());
+        return builder.emitMakeArray(
+            arrayType,
+            resultVectors.getCount(),
+            resultVectors.getBuffer());
     }
 
     IRInst* legalizeBinaryOperation(IRInst* inst, IROp binaryOp)
@@ -251,34 +270,56 @@ struct MatrixTypeLoweringContext
         // Check what types we're dealing with
         auto typeA = opdA->getDataType();
         auto typeB = opdB->getDataType();
-        
+
         auto matrixTypeA = as<IRMatrixType>(typeA);
         auto matrixTypeB = as<IRMatrixType>(typeB);
-        
+
         bool shouldLowerA = matrixTypeA && shouldLowerMatrixType(matrixTypeA);
         bool shouldLowerB = matrixTypeB && shouldLowerMatrixType(matrixTypeB);
 
         // Get the result matrix type to determine dimensions
         auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
         SLANG_ASSERT(resultMatrixType && "Binary operation should have matrix result type");
-        SLANG_ASSERT(shouldLowerMatrixType(resultMatrixType) && "Result matrix type should need legalization");
+        SLANG_ASSERT(
+            shouldLowerMatrixType(resultMatrixType) &&
+            "Result matrix type should need legalization");
 
         // Create IRBuilder at the top level
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        
+
         // Get legalized operands once
         IRInst* legalizedA = getReplacement(opdA);
         IRInst* legalizedB = getReplacement(opdB);
-        
-        if (shouldLowerA && shouldLowerB) {
-            return legalizeMatrixMatrixBinaryOperation(builder, legalizedA, legalizedB, resultMatrixType, binaryOp);
-        } else if (shouldLowerA && !shouldLowerB) {
-            return legalizeMatrixMixedBinaryOperation<true>(builder, legalizedA, legalizedB, resultMatrixType, binaryOp);
-        } else if (!shouldLowerA && shouldLowerB) {
-            return legalizeMatrixMixedBinaryOperation<false>(builder, legalizedB, legalizedA, resultMatrixType, binaryOp);
+
+        if (shouldLowerA && shouldLowerB)
+        {
+            return legalizeMatrixMatrixBinaryOperation(
+                builder,
+                legalizedA,
+                legalizedB,
+                resultMatrixType,
+                binaryOp);
         }
-        
+        else if (shouldLowerA && !shouldLowerB)
+        {
+            return legalizeMatrixMixedBinaryOperation<true>(
+                builder,
+                legalizedA,
+                legalizedB,
+                resultMatrixType,
+                binaryOp);
+        }
+        else if (!shouldLowerA && shouldLowerB)
+        {
+            return legalizeMatrixMixedBinaryOperation<false>(
+                builder,
+                legalizedB,
+                legalizedA,
+                resultMatrixType,
+                binaryOp);
+        }
+
         // Neither operand is a matrix that needs lowering, shouldn't reach here
         SLANG_UNREACHABLE("legalizeBinaryOperation called but no matrix operand needs lowering");
     }
@@ -291,28 +332,32 @@ struct MatrixTypeLoweringContext
         // Check what types we're dealing with
         auto typeA = opdA->getDataType();
         auto typeB = opdB->getDataType();
-        
+
         auto matrixTypeA = as<IRMatrixType>(typeA);
         auto matrixTypeB = as<IRMatrixType>(typeB);
-        
+
         bool shouldLowerA = matrixTypeA && shouldLowerMatrixType(matrixTypeA);
         bool shouldLowerB = matrixTypeB && shouldLowerMatrixType(matrixTypeB);
 
         // Only matrix-matrix comparisons are supported
-        SLANG_ASSERT(shouldLowerA && shouldLowerB && "Comparison operations only supported between matrices that need lowering");
+        SLANG_ASSERT(
+            shouldLowerA && shouldLowerB &&
+            "Comparison operations only supported between matrices that need lowering");
 
         // Create IRBuilder at the top level
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        
+
         // Get legalized operands
         IRInst* legalizedA = getReplacement(opdA);
         IRInst* legalizedB = getReplacement(opdB);
-        
+
         auto rowCount = as<IRIntLit>(matrixTypeA->getRowCount());
         auto columnCount = as<IRIntLit>(matrixTypeA->getColumnCount());
-        
-        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
 
         // Create boolean vector type for rows: vector<bool, C>
         auto boolType = builder.getBoolType();
@@ -323,23 +368,26 @@ struct MatrixTypeLoweringContext
 
         // Extract vectors from both arrays and apply comparison operation
         List<IRInst*> resultVectors;
-        
+
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
             // Extract the row vector from each operand array
             auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
             auto vectorA = builder.emitElementExtract(legalizedA, rowIndexInst);
             auto vectorB = builder.emitElementExtract(legalizedB, rowIndexInst);
-            
+
             // Apply the comparison operation to the vectors
             IRInst* args[] = {vectorA, vectorB};
             auto resultVector = builder.emitIntrinsicInst(boolVectorType, comparisonOp, 2, args);
-            
+
             resultVectors.add(resultVector);
         }
-        
+
         // Create the result array from the vectors
-        return builder.emitMakeArray(boolArrayType, resultVectors.getCount(), resultVectors.getBuffer());
+        return builder.emitMakeArray(
+            boolArrayType,
+            resultVectors.getCount(),
+            resultVectors.getBuffer());
     }
 
     IRInst* legalizeUnaryOperation(IRInst* inst, IROp unaryOp)
@@ -352,13 +400,17 @@ struct MatrixTypeLoweringContext
         // Get the result matrix type to determine dimensions
         auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
         SLANG_ASSERT(resultMatrixType && "Unary operation should have matrix result type");
-        SLANG_ASSERT(shouldLowerMatrixType(resultMatrixType) && "Result matrix type should need legalization");
+        SLANG_ASSERT(
+            shouldLowerMatrixType(resultMatrixType) &&
+            "Result matrix type should need legalization");
 
         auto elementType = resultMatrixType->getElementType();
         auto rowCount = as<IRIntLit>(resultMatrixType->getRowCount());
         auto columnCount = as<IRIntLit>(resultMatrixType->getColumnCount());
-        
-        SLANG_ASSERT(rowCount && columnCount && "Matrix dimensions must be compile-time constants for lowering");
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
@@ -371,22 +423,25 @@ struct MatrixTypeLoweringContext
 
         // Extract vectors from array and apply unary operation
         List<IRInst*> resultVectors;
-        
+
         for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
         {
             // Extract the row vector from operand array
             auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
             auto vector = builder.emitElementExtract(legalizedOperand, rowIndexInst);
-            
+
             // Apply the unary operation to the vector
             IRInst* args[] = {vector};
             auto resultVector = builder.emitIntrinsicInst(vectorType, unaryOp, 1, args);
-            
+
             resultVectors.add(resultVector);
         }
-        
+
         // Create the result array from the vectors
-        return builder.emitMakeArray(arrayType, resultVectors.getCount(), resultVectors.getBuffer());
+        return builder.emitMakeArray(
+            arrayType,
+            resultVectors.getCount(),
+            resultVectors.getBuffer());
     }
 
     IRInst* legalizeMatrixProducingInstruction(IRInst* inst)
@@ -435,7 +490,8 @@ struct MatrixTypeLoweringContext
             newInst = legalizeMatrixTypeDeclaration(inst);
 
         IRType* resultType = inst->getDataType();
-        if (auto matrixType = as<IRMatrixType>(resultType)) {
+        if (auto matrixType = as<IRMatrixType>(resultType))
+        {
             if (shouldLowerMatrixType(matrixType))
                 newInst = legalizeMatrixProducingInstruction(inst);
         }

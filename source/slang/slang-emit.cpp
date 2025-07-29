@@ -1337,7 +1337,7 @@ Result linkAndOptimizeIR(
 
     legalizeMatrixTypes(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
-    
+
     legalizeVectorTypes(irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
