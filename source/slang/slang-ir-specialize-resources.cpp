@@ -1423,6 +1423,8 @@ bool isIllegalRefValueTypeParameterType(TargetRequest* targetRequest, IRType* ty
     {
         return isIllegalWGSLParameterType(type);
     }
+
+    return false;
 }
 
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
