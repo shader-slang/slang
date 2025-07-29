@@ -35,6 +35,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-detect-uninitialized-resources.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -1101,6 +1102,8 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    detectUninitializedResources(irModule, sink);
 
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
