@@ -130,6 +130,8 @@ UnownedStringSlice getStageText(Stage stage);
 Stage getStageFromAtom(CapabilityAtom atom);
 CapabilityAtom getAtomFromStage(Stage stage);
 
+String getHLSLProfileName(Profile profile);
+
 } // namespace Slang
 
 #endif
