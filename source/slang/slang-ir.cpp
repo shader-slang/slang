@@ -8531,6 +8531,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
+    if (as<IRTypeFlowData>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8720,9 +8723,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_BackwardDifferentiatePrimal:
     case kIROp_BackwardDifferentiatePropagate:
     case kIROp_DetachDerivative:
-        return false;
-
-    case kIROp_TypeFlowCollection:
         return false;
 
     case kIROp_Div:

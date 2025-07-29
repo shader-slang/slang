@@ -669,5 +669,11 @@ return {
 	["SPIRVAsmOperand.__sampledType"] = 665,
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
-	["TypeFlow.TypeFlowCollection"] = 668
+	["TypeFlowData.CollectionBase.TypeCollection"] = 668,
+	["TypeFlowData.CollectionBase.FuncCollection"] = 669,
+	["TypeFlowData.CollectionBase.TableCollection"] = 670,
+	["TypeFlowData.CollectionBase.GenericCollection"] = 671,
+	["TypeFlowData.UnboundedCollection"] = 672,
+	["TypeFlowData.CollectionTagType"] = 673,
+	["TypeFlowData.CollectionTaggedUnionType"] = 674
 }

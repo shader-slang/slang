@@ -2173,9 +2173,19 @@ local insts = {
 	{
 		-- A collection of IR instructions used for propagation analysis
 		-- The operands are the elements of the set, sorted by unique ID to ensure canonical ordering
-		TypeFlow = {
+		TypeFlowData = {
 			hoistable = true,
-			{ TypeFlowCollection = {} } 
+			{
+				CollectionBase = {
+					{ TypeCollection = {} },
+					{ FuncCollection = {} },
+					{ TableCollection = {} },
+					{ GenericCollection = {} },
+				},
+			},
+			{ UnboundedCollection = {} },
+			{ CollectionTagType = {} }, -- Operand is TypeCollection/FuncCollection/TableCollection (funcs/tables)
+			{ CollectionTaggedUnionType = {}} -- Operand is TypeCollection, TableCollection for existential
 		},
 	}
 }
