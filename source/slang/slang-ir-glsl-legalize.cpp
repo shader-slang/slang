@@ -3721,7 +3721,9 @@ void legalizeEntryPointParameterForGLSL(
             pp);
 
         // Generate member-level debug info for entry point struct parameters
-        if (entryPointDebugVar && codeGenContext->getTargetProgram()->getOptionSet().getDebugInfoLevel() != DebugInfoLevel::None)
+        if (entryPointDebugVar &&
+            codeGenContext->getTargetProgram()->getOptionSet().getDebugInfoLevel() !=
+                DebugInfoLevel::None)
         {
             if (auto structType = as<IRStructType>(valueType))
             {

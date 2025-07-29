@@ -3894,7 +3894,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (debugValue->getDebugVar() == debugVar)
                 {
                     auto valueInst = debugValue->getValue();
-                    // Check if the value is a global parameter (entry point parameter that was legalized)
+                    // Check if the value is a global parameter (entry point parameter that was
+                    // legalized)
                     if (as<IRGlobalParam>(valueInst))
                     {
                         // Don't create a backing variable for this debug variable.
