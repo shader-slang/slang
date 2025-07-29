@@ -6260,6 +6260,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
                 }
+                else if (semanticName == "nv_fragmentsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityShadingRateNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shading_rate"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragmentSizeNV, inst);
+                }
+                else if (semanticName == "nv_invocationsperpixel")
+                {
+                    requireSPIRVCapability(SpvCapabilityShadingRateNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shading_rate"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationsPerPixelNV, inst);
+                }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
         }
