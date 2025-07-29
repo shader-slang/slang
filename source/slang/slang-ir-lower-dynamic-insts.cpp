@@ -1785,7 +1785,7 @@ struct DynamicInstLoweringContext
                         keyMappingFunc,
                         List<IRInst*>({inst->getWitnessTable()}));
                     inst->replaceUsesWith(witnessTableId);
-                    propagationMap[Element(witnessTableId)] = info;
+                    propagationMap[Element(context, witnessTableId)] = info;
                     inst->removeAndDeallocate();
                     return true;
                 }
@@ -1819,7 +1819,7 @@ struct DynamicInstLoweringContext
             auto operand = inst->getOperand(0);
             auto element = builder.emitGetTupleElement(builder.getUIntType(), operand, 0);
             inst->replaceUsesWith(element);
-            propagationMap[Element(element)] = info;
+            propagationMap[Element(context, element)] = info;
             inst->removeAndDeallocate();
             return true;
         }
@@ -2246,7 +2246,7 @@ struct DynamicInstLoweringContext
         auto newCall = builder.emitCallInst(inst->getDataType(), dispatchFunc, newArgs);
         inst->replaceUsesWith(newCall);
         if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(newCall)] = info;
+            propagationMap[Element(context, newCall)] = info;
         replaceType(context, newCall); // "maybe replace type"
         inst->removeAndDeallocate();
         return true;
@@ -2308,7 +2308,7 @@ struct DynamicInstLoweringContext
         auto tuple = builder.emitMakeTuple(tupleType, 2, tupleArgs);
 
         if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(tuple)] = info;
+            propagationMap[Element(context, tuple)] = info;
 
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
@@ -2352,7 +2352,7 @@ struct DynamicInstLoweringContext
                  builder.emitReinterpret(existentialTupleType->getOperand(1), inst->getValue())}));
 
         if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(existentialTuple)] = info;
+            propagationMap[Element(context, existentialTuple)] = info;
 
         inst->replaceUsesWith(existentialTuple);
         inst->removeAndDeallocate();
