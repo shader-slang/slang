@@ -39,23 +39,6 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         type = unwrapArray(type);
         bool isArray = type != param->getDataType();
 
-        // On all of our (current) targets, a function that
-        // takes a `ConstantBuffer<T>` parameter requires
-        // specialization. Surprisingly this includes DXIL
-        // because dxc apparently does not treat `ConstantBuffer<T>`
-        // as a first-class type.
-        //
-        // TODO: This should not apply to CPU or CUDA, where
-        // `ConstantBuffer<T>` is just `T*`. Right now this
-        // optimization is not applying to those targets by
-        // coincidence (because the shader parameters are not
-        // globals, there is no way for the specialization to
-        // succeed), but eventually we should turn it off more
-        // carefully.
-        //
-        if (as<IRUniformParameterGroupType>(type))
-            return true;
-
         // For GL/Vulkan targets, we also need to specialize
         // any parameters that use structured or byte-addressed
         // buffers or images with format qualifiers.
@@ -316,28 +299,37 @@ struct ResourceOutputSpecializationPass
 
     IRPtrTypeBase* getTypeToLegalizeLikeAnOutPointer(IRType* type)
     {
-        // The overall goal of this logic is that certain targets do not allow
-        // passing resource-objects as pointers to functions with varying limitatins
-        if (isKhronosTarget(this->targetRequest) || isWGPUTarget(this->targetRequest))
-        {
-            // We treat out, in out, ref, and const_ref, all as "output" parameters
-            // since in terms of legalization, we need to do the same task
-            // for all of these params (even if they are not all exactly used
-            // as an output). Specifically, the shared goal here is that we need
-            // to discard the "pointer-ness" of these resources.
-            //
-            // This logic is not the default since this is the worst-case senario
-            // and easy to change in-case new targets are added.
-            if (as<IROutTypeBase>(type) || as<IRConstRefType>(type))
-                return as<IRPtrTypeBase>(type);
-            return nullptr;
-        }
-
         // If any of the parameters of the function are `out`
         // or `inout` parameters of a resource type, then we
         // should specialize the function.
         //
-        return as<IROutTypeBase>(type);
+        if (auto outTypeBase = as<IROutTypeBase>(type))
+            return outTypeBase;
+
+        // Illegal parameter types should never be left 
+        // as a constref<T>, we should be removing-and-directly
+        // referencing so that `T` is not in the parameter
+        // list (although `constref<T>` is not `T`, we treat it
+        // as such in many senarios).
+        //
+        // We only remove illegal-parameter instances since some 
+        // uses of constref<T> is fine as a parameter; HitObject 
+        // is an example.
+        //
+        if (auto constRefType = as<IRConstRefType>(type))
+        {
+            auto valueType = constRefType->getValueType();
+            auto unwrappedValueType = unwrapArray(valueType);
+            if (isIllegalParameterType(
+                targetRequest,
+                constRefType->getValueType(),
+                unwrappedValueType != valueType))
+            {
+                return constRefType;
+            }
+        }
+
+        return nullptr;
     }
 
     // With the overall flow of the pass described, we can now drill down
@@ -870,13 +862,7 @@ struct ResourceOutputSpecializationPass
                 valueType = pseudoOutType->getValueType();
                 auto unwrappedValueType = unwrapArray(valueType);
                 auto isArray = valueType == unwrappedValueType;
-                if (isIllegalParameterType(
-                        codeGenContext->getTargetReq(),
-                        unwrappedValueType,
-                        false))
-                    outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
-                else
-                    outParamInfo.oldArgMode = ParamInfo::OldArgMode::Deref;
+                outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
             }
             else
             {
@@ -1398,6 +1384,23 @@ bool isIllegalGLSLParameterType(IRType* type)
 
 bool isIllegalParameterType(TargetRequest* targetRequest, IRType* type, bool isArray)
 {
+    // On all of our (current) targets, a function that
+    // takes a `ConstantBuffer<T>` parameter requires
+    // specialization. Surprisingly this includes DXIL
+    // because dxc apparently does not treat `ConstantBuffer<T>`
+    // as a first-class type.
+    //
+    // TODO: This should not apply to CPU or CUDA, where
+    // `ConstantBuffer<T>` is just `T*`. Right now this
+    // optimization is not applying to those targets by
+    // coincidence (because the shader parameters are not
+    // globals, there is no way for the specialization to
+    // succeed), but eventually we should turn it off more
+    // carefully.
+    //
+    if (as<IRUniformParameterGroupType>(type))
+        return true;
+
     if (isKhronosTarget(targetRequest))
     {
         if (targetRequest->getOptionSet().shouldEmitSPIRVDirectly())

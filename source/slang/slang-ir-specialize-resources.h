@@ -6,7 +6,7 @@ namespace Slang
 struct CodeGenContext;
 struct IRModule;
 struct IRType;
-struct TargetRequest;
+class TargetRequest;
 
 /// Specialize calls to functions with resource-type parameters.
 ///
