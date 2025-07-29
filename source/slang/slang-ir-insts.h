@@ -3866,7 +3866,10 @@ public:
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
-    IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source, bool isIncludedFile);
+    IRInst* emitDebugSource(
+        UnownedStringSlice fileName,
+        UnownedStringSlice source,
+        bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
     IRInst* emitDebugLine(
