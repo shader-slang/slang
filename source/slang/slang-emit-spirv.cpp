@@ -1802,10 +1802,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto valueType = ptrType->getValueType();
-                // If we haven't emitted the inner type yet, we need to emit a forward declaration.
-                bool useForwardDeclaration =
-                    (!m_mapIRInstToSpvInst.containsKey(valueType) && as<IRStructType>(valueType) &&
-                     storageClass == SpvStorageClassPhysicalStorageBuffer);
+                bool useForwardDeclaration = false;
                 SpvId valueTypeId;
                 if (as<IRVoidType>(valueType))
                 {
@@ -1814,9 +1811,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     builder.setInsertBefore(valueType);
                     valueTypeId = getID(ensureInst(builder.getUIntType()));
                 }
-                else if (useForwardDeclaration)
+                else if (as<IRStructType>(valueType) && storageClass == SpvStorageClassPhysicalStorageBuffer)
                 {
-                    valueTypeId = getIRInstSpvID(valueType);
+                    // We need to emit a forward declaration if the struct type contains a pointer to itself.
+                    if (m_emittingTypes.add(ptrType))
+                    {
+                        auto spvValueType = ensureInst(valueType);
+                        valueTypeId = getID(spvValueType);
+
+                        m_emittingTypes.remove(ptrType);
+                        useForwardDeclaration = false;
+                    }
+                    else
+                    {
+                        valueTypeId = getIRInstSpvID(valueType);
+                        useForwardDeclaration = true;
+                    }
                 }
                 else if (storageClass == SpvStorageClassNodePayloadAMDX)
                 {
@@ -9458,25 +9468,6 @@ SlangResult emitSPIRVFromIR(
         sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
         return SLANG_FAIL;
     }
-
-    // Move forward delcared pointers to the end.
-    do
-    {
-        auto fwdPointers = context.m_forwardDeclaredPointers;
-        context.m_forwardDeclaredPointers.clear();
-
-        for (auto ptrType : fwdPointers)
-        {
-            auto spvPtrType = ptrType.key;
-            // When we emit a pointee type, we may introduce new
-            // forward-declared pointer types, so we need to
-            // keep iterating until we have emitted all of them.
-            context.ensureInst(ptrType.value->getValueType());
-            auto parent = spvPtrType->parent;
-            spvPtrType->removeFromParent();
-            parent->addInst(spvPtrType);
-        }
-    } while (context.m_forwardDeclaredPointers.getCount() != 0);
 
     // Emit extensions and capabilities for which there are multiple options available.
     // This is delayed to avoid emitting unnecessary extensions and capabilities if
