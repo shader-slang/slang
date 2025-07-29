@@ -582,8 +582,6 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        // Boolean vectors now use typedef to ucharN to follow CUDA's builtin vector alignment rules
-        // No special case needed - they follow the same rules as other CUDA vector types
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
