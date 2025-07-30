@@ -2358,22 +2358,32 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     // Check for static const variables without initializers
-    if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+    if (!varDecl->initExpr)
     {
-        if (!varDecl->initExpr)
+        bool isStatic = false;
+        bool isConst = false;
+        bool isExtern = false;
+        for(auto modifier : varDecl->modifiers)
         {
+            if(as<HLSLStaticModifier>(modifier))
+                isStatic = true;
+            else if(as<ConstModifier>(modifier))
+                isConst = true;
+            else if(as<ExternModifier>(modifier))
+                isExtern = true;
+
+            if(isStatic && isConst && isExtern)
+                break;
+        }
+        if(isStatic && isConst &&
             // Don't error for extern variables
-            if (!varDecl->hasModifier<ExternModifier>())
-            {
-                // Don't error for interface member variables
-                if (!as<InterfaceDecl>(varDecl->parentDecl))
-                {
-                    getSink()->diagnose(
-                        varDecl,
-                        Diagnostics::staticConstVariableRequiresInitializer,
-                        varDecl->getName());
-                }
-            }
+            // Don't error for interface member variables
+            !isExtern && !as<InterfaceDecl>(varDecl->parentDecl))
+        {
+            getSink()->diagnose(
+                varDecl,
+                Diagnostics::staticConstVariableRequiresInitializer,
+                varDecl);
         }
     }
 
