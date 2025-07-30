@@ -3070,6 +3070,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
+    case kIROp_IRSize:
+        {
+            m_writer->emit(UInt(uint32_t(42)));
+            m_writer->emit("U");
+            break;
+        }
     case kIROp_RequirePrelude:
         {
             auto preludeTextInst = as<IRStringLit>(inst->getOperand(0));
