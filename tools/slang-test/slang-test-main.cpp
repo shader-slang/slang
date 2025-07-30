@@ -31,6 +31,7 @@
 #include "slangi-tool.h"
 #include "test-context.h"
 #include "test-reporter.h"
+#include "../render-test/slang-support.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -844,6 +845,9 @@ Result spawnAndWaitSharedLibrary(
     {
         StringBuilder stdErrorString;
         StringBuilder stdOutString;
+        renderer_test::CoreDebugCallback coreDebugCallback;
+        renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+        rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
         StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
@@ -854,6 +858,7 @@ Result spawnAndWaitSharedLibrary(
         StdWriters stdWriters;
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+        stdWriters.setDebugCallback(&coreDebugCallback);
 
         if (exeName == "slangc" || exeName == "slangi")
         {
@@ -876,6 +881,7 @@ Result spawnAndWaitSharedLibrary(
 
         outRes.standardError = stdErrorString;
         outRes.standardOutput = stdOutString;
+        outRes.debugLayer = coreDebugCallback.getString();
 
         outRes.resultCode = (int)TestToolUtil::getReturnCode(res);
 
@@ -1013,6 +1019,7 @@ static Result _executeRPC(
     outRes.resultCode = exeRes.returnCode;
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
+    outRes.debugLayer = exeRes.debugLayer;
 
     return SLANG_OK;
 }
@@ -1530,6 +1537,7 @@ String getOutput(const ExecuteResult& exeRes)
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -1540,6 +1548,12 @@ String getOutput(const ExecuteResult& exeRes)
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOuptut);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     return actualOutputBuilder.produceString();
 }
@@ -3262,6 +3276,7 @@ static TestResult _runHLSLComparisonTest(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -3272,6 +3287,12 @@ static TestResult _runHLSLComparisonTest(
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOutput);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     String actualOutput = actualOutputBuilder.produceString();
 
@@ -3339,6 +3360,7 @@ TestResult doGLSLComparisonTestRun(
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3349,6 +3371,12 @@ TestResult doGLSLComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOuptut);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -3748,6 +3776,7 @@ TestResult doRenderComparisonTestRun(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3758,6 +3787,12 @@ TestResult doRenderComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOutput);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -4739,6 +4774,9 @@ static SlangResult runUnitTestModule(
     unitTestContext.enabledApis = context->options.enabledApis;
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
+
+    // Unit tests don't use RHI, so there are no debug layer messages to capture
+    unitTestContext.debugCallback = nullptr; 
 
     auto testCount = testModule->getTestCount();
 
