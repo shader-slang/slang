@@ -138,41 +138,41 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         )
     endif()
 
-if(NOT ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
-    # SPIRV-Tools
-    set(SPIRV_TOOLS_BUILD_STATIC ON)
-    set(SPIRV_WERROR OFF)
-    set(SPIRV_SKIP_TESTS ON)
-    # Tools
-    if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
-        add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
-            spirv-tools
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
+    if(NOT ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+        # SPIRV-Tools
+        set(SPIRV_TOOLS_BUILD_STATIC ON)
+        set(SPIRV_WERROR OFF)
+        set(SPIRV_SKIP_TESTS ON)
+        # Tools
+        if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
+            add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
+                spirv-tools
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
     endif()
-endif()
 
-if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
-    # glslang
-    set(SKIP_GLSLANG_INSTALL ON)
-    set(ENABLE_OPT ON)
-    set(ENABLE_PCH OFF)
-    set(ALLOW_EXTERNAL_SPIRV_TOOLS ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
-    if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
-        add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
-            glslang
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
+    if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
+        # glslang
+        set(SKIP_GLSLANG_INSTALL ON)
+        set(ENABLE_OPT ON)
+        set(ENABLE_PCH OFF)
+        set(ALLOW_EXTERNAL_SPIRV_TOOLS ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+        if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
+            add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
+                glslang
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
     endif()
-endif()
 endif()
 
 # imgui

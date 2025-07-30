@@ -175,8 +175,16 @@ advanced_option(
     "Build using system unordered dense"
     OFF
 )
-advanced_option(SLANG_USE_SYSTEM_SPIRV_TOOLS "Build using system SPIR-V tools library" OFF)
-advanced_option(SLANG_USE_SYSTEM_GLSLANG "Build using system glslang library" OFF)
+advanced_option(
+    SLANG_USE_SYSTEM_SPIRV_TOOLS
+    "Build using system SPIR-V tools library"
+    OFF
+)
+advanced_option(
+    SLANG_USE_SYSTEM_GLSLANG
+    "Build using system glslang library"
+    OFF
+)
 
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
