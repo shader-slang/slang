@@ -220,7 +220,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
     }
 
     // We allow out-of-order def-use in global scope.
-    bool allInGlobalScope = inst->getParent() && inst->getParent()->getOp() == kIROp_Module;
+    bool allInGlobalScope = inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst;
     if (allInGlobalScope)
     {
         for (UInt i = 0; i < inst->getOperandCount(); i++)
@@ -230,7 +230,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
                 continue;
             if (!op->getParent())
                 continue;
-            if (op->getParent()->getOp() != kIROp_Module)
+            if (op->getParent()->getOp() != kIROp_ModuleInst)
             {
                 allInGlobalScope = false;
                 break;
@@ -292,10 +292,10 @@ void validateIRInstOperands(IRInst* inst)
         return;
     switch (inst->getOp())
     {
-    case kIROp_loop:
-    case kIROp_ifElse:
-    case kIROp_unconditionalBranch:
-    case kIROp_conditionalBranch:
+    case kIROp_Loop:
+    case kIROp_IfElse:
+    case kIROp_UnconditionalBranch:
+    case kIROp_ConditionalBranch:
     case kIROp_Switch:
         return;
     default:
@@ -325,12 +325,12 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
         validate(context, terminator, block, "block must have valid terminator inst.");
         switch (terminator->getOp())
         {
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             validateBranchTarget(terminator, as<IRConditionalBranch>(terminator)->getTrueBlock());
             validateBranchTarget(terminator, as<IRConditionalBranch>(terminator)->getFalseBlock());
             break;
-        case kIROp_loop:
-        case kIROp_unconditionalBranch:
+        case kIROp_Loop:
+        case kIROp_UnconditionalBranch:
             validateBranchTarget(
                 terminator,
                 as<IRUnconditionalBranch>(terminator)->getTargetBlock());
@@ -613,6 +613,9 @@ void validateVectorsAndMatrices(
                 elementType,
                 allowedWidths,
                 Diagnostics::matrixWithDisallowedElementTypeEncountered);
+            // Matrix element type validation removed to allow integer/bool matrices
+            // which will be lowered to arrays of vectors on targets that don't support them
+            // natively
         }
         else if (auto vectorType = as<IRVectorType>(globalInst))
         {

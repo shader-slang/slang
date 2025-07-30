@@ -56,7 +56,7 @@ static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* 
         switch (terminator->getOp())
         {
         case kIROp_Switch:
-        case kIROp_loop:
+        case kIROp_Loop:
             return terminator;
         }
     }
@@ -138,7 +138,7 @@ bool isTrivialSingleIterationLoop(
             //
             switch (terminator->getOp())
             {
-            case kIROp_loop:
+            case kIROp_Loop:
                 if (isBlockInRegion(domTree, as<IRLoop>(terminator), breakOriginBlock))
                     return false;
                 break;
@@ -351,7 +351,7 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
         if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
         {
             if (br->getTargetBlock() == condBranch->getAfterBlock() &&
-                br->getOp() == kIROp_unconditionalBranch)
+                br->getOp() == kIROp_UnconditionalBranch)
             {
                 return true;
             }
@@ -436,7 +436,7 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
         if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
         {
             if (br->getTargetBlock() == switchInst->getBreakLabel() &&
-                br->getOp() == kIROp_unconditionalBranch)
+                br->getOp() == kIROp_UnconditionalBranch)
             {
                 return true;
             }
@@ -564,7 +564,7 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
         for (;;)
         {
             auto block = as<IRBlock>(targetUse->get());
-            if (block->getFirstInst()->getOp() != kIROp_unconditionalBranch)
+            if (block->getFirstInst()->getOp() != kIROp_UnconditionalBranch)
                 return;
             auto branch = as<IRUnconditionalBranch>(block->getFirstInst());
             // We can't fuse the block if there are phi arguments.
@@ -580,8 +580,8 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
                     continue;
                 switch (use->getUser()->getOp())
                 {
-                case kIROp_loop:
-                case kIROp_ifElse:
+                case kIROp_Loop:
+                case kIROp_IfElse:
                 case kIROp_Switch:
                     // If the target block is used by a special control flow inst,
                     // it is likely a merge block and we can't fuse it.
@@ -690,7 +690,7 @@ static bool simplifyBoolPhiParams(IRBlock* block)
     Array<IRBlock*, 2> preds;
     for (auto pred : block->getPredecessors())
     {
-        if (pred->getTerminator()->getOp() != kIROp_unconditionalBranch)
+        if (pred->getTerminator()->getOp() != kIROp_UnconditionalBranch)
             return false;
         preds.add(pred);
     }
@@ -914,7 +914,7 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                 }
 
                 // If `block` does not end with an unconditional branch, bail.
-                if (block->getTerminator()->getOp() != kIROp_unconditionalBranch)
+                if (block->getTerminator()->getOp() != kIROp_UnconditionalBranch)
                     break;
                 auto branch = as<IRUnconditionalBranch>(block->getTerminator());
                 auto successor = branch->getTargetBlock();

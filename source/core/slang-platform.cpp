@@ -15,6 +15,11 @@
 #include <dlfcn.h>
 #endif
 
+
+#if SLANG_LINUX_FAMILY
+#include <execinfo.h>
+#endif
+
 namespace Slang
 {
 // SharedLibrary
@@ -328,6 +333,27 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
     return SLANG_OK;
 #else
     return SLANG_E_NOT_AVAILABLE;
+#endif
+}
+
+/* static */ void PlatformUtil::backtrace()
+{
+#if SLANG_LINUX_FAMILY
+    // Print stack trace for debugging assistance
+    void* stackTrace[64];
+    int stackDepth = ::backtrace(stackTrace, 64);
+    char** symbols = ::backtrace_symbols(stackTrace, stackDepth);
+    if (symbols)
+    {
+        for (int i = 0; i < stackDepth; ++i)
+        {
+            fprintf(stdout, "%s\n", symbols[i]);
+        }
+        free(symbols);
+    }
+    fprintf(stdout, "\n");
+#else
+    fprintf(stdout, "Stack trace not available on this platform.\n");
 #endif
 }
 

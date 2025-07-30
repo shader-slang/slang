@@ -253,7 +253,7 @@ IRInst* emitLoopBlocks(
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 // Remove all linkage decorations from func.
-void removeLinkageDecorations(IRGlobalValueWithCode* func);
+void removeLinkageDecorations(IRInst* inst);
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
@@ -327,6 +327,7 @@ IRBlock* getBlock(IRInst* inst);
 IRVarLayout* findVarLayout(IRInst* value);
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
 // Run an operation over every block in a module
 template<typename F>
@@ -421,6 +422,8 @@ constexpr bool anyOf(Range&& range, Predicate&& pred)
 IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 
 bool isSignedType(IRType* type);
+
+bool isIROpaqueType(IRType* type);
 } // namespace Slang
 
 #endif

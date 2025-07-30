@@ -463,7 +463,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // the compilation.
         // If we are emitting C++, then there is no way in general to know how that C++ will be
         // compiled it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -476,7 +476,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
             info.size = sizeof(void*) * 2;
-            info.alignment = SLANG_ALIGN_OF(void*);
+            info.alignment = alignof(void*);
 
             return info;
         }
@@ -539,7 +539,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
                 return SimpleLayoutInfo(
                     LayoutResourceKind::Uniform,
                     sizeof(uint8_t),
-                    SLANG_ALIGN_OF(uint8_t));
+                    alignof(uint8_t));
             }
 
         default:
@@ -1195,60 +1195,41 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::ConstantBuffer:
         case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::MutableTexture:
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
             // It's a pointer to a texture interface
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             // It's a ptr and a size of the amount of elements
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
             // It's a pointer and a size in bytes
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
                 return info;
             }
         case ShaderParameterKind::InputRenderTarget:

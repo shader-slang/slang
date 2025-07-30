@@ -1,5 +1,4 @@
-#ifndef SLANG_AST_SUPPORT_TYPES_H
-#define SLANG_AST_SUPPORT_TYPES_H
+#pragma once
 
 #include "../compiler-core/slang-doc-extractor.h"
 #include "../compiler-core/slang-lexer.h"
@@ -7,13 +6,15 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
-#include "slang-ast-support-types.h.fiddle"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
 #include <assert.h>
 #include <type_traits>
+
+//
+#include "slang-ast-support-types.h.fiddle"
 
 FIDDLE(hidden class RefObject;)
 
@@ -219,6 +220,25 @@ FIDDLE() namespace Slang
     bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat);
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
+
+    /// Enum for known built-in function names to replace string-based comparisons
+    enum class KnownBuiltinDeclName : uint32_t
+    {
+        GeometryStreamAppend,
+        GeometryStreamRestart,
+        GetAttributeAtVertex,
+        DispatchMesh,
+        saturated_cooperation,
+        saturated_cooperation_using,
+        IDifferentiable,
+        IDifferentiablePtr,
+        NullDifferential,
+        OperatorAddressOf,
+        COUNT
+    };
+
+    /// Convert string name to KnownBuiltinDeclName enum
+    KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
 
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
@@ -1731,5 +1751,3 @@ FIDDLE() namespace Slang
     };
 
 } // namespace Slang
-
-#endif

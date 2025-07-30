@@ -4,13 +4,11 @@ on:
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   build:
     strategy:
@@ -70,8 +68,10 @@ jobs:
             compiler: cl
             platform: x86_64
             test-category: full
+            # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
@@ -81,9 +81,12 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
+          # Enable debug layers for all by default
+          - enable-debug-layers: true
+          - { os: windows, config: debug, enable-debug-alyers: false } # issue 7965
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -123,7 +126,7 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" = "linux" ]]; then
               sudo apt-get update
-              sudo apt-get install -y libx11-dev
+              sudo apt-get install -y libx11-dev 
           fi
       - name: Setup Node.js
         if: matrix.os == 'linux'
@@ -139,6 +142,30 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
+
+      # Don't need to check this on every config
+      - name: Check Stable Names Table
+        if: ${{ matrix.os == 'linux' && matrix.config == 'debug' }}
+        run: ./extras/check-ir-stable-names-gh-actions.sh
+
+      - name: Check Version Constants
+        id: check-ir-versions
+        if: ${{ matrix.os == 'linux' && matrix.config == 'debug' && github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: ./extras/check-inst-version-changes.sh
+
+      - name: Upload IR version check results
+        if: ${{ steps.check-versions.outputs.artifact_created == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ir-version-check-results
+          path: ir-version-check-artifact/
+          retention-days: 1
+
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
@@ -238,7 +265,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers true
+              -enable-debug-layers ${{ matrix.enable-debug-layers }}
           else
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -247,7 +274,7 @@ jobs:
               -expected-failure-list tests/expected-failure-no-gpu.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers true
+              -enable-debug-layers ${{ matrix.enable-debug-layers }}
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests

@@ -7,9 +7,11 @@
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
-#include "slang-serialize-ast.cpp.fiddle"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
+
+//
+#include "slang-serialize-ast.cpp.fiddle"
 
 #define SLANG_ENABLE_AST_DESERIALIZATION_STATS 0
 #define SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION 1
@@ -345,13 +347,12 @@ struct ASTSerialContext;
 using ASTSerializer = Serializer_<ISerializerImpl, ASTSerialContext>;
 
 /// Context interface for AST serialization
-struct ASTSerialContext
+struct ASTSerialContext : SourceLocSerialContext
 {
 public:
     virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& value) = 0;
     virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* value) = 0;
     virtual void handleName(ASTSerializer const& serializer, Name*& value) = 0;
-    virtual void handleSourceLoc(ASTSerializer const& serializer, SourceLoc& value) = 0;
     virtual void handleToken(ASTSerializer const& serializer, Token& value) = 0;
     virtual void handleContainerDeclDirectMemberDecls(
         ASTSerializer const& serializer,
@@ -552,13 +553,13 @@ private:
     //
 
     virtual void handleName(ASTSerializer const& serializer, Name*& value) override;
-    virtual void handleSourceLoc(ASTSerializer const& serializer, SourceLoc& value) override;
     virtual void handleToken(ASTSerializer const& serializer, Token& value) override;
     virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& node) override;
     virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node) override;
     virtual void handleContainerDeclDirectMemberDecls(
         ASTSerializer const& serializer,
         ContainerDeclDirectMemberDecls& value) override;
+    virtual SerialSourceLocWriter* getSourceLocWriter() override { return _sourceLocWriter; }
 
     void _writeImportedModule(ASTSerializer const& serializer, ModuleDecl* moduleDecl);
     void _writeImportedDecl(
@@ -695,13 +696,13 @@ private:
     //
 
     virtual void handleName(ASTSerializer const& serializer, Name*& value) override;
-    virtual void handleSourceLoc(ASTSerializer const& serializer, SourceLoc& value) override;
     virtual void handleToken(ASTSerializer const& serializer, Token& value) override;
     virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& outNode) override;
     virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node) override;
     virtual void handleContainerDeclDirectMemberDecls(
         ASTSerializer const& serializer,
         ContainerDeclDirectMemberDecls& value) override;
+    virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
 
     ModuleDecl* _readImportedModule(ASTSerializer const& serializer);
     NodeBase* _readImportedDecl(ASTSerializer const& serializer);
@@ -709,86 +710,6 @@ private:
     void _cleanUpASTNode(NodeBase* node);
     void _assignGenericParameterIndices(GenericDecl* genericDecl);
 };
-
-//
-// Let's look at a concrete example of how the `ASTSerialReadContext`
-// and `ASTSerialWriteContext` get applied to handle one of the types
-// that needs them for additional context.
-//
-// The `serialize()` function for `SourceLoc` is declared to take
-// an `ASTSerializer` argument instead of a simple `Serializer`:
-//
-void serialize(ASTSerializer const& serializer, SourceLoc& value)
-{
-    // Its body is trivial, because the actual handling of `SourceLoc`
-    // serialization is delegated to the `ASTSerialWriteContext` and
-    // `ASTSerialReadContext`.
-    //
-    serializer.getContext()->handleSourceLoc(serializer, value);
-}
-
-void ASTSerialWriteContext::handleSourceLoc(ASTSerializer const& serializer, SourceLoc& value)
-{
-    // Writing of source location information can be disabled by
-    // compiler options, and in that case the `_sourceLocWriter`
-    // may be null.
-    //
-    // In order to handle that possibility, we serialize a `SourceLoc`
-    // as an optional value, dependent on whether we have a
-    // `_sourceLocWriter` that can be used.
-    //
-    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-    if (_sourceLocWriter != nullptr)
-    {
-        // The `SourceLoc` type is implemented under the hood as an
-        // integer offset that can only be decoded using the specific
-        // `SourceManager` that created it.
-        //
-        // The source location writer handles the task of translating
-        // the under-the-hood representation to a single integer value
-        // (represented as `SerialSourceLocData::SourceLoc`) that can
-        // be decoded on the other side using other data that the
-        // source location writer will write out as part of its own
-        // representation (all of which goes into the dedicated debug
-        // data chunk, distinct from the AST).
-        //
-        SerialSourceLocData::SourceLoc rawValue = _sourceLocWriter->addSourceLoc(value);
-        serialize(serializer, rawValue);
-    }
-}
-
-void ASTSerialReadContext::handleSourceLoc(ASTSerializer const& serializer, SourceLoc& value)
-{
-    // Because the source location was *written* as an optional,
-    // we clearly need to *read* it as one.
-    //
-    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-    if (hasElements(serializer))
-    {
-        SerialSourceLocData::SourceLoc rawValue;
-        serialize(serializer, rawValue);
-
-        // Even if the serialized optional had a value, it is
-        // possible that the debug-data chunk got stripped from
-        // the compiled module file, in which case we wouldn't
-        // have access to the data needed to decode it.
-        //
-        // In that case, the `_sourceLocReader` member would be
-        // null, so we handle that possibility here.
-        //
-        if (auto sourceLocReader = _sourceLocReader)
-        {
-            value = sourceLocReader->getSourceLoc(rawValue);
-        }
-    }
-}
-
-// Now that we've seen the relevant serialization logic, it is clear that
-// a `SourceLoc` gets fossilized the same way that an optional wrapping
-// an integer (of type `SerialSourceLocData::SourceLoc`) would.
-//
-SLANG_DECLARE_FOSSILIZED_AS(SourceLoc, std::optional<SerialSourceLocData::SourceLoc>);
-
 
 //
 // Earlier we generated forward declarations for all of the types
@@ -1313,7 +1234,6 @@ void serialize(ASTSerializer const& serializer, ValNodeOperand& value)
 //
 #if 0 // FIDDLE TEMPLATE:
 %for _,T in ipairs(astStructTypes) do
-% TRACE(T)
 /// Fossilized representation of a value of type `$T`
 struct Fossilized_$T
 %   if T.directSuperClass then

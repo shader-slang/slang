@@ -1,6 +1,5 @@
 // slang-ir.h
-#ifndef SLANG_IR_H_INCLUDED
-#define SLANG_IR_H_INCLUDED
+#pragma once
 
 // This file defines the intermediate representation (IR) used for Slang
 // shader code. This is a typed static single assignment (SSA) IR,
@@ -11,12 +10,17 @@
 #include "../compiler-core/slang-source-map.h"
 #include "../core/slang-basic.h"
 #include "../core/slang-memory-arena.h"
+#include "slang-ast-type.h"
 #include "slang-container-pool.h"
+#include "slang-ir-insts-enum.h"
 #include "slang-type-system-shared.h"
 
-#include <bit>
 #include <functional>
 
+//
+#include "slang-ir.h.fiddle"
+
+FIDDLE()
 namespace Slang
 {
 
@@ -36,6 +40,8 @@ struct IRModule;
 struct IRStructField;
 struct IRStructKey;
 
+FIDDLE(instStructForwardDecls())
+
 typedef unsigned int IROpFlags;
 enum : IROpFlags
 {
@@ -46,37 +52,6 @@ enum : IROpFlags
         1 << 2, ///< If set this op is a hoistable inst that needs to be deduplicated.
     kIROpFlag_Global =
         1 << 3, ///< If set this op should always be hoisted but should never be deduplicated.
-};
-
-/* Bit usage of IROp is a follows
-
-          MainOp | Other
-Bit range: 0-10   | Remaining bits
-
-For doing range checks (for example for doing isa tests), the value is masked by kIROpMask_OpMask,
-such that the Other bits don't interfere. The other bits can be used for storage for anything that
-needs to identify as a different 'op' or 'type'. It is currently used currently for storing the
-TextureFlavor of a IRResourceTypeBase derived types for example.
-
-TODO: We should eliminate the use of the "other" bits so that the entire value/state
-of an instruction is manifest in its opcode, operands, and children.
-*/
-enum IROp : int32_t
-{
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) kIROp_##ID,
-#include "slang-ir-inst-defs.h"
-
-    /// The total number of valid opcodes
-    kIROpCount,
-
-    /// An invalid opcode used to represent a missing or unknown opcode value.
-    kIROp_Invalid = kIROpCount,
-
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
-#define INST_RANGE(BASE, FIRST, LAST) \
-    kIROp_First##BASE = kIROp_##FIRST, kIROp_Last##BASE = kIROp_##LAST,
-
-#include "slang-ir-inst-defs.h"
 };
 
 /* IROpMeta describes values for the layout of IROps */
@@ -557,8 +532,10 @@ struct IRBlock;
 // Every value in the IR is an instruction (even things
 // like literal values).
 //
+FIDDLE()
 struct IRInst
 {
+    FIDDLE(...)
     // The operation that this value represents
     IROp m_op;
 
@@ -963,39 +940,18 @@ typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 
 // Types
 
-#define IR_LEAF_ISA(NAME)                               \
-    static bool isaImpl(IROp op)                        \
-    {                                                   \
-        return (kIROpMask_OpMask & op) == kIROp_##NAME; \
-    }
-#define IR_PARENT_ISA(NAME)                                       \
-    static bool isaImpl(IROp opIn)                                \
-    {                                                             \
-        const int op = (kIROpMask_OpMask & opIn);                 \
-        return op >= kIROp_First##NAME && op <= kIROp_Last##NAME; \
-    }
-
-#define SIMPLE_IR_TYPE(NAME, BASE) \
-    struct IR##NAME : IR##BASE     \
-    {                              \
-        IR_LEAF_ISA(NAME)          \
-    };
-#define SIMPLE_IR_PARENT_TYPE(NAME, BASE) \
-    struct IR##NAME : IR##BASE            \
-    {                                     \
-        IR_PARENT_ISA(NAME)               \
-    };
-
 
 // All types in the IR are represented as instructions which conceptually
 // execute before run time.
+FIDDLE()
 struct IRType : IRInst
 {
+    FIDDLE(baseInst{noIsaImpl = true})
     IRType* getCanonicalType() { return this; }
 
     // Hack: specialize can also be a type. We should consider using a
     // separate `specializeType` op code for types so we can use the normal
-    // `IR_PARENT_ISA` macro here.
+    // isaImpl definition macro here.
     static bool isaImpl(IROp opIn)
     {
         const int op = (kIROpMask_OpMask & opIn);
@@ -1005,32 +961,31 @@ struct IRType : IRInst
 
 IRType* unwrapArray(IRType* type);
 
+FIDDLE()
 struct IRBasicType : IRType
 {
+    FIDDLE(baseInst())
     BaseType getBaseType() { return BaseType(getOp() - kIROp_FirstBasicType); }
-
-    IR_PARENT_ISA(BasicType)
 };
 
+FIDDLE()
 struct IRVoidType : IRBasicType
 {
-    IR_LEAF_ISA(VoidType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBoolType : IRBasicType
 {
-    IR_LEAF_ISA(BoolType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRStringTypeBase : IRType
 {
-    IR_PARENT_ISA(StringTypeBase)
+    FIDDLE(baseInst())
 };
 
-SIMPLE_IR_TYPE(StringType, StringTypeBase)
-SIMPLE_IR_TYPE(NativeStringType, StringTypeBase)
-
-SIMPLE_IR_TYPE(DynamicType, Type)
 
 // True if types are equal
 // Note compares nominal types by name alone
@@ -1075,8 +1030,10 @@ typedef int64_t IRIntegerValue;
 typedef uint64_t IRUnsignedIntegerValue;
 typedef double IRFloatingPointValue;
 
+FIDDLE()
 struct IRConstant : IRInst
 {
+    FIDDLE(baseInst())
     enum class FloatKind
     {
         Finite,
@@ -1129,7 +1086,6 @@ struct IRConstant : IRInst
     /// Get the hash
     HashCode getHashCode();
 
-    IR_PARENT_ISA(Constant)
 
     // Must be last member, because data may be held behind
     // NOTE! The total size of IRConstant may not be allocated - only enough space is allocated for
@@ -1137,25 +1093,25 @@ struct IRConstant : IRInst
     ValueUnion value;
 };
 
+FIDDLE()
 struct IRIntLit : IRConstant
 {
+    FIDDLE(leafInst())
     IRIntegerValue getValue() { return value.intVal; }
-
-    IR_LEAF_ISA(IntLit);
 };
 
+FIDDLE()
 struct IRFloatLit : IRConstant
 {
+    FIDDLE(leafInst())
     IRFloatingPointValue getValue() { return value.floatVal; }
-
-    IR_LEAF_ISA(FloatLit);
 };
 
+FIDDLE()
 struct IRBoolLit : IRConstant
 {
+    FIDDLE(leafInst())
     bool getValue() { return value.intVal != 0; }
-
-    IR_LEAF_ISA(BoolLit);
 };
 
 // Get the compile-time constant integer value of an instruction,
@@ -1167,33 +1123,37 @@ IRIntegerValue getIntVal(IRInst* inst);
 // the actual size.
 IRIntegerValue getArraySizeVal(IRInst* inst);
 
+FIDDLE()
 struct IRStringLit : IRConstant
 {
-
-    IR_LEAF_ISA(StringLit);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBlobLit : IRConstant
 {
-    IR_LEAF_ISA(BlobLit);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPtrLit : IRConstant
 {
-    IR_LEAF_ISA(PtrLit);
+    FIDDLE(leafInst())
 
     void* getValue() { return value.ptrVal; }
 };
 
+FIDDLE()
 struct IRVoidLit : IRConstant
 {
-    IR_LEAF_ISA(VoidLit);
+    FIDDLE(leafInst())
 };
 
 // A instruction that ends a basic block (usually because of control flow)
+FIDDLE()
 struct IRTerminatorInst : IRInst
 {
-    IR_PARENT_ISA(TerminatorInst)
+    FIDDLE(baseInst())
 };
 
 // A function parameter is owned by a basic block, and represents
@@ -1204,12 +1164,12 @@ struct IRTerminatorInst : IRInst
 // In each case, the basic idea is that a block is a "label with
 // arguments."
 //
+FIDDLE()
 struct IRParam : IRInst
 {
+    FIDDLE(leafInst())
     IRParam* getNextParam();
     IRParam* getPrevParam();
-
-    IR_LEAF_ISA(Param)
 };
 
 /// A control-flow edge from one basic block to another
@@ -1239,8 +1199,10 @@ private:
 // no function declarations, or nested blocks). We also expect
 // that the previous/next instruction are always a basic block.
 //
+FIDDLE()
 struct IRBlock : IRInst
 {
+    FIDDLE(leafInst())
     // Linked list of the instructions contained in this block
     //
     IRInst* getFirstInst() { return getChildren().first; }
@@ -1386,14 +1348,13 @@ struct IRBlock : IRInst
     SuccessorList getSuccessors();
 
     //
-
-    IR_LEAF_ISA(Block)
 };
 
-SIMPLE_IR_TYPE(BasicBlockType, Type)
 
+FIDDLE()
 struct IRResourceTypeBase : IRType
 {
+    FIDDLE(baseInst())
     IRInst* getShapeInst() { return getOperand(kCoreModule_TextureShapeParameterIndex); }
     IRInst* getIsArrayInst() { return getOperand(kCoreModule_TextureIsArrayParameterIndex); }
     IRInst* getIsMultisampleInst()
@@ -1461,152 +1422,125 @@ struct IRResourceTypeBase : IRType
         }
         return SLANG_RESOURCE_ACCESS_UNKNOWN;
     }
-
-    IR_PARENT_ISA(ResourceTypeBase);
 };
 
+FIDDLE()
 struct IRResourceType : IRResourceTypeBase
 {
+    FIDDLE(baseInst())
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getSampleCount() { return getSampleCountInst(); }
     bool hasFormat() { return getOperandCount() >= 9; }
     IRIntegerValue getFormat() { return getIntVal(getFormatInst()); }
-
-    IR_PARENT_ISA(ResourceType)
 };
 
+FIDDLE()
 struct IRTextureTypeBase : IRResourceType
 {
-    IR_PARENT_ISA(TextureTypeBase)
+    FIDDLE(baseInst())
 };
 
+FIDDLE()
 struct IRTextureType : IRTextureTypeBase
 {
-    IR_LEAF_ISA(TextureType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGLSLImageType : IRTextureTypeBase
 {
-    IR_LEAF_ISA(GLSLImageType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRSubpassInputType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getIsMultisampleInst() { return getOperand(1); }
+    FIDDLE(leafInst())
     bool isMultisample() { return getIntVal(getIsMultisampleInst()) == 1; }
-
-    IR_LEAF_ISA(SubpassInputType)
 };
 
+FIDDLE()
 struct IRSamplerStateTypeBase : IRType
 {
-    IR_PARENT_ISA(SamplerStateTypeBase)
+    FIDDLE(baseInst())
 };
 
-SIMPLE_IR_TYPE(SamplerStateType, SamplerStateTypeBase)
-SIMPLE_IR_TYPE(SamplerComparisonStateType, SamplerStateTypeBase)
 
+FIDDLE()
 struct IRBuiltinGenericType : IRType
 {
+    FIDDLE(baseInst())
     IRType* getElementType() { return (IRType*)getOperand(0); }
-
-    IR_PARENT_ISA(BuiltinGenericType)
 };
 
-SIMPLE_IR_PARENT_TYPE(PointerLikeType, BuiltinGenericType);
 
+FIDDLE()
 struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
 {
+    FIDDLE(baseInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }
-
-    IR_PARENT_ISA(HLSLStructuredBufferTypeBase)
 };
 
-SIMPLE_IR_TYPE(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_IR_TYPE(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_IR_TYPE(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
 
-SIMPLE_IR_PARENT_TYPE(UntypedBufferResourceType, Type)
-SIMPLE_IR_PARENT_TYPE(ByteAddressBufferTypeBase, UntypedBufferResourceType)
-SIMPLE_IR_TYPE(HLSLByteAddressBufferType, ByteAddressBufferTypeBase)
-SIMPLE_IR_TYPE(HLSLRWByteAddressBufferType, ByteAddressBufferTypeBase)
-SIMPLE_IR_TYPE(HLSLRasterizerOrderedByteAddressBufferType, ByteAddressBufferTypeBase)
-
-SIMPLE_IR_TYPE(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_IR_TYPE(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
-
+FIDDLE()
 struct IRHLSLPatchType : IRType
 {
+    FIDDLE(baseInst())
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getElementCount() { return getOperand(1); }
-
-    IR_PARENT_ISA(HLSLPatchType)
 };
 
-SIMPLE_IR_TYPE(HLSLInputPatchType, HLSLPatchType)
-SIMPLE_IR_TYPE(HLSLOutputPatchType, HLSLPatchType)
-
-SIMPLE_IR_PARENT_TYPE(HLSLStreamOutputType, BuiltinGenericType)
-SIMPLE_IR_TYPE(HLSLPointStreamType, HLSLStreamOutputType)
-SIMPLE_IR_TYPE(HLSLLineStreamType, HLSLStreamOutputType)
-SIMPLE_IR_TYPE(HLSLTriangleStreamType, HLSLStreamOutputType)
 
 // Mesh shaders
 // TODO: Ellie, should this parent struct be shared with Patch?
 // IRArrayLikeType? IROpaqueArrayLikeType?
+FIDDLE()
 struct IRMeshOutputType : IRType
 {
+    FIDDLE(baseInst())
     IRType* getElementType() { return (IRType*)getOperand(0); }
     IRInst* getMaxElementCount() { return getOperand(1); }
-
-    IR_PARENT_ISA(MeshOutputType)
 };
 
-SIMPLE_IR_TYPE(VerticesType, MeshOutputType)
-SIMPLE_IR_TYPE(IndicesType, MeshOutputType)
-SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
+FIDDLE()
 struct IRMetalMeshType : IRType
 {
-    IR_LEAF_ISA(MetalMeshType);
-
-    IRType* getVerticesType() { return (IRType*)getOperand(0); }
-    IRType* getPrimitivesType() { return (IRType*)getOperand(1); }
-    IRInst* getNumVertices() { return (IRInst*)getOperand(2); }
-    IRInst* getNumPrimitives() { return (IRInst*)getOperand(3); }
-    IRIntLit* getTopology() { return (IRIntLit*)getOperand(4); }
+    FIDDLE(leafInst())
 };
 
-SIMPLE_IR_TYPE(MetalMeshGridPropertiesType, Type)
+FIDDLE()
+struct IRPointerLikeType : IRBuiltinGenericType
+{
+    FIDDLE(baseInst())
+};
 
-SIMPLE_IR_TYPE(GLSLInputAttachmentType, Type)
-SIMPLE_IR_PARENT_TYPE(ParameterGroupType, PointerLikeType)
+FIDDLE()
+struct IRParameterGroupType : IRPointerLikeType
+{
+    FIDDLE(baseInst())
+};
 
+FIDDLE()
 struct IRUniformParameterGroupType : IRParameterGroupType
 {
-    IR_PARENT_ISA(UniformParameterGroupType)
+    FIDDLE(baseInst())
 
     IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
 };
 
-SIMPLE_IR_PARENT_TYPE(VaryingParameterGroupType, ParameterGroupType)
-SIMPLE_IR_TYPE(ConstantBufferType, UniformParameterGroupType)
-SIMPLE_IR_TYPE(TextureBufferType, UniformParameterGroupType)
-SIMPLE_IR_TYPE(GLSLInputParameterGroupType, VaryingParameterGroupType)
-SIMPLE_IR_TYPE(GLSLOutputParameterGroupType, VaryingParameterGroupType)
-SIMPLE_IR_TYPE(ParameterBlockType, UniformParameterGroupType)
-SIMPLE_IR_TYPE(DynamicResourceType, Type)
 
+FIDDLE()
 struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
 {
+    FIDDLE(leafInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }
-
-    IR_LEAF_ISA(GLSLShaderStorageBufferType)
 };
 
+FIDDLE()
 struct IRArrayTypeBase : IRType
 {
+    FIDDLE(baseInst())
     IRType* getElementType() { return (IRType*)getOperand(0); }
 
     // Returns the element count for an `IRArrayType`, and null
@@ -1629,51 +1563,38 @@ struct IRArrayTypeBase : IRType
         }
         return nullptr;
     }
-
-    IR_PARENT_ISA(ArrayTypeBase)
 };
 
+FIDDLE()
 struct IRArrayType : IRArrayTypeBase
 {
-    IR_LEAF_ISA(ArrayType)
+    FIDDLE(leafInst())
 };
 
-SIMPLE_IR_TYPE(UnsizedArrayType, ArrayTypeBase)
 
+FIDDLE()
 struct IRAtomicType : IRType
 {
-    IR_LEAF_ISA(AtomicType)
-
-    IRType* getElementType() { return (IRType*)getOperand(0); }
+    FIDDLE(leafInst())
 };
 
-SIMPLE_IR_PARENT_TYPE(Rate, Type)
-SIMPLE_IR_TYPE(ConstExprRate, Rate)
-SIMPLE_IR_TYPE(SpecConstRate, Rate)
-SIMPLE_IR_TYPE(GroupSharedRate, Rate)
-SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 
+FIDDLE()
 struct IRRateQualifiedType : IRType
 {
-    IRRate* getRate() { return (IRRate*)getOperand(0); }
-    IRType* getValueType() { return (IRType*)getOperand(1); }
-
-    IR_LEAF_ISA(RateQualifiedType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDescriptorHandleType : IRType
 {
-    IRType* getResourceType() { return (IRType*)getOperand(0); }
-    IR_LEAF_ISA(DescriptorHandleType)
+    FIDDLE(leafInst())
 };
 
 // Unlike the AST-level type system where `TypeType` tracks the
 // underlying type, the "type of types" in the IR is a simple
 // value with no operands, so that all type nodes have the
 // same type.
-SIMPLE_IR_PARENT_TYPE(Kind, Type);
-SIMPLE_IR_TYPE(TypeKind, Kind);
-SIMPLE_IR_TYPE(TypeParameterPackKind, Kind);
 
 // The kind of any and all generics.
 //
@@ -1684,83 +1605,79 @@ SIMPLE_IR_TYPE(TypeParameterPackKind, Kind);
 // "higher-kinded" generics (e.g., a generic that takes another
 // generic as a parameter).
 //
-SIMPLE_IR_TYPE(GenericKind, Kind)
 
+FIDDLE()
 struct IRDifferentialPairTypeBase : IRType
 {
+    FIDDLE(baseInst())
     IRType* getValueType() { return (IRType*)getOperand(0); }
     IRInst* getWitness() { return (IRInst*)getOperand(1); }
-
-    IR_PARENT_ISA(DifferentialPairTypeBase)
 };
 
+FIDDLE()
 struct IRDifferentialPairType : IRDifferentialPairTypeBase
 {
-    IR_LEAF_ISA(DifferentialPairType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDifferentialPtrPairType : IRDifferentialPairTypeBase
 {
-    IR_LEAF_ISA(DifferentialPtrPairType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRDifferentialPairUserCodeType : IRDifferentialPairTypeBase
 {
-    IR_LEAF_ISA(DifferentialPairUserCodeType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBackwardDiffIntermediateContextType : IRType
 {
-    IRInst* getFunc() { return getOperand(0); }
-    IR_LEAF_ISA(BackwardDiffIntermediateContextType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRVectorType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getElementCount() { return getOperand(1); }
-
-    IR_LEAF_ISA(VectorType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRMatrixType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getRowCount() { return getOperand(1); }
-    IRInst* getColumnCount() { return getOperand(2); }
-    IRInst* getLayout() { return getOperand(3); }
-
-    IR_LEAF_ISA(MatrixType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRArrayListType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-
-    IR_LEAF_ISA(ArrayListType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTensorViewType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-
-    IR_LEAF_ISA(TensorViewType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTorchTensorType : IRType
 {
-    IR_LEAF_ISA(TorchTensorType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRSPIRVLiteralType : IRType
 {
-    IR_LEAF_ISA(SPIRVLiteralType)
-
-    IRType* getValueType() { return static_cast<IRType*>(getOperand(0)); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPtrTypeBase : IRType
 {
+    FIDDLE(baseInst())
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
     bool hasAddressSpace()
@@ -1774,65 +1691,59 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(1))->getValue()
                    : AddressSpace::Generic;
     }
-
-    IR_PARENT_ISA(PtrTypeBase)
 };
 
-SIMPLE_IR_TYPE(PtrType, PtrTypeBase)
-SIMPLE_IR_TYPE(RefType, PtrTypeBase)
-SIMPLE_IR_TYPE(ConstRefType, PtrTypeBase)
-SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
-SIMPLE_IR_TYPE(OutType, OutTypeBase)
-SIMPLE_IR_TYPE(InOutType, OutTypeBase)
-
+FIDDLE()
 struct IRComPtrType : public IRType
 {
-    IR_LEAF_ISA(ComPtrType);
-    IRType* getValueType() { return (IRType*)getOperand(0); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRNativePtrType : public IRType
 {
-    IR_LEAF_ISA(NativePtrType);
-    IRType* getValueType() { return (IRType*)getOperand(0); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRPseudoPtrType : public IRPtrTypeBase
 {
-    IR_LEAF_ISA(PseudoPtrType);
+    FIDDLE(leafInst())
 };
 
 /// The base class of RawPointerType and RTTIPointerType.
+FIDDLE()
 struct IRRawPointerTypeBase : IRType
 {
-    IR_PARENT_ISA(RawPointerTypeBase);
+    FIDDLE(baseInst())
 };
 
 /// Represents a pointer to an object of unknown type.
+FIDDLE()
 struct IRRawPointerType : IRRawPointerTypeBase
 {
-    IR_LEAF_ISA(RawPointerType)
+    FIDDLE(leafInst())
 };
 
 /// Represents a pointer to an object whose type is determined at runtime,
 /// with type information available through `rttiOperand`.
 ///
+FIDDLE()
 struct IRRTTIPointerType : IRRawPointerTypeBase
 {
-    IRInst* getRTTIOperand() { return getOperand(0); }
-    IR_LEAF_ISA(RTTIPointerType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGlobalHashedStringLiterals : IRInst
 {
-    IR_LEAF_ISA(GlobalHashedStringLiterals)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRGetStringHash : IRInst
 {
-    IR_LEAF_ISA(GetStringHash)
-
-    IRStringLit* getStringLit() { return as<IRStringLit>(getOperand(0)); }
+    FIDDLE(leafInst())
 };
 
 /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
@@ -1840,8 +1751,10 @@ struct IRGetStringHash : IRInst
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
 
+FIDDLE()
 struct IRFuncType : IRType
 {
+    FIDDLE(leafInst())
     IRType* getResultType() { return (IRType*)getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
@@ -1849,54 +1762,45 @@ struct IRFuncType : IRType
     {
         return IROperandList<IRType>(getOperands() + 1, getOperands() + getOperandCount());
     }
-
-    IR_LEAF_ISA(FuncType)
 };
 
+FIDDLE()
 struct IRRayQueryType : IRType
 {
-    IR_LEAF_ISA(RayQueryType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRHitObjectType : IRType
 {
-    IR_LEAF_ISA(HitObjectType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCoopVectorType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getElementCount() { return getOperand(1); }
-
-    IR_LEAF_ISA(CoopVectorType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRCoopMatrixType : IRType
 {
-    IRType* getElementType() { return (IRType*)getOperand(0); }
-    IRInst* getScope() { return getOperand(1); }
-    IRInst* getRowCount() { return getOperand(2); }
-    IRInst* getColumnCount() { return getOperand(3); }
-    IRInst* getMatrixUse() { return getOperand(4); }
-
-    IR_LEAF_ISA(CoopMatrixType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTensorAddressingTensorLayoutType : IRType
 {
-    IRInst* getDimension() { return getOperand(0); }
-    IRInst* getClampMode() { return getOperand(1); }
-
-    IR_LEAF_ISA(TensorAddressingTensorLayoutType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTensorAddressingTensorViewType : IRType
 {
+    FIDDLE(leafInst())
     IRInst* getDimension() { return getOperand(0); }
     IRInst* getHasDimension() { return getOperand(1); }
     IRInst* getPermutation(int index) { return getOperand(2 + index); }
-
-    IR_LEAF_ISA(TensorAddressingTensorViewType)
 };
 
 bool isDefinition(IRInst* inVal);
@@ -1910,9 +1814,10 @@ bool isDefinition(IRInst* inVal);
 // (that is, they have mangled names that can be used
 // for linkage).
 //
+FIDDLE()
 struct IRStructKey : IRInst
 {
-    IR_LEAF_ISA(StructKey)
+    FIDDLE(leafInst())
 };
 //
 // The fields of the struct are then defined as mappings
@@ -1922,8 +1827,10 @@ struct IRStructKey : IRInst
 // A struct field thus has two operands: the key, and the
 // type of the field.
 //
+FIDDLE()
 struct IRStructField : IRInst
 {
+    FIDDLE(leafInst())
     IRStructKey* getKey() { return cast<IRStructKey>(getOperand(0)); }
     IRType* getFieldType()
     {
@@ -1935,8 +1842,6 @@ struct IRStructField : IRInst
         return (IRType*)getOperand(1);
     }
     void setFieldType(IRType* type) { setOperand(1, type); }
-
-    IR_LEAF_ISA(StructField)
 };
 //
 // The struct type is then represented as a parent instruction
@@ -1944,191 +1849,201 @@ struct IRStructField : IRInst
 // *not* contain the keys, because code needs to be able to
 // reference the keys from scopes outside of the struct.
 //
+FIDDLE()
 struct IRStructType : IRType
 {
+    FIDDLE(leafInst())
     IRFilteredInstList<IRStructField> getFields()
     {
         return IRFilteredInstList<IRStructField>(getChildren());
     }
-
-    IR_LEAF_ISA(StructType)
 };
 
+FIDDLE()
 struct IRClassType : IRType
 {
+    FIDDLE(leafInst())
     IRFilteredInstList<IRStructField> getFields()
     {
         return IRFilteredInstList<IRStructField>(getChildren());
     }
-
-    IR_LEAF_ISA(ClassType)
 };
 
+FIDDLE()
 struct IRAssociatedType : IRType
 {
-    IR_LEAF_ISA(AssociatedType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRThisType : IRType
 {
-    IR_LEAF_ISA(ThisType)
+    FIDDLE(leafInst())
 
     IRInst* getConstraintType() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRThisTypeWitness : IRInst
 {
-    IR_LEAF_ISA(ThisTypeWitness)
+    FIDDLE(leafInst())
 
     IRInst* getConstraintType() { return getOperand(0); }
 };
 
+FIDDLE()
 struct IRInterfaceRequirementEntry : IRInst
 {
-    IRInst* getRequirementKey() { return getOperand(0); }
-    IRInst* getRequirementVal() { return getOperand(1); }
+    FIDDLE(leafInst())
     void setRequirementKey(IRInst* val) { setOperand(0, val); }
     void setRequirementVal(IRInst* val) { setOperand(1, val); }
-
-    IR_LEAF_ISA(InterfaceRequirementEntry);
 };
 
+FIDDLE()
 struct IRInterfaceType : IRType
 {
-    IR_LEAF_ISA(InterfaceType)
+    FIDDLE(leafInst())
 
     UInt getRequirementCount() { return getOperandCount(); }
 };
 
+FIDDLE()
 struct IRConjunctionType : IRType
 {
-    IR_LEAF_ISA(ConjunctionType)
+    FIDDLE(leafInst())
 
     Int getCaseCount() { return getOperandCount(); }
     IRType* getCaseType(Int index) { return (IRType*)getOperand(index); }
 };
 
+FIDDLE()
 struct IRAttributedType : IRType
 {
-    IR_LEAF_ISA(AttributedType)
-
-    IRType* getBaseType() { return (IRType*)getOperand(0); }
-    IRInst* getAttr() { return getOperand(1); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTupleTypeBase : IRType
 {
-    IR_PARENT_ISA(TupleTypeBase)
+    FIDDLE(baseInst())
 };
 
 /// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
 /// are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
+FIDDLE()
 struct IRTupleType : IRTupleTypeBase
 {
-    IR_LEAF_ISA(TupleType)
+    FIDDLE(leafInst())
 };
 
 /// Represents a type pack. Type packs behave like tuples, but they have a
 /// "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
 /// MakeTypePack(T1,T2,T3).
+FIDDLE()
 struct IRTypePack : IRTupleTypeBase
 {
-    IR_LEAF_ISA(TypePack)
+    FIDDLE(leafInst())
 };
 
 // A placeholder struct key for tuple type layouts that will be replaced with
 // the actual struct key when the tuple type is materialized into a struct type.
+FIDDLE()
 struct IRIndexedFieldKey : IRInst
 {
-    IR_LEAF_ISA(IndexedFieldKey)
+    FIDDLE(leafInst())
     IRInst* getBaseType() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
 };
 
 /// Represents a tuple in target language. TargetTupleType will not be lowered to structs.
+FIDDLE()
 struct IRTargetTupleType : IRType
 {
-    IR_LEAF_ISA(TargetTupleType)
+    FIDDLE(leafInst())
 };
 
 /// Represents a `expand T` type used in variadic generic decls in Slang. Expected to be substituted
 /// by actual types during specialization.
-struct IRExpandType : IRType
+FIDDLE()
+struct IRExpandTypeOrVal : IRType
 {
-    IR_LEAF_ISA(ExpandTypeOrVal)
+    FIDDLE(leafInst())
     IRType* getPatternType() { return (IRType*)(getOperand(0)); }
     UInt getCaptureCount() { return getOperandCount() - 1; }
     IRType* getCaptureType(UInt index) { return (IRType*)(getOperand(index + 1)); }
 };
 
 /// Represents an `Result<T,E>`, used by functions that throws error codes.
+FIDDLE()
 struct IRResultType : IRType
 {
-    IR_LEAF_ISA(ResultType)
-
-    IRType* getValueType() { return (IRType*)getOperand(0); }
-    IRType* getErrorType() { return (IRType*)getOperand(1); }
+    FIDDLE(leafInst())
 };
 
 /// Represents an `Optional<T>`.
+FIDDLE()
 struct IROptionalType : IRType
 {
-    IR_LEAF_ISA(OptionalType)
-
-    IRType* getValueType() { return (IRType*)getOperand(0); }
+    FIDDLE(leafInst())
 };
 
 /// Represents an enum type
+FIDDLE()
 struct IREnumType : IRType
 {
-    IR_LEAF_ISA(EnumType)
-
-    IRType* getTagType() { return (IRType*)getOperand(0); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRTypeType : IRType
 {
-    IR_LEAF_ISA(TypeType);
+    FIDDLE(leafInst())
 };
 
 /// Represents the IR type for an `IRRTTIObject`.
+FIDDLE()
 struct IRRTTIType : IRType
 {
-    IR_LEAF_ISA(RTTIType);
+    FIDDLE(leafInst())
 };
 
 /// Represents a handle to an RTTI object.
 /// This is lowered as an integer number identifying a type.
+FIDDLE()
 struct IRRTTIHandleType : IRType
 {
-    IR_LEAF_ISA(RTTIHandleType);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRAnyValueType : IRType
 {
-    IR_LEAF_ISA(AnyValueType);
-    IRInst* getSize() { return getOperand(0); }
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRWitnessTableTypeBase : IRType
 {
+    FIDDLE(baseInst())
     IRInst* getConformanceType() { return getOperand(0); }
-    IR_PARENT_ISA(WitnessTableTypeBase);
 };
 
+FIDDLE()
 struct IRWitnessTableType : IRWitnessTableTypeBase
 {
-    IR_LEAF_ISA(WitnessTableType);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRWitnessTableIDType : IRWitnessTableTypeBase
 {
-    IR_LEAF_ISA(WitnessTableIDType);
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBindExistentialsTypeBase : IRType
 {
-    IR_PARENT_ISA(BindExistentialsTypeBase)
+    FIDDLE(baseInst())
 
     IRType* getBaseType() { return (IRType*)getOperand(0); }
     UInt getExistentialArgCount() { return getOperandCount() - 1; }
@@ -2136,14 +2051,16 @@ struct IRBindExistentialsTypeBase : IRType
     IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
 };
 
+FIDDLE()
 struct IRBindExistentialsType : IRBindExistentialsTypeBase
 {
-    IR_LEAF_ISA(BindExistentialsType)
+    FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBoundInterfaceType : IRBindExistentialsTypeBase
 {
-    IR_LEAF_ISA(BoundInterfaceType)
+    FIDDLE(leafInst())
 
     IRType* getInterfaceType() { return getBaseType(); }
     IRType* getConcreteType() { return (IRType*)getExistentialArg(0); }
@@ -2153,20 +2070,22 @@ struct IRBoundInterfaceType : IRBindExistentialsTypeBase
 
 /// @brief A global value that potentially holds executable code.
 ///
+FIDDLE()
 struct IRGlobalValueWithCode : IRInst
 {
+    FIDDLE(baseInst())
     // The children of a value with code will be the basic
     // blocks of its definition.
     IRBlock* getFirstBlock() { return cast<IRBlock>(getFirstChild()); }
     IRBlock* getLastBlock() { return cast<IRBlock>(getLastChild()); }
     IRInstList<IRBlock> getBlocks() { return IRInstList<IRBlock>(getChildren()); }
-
-    IR_PARENT_ISA(GlobalValueWithCode)
 };
 
 // A value that has parameters so that it can conceptually be called.
+FIDDLE()
 struct IRGlobalValueWithParams : IRGlobalValueWithCode
 {
+    FIDDLE(baseInst())
     // Convenience accessor for the IR parameters,
     // which are actually the parameters of the first
     // block.
@@ -2174,16 +2093,16 @@ struct IRGlobalValueWithParams : IRGlobalValueWithCode
     IRParam* getLastParam();
     IRInstList<IRParam> getParams();
     IRInst* getFirstOrdinaryInst();
-
-    IR_PARENT_ISA(GlobalValueWithParams)
 };
 
 // A function is a parent to zero or more blocks of instructions.
 //
 // A function is itself a value, so that it can be a direct operand of
 // an instruction (e.g., a call).
+FIDDLE()
 struct IRFunc : IRGlobalValueWithParams
 {
+    FIDDLE(leafInst())
     // The type of the IR-level function
     IRFuncType* getDataType() { return (IRFuncType*)IRInst::getDataType(); }
 
@@ -2194,8 +2113,6 @@ struct IRFunc : IRGlobalValueWithParams
     IRType* getParamType(UInt index);
 
     bool isDefinition() { return getFirstBlock() != nullptr; }
-
-    IR_LEAF_ISA(Func)
 };
 
 /// Adjust the type of an IR function based on its parameter list.
@@ -2218,9 +2135,10 @@ void fixUpFuncType(IRFunc* func);
 //
 // In practice, a generic always holds only a single block, and ends
 // with a `return` instruction for the value that the generic yields.
+FIDDLE()
 struct IRGeneric : IRGlobalValueWithParams
 {
-    IR_LEAF_ISA(Generic)
+    FIDDLE(leafInst())
 };
 
 // Find the value that is returned from a generic, so that
@@ -2255,16 +2173,16 @@ IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferent
 
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.
+FIDDLE()
 struct IRModuleInst : IRInst
 {
+    FIDDLE(leafInst())
     // Pointer back to the non-instruction object that represents
     // the module, so that we can get back to it in algorithms
     // that need it.
     IRModule* module;
 
     IRInstListBase getGlobalInsts() { return getChildren(); }
-
-    IR_LEAF_ISA(Module)
 };
 
 struct IRModule;
@@ -2388,8 +2306,10 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
+FIDDLE()
 struct IRModule : RefObject
 {
+    FIDDLE(...)
 public:
     enum
     {
@@ -2472,7 +2392,29 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
+    //
+    // The range of module versions this compiler supports
+    //
+    // This will need to be updated if for example an instruction is removed,
+    // the max supported version should be incremented and the min supported
+    // version set to above the last version an instance of that instruction
+    // could be found
+    //
+    // Additionally this should be updated when new instructions are added,
+    // however only k_maxSupportedModuleVersion needs to be incremented in that
+    // case
+    //
+    // It represents the version of module regarding semantics and doesn't have
+    // anything to do with serialization format
+    //
+    const static UInt k_minSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 1;
+    static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
 private:
+    friend struct IRSerialReadContext;
+    friend struct IRSerialWriteContext;
+    friend struct Fossilized_IRModule;
     IRModule() = delete;
 
     /// Ctor
@@ -2491,10 +2433,13 @@ private:
     /// instructions from an arbitrary IR instruction we expect to find the
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
-    IRModuleInst* m_moduleInst = nullptr;
+    FIDDLE() IRModuleInst* m_moduleInst = nullptr;
 
     // The name of the module.
-    Name* m_name = nullptr;
+    FIDDLE() Name* m_name = nullptr;
+
+    // The version of the module as it was loaded
+    FIDDLE() UInt64 m_version = k_maxSupportedModuleVersion;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.
@@ -2603,9 +2548,10 @@ struct InstHashSet
 };
 
 
+FIDDLE()
 struct IRSpecializationDictionaryItem : public IRInst
 {
-    IR_LEAF_ISA(SpecializationDictionaryItem)
+    FIDDLE(leafInst())
 };
 
 struct IRDumpOptions
@@ -2695,6 +2641,10 @@ bool isMovableInst(IRInst* inst);
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
+extern uint32_t _slangIRAllocBreak;
+extern bool _slangIRPrintStackAtBreak;
+void _debugSetInstBeingCloned(uint32_t uid);
+void _debugResetInstBeingCloned();
 #endif
 
 // TODO: Ellie, comment and move somewhere more appropriate?
@@ -2832,5 +2782,3 @@ R* composeGetters(T* t)
 }
 
 } // namespace Slang
-
-#endif

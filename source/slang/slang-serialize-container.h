@@ -17,10 +17,16 @@ struct SerialContainerUtil
 {
     struct WriteOptions
     {
-        SerialOptionFlags optionFlags =
-            SerialOptionFlag::ASTModule |
-            SerialOptionFlag::IRModule; ///< Flags controlling what is written
-        SourceManager* sourceManager =
+        /// The source manager that is used by `SourceLoc`s in the input.
+        ///
+        /// If null, source location information will not be serialized
+        /// as part of the output.
+        ///
+        /// If non-null, it must be the `SourceManager` that was used to
+        /// create any `SourceLoc`s that appear in the module(s) that get
+        /// written.
+        ///
+        SourceManager* sourceManagerToUseWhenSerializingSourceLocs =
             nullptr; ///< The source manager used for the SourceLoc in the input
     };
 
@@ -62,7 +68,9 @@ public:
     String getValue() const;
 };
 
-struct IRModuleChunk;
+struct IRModuleChunk : RIFF::ListChunk
+{
+};
 
 struct ASTModuleChunk : RIFF::ListChunk
 {
@@ -122,12 +130,6 @@ SlangResult readSourceLocationsFromDebugChunk(
     DebugChunk const* debugChunk,
     SourceManager* sourceManager,
     RefPtr<SerialSourceLocReader>& outReader);
-
-SlangResult decodeModuleIR(
-    RefPtr<IRModule>& outIRModule,
-    IRModuleChunk const* chunk,
-    Session* session,
-    SerialSourceLocReader* sourceLocReader);
 
 } // namespace Slang
 

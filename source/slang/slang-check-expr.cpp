@@ -15,6 +15,7 @@
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
+#include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -385,6 +386,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // and given a type of `(Test) -> float` to indicate
             // that it is an "unbound" instance method.
             //
+            auto expr = m_astBuilder->create<StaticMemberExpr>();
+            expr->loc = loc;
+            expr->type = type;
             if (!isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
@@ -392,11 +396,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     Diagnostics::staticRefToNonStaticMember,
                     typeType->getType(),
                     declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
             }
 
-            auto expr = m_astBuilder->create<StaticMemberExpr>();
-            expr->loc = loc;
-            expr->type = type;
             expr->baseExpression = baseExpr;
             expr->name = name;
             expr->declRef = declRef;
@@ -410,7 +412,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
             baseTypeExpr->base.type = baseExprType;
             baseTypeExpr->type.type = m_astBuilder->getTypeType(baseExprType);
-
+            baseTypeExpr->base.exp = baseExpr;
             auto expr = m_astBuilder->create<StaticMemberExpr>();
             expr->loc = loc;
             expr->type = type;
@@ -537,6 +539,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     if (as<PtrType>(base->type) || as<RefType>(base->type))
     {
         derefExpr->type.isLeftValue = true;
+    }
+    else if (isImmutableBufferType(base->type))
+    {
+        derefExpr->type.isLeftValue = false;
+        derefExpr->type.isWriteOnly = false;
     }
     else
     {
@@ -1178,6 +1185,20 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     return result;
 }
 
+bool SemanticsVisitor::maybeDiagnoseAmbiguousReference(Expr* expr)
+{
+    if (auto overloadExpr = as<OverloadedExpr>(expr))
+    {
+        if (overloadExpr->lookupResult2.isValid() &&
+            !as<NamespaceDecl>(overloadExpr->lookupResult2.item.declRef.getDecl()))
+        {
+            diagnoseAmbiguousReference(overloadExpr);
+            return true;
+        }
+    }
+    return false;
+}
+
 void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
@@ -1204,6 +1225,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
     {
         getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
     }
+    expr->type = m_astBuilder->getErrorType();
 }
 
 Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
@@ -1627,6 +1649,31 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 }
 
+// This checks that if a differentiable function access a non-diff type "This", in such case we
+// want to provide a non-error diagnostic to the user to notify that there could be an unexpected
+// behavior because every member access will not have derivative computed for it. User can use
+// [NoDiffThis] to clarify that this is intended.
+void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
+{
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
+        if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
+        {
+            if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
+                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+            {
+                return;
+            }
+
+            getSink()->diagnose(
+                memberExpr->loc,
+                Diagnostics::noDerivativeOnNonDifferentiableThisType,
+                memberExpr->declRef.getDecl(),
+                this->m_parentFunc);
+        }
+    }
+}
 
 Expr* SemanticsVisitor::CheckTerm(Expr* term)
 {
@@ -1644,7 +1691,13 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
         maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+
+        if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            maybeCheckMissingNoDiffThis(checkedTerm);
+        }
     }
+
     return checkedTerm;
 }
 
@@ -1725,6 +1778,10 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     {
         return memberExpr->baseExpression;
     }
+    else if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+    {
+        return staticMemberExpr->baseExpression;
+    }
     else if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
         return overloadedExpr->base;
@@ -1739,7 +1796,7 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     }
     else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(expr))
     {
-        return GetBaseExpr(partiallyApplied->originalExpr);
+        return GetBaseExpr(partiallyApplied->baseExpr);
     }
     return nullptr;
 }
@@ -2453,13 +2510,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     {
         expr = CheckExpr(expr);
     }
-    auto indexExpr = subscriptExpr->indexExprs[0];
+    auto& indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!isScalarIntegerType(indexExpr->type.type))
-    {
-        getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
-        return CreateErrorExpr(subscriptExpr);
-    }
+    auto intTargetType = getMatchingIntType(indexExpr->type.type);
+    indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
@@ -2573,7 +2627,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     if (!lookupResult.isValid())
     {
         if (!diagnosed)
-            getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        {
+            if (!maybeDiagnoseAmbiguousReference(baseExpr))
+                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        }
         return CreateErrorExpr(subscriptExpr);
     }
     auto subscriptFuncExpr = createLookupResultExpr(
@@ -2626,7 +2683,7 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
-void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
+void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
     //
@@ -2646,20 +2703,20 @@ void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
         {
             e = subscriptExpr->baseExpression;
         }
-        else
+        else if (as<ThisExpr>(e))
         {
             break;
         }
-    }
-    //
-    // Now we check to see if we have a `this` expression,
-    // and if it is immutable.
-    if (auto thisExpr = as<ThisExpr>(e))
-    {
-        if (!thisExpr->type.isLeftValue)
+        else
         {
-            getSink()->diagnoseWithoutSourceView(thisExpr, Diagnostics::thisIsImmutableByDefault);
+            return;
         }
+    }
+
+    // Check if we're trying to assign to a non-l-value (const variable, immutable member, etc.)
+    if (!expr->type.isLeftValue)
+    {
+        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::attemptingToAssignToConstVariable);
     }
 }
 
@@ -2685,14 +2742,10 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         }
         else
         {
-            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+            // Provide a more helpful diagnostic about const variable assignment
+            maybeDiagnoseConstVariableAssignment(expr->left);
 
-            // As a special case, check if the LHS expression is derived
-            // from a `this` parameter (implicitly or explicitly), which
-            // is immutable. We can give the user a bit more context into
-            // what is going on.
-            //
-            maybeDiagnoseThisNotLValue(expr->left);
+            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
         }
     }
     expr->type = type;
@@ -2819,6 +2872,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
+        if (!invoke->functionExpr)
+            return rs;
+
         // if this is still an invoke expression, test arguments passed to inout/out parameter are
         // LValues
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
@@ -2926,6 +2982,31 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
+                                // Emit additional diagnostic for invalid pointer taking operations
+                                auto funcDeclRef = funcDeclRefExpr
+                                                       ? getDeclRef(m_astBuilder, funcDeclRefExpr)
+                                                       : DeclRef<Decl>();
+                                if (funcDeclRef)
+                                {
+                                    auto knownBuiltinAttr =
+                                        funcDeclRef.getDecl()
+                                            ->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr)
+                                    {
+                                        if (auto constantIntVal =
+                                                as<ConstantIntVal>(knownBuiltinAttr->name))
+                                        {
+                                            if (constantIntVal->getValue() ==
+                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
+                                            {
+                                                getSink()->diagnose(
+                                                    argExpr,
+                                                    Diagnostics::cannotTakeConstantPointers);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 getSink()->diagnose(
                                     argExpr,
                                     Diagnostics::argumentExpectedLValue,
@@ -2963,7 +3044,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                         implicitCastExpr->type);
                                 }
 
-                                maybeDiagnoseThisNotLValue(argExpr);
+                                maybeDiagnoseConstVariableAssignment(argExpr);
                             }
                         }
                     }
@@ -4488,29 +4569,32 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
     auto knownBuiltinAttr = callee->findModifier<KnownBuiltinAttribute>();
     if (!knownBuiltinAttr)
         return;
-    if (knownBuiltinAttr->name == "GetAttributeAtVertex")
+    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
     {
-        if (checkedInvokeExpr->arguments.getCount() != 2)
-            return;
-        auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
-        auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
-        if (!vertexAttributeArgDeclRefExpr)
+        if (constantIntVal->getValue() == (int)KnownBuiltinDeclName::GetAttributeAtVertex)
         {
-            getSink()->diagnose(
-                invokeExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
-        }
-        auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
-        if (!vertexAttributeArgDecl)
-            return;
-        if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
-            !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
-        {
-            getSink()->diagnose(
-                vertexAttributeArgDeclRefExpr,
-                Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
-            return;
+            if (checkedInvokeExpr->arguments.getCount() != 2)
+                return;
+            auto vertexAttributeArg = checkedInvokeExpr->arguments[0];
+            auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
+            if (!vertexAttributeArgDeclRefExpr)
+            {
+                getSink()->diagnose(
+                    invokeExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
+            auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
+            if (!vertexAttributeArgDecl)
+                return;
+            if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
+                !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
+            {
+                getSink()->diagnose(
+                    vertexAttributeArgDeclRefExpr,
+                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                return;
+            }
         }
     }
 }
@@ -4545,17 +4629,6 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
 
     bool anyDuplicates = false;
     int zeroIndexOffset = -1;
-
-    if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = baseElementRowCount;
-        suggestions.elementCount[1] = baseElementColCount;
-    }
 
     String swizzleText = getText(memberRefExpr->name);
     auto cursor = swizzleText.begin();
@@ -4704,18 +4777,6 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     UInt tupleElementCount = (UInt)baseTupleType->getMemberCount();
     if (tupleElementCount == 0)
         return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
-
-    if (memberExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberExpr->baseExpression ? memberExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = (Index)tupleElementCount;
-        suggestions.elementCount[1] = 0;
-        return memberExpr;
-    }
 
     String swizzleText = getText(memberExpr->name);
     auto span = swizzleText.getUnownedSlice();
@@ -5173,9 +5234,12 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     // Check it's a member expression
     SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-    if (!supressDiagnostic)
-        getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
     expr->type = QualType(m_astBuilder->getErrorType());
+    if (!supressDiagnostic)
+    {
+        if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+    }
     return expr;
 }
 
@@ -5224,11 +5288,9 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
                 shouldRemove = true;
             if (!shouldRemove)
             {
-                filteredLookupResult.items.add(lookupResult);
+                AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
-        if (filteredLookupResult.items.getCount() == 1)
-            filteredLookupResult.item = filteredLookupResult.items.getFirst();
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
             filteredLookupResult,
@@ -5294,6 +5356,27 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
                 suggestions.elementCount[1] = 0;
                 suggestions.elementCount[0] = 1;
                 suggestions.swizzleBaseType = scalarType;
+            }
+            else if (auto matrixType = as<MatrixExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.clear();
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.swizzleBaseType = matrixType;
+                suggestions.elementCount[0] = 0;
+                suggestions.elementCount[1] = 0;
+                if (auto rowCount = as<ConstantIntVal>(matrixType->getRowCount()))
+                    suggestions.elementCount[0] = rowCount->getValue();
+                if (auto colCount = as<ConstantIntVal>(matrixType->getColumnCount()))
+                    suggestions.elementCount[1] = colCount->getValue();
+            }
+            else if (auto tupleType = as<TupleType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[0] = tupleType->getMemberCount();
+                suggestions.elementCount[1] = 0;
+                suggestions.swizzleBaseType = tupleType;
             }
         }
     }

@@ -143,6 +143,10 @@ build/Debug/bin/slang-test
 
 See the [documentation on testing](../tools/slang-test/README.md) for more information.
 
+## Debugging
+
+See the [documentation on debugging](/docs/debugging.md).
+
 ## More niche topics
 
 ### CMake options
@@ -322,7 +326,7 @@ have the Nix environment automatically activate when you enter your clone of
 this repository:
 
 ```bash
-echo 'use flake' >> .envrc
+echo 'use flake' > .envrc
 direnv allow
 ```
 

@@ -1069,7 +1069,7 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
-static void _maybeDiagnoseMissingVulkanLayoutModifier(
+static bool _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext* context,
     DeclRef<VarDeclBase> const& varDecl)
 {
@@ -1077,7 +1077,7 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     if (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
         varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
     {
-        return;
+        return false;
     }
 
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
@@ -1085,6 +1085,11 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
+        // Don't warn if the declaration already has a vk::binding attribute
+        if (varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        {
+            return false;
+        }
         auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
         if (auto textureType = as<TextureType>(varType))
         {
@@ -1095,7 +1100,7 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
                     registerModifier,
                     Diagnostics::registerModifierButNoVulkanLayout,
                     varDecl.getName());
-                return;
+                return true;
             }
         }
 
@@ -1111,7 +1116,9 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
             Diagnostics::registerModifierButNoVkBindingNorShift,
             varDecl.getName(),
             registerClassName);
+        return true;
     }
+    return false;
 }
 
 static void addExplicitParameterBindings_GLSL(
@@ -1273,8 +1280,16 @@ static void addExplicitParameterBindings_GLSL(
     // If we are not told how to infer bindings with a compile option, we warn
     if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
     {
-        warnedMissingVulkanLayoutModifier = true;
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        warnedMissingVulkanLayoutModifier =
+            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+        // For behavioral compatibility, if we didn't warn due to a push constant or shader record,
+        // we still need to set the flag to true to maintain the same binding logic
+        if (!warnedMissingVulkanLayoutModifier &&
+            (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
+             varDecl.getDecl()->hasModifier<ShaderRecordAttribute>()))
+        {
+            warnedMissingVulkanLayoutModifier = true;
+        }
     }
 
     // We need an HLSL register semantic to to infer from
@@ -1301,8 +1316,8 @@ static void addExplicitParameterBindings_GLSL(
         {
             if (!warnedMissingVulkanLayoutModifier)
             {
-                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-                warnedMissingVulkanLayoutModifier = true;
+                warnedMissingVulkanLayoutModifier =
+                    _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
             }
             return;
         }
@@ -1323,8 +1338,8 @@ static void addExplicitParameterBindings_GLSL(
     {
         if (!warnedMissingVulkanLayoutModifier)
         {
-            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-            warnedMissingVulkanLayoutModifier = true;
+            warnedMissingVulkanLayoutModifier =
+                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
         }
     }
 
@@ -2201,7 +2216,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // A matrix is processed as if it was an array of rows
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
-        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto foldedRowCountVal =
+            context->getTargetProgram()->getProgram()->tryFoldIntVal(matrixType->getRowCount());
+        IntegerLiteralValue rowCount = 0;
+        if (!foldedRowCountVal)
+        {
+            rowCount = getIntVal(foldedRowCountVal);
+        }
         return processSimpleEntryPointParameter(
             context,
             matrixType,
@@ -2213,10 +2234,15 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
+        UInt elementCount = 0;
 
-        auto elementCount = (UInt)getIntVal(arrayType->getElementCount());
-        if (arrayType->isUnsized())
-            elementCount = 0;
+        if (!arrayType->isUnsized())
+        {
+            auto intVal = context->getTargetProgram()->getProgram()->tryFoldIntVal(
+                arrayType->getElementCount());
+            if (intVal)
+                elementCount = (UInt)getIntVal(intVal);
+        }
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(
@@ -2441,7 +2467,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 //
                 for (auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
                 {
-                    SLANG_RELEASE_ASSERT(fieldTypeResInfo.count != 0);
+                    // If the field is a Conditional<T, false> type, then it could have 0 size.
+                    // We should skip this field if it has no use of layout units.
+                    if (fieldTypeResInfo.count == 0)
+                        continue;
+
                     auto kind = fieldTypeResInfo.kind;
 
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
@@ -2523,6 +2553,16 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     type,
                     globalGenericParamDecl.getDecl());
             }
+        }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            // We handle an enumeration type as its tag type for varying parameters.
+            // This allows enums to be used in vertex output/input similar to their
+            // underlying integer types.
+            //
+            auto tagType = enumDeclRef.getDecl()->tagType;
+            SLANG_ASSERT(tagType);
+            return processEntryPointVaryingParameter(context, tagType, state, varLayout);
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
         {

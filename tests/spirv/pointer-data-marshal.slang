@@ -8,9 +8,9 @@ struct Params {
   Foo *foo;
 };
 
-// CHECK: %[[PTR0:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_PhysicalStorageBuffer__arr_v3float_int_2 %{{.*}} %int_0
-// CHECK: %[[PTR1:[A-Za-z0-9_]+]]  = OpAccessChain %_ptr_PhysicalStorageBuffer_v3float %[[PTR0]] %int_1
-// CHECK: %[[PTR2:[A-Za-z0-9_]+]]  = OpAccessChain %_ptr_PhysicalStorageBuffer_float %[[PTR1]] %int_2
+// CHECK: %[[PTR0:[A-Za-z0-9_]+]] = Op{{.*}}AccessChain %_ptr_PhysicalStorageBuffer__arr_v3float_int_2 %{{.*}} %int_0
+// CHECK: %[[PTR1:[A-Za-z0-9_]+]]  = Op{{.*}}AccessChain %_ptr_PhysicalStorageBuffer_v3float %[[PTR0]] %int_1
+// CHECK: %[[PTR2:[A-Za-z0-9_]+]]  = Op{{.*}}AccessChain %_ptr_PhysicalStorageBuffer_float %[[PTR1]] %int_2
 
 ConstantBuffer<Params> params;
 

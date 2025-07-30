@@ -613,7 +613,7 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
             m_writer->emit(");\n");
         }
         break;
-    case kIROp_discard:
+    case kIROp_Discard:
         m_writer->emit("discard;\n");
         break;
     default:
@@ -1471,7 +1471,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElementPtr:
     case kIROp_Specialize:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_GetValueFromBoundInterface:
         return true;
 
@@ -1502,7 +1502,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     //
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
-    case kIROp_swizzleSet:
+    case kIROp_SwizzleSet:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeCoopVector:
 
@@ -1679,7 +1679,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // for GLSL), so we check this only after all those special cases are
     // considered.
     //
-    if (inst->getOp() == kIROp_undefined)
+    if (inst->getOp() == kIROp_Undefined)
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
@@ -2244,7 +2244,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     handleRequiredCapabilities(funcValue);
 
     // Detect if this is a call into a COM interface method.
-    if (funcValue->getOp() == kIROp_LookupWitness)
+    if (funcValue->getOp() == kIROp_LookupWitnessMethod)
     {
         auto operand0Type = funcValue->getOperand(0)->getDataType();
         switch (operand0Type->getOp())
@@ -2388,7 +2388,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_RTTIPointerType:
         break;
 
-    case kIROp_undefined:
+    case kIROp_Undefined:
     case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
@@ -2707,10 +2707,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_NonUniformResourceIndex:
         emitOperand(
             inst->getOperand(0),
-            getInfo(EmitOp::General)); // Directly emit NonUniformResourceIndex Operand0;
+            outerPrec); // Directly emit NonUniformResourceIndex Operand0;
         break;
 
-    case kIROp_getNativeStr:
+    case kIROp_GetNativeStr:
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -2828,7 +2828,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
-    case kIROp_swizzle:
+    case kIROp_Swizzle:
         {
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
@@ -3242,7 +3242,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
         break;
-    case kIROp_undefined:
+    case kIROp_Undefined:
     case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
@@ -3285,11 +3285,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->emit(";\n");
         break;
 
-    case kIROp_discard:
+    case kIROp_Discard:
         emitInstStmt(inst);
         break;
 
-    case kIROp_swizzleSet:
+    case kIROp_SwizzleSet:
         {
             auto ii = (IRSwizzleSet*)inst;
             emitInstResultDecl(inst);
@@ -3606,7 +3606,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                     break;
 
                 case kIROp_Return:
-                case kIROp_discard:
+                case kIROp_Discard:
                     // For extremely simple terminators, we just handle
                     // them here, so that we don't have to allocate
                     // separate `Region`s for them.
@@ -4804,7 +4804,7 @@ void CLikeSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
 
 bool _isFoldableValue(IRInst* val)
 {
-    if (val->getParent() && val->getParent()->getOp() == kIROp_Module)
+    if (val->getParent() && val->getParent()->getOp() == kIROp_ModuleInst)
         return true;
 
     switch (val->getOp())
@@ -5148,7 +5148,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
         {

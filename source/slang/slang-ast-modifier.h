@@ -3,6 +3,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-modifier.h.fiddle"
+#include "slang-ir-insts-enum.h"
 
 FIDDLE()
 namespace Slang
@@ -1916,16 +1917,6 @@ class RequireFullQuadsAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[payload]` attribute indicates that a `struct` type will be used as
-/// a ray payload for `TraceRay()` calls, and thus also as input/output
-/// for shaders in the ray tracing pipeline that might be invoked for
-/// such a ray.
-///
-FIDDLE()
-class PayloadAttribute : public Attribute
-{
-    FIDDLE(...)
-};
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output
@@ -1962,7 +1953,7 @@ class NoSideEffectAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[KnownBuiltin("name")]` attribute allows the compiler to
+/// A `[KnownBuiltin(name)]` attribute allows the compiler to
 /// identify this declaration during compilation, despite obfuscation or
 /// linkage removing optimizations
 ///
@@ -1970,7 +1961,7 @@ FIDDLE()
 class KnownBuiltinAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() String name;
+    FIDDLE() IntVal* name;
 };
 
 /// A modifier that applies to types rather than declarations.

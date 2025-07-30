@@ -1,16 +1,20 @@
+#if 0
+// Duplicated: This test is identical to slang-rhi\tests\test-texture-types.cpp
+
 #include "core/slang-basic.h"
 #include "gfx-test-texture-util.h"
 #include "gfx-test-util.h"
-#include "gfx-util/shader-cursor.h"
-#include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <slang-rhi.h>
+#include <slang-rhi/shader-cursor.h>
 
 #if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>
 #endif
 
 using namespace Slang;
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -19,18 +23,18 @@ struct BaseTextureViewTest
     IDevice* device;
     UnitTestContext* context;
 
-    IResourceView::Type viewType;
+    TextureViewType viewType;
     size_t alignedRowStride;
 
     RefPtr<TextureInfo> textureInfo;
     RefPtr<ValidationTextureFormatBase> validationFormat;
 
-    ComPtr<ITextureResource> texture;
-    ComPtr<IResourceView> textureView;
-    ComPtr<IBufferResource> resultsBuffer;
-    ComPtr<IResourceView> bufferView;
+    ComPtr<ITexture> texture;
+    ComPtr<ITextureView> textureView;
+    ComPtr<IBuffer> resultsBuffer;
+    ComPtr<IBufferView> bufferView;
 
-    ComPtr<ISamplerState> sampler;
+    ComPtr<ISampler> sampler;
 
     const void* expectedTextureData;
 
@@ -39,8 +43,8 @@ struct BaseTextureViewTest
         UnitTestContext* context,
         Format format,
         RefPtr<ValidationTextureFormatBase> validationFormat,
-        IResourceView::Type viewType,
-        IResource::Type type)
+        TextureViewType viewType,
+        TextureType type)
     {
         this->device = device;
         this->context = context;
@@ -52,20 +56,18 @@ struct BaseTextureViewTest
         this->textureInfo->textureType = type;
     }
 
-    ResourceState getDefaultResourceStateForViewType(IResourceView::Type type)
+    ResourceState getDefaultResourceStateForViewType(TextureViewType type)
     {
         switch (type)
         {
-        case IResourceView::Type::RenderTarget:
+        case TextureViewType::RenderTarget:
             return ResourceState::RenderTarget;
-        case IResourceView::Type::DepthStencil:
+        case TextureViewType::DepthStencil:
             return ResourceState::DepthWrite;
-        case IResourceView::Type::ShaderResource:
+        case TextureViewType::ShaderResource:
             return ResourceState::ShaderResource;
-        case IResourceView::Type::UnorderedAccess:
+        case TextureViewType::UnorderedAccess:
             return ResourceState::UnorderedAccess;
-        case IResourceView::Type::AccelerationStructure:
-            return ResourceState::AccelerationStructure;
         default:
             return ResourceState::Undefined;
         }
@@ -79,16 +81,16 @@ struct BaseTextureViewTest
 
         switch (textureInfo->textureType)
         {
-        case IResource::Type::Texture1D:
+        case TextureType::Texture1D:
             shape = "1D";
             break;
-        case IResource::Type::Texture2D:
+        case TextureType::Texture2D:
             shape = "2D";
             break;
-        case IResource::Type::Texture3D:
+        case TextureType::Texture3D:
             shape = "3D";
             break;
-        case IResource::Type::TextureCube:
+        case TextureType::TextureCube:
             shape = "Cube";
             break;
         default:
@@ -98,20 +100,17 @@ struct BaseTextureViewTest
 
         switch (viewType)
         {
-        case IResourceView::Type::RenderTarget:
+        case TextureViewType::RenderTarget:
             view = "Render";
             break;
-        case IResourceView::Type::DepthStencil:
+        case TextureViewType::DepthStencil:
             view = "Depth";
             break;
-        case IResourceView::Type::ShaderResource:
+        case TextureViewType::ShaderResource:
             view = "Shader";
             break;
-        case IResourceView::Type::UnorderedAccess:
+        case TextureViewType::UnorderedAccess:
             view = "Unordered";
-            break;
-        case IResourceView::Type::AccelerationStructure:
-            view = "Accel";
             break;
         default:
             assert(!"Invalid resource view");
@@ -127,10 +126,10 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
 {
     void createRequiredResources()
     {
-        ITextureResource::Desc textureDesc = {};
+        TextureDesc textureDesc = {};
         textureDesc.type = textureInfo->textureType;
         textureDesc.numMipLevels = textureInfo->mipLevelCount;
-        textureDesc.arraySize = textureInfo->arrayLayerCount;
+        textureDesc.arrayLength = textureInfo->arrayLayerCount;
         textureDesc.size = textureInfo->extents;
         textureDesc.defaultState = getDefaultResourceStateForViewType(viewType);
         textureDesc.allowedStates = ResourceStateSet(
@@ -139,28 +138,24 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
             ResourceState::CopyDestination);
         textureDesc.format = textureInfo->format;
 
-        GFX_CHECK_CALL_ABORT(device->createTextureResource(
-            textureDesc,
-            textureInfo->subresourceDatas.getBuffer(),
-            texture.writeRef()));
+        texture = device->createTexture(textureDesc, textureInfo->subresourceDatas.getBuffer());
+        SLANG_CHECK_ABORT(texture);
 
-        IResourceView::Desc textureViewDesc = {};
+        TextureViewDesc textureViewDesc = {};
         textureViewDesc.type = viewType;
-        textureViewDesc.format =
-            textureDesc.format; // TODO: Handle typeless formats - gfxIsTypelessFormat(format) ?
-                                // convertTypelessFormat(format) : format;
-        GFX_CHECK_CALL_ABORT(
-            device->createTextureView(texture, textureViewDesc, textureView.writeRef()));
+        textureViewDesc.format = textureDesc.format;
+        textureView = device->createTextureView(texture, textureViewDesc);
+        SLANG_CHECK_ABORT(textureView);
 
         auto texelSize = getTexelSize(textureInfo->format);
         size_t alignment;
         device->getTextureRowAlignment(&alignment);
         alignedRowStride =
             (textureInfo->extents.width * texelSize + alignment - 1) & ~(alignment - 1);
-        IBufferResource::Desc bufferDesc = {};
+        BufferDesc bufferDesc = {};
         // All of the values read back from the shader will be uint32_t
-        bufferDesc.sizeInBytes = textureDesc.size.width * textureDesc.size.height *
-                                 textureDesc.size.depth * texelSize * sizeof(uint32_t);
+        bufferDesc.size = textureDesc.size.width * textureDesc.size.height *
+                         textureDesc.size.depth * texelSize * sizeof(uint32_t);
         bufferDesc.format = Format::Unknown;
         bufferDesc.elementSize = sizeof(uint32_t);
         bufferDesc.defaultState = ResourceState::UnorderedAccess;
@@ -170,27 +165,18 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
             ResourceState::CopySource);
         bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-        GFX_CHECK_CALL_ABORT(
-            device->createBufferResource(bufferDesc, nullptr, resultsBuffer.writeRef()));
+        resultsBuffer = device->createBuffer(bufferDesc, nullptr);
+        SLANG_CHECK_ABORT(resultsBuffer);
 
-        IResourceView::Desc bufferViewDesc = {};
-        bufferViewDesc.type = IResourceView::Type::UnorderedAccess;
+        BufferViewDesc bufferViewDesc = {};
+        bufferViewDesc.type = BufferViewType::UnorderedAccess;
         bufferViewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(device->createBufferView(
-            resultsBuffer,
-            nullptr,
-            bufferViewDesc,
-            bufferView.writeRef()));
+        bufferView = device->createBufferView(resultsBuffer, nullptr, bufferViewDesc);
+        SLANG_CHECK_ABORT(bufferView);
     }
 
     void submitShaderWork(const char* entryPoint)
     {
-        Slang::ComPtr<ITransientResourceHeap> transientHeap;
-        ITransientResourceHeap::Desc transientHeapDesc = {};
-        transientHeapDesc.constantBufferSize = 4096;
-        GFX_CHECK_CALL_ABORT(
-            device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
         GFX_CHECK_CALL_ABORT(loadComputeProgram(
@@ -200,22 +186,21 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
             entryPoint,
             slangReflection));
 
-        ComputePipelineStateDesc pipelineDesc = {};
+        ComputePipelineDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
-        ComPtr<gfx::IPipelineState> pipelineState;
-        GFX_CHECK_CALL_ABORT(
-            device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        ComPtr<IComputePipeline> pipelineState;
+        pipelineState = device->createComputePipeline(pipelineDesc);
+        SLANG_CHECK_ABORT(pipelineState);
 
         // We have done all the set up work, now it is time to start recording a command buffer for
         // GPU execution.
         {
-            ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-            auto queue = device->createCommandQueue(queueDesc);
+            auto queue = device->getQueue(QueueType::Graphics);
 
-            auto commandBuffer = transientHeap->createCommandBuffer();
-            auto encoder = commandBuffer->encodeComputeCommands();
+            ComPtr<ICommandEncoder> encoder = queue->createCommandEncoder();
+            ComPtr<IComputeCommandEncoder> computeEncoder = encoder->beginComputePass();
 
-            auto rootObject = encoder->bindPipeline(pipelineState);
+            ComPtr<IShaderObject> rootObject = computeEncoder->bindPipeline(pipelineState);
 
             ShaderCursor entryPointCursor(
                 rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
@@ -229,20 +214,23 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
             entryPointCursor["depth"].setData(depth);
 
             // Bind texture view to the entry point
-            entryPointCursor["resourceView"].setResource(
-                textureView); // TODO: Bind nullptr and make sure it doesn't splut - should be 0
-                              // everywhere
+            entryPointCursor["resourceView"].setResource(textureView);
             entryPointCursor["testResults"].setResource(bufferView);
 
             if (sampler)
-                entryPointCursor["sampler"].setSampler(
-                    sampler); // TODO: Bind nullptr and make sure it doesn't splut
+                entryPointCursor["sampler"].setSampler(sampler);
 
             auto bufferElementCount = width * height * depth;
-            encoder->dispatchCompute(bufferElementCount, 1, 1);
-            encoder->endEncoding();
-            commandBuffer->close();
-            queue->executeCommandBuffer(commandBuffer);
+            DispatchArguments args = {};
+            args.threadsPerAxis[0] = bufferElementCount;
+            args.threadsPerAxis[1] = 1;
+            args.threadsPerAxis[2] = 1;
+            computeEncoder->dispatchCompute(args);
+            computeEncoder->end();
+            
+            ComPtr<ICommandBuffer> commandBuffer;
+            encoder->finish(commandBuffer.writeRef());
+            queue->submit(commandBuffer);
             queue->waitOnHost();
         }
     }
@@ -270,12 +258,12 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
     {
         // Shader resources are read-only, so we don't need to check that writes to the resource
         // were correct.
-        if (viewType != IResourceView::Type::ShaderResource)
+        if (viewType != TextureViewType::ShaderResource)
         {
             ComPtr<ISlangBlob> textureBlob;
             size_t rowPitch;
             size_t pixelSize;
-            GFX_CHECK_CALL_ABORT(device->readTextureResource(
+            GFX_CHECK_CALL_ABORT(device->readTexture(
                 texture,
                 ResourceState::CopySource,
                 textureBlob.writeRef(),
@@ -301,10 +289,10 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
         }
 
         ComPtr<ISlangBlob> bufferBlob;
-        GFX_CHECK_CALL_ABORT(device->readBufferResource(
+        GFX_CHECK_CALL_ABORT(device->readBuffer(
             resultsBuffer,
             0,
-            resultsBuffer->getDesc()->sizeInBytes,
+            resultsBuffer->getDesc().size,
             bufferBlob.writeRef()));
         auto results = (uint32_t*)bufferBlob->getBufferPointer();
 
@@ -320,15 +308,15 @@ struct ShaderAndUnorderedTests : BaseTextureViewTest
     void run()
     {
         // TODO: Should test with samplers
-        //             ISamplerState::Desc samplerDesc;
-        //             sampler = device->createSamplerState(samplerDesc);
+        //             SamplerDesc samplerDesc;
+        //             sampler = device->createSampler(samplerDesc);
 
         // TODO: Should test multiple mip levels and array layers
         textureInfo->extents.width = 4;
         textureInfo->extents.height =
-            (textureInfo->textureType == IResource::Type::Texture1D) ? 1 : 4;
+            (textureInfo->textureType == TextureType::Texture1D) ? 1 : 4;
         textureInfo->extents.depth =
-            (textureInfo->textureType != IResource::Type::Texture3D) ? 1 : 2;
+            (textureInfo->textureType != TextureType::Texture3D) ? 1 : 2;
         textureInfo->mipLevelCount = 1;
         textureInfo->arrayLayerCount = 1;
         generateTextureData(textureInfo, validationFormat);
@@ -380,22 +368,19 @@ struct RenderTargetTests : BaseTextureViewTest
 
     int sampleCount = 1;
 
-    ComPtr<ITransientResourceHeap> transientHeap;
-    ComPtr<IPipelineState> pipelineState;
-    ComPtr<IRenderPassLayout> renderPass;
-    ComPtr<IFramebuffer> framebuffer;
+    ComPtr<IRenderPipeline> pipelineState;
 
-    ComPtr<ITextureResource> sampledTexture;
-    ComPtr<IBufferResource> vertexBuffer;
+    ComPtr<ITexture> sampledTexture;
+    ComPtr<IBuffer> vertexBuffer;
 
     void createRequiredResources()
     {
-        IBufferResource::Desc vertexBufferDesc;
-        vertexBufferDesc.type = IResource::Type::Buffer;
-        vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+        BufferDesc vertexBufferDesc;
+        vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
         vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
         vertexBufferDesc.allowedStates = ResourceState::VertexBuffer;
-        vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
+        vertexBufferDesc.usage = BufferUsage::VertexBuffer;
+        vertexBuffer = device->createBuffer(vertexBufferDesc, &kVertexData[0]);
         SLANG_CHECK_ABORT(vertexBuffer != nullptr);
 
         VertexStreamDesc vertexStreams[] = {
@@ -404,14 +389,14 @@ struct RenderTargetTests : BaseTextureViewTest
 
         InputElementDesc inputElements[] = {
             // Vertex buffer data
-            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), 0},
-            {"COLOR", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, color), 0},
+            {"POSITION", 0, Format::RGB32Float, offsetof(Vertex, position), 0},
+            {"COLOR", 0, Format::RGB32Float, offsetof(Vertex, color), 0},
         };
 
-        ITextureResource::Desc sampledTexDesc = {};
+        TextureDesc sampledTexDesc = {};
         sampledTexDesc.type = textureInfo->textureType;
         sampledTexDesc.numMipLevels = textureInfo->mipLevelCount;
-        sampledTexDesc.arraySize = textureInfo->arrayLayerCount;
+        sampledTexDesc.arrayLength = textureInfo->arrayLayerCount;
         sampledTexDesc.size = textureInfo->extents;
         sampledTexDesc.defaultState = getDefaultResourceStateForViewType(viewType);
         sampledTexDesc.allowedStates = ResourceStateSet(
@@ -419,40 +404,35 @@ struct RenderTargetTests : BaseTextureViewTest
             ResourceState::ResolveSource,
             ResourceState::CopySource);
         sampledTexDesc.format = textureInfo->format;
-        sampledTexDesc.sampleDesc.numSamples = sampleCount;
+        sampledTexDesc.sampleCount = sampleCount;
 
-        GFX_CHECK_CALL_ABORT(device->createTextureResource(
+        sampledTexture = device->createTexture(
             sampledTexDesc,
-            textureInfo->subresourceDatas.getBuffer(),
-            sampledTexture.writeRef()));
+            textureInfo->subresourceDatas.getBuffer());
+        SLANG_CHECK_ABORT(sampledTexture);
 
-        ITextureResource::Desc texDesc = {};
+        TextureDesc texDesc = {};
         texDesc.type = textureInfo->textureType;
         texDesc.numMipLevels = textureInfo->mipLevelCount;
-        texDesc.arraySize = textureInfo->arrayLayerCount;
+        texDesc.arrayLength = textureInfo->arrayLayerCount;
         texDesc.size = textureInfo->extents;
         texDesc.defaultState = ResourceState::ResolveDestination;
         texDesc.allowedStates =
             ResourceStateSet(ResourceState::ResolveDestination, ResourceState::CopySource);
         texDesc.format = textureInfo->format;
 
-        GFX_CHECK_CALL_ABORT(device->createTextureResource(
+        texture = device->createTexture(
             texDesc,
-            textureInfo->subresourceDatas.getBuffer(),
-            texture.writeRef()));
+            textureInfo->subresourceDatas.getBuffer());
+        SLANG_CHECK_ABORT(texture);
 
-        IInputLayout::Desc inputLayoutDesc = {};
+        InputLayoutDesc inputLayoutDesc = {};
         inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
         inputLayoutDesc.inputElements = inputElements;
         inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
         inputLayoutDesc.vertexStreams = vertexStreams;
         auto inputLayout = device->createInputLayout(inputLayoutDesc);
         SLANG_CHECK_ABORT(inputLayout != nullptr);
-
-        ITransientResourceHeap::Desc transientHeapDesc = {};
-        transientHeapDesc.constantBufferSize = 4096;
-        GFX_CHECK_CALL_ABORT(
-            device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
@@ -464,50 +444,19 @@ struct RenderTargetTests : BaseTextureViewTest
             "fragmentMain",
             slangReflection));
 
-        IFramebufferLayout::TargetLayout targetLayout;
-        targetLayout.format = textureInfo->format;
-        targetLayout.sampleCount = sampleCount;
-
-        IFramebufferLayout::Desc framebufferLayoutDesc;
-        framebufferLayoutDesc.renderTargetCount = 1;
-        framebufferLayoutDesc.renderTargets = &targetLayout;
-        ComPtr<gfx::IFramebufferLayout> framebufferLayout =
-            device->createFramebufferLayout(framebufferLayoutDesc);
-        SLANG_CHECK_ABORT(framebufferLayout != nullptr);
-
-        GraphicsPipelineStateDesc pipelineDesc = {};
+        ColorTargetDesc colorTarget = {};
+        colorTarget.format = textureInfo->format;
+        
+        RenderPipelineDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
         pipelineDesc.inputLayout = inputLayout;
-        pipelineDesc.framebufferLayout = framebufferLayout;
+        pipelineDesc.targets = &colorTarget;
+        pipelineDesc.targetCount = 1;
+        pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
         pipelineDesc.depthStencil.depthTestEnable = false;
         pipelineDesc.depthStencil.depthWriteEnable = false;
-        GFX_CHECK_CALL_ABORT(
-            device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef()));
-
-        IRenderPassLayout::Desc renderPassDesc = {};
-        renderPassDesc.framebufferLayout = framebufferLayout;
-        renderPassDesc.renderTargetCount = 1;
-        IRenderPassLayout::TargetAccessDesc renderTargetAccess = {};
-        renderTargetAccess.loadOp = IRenderPassLayout::TargetLoadOp::Clear;
-        renderTargetAccess.storeOp = IRenderPassLayout::TargetStoreOp::Store;
-        renderTargetAccess.initialState = getDefaultResourceStateForViewType(viewType);
-        renderTargetAccess.finalState = ResourceState::ResolveSource;
-        renderPassDesc.renderTargetAccess = &renderTargetAccess;
-        GFX_CHECK_CALL_ABORT(device->createRenderPassLayout(renderPassDesc, renderPass.writeRef()));
-
-        gfx::IResourceView::Desc colorBufferViewDesc;
-        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-        colorBufferViewDesc.format = textureInfo->format;
-        colorBufferViewDesc.renderTarget.shape = textureInfo->textureType; // TODO: TextureCube?
-        colorBufferViewDesc.type = viewType;
-        auto rtv = device->createTextureView(sampledTexture, colorBufferViewDesc);
-
-        gfx::IFramebuffer::Desc framebufferDesc;
-        framebufferDesc.renderTargetCount = 1;
-        framebufferDesc.depthStencilView = nullptr;
-        framebufferDesc.renderTargetViews = rtv.readRef();
-        framebufferDesc.layout = framebufferLayout;
-        GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
+        pipelineState = device->createRenderPipeline(pipelineDesc);
+        SLANG_CHECK_ABORT(pipelineState);
 
         auto texelSize = getTexelSize(textureInfo->format);
         size_t alignment;
@@ -518,25 +467,47 @@ struct RenderTargetTests : BaseTextureViewTest
 
     void submitShaderWork(const char* entryPointName)
     {
-        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = device->createCommandQueue(queueDesc);
+        auto queue = device->getQueue(QueueType::Graphics);
 
-        auto commandBuffer = transientHeap->createCommandBuffer();
-        auto renderEncoder = commandBuffer->encodeRenderCommands(renderPass, framebuffer);
+        ComPtr<ICommandEncoder> encoder = queue->createCommandEncoder();
+        
+        // Create render target view
+        TextureViewDesc rtvDesc = {};
+        rtvDesc.type = TextureViewType::RenderTarget;
+        rtvDesc.format = textureInfo->format;
+        auto rtv = device->createTextureView(sampledTexture, rtvDesc);
+
+        RenderPassColorAttachment colorAttachment = {};
+        colorAttachment.view = rtv;
+        colorAttachment.loadOp = LoadOp::Clear;
+        colorAttachment.storeOp = StoreOp::Store;
+        float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        memcpy(colorAttachment.clearValue, clearColor, sizeof(clearColor));
+
+        RenderPassDesc passDesc = {};
+        passDesc.colorAttachments = &colorAttachment;
+        passDesc.colorAttachmentCount = 1;
+
+        auto renderEncoder = encoder->beginRenderPass(passDesc);
         auto rootObject = renderEncoder->bindPipeline(pipelineState);
 
-        gfx::Viewport viewport = {};
+        Viewport viewport = {};
         viewport.maxZ = (float)textureInfo->extents.depth;
-        viewport.extentX = (float)textureInfo->extents.width;
-        viewport.extentY = (float)textureInfo->extents.height;
-        renderEncoder->setViewportAndScissor(viewport);
+        viewport.width = (float)textureInfo->extents.width;
+        viewport.height = (float)textureInfo->extents.height;
+        
+        RenderState state = {};
+        state.viewports[0] = viewport;
+        state.viewportCount = 1;
+        state.vertexBuffers[0] = BufferOffsetPair(vertexBuffer, 0);
+        state.vertexBufferCount = 1;
+        renderEncoder->setRenderState(state);
 
-        renderEncoder->setVertexBuffer(0, vertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-        renderEncoder->draw(kVertexCount, 0);
-        renderEncoder->endEncoding();
-
-        auto resourceEncoder = commandBuffer->encodeResourceCommands();
+        DrawArguments drawArgs = {};
+        drawArgs.vertexCount = kVertexCount;
+        drawArgs.startVertexLocation = 0;
+        renderEncoder->draw(drawArgs);
+        renderEncoder->end();
 
         if (sampleCount > 1)
         {
@@ -554,28 +525,29 @@ struct RenderTargetTests : BaseTextureViewTest
             dstSubresource.baseArrayLayer = 0;
             dstSubresource.layerCount = 1;
 
-            resourceEncoder->resolveResource(
+            encoder->resolveResource(
                 sampledTexture,
                 ResourceState::ResolveSource,
                 msaaSubresource,
                 texture,
                 ResourceState::ResolveDestination,
                 dstSubresource);
-            resourceEncoder->textureBarrier(
+            encoder->textureBarrier(
                 texture,
                 ResourceState::ResolveDestination,
                 ResourceState::CopySource);
         }
         else
         {
-            resourceEncoder->textureBarrier(
+            encoder->textureBarrier(
                 sampledTexture,
                 ResourceState::ResolveSource,
                 ResourceState::CopySource);
         }
-        resourceEncoder->endEncoding();
-        commandBuffer->close();
-        queue->executeCommandBuffer(commandBuffer);
+        
+        ComPtr<ICommandBuffer> commandBuffer;
+        encoder->finish(commandBuffer.writeRef());
+        queue->submit(commandBuffer);
         queue->waitOnHost();
     }
 
@@ -614,7 +586,7 @@ struct RenderTargetTests : BaseTextureViewTest
         size_t pixelSize;
         if (sampleCount > 1)
         {
-            GFX_CHECK_CALL_ABORT(device->readTextureResource(
+            GFX_CHECK_CALL_ABORT(device->readTexture(
                 texture,
                 ResourceState::CopySource,
                 textureBlob.writeRef(),
@@ -623,7 +595,7 @@ struct RenderTargetTests : BaseTextureViewTest
         }
         else
         {
-            GFX_CHECK_CALL_ABORT(device->readTextureResource(
+            GFX_CHECK_CALL_ABORT(device->readTexture(
                 sampledTexture,
                 ResourceState::CopySource,
                 textureBlob.writeRef(),
@@ -653,9 +625,9 @@ struct RenderTargetTests : BaseTextureViewTest
 
         textureInfo->extents.width = 4;
         textureInfo->extents.height =
-            (textureInfo->textureType == IResource::Type::Texture1D) ? 1 : 4;
+            (textureInfo->textureType == TextureType::Texture1D) ? 1 : 4;
         textureInfo->extents.depth =
-            (textureInfo->textureType != IResource::Type::Texture3D) ? 1 : 2;
+            (textureInfo->textureType != TextureType::Texture3D) ? 1 : 2;
         textureInfo->mipLevelCount = 1;
         textureInfo->arrayLayerCount = 1;
         generateTextureData(textureInfo, validationFormat);
@@ -674,12 +646,12 @@ struct RenderTargetTests : BaseTextureViewTest
 void shaderAndUnorderedTestImpl(IDevice* device, UnitTestContext* context)
 {
     // TODO: Buffer and TextureCube
-    for (Int i = 2; i < (int32_t)IResource::Type::TextureCube; ++i)
+    for (Int i = 2; i < (int32_t)TextureType::TextureCube; ++i)
     {
-        for (Int j = 3; j < (int32_t)IResourceView::Type::AccelerationStructure; ++j)
+        for (Int j = 3; j < (int32_t)TextureViewType::AccelerationStructure; ++j)
         {
-            auto shape = (IResource::Type)i;
-            auto view = (IResourceView::Type)j;
+            auto shape = (TextureType)i;
+            auto view = (TextureViewType)j;
             auto format = Format::R8G8B8A8_UINT;
             auto validationFormat = getValidationTextureFormat(format);
             if (!validationFormat)
@@ -695,10 +667,10 @@ void shaderAndUnorderedTestImpl(IDevice* device, UnitTestContext* context)
 void renderTargetTestImpl(IDevice* device, UnitTestContext* context)
 {
     // TODO: Buffer and TextureCube
-    for (Int i = 2; i < (int32_t)IResource::Type::TextureCube; ++i)
+    for (Int i = 2; i < (int32_t)TextureType::TextureCube; ++i)
     {
-        auto shape = (IResource::Type)i;
-        auto view = IResourceView::Type::RenderTarget;
+        auto shape = (TextureType)i;
+        auto view = TextureViewType::RenderTarget;
         auto format = Format::R32G32B32A32_FLOAT;
         auto validationFormat = getValidationTextureFormat(format);
         if (!validationFormat)
@@ -712,16 +684,18 @@ void renderTargetTestImpl(IDevice* device, UnitTestContext* context)
 
 SLANG_UNIT_TEST(shaderAndUnorderedAccessTests)
 {
-    runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
-    runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, DeviceType::D3D12);
+    runTestImpl(shaderAndUnorderedTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 SLANG_UNIT_TEST(renderTargetTests)
 {
-    runTestImpl(renderTargetTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
-    runTestImpl(renderTargetTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(renderTargetTestImpl, unitTestContext, DeviceType::D3D12);
+    runTestImpl(renderTargetTestImpl, unitTestContext, DeviceType::Vulkan);
 }
 } // namespace gfx_test
+
+#endif // Disabled test file
 
 // 1D + array + multisample, ditto for 2D, ditto for 3D
 // one test with something bound, one test with nothing bound, one test with subset of layers (set

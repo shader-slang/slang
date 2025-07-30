@@ -56,7 +56,7 @@ bool Test_ScalarType()
     const mat3 identity3x3 = mat3(vec3(1,0,0),vec3(0,1,0),vec3(0,0,1));
     const mat4 identity4x4 = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),vec4(0,0,0,1));
 
-    // CHECK_SPIR-LABEL: OpAccessChain {{.*}} %inputBuffer
+    // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
     const int zero = inputBuffer.data[0];
     const int one = inputBuffer.data[1];
     const int negaOne = inputBuffer.data[2];
@@ -539,7 +539,7 @@ bool Test_VectorType()
 
     constexpr const float epsilon = 0.000001;
 
-    // CHECK_SPIR-LABEL: OpAccessChain {{.*}} %inputBuffer
+    // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
     const int zero = inputBuffer.data[0];
     const int one = inputBuffer.data[1];
     const int negaOne = inputBuffer.data[2];
@@ -1106,7 +1106,7 @@ bool Test_VectorType()
         ;
 
     // CHECK_GLSL-LABEL: bool Test_VectorType_1
-    // CHECK_SPIR-LABEL: OpAccessChain {{.*}} %inputBuffer
+    // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
 }
 
 [numthreads(4, 1, 1)]

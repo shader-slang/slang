@@ -1,7 +1,7 @@
 #ifndef SLANG_CPP_PRELUDE_H
 #define SLANG_CPP_PRELUDE_H
 
-// Because the signiture of isnan, isfinite, and is isinf changed in C++, we use the macro
+// Because the signature of isnan, isfinite, and is isinf changed in C++, we use the macro
 // to use the version in the std namespace.
 // https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
 
@@ -223,7 +223,12 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // GCC Specific
 #if SLANG_GCC_FAMILY
-#define SLANG_ALIGN_OF(T) __alignof__(T)
+
+#if INTPTR_MAX == INT64_MAX
+#define SLANG_64BIT 1
+#else
+#define SLANG_64BIT 0
+#endif
 
 #define SLANG_BREAKPOINT(id) __builtin_trap()
 
@@ -234,7 +239,6 @@ Any platforms not detected by the above logic are now now explicitly zeroed out.
 
 // Microsoft VC specific
 #if SLANG_VC
-#define SLANG_ALIGN_OF(T) __alignof(T)
 
 #define SLANG_BREAKPOINT(id) __debugbreak();
 

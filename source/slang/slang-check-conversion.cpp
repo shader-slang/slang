@@ -346,6 +346,8 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     auto* varExpr = getASTBuilder()->create<VarExpr>();
     varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
     varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+    varExpr->loc = loc;
+    varExpr->checked = true;
 
     auto* constructorExpr = getASTBuilder()->create<ExplicitCtorInvokeExpr>();
     constructorExpr->functionExpr = varExpr;
@@ -382,6 +384,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->args);
 
             DiagnosticSink tempSink(getSourceManager(), nullptr);
+            tempSink.setFlags(getSink()->getFlags());
+
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
@@ -395,6 +399,12 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                     getSink()->diagnoseRaw(
                         Severity::Error,
                         static_cast<char const*>(blob->getBufferPointer()));
+                    // For non-c-style types, we will always return true when there
+                    // is a ctor, so that we do not fallback to legacy initializer list logic
+                    // in `_coerceInitializerList()` and produce unrelated errors.
+                    if (outExpr)
+                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                    return true;
                 }
                 return false;
             }
@@ -956,13 +966,13 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // We will fall back to the legacy logic of initialize list.
+    Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
             toType,
-            outToExpr,
+            &outInitListExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
-
     if (argIndex != argCount)
     {
         if (outToExpr)
@@ -974,6 +984,8 @@ bool SemanticsVisitor::_coerceInitializerList(
                 argCount);
         }
     }
+    if (outToExpr)
+        *outToExpr = outInitListExpr;
 
     return true;
 }
@@ -1430,7 +1442,11 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (outToExpr)
                 {
-                    *outToExpr = fromExpr;
+                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    castExpr->type = toType;
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->base = fromExpr;
+                    *outToExpr = castExpr;
                 }
                 return true;
             }
@@ -1864,9 +1880,18 @@ bool SemanticsVisitor::_coerce(
             castExpr->arguments.add(args[0]);
         }
         if (!cachedMethod)
-            getShared()->cacheImplicitCastMethod(
-                implicitCastKey,
-                ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+        {
+            // We can only cache the method if it is a public, otherwise we may not be able to
+            // use this method depending on where we are performing the coercion.
+            if (overloadContext.bestCandidate->item.declRef &&
+                getDeclVisibility(overloadContext.bestCandidate->item.declRef.getDecl()) ==
+                    DeclVisibility::Public)
+            {
+                getShared()->cacheImplicitCastMethod(
+                    implicitCastKey,
+                    ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+            }
+        }
         return true;
     }
     if (!cachedMethod)

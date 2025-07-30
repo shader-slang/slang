@@ -3511,7 +3511,7 @@ protected:
             {
                 if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
                 {
-                    if (dec->getName() == "DispatchMesh")
+                    if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                         dispatchMeshFunc = func;

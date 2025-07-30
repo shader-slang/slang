@@ -183,6 +183,12 @@ option(
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
 # Options for user defined paths for external modules.
+#
+# Note that these paths point to a directory containing an subdirectory of the
+# dependency name, rather than to the dependency directory itself, for example
+# SLANG_OVERRIDE_LZ4_PATH points to a directory containing a directory called
+# `lz4` containing the lz4 source.
+#
 advanced_option(
     SLANG_OVERRIDE_LZ4_PATH
     "Build using user defined path for LZ4"
@@ -398,6 +404,10 @@ if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
 endif()
 
+if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    find_package(SPIRV-Headers REQUIRED)
+endif()
+
 add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
@@ -488,7 +498,7 @@ configure_package_config_file(
 
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
-# export the slang targets. 
+# export the slang targets.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         install(

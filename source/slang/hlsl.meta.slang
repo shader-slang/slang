@@ -645,7 +645,7 @@ extension vector<int64_t,2>:ITexelElement
 /// |6  |`"r32f"`              | 1 channel 32-bit floating point texture |
 /// |7  |`"r16f"`              | 1 channel 16-bit floating point texture |
 /// |8  |`"rgba16"`            | 4 channel 16-bit normalized unsigned integer texture |
-/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit signed integer texture |
+/// |9  |`"rgb10_a2"`          | 4 channel 10/10/10/2-bit normalized unsigned integer texture |
 /// |10 |`"rgba8"`             | 4 channel 8-bit normalized unsigned integer texture |
 /// |11 |`"rg16"`              | 2 channel 16-bit normalized unsigned integer texture |
 /// |12 |`"rg8"`               | 2 channel 8-bit normalized unsigned integer texture |
@@ -6111,7 +6111,7 @@ __magic_type(HLSLPointStreamType)
 __intrinsic_type($(kIROp_HLSLPointStreamType))
 struct PointStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6122,7 +6122,7 @@ struct PointStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6141,7 +6141,7 @@ __magic_type(HLSLLineStreamType)
 __intrinsic_type($(kIROp_HLSLLineStreamType))
 struct LineStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6152,7 +6152,7 @@ struct LineStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6171,7 +6171,7 @@ __magic_type(HLSLTriangleStreamType)
 __intrinsic_type($(kIROp_HLSLTriangleStreamType))
 struct TriangleStream
 {
-    [KnownBuiltin("GeometryStreamAppend")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamAppend))]
     void Append(T value)
     {
         __target_switch
@@ -6182,7 +6182,7 @@ struct TriangleStream
         }
     }
 
-    [KnownBuiltin("GeometryStreamRestart")]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::GeometryStreamRestart))]
     void RestartStrip()
     {
         __target_switch
@@ -6481,13 +6481,9 @@ bool all(T x)
 {
     __target_switch
     {
-    default:
-        __intrinsic_asm "bool($0)";
     case hlsl:
         __intrinsic_asm "all";
     case metal:
-        __intrinsic_asm "all";
-    case wgsl:
         __intrinsic_asm "all";
     case spirv:
         let zero = __default<T>();
@@ -6505,6 +6501,8 @@ bool all(T x)
             return __slang_noop_cast<bool>(x);
         else
             return false;
+    default:
+        __intrinsic_asm "bool($0)";
     }
 }
 
@@ -6550,9 +6548,17 @@ bool all(vector<T,N> x)
             };
         }
     case wgsl:
+        // WGSL all() only works with boolean vectors
         if (__isBool<T>())
-            __intrinsic_asm "all";
-        __intrinsic_asm "all(vec$N0<bool>($0))";
+            __intrinsic_asm "all($0)";
+        else
+        {
+            // Fall back to loop for non-boolean types since WGSL doesn't support direct conversion
+            bool result = true;
+            for(int i = 0; i < N; ++i)
+                result = result && all(x[i]);
+            return result;
+        }
     default:
         bool result = true;
         for(int i = 0; i < N; ++i)
@@ -6563,7 +6569,7 @@ bool all(vector<T,N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool all(matrix<T,N,M> x)
 {
     __target_switch
@@ -6619,8 +6625,25 @@ void AllMemoryBarrierWithGroupSync()
 
 // Returns the workgroup size of the calling entry point.
 [require(compute)]
+[require(meshshading)]
 __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
+
+// Returns number of workgroups that have been dispatched to a GLSL or SPIR-V compute shader
+[require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+[require(glsl_spirv, meshshading)]
+uint3 WorkgroupCount()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumWorkGroups)";
+    case spirv:
+        return spirv_asm {
+            result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
+        };
+    }
+}
 
 // Test if any components is non-zero.
 
@@ -6638,7 +6661,8 @@ bool any(T x)
     case metal:
         __intrinsic_asm "any";
     case wgsl:
-        __intrinsic_asm "any";
+        // For scalars, any() doesn't exist in WGSL, just convert to bool
+        __intrinsic_asm "bool($0)";
     case spirv:
         let zero = __default<T>();
         if (__isInt<T>())
@@ -6669,7 +6693,17 @@ bool any(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "any";
     case metal:
-        __intrinsic_asm "any";
+        if (__isBool<T>())
+            __intrinsic_asm "any";
+        else
+        {
+            // For non-bool types, convert to bool vector first
+            // Metal's any() only works with bool vectors
+            bool result = false;
+            for(int i = 0; i < N; ++i)
+                result = result || any(x[i]);
+            return result;
+        }
     case glsl:
         __intrinsic_asm "any(bvec$N0($0))";
     case spirv:
@@ -6697,7 +6731,17 @@ bool any(vector<T, N> x)
             };
         }
     case wgsl:
-        __intrinsic_asm "any";
+        // WGSL any() only works with boolean vectors
+        if (__isBool<T>())
+            __intrinsic_asm "any($0)";
+        else
+        {
+            // Fall back to loop for non-boolean types since WGSL doesn't support direct conversion
+            bool result = false;
+            for(int i = 0; i < N; ++i)
+                result = result || any(x[i]);
+            return result;
+        }
     default:
         bool result = false;
         for(int i = 0; i < N; ++i)
@@ -6708,7 +6752,7 @@ bool any(vector<T, N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch
@@ -7685,7 +7729,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 {
     let ux = reinterpret<vector<uint16_t,N>>(x);
@@ -7702,7 +7746,7 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 {
     let ux = reinterpret<vector<uint32_t,N>>(x);
@@ -7719,7 +7763,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<double,N> copysign_double(vector<double,N> x, vector<double,N> y)
 {
     let ux = reinterpret<vector<uint64_t,N>>(x);
@@ -7740,7 +7784,7 @@ vector<T,N> __real_cast(vector<U,N> val);
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -7766,7 +7810,7 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 T copysign(T x, T y)
 {
     __target_switch
@@ -8565,6 +8609,52 @@ T determinant(matrix<T,N,N> m)
         OpExtInst $$T result glsl450 Determinant $m
     };
     case wgsl: __intrinsic_asm "determinant";
+    default:
+        static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
+        if (N == 1)
+        {
+            return m[0][0];
+        }
+        else if (N == 2)
+        {
+            return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+        }
+        else if (N == 3)
+        {
+            return
+                m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+              - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+              + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        }
+        else// if (N == 4)
+        {
+            T a = m[2][2] * m[3][3] - m[2][3] * m[3][2];
+            T b = m[2][1] * m[3][3] - m[2][3] * m[3][1];
+            T c = m[2][1] * m[3][2] - m[2][2] * m[3][1];
+            T d = m[2][0] * m[3][3] - m[2][3] * m[3][0];
+            T e = m[2][0] * m[3][2] - m[2][2] * m[3][0];
+            T f = m[2][0] * m[3][1] - m[2][1] * m[3][0];
+            return
+                m[0][0] * (m[1][1] * a - m[1][2] * b + m[1][3] * c)
+              - m[0][1] * (m[1][0] * a - m[1][2] * d + m[1][3] * e)
+              + m[0][2] * (m[1][0] * b - m[1][1] * d + m[1][3] * f)
+              - m[0][3] * (m[1][0] * c - m[1][1] * e + m[1][2] * f);
+        }
+    }
+}
+
+/// @param m The matrix.
+/// @return The determinant of the matrix.
+/// @category math
+__generic<T : __BuiltinIntegerType, let N : int>
+[__readNone]
+[require(glsl_hlsl_metal_spirv_wgsl)]
+T determinant(matrix<T,N,N> m)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "determinant";
+    // GLSL, WGSL, and SPIR-V don't support integer determinants for lowered matrices, so we need to implement it manually
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -9473,6 +9563,39 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
     }
 }
 
+// Helper functions for Metal target
+internal int __metal_clz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+internal uint __metal_clz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "clz";
+    }
+}
+
+internal int __metal_ctz(int value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
+internal uint __metal_ctz(uint value)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "ctz";
+    }
+}
+
 /// Find first set bit starting at high bit and working down.
 /// @param value The value to find set bits in.
 /// @return The bit index number of the most significant bit,
@@ -9493,7 +9616,14 @@ int firstbithigh(int value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindSMsb $value
     };
@@ -9510,7 +9640,6 @@ vector<int, N> firstbithigh(vector<int, N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
     };
@@ -9530,7 +9659,14 @@ uint firstbithigh(uint value)
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
+    case metal:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __metal_clz(value);
+        }
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
@@ -9547,7 +9683,6 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case metal: __intrinsic_asm "clz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
     };
@@ -9573,7 +9708,7 @@ int firstbitlow(int value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$int result glsl450 FindILsb $value
     };
@@ -9590,7 +9725,6 @@ vector<int,N> firstbitlow(vector<int,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<int,N> result glsl450 FindILsb $value
     };
@@ -9610,7 +9744,7 @@ uint firstbitlow(uint value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
+    case metal: return (value==0) ? -1 : __metal_ctz(value);
     case spirv: return spirv_asm {
         OpExtInst $$uint result glsl450 FindILsb $value
     };
@@ -9627,7 +9761,6 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: __intrinsic_asm "ctz";
     case spirv: return spirv_asm {
         OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
     };
@@ -10239,7 +10372,7 @@ __generic<T : __BuiltinType>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-[KnownBuiltin("GetAttributeAtVertex")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::GetAttributeAtVertex))]
 [__unsafeForceInlineEarly]
 T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
@@ -13090,7 +13223,7 @@ int sign(T x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "i32(sign($0))";
     }
 }
 
@@ -13114,7 +13247,7 @@ vector<int, N> sign(vector<T, N> x)
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
-    case wgsl: __intrinsic_asm "sign";
+    case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -13695,18 +13828,14 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
-    case spirv: return spirv_asm {
-        OpTranspose $$matrix<T, M, N> result $x
-    };
-    case wgsl: __intrinsic_asm "transpose";
+    // GLSL, WGSL, SPIR-V, and Metal don't support integer matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -13717,19 +13846,18 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
     case spirv: return spirv_asm {
         OpTranspose $$matrix<T, M, N> result $x
     };
-    case wgsl: __intrinsic_asm "transpose";
+    // GLSL, WGSL, and Metal don't support bool matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -18275,7 +18403,7 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount)
 /// and provide the values for per-mesh payload parameters.
 /// @return This function doesn't return.
 /// @category meshshading
-[KnownBuiltin("DispatchMesh")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::DispatchMesh))]
 [require(glsl_hlsl_metal_spirv, meshshading)]
 [noRefInline]
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, __ref P meshPayload)
@@ -18947,7 +19075,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
             };
         }
     }
@@ -20550,17 +20678,6 @@ struct HitObject
         case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
         }
     }
-
-    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
-    [ForceInline]
-    [require(cuda, ser_raygen_closesthit_miss)]
-    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
-    {
-        __target_switch
-        {
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
-        }
-    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
@@ -20943,11 +21060,13 @@ struct HitObject
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [__requiresNVAPI]
     [require(hlsl, ser)]
+    [require(cuda, ser)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".LoadLocalRootTableConstant";
+        case cuda: __intrinsic_asm "(*(uint32_t*)((char*)optixHitObjectGetSbtDataPointer()+$1))";
         }
     }
 
@@ -21562,7 +21681,7 @@ uint3 cudaBlockDim()
 // the signature or behavior of this function should be adjusted for there).
 //
 //@hidden:
-[KnownBuiltin("saturated_cooperation")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation))]
 func saturated_cooperation<A : __BuiltinType, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -21593,7 +21712,7 @@ func __WaveReadLaneAtBuiltin<T : __BuiltinType>(T t, int i) -> T
 // waveMatch: a function to return a mask of lanes with the same input as this one
 // broadcast: a function which returns the value passed into it on the specified lane
 //
-[KnownBuiltin("saturated_cooperation_using")]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::saturated_cooperation_using))]
 func saturated_cooperation_using<A, B, C>(
     cooperate : functype (A, B) -> C,
     fallback : functype (A, B) -> C,
@@ -24363,7 +24482,7 @@ extension<
     CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
 
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
-    static CoopMat<T, S, M, N, R> __MapElement<
+    internal static CoopMat<T, S, M, N, R> __MapElement<
         TOperator,
         TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
     >(This tuple, TOperator mapOp, TFunc mapObj);
@@ -26725,7 +26844,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27176,7 +27294,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         if (__isSignedInt<U>())
         {
             operands |= 0x02; // MatrixBSignedComponentsKHR
-            operands |= 0x04; // MatrixCSignedComponentsKHR
         }
         if (__isSignedInt<T>())
         {
@@ -27353,6 +27470,10 @@ CoopVec<T, M> coopVecMatMulPacked(
         int operands = 0; // NoneKHR
         let zero = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
         if (__isSignedInt<T>())
         {
             operands |= 0x08; // MatrixResultSignedComponentsKHR
@@ -27422,9 +27543,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         let zero : int32_t = 0;
         let cvtMatPtr = (Ptr<T[]>)matrixPtr;
         let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

@@ -77,10 +77,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_HOST_HOST_CALLABLE, "", "host-host-callable", "Host callable for host execution"},
     {SLANG_METAL, "metal", "metal", "Metal shader source"},
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
-    {SLANG_METAL_LIB_ASM,
-     "metallib-asm"
-     "metallib-asm",
-     "Metal Library Bytecode assembly"},
+    {SLANG_METAL_LIB_ASM, "metallib-asm", "metallib-asm", "Metal Library Bytecode assembly"},
     {SLANG_WGSL, "wgsl", "wgsl", "WebGPU shading language source"},
     {SLANG_WGSL_SPIRV_ASM,
      "wgsl-spirv-asm",
@@ -171,6 +168,14 @@ static const NamesDescriptionValue s_floatingPointModes[] = {
      "by the target."},
     {SLANG_FLOATING_POINT_MODE_DEFAULT, "default", "Default floating point mode"}};
 
+static const NamesDescriptionValue s_fpDenormalModes[] = {
+    {SLANG_FP_DENORM_MODE_ANY,
+     "any",
+     "Use any denormal handling mode (default). The mode used is implementation defined."},
+    {SLANG_FP_DENORM_MODE_PRESERVE, "preserve", "Preserve denormal values"},
+    {SLANG_FP_DENORM_MODE_FTZ, "ftz", "Flush denormals to zero"},
+};
+
 static const NamesDescriptionValue s_optimizationLevels[] = {
     {SLANG_OPTIMIZATION_LEVEL_NONE, "0,none", "Disable all optimizations"},
     {SLANG_OPTIMIZATION_LEVEL_DEFAULT,
@@ -251,6 +256,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFloatingPointModeInfos()
 {
     return makeConstArrayView(s_floatingPointModes);
+}
+
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormalModeInfos()
+{
+    return makeConstArrayView(s_fpDenormalModes);
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()
