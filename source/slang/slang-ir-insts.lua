@@ -1908,7 +1908,7 @@ local insts = {
 	{ IsSignedInt = { min_operands = 1 } },
 	{ IsVector = { min_operands = 1 } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
-	{ IRSize = { min_operands = 1 } },
+	{ IRSize = { min_operands = 1, hoistable = true } },
 	{ ForwardDifferentiate = { min_operands = 1 } },
 	-- Produces the primal computation of backward derivatives, will return an intermediate context for
 	-- backward derivative func.
