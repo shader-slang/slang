@@ -2,8 +2,10 @@
 #pragma once
 
 #include "slang-ast-base.h"
-#include "slang-ast-modifier.h.fiddle"
 #include "slang-ir-insts-enum.h"
+
+//
+#include "slang-ast-modifier.h.fiddle"
 
 FIDDLE()
 namespace Slang
