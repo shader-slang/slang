@@ -1355,7 +1355,10 @@ Result linkAndOptimizeIR(
     }
 
     legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
     legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
