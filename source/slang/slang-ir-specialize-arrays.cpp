@@ -55,9 +55,10 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
             as<IRConstRefType>(paramType))
         {
             paramType = as<IRPtrTypeBase>(paramType)->getValueType();
-            if(auto argPtrTypeBase = as<IRPtrTypeBase>(argType))
+            if (auto argPtrTypeBase = as<IRPtrTypeBase>(argType))
+            {
                 argType = argPtrTypeBase->getValueType();
-
+            }
             // Handle types which "auto-unwrap" and are ptr-like
             else if (as<IRParameterBlockType>(argType) || as<IRConstantBufferType>(argType))
             {

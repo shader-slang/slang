@@ -2755,9 +2755,99 @@ private:
     }
 };
 
+// Why this function exists:
+// Metal argument buffers map 1-to-1 to ParameterBlocks. This is an issue
+// since we allow `ParameterBlock<T>` to implicitly coerce
+// into `__const_ref T`. This is a problem since we legalize `T`
+// (split up the struct and split-out resource-members) but do not legalize
+// `ParameterBlock<T>`. This causes a mismatch in parameters.
+// 
+// This function implements the trivial solution to this problem (for sake of
+// finishing the overall feature before siggraph), if we have this senario, 
+// just "copy" parameter block so we don't have to deal with the legalization
+// of parameter-block being different depending on context.
+// This handles our problem cases:
+// * `const_ref T` as param-type getting copied into
+//     * `const_ref ParameterBlock<T>` as param
+//     OR
+//     * `ParameterBlock<T>` as param
+// 
+// This solution should eventually be changed into a more formal solution
+// of a new `LegalType::declAndAccess` where we essentially: (1) use 
+// `LegalType::declAndAccess->decl` as our LegalType for declaration sites 
+// (we should emit the same type as we do now for this parameter);
+// (2) implement uses of `ParameterBlock<T>` to non-param blocks as 
+// member-variable references through the `LegalType::flavor::wrappedBuffer`
+// stored in `LegalType::declAndAccess->access`.
+static void transformConstRefParameterBlockToConstRefStructIntoLoad(
+    IRTypeLegalizationContext* context,
+    IRFunc* irFunc)
+{
+    bool mayRequireLegalization = false;
+    for (auto p : irFunc->getParams())
+    {
+        auto constRefType = as<IRConstRefType>(p->getDataType());
+        if (constRefType && !as<IRParameterBlockType>(constRefType->getValueType()))
+        {
+            mayRequireLegalization = true;
+            break;
+        }
+    }
+    if (!mayRequireLegalization)
+        return;
+
+    traverseUsers<IRCall>(
+        irFunc,
+        [&](IRCall* user)
+        {
+            auto argCount = user->getArgCount();
+            for (auto argNum = 0; argNum < argCount; argNum++)
+            {
+                auto paramType = as<IRConstRefType>(irFunc->getParamType(argNum));
+                if (!paramType)
+                    continue;
+                auto paramValueType = paramType->getValueType();
+                // do not legalize if paramBlock to paramBlock
+                if (as<IRParameterBlockType>(paramValueType))
+                    continue;
+
+                auto arg = user->getArg(argNum);
+                auto argType = arg->getDataType();
+                bool isRef = false;
+                if (auto argRefType = as<IRConstRefType>(argType))
+                {
+                    isRef = true;
+                    argType = argRefType->getValueType();
+                }
+                if (!as<IRParameterBlockType>(argType))
+                {
+                    continue;
+                }
+                
+                IRBuilder builder(user);
+                builder.setInsertBefore(user);
+                IRInst* var = builder.emitVar(paramValueType);
+                if (isRef)
+                {
+                    builder.emitStore(var, builder.emitLoad(builder.emitLoad(arg)));
+                }
+                else
+                {
+                    builder.emitStore(var, builder.emitLoad(arg));
+                }
+                user->setArg(argNum, var);
+            }
+        }
+    );
+}
+
 static LegalVal legalizeFunc(IRTypeLegalizationContext* context, IRFunc* irFunc)
 {
     LegalFuncBuilder builder(context);
+    
+    if (isMetalTarget(context->targetProgram->getTargetReq()))
+        transformConstRefParameterBlockToConstRefStructIntoLoad(context, irFunc);
+    
     return builder.build(irFunc);
 }
 
