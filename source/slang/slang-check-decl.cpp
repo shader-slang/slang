@@ -2363,19 +2363,19 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         bool isStatic = false;
         bool isConst = false;
         bool isExtern = false;
-        for(auto modifier : varDecl->modifiers)
+        for (auto modifier : varDecl->modifiers)
         {
-            if(as<HLSLStaticModifier>(modifier))
+            if (as<HLSLStaticModifier>(modifier))
                 isStatic = true;
-            else if(as<ConstModifier>(modifier))
+            else if (as<ConstModifier>(modifier))
                 isConst = true;
-            else if(as<ExternModifier>(modifier))
+            else if (as<ExternModifier>(modifier))
                 isExtern = true;
 
-            if(isStatic && isConst && isExtern)
+            if (isStatic && isConst && isExtern)
                 break;
         }
-        if(isStatic && isConst &&
+        if (isStatic && isConst &&
             // Don't error for extern variables
             // Don't error for interface member variables
             !isExtern && !as<InterfaceDecl>(varDecl->parentDecl))
