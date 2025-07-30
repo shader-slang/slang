@@ -336,6 +336,14 @@ jobs:
           }
           Write-Host "Listing files in slangpy directory..."
           Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
+          Write-Host "Checking if pytest is installed..."
+          try {
+            python -c "import pytest" 2>$null
+            Write-Host "pytest is already installed"
+          } catch {
+            Write-Host "pytest not found, installing..."
+            python -m pip install pytest
+          }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
