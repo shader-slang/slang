@@ -2780,7 +2780,6 @@ private:
 // member-variable references through the `LegalType::flavor::wrappedBuffer`
 // stored in `LegalType::declAndAccess->access`.
 static void transformConstRefParameterBlockToConstRefStructIntoLoad(
-    IRTypeLegalizationContext* context,
     IRFunc* irFunc)
 {
     bool mayRequireLegalization = false;
@@ -2846,7 +2845,7 @@ static LegalVal legalizeFunc(IRTypeLegalizationContext* context, IRFunc* irFunc)
     LegalFuncBuilder builder(context);
     
     if (isMetalTarget(context->targetProgram->getTargetReq()))
-        transformConstRefParameterBlockToConstRefStructIntoLoad(context, irFunc);
+        transformConstRefParameterBlockToConstRefStructIntoLoad(irFunc);
     
     return builder.build(irFunc);
 }
