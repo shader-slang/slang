@@ -356,6 +356,32 @@ String DocMarkdownWriter::_getName(InheritanceDecl* decl)
     return buf.produceString();
 }
 
+String DocMarkdownWriter::_getName(ExtensionDecl* decl)
+{
+    StringBuilder buf;
+    buf << "extension " << decl->targetType->toString();
+    
+    List<InheritanceDecl*> inheritanceDecls;
+    _getDecls(decl, inheritanceDecls);
+    
+    const Index count = inheritanceDecls.getCount();
+    if (count)
+    {
+        buf << " : ";
+        for (Index i = 0; i < count; ++i)
+        {
+            InheritanceDecl* inheritanceDecl = inheritanceDecls[i];
+            if (i > 0)
+            {
+                buf << ", ";
+            }
+            buf << inheritanceDecl->base->toString();
+        }
+    }
+    
+    return buf.produceString();
+}
+
 DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(
     ASTMarkup::Entry* entry,
     Decl* decl)
@@ -2971,7 +2997,12 @@ DocumentPage* DocMarkdownWriter::getPage(Decl* decl)
     page = new DocumentPage();
     page->title = _getFullName(decl);
     page->path = path;
-    page->shortName = _getName(decl);
+    if (auto extDecl = as<ExtensionDecl>(decl))
+    {
+        page->shortName = _getName(extDecl);
+    } else {
+        page->shortName = _getName(decl);
+    }
     page->decl = decl;
     m_output[path] = page;
 
