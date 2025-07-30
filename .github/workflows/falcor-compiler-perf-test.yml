@@ -3,14 +3,6 @@
 name: Falcor Compiler Perf-Test
 
 on:
-  push:
-    branches: [master]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
   pull_request:
     branches: [master]
     paths-ignore:
