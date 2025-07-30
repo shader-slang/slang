@@ -1069,6 +1069,16 @@ public:
         return result;
     }
 
+    // Setup the flag to indicate we're in a for-loop side effect context where comma operators are allowed
+    SemanticsContext withInForLoopSideEffect()
+    {
+        SemanticsContext result(*this);
+        result.m_inForLoopSideEffect = true;
+        return result;
+    }
+
+    bool getInForLoopSideEffect() { return m_inForLoopSideEffect; }
+
     TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
     SemanticsContext withEnclosingTryClauseType(TryClauseType tryClauseType)
@@ -1201,6 +1211,9 @@ protected:
     // 2. the logic expression is in the init expression of a static const variable.
     // 3. the logic expression is in an array size declaration.
     bool m_shouldShortCircuitLogicExpr = true;
+
+    // Flag to track when we're in a for-loop side effect expression where comma operators are allowed
+    bool m_inForLoopSideEffect = false;
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 

@@ -3221,6 +3221,22 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
 
+    // Check for comma operator usage and emit warning if not in for-loop side effect context
+    if (auto infixExpr = as<InfixExpr>(expr))
+    {
+        if (auto varExpr = as<VarExpr>(infixExpr->functionExpr))
+        {
+            if (varExpr->name && varExpr->name->text == ",")
+            {
+                // Allow comma operators in for-loop side effects and expand expressions without warning
+                if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+                {
+                    getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+                }
+            }
+        }
+    }
+
     expr->functionExpr = CheckTerm(expr->functionExpr);
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
