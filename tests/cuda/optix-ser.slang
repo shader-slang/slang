@@ -36,10 +36,10 @@ uint calcValue(HitObject hit)
         // CHECK: optixHitObjectGetSbtRecordIndex
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
-        // CHECK: optixHitObjectSetSbtRecordIndex((0U));
+        // CHECK: optixHitObjectSetSbtRecordIndex((0U))
         uint setShaderTableIndex = hit.SetShaderTableIndex(0);
 
-        // CHECK: optixHitObjectGetSbtDataPointer()+(0U);
+        // CHECK: optixHitObjectGetSbtDataPointer()+(0U)
         uint ialbedo = hit.LoadLocalRootTableConstant(0);
 
         // CHECK: optixHitObjectGetAttribute
@@ -61,7 +61,9 @@ uint calcValue(HitObject hit)
 
 void rayGenerationMain()
 {
+    // CHECK: optixGetLaunchIndex
     int2 launchID = int2(DispatchRaysIndex().xy);
+    // CHECK: optixGetLaunchDimensions
     int2 launchSize = int2(DispatchRaysDimensions().xy);
 
     int idx = launchID.x;
@@ -80,7 +82,6 @@ void rayGenerationMain()
     uint rayContributionToHitGroupIndex = 0;
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
-    // SPIRV: OpHitObjectTraceRayNV
     // CHECK: optixTraverse
     HitObject hit = HitObject::TraceRay(
         scene,
@@ -92,13 +93,18 @@ void rayGenerationMain()
         ray,
         someValues);
 
+    // CHECK-DAG: optixReorder();
+    // CHECK-DAG: optixReorder((uint(idx_0 & int(3))), (2U));
+    // CHECK-DAG: optixReorder(uint(idx_0 & int(1)), 1U);
     ReorderThread(hit);
     ReorderThread(hit, uint(idx & 3), 2);
     ReorderThread(uint(idx & 1), 1);
 
     outputBuffer[idx] = calcValue(hit);
     HitObject miss[2];
+    // CHECK: optixMakeMissHitObject(0U, ray_0, &miss_0[int(0)]);
     miss[0] = HitObject::MakeMiss(0u, ray);
+    // CHECK: optixMakeMissHitObject(0U, ray_0, 1.0f, &miss_0[int(1)]);
     miss[1] = HitObject::MakeMotionMiss(0u, ray, 1.f);
 
     uint hitGroupRecordIndex = 0;
@@ -108,6 +114,7 @@ void rayGenerationMain()
     uint hitKind = 0;
     BuiltInTriangleIntersectionAttributes attr = { 0.01f, 0.2f };
 
+    // CHECK: optixMakeHitObject
     HitObject hitObj = HitObject::MakeHit(
         hitGroupRecordIndex,
         scene,
@@ -117,7 +124,9 @@ void rayGenerationMain()
         hitKind,
         ray,
         attr);
+    // CHECK: optixMakeNopHitObject
     HitObject nopObj = HitObject::MakeNop();
+    // CHECK: optixHitObjectIsNop
     outputBuffer[idx] = uint(nopObj.IsNop());
 
     outputBuffer[idx] += calcValue(hit);
@@ -129,8 +138,10 @@ void rayGenerationMain()
     // Change the payload
     SomeValues otherValues = { idx * -2, idx * 8.0f };
 
+    // CHECK: optixInvoke
     HitObject::Invoke(scene, hit, otherValues);
     HitObject motionHitObj[2];
+    // CHECK: optixMakeHitObject
     motionHitObj[0] = HitObject::MakeMotionHit(
         scene,
         instanceIndex,
@@ -142,6 +153,7 @@ void rayGenerationMain()
         ray,
         0.f,
         attr);
+    // CHECK: optixMakeHitObject
     motionHitObj[1] = HitObject::MakeMotionHit(
         hitGroupRecordIndex,
         scene,
@@ -155,6 +167,7 @@ void rayGenerationMain()
     outputBuffer[idx] += calcValue(motionHitObj[0]);
     outputBuffer[idx] += calcValue(motionHitObj[1]);
 
+    // CHECK: optixHitObjectGetRayDesc
     RayDesc rayD = hit.GetRayDesc();
 
     outputBuffer[idx] += uint(rayD.TMin > 0);

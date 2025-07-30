@@ -20654,7 +20654,7 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".SetShaderTableIndex";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer($1)";
+        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex($1)";
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
