@@ -360,10 +360,10 @@ String DocMarkdownWriter::_getName(ExtensionDecl* decl)
 {
     StringBuilder buf;
     buf << "extension " << decl->targetType->toString();
-    
+
     List<InheritanceDecl*> inheritanceDecls;
     _getDecls(decl, inheritanceDecls);
-    
+
     const Index count = inheritanceDecls.getCount();
     if (count)
     {
@@ -378,7 +378,7 @@ String DocMarkdownWriter::_getName(ExtensionDecl* decl)
             buf << inheritanceDecl->base->toString();
         }
     }
-    
+
     return buf.produceString();
 }
 
@@ -3000,7 +3000,9 @@ DocumentPage* DocMarkdownWriter::getPage(Decl* decl)
     if (auto extDecl = as<ExtensionDecl>(decl))
     {
         page->shortName = _getName(extDecl);
-    } else {
+    }
+    else
+    {
         page->shortName = _getName(decl);
     }
     page->decl = decl;
