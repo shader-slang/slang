@@ -970,10 +970,9 @@ matrix<T,N,M> select(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,
         return __hlsl_select(condition, ifTrue, ifFalse);
     default:
         matrix<T,N,M> result;
-        matrix<int,N,M> icond = matrix<int,N,M>(condition);
         [[unroll]]
         for (uint32_t i = 0; i < N; i++)
-            result[i] = select(vector<bool,M>(icond[i]), ifTrue[i], ifFalse[i]);
+            result[i] = select(condition[i], ifTrue[i], ifFalse[i]);
         return result;
     }
 }

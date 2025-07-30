@@ -9,6 +9,14 @@
 
 namespace Slang
 {
+
+bool requiresLegalization(IRInst* type)
+{
+    return !as<IRBasicType>(type) &&
+        !as<IRVectorType>(type) &&
+        !as<IRMatrixType>(type);
+}
+
 void legalizeASingleNonVectorCompositeSelect(IRBuilder& builder, IRSelect* selectInst)
 {
     SLANG_ASSERT(selectInst);
@@ -49,6 +57,7 @@ void legalizeASingleNonVectorCompositeSelect(IRBuilder& builder, IRSelect* selec
     // Clean up
     selectInst->removeAndDeallocate();
 }
+
 void legalizeNonVectorCompositeSelect(IRModule* module)
 {
     IRBuilder builder(module);
@@ -57,23 +66,20 @@ void legalizeNonVectorCompositeSelect(IRModule* module)
         auto func = as<IRFunc>(globalInst);
         if (!func)
             continue;
+
         for (auto block : func->getBlocks())
         {
-            auto inst = block->getFirstInst();
-            IRInst* next;
-            for (; inst; inst = next)
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
             {
-                next = inst->getNextInst();
-                switch (inst->getOp())
+                if (auto select = as<IRSelect>(inst))
                 {
-                case kIROp_Select:
                     // Replace OpSelect with if/else branch (same process as glslang)
-                    if (!isScalarOrVectorType(inst->getFullType()))
-                        legalizeASingleNonVectorCompositeSelect(builder, as<IRSelect>(inst));
-                    continue;
+                    if (requiresLegalization(select->getFullType()))
+                        legalizeASingleNonVectorCompositeSelect(builder, select);
                 }
             }
         }
     }
 }
+
 } // namespace Slang
