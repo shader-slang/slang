@@ -9472,6 +9472,25 @@ SlangResult emitSPIRVFromIR(
         return SLANG_FAIL;
     }
 
+    // Move forward delcared pointers to the end.
+    do
+    {
+        auto fwdPointers = context.m_forwardDeclaredPointers;
+        context.m_forwardDeclaredPointers.clear();
+
+        for (auto ptrType : fwdPointers)
+        {
+            auto spvPtrType = ptrType.key;
+            // When we emit a pointee type, we may introduce new
+            // forward-declared pointer types, so we need to
+            // keep iterating until we have emitted all of them.
+            context.ensureInst(ptrType.value->getValueType());
+            auto parent = spvPtrType->parent;
+            spvPtrType->removeFromParent();
+            parent->addInst(spvPtrType);
+        }
+    } while (context.m_forwardDeclaredPointers.getCount() != 0);
+
     // Emit extensions and capabilities for which there are multiple options available.
     // This is delayed to avoid emitting unnecessary extensions and capabilities if
     // one of the options is already required by some other op.
