@@ -1722,10 +1722,10 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
     // If one candidate got further along in validation, pick it
     if (left->status != right->status)
         return int(right->status) - int(left->status);
-    left->flavor
-        // If both candidates are applicable, then we need to compare
-        // the costs of their type conversion sequences
-        if (left->status == OverloadCandidate::Status::Applicable)
+
+    // If both candidates are applicable, then we need to compare
+    // the costs of their type conversion sequences
+    if (left->status == OverloadCandidate::Status::Applicable)
     {
         // If one candidate incurred less cost related to
         // implicit conversion of arguments to matching
