@@ -2592,7 +2592,12 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         for (auto param : params)
         {
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
+            if (!paramLayoutDecoration)
+            {
+                // Some parameters (like ParameterBlock types) may not have layout decorations
+                // in ray tracing shaders, so we skip them here.
+                continue;
+            }
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
@@ -2608,7 +2613,12 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
                 continue;
             }
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
+            if (!paramLayoutDecoration)
+            {
+                // Some parameters (like ParameterBlock types) may not have layout decorations
+                // in ray tracing shaders, so we skip them here.
+                continue;
+            }
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
