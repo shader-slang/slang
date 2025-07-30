@@ -1,0 +1,2 @@
+command script import source/core/core_lldb.py
+command script import source/slang/slang_lldb.py
