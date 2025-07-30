@@ -4768,15 +4768,17 @@ static SlangResult runUnitTestModule(
     if (!testModule)
         return SLANG_FAIL;
 
+    renderer_test::CoreDebugCallback coreDebugCallback;
+    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
+
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-
-    // Unit tests don't use RHI, so there are no debug layer messages to capture
-    unitTestContext.debugCallback = nullptr; 
+    unitTestContext.debugCallback = &rhiDebugBridge; 
 
     auto testCount = testModule->getTestCount();
 
