@@ -1069,7 +1069,8 @@ public:
         return result;
     }
 
-    // Setup the flag to indicate we're in a for-loop side effect context where comma operators are allowed
+    // Setup the flag to indicate we're in a for-loop side effect context where comma operators are
+    // allowed
     SemanticsContext withInForLoopSideEffect()
     {
         SemanticsContext result(*this);
@@ -1212,7 +1213,8 @@ protected:
     // 3. the logic expression is in an array size declaration.
     bool m_shouldShortCircuitLogicExpr = true;
 
-    // Flag to track when we're in a for-loop side effect expression where comma operators are allowed
+    // Flag to track when we're in a for-loop side effect expression where comma operators are
+    // allowed
     bool m_inForLoopSideEffect = false;
 
     ExpandExpr* m_parentExpandExpr = nullptr;
