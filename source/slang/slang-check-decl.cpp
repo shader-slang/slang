@@ -2356,6 +2356,27 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Check for static const variables without initializers
+    if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+    {
+        if (!varDecl->initExpr)
+        {
+            // Don't error for extern variables
+            if (!varDecl->hasModifier<ExternModifier>())
+            {
+                // Don't error for interface member variables
+                if (!as<InterfaceDecl>(varDecl->parentDecl))
+                {
+                    getSink()->diagnose(
+                        varDecl,
+                        Diagnostics::staticConstVariableRequiresInitializer,
+                        varDecl->getName());
+                }
+            }
+        }
+    }
+
     checkVisibility(varDecl);
 }
 
