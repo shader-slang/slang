@@ -84,6 +84,9 @@ jobs:
             runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
+          # Enable debug layers for all by default
+          - enable-debug-layers: true
+          - { os: windows, config: debug, enable-debug-alyers: false } # issue 7965
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -262,7 +265,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers true
+              -enable-debug-layers ${{ matrix.enable-debug-layers }}
           else
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -271,7 +274,7 @@ jobs:
               -expected-failure-list tests/expected-failure-no-gpu.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              -enable-debug-layers true
+              -enable-debug-layers ${{ matrix.enable-debug-layers }}
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
