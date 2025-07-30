@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -vk -shaderobj -xslang -emit-spirv-directly -xslang -DTYPE=int
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -vk -shaderobj -xslang -emit-spirv-directly -xslang -DTYPE=uint
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -vk -output-using-type -compute -emit-spirv-via-glsl -shaderobj -xslang -DTYPE=int
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -vk -output-using-type -compute -emit-spirv-via-glsl -shaderobj -xslang -DTYPE=uint
 
 #ifndef TYPE
 #define TYPE int
@@ -196,4 +196,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 1
     outputBuffer[39] = TYPE(negated[1][1] == expectedBuffer[1]);
     // CHECK-NEXT: 1
-}
+} 
