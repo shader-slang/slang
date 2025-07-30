@@ -4612,8 +4612,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitIRSizeExpr(IRSizeExpr*)
     {
-        auto builder = getBuilder();
-        IRInst* args[] = {builder->getModule()->getModuleInst()};
+        auto builder = context->irBuilder;
+        auto moduleName = builder->getModule()->getName()->text.getUnownedSlice();
+        IRInst* args[] = {builder->getStringValue(moduleName)};
         return LoweredValInfo::simple(
             builder->emitIntrinsicInst(builder->getUIntType(), kIROp_IRSize, 1, args));
     }

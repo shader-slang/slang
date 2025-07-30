@@ -3072,7 +3072,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_IRSize:
         {
-            m_writer->emit(UInt(uint32_t(42)));
+            auto moduleName = as<IRStringLit>(inst->getOperand(0));
+            m_writer->emit(UInt(moduleName->getStringSlice().getLength()));
             m_writer->emit("U");
             break;
         }
