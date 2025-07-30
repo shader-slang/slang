@@ -57,6 +57,15 @@ class IRInstListBase_synthetic(lldb.SBSyntheticValueProvider):
             self.children.append(child.Clone(f"[{i}]"))
             pointer = child.GetNonSyntheticValue().GetChildMemberWithName("next")
             i += 1
+            if i >= 5000:
+                # The debugger can call this function on uninitialized
+                # values, so we need to ensure that we stop iterating at
+                # some point. Ideally we'd provide a synthetic child
+                # called something like `[more]` to see another batch of
+                # many children in the case where there really is just a
+                # very large list, but this is good enough because one
+                # can always manually follow `next` pointers.
+                break
 
     def has_children(self):
         return True
@@ -114,7 +123,12 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
         offset = ty.GetByteSize()
         ir_use_t = target.FindFirstType("Slang::IRUse")
         ir_use_size = ir_use_t.GetByteSize()
-        for index in range(self.valobj.GetChildMemberWithName("operandCount").unsigned):
+        operand_count = self.valobj.GetChildMemberWithName("operandCount").unsigned
+        # We must ensure that we don't loop for an unbounded amount of
+        # time, so we cap the number of operands displayed here. Ideally
+        # we'd provide a way to view more in the case of instructions
+        # with more than this many operands, though.
+        for index in range(min(operand_count, 10)):
             name = f"[operand{index}]"
             operand = self.valobj.CreateChildAtOffset(
                 name, offset + index * ir_use_size, ir_use_t
