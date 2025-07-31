@@ -1372,7 +1372,13 @@ int SemanticsVisitor::CompareLookupResultItems(
     auto genericsRight = as<GenericDecl>(right.declRef.getDecl());
     if ((genericsLeft && as<CallableDecl>(genericsLeft->inner)) ||
         (genericsRight && as<CallableDecl>(genericsRight->inner)))
-        return 0;
+    {
+        bool isLeftInterfaceType = as<InterfaceDecl>(leftDeclRefParent.getDecl()) != nullptr;
+        bool isRightInterfaceType = as<InterfaceDecl>(rightDeclRefParent.getDecl()) != nullptr;
+        // Always prefer the generic defined in concrete type instead of interface type. For other
+        // cases, we cannot decide which one is better, so we return 0.
+        return (isLeftInterfaceType - isRightInterfaceType);
+    }
 
     // If both left and right are extern, then they are equal.
     // If only one of them is extern, then the other one is preferred.
