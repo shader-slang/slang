@@ -3,6 +3,7 @@
 
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 
@@ -455,6 +456,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                     builder,
                     entryPointUniformStructTypeLayout);
                 elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
+
+                IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
                 // Filter offsets for the `elementVarLayout` part of the new parameter group layout.
                 for (auto resKind : resourceKinds)
                 {
@@ -465,7 +468,11 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                     resInfo->offset = originalOffset->getOffset();
                     resInfo->space = originalOffset->getSpace();
                 }
-                IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
+                for (auto resKind : resourceKinds)
+                {
+                    if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
+                        paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+                }
                 auto newElementVarLayout = elementVarLayoutBuilder.build();
                 // The "containerVarLayout" part should remain unchanged from the original layout.
                 // Because this is where we store the offset of the default constant buffer itself.
