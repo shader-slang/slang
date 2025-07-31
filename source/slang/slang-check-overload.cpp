@@ -1368,8 +1368,23 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
     bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
 
-    bool isGeneric = as<GenericDecl>(left.declRef.getDecl()) != nullptr ||
-                     as<GenericDecl>(right.declRef.getDecl()) != nullptr;
+    auto genericsLeft = as<GenericDecl>(left.declRef.getDecl());
+    auto genericsRight = as<GenericDecl>(right.declRef.getDecl());
+    if ((genericsLeft && as<CallableDecl>(genericsLeft->inner)) ||
+        (genericsRight && as<CallableDecl>(genericsRight->inner)))
+        return 0;
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
 
     // Prefer declarations that are not in free-form generic extensions, i.e.
     // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
@@ -1384,28 +1399,6 @@ int SemanticsVisitor::CompareLookupResultItems(
         rightIsExtension = true;
         if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
             rightIsFreeFormExtension = true;
-    }
-
-    // If we are comparing two generic and one of them in an extension, then this generic
-    // must be CallableDecl. So we're not able to decide which one is better, because candidates
-    // in this pass of overload resolution only check the generic parameters, instead of the
-    // function parameters, therefore, we have to defer this check in the second pass of
-    // overload resolution, where it will check the function parameters.
-    if ((leftIsExtension || rightIsExtension) && isGeneric)
-    {
-        return 0;
-    }
-
-    // If both left and right are extern, then they are equal.
-    // If only one of them is extern, then the other one is preferred.
-    // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
-    {
-        return (rigthIsExtern ? 0 : 1);
-    }
-    if (rigthIsExtern)
-    {
-        return (leftIsExtern ? -1 : 0);
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
