@@ -1440,9 +1440,9 @@ int SemanticsVisitor::CompareLookupResultItems(
 
         // If we are comparing two generic and one of them in an extension, then this generic
         // must be CallableDecl. So we're not able to decide which one is better, because candidates
-        // in this pass of overload resolution only check the generic parameters, instead of the function
-        // parameters, therefore, we have to defer this check in the second pass of overload resolution, where
-        // it will check the function parameters.
+        // in this pass of overload resolution only check the generic parameters, instead of the
+        // function parameters, therefore, we have to defer this check in the second pass of
+        // overload resolution, where it will check the function parameters.
         if (as<GenericDecl>(left.declRef.getDecl()))
             return 0;
 
