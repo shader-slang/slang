@@ -2819,7 +2819,19 @@ void addArg(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
 
-                LoweredValInfo tempVar = createVar(context, paramType);
+                LoweredValInfo tempVar;
+
+                if (paramDirection == kParameterDirection_ConstRef &&
+                    (as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
+                     as<IRGlobalVar>(argVal.val)))
+                {
+                    // we do not need the temp-var
+                    tempVar = LoweredValInfo::ptr(argVal.val);
+                }
+                else
+                {
+                    tempVar = createVar(context, paramType);
+                }
 
                 // If the parameter is `in out` or `inout`, then we need
                 // to ensure that we pass in the original value stored
@@ -2827,7 +2839,9 @@ void addArg(
                 // from the l-value to our temp.
                 //
                 if (paramDirection == kParameterDirection_InOut ||
-                    paramDirection == kParameterDirection_ConstRef)
+                    (paramDirection == kParameterDirection_ConstRef &&
+                     !(as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
+                       as<IRGlobalVar>(argVal.val))))
                 {
                     assign(context, tempVar, argVal);
                 }
