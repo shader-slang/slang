@@ -204,8 +204,14 @@ struct __align__(1) bool1
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(2) bool2
@@ -218,8 +224,14 @@ struct __align__(2) bool2
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(1) bool3
@@ -232,8 +244,14 @@ struct __align__(1) bool3
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 struct __align__(4) bool4
@@ -246,8 +264,14 @@ struct __align__(4) bool4
     {
     }
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
 };
 
 // Vector element pointer functions for boolean vectors
@@ -285,68 +309,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL bool _slang_vector_get_element(bool4 x, int i
 {
     return x[index];
 }
-
-// Boolean struct vector operations - full compatibility with int vector operations
-// These provide the same operators that were available when boolX were typedef intX
-
-#define SLANG_CUDA_BOOL_BINARY_OP(n, op)                                                       \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(const bool##n& a, const bool##n& b) \
-    {                                                                                          \
-        bool##n result;                                                                        \
-        for (int i = 0; i < n; i++)                                                            \
-            *_slang_vector_get_element_ptr(&result, i) =                                       \
-                (bool)(_slang_vector_get_element(a, i) op _slang_vector_get_element(b, i));    \
-        return result;                                                                         \
-    }
-
-#define SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, op)                                               \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(const bool##n& a, const bool##n& b) \
-    {                                                                                          \
-        bool##n result;                                                                        \
-        for (int i = 0; i < n; i++)                                                            \
-            *_slang_vector_get_element_ptr(&result, i) =                                       \
-                (bool)(_slang_vector_get_element(a, i) op _slang_vector_get_element(b, i));    \
-        return result;                                                                         \
-    }
-
-#define SLANG_CUDA_BOOL_UNARY_OP(n, op)                                      \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(const bool##n& a) \
-    {                                                                        \
-        bool##n result;                                                      \
-        for (int i = 0; i < n; i++)                                          \
-            *_slang_vector_get_element_ptr(&result, i) =                     \
-                (bool)(op _slang_vector_get_element(a, i));                  \
-        return result;                                                       \
-    }
-
-#define SLANG_CUDA_BOOL_OPS(n)               \
-    SLANG_CUDA_BOOL_BINARY_OP(n, +)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, -)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, *)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, /)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, %)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, ^)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, &)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, |)          \
-    SLANG_CUDA_BOOL_BINARY_OP(n, &&)         \
-    SLANG_CUDA_BOOL_BINARY_OP(n, ||)         \
-    SLANG_CUDA_BOOL_BINARY_OP(n, >>)         \
-    SLANG_CUDA_BOOL_BINARY_OP(n, <<)         \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, >)  \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, <)  \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, >=) \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, <=) \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, ==) \
-    SLANG_CUDA_BOOL_BINARY_COMPARE_OP(n, !=) \
-    SLANG_CUDA_BOOL_UNARY_OP(n, !)           \
-    SLANG_CUDA_BOOL_UNARY_OP(n, -)           \
-    SLANG_CUDA_BOOL_UNARY_OP(n, ~)
-
-// Apply to all boolean struct types
-SLANG_CUDA_BOOL_OPS(1)
-SLANG_CUDA_BOOL_OPS(2)
-SLANG_CUDA_BOOL_OPS(3)
-SLANG_CUDA_BOOL_OPS(4)
 
 #if SLANG_CUDA_RTC
 
@@ -534,6 +496,7 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
     SLANG_CUDA_VECTOR_INT_OP(T, 4)
 
 SLANG_CUDA_VECTOR_INT_OPS(int)
+SLANG_CUDA_VECTOR_INT_OPS(bool)
 SLANG_CUDA_VECTOR_INT_OPS(uint)
 SLANG_CUDA_VECTOR_INT_OPS(ushort)
 SLANG_CUDA_VECTOR_INT_OPS(short)
