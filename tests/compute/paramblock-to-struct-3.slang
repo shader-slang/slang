@@ -7,14 +7,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=output
-RWStructuredBuffer<int> output;
-
 struct Data {
     RWStructuredBuffer<int> input;
+    RWStructuredBuffer<int> output;
 };
 
-int fetchInner(Data thisData, int index)
+int fetchInner(__constref Data thisData, int index)
 {
     return thisData.input.Load(index) + 10;
 }
@@ -24,7 +22,7 @@ int fetch(ParameterBlock<Data> thisData, int index)
     return fetchInner(thisData, index);
 }
 
-//TEST_INPUT:set data = new Data{ubuffer(data=[1 2 3 4], stride = 4)}
+//TEST_INPUT:set data = new Data{ubuffer(data=[1 2 3 4], stride = 4), out ubuffer(data=[0 0 0 0], stride = 4)}
 ParameterBlock<Data> data;
 
 [shader("compute")]
