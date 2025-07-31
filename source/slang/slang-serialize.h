@@ -21,26 +21,11 @@
 //          SomeObject* object;
 //      };
 //
-// then you can declare serialization support for your type
+// then you can implement serialization support for your type
 // with something like:
 //
-//      // my-thing.h
-//      ...
-//      #include "slang-serialize.h"
-//      ...
-//
-//      struct MyThing { ... }
-//
-//      void serialize(Serializer const& serializer, MyThing& value);
-//
-// and then implement that support with something like:
-//
-//      // my-thing.cpp
-//      #include "my-thing.h"
-//
-//      ...
-//
-//      void serialize(Serializer const& serializer, MyThing& value)
+//      template<typename S>
+//      void serialize(S const& serializer, MyThing& value)
 //      {
 //          SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
 //          serialize(serializer, value.a);
@@ -81,16 +66,55 @@ enum class SerializationMode
 };
 
 //
-// In order to support different serialized formats, and to
-// abstract over the difference between reading and writing,
-// we define a base interface for serialization. This interface
-// is somewhat user-unfriendly, and is *not* intended for
-// ordinary code to interface with directly.
+// Complex pointer-based object graphs can be challenging for
+// a serialization system. Naively written recursive serialization
+// logic can lead to extremely deep call graphs at runtime
+// (potentially overflowing the stack), and when deserialization
+// needs to interact with systems for caching and/or deduplicating
+// objects, the ordering constraints imposed by those systems
+// must be respected.
+//
+// This serialization system relies on callback functions in
+// a few places to allow serialization actions to be queued up or
+// otherwise rescheduled to avoid these problems.
+//
+
+/// Callback type used by the serialization infrastructure.
+///
+/// Users typically will never define callbacks manually; the
+/// system creates and manages them behind the scenes, based
+/// on user-defined types.
+///
+typedef void (*SerializerCallback)(void* valuePtr, void* impl, void* context);
+
+//
+// In order to achieve the best possible performance,
+// serialization functions need to be statically specialized
+// to the particular data format being used. To that
+// end, concrete serialization formats are expected to
+// model the right concept (provide the right methods,
+// type declarations, etc.), but there is not a single
+// base class or interface that they all *must* inherit from.
+//
+// However, to help illustrate the requirements for a
+// complete serializer implementation, we will declare an
+// interface that helps illustrate the outline of what
+// a serializer implementation needs to provide.
+//
+// Note: this interface is somewhat user-unfriendly. It
+// is *not* intended to be something that user code would
+// usually interact with directly, and instead is intended
+// to define only the operations that a serialization
+// back-end must support.
 //
 
 /// Base interface for serialization.
 ///
 /// Can be used for both reading and writing of serialized data.
+///
+/// Note that implementations of serialization back-ends do
+/// *not* need to inherit from this type; it currently serves
+/// only to define the requirements.
 ///
 struct ISerializerImpl
 {
@@ -217,6 +241,35 @@ struct ISerializerImpl
     ///
     virtual void handleString(String& value) = 0;
 
+    //
+    // Every concrete serializer implementation should define
+    // its own `Scope` type, which will be passed as the
+    // operand to the various paired `begin`/`end` operations
+    // below. Code that is calling into a serializer takes
+    // responsibility for maintaining the `Scope` for the
+    // duration of the `begin`/`end` pair, and passing the
+    // same data in to `end` that was passed into `begin`,
+    // without making any modifications of its own.
+    //
+    // An implementation may be able to use the `Scope` to
+    // store information related to the hierarchy of `begin`
+    // and `end` operations, and thus avoid needing to
+    // maintain its own heap-allocated stack structure.
+    //
+    struct Scope
+    {
+        // The implementation of `Scope` in this placeholder
+        // interface is intended to define a kind of upper
+        // bound on the size of reasonable scope representations.
+        //
+        // The intention is that any concrete implementation
+        // could be wrapped up as an `ISerializerImpl`, so
+        // long as its `Scope` fits within the storage limit
+        // defined here.
+        //
+        void* storage[8];
+    };
+
     /// Begin serializing an array value.
     ///
     /// An array should be used to serialize an
@@ -235,10 +288,10 @@ struct ISerializerImpl
     /// and serialize values in a loop until `hasElements()`
     /// returns `false`.
     ///
-    virtual void beginArray() = 0;
+    virtual void beginArray(Scope&) = 0;
 
     /// End serializing an array value.
-    virtual void endArray() = 0;
+    virtual void endArray(Scope&) = 0;
 
     /// Begin serializing an optional value.
     ///
@@ -258,10 +311,10 @@ struct ISerializerImpl
     /// test whether the serialized optional has a value and,
     /// if it does, read the value before calling `endOptional()`.
     ///
-    virtual void beginOptional() = 0;
+    virtual void beginOptional(Scope&) = 0;
 
     /// End serializing an optional value.
-    virtual void endOptional() = 0;
+    virtual void endOptional(Scope&) = 0;
 
     /// Begin serializing a dictionary value.
     ///
@@ -285,10 +338,10 @@ struct ISerializerImpl
     /// and serialize values in a loop until `hasElements()`
     /// returns `false`.
     ///
-    virtual void beginDictionary() = 0;
+    virtual void beginDictionary(Scope&) = 0;
 
     /// End serializing a dictionary value.
-    virtual void endDictionary() = 0;
+    virtual void endDictionary(Scope&) = 0;
 
     /// Check whether there are elements remaining to be read
     /// from a serialized container.
@@ -309,10 +362,10 @@ struct ISerializerImpl
     /// to `hasElements()` are allowed between `beginTuple()`
     /// and `endTuple()`.
     ///
-    virtual void beginTuple() = 0;
+    virtual void beginTuple(Scope&) = 0;
 
     /// End serializing a tuple value.
-    virtual void endTuple() = 0;
+    virtual void endTuple(Scope&) = 0;
 
 
     /// Begin serializing a struct value.
@@ -330,10 +383,10 @@ struct ISerializerImpl
     /// they were written, and how to handle attempts
     /// to read a field that was not written.
     ///
-    virtual void beginStruct() = 0;
+    virtual void beginStruct(Scope&) = 0;
 
     /// End serializing a struct value.
-    virtual void endStruct() = 0;
+    virtual void endStruct(Scope&) = 0;
 
     /// Begin serializing a variant value.
     ///
@@ -354,10 +407,10 @@ struct ISerializerImpl
     /// struct always including the same members in the same
     /// order.
     ///
-    virtual void beginVariant() = 0;
+    virtual void beginVariant(Scope&) = 0;
 
     /// End serializing a variant value.
-    virtual void endVariant() = 0;
+    virtual void endVariant(Scope&) = 0;
 
     /// Set the key for the next struct field to be serialized.
     ///
@@ -433,11 +486,12 @@ struct ISerializerImpl
 };
 
 //
-// Rather than interact with instances of `ISerializerImpl` directly,
+// Rather than interface with serialization back-ends directly,
 // most client code will use a wrapper type that amounts to a kind
 // of smart pointer.
 //
-// While the `ISerializerImpl` interface can cover a wide range of
+// While serialization back-ends providing operations comparable to
+// `ISerializerImpl` above can cover a wide range of
 // types that need to be serialized, it is common for types to require
 // more specific *context* to be available in order to perform serialization.
 // For example, code might need access to a factory object in order
@@ -451,35 +505,40 @@ struct ISerializerImpl
 
 /// Base type for serialization contexts.
 ///
-/// The type parameter `Impl` should be a type that derives from
-/// `ISerializerImpl`, and the `Context` type parameter can be any
-/// type that passes along additional context information needed.
+/// The type parameter `I` should be the serialization back-end
+/// implementation (e.g., `ISerializerImpl`), while the `C` type
+/// parameter can be any type that carries additional context
+/// information needed.
 ///
-template<typename Impl, typename Context>
-struct SerializerBase
+template<typename I, typename C>
+struct Serializer
 {
 public:
-    SerializerBase() = default;
-    SerializerBase(Impl* impl, Context* context = nullptr)
+    using Impl = I;
+    using Context = C;
+
+    SLANG_FORCE_INLINE Serializer() = default;
+    SLANG_FORCE_INLINE Serializer(Impl* impl, Context* context = nullptr)
         : _impl(impl), _context(context)
     {
     }
 
-    template<typename I, typename C>
-    SerializerBase(
-        SerializerBase<I, C> const& serializer,
+    template<typename SourceImpl, typename SourceContext>
+    SLANG_FORCE_INLINE Serializer(
+        Serializer<SourceImpl, SourceContext> const& serializer,
         std::enable_if_t<
-            std::is_convertible_v<I*, Impl*> && std::is_convertible_v<C*, Context*>,
+            std::is_convertible_v<SourceImpl*, Impl*> &&
+                std::is_convertible_v<SourceContext*, Context*>,
             void>* = nullptr)
         : _impl(serializer.getImpl()), _context(serializer.getContext())
     {
     }
 
-    Impl* getImpl() const { return _impl; }
-    Context* getContext() const { return _context; }
+    SLANG_FORCE_INLINE Impl* getImpl() const { return _impl; }
+    SLANG_FORCE_INLINE Context* getContext() const { return _context; }
 
-    Impl* get() const { return _impl; }
-    Impl* operator->() const { return get(); }
+    SLANG_FORCE_INLINE Impl* get() const { return _impl; }
+    SLANG_FORCE_INLINE Impl* operator->() const { return get(); }
 
 
 private:
@@ -487,113 +546,109 @@ private:
     Context* _context = nullptr;
 };
 
-/// A serialization context.
-///
-/// The type parameter `Impl` should be a type that derives from
-/// `ISerializerImpl`, and the `Context` type parameter can be any
-/// type that passes along additional context information needed.
-///
-template<typename Impl, typename Context>
-struct Serializer_ : SerializerBase<Impl, Context>
-{
-    using SerializerBase<Impl, Context>::SerializerBase;
-};
-
-/// Default serialization context.
-using Serializer = Serializer_<ISerializerImpl, void>;
-
 //
 // We define namespace-scope functions that mirror some
-// of the operations of `ISerializerImpl`, so that they
-// can be invoked on any type that is contextually
-// convertible to a `Serializer`. This allows users
-// to define their own serialization context types while
-// still being able to take advantage of the utility
-// operations in this file for serializing basic types,
-// arrays, dictionaries, etc.
+// of the operations of `ISerializerImpl`, to insulate
+// user-defined `serialize()` function implementations
+// a bit from the details of the serializer concept/interface.
 //
 
-
 /// Get the mode of `serializer`.
-inline SerializationMode getMode(Serializer const& serializer)
+template<typename S>
+SLANG_FORCE_INLINE SerializationMode getMode(S const& serializer)
 {
     return serializer->getMode();
 }
 
 /// Check if `serializer` is reading serialized data.
-inline bool isReading(Serializer const& serializer)
+template<typename S>
+SLANG_FORCE_INLINE bool isReading(S const& serializer)
 {
     return getMode(serializer) == SerializationMode::Read;
 }
 
 /// Check if `serializer` is writing serialized data.
-inline bool isWriting(Serializer const& serializer)
+template<typename S>
+SLANG_FORCE_INLINE bool isWriting(S const& serializer)
 {
     return getMode(serializer) == SerializationMode::Write;
 }
 
 /// Check if `serializer` has more container elements.
-inline bool hasElements(Serializer const& serializer)
+template<typename S>
+SLANG_FORCE_INLINE bool hasElements(S const& serializer)
 {
     return serializer->hasElements();
 }
 
-inline void serialize(Serializer const& serializer, bool& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, bool& value)
 {
     serializer->handleBool(value);
 }
 
-inline void serialize(Serializer const& serializer, int8_t& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, int8_t& value)
 {
     serializer->handleInt8(value);
 }
 
-inline void serialize(Serializer const& serializer, int16_t& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, int16_t& value)
 {
     serializer->handleInt16(value);
 }
 
-inline void serialize(Serializer const& serializer, Int32& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, Int32& value)
 {
     serializer->handleInt32(value);
 }
 
-inline void serialize(Serializer const& serializer, Int64& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, Int64& value)
 {
     serializer->handleInt64(value);
 }
 
-inline void serialize(Serializer const& serializer, uint8_t& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, uint8_t& value)
 {
     serializer->handleUInt8(value);
 }
 
-inline void serialize(Serializer const& serializer, uint16_t& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, uint16_t& value)
 {
     serializer->handleUInt16(value);
 }
 
-inline void serialize(Serializer const& serializer, UInt32& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, UInt32& value)
 {
     serializer->handleUInt32(value);
 }
 
-inline void serialize(Serializer const& serializer, UInt64& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, UInt64& value)
 {
     serializer->handleUInt64(value);
 }
 
-inline void serialize(Serializer const& serializer, float& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, float& value)
 {
     serializer->handleFloat32(value);
 }
 
-inline void serialize(Serializer const& serializer, double& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, double& value)
 {
     serializer->handleFloat64(value);
 }
 
-inline void serialize(Serializer const& serializer, String& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, String& value)
 {
     serializer->handleString(value);
 }
@@ -604,8 +659,8 @@ inline void serialize(Serializer const& serializer, String& value)
 /// converting it to/from the given `RawType` for storage
 /// in the serialized format.
 ///
-template<typename RawType = Int32, typename EnumType>
-void serializeEnum(Serializer const& serializer, EnumType& value)
+template<typename RawType = Int32, typename S, typename EnumType>
+SLANG_FORCE_INLINE void serializeEnum(S const& serializer, EnumType& value)
 {
     auto raw = RawType(value);
     serialize(serializer, raw);
@@ -619,136 +674,152 @@ void serializeEnum(Serializer const& serializer, EnumType& value)
 // each of those types we define a macro to simplify
 // introducing a coresponding scope.
 //
+// These types handle the details of properly allocating
+// and retaining a `Scope` value appropriate to the
+// serializer implementation, and passing it into both
+// the `begin` and `end` operations.
+//
 
+template<typename S>
 struct ScopedSerializerArray
 {
 public:
-    ScopedSerializerArray(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerArray(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginArray();
+        serializer->beginArray(_scope);
     }
 
-    ~ScopedSerializerArray() { _serializer->endArray(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerArray() { _serializer->endArray(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
+template<typename S>
 struct ScopedSerializerDictionary
 {
 public:
-    ScopedSerializerDictionary(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerDictionary(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginDictionary();
+        serializer->beginDictionary(_scope);
     }
 
-    ~ScopedSerializerDictionary() { _serializer->endDictionary(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerDictionary() { _serializer->endDictionary(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
+template<typename S>
 struct ScopedSerializerStruct
 {
 public:
-    ScopedSerializerStruct(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerStruct(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginStruct();
+        serializer->beginStruct(_scope);
     }
 
-    ~ScopedSerializerStruct() { _serializer->endStruct(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerStruct() { _serializer->endStruct(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
+template<typename S>
 struct ScopedSerializerVariant
 {
 public:
-    ScopedSerializerVariant(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerVariant(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginVariant();
+        serializer->beginVariant(_scope);
     }
 
-    ~ScopedSerializerVariant() { _serializer->endVariant(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerVariant() { _serializer->endVariant(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
+template<typename S>
 struct ScopedSerializerTuple
 {
 public:
-    ScopedSerializerTuple(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerTuple(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginTuple();
+        serializer->beginTuple(_scope);
     }
 
-    ~ScopedSerializerTuple() { _serializer->endTuple(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerTuple() { _serializer->endTuple(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
+template<typename S>
 struct ScopedSerializerOptional
 {
 public:
-    ScopedSerializerOptional(Serializer const& serializer)
+    SLANG_FORCE_INLINE ScopedSerializerOptional(S const& serializer)
         : _serializer(serializer)
     {
-        serializer->beginOptional();
+        serializer->beginOptional(_scope);
     }
 
-    ~ScopedSerializerOptional() { _serializer->endOptional(); }
+    SLANG_FORCE_INLINE ~ScopedSerializerOptional() { _serializer->endOptional(_scope); }
 
 private:
-    Serializer _serializer;
+    S _serializer;
+    typename S::Impl::Scope _scope;
 };
 
 
-#define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER) \
-    ::Slang::ScopedSerializerArray SLANG_CONCAT(_scopedSerializerArray, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerArray<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerArray,                                                                 \
+        __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                       \
-    ::Slang::ScopedSerializerDictionary SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)( \
-        SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                 \
+    ::Slang::ScopedSerializerDictionary<std::remove_reference_t<decltype(SERIALIZER)>> \
+    SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER) \
-    ::Slang::ScopedSerializerOptional SLANG_CONCAT(_scopedSerializerOptional, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerOptional<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerOptional,                                                                 \
+        __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER) \
-    ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerStruct<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerStruct,                                                                 \
+        __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER) \
-    ::Slang::ScopedSerializerVariant SLANG_CONCAT(_scopedSerializerVariant, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerVariant<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerVariant,                                                                 \
+        __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER) \
-    ::Slang::ScopedSerializerTuple SLANG_CONCAT(_scopedSerializerTuple, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER)                                               \
+    ::Slang::ScopedSerializerTuple<std::remove_reference_t<decltype(SERIALIZER)>> SLANG_CONCAT( \
+        _scopedSerializerTuple,                                                                 \
+        __LINE__)(SERIALIZER)
 
 //
 // Containers like arrays and dictionaries are more
 // difficult to serialize than typical user-defined
-// types for a few reasons:
-//
-// * They typically need to have distinct code paths
-//   for reading and writing, so they don't benefit
-//   much from having a unified read/write abstraction.
-//
-// * They need to be written as templates, to abstract
-//   over the element type, and thus need to be
-//   defined in headers.
-//
-// * Because the element type might require a more
-//   specialized type of serialization context, they
-//   also need to be templated on the type of the
-//   serializer itself.
-//
-// With all that said, the definitions themselves
+// types because they typically need to have distinct
+// code paths for reading and writing, so they don't
+// benefit much from having a unified read/write abstraction.
+///
+// That said, the definitions themselves
 // are fairly straightforward. All we have to do is
 // branch on whether we are reading or writing and
 // either iterate over the serialized data to fill
@@ -856,7 +927,7 @@ void serialize(S const& serializer, KeyValuePair<K, V>& value)
 }
 
 template<typename S, typename K, typename V>
-void serialize(S const& serializer, std::pair<K, V>& value)
+SLANG_FORCE_INLINE void serialize(S const& serializer, std::pair<K, V>& value)
 {
     SLANG_SCOPED_SERIALIZER_TUPLE(serializer);
     serialize(serializer, value.first);
@@ -864,7 +935,7 @@ void serialize(S const& serializer, std::pair<K, V>& value)
 }
 
 template<typename S, typename K, typename V>
-void serialize(S const& serializer, Dictionary<K, V>& value)
+SLANG_FORCE_INLINE void serialize(S const& serializer, Dictionary<K, V>& value)
 {
     SLANG_SCOPED_SERIALIZER_DICTIONARY(serializer);
     if (isWriting(serializer))
@@ -957,27 +1028,26 @@ void serialize(S const& serializer, OrderedDictionary<K, V>& value)
 //
 
 template<typename S, typename T>
-void serializeObjectContents(S const& serializer, T* value, void*)
+SLANG_FORCE_INLINE void serializeObjectContents(S const& serializer, T* value, void*)
 {
     serialize(serializer, *value);
 }
 
-template<typename I, typename C, typename T>
+template<typename S, typename T>
 void _serializeObjectContentsCallback(void* valuePtr, void* impl, void* context)
 {
-    Serializer_<I, C> serializer((I*)impl, (C*)context);
+    S serializer((typename S::Impl*)impl, (typename S::Context*)context);
     auto value = (T*)valuePtr;
     serializeObjectContents(serializer, value, (T*)nullptr);
 }
 
-template<typename I, typename C, typename T>
-void deferSerializeObjectContents(Serializer_<I, C> const& serializer, T* value)
+template<typename S, typename T>
+SLANG_FORCE_INLINE void deferSerializeObjectContents(S const& serializer, T* value)
 {
-    ((Serializer)serializer)
-        ->handleDeferredObjectContents(
-            value,
-            _serializeObjectContentsCallback<I, C, T>,
-            serializer.getContext());
+    serializer->handleDeferredObjectContents(
+        value,
+        _serializeObjectContentsCallback<S, T>,
+        serializer.getContext());
 }
 
 template<typename S, typename T>
@@ -990,48 +1060,46 @@ void serializeObject(S const& serializer, T*& value, void*)
     deferSerializeObjectContents(serializer, value);
 }
 
-template<typename I, typename C, typename T>
+template<typename S, typename T>
 void _serializeObjectCallback(void* valuePtr, void* impl, void* context)
 {
-    Serializer_<I, C> serializer((I*)impl, (C*)context);
+    S serializer((typename S::Impl*)impl, (typename S::Context*)context);
     auto& value = *(T**)valuePtr;
     serializeObject(serializer, value, (T*)nullptr);
 }
 
-template<typename I, typename C, typename T>
-void serializeSharedPtr(Serializer_<I, C> const& serializer, T*& value)
+template<typename S, typename T>
+SLANG_FORCE_INLINE void serializeSharedPtr(S const& serializer, T*& value)
 {
-    ((Serializer)serializer)
-        ->handleSharedPtr(
-            *(void**)&value,
-            _serializeObjectCallback<I, C, T>,
-            serializer.getContext());
-}
-
-template<typename I, typename C, typename T>
-void serializeUniquePtr(Serializer_<I, C> const& serializer, T*& value)
-{
-    ((Serializer)serializer)
-        ->handleUniquePtr(
-            *(void**)&value,
-            _serializeObjectCallback<I, C, T>,
-            serializer.getContext());
+    serializer->handleSharedPtr(
+        *(void**)&value,
+        _serializeObjectCallback<S, T>,
+        serializer.getContext());
 }
 
 template<typename S, typename T>
-void serializePtr(S const& serializer, T*& value, void*)
+SLANG_FORCE_INLINE void serializeUniquePtr(S const& serializer, T*& value)
+{
+    serializer->handleUniquePtr(
+        *(void**)&value,
+        _serializeObjectCallback<S, T>,
+        serializer.getContext());
+}
+
+template<typename S, typename T>
+SLANG_FORCE_INLINE void serializePtr(S const& serializer, T*& value, void*)
 {
     serializeSharedPtr(serializer, value);
 }
 
 template<typename S, typename T>
-void serialize(S const& serializer, T*& value)
+SLANG_FORCE_INLINE void serialize(S const& serializer, T*& value)
 {
     serializePtr(serializer, value, (T*)nullptr);
 }
 
 template<typename S, typename T>
-void serialize(S const& serializer, RefPtr<T>& value)
+SLANG_FORCE_INLINE void serialize(S const& serializer, RefPtr<T>& value)
 {
     T* raw = value;
     serialize(serializer, raw);
