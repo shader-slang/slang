@@ -39,7 +39,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         type = unwrapArray(type);
         bool isArray = type != param->getDataType();
 
-        if(isIllegalParameterType(targetRequest, type, isArray))
+        if (isIllegalParameterType(targetRequest, type, isArray))
             return true;
 
         // For now, we will not treat any other parameters as
@@ -302,16 +302,16 @@ struct ResourceOutputSpecializationPass
         if (auto outTypeBase = as<IROutTypeBase>(type))
             return outTypeBase;
 
-        // Illegal pointer parameter types should never be left 
+        // Illegal pointer parameter types should never be left
         // as a constref<T> since constref<T> will become a pointer<T>
         if (auto constRefType = as<IRConstRefType>(type))
         {
             auto valueType = constRefType->getValueType();
             auto unwrappedValueType = unwrapArray(valueType);
             if (isIllegalRefValueTypeParameterType(
-                targetRequest,
-                constRefType->getValueType(),
-                unwrappedValueType != valueType))
+                    targetRequest,
+                    constRefType->getValueType(),
+                    unwrappedValueType != valueType))
             {
                 return constRefType;
             }
@@ -824,8 +824,7 @@ struct ResourceOutputSpecializationPass
         //
         IRVar* newVar = bodyBuilder.emitVar(valueType);
 
-        if (as<IRInOutType>(pseudoOutType) ||
-            as<IRConstRefType>(pseudoOutType))
+        if (as<IRInOutType>(pseudoOutType) || as<IRConstRefType>(pseudoOutType))
         {
             // If the parameter is an `inout` rather than just
             // an `out`, then we still need a parameter to
