@@ -2801,16 +2801,6 @@ void addArg(
             {
                 addInArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
             }
-            else if (paramDirection == kParameterDirection_ConstRef &&
-                     (as<IRGlobalParam>(argVal.val) ||
-                      as<IRVar>(argVal.val) ||
-                      as<IRGlobalVar>(argVal.val)))
-            {
-                // For ConstRef parameters with global variables, we can pass the address directly
-                // without creating a temporary variable
-                IRInst* argAddr = getAddress(context, argVal, loc);
-                addInArg(context, ioArgs, LoweredValInfo::simple(argAddr));
-            }
             else
             {
                 // If the value is not one that could yield a simple l-value
@@ -2829,24 +2819,48 @@ void addArg(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
 
-                LoweredValInfo tempVar = createVar(context, paramType);
+                LoweredValInfo tempVar;
+                bool skipTempVar = false;
+                if (paramDirection == kParameterDirection_ConstRef &&
+                    (as<IRGlobalParam>(argVal.val) ||
+                     as<IRVar>(argVal.val) ||
+                     as<IRGlobalVar>(argVal.val)))
+                {
+                    // we do not need the temp-var for global parameters
+                    skipTempVar = true;
+                }
+                
+                if (!skipTempVar)
+                {
+                    tempVar = createVar(context, paramType);
+                }
 
                 // If the parameter is `in out` or `inout`, then we need
                 // to ensure that we pass in the original value stored
                 // in the argument, which we accomplish by assigning
                 // from the l-value to our temp.
                 //
-                if (paramDirection == kParameterDirection_InOut ||
-                    paramDirection == kParameterDirection_ConstRef)
+                if (!skipTempVar &&
+                    (paramDirection == kParameterDirection_InOut ||
+                     paramDirection == kParameterDirection_ConstRef))
                 {
                     assign(context, tempVar, argVal);
                 }
 
                 // Now we can pass the address of the temporary variable
                 // to the callee as the actual argument for the `in out`
-                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                IRInst* tempPtr = getAddress(context, tempVar, loc);
-                addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
+                if (skipTempVar)
+                {
+                    // For global parameters with ConstRef, pass the address directly
+                    IRInst* argAddr = getAddress(context, argVal, loc);
+                    addInArg(context, ioArgs, LoweredValInfo::simple(argAddr));
+                }
+                else
+                {
+                    SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+                    IRInst* tempPtr = getAddress(context, tempVar, loc);
+                    addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
+                }
 
                 // Finally, after the call we will need
                 // to copy in the other direction: from our
