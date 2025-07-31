@@ -68,9 +68,9 @@ void legalizeNonVectorCompositeSelect(IRModule* module)
                 {
                     // Replace OpSelect with if/else branch (same process as glslang)
                     bool requiresLegalization = !as<IRBasicType>(select->getFullType()) &&
-                        !as<IRVectorType>(select->getFullType()) &&
-                        !as<IRMatrixType>(select->getFullType());
-                    
+                                                !as<IRVectorType>(select->getFullType()) &&
+                                                !as<IRMatrixType>(select->getFullType());
+
                     if (requiresLegalization)
                         legalizeCompositeSelect(builder, select);
                 }
