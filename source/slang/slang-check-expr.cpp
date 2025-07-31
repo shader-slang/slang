@@ -3234,9 +3234,11 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         {
             if (varExpr->name && varExpr->name->text == ",")
             {
-                // Allow comma operators in for-loop side effects, expand expressions, and return
-                // statements without warning
-                if (!getInForLoopSideEffect() && !m_parentExpandExpr && !getInReturnStmt())
+                // Allow comma operators in for-loop side effects, expand expressions, return
+                // statements, and Slang 2026+ mode (where parentheses create tuples) without
+                // warning
+                if (!getInForLoopSideEffect() && !m_parentExpandExpr && !getInReturnStmt() &&
+                    !isSlang2026OrLater(this))
                 {
                     getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
                 }
