@@ -2800,7 +2800,7 @@ static void transformConstRefParameterBlockToConstRefStructIntoLoad(
         [&](IRCall* user)
         {
             auto argCount = user->getArgCount();
-            for (auto argNum = 0; argNum < argCount; argNum++)
+            for (UInt argNum = 0; argNum < argCount; argNum++)
             {
                 auto paramType = as<IRConstRefType>(irFunc->getParamType(argNum));
                 if (!paramType)
