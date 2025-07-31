@@ -11,7 +11,7 @@ int fetch(__constref ParameterBlock<Data> thisData)
     return thisData.val;
 }
 
-ParameterBlock<Data> data = { 42 };
+ParameterBlock<Data> data;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

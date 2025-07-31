@@ -1696,11 +1696,18 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::WGSL:
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
+        // Add parameter copy elimination for GLSL to handle ParameterBlock __constref issue
+        if (target == CodeGenTarget::GLSL)
+        {
+            undoParameterCopy(irModule);
+        }
         break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
+        // Add parameter copy elimination for SPIRV to handle ParameterBlock __constref issue
+        undoParameterCopy(irModule);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             introduceExplicitGlobalContext(irModule, target);

@@ -2819,19 +2819,15 @@ void addArg(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
 
-                LoweredValInfo tempVar;
-                
+                LoweredValInfo tempVar = createVar(context, paramType);
+
+                // Mark temporary variables created for parameter passing
                 if (paramDirection == kParameterDirection_ConstRef &&
-                    (as<IRGlobalParam>(argVal.val) ||
-                     as<IRVar>(argVal.val) ||
+                    (as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
                      as<IRGlobalVar>(argVal.val)))
                 {
-                    // we do not need the temp-var
-                    tempVar = LoweredValInfo::ptr(argVal.val);
-                }
-                else
-                {
-                    tempVar = createVar(context, paramType);
+                    context->irBuilder->addSimpleDecoration<IRTempCallArgVarDecoration>(
+                        tempVar.val);
                 }
 
                 // If the parameter is `in out` or `inout`, then we need
@@ -2840,10 +2836,7 @@ void addArg(
                 // from the l-value to our temp.
                 //
                 if (paramDirection == kParameterDirection_InOut ||
-                    (paramDirection == kParameterDirection_ConstRef &&
-                     !(as<IRGlobalParam>(argVal.val) ||
-                       as<IRVar>(argVal.val) ||
-                       as<IRGlobalVar>(argVal.val))))
+                    paramDirection == kParameterDirection_ConstRef)
                 {
                     assign(context, tempVar, argVal);
                 }
