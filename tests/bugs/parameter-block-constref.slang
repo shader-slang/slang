@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK):-output-using-type -cpu
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain
 
-//CHECK: result: 42
+//CHECK: OpExecutionMode
 
 struct Data {
     int val;
@@ -18,5 +18,4 @@ ParameterBlock<Data> data = { 42 };
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     int res = fetch(data);
-    printf("result: %d\n", res);
 }

@@ -2820,17 +2820,16 @@ void addArg(
                 }
 
                 LoweredValInfo tempVar;
-                bool skipTempVar = false;
+                
                 if (paramDirection == kParameterDirection_ConstRef &&
                     (as<IRGlobalParam>(argVal.val) ||
                      as<IRVar>(argVal.val) ||
                      as<IRGlobalVar>(argVal.val)))
                 {
-                    // we do not need the temp-var for global parameters
-                    skipTempVar = true;
+                    // we do not need the temp-var
+                    tempVar = LoweredValInfo::ptr(argVal.val);
                 }
-                
-                if (!skipTempVar)
+                else
                 {
                     tempVar = createVar(context, paramType);
                 }
@@ -2840,27 +2839,20 @@ void addArg(
                 // in the argument, which we accomplish by assigning
                 // from the l-value to our temp.
                 //
-                if (!skipTempVar &&
-                    (paramDirection == kParameterDirection_InOut ||
-                     paramDirection == kParameterDirection_ConstRef))
+                if (paramDirection == kParameterDirection_InOut ||
+                    (paramDirection == kParameterDirection_ConstRef &&
+                     !(as<IRGlobalParam>(argVal.val) ||
+                       as<IRVar>(argVal.val) ||
+                       as<IRGlobalVar>(argVal.val))))
                 {
                     assign(context, tempVar, argVal);
                 }
 
                 // Now we can pass the address of the temporary variable
                 // to the callee as the actual argument for the `in out`
-                if (skipTempVar)
-                {
-                    // For global parameters with ConstRef, pass the address directly
-                    IRInst* argAddr = getAddress(context, argVal, loc);
-                    addInArg(context, ioArgs, LoweredValInfo::simple(argAddr));
-                }
-                else
-                {
-                    SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                    IRInst* tempPtr = getAddress(context, tempVar, loc);
-                    addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
-                }
+                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+                IRInst* tempPtr = getAddress(context, tempVar, loc);
+                addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
 
                 // Finally, after the call we will need
                 // to copy in the other direction: from our
