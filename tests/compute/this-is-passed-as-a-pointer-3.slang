@@ -1,10 +1,10 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -compute -mtl -render-features argument-buffer-tier-2
 // WGSL bug (Array of resource types can generate an array<array<T>,U>, which is illegal WGSL), tracked with issue #7980
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu
 

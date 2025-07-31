@@ -1,11 +1,12 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -compute -mtl -render-features argument-buffer-tier-2
+
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain
