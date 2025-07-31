@@ -599,7 +599,8 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
 
                 m_builder << m_options.indent << m_options.indent;
 
-                m_builder << "To get a list of values that can be used for <" << usageCat.name << ">, ";
+                m_builder << "To get a list of values that can be used for <" << usageCat.name
+                          << ">, ";
                 m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
             }
         }
