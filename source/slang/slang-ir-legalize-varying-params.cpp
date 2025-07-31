@@ -3283,11 +3283,34 @@ protected:
             }
         case SystemValueSemanticName::Target:
             {
-                result.systemValueName =
-                    (StringBuilder()
-                     << "color(" << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
-                     << ")")
-                        .produceString();
+                // Check if this is a dual-source blend output with vk::index attribute
+                int location = semanticIndex.getLength() != 0 ? stringToInt(semanticIndex) : 0;
+                int index = 0;
+                
+                // Look for VaryingOutput resource info to get location and index information
+                if (parentVar)
+                {
+                    if (auto varLayout = findVarLayout(parentVar))
+                    {
+                        if (auto varyingOutputInfo = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                        {
+                            // For dual-source blending:
+                            // - location is stored in offset
+                            // - index is stored in space
+                            location = (int)varyingOutputInfo->getOffset();
+                            index = (int)varyingOutputInfo->getSpace();
+                        }
+                    }
+                }
+                
+                // Generate Metal color attribute with location and optional index
+                StringBuilder sb;
+                sb << "color(" << location << ")";
+                if (index != 0)
+                {
+                    sb << ", index(" << index << ")";
+                }
+                result.systemValueName = sb.produceString();
                 result.permittedTypes = permittedTypes_sv_target;
 
                 break;
