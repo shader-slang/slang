@@ -1368,6 +1368,9 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
     bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
 
+    bool isGeneric = as<GenericDecl>(left.declRef.getDecl()) != nullptr ||
+                     as<GenericDecl>(right.declRef.getDecl()) != nullptr;
+
     // If both left and right are extern, then they are equal.
     // If only one of them is extern, then the other one is preferred.
     // If neither is extern, then we continue with the rest of the checks.
@@ -1393,6 +1396,16 @@ int SemanticsVisitor::CompareLookupResultItems(
         rightIsExtension = true;
         if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
             rightIsFreeFormExtension = true;
+    }
+
+    // If we are comparing two generic and one of them in an extension, then this generic
+    // must be CallableDecl. So we're not able to decide which one is better, because candidates
+    // in this pass of overload resolution only check the generic parameters, instead of the
+    // function parameters, therefore, we have to defer this check in the second pass of
+    // overload resolution, where it will check the function parameters.
+    if ((leftIsExtension || rightIsExtension) && isGeneric)
+    {
+        return 0;
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
@@ -1437,14 +1450,6 @@ int SemanticsVisitor::CompareLookupResultItems(
                 }
             }
         }
-
-        // If we are comparing two generic and one of them in an extension, then this generic
-        // must be CallableDecl. So we're not able to decide which one is better, because candidates
-        // in this pass of overload resolution only check the generic parameters, instead of the
-        // function parameters, therefore, we have to defer this check in the second pass of
-        // overload resolution, where it will check the function parameters.
-        if (as<GenericDecl>(left.declRef.getDecl()))
-            return 0;
 
         return int(leftIsExtension) - int(rightIsExtension);
     }
