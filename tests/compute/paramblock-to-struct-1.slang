@@ -7,15 +7,11 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -compute -mtl -render-features argument-buffer-tier-2
 
-
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain
 //METALLIB: @computeMain
 
-
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=output
-RWStructuredBuffer<int> output;
-
 struct Data {
+    RWStructuredBuffer<int> output;
     RWStructuredBuffer<int> input;
     int val;
 };
@@ -30,7 +26,7 @@ int fetch(ParameterBlock<Data> thisData, int index)
     return fetchInner(thisData, index);
 }
 
-//TEST_INPUT:set data = new Data{ubuffer(data=[1 2 3 4], stride = 4), 10}
+//TEST_INPUT:set data = new Data{ubuffer(data=[1 2 3 4], stride = 4), out ubuffer(data=[0 0 0 0], stride = 4), 10}
 ParameterBlock<Data> data;
 
 [shader("compute")]
@@ -39,6 +35,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     let res = fetch(data, data.input[0]);
 
-//BUF: C
-    output[0] = res;
+// BUF: C
+    data.output[0] = res;
 }

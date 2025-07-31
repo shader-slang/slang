@@ -1163,11 +1163,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             // Metal also requires `const` for some objects.
             //
             // Due to this we need a more robust system to manage
-            // the `const` of values with metal.
-            // Currently, we will just be percise by adding `const`
-            // when mandatory.
+            // the `const` of poiners with metal.
+            // 
+            // Currently, we will only add `const` when mandatory
+            // to avoid generating invalid code.
             //
-            // `object_data` must be const if in `mesh` stage
+            // `object_data` must be const if in `mesh` stage.
             if (ptrType->getAddressSpace() == AddressSpace::MetalObjectData
                 && this->m_entryPointStage == Stage::Mesh)
             {

@@ -844,8 +844,7 @@ struct ResourceOutputSpecializationPass
 
             if (as<IRConstRefType>(pseudoOutType))
             {
-                // illegal-as-param types should never need to be deref'ed,
-                // since these types do not make sense to pass as a pointer.
+                // ref types should never need to be deref'ed.
                 outParamInfo.oldArgMode = ParamInfo::OldArgMode::Keep;
             }
             else
