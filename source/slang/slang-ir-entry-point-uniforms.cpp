@@ -443,12 +443,22 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             resInfo->offset = offset->getOffset();
             resInfo->space = offset->getSpace();
         }
-        auto entryPointUniformsVarLayout = varLayoutBuilder.build();
 
         if (collectedParam)
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
-            builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
+
+            if (needConstantBuffer)
+            {
+                // If the original entryPointParamsLayout is already a ParameterGroupLayout,
+                // use it directly.
+                builder->addLayoutDecoration(collectedParam, entryPointParamsLayout);
+            }
+            else
+            {
+                auto entryPointUniformsVarLayout = varLayoutBuilder.build();
+                builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
+            }
         }
 
         fixUpFuncType(entryPointFunc);
