@@ -2703,9 +2703,13 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
         {
             e = subscriptExpr->baseExpression;
         }
-        else
+        else if (as<ThisExpr>(e))
         {
             break;
+        }
+        else
+        {
+            return;
         }
     }
 
@@ -2979,7 +2983,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             else if (!as<ErrorType>(argExpr->type))
                             {
                                 // Emit additional diagnostic for invalid pointer taking operations
-                                auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+                                auto funcDeclRef = funcDeclRefExpr
+                                                       ? getDeclRef(m_astBuilder, funcDeclRefExpr)
+                                                       : DeclRef<Decl>();
                                 if (funcDeclRef)
                                 {
                                     auto knownBuiltinAttr =

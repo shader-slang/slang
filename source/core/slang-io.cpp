@@ -1316,9 +1316,17 @@ void LockFile::close()
         return;
 
 #if SLANG_WINDOWS_FAMILY
-    ::CloseHandle(m_fileHandle);
+    if (m_fileHandle != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(m_fileHandle);
+        m_fileHandle = INVALID_HANDLE_VALUE;
+    }
 #else
-    ::close(m_fileHandle);
+    if (m_fileHandle != -1)
+    {
+        ::close(m_fileHandle);
+        m_fileHandle = -1;
+    }
 #endif
 
     m_isOpen = false;
@@ -1409,6 +1417,11 @@ SlangResult LockFile::unlock()
 LockFile::LockFile()
     : m_isOpen(false)
 {
+#if SLANG_WINDOWS_FAMILY
+    m_fileHandle = INVALID_HANDLE_VALUE;
+#else
+    m_fileHandle = -1;
+#endif
 }
 
 LockFile::~LockFile()
