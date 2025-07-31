@@ -2801,6 +2801,16 @@ void addArg(
             {
                 addInArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
             }
+            else if (paramDirection == kParameterDirection_ConstRef &&
+                     (as<IRGlobalParam>(argVal.val) ||
+                      as<IRVar>(argVal.val) ||
+                      as<IRGlobalVar>(argVal.val)))
+            {
+                // For ConstRef parameters with global variables, we can pass the address directly
+                // without creating a temporary variable
+                IRInst* argAddr = getAddress(context, argVal, loc);
+                addInArg(context, ioArgs, LoweredValInfo::simple(argAddr));
+            }
             else
             {
                 // If the value is not one that could yield a simple l-value
@@ -2819,19 +2829,7 @@ void addArg(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
 
-                LoweredValInfo tempVar;
-
-                if (paramDirection == kParameterDirection_ConstRef &&
-                    (as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
-                     as<IRGlobalVar>(argVal.val)))
-                {
-                    // we do not need the temp-var
-                    tempVar = LoweredValInfo::ptr(argVal.val);
-                }
-                else
-                {
-                    tempVar = createVar(context, paramType);
-                }
+                LoweredValInfo tempVar = createVar(context, paramType);
 
                 // If the parameter is `in out` or `inout`, then we need
                 // to ensure that we pass in the original value stored
@@ -2839,9 +2837,7 @@ void addArg(
                 // from the l-value to our temp.
                 //
                 if (paramDirection == kParameterDirection_InOut ||
-                    (paramDirection == kParameterDirection_ConstRef &&
-                     !(as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
-                       as<IRGlobalVar>(argVal.val))))
+                    paramDirection == kParameterDirection_ConstRef)
                 {
                     assign(context, tempVar, argVal);
                 }
