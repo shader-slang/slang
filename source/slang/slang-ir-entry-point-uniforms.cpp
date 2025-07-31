@@ -426,39 +426,91 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // struct typed uniform parameter, and we need to ensure it only contains uniform parameter
         // offsets, not varying ones, so isVaryingParameter() can correctly identify the newly
         // created struct param as a uniform param.
-        List<IRVarOffsetAttr*> filteredOffsetAttrs;
-        for (auto offsetAttr : entryPointParamsLayout->getOffsetAttrs())
-        {
-            if (resourceKinds.contains(offsetAttr->getResourceKind()))
-            {
-                filteredOffsetAttrs.add(offsetAttr);
-            }
-        }
-        auto entryPointUniformsTypeLayout = structLayoutBuilder.build();
-        IRVarLayout::Builder varLayoutBuilder(builder, entryPointUniformsTypeLayout);
-        varLayoutBuilder.cloneEverythingButOffsetsFrom(entryPointParamsLayout);
-        for (auto offset : filteredOffsetAttrs)
-        {
-            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offset->getResourceKind());
-            resInfo->offset = offset->getOffset();
-            resInfo->space = offset->getSpace();
-        }
 
         if (collectedParam)
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
+            IRTypeLayout* entryPointUniformsTypeLayout = nullptr;
 
-            if (needConstantBuffer)
+            if (auto originalParamGroupLayout =
+                    as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()))
             {
-                // If the original entryPointParamsLayout is already a ParameterGroupLayout,
-                // use it directly.
-                builder->addLayoutDecoration(collectedParam, entryPointParamsLayout);
+                // If the original entry point layout is a parameter gorup layout,
+                // the new layout of the newly created `entryPointParams` param should also
+                // be a parameter group layout, but with unrelated offsets (e.g. varying offsets)
+                // stripped off.
+                // We will now create this layout inst.
+                //
+                // Register any existing ResourceKinds on the container var layout as "related".
+                for (auto offsetAttr :
+                     originalParamGroupLayout->getContainerVarLayout()->getOffsetAttrs())
+                {
+                    resourceKinds.add(offsetAttr->getResourceKind());
+                }
+                // Create the struct layout for parameters that goes into the `EntryPointParams`
+                // struct.
+                auto entryPointUniformStructTypeLayout = structLayoutBuilder.build();
+                auto originalElementVarLayout = originalParamGroupLayout->getElementVarLayout();
+                IRVarLayout::Builder elementVarLayoutBuilder(
+                    builder,
+                    entryPointUniformStructTypeLayout);
+                elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
+                // Filter offsets for the `elementVarLayout` part of the new parameter group layout.
+                for (auto resKind : resourceKinds)
+                {
+                    auto originalOffset = originalElementVarLayout->findOffsetAttr(resKind);
+                    if (!originalOffset)
+                        continue;
+                    auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
+                    resInfo->offset = originalOffset->getOffset();
+                    resInfo->space = originalOffset->getSpace();
+                }
+                IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
+                auto newElementVarLayout = elementVarLayoutBuilder.build();
+                // The "containerVarLayout" part should remain unchanged from the original layout.
+                // Because this is where we store the offset of the default constant buffer itself.
+                paramGroupTypeLayoutBuilder.setContainerVarLayout(
+                    originalParamGroupLayout->getContainerVarLayout());
+                // The "elementVarLayout" part should be the new one we just created.
+                paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
+                // The "offsetElementTypeLayout" part is just redundant convenient info that
+                // can be calculated from `entryPointUniformStructTypeLayout` and
+                // `newElementVarLayout`.
+                paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(applyOffsetToTypeLayout(
+                    builder,
+                    entryPointUniformStructTypeLayout,
+                    newElementVarLayout));
+                // Now we have the new type layout for the `EntryPointParams` parameter.
+                entryPointUniformsTypeLayout = paramGroupTypeLayoutBuilder.build();
             }
             else
             {
-                auto entryPointUniformsVarLayout = varLayoutBuilder.build();
-                builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
+                // If the original entry point layout isn't a constant buffer, we will simply use
+                // the new struct type layout as the entrypoint layout.
+                entryPointUniformsTypeLayout = structLayoutBuilder.build();
             }
+
+            // Now create the var layout for the new `entryPointParams` parameter.
+            // This can be done by simply filtering out unrelated offset attributes from the
+            // original var layout.
+            IRVarLayout::Builder varLayoutBuilder(builder, entryPointUniformsTypeLayout);
+            varLayoutBuilder.cloneEverythingButOffsetsFrom(entryPointParamsLayout);
+            List<IRVarOffsetAttr*> filteredOffsetAttrs;
+            for (auto offsetAttr : entryPointParamsLayout->getOffsetAttrs())
+            {
+                if (resourceKinds.contains(offsetAttr->getResourceKind()))
+                {
+                    filteredOffsetAttrs.add(offsetAttr);
+                }
+            }
+            for (auto offset : filteredOffsetAttrs)
+            {
+                auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offset->getResourceKind());
+                resInfo->offset = offset->getOffset();
+                resInfo->space = offset->getSpace();
+            }
+            auto entryPointUniformsVarLayout = varLayoutBuilder.build();
+            builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
         }
 
         fixUpFuncType(entryPointFunc);
