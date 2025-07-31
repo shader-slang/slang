@@ -7,6 +7,10 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
 
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain
+//METALLIB: @computeMain
+
+
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=output
 RWStructuredBuffer<int> output;
 
@@ -35,5 +39,5 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     let res = fetch(data, data.input[0]);
 
 //BUF: C
-    data.output[0] = res;
+    output[0] = res;
 }

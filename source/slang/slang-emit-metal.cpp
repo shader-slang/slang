@@ -1156,15 +1156,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
 
-            // Note: we cannot emit `const` given a `__constref`.
-            // This is because metal considers `const int device* thread*` an 
-            // incompatible type to `int device* thread* v1`. Additionally,
-            // these types cannot be cast into.
+            // Note: metal considers `int device* thread*` incompatible 
+            // to cast to `int device* thread* v1`.
             // 
-            //if (type->getOp() == kIROp_ConstRefType)
-            //{
-            //    m_writer->emit("const ");
-            //}
+            if (type->getOp() == kIROp_ConstRefType)
+            {
+                m_writer->emit("const ");
+            }
             emitType((IRType*)ptrType->getValueType());
             switch (ptrType->getAddressSpace())
             {

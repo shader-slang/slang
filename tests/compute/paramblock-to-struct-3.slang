@@ -7,6 +7,10 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
 
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain
+//METALLIB: @computeMain
+
+
 struct Data {
     RWStructuredBuffer<int> input;
     RWStructuredBuffer<int> output;
