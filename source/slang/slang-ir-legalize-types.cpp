@@ -2761,9 +2761,9 @@ private:
 // into `__const_ref T`. This is a problem since we legalize `T`
 // (split up the struct and split-out resource-members) but do not legalize
 // `ParameterBlock<T>`. This causes a mismatch in parameters.
-// 
-// This function implements the trivial solution to this problem (due to 
-// limitation on time). Just "copy" a `ParameterBlock<T>` to a `T` so we 
+//
+// This function implements the trivial solution to this problem (due to
+// limitation on time). Just "copy" a `ParameterBlock<T>` to a `T` so we
 // don't have to deal with the legalization of parameter-block.
 // This has the downside that we are not passing certain values by pointer,
 // potentially wasting performance with a unneeded copy.
@@ -2772,16 +2772,15 @@ private:
 //     * `const_ref ParameterBlock<T>` as param
 //     OR
 //     * `ParameterBlock<T>` as param
-// 
+//
 // This solution should eventually be changed into a more formal solution
-// of a new `LegalType::declAndAccess` where we essentially: (1) use 
+// of a new `LegalType::declAndAccess` where we essentially: (1) use
 // `LegalType::declAndAccess->decl` as our LegalType for declaration sites;
-// (2) implement how to legalize uses of `ParameterBlock<T>` copying to 
+// (2) implement how to legalize uses of `ParameterBlock<T>` copying to
 // non-param blocks via `LegalType::declAndAccess->access`. We would legalize
 // a copy into field-accesses via `LegalType::flavor::wrappedBuffer` so we can
 // still pass data around as a pointer.
-static void transformConstRefParameterBlockToConstRefStructIntoLoad(
-    IRFunc* irFunc)
+static void transformConstRefParameterBlockToConstRefStructIntoLoad(IRFunc* irFunc)
 {
     bool mayRequireLegalization = false;
     for (auto p : irFunc->getParams())
@@ -2823,7 +2822,7 @@ static void transformConstRefParameterBlockToConstRefStructIntoLoad(
                 {
                     continue;
                 }
-                
+
                 IRBuilder builder(user);
                 builder.setInsertBefore(user);
                 IRInst* var = builder.emitVar(paramValueType);
@@ -2837,17 +2836,16 @@ static void transformConstRefParameterBlockToConstRefStructIntoLoad(
                 }
                 user->setArg(argNum, var);
             }
-        }
-    );
+        });
 }
 
 static LegalVal legalizeFunc(IRTypeLegalizationContext* context, IRFunc* irFunc)
 {
     LegalFuncBuilder builder(context);
-    
+
     if (isMetalTarget(context->targetProgram->getTargetReq()))
         transformConstRefParameterBlockToConstRefStructIntoLoad(irFunc);
-    
+
     return builder.build(irFunc);
 }
 

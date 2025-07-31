@@ -665,7 +665,8 @@ struct LoweredElementTypeContext
             // comes out the same. This is because different layout rules may have different array
             // stride requirements.
             //
-            // Additionally, `buffer` blocks do not work correctly unless lowered when targeting GLSL
+            // Additionally, `buffer` blocks do not work correctly unless lowered when targeting
+            // GLSL
             if (!isKhronosTarget(target->getTargetReq()))
             {
                 // For non-spirv target, we skip lowering this type if all field types are
