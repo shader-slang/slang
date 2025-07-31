@@ -307,9 +307,10 @@ jobs:
             -show-adapter-info
       - name: Run slang-rhi tests
         # Run slang-rhi tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
+        # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices
+          "$bin_dir/slang-rhi-tests" -check-devices -tce=cmd-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*
       - name: Run slangpy tests
         # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
