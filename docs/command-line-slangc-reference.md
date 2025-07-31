@@ -361,6 +361,11 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
+<a id="msvc-style-bitfield-packing"></a>
+### -msvc-style-bitfield-packing
+Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+
+
 
 <a id="Target"></a>
 ## Target
