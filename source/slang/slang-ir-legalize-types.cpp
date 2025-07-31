@@ -2764,9 +2764,11 @@ private:
 // 
 // This function implements the trivial solution to this problem (for sake of
 // finishing the overall feature before siggraph), if we have this senario, 
-// just "copy" parameter block so we don't have to deal with the legalization
-// of parameter-block being different depending on context.
-// This handles our problem cases:
+// just "copy" a `ParameterBlock<T>` to a `T` so we don't have to deal with
+// the legalization of parameter-block being different depending on context.
+// This has the downside that we are not passing certain values by pointer,
+// potentially wasting performance with a unneeded copy.
+// This handles our problem cases though:
 // * `const_ref T` as param-type getting copied into
 //     * `const_ref ParameterBlock<T>` as param
 //     OR
@@ -2779,6 +2781,7 @@ private:
 // (2) implement uses of `ParameterBlock<T>` to non-param blocks as 
 // member-variable references through the `LegalType::flavor::wrappedBuffer`
 // stored in `LegalType::declAndAccess->access`.
+// This change will require significantly more time & effort.
 static void transformConstRefParameterBlockToConstRefStructIntoLoad(
     IRFunc* irFunc)
 {
