@@ -198,12 +198,6 @@ struct __align__(1) bool1
 {
     bool x;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1() {}
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1(bool x)
-        : x(x)
-    {
-    }
-
     SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
     {
         return (&x)[idx];
@@ -217,12 +211,6 @@ struct __align__(1) bool1
 struct __align__(2) bool2
 {
     bool x, y;
-
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2() {}
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2(bool x, bool y)
-        : x(x), y(y)
-    {
-    }
 
     SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
     {
@@ -238,12 +226,6 @@ struct __align__(1) bool3
 {
     bool x, y, z;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3() {}
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3(bool x, bool y, bool z)
-        : x(x), y(y), z(z)
-    {
-    }
-
     SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
     {
         return (&x)[idx];
@@ -257,12 +239,6 @@ struct __align__(1) bool3
 struct __align__(4) bool4
 {
     bool x, y, z, w;
-
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4() {}
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4(bool x, bool y, bool z, bool w)
-        : x(x), y(y), z(z), w(w)
-    {
-    }
 
     SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
     {
