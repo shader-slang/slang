@@ -1060,6 +1060,7 @@ Result linkAndOptimizeIR(
     finalizeSpecialization(irModule);
 
     {
+        List<IRInst*> removeList;
         IRBuilder builder(irModule);
         for (auto inst : irModule->getGlobalInsts())
         {
@@ -1069,8 +1070,12 @@ Result linkAndOptimizeIR(
                 auto& blob = moduleBlobs.getValue(moduleName);
                 auto value = builder.getIntValue(builder.getUIntType(), blob->getBufferSize());
                 inst->replaceUsesWith(value);
-                inst->removeAndDeallocate();
+                removeList.add(inst);
             }
+        }
+        for (auto inst : removeList)
+        {
+            inst->removeAndDeallocate();
         }
     }
 
