@@ -2821,15 +2821,6 @@ void addArg(
 
                 LoweredValInfo tempVar = createVar(context, paramType);
 
-                // Mark temporary variables created for parameter passing
-                if (paramDirection == kParameterDirection_ConstRef &&
-                    (as<IRGlobalParam>(argVal.val) || as<IRVar>(argVal.val) ||
-                     as<IRGlobalVar>(argVal.val)))
-                {
-                    context->irBuilder->addSimpleDecoration<IRTempCallArgVarDecoration>(
-                        tempVar.val);
-                }
-
                 // If the parameter is `in out` or `inout`, then we need
                 // to ensure that we pass in the original value stored
                 // in the argument, which we accomplish by assigning
