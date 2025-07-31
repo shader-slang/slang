@@ -11,8 +11,8 @@
 //METALLIB: @computeMain
 
 struct Data {
-    RWStructuredBuffer<int> output;
     RWStructuredBuffer<int> input;
+    RWStructuredBuffer<int> output;
     int val;
 };
 
