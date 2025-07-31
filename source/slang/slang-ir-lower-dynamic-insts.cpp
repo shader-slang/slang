@@ -2,6 +2,7 @@
 
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-witness-table-wrapper.h"
@@ -209,6 +210,29 @@ bool areInfosEqual(IRInst* a, IRInst* b)
     return a == b;
 }
 
+// Helper to iterate over collection elements
+template<typename F>
+void forEachInCollection(IRCollectionBase* info, F func)
+{
+    for (UInt i = 0; i < info->getOperandCount(); ++i)
+        func(info->getOperand(i));
+}
+
+template<typename F>
+void forEachInCollection(IRCollectionTagType* tagType, F func)
+{
+    forEachInCollection(as<IRCollectionBase>(tagType->getOperand(0)), func);
+}
+
+static IRInst* findEntryInConcreteTable(IRInst* witnessTable, IRInst* key)
+{
+    if (auto concreteTable = as<IRWitnessTable>(witnessTable))
+        for (auto entry : concreteTable->getEntries())
+            if (entry->getRequirementKey() == key)
+                return entry->getSatisfyingVal();
+    return nullptr; // Not found
+}
+
 struct DynamicInstLoweringContext
 {
     // Helper methods for creating canonical collections
@@ -306,12 +330,14 @@ struct DynamicInstLoweringContext
             elements.getBuffer()));
     }
 
-    /*IRCollectionTaggedUnionType* makeExistential(const HashSet<IRInst*>& tables)
+    IRCollectionTagType* makeTagType(IRCollectionBase* collection)
     {
-        SLANG_ASSERT(tables.getCount() > 0);
-        auto tableCollection = createCollection(kIROp_TableCollection, tables);
-        return makeExistential(tableCollection);
-    }*/
+        IRInst* collectionInst = collection;
+        // Create the tag type from the collection
+        IRBuilder builder(module);
+        return as<IRCollectionTagType>(
+            builder.emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collectionInst));
+    }
 
     UCount getCollectionCount(IRCollectionBase* collection)
     {
@@ -326,11 +352,23 @@ struct DynamicInstLoweringContext
         return getCollectionCount(as<IRCollectionBase>(typeCollection));
     }
 
+    UCount getCollectionCount(IRCollectionTagType* tagType)
+    {
+        auto collection = tagType->getOperand(0);
+        return getCollectionCount(as<IRCollectionBase>(collection));
+    }
+
     IRInst* getCollectionElement(IRCollectionBase* collection, UInt index)
     {
         if (!collection || index >= collection->getOperandCount())
             return nullptr;
         return collection->getOperand(index);
+    }
+
+    IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
+    {
+        auto typeCollection = collectionTagType->getOperand(0);
+        return getCollectionElement(as<IRCollectionBase>(typeCollection), index);
     }
 
     IRUnboundedCollection* makeUnbounded()
@@ -341,14 +379,6 @@ struct DynamicInstLoweringContext
     }
 
     IRTypeFlowData* none() { return nullptr; }
-
-    // Helper to iterate over collection elements
-    template<typename F>
-    void forEachInCollection(IRCollectionBase* info, F func)
-    {
-        for (UInt i = 0; i < info->getOperandCount(); ++i)
-            func(info->getOperand(i));
-    }
 
     // Helper to convert collection to HashSet
     HashSet<IRInst*> collectionToHashSet(IRCollectionBase* info)
@@ -558,6 +588,67 @@ struct DynamicInstLoweringContext
         }
     }
 
+    IRInst* upcastCollection(IRInst* context, IRInst* arg, IRTypeFlowData* destInfo)
+    {
+        /*auto argInfo = tryGetInfo(context, arg);
+        if (!argInfo || !destInfo)
+            return arg;*/
+        auto argInfo = as<IRTypeFlowData>(arg->getDataType());
+        if (!argInfo || !destInfo)
+            return arg;
+
+        if (as<IRCollectionTaggedUnionType>(argInfo) && as<IRCollectionTaggedUnionType>(destInfo))
+        {
+            if (getCollectionCount(as<IRCollectionTaggedUnionType>(argInfo)) !=
+                getCollectionCount(as<IRCollectionTaggedUnionType>(destInfo)))
+            {
+                // If the sets of witness tables are not equal, reinterpret to the parameter type
+                IRBuilder builder(module);
+                builder.setInsertAfter(arg);
+
+                auto argTupleType = as<IRTupleType>(arg->getDataType());
+                auto tag =
+                    builder.emitGetTupleElement((IRType*)argTupleType->getOperand(0), arg, 0);
+                auto value =
+                    builder.emitGetTupleElement((IRType*)argTupleType->getOperand(1), arg, 1);
+
+                auto newTag = upcastCollection(
+                    context,
+                    tag,
+                    makeTagType(cast<IRTableCollection>(destInfo->getOperand(1))));
+                auto newValue = upcastCollection(
+                    context,
+                    value,
+                    cast<IRTypeCollection>(destInfo->getOperand(0)));
+
+                return builder.emitMakeTuple(newTag, newValue);
+            }
+        }
+        else if (as<IRCollectionTagType>(argInfo) && as<IRCollectionTagType>(destInfo))
+        {
+            if (getCollectionCount(as<IRCollectionTagType>(argInfo)) !=
+                getCollectionCount(as<IRCollectionTagType>(destInfo)))
+            {
+                IRBuilder builder(module);
+                builder.setInsertAfter(arg);
+                return builder
+                    .emitIntrinsicInst((IRType*)destInfo, kIROp_GetTagForSuperCollection, 1, &arg);
+            }
+        }
+        else if (as<IRCollectionBase>(argInfo) && as<IRCollectionBase>(destInfo))
+        {
+            if (getCollectionCount(as<IRCollectionBase>(argInfo)) !=
+                getCollectionCount(as<IRCollectionBase>(destInfo)))
+            {
+                // If the sets of witness tables are not equal, reinterpret to the parameter type
+                IRBuilder builder(module);
+                builder.setInsertAfter(arg);
+                return builder.emitReinterpret((IRType*)destInfo, arg);
+            }
+        }
+    }
+
+    /*
     IRInst* maybeReinterpret(IRInst* context, IRInst* arg, IRTypeFlowData* destInfo)
     {
         auto argInfo = tryGetInfo(context, arg);
@@ -715,6 +806,7 @@ struct DynamicInstLoweringContext
 
         return changed;
     }
+    */
 
     void processInstForPropagation(IRInst* context, IRInst* inst, LinkedList<WorkItem>& workQueue)
     {
@@ -804,20 +896,13 @@ struct DynamicInstLoweringContext
         if (as<IRUnboundedCollection>(witnessTableInfo))
             return makeUnbounded();
 
-        HashSet<IRInst*> tables;
-        if (auto collection = as<IRTableCollection>(witnessTableInfo))
-            return makeExistential(collection);
+        if (as<IRWitnessTable>(witnessTable))
+            return makeExistential(as<IRTableCollection>(makeSingletonSet(witnessTable)));
+
+        if (auto collectionTag = as<IRCollectionTagType>(witnessTableInfo))
+            return makeExistential(cast<IRTableCollection>(collectionTag->getOperand(0)));
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
-    }
-
-    static IRInst* findEntryInConcreteTable(IRInst* witnessTable, IRInst* key)
-    {
-        if (auto concreteTable = as<IRWitnessTable>(witnessTable))
-            for (auto entry : concreteTable->getEntries())
-                if (entry->getRequirementKey() == key)
-                    return entry->getSatisfyingVal();
-        return nullptr; // Not found
     }
 
     IRTypeFlowData* analyzeLoad(IRInst* context, IRLoad* loadInst)
@@ -851,13 +936,13 @@ struct DynamicInstLoweringContext
         if (as<IRUnboundedCollection>(witnessTableInfo))
             return makeUnbounded();
 
-        if (auto collection = as<IRCollectionBase>(witnessTableInfo))
+        if (auto tagType = as<IRCollectionTagType>(witnessTableInfo))
         {
             HashSet<IRInst*> results;
             forEachInCollection(
-                collection,
+                cast<IRTableCollection>(tagType->getOperand(0)),
                 [&](IRInst* table) { results.add(findEntryInConcreteTable(table, key)); });
-            return makeSet(results);
+            return makeTagType(makeSet(results));
         }
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
@@ -877,7 +962,7 @@ struct DynamicInstLoweringContext
             return makeUnbounded();
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
-            return as<IRTableCollection>(taggedUnion->getOperand(1));
+            return makeTagType(cast<IRTableCollection>(taggedUnion->getOperand(1)));
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
@@ -894,17 +979,24 @@ struct DynamicInstLoweringContext
             return makeUnbounded();
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
-            return as<IRTypeCollection>(taggedUnion->getOperand(0));
+            return makeTagType(cast<IRTypeCollection>(taggedUnion->getOperand(0)));
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
     }
 
     IRTypeFlowData* analyzeExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
-        // We don't care about the value itself.
-        // (We rely on the propagation info for the type)
-        //
-        return none();
+        auto operand = inst->getOperand(0);
+        auto operandInfo = tryGetInfo(context, operand);
+
+        if (!operandInfo)
+            return none();
+
+        if (as<IRUnboundedCollection>(operandInfo))
+            return makeUnbounded();
+
+        if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
+            return cast<IRTypeCollection>(taggedUnion->getOperand(0));
     }
 
     IRTypeFlowData* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
@@ -924,7 +1016,7 @@ struct DynamicInstLoweringContext
                 "Unexpected ExtractExistentialWitnessTable on Set (should be Existential)");
         }
 
-        if (auto collection = as<IRCollectionBase>(operandInfo))
+        if (auto collectionTag = as<IRCollectionTagType>(operandInfo))
         {
             List<IRInst*> specializationArgs;
             for (auto i = 0; i < inst->getArgCount(); ++i)
@@ -950,12 +1042,13 @@ struct DynamicInstLoweringContext
                         "set");
                 }
 
-                if (auto argCollection = as<IRCollectionBase>(argInfo))
+                if (auto argCollectionTag = as<IRCollectionTagType>(argInfo))
                 {
-                    if (getCollectionCount(argCollection) == 1)
-                        specializationArgs.add(getCollectionElement(argCollection, 0));
+                    if (getCollectionCount(argCollectionTag) == 1)
+                        specializationArgs.add(getCollectionElement(argCollectionTag, 0));
                     else
-                        specializationArgs.add(argCollection);
+                        specializationArgs.add(
+                            cast<IRCollectionBase>(argCollectionTag->getOperand(0)));
                 }
                 else
                 {
@@ -972,12 +1065,12 @@ struct DynamicInstLoweringContext
                 {
                     if (auto info = tryGetInfo(context, type))
                     {
-                        if (auto infoCollection = as<IRCollectionBase>(info))
+                        if (auto infoCollectionTag = as<IRCollectionTagType>(info))
                         {
-                            if (getCollectionCount(infoCollection) == 1)
-                                return getCollectionElement(infoCollection, 0);
+                            if (getCollectionCount(infoCollectionTag) == 1)
+                                return getCollectionElement(infoCollectionTag, 0);
                             else
-                                return infoCollection;
+                                return as<IRCollectionBase>(infoCollectionTag->getOperand(0));
                         }
                         else
                             return type;
@@ -1004,7 +1097,7 @@ struct DynamicInstLoweringContext
             // Specialize each element in the set
             HashSet<IRInst*> specializedSet;
             forEachInCollection(
-                collection,
+                collectionTag,
                 [&](IRInst* arg)
                 {
                     // Create a new specialized instruction for each argument
@@ -1013,7 +1106,8 @@ struct DynamicInstLoweringContext
                     specializedSet.add(
                         builder.emitSpecializeInst(typeOfSpecialization, arg, specializationArgs));
                 });
-            return makeSet(specializedSet);
+
+            return makeTagType(makeSet(specializedSet));
         }
 
         SLANG_UNEXPECTED("Unhandled PropagationJudgment in analyzeExtractExistentialWitnessTable");
@@ -1329,80 +1423,66 @@ struct DynamicInstLoweringContext
         }
     }
 
-    IRTypeFlowData* unionPropagationInfo(const List<IRTypeFlowData*>& infos)
+    template<typename T>
+    T* unionCollection(T* collection1, T* collection2)
     {
-        if (infos.getCount() == 0)
-        {
-            return none();
-        }
+        SLANG_ASSERT(as<IRCollectionBase>(collection1) && as<IRCollectionBase>(collection2));
+        SLANG_ASSERT(collection1->getOp() == collection2->getOp());
 
-        if (infos.getCount() == 1)
-        {
-            return infos[0];
-        }
+        if (!collection1)
+            return collection2;
+        if (!collection2)
+            return collection1;
+        if (collection1 == collection2)
+            return collection1;
 
-        // Check if all infos are the same
-        bool allSame = true;
-        for (Index i = 1; i < infos.getCount(); i++)
-        {
-            if (!areInfosEqual(infos[0], infos[i]))
-            {
-                allSame = false;
-                break;
-            }
-        }
-
-        if (allSame)
-        {
-            return infos[0];
-        }
-
-        // Need to create a union - collect all possible values based on IR instruction types
         HashSet<IRInst*> allValues;
+        // Collect all values from both collections
+        forEachInCollection(collection1, [&](IRInst* value) { allValues.add(value); });
+        forEachInCollection(collection2, [&](IRInst* value) { allValues.add(value); });
 
-        // Determine the union type and collect values
-        bool hasUnbounded = false;
-        bool hasExistential = false;
-
-        for (auto info : infos)
-        {
-            if (!info)
-                continue;
-
-            if (as<IRUnboundedCollection>(info))
-            {
-                // If any info is unbounded, the union is unbounded
-                return makeUnbounded();
-            }
-            else if (auto taggedUnion = as<IRCollectionTaggedUnionType>(info))
-            {
-                hasExistential = true;
-                auto tableCollection = as<IRCollectionBase>(taggedUnion->getOperand(1));
-                forEachInCollection(tableCollection, [&](IRInst* value) { allValues.add(value); });
-            }
-            else if (auto collection = as<IRCollectionBase>(info))
-            {
-                forEachInCollection(collection, [&](IRInst* value) { allValues.add(value); });
-            }
-        }
-
-        if (hasExistential && allValues.getCount() > 0)
-            return makeExistential(
-                as<IRTableCollection>(createCollection(kIROp_TableCollection, allValues)));
-
-        if (allValues.getCount() > 0)
-            return makeSet(allValues);
-        else
-            return none();
+        return as<T>(createCollection(
+            collection1->getOp(),
+            allValues)); // Create a new collection with the union of values
     }
 
     IRTypeFlowData* unionPropagationInfo(IRTypeFlowData* info1, IRTypeFlowData* info2)
     {
-        // Union the two infos
-        List<IRTypeFlowData*> infos;
-        infos.add(info1);
-        infos.add(info2);
-        return unionPropagationInfo(infos);
+        if (!info1)
+            return info2;
+        if (!info2)
+            return info1;
+
+        if (as<IRUnboundedCollection>(info1) && as<IRUnboundedCollection>(info2))
+        {
+            // If either info is unbounded, the union is unbounded
+            return makeUnbounded();
+        }
+
+        if (as<IRCollectionTaggedUnionType>(info1) && as<IRCollectionTaggedUnionType>(info2))
+        {
+            return makeExistential(
+                unionCollection<IRTableCollection>(
+                    cast<IRTableCollection>(info1->getOperand(1)),
+                    cast<IRTableCollection>(info2->getOperand(1))));
+        }
+
+        if (as<IRCollectionTagType>(info1) && as<IRCollectionTagType>(info2))
+        {
+            return makeTagType(
+                unionCollection<IRCollectionBase>(
+                    cast<IRCollectionBase>(info1->getOperand(0)),
+                    cast<IRCollectionBase>(info2->getOperand(0))));
+        }
+
+        if (as<IRCollectionBase>(info1) && as<IRCollectionBase>(info2))
+        {
+            return unionCollection<IRCollectionBase>(
+                cast<IRCollectionBase>(info1),
+                cast<IRCollectionBase>(info2));
+        }
+
+        SLANG_UNEXPECTED("Unhandled propagation info types in unionPropagationInfo");
     }
 
     IRTypeFlowData* analyzeDefault(IRInst* context, IRInst* inst)
@@ -1416,6 +1496,91 @@ struct DynamicInstLoweringContext
             return none(); // Default case, no propagation info
     }
 
+    bool lowerInstsInBlock(IRInst* context, IRBlock* block)
+    {
+        List<IRInst*> instsToLower;
+        bool hasChanges = false;
+        for (auto inst : block->getChildren())
+            instsToLower.add(inst);
+
+        UIndex paramIndex = 0;
+        for (auto inst : instsToLower)
+            hasChanges |= lowerInst(context, inst);
+
+        return hasChanges;
+    }
+
+    bool lowerFunc(IRFunc* func)
+    {
+        bool hasChanges = false;
+        for (auto block : func->getBlocks())
+            hasChanges |= lowerInstsInBlock(func, block);
+
+        for (auto block : func->getBlocks())
+        {
+            UIndex paramIndex = 0;
+            // Process each parameter in this block (these are phi parameters)
+            for (auto param : block->getParams())
+            {
+                auto paramInfo = tryGetInfo(param);
+                if (!paramInfo)
+                {
+                    paramIndex++;
+                    continue;
+                }
+
+                // Find all predecessors of this block
+                for (auto pred : block->getPredecessors())
+                {
+                    auto terminator = pred->getTerminator();
+                    if (auto unconditionalBranch = as<IRUnconditionalBranch>(terminator))
+                    {
+                        auto arg = unconditionalBranch->getArg(paramIndex);
+                        auto newArg =
+                            upcastCollection(func, arg, as<IRTypeFlowData>(param->getDataType()));
+
+                        if (newArg != arg)
+                        {
+                            hasChanges = true;
+                            // Replace the argument in the branch instruction
+                            SLANG_ASSERT(!as<IRLoop>(unconditionalBranch));
+                            unconditionalBranch->setOperand(1 + paramIndex, newArg);
+                        }
+                    }
+                }
+
+                paramIndex++;
+            }
+
+            // Is the terminator a return instruction?
+            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            {
+                if (!as<IRVoidType>(returnInst->getVal()->getDataType()))
+                {
+                    auto funcReturnInfo = getFuncReturnInfo(func);
+                    auto newReturnVal =
+                        upcastCollection(func, returnInst->getVal(), funcReturnInfo);
+                    if (newReturnVal != returnInst->getVal())
+                    {
+                        // Replace the return value with the reinterpreted value
+                        hasChanges = true;
+                        returnInst->setOperand(0, newReturnVal);
+                    }
+                }
+            }
+        }
+
+        auto effectiveFuncType = getEffectiveFuncType(func);
+        if (effectiveFuncType != func->getFullType())
+        {
+            hasChanges = true;
+            func->setFullType(effectiveFuncType);
+        }
+
+        return hasChanges;
+    }
+
+    /*
     bool lowerInstsInFunc(IRFunc* func)
     {
         // Collect all instructions that need lowering
@@ -1501,22 +1666,24 @@ struct DynamicInstLoweringContext
 
         return hasChanges;
     }
+    */
 
     bool performDynamicInstLowering()
     {
-        List<IRFunc*> funcsForTypeReplacement;
+        // List<IRFunc*> funcsForTypeReplacement;
         List<IRFunc*> funcsToProcess;
 
         for (auto globalInst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(globalInst))
             {
-                funcsForTypeReplacement.add(func);
+                // funcsForTypeReplacement.add(func);
                 funcsToProcess.add(func);
             }
 
         bool hasChanges = false;
         do
         {
+            /*
             while (funcsForTypeReplacement.getCount() > 0)
             {
                 auto func = funcsForTypeReplacement.getLast();
@@ -1525,6 +1692,7 @@ struct DynamicInstLoweringContext
                 // Replace the function type with a concrete type if it has existential return types
                 hasChanges |= replaceFuncType(func, this->funcReturnInfo[func]);
             }
+            */
 
             while (funcsToProcess.getCount() > 0)
             {
@@ -1532,7 +1700,7 @@ struct DynamicInstLoweringContext
                 funcsToProcess.removeLast();
 
                 // Lower the instructions in the function
-                hasChanges |= lowerInstsInFunc(func);
+                hasChanges |= lowerFunc(func);
             }
 
             // The above loops might have added new contexts to lower.
@@ -1540,16 +1708,16 @@ struct DynamicInstLoweringContext
             {
                 hasChanges |= lowerContext(context);
                 auto newFunc = cast<IRFunc>(this->loweredContexts[context]);
-                funcsForTypeReplacement.add(newFunc);
                 funcsToProcess.add(newFunc);
             }
             this->contextsToLower.clear();
 
-        } while (funcsForTypeReplacement.getCount() > 0 || funcsToProcess.getCount() > 0);
+        } while (funcsToProcess.getCount() > 0);
 
         return hasChanges;
     }
 
+    /*
     bool replaceFuncType(IRFunc* func, IRTypeFlowData* returnTypeInfo)
     {
         IRFuncType* origFuncType = as<IRFuncType>(func->getFullType());
@@ -1583,14 +1751,15 @@ struct DynamicInstLoweringContext
         func->setFullType(newFuncType);
         return true;
     }
+    */
 
     IRType* getTypeForExistential(IRCollectionTaggedUnionType* taggedUnion)
     {
-        // Replace type with Tuple<UInt, AnyValueType>
+        // Replace type with Tuple<CollectionTagType(collection), TypeCollection>
         IRBuilder builder(module);
         builder.setInsertInto(module);
 
-        HashSet<IRInst*> types;
+        /*HashSet<IRInst*> types;
         auto tableCollection = as<IRCollectionBase>(taggedUnion->getOperand(1));
         forEachInCollection(
             tableCollection,
@@ -1599,29 +1768,62 @@ struct DynamicInstLoweringContext
                 if (auto witnessTable = as<IRWitnessTable>(table))
                     if (auto concreteType = witnessTable->getConcreteType())
                         types.add(concreteType);
-            });
+            });*/
 
-        SLANG_ASSERT(types.getCount() > 0);
-        auto unionType = types.getCount() > 1 ? createAnyValueTypeFromInsts(types) : *types.begin();
-        return builder.getTupleType(List<IRType*>({builder.getUIntType(), (IRType*)unionType}));
+        auto typeCollection = cast<IRTypeCollection>(taggedUnion->getOperand(0));
+        auto tableCollection = cast<IRTableCollection>(taggedUnion->getOperand(1));
+        return builder.getTupleType(
+            List<IRType*>({(IRType*)makeTagType(tableCollection), (IRType*)typeCollection}));
+    }
+
+    IRType* getLoweredType(IRTypeFlowData* info)
+    {
+        if (!info)
+            return nullptr;
+
+        if (as<IRUnboundedCollection>(info))
+            return nullptr;
+
+        if (auto taggedUnion = as<IRCollectionTaggedUnionType>(info))
+        {
+            // If this is a tagged union, we need to create a tuple type
+            return getTypeForExistential(taggedUnion);
+        }
+
+        if (auto collectionTag = as<IRCollectionTagType>(info))
+        {
+            // If this is a collection tag, we can return the collection type
+            return (IRType*)collectionTag;
+        }
+
+        if (auto collection = as<IRTypeCollection>(info))
+        {
+            if (getCollectionCount(collection) == 1)
+            {
+                // If there's only one type in the collection, return it directly
+                return (IRType*)getCollectionElement(collection, 0);
+            }
+
+            // If this is a concrete collection, return it directly
+            return (IRType*)collection;
+        }
+
+        SLANG_UNEXPECTED("Unhandled IRTypeFlowData type in getLoweredType");
     }
 
     bool replaceType(IRInst* context, IRInst* inst)
     {
         auto info = tryGetInfo(context, inst);
-        auto taggedUnion = as<IRCollectionTaggedUnionType>(info);
-        if (!taggedUnion)
-            return false;
-
         if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
         {
             IRBuilder builder(module);
-            inst->setFullType(
-                builder.getPtrTypeWithAddressSpace(getTypeForExistential(taggedUnion), ptrType));
+            if (auto loweredType = getLoweredType(info))
+                inst->setFullType(builder.getPtrTypeWithAddressSpace(loweredType, ptrType));
         }
         else
         {
-            inst->setFullType(getTypeForExistential(taggedUnion));
+            if (auto loweredType = getLoweredType(info))
+                inst->setFullType(loweredType);
         }
         return true;
     }
@@ -1646,8 +1848,14 @@ struct DynamicInstLoweringContext
             return lowerMakeExistential(context, as<IRMakeExistential>(inst));
         case kIROp_CreateExistentialObject:
             return lowerCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
+        case kIROp_Store:
+            SLANG_UNEXPECTED("handle this");
         default:
-            return false;
+            {
+                if (auto info = tryGetInfo(context, inst))
+                    return replaceType(context, info);
+                return false;
+            }
         }
     }
 
@@ -1657,10 +1865,14 @@ struct DynamicInstLoweringContext
         if (!info)
             return false;
 
+        auto collectionTagType = as<IRCollectionTagType>(info);
+        if (!collectionTagType)
+            return false;
+
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (auto collection = as<IRCollectionBase>(info))
+        /*if (auto collection = as<IRCollectionBase>(info))
         {
             if (getCollectionCount(collection) == 1)
             {
@@ -1669,51 +1881,77 @@ struct DynamicInstLoweringContext
                 inst->removeAndDeallocate();
                 return true;
             }
-            else
+            else if (auto typeCollection = as<IRTypeCollection>(collection))
             {
                 // Set of types.
-                if (inst->getDataType()->getOp() == kIROp_TypeKind)
-                {
-                    // Create an any-value type based on the set of types
-                    auto typeSet = collectionToHashSet(collection);
-                    auto unionType = typeSet.getCount() > 1 ? createAnyValueTypeFromInsts(typeSet)
-                                                            : *typeSet.begin();
+                // Create an any-value type based on the set of types
+                auto typeSet = collectionToHashSet(collection);
+                auto unionType = typeSet.getCount() > 1 ? createAnyValueTypeFromInsts(typeSet)
+                                                        : *typeSet.begin();
 
-                    // Store the mapping for later use
-                    loweredInstToAnyValueType[inst] = unionType;
+                // Store the mapping for later use
+                loweredInstToAnyValueType[inst] = unionType;
 
-                    // Replace the instruction with the any-value type
-                    inst->replaceUsesWith(unionType);
-                    inst->removeAndDeallocate();
-                    return true;
-                }
-                else
-                {
-                    // Get the witness table operand info
-                    auto witnessTableInst = inst->getWitnessTable();
-                    auto witnessTableInfo = tryGetInfo(context, witnessTableInst);
-
-                    if (auto witnessTableCollection = as<IRCollectionBase>(witnessTableInfo))
-                    {
-                        // Create a key mapping function
-                        auto keyMappingFunc = createKeyMappingFunc(
-                            inst->getRequirementKey(),
-                            collectionToHashSet(witnessTableCollection),
-                            collectionToHashSet(collection));
-
-                        // Replace with call to key mapping function
-                        auto witnessTableId = builder.emitCallInst(
-                            builder.getUIntType(),
-                            keyMappingFunc,
-                            List<IRInst*>({inst->getWitnessTable()}));
-                        inst->replaceUsesWith(witnessTableId);
-                        propagationMap[Element(context, witnessTableId)] = info;
-                        inst->removeAndDeallocate();
-                        return true;
-                    }
-                }
+                // Replace the instruction with the any-value type
+                inst->replaceUsesWith(typeCollection);
+                inst->removeAndDeallocate();
+                return true;
             }
         }
+        else*/
+
+        if (getCollectionCount(collectionTagType) == 1)
+        {
+            // Found a single possible type. Simple replacement.
+            inst->replaceUsesWith(getCollectionElement(collectionTagType, 0));
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        if (auto typeCollection = as<IRTypeCollection>(collectionTagType->getOperand(0)))
+        {
+            // If this is a type collection, we can replace it with the collection type
+            // We don't currently care about the tag of a type.
+            //
+            inst->replaceUsesWith(typeCollection);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        // Get the witness table operand info
+        auto witnessTableInst = inst->getWitnessTable();
+        auto witnessTableInfo = tryGetInfo(context, witnessTableInst);
+
+        SLANG_ASSERT(as<IRCollectionTagType>(witnessTableInfo));
+        List<IRInst*> operands = {witnessTableInst, inst->getRequirementKey()};
+
+        auto newInst = builder.emitIntrinsicInst(
+            (IRType*)info,
+            kIROp_GetTagForMappedCollection,
+            operands.getCount(),
+            operands.getBuffer());
+        inst->replaceUsesWith(newInst);
+        propagationMap[Element(context, newInst)] = info;
+        inst->removeAndDeallocate();
+
+        /*if (auto witnessTableCollection = as<IRCollectionBase>(witnessTableInfo))
+        {
+            // Create a key mapping function
+            auto keyMappingFunc = createKeyMappingFunc(
+                inst->getRequirementKey(),
+                collectionToHashSet(witnessTableCollection),
+                collectionToHashSet(collection));
+
+            // Replace with call to key mapping function
+            auto witnessTableId = builder.emitCallInst(
+                builder.getUIntType(),
+                keyMappingFunc,
+                List<IRInst*>({inst->getWitnessTable()}));
+            inst->replaceUsesWith(witnessTableId);
+            propagationMap[Element(context, witnessTableId)] = info;
+            inst->removeAndDeallocate();
+            return true;
+        }*/
 
         return false;
     }
@@ -1729,27 +1967,27 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (auto collection = as<IRCollectionBase>(info))
+        auto collectionTagType = as<IRCollectionTagType>(info);
+        if (!collectionTagType)
+            return false;
+
+        if (getCollectionCount(collectionTagType) == 1)
         {
-            if (getCollectionCount(collection) == 1)
-            {
-                // Found a single possible type. Simple replacement.
-                inst->replaceUsesWith(getCollectionElement(collection, 0));
-                inst->removeAndDeallocate();
-                return true;
-            }
-            else
-            {
-                // Replace with GetElement(loweredInst, 0) -> uint
-                auto operand = inst->getOperand(0);
-                auto element = builder.emitGetTupleElement(builder.getUIntType(), operand, 0);
-                inst->replaceUsesWith(element);
-                propagationMap[Element(context, element)] = info;
-                inst->removeAndDeallocate();
-                return true;
-            }
+            // Found a single possible type. Simple replacement.
+            inst->replaceUsesWith(getCollectionElement(collectionTagType, 0));
+            inst->removeAndDeallocate();
+            return true;
         }
-        return false;
+        else
+        {
+            // Replace with GetElement(loweredInst, 0) -> uint
+            auto operand = inst->getOperand(0);
+            auto element = builder.emitGetTupleElement((IRType*)collectionTagType, operand, 0);
+            inst->replaceUsesWith(element);
+            propagationMap[Element(context, element)] = info;
+            inst->removeAndDeallocate();
+            return true;
+        }
     }
 
     bool lowerExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
@@ -1759,20 +1997,26 @@ struct DynamicInstLoweringContext
         if (!taggedUnion)
             return false;
 
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-
+        /*
         // Check if we have a lowered any-value type for the result
         auto resultType = inst->getDataType();
         auto loweredType = loweredInstToAnyValueType.tryGetValue(inst);
         if (loweredType)
         {
             resultType = (IRType*)*loweredType;
-        }
+        }*/
 
-        // Replace with GetElement(loweredInst, 1) -> AnyValueType
+        auto info = tryGetInfo(context, inst);
+        auto typeCollection = as<IRTypeCollection>(info);
+        if (!typeCollection)
+            return false;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Replace with GetElement(loweredInst, 1) : TypeCollection
         auto operand = inst->getOperand(0);
-        auto element = builder.emitGetTupleElement(resultType, operand, 1);
+        auto element = builder.emitGetTupleElement((IRType*)info, operand, 1);
         inst->replaceUsesWith(element);
         inst->removeAndDeallocate();
         return true;
@@ -1781,31 +2025,32 @@ struct DynamicInstLoweringContext
     bool lowerExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
         auto info = tryGetInfo(context, inst);
-        auto collection = as<IRCollectionBase>(info);
-        if (!collection)
+        auto collectionTagType = as<IRCollectionTagType>(info);
+        if (!collectionTagType)
             return false;
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (getCollectionCount(collection) == 1)
+        if (getCollectionCount(collectionTagType) == 1)
         {
             // Found a single possible type. Simple replacement.
-            auto singletonValue = getCollectionElement(collection, 0);
+            auto singletonValue = getCollectionElement(collectionTagType, 0);
             inst->replaceUsesWith(singletonValue);
             inst->removeAndDeallocate();
-            loweredInstToAnyValueType[inst] = singletonValue;
+            // loweredInstToAnyValueType[inst] = singletonValue;
             return true;
         }
 
         // Create an any-value type based on the set of types
+        /*
         auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(collection));
 
         // Store the mapping for later use
-        loweredInstToAnyValueType[inst] = anyValueType;
+        loweredInstToAnyValueType[inst] = anyValueType;*/
 
-        // Replace the instruction with the any-value type
-        inst->replaceUsesWith(anyValueType);
+        // Replace the instruction with the collection type.
+        inst->replaceUsesWith(collectionTagType->getOperand(0));
         inst->removeAndDeallocate();
         return true;
     }
@@ -1833,7 +2078,141 @@ struct DynamicInstLoweringContext
             return {ParameterDirection::kParameterDirection_In, paramType};
     }
 
-    IRFuncType* getExpectedFuncType(IRInst* context, IRCall* inst)
+    IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirection direction, IRType* type)
+    {
+        switch (direction)
+        {
+        case ParameterDirection::kParameterDirection_In:
+            return type;
+        case ParameterDirection::kParameterDirection_Out:
+            return builder->getOutType(type);
+        case ParameterDirection::kParameterDirection_InOut:
+            return builder->getInOutType(type);
+        case ParameterDirection::kParameterDirection_ConstRef:
+            return builder->getConstRefType(type);
+        default:
+            SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
+            return nullptr;
+        }
+    }
+
+    IRFuncType* getEffectiveFuncType(IRInst* callee)
+    {
+        IRBuilder builder(module);
+
+        List<IRType*> paramTypes;
+        IRType* resultType = nullptr;
+
+        auto updateType = [&](IRType* currentType, IRType* newType) -> IRType*
+        {
+            if (auto collection = as<IRCollectionBase>(currentType))
+            {
+                List<IRInst*> collectionElements;
+                forEachInCollection(
+                    collection,
+                    [&](IRInst* element)
+                    {
+                        if (auto loweredType = getLoweredType(tryGetInfo(callee, element)))
+                            collectionElements.add(loweredType);
+                        else
+                            collectionElements.add(element);
+                    });
+                collectionElements.add(newType);
+
+                // If this is a collection, we need to create a new collection with the new type
+                auto newCollection = createCollection(collection->getOp(), collectionElements);
+                return (IRType*)newCollection;
+            }
+            else if (currentType == newType)
+            {
+                return currentType;
+            }
+            else if (currentType == nullptr)
+            {
+                return newType;
+            }
+            else // Need to create a new collection.
+            {
+                List<IRInst*> collectionElements;
+
+                SLANG_ASSERT(!as<IRCollectionBase>(currentType) && !as<IRCollectionBase>(newType));
+
+                collectionElements.add(currentType);
+                collectionElements.add(newType);
+
+                // If this is a collection, we need to create a new collection with the new type
+                auto newCollection = createCollection(currentType->getOp(), collectionElements);
+                return (IRType*)newCollection;
+            }
+        };
+
+        auto updateParamType = [&](UInt index, IRType* paramType) -> IRType*
+        {
+            if (paramTypes.getCount() <= index)
+            {
+                // If we don't have enough types, just add the new type
+                paramTypes.add(paramType);
+                return paramType;
+            }
+            else
+            {
+                // Otherwise, update the existing type
+                auto [currentDirection, currentType] =
+                    getParameterDirectionAndType(paramTypes[index]);
+                auto [newDirection, newType] = getParameterDirectionAndType(paramType);
+                auto updatedType = updateType(currentType, paramType);
+                SLANG_ASSERT(currentDirection == newDirection);
+                paramTypes[index] = fromDirectionAndType(&builder, currentDirection, updatedType);
+                return updatedType;
+            }
+        };
+
+        List<IRInst*> contextsToProcess;
+        if (auto collection = as<IRFuncCollection>(callee))
+        {
+            forEachInCollection(collection, [&](IRInst* func) { contextsToProcess.add(func); });
+        }
+        else if (auto collectionTagType = as<IRCollectionTagType>(callee->getDataType()))
+        {
+            forEachInCollection(
+                collectionTagType,
+                [&](IRInst* func) { contextsToProcess.add(func); });
+        }
+        else
+        {
+            // Otherwise, just process the single function
+            contextsToProcess.add(callee);
+        }
+
+        for (auto func : contextsToProcess)
+        {
+            auto paramInfos = getParamInfos(callee);
+            auto paramDirections = getParamDirections(callee);
+            for (UInt i = 0; i < paramInfos.getCount(); i++)
+            {
+                if (auto loweredType = getLoweredType(paramInfos[i]))
+                    updateParamType(
+                        i,
+                        fromDirectionAndType(&builder, paramDirections[i], loweredType));
+                else
+                    SLANG_UNEXPECTED("Unhandled parameter type in getEffectiveFuncType");
+            }
+
+            auto returnType = getFuncReturnInfo(func);
+            if (auto newResultType = getLoweredType(returnType))
+            {
+                resultType = updateType(resultType, newResultType);
+            }
+            else
+            {
+                resultType = updateType(resultType, (IRType*)returnType);
+            }
+        }
+
+        return builder.getFuncType(paramTypes, resultType);
+    }
+
+    /*IRFuncType* getExpectedFuncType(IRInst* context, IRCall* inst)
     {
         IRBuilder builder(module);
         builder.setInsertInto(module);
@@ -1905,7 +2284,7 @@ struct DynamicInstLoweringContext
         }
 
         return builder.getFuncType(paramTypes, resultType);
-    }
+    }*/
 
     bool isDynamicGeneric(IRInst* callee)
     {
@@ -1943,31 +2322,26 @@ struct DynamicInstLoweringContext
 
         IRCloneEnv cloneEnv;
         Index argIndex = 0;
-        UCount extraIndices = 0;
+        List<IRType*> extraParamTypes;
         // Map the generic's parameters to the specialized arguments.
         for (auto param : generic->getFirstBlock()->getParams())
         {
             auto specArg = specializeInst->getArg(argIndex++);
-            if (as<IRCollectionBase>(specArg))
+            if (auto collection = as<IRCollectionBase>(specArg))
             {
                 // We're dealing with a set of types.
                 if (as<IRTypeType>(param->getDataType()))
                 {
-                    HashSet<IRInst*> collectionSet;
-                    for (auto index = 0; index < specArg->getOperandCount(); index++)
-                    {
-                        auto operand = specArg->getOperand(index);
-                        collectionSet.add(operand);
-                    }
-
-                    auto unionType = createAnyValueTypeFromInsts(collectionSet);
-                    cloneEnv.mapOldValToNew[param] = unionType;
+                    // auto unionType = createAnyValueTypeFromInsts(collectionSet);
+                    cloneEnv.mapOldValToNew[param] = collection;
                 }
                 else if (as<IRWitnessTableType>(param->getDataType()))
                 {
                     // Add an integer param to the func.
-                    cloneEnv.mapOldValToNew[param] = builder.emitParam(builder.getUIntType());
-                    extraIndices++;
+                    auto tagType = (IRType*)makeTagType(collection);
+                    cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                    extraParamTypes.add(tagType);
+                    // extraIndices++;
                 }
             }
             else
@@ -2036,8 +2410,8 @@ struct DynamicInstLoweringContext
 
                 // Add extra indices to the func-type parameters
                 List<IRType*> funcTypeParams;
-                for (Index i = 0; i < extraIndices; i++)
-                    funcTypeParams.add(builder.getUIntType());
+                for (Index i = 0; i < extraParamTypes.getCount(); i++)
+                    funcTypeParams.add(extraParamTypes[i]);
 
                 for (auto paramType : loweredFuncType->getParamTypes())
                     funcTypeParams.add(paramType);
@@ -2090,6 +2464,38 @@ struct DynamicInstLoweringContext
             this->contextsToLower.add(context);
 
         return context;
+    }
+
+    List<IRInst*> getArgsForDynamicSpecialization(IRSpecialize* specializedCallee)
+    {
+        List<IRInst*> callArgs;
+        for (auto ii = 0; ii < specializedCallee->getArgCount(); ii++)
+        {
+            auto specArg = specializedCallee->getArg(ii);
+            auto argInfo = specArg->getDataType();
+            if (auto argCollection = as<IRCollectionBase>(argInfo))
+            {
+                if (as<IRWitnessTable>(getCollectionElement(argCollection, 0)))
+                {
+                    // Needs an index (spec-arg will carry an index, we'll
+                    // just need to append it to the call)
+                    //
+                    callArgs.add(specArg);
+                }
+                else if (as<IRType>(getCollectionElement(argCollection, 0)))
+                {
+                    // Needs no dynamic information. Skip.
+                }
+                else
+                {
+                    // If it's a witness table, we need to handle it differently
+                    // For now, we will not lower this case.
+                    SLANG_UNEXPECTED("Unhandled type-flow-collection in dynamic generic call");
+                }
+            }
+        }
+
+        return callArgs;
     }
 
     bool lowerCallToDynamicGeneric(IRInst* context, IRCall* inst)
@@ -2147,49 +2553,154 @@ struct DynamicInstLoweringContext
     bool lowerCall(IRInst* context, IRCall* inst)
     {
         auto callee = inst->getCallee();
-        auto calleeInfo = tryGetInfo(context, callee);
+        auto expectedFuncType = getEffectiveFuncType(callee);
 
-        auto calleeCollection = as<IRCollectionBase>(calleeInfo);
+        // First, we'll legalize all operands by upcasting if necessary.
+        // This needs to be done even if the callee is not a collection.
+        //
+        // List<IRTypeFlowData*> paramTypeFlows = getParamInfos(callee);
+        // List<ParameterDirection> paramDirections = getParamDirections(callee);
+        bool changed = false;
+        List<IRInst*> newArgs;
+        for (UInt i = 0; i < inst->getArgCount(); i++)
+        {
+            auto arg = inst->getArg(i);
+            const auto [paramDirection, paramType] =
+                getParameterDirectionAndType(expectedFuncType->getParamType(i));
+            if (!as<IRTypeFlowData>(paramType))
+            {
+                SLANG_ASSERT(!as<IRTypeFlowData>(arg->getDataType()));
+                newArgs.add(arg); // No need to change the argument
+                continue;
+            }
+
+            IRInst* newArg = nullptr;
+            switch (paramDirection)
+            {
+            case kParameterDirection_In:
+                newArgs.add(upcastCollection(context, arg, as<IRTypeFlowData>(paramType)));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled parameter direction in lowerCall");
+            }
+
+            /*if (newArg != arg)
+            {
+                // If the argument changed, replace the old one.
+                changed = true;
+                IRBuilder builder(inst->getModule());
+                builder.setInsertBefore(inst);
+                builder.replaceOperand(&inst->getArgs()[i + 1], newArg);
+            }*/
+        }
+
+        // New we need to determine the new callee.
+        IRInst* newCallee = nullptr;
+
+        List<IRInst*> extraArgs;
+
+        // auto calleeInfo = tryGetInfo(context, callee);
+        auto calleeInfo = as<IRTypeFlowData>(callee->getDataType());
+        auto calleeCollection = as<IRCollectionTagType>(calleeInfo);
         if (!calleeCollection)
-            return false;
-
-        if (getCollectionCount(calleeCollection) == 1)
+            newCallee = callee; // Not a collection, no need to lower
+        else if (getCollectionCount(calleeCollection) == 1)
         {
             auto singletonValue = getCollectionElement(calleeCollection, 0);
+            if (singletonValue == callee)
+            {
+                newCallee = callee;
+            }
+            else
+            {
+                changed = true;
+                if (isDynamicGeneric(singletonValue))
+                    extraArgs = getArgsForDynamicSpecialization(cast<IRSpecialize>(singletonValue));
+
+                newCallee = singletonValue;
+            }
+
+            /*
             if (isDynamicGeneric(singletonValue))
                 return lowerCallToDynamicGeneric(context, inst);
 
             if (singletonValue == callee)
                 return false;
+            */
 
-            IRBuilder builder(inst->getModule());
-            builder.replaceOperand(inst->getCalleeUse(), singletonValue);
-            return true; // Replaced with a single function
+            // IRBuilder builder(inst->getModule());
+            // builder.replaceOperand(inst->getCalleeUse(), singletonValue);
+            // newCallee = singletonValue; // Replace with the single value
+            // return true; // Replaced with a single function
+        }
+        else
+        {
+            changed = true;
+            // Multiple elements in the collection.
+            extraArgs.add(callee);
+            auto funcCollection = cast<IRFuncCollection>(callee->getOperand(0));
+
+            // Check if the first element is a dynamic generic (this should imply that all
+            // elements are similar dynamic generics, but we might want to check for that..)
+            //
+            if (isDynamicGeneric(getCollectionElement(funcCollection, 0)))
+            {
+                SLANG_UNEXPECTED("Dynamic generic in a collection call");
+                auto dynamicSpecArgs = getArgsForDynamicSpecialization(
+                    cast<IRSpecialize>(getCollectionElement(funcCollection, 0)));
+                for (auto& arg : dynamicSpecArgs)
+                    extraArgs.add(arg);
+            }
+
+            if (!as<IRFuncType>(funcCollection->getDataType()))
+            {
+                auto typeForCollection = getEffectiveFuncType(funcCollection);
+                funcCollection->setFullType(typeForCollection);
+            }
+
+            newCallee = funcCollection;
         }
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        auto expectedFuncType = getExpectedFuncType(context, inst);
-        // Create dispatch function
+
+        /* Create dispatch function
         auto dispatchFunc =
-            createDispatchFunc(collectionToHashSet(calleeCollection), expectedFuncType);
+            createDispatchFunc(collectionToHashSet(calleeCollection), expectedFuncType);*/
+
 
         // Replace call with dispatch
-        List<IRInst*> newArgs;
+        /*List<IRInst*> newArgs;
         newArgs.add(callee); // Add the lookup as first argument (will get lowered into an uint tag)
         for (UInt i = 1; i < inst->getOperandCount(); i++)
         {
             newArgs.add(inst->getOperand(i));
-        }
+        }*/
 
-        auto newCall = builder.emitCallInst(inst->getDataType(), dispatchFunc, newArgs);
-        inst->replaceUsesWith(newCall);
-        if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(context, newCall)] = info;
-        replaceType(context, newCall); // "maybe replace type"
-        inst->removeAndDeallocate();
-        return true;
+        if (changed)
+        {
+            List<IRInst*> callArgs;
+
+            auto newCall =
+                builder.emitCallInst(expectedFuncType->getResultType(), newCallee, newArgs);
+            inst->replaceUsesWith(newCall);
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (expectedFuncType->getResultType() != inst->getDataType())
+        {
+            // If we didn't change the callee or the arguments, we still might
+            // need to update the result type.
+            //
+            inst->setFullType(expectedFuncType->getResultType());
+            return true;
+        }
+        else
+        {
+            // Nothing changed.
+            return false;
+        }
     }
 
     bool lowerMakeExistential(IRInst* context, IRMakeExistential* inst)
@@ -2202,56 +2713,53 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        auto witnessTableInfo = tryGetInfo(context, inst->getWitnessTable());
-        auto witnessTableCollection = as<IRCollectionBase>(witnessTableInfo);
-        if (!witnessTableCollection)
-            return false; // Witness table must be a set of tables
+        // auto witnessTableInfo = tryGetInfo(context, inst->getWitnessTable());
+
+        // Collect types from the witness tables to determine the any-value type
+        auto tableCollection = as<IRTableCollection>(taggedUnion->getOperand(1));
+        auto typeCollection = as<IRTypeCollection>(taggedUnion->getOperand(0));
 
         IRInst* witnessTableID = nullptr;
-        if (getCollectionCount(witnessTableCollection) == 1)
+        if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
             // Get unique ID for the witness table.
-            witnessTableID = builder.getIntValue(
+            /*witnessTableID = builder.getIntValue(
                 builder.getUIntType(),
-                getUniqueID(getCollectionElement(witnessTableCollection, 0)));
+                getUniqueID(getCollectionElement(witnessTableCollection, 0)));*/
+            auto singletonTagType = makeTagType(makeSingletonSet(witnessTable));
+            auto zeroValueOfTagType = builder.getIntValue((IRType*)singletonTagType, 0);
+            witnessTableID = builder.emitIntrinsicInst(
+                (IRType*)makeTagType(tableCollection),
+                kIROp_GetTagForSuperCollection,
+                1,
+                &zeroValueOfTagType);
         }
-        else
+        else if (
+            auto witnessTableTag = as<IRCollectionTagType>(inst->getWitnessTable()->getDataType()))
         {
-            // Dynamic. Use the witness table inst as an integer key.
+            // Dynamic. Use the witness table inst as a tag
             witnessTableID = inst->getWitnessTable();
         }
 
-        // Collect types from the witness tables to determine the any-value type
-        HashSet<IRType*> types;
-        auto tableCollection = as<IRCollectionBase>(taggedUnion->getOperand(1));
-        forEachInCollection(
-            tableCollection,
-            [&](IRInst* table)
-            {
-                if (auto witnessTableInst = as<IRWitnessTable>(table))
-                {
-                    if (auto concreteType = witnessTableInst->getConcreteType())
-                    {
-                        types.add(concreteType);
-                    }
-                }
-            });
 
         // Create the appropriate any-value type
-        SLANG_ASSERT(types.getCount() > 0);
-        auto unionType = types.getCount() > 1 ? createAnyValueType(types) : *types.begin();
+        auto collectionType = getCollectionCount(typeCollection) == 1
+                                  ? (IRType*)typeCollection->getOperand(0)
+                                  : (IRType*)typeCollection;
 
         // Pack the value
-        auto packedValue = builder.emitPackAnyValue(unionType, inst->getWrappedValue());
+        auto packedValue = builder.emitPackAnyValue(collectionType, inst->getWrappedValue());
+
+        auto taggedUnionTupleType = getLoweredType(taggedUnion);
 
         // Create tuple (table_unique_id, PackAnyValue(val))
-        auto tupleType = builder.getTupleType(
-            List<IRType*>({builder.getUIntType(), packedValue->getDataType()}));
         IRInst* tupleArgs[] = {witnessTableID, packedValue};
-        auto tuple = builder.emitMakeTuple(tupleType, 2, tupleArgs);
+        auto tuple = builder.emitMakeTuple(taggedUnionTupleType, 2, tupleArgs);
 
+        /*
         if (auto info = tryGetInfo(context, inst))
             propagationMap[Element(context, tuple)] = info;
+        */
 
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
@@ -2259,6 +2767,40 @@ struct DynamicInstLoweringContext
     }
 
     bool lowerCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
+    {
+        auto info = tryGetInfo(context, inst);
+        auto taggedUnion = as<IRCollectionTaggedUnionType>(info);
+        if (!taggedUnion)
+            return false;
+
+        auto taggedUnionTupleType = getLoweredType(taggedUnion);
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        List<IRInst*> args;
+        args.add(inst->getDataType());
+        args.add(inst->getTypeID());
+        auto translatedTag = builder.emitIntrinsicInst(
+            (IRType*)taggedUnionTupleType->getOperand(0),
+            kIROp_GetTagFromSequentialID,
+            args.getCount(),
+            args.getBuffer());
+
+        auto packedValue = builder.emitPackAnyValue(
+            (IRType*)taggedUnionTupleType->getOperand(1),
+            inst->getValue());
+
+        auto newInst = builder.emitMakeTuple(
+            taggedUnionTupleType,
+            List<IRInst*>({translatedTag, packedValue}));
+
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    /*bool _lowerCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
         auto info = tryGetInfo(context, inst);
         auto taggedUnion = as<IRCollectionTaggedUnionType>(info);
@@ -2302,7 +2844,7 @@ struct DynamicInstLoweringContext
         inst->replaceUsesWith(existentialTuple);
         inst->removeAndDeallocate();
         return true;
-    }
+    }*/
 
     UInt getUniqueID(IRInst* funcOrTable)
     {
@@ -2315,70 +2857,7 @@ struct DynamicInstLoweringContext
         return newId;
     }
 
-    IRFunc* createIntegerMappingFunc(Dictionary<UInt, UInt>& mapping)
-    {
-        // Create a function that maps input IDs to output IDs
-        IRBuilder builder(module);
-
-        auto funcType =
-            builder.getFuncType(List<IRType*>({builder.getUIntType()}), builder.getUIntType());
-        auto func = builder.createFunc();
-        builder.setInsertInto(func);
-        func->setFullType(funcType);
-
-        auto entryBlock = builder.emitBlock();
-        builder.setInsertInto(entryBlock);
-
-        auto param = builder.emitParam(builder.getUIntType());
-
-        // Create default block that returns 0
-        auto defaultBlock = builder.emitBlock();
-        builder.setInsertInto(defaultBlock);
-        builder.emitReturn(builder.getIntValue(builder.getUIntType(), 0));
-
-        // Go back to entry block and create switch
-        builder.setInsertInto(entryBlock);
-
-        // Create case blocks for each input table
-        List<IRInst*> caseValues;
-        List<IRBlock*> caseBlocks;
-
-        for (auto item : mapping)
-        {
-            // Create case block
-            auto caseBlock = builder.emitBlock();
-            builder.setInsertInto(caseBlock);
-            builder.emitReturn(builder.getIntValue(builder.getUIntType(), item.second));
-
-            caseValues.add(builder.getIntValue(builder.getUIntType(), item.first));
-            caseBlocks.add(caseBlock);
-        }
-
-        // Create flattened case arguments array
-        List<IRInst*> flattenedCaseArgs;
-        for (Index i = 0; i < caseValues.getCount(); i++)
-        {
-            flattenedCaseArgs.add(caseValues[i]);
-            flattenedCaseArgs.add(caseBlocks[i]);
-        }
-
-        // Emit an unreachable block for the break block.
-        auto unreachableBlock = builder.emitBlock();
-        builder.setInsertInto(unreachableBlock);
-        builder.emitUnreachable();
-
-        // Go back to entry and emit switch
-        builder.setInsertInto(entryBlock);
-        builder.emitSwitch(
-            param,
-            unreachableBlock,
-            defaultBlock,
-            flattenedCaseArgs.getCount(),
-            flattenedCaseArgs.getBuffer());
-
-        return func;
-    }
-
+    /*
     IRFunc* createKeyMappingFunc(
         IRInst* key,
         const HashSet<IRInst*>& inputTables,
@@ -2394,158 +2873,9 @@ struct DynamicInstLoweringContext
             mapping[inputId] = outputId;
         }
 
-        return createIntegerMappingFunc(mapping);
+        return createIntegerMappingFunc(module, mapping);
     }
-
-    IRFunc* createDispatchFunc(const HashSet<IRInst*>& funcs, IRFuncType* expectedFuncType)
-    {
-        // Create a dispatch function with switch-case for each function
-        IRBuilder builder(module);
-
-        // Extract parameter types from the first function in the set
-        List<IRType*> paramTypes;
-        paramTypes.add(builder.getUIntType()); // ID parameter
-
-        // Get parameter types from first function
-        List<IRInst*> funcArray;
-        for (auto func : funcs)
-            funcArray.add(func);
-
-        for (UInt i = 0; i < expectedFuncType->getParamCount(); i++)
-        {
-            paramTypes.add(expectedFuncType->getParamType(i));
-        }
-
-        auto resultType = expectedFuncType->getResultType();
-        auto funcType = builder.getFuncType(paramTypes, resultType);
-        auto func = builder.createFunc();
-        builder.setInsertInto(func);
-        func->setFullType(funcType);
-
-        auto entryBlock = builder.emitBlock();
-        builder.setInsertInto(entryBlock);
-
-        auto idParam = builder.emitParam(builder.getUIntType());
-
-        // Create parameters for the original function arguments
-        List<IRInst*> originalParams;
-        for (UInt i = 1; i < paramTypes.getCount(); i++)
-        {
-            originalParams.add(builder.emitParam(paramTypes[i]));
-        }
-
-        // Create default block
-        auto defaultBlock = builder.emitBlock();
-        builder.setInsertInto(defaultBlock);
-        if (resultType->getOp() == kIROp_VoidType)
-        {
-            builder.emitReturn();
-        }
-        else
-        {
-            // Return a default-constructed value
-            auto defaultValue = builder.emitDefaultConstruct(resultType);
-            builder.emitReturn(defaultValue);
-        }
-
-        // Go back to entry block and create switch
-        builder.setInsertInto(entryBlock);
-
-        // Create case blocks for each function
-        List<IRInst*> caseValues;
-        List<IRBlock*> caseBlocks;
-
-        for (auto funcInst : funcs)
-        {
-            auto funcId = getUniqueID(funcInst);
-
-            auto wrapperFunc =
-                emitWitnessTableWrapper(funcInst->getModule(), funcInst, expectedFuncType);
-
-            // Create case block
-            auto caseBlock = builder.emitBlock();
-            builder.setInsertInto(caseBlock);
-
-            List<IRInst*> callArgs;
-            auto wrappedFuncType = as<IRFuncType>(wrapperFunc->getDataType());
-            for (UIndex ii = 0; ii < originalParams.getCount(); ii++)
-            {
-                callArgs.add(originalParams[ii]);
-            }
-
-            // Call the specific function
-            auto callResult =
-                builder.emitCallInst(wrappedFuncType->getResultType(), wrapperFunc, callArgs);
-
-            if (resultType->getOp() == kIROp_VoidType)
-            {
-                builder.emitReturn();
-            }
-            else
-            {
-                builder.emitReturn(callResult);
-            }
-
-            caseValues.add(builder.getIntValue(builder.getUIntType(), funcId));
-            caseBlocks.add(caseBlock);
-        }
-
-        // Create flattened case arguments array
-        List<IRInst*> flattenedCaseArgs;
-        for (Index i = 0; i < caseValues.getCount(); i++)
-        {
-            flattenedCaseArgs.add(caseValues[i]);
-            flattenedCaseArgs.add(caseBlocks[i]);
-        }
-
-        // Create an unreachable block for the break block.
-        auto unreachableBlock = builder.emitBlock();
-        builder.setInsertInto(unreachableBlock);
-        builder.emitUnreachable();
-
-        // Go back to entry and emit switch
-        builder.setInsertInto(entryBlock);
-        builder.emitSwitch(
-            idParam,
-            unreachableBlock,
-            defaultBlock,
-            flattenedCaseArgs.getCount(),
-            flattenedCaseArgs.getBuffer());
-
-        return func;
-    }
-
-    IRAnyValueType* createAnyValueType(const HashSet<IRType*>& types)
-    {
-        IRBuilder builder(module);
-        auto size = calculateAnyValueSize(types);
-        return builder.getAnyValueType(size);
-    }
-
-    IRAnyValueType* createAnyValueTypeFromInsts(const HashSet<IRInst*>& typeInsts)
-    {
-        HashSet<IRType*> types;
-        for (auto inst : typeInsts)
-        {
-            if (auto type = as<IRType>(inst))
-            {
-                types.add(type);
-            }
-        }
-        return createAnyValueType(types);
-    }
-
-    SlangInt calculateAnyValueSize(const HashSet<IRType*>& types)
-    {
-        SlangInt maxSize = 0;
-        for (auto type : types)
-        {
-            auto size = getAnyValueSize(type);
-            if (size > maxSize)
-                maxSize = size;
-        }
-        return maxSize;
-    }
+    */
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }
 
@@ -2587,7 +2917,7 @@ struct DynamicInstLoweringContext
         return tables;
     }
 
-    bool lowerCollectionTypes()
+    /*bool lowerTypeCollections()
     {
         bool hasChanges = false;
 
@@ -2616,7 +2946,44 @@ struct DynamicInstLoweringContext
         }
 
         return hasChanges;
+    }*/
+
+    /*
+    bool transferDataToInstTypes()
+    {
+        bool hasChanges = false;
+
+        for (auto& pair : propagationMap)
+        {
+            auto instWithContext = pair.first;
+            auto flowData = pair.second;
+
+            if (!flowData)
+                continue; // No propagation data
+
+            if (as<IRUnboundedCollection>(flowData))
+            {
+                // If the flow data is an unbounded collection, don't touch
+                // the types.
+                continue;
+            }
+
+            auto inst = instWithContext.inst;
+            auto context = instWithContext.context;
+
+            // Only transfer data for insts that are in top-level
+            // contexts. We'll come back to specialized contexts later.
+            //
+            if (context->getOp() == kIROp_Func)
+            {
+                inst->setFullType((IRType*)flowData);
+                hasChanges = true;
+            }
+        }
+
+        return hasChanges;
     }
+    */
 
     bool processModule()
     {
@@ -2628,14 +2995,14 @@ struct DynamicInstLoweringContext
         // Phase 1.5: Insert reinterprets for points where sets merge
         // e.g. phi, return, call
         //
-        hasChanges |= insertReinterprets();
+        // hasChanges |= insertReinterprets();
 
         // Phase 2: Dynamic Instruction Lowering
         hasChanges |= performDynamicInstLowering();
 
         // Phase 3: Lower collection types.
-        if (hasChanges)
-            lowerCollectionTypes();
+        // if (hasChanges)
+        //    lowerTypeCollections();
 
         return hasChanges;
     }
@@ -2674,6 +3041,418 @@ struct DynamicInstLoweringContext
     // Lowered contexts.
     Dictionary<IRInst*, IRInst*> loweredContexts;
 };
+
+SlangInt calculateAnyValueSize(const HashSet<IRType*>& types)
+{
+    SlangInt maxSize = 0;
+    for (auto type : types)
+    {
+        auto size = getAnyValueSize(type);
+        if (size > maxSize)
+            maxSize = size;
+    }
+    return maxSize;
+}
+
+IRAnyValueType* createAnyValueType(IRBuilder* builder, const HashSet<IRType*>& types)
+{
+    auto size = calculateAnyValueSize(types);
+    return builder->getAnyValueType(size);
+}
+
+IRFunc* createDispatchFunc(IRFuncCollection* collection)
+{
+    // An effective func type should have been set during the dynamic-inst-lowering
+    // pass.
+    //
+    IRFuncType* expectedFuncType = cast<IRFuncType>(collection->getFullType());
+
+    // Create a dispatch function with switch-case for each function
+    IRBuilder builder(collection->getModule());
+
+    List<IRType*> paramTypes;
+    paramTypes.add(builder.getUIntType()); // ID parameter
+    for (UInt i = 0; i < expectedFuncType->getParamCount(); i++)
+        paramTypes.add(expectedFuncType->getParamType(i));
+
+    auto resultType = expectedFuncType->getResultType();
+    auto funcType = builder.getFuncType(paramTypes, resultType);
+    auto func = builder.createFunc();
+    builder.setInsertInto(func);
+    func->setFullType(funcType);
+
+    auto entryBlock = builder.emitBlock();
+    builder.setInsertInto(entryBlock);
+
+    auto idParam = builder.emitParam(builder.getUIntType());
+
+    // Create parameters for the original function arguments
+    List<IRInst*> originalParams;
+    for (UInt i = 1; i < paramTypes.getCount(); i++)
+    {
+        originalParams.add(builder.emitParam(paramTypes[i]));
+    }
+
+    // Create default block
+    auto defaultBlock = builder.emitBlock();
+    builder.setInsertInto(defaultBlock);
+    if (resultType->getOp() == kIROp_VoidType)
+    {
+        builder.emitReturn();
+    }
+    else
+    {
+        // Return a default-constructed value
+        auto defaultValue = builder.emitDefaultConstruct(resultType);
+        builder.emitReturn(defaultValue);
+    }
+
+    // Go back to entry block and create switch
+    builder.setInsertInto(entryBlock);
+
+    // Create case blocks for each function
+    List<IRInst*> caseValues;
+    List<IRBlock*> caseBlocks;
+
+    UIndex funcSeqID = 0;
+    forEachInCollection(
+        collection,
+        [&](IRInst* funcInst)
+        {
+            auto funcId = funcSeqID++;
+            auto wrapperFunc =
+                emitWitnessTableWrapper(funcInst->getModule(), funcInst, expectedFuncType);
+
+            // Create case block
+            auto caseBlock = builder.emitBlock();
+            builder.setInsertInto(caseBlock);
+
+            List<IRInst*> callArgs;
+            auto wrappedFuncType = as<IRFuncType>(wrapperFunc->getDataType());
+            for (UIndex ii = 0; ii < originalParams.getCount(); ii++)
+            {
+                callArgs.add(originalParams[ii]);
+            }
+
+            // Call the specific function
+            auto callResult =
+                builder.emitCallInst(wrappedFuncType->getResultType(), wrapperFunc, callArgs);
+
+            if (resultType->getOp() == kIROp_VoidType)
+            {
+                builder.emitReturn();
+            }
+            else
+            {
+                builder.emitReturn(callResult);
+            }
+
+            caseValues.add(builder.getIntValue(builder.getUIntType(), funcId));
+            caseBlocks.add(caseBlock);
+        });
+
+    // Create flattened case arguments array
+    List<IRInst*> flattenedCaseArgs;
+    for (Index i = 0; i < caseValues.getCount(); i++)
+    {
+        flattenedCaseArgs.add(caseValues[i]);
+        flattenedCaseArgs.add(caseBlocks[i]);
+    }
+
+    // Create an unreachable block for the break block.
+    auto unreachableBlock = builder.emitBlock();
+    builder.setInsertInto(unreachableBlock);
+    builder.emitUnreachable();
+
+    // Go back to entry and emit switch
+    builder.setInsertInto(entryBlock);
+    builder.emitSwitch(
+        idParam,
+        unreachableBlock,
+        defaultBlock,
+        flattenedCaseArgs.getCount(),
+        flattenedCaseArgs.getBuffer());
+
+    return func;
+}
+
+
+IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mapping)
+{
+    // Create a function that maps input IDs to output IDs
+    IRBuilder builder(module);
+
+    auto funcType =
+        builder.getFuncType(List<IRType*>({builder.getUIntType()}), builder.getUIntType());
+    auto func = builder.createFunc();
+    builder.setInsertInto(func);
+    func->setFullType(funcType);
+
+    auto entryBlock = builder.emitBlock();
+    builder.setInsertInto(entryBlock);
+
+    auto param = builder.emitParam(builder.getUIntType());
+
+    // Create default block that returns 0
+    auto defaultBlock = builder.emitBlock();
+    builder.setInsertInto(defaultBlock);
+    builder.emitReturn(builder.getIntValue(builder.getUIntType(), 0));
+
+    // Go back to entry block and create switch
+    builder.setInsertInto(entryBlock);
+
+    // Create case blocks for each input table
+    List<IRInst*> caseValues;
+    List<IRBlock*> caseBlocks;
+
+    for (auto item : mapping)
+    {
+        // Create case block
+        auto caseBlock = builder.emitBlock();
+        builder.setInsertInto(caseBlock);
+        builder.emitReturn(builder.getIntValue(builder.getUIntType(), item.second));
+
+        caseValues.add(builder.getIntValue(builder.getUIntType(), item.first));
+        caseBlocks.add(caseBlock);
+    }
+
+    // Create flattened case arguments array
+    List<IRInst*> flattenedCaseArgs;
+    for (Index i = 0; i < caseValues.getCount(); i++)
+    {
+        flattenedCaseArgs.add(caseValues[i]);
+        flattenedCaseArgs.add(caseBlocks[i]);
+    }
+
+    // Emit an unreachable block for the break block.
+    auto unreachableBlock = builder.emitBlock();
+    builder.setInsertInto(unreachableBlock);
+    builder.emitUnreachable();
+
+    // Go back to entry and emit switch
+    builder.setInsertInto(entryBlock);
+    builder.emitSwitch(
+        param,
+        unreachableBlock,
+        defaultBlock,
+        flattenedCaseArgs.getCount(),
+        flattenedCaseArgs.getBuffer());
+
+    return func;
+}
+
+// This context lowers `IRGetTagFromSequentialID`,
+// `IRGetTagForSuperCollection`, and `IRGetTagForMappedCollection` instructions,
+//
+
+struct TagOpsLoweringContext : public InstPassBase
+{
+    TagOpsLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
+    {
+        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
+        auto srcSeqID = inst->getOperand(1);
+
+        Dictionary<UInt, UInt> mapping;
+
+        // Map from sequential ID to unique ID
+        auto destCollection =
+            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+
+        UIndex dstSeqID = 0;
+        forEachInCollection(
+            destCollection,
+            [&](IRInst* table)
+            {
+                // Get unique ID for the witness table
+                auto witnessTable = cast<IRWitnessTable>(table);
+                auto outputId = dstSeqID++;
+                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
+                if (seqDecoration)
+                {
+                    auto inputId = seqDecoration->getSequentialID();
+                    mapping[inputId] = outputId; // Map ID to itself for now
+                }
+            });
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto translatedID = builder.emitCallInst(
+            inst->getDataType(),
+            createIntegerMappingFunc(builder.getModule(), mapping),
+            List<IRInst*>({srcSeqID}));
+
+        inst->replaceUsesWith(translatedID);
+        inst->removeAndDeallocate();
+    }
+
+    void lowerGetTagForSuperCollection(IRGetTagForSuperCollection* inst)
+    {
+        auto srcCollection = cast<IRCollectionBase>(
+            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto destCollection =
+            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+
+        IRBuilder builder(inst->getModule());
+
+        List<IRInst*> indices;
+        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        {
+            // Find in destCollection
+            auto srcElement = srcCollection->getOperand(i);
+            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+            {
+                auto destElement = destCollection->getOperand(j);
+                if (srcElement == destElement)
+                {
+                    indices.add(builder.getIntValue(builder.getUIntType(), j));
+                    break; // Found the index
+                }
+            }
+            // destCollection must be a super-set
+            SLANG_UNEXPECTED("Element not found in destination collection");
+        }
+
+        // Create an array for the lookup
+        auto lookupArrayType = builder.getArrayType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), indices.getCount()));
+        auto lookupArray =
+            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
+        auto resultID =
+            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
+        inst->replaceUsesWith(resultID);
+        inst->removeAndDeallocate();
+    }
+
+    void lowerGetTagForMappedCollection(IRGetTagForMappedCollection* inst)
+    {
+        auto srcCollection = cast<IRTableCollection>(
+            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto destCollection =
+            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+        auto key = cast<IRStructKey>(inst->getOperand(1));
+
+        IRBuilder builder(inst->getModule());
+
+        List<IRInst*> indices;
+        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        {
+            // Find in destCollection
+            auto srcElement = findEntryInConcreteTable(srcCollection->getOperand(i), key);
+            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+            {
+                auto destElement = destCollection->getOperand(j);
+                if (srcElement == destElement)
+                {
+                    indices.add(builder.getIntValue(builder.getUIntType(), j));
+                    break; // Found the index
+                }
+            }
+
+            // destCollection must be a super-set
+            SLANG_UNEXPECTED("Element not found in destination collection");
+        }
+
+        // Create an array for the lookup
+        auto lookupArrayType = builder.getArrayType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), indices.getCount()));
+        auto lookupArray =
+            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
+        auto resultID =
+            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
+        inst->replaceUsesWith(resultID);
+        inst->removeAndDeallocate();
+    }
+
+    void processInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_GetTagFromSequentialID:
+            lowerGetTagFromSequentialID(as<IRGetTagFromSequentialID>(inst));
+            break;
+        case kIROp_GetTagForSuperCollection:
+            lowerGetTagForSuperCollection(as<IRGetTagForSuperCollection>(inst));
+            break;
+        case kIROp_GetTagForMappedCollection:
+            lowerGetTagForMappedCollection(as<IRGetTagForMappedCollection>(inst));
+            break;
+        default:
+            break;
+        }
+    }
+
+    void processModule()
+    {
+        processAllReachableInsts([&](IRInst* inst) { return processInst(inst); });
+    }
+};
+
+// This context lowers `IRTypeCollection` and `IRFuncCollection` instructions
+struct CollectionLoweringContext : public InstPassBase
+{
+    CollectionLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    void lowerTypeCollection(IRTypeCollection* collection)
+    {
+        HashSet<IRType*> types;
+        for (UInt i = 0; i < collection->getOperandCount(); i++)
+        {
+            if (auto type = as<IRType>(collection->getOperand(i)))
+            {
+                types.add(type);
+            }
+        }
+
+        IRBuilder builder(collection->getModule());
+        auto anyValueType = createAnyValueType(&builder, types);
+        collection->replaceUsesWith(anyValueType);
+    }
+
+    void lowerFuncCollection(IRFuncCollection* collection)
+    {
+        IRBuilder builder(collection->getModule());
+        auto dispatchFunc = createDispatchFunc(collection);
+        collection->replaceUsesWith(dispatchFunc);
+    }
+
+    void processModule()
+    {
+        processInstsOfType<IRFuncCollection>(
+            kIROp_FuncCollection,
+            [&](IRFuncCollection* inst) { return lowerFuncCollection(inst); });
+
+        processInstsOfType<IRTypeCollection>(
+            kIROp_TypeCollection,
+            [&](IRTypeCollection* inst) { return lowerTypeCollection(inst); });
+
+        processInstsOfType<IRCollectionTagType>(
+            kIROp_CollectionTagType,
+            [&](IRCollectionTagType* inst)
+            {
+                IRBuilder builder(inst->getModule());
+                inst->replaceUsesWith(builder.getUIntType());
+            });
+    }
+};
+
+void lowerCollectionAndTagInsts(IRModule* module, DiagnosticSink* sink)
+{
+    TagOpsLoweringContext tagContext(module);
+    tagContext.processModule();
+
+    CollectionLoweringContext context(module);
+    context.processModule();
+}
 
 // Main entry point
 bool lowerDynamicInsts(IRModule* module, DiagnosticSink* sink)

@@ -675,5 +675,8 @@ return {
 	["TypeFlowData.CollectionBase.GenericCollection"] = 671,
 	["TypeFlowData.UnboundedCollection"] = 672,
 	["TypeFlowData.CollectionTagType"] = 673,
-	["TypeFlowData.CollectionTaggedUnionType"] = 674
+	["TypeFlowData.CollectionTaggedUnionType"] = 674,
+	["GetTagForSuperCollection"] = 675,
+	["GetTagForMappedCollection"] = 676,
+	["GetTagFromSequentialID"] = 677
 }

@@ -8,4 +8,5 @@ namespace Slang
 {
 // Main entry point for the pass
 bool lowerDynamicInsts(IRModule* module, DiagnosticSink* sink);
+void lowerCollectionAndTagInsts(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang
