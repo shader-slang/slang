@@ -3228,19 +3228,21 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         return newExpr;
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
-    if (auto infixExpr = as<InfixExpr>(expr))
+    // Skip warning in Slang 2026+ mode where parentheses create tuples
+    if (!isSlang2026OrLater(this))
     {
-        if (auto varExpr = as<VarExpr>(infixExpr->functionExpr))
+        if (auto infixExpr = as<InfixExpr>(expr))
         {
-            if (varExpr->name && varExpr->name->text == ",")
+            if (auto varExpr = as<VarExpr>(infixExpr->functionExpr))
             {
-                // Allow comma operators in for-loop side effects, expand expressions, return
-                // statements, and Slang 2026+ mode (where parentheses create tuples) without
-                // warning
-                if (!getInForLoopSideEffect() && !m_parentExpandExpr && !getInReturnStmt() &&
-                    !isSlang2026OrLater(this))
+                if (varExpr->name && varExpr->name->text == ",")
                 {
-                    getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+                    // Allow comma operators in for-loop side effects and expand expressions without
+                    // warning
+                    if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+                    {
+                        getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+                    }
                 }
             }
         }
