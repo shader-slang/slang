@@ -1,10 +1,12 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain
 
 // CUDA: fetch{{.*}}Data_0{{.*}}* this
 // CPP: fetch{{.*}}Data_0{{.*}}* this
-// METAL: fetch{{.*}}const Data_{{.*}} constant* this
+// METAL: fetch{{.*}}Data_{{.*}} thread* this
+// METALLIB: @computeMain
 
 struct Data {
     StructuredBuffer<float> input[2];

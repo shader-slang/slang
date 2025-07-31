@@ -5,10 +5,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d12
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -d3d11
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -metal
-
 // WGSL bug (Array of resource types can generate an array<array<T>,U>, which is illegal WGSL), tracked with issue #7980
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -wgpu
 
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain
+
+// METALLIB: @computeMain
 
 struct Data {
     RWStructuredBuffer<int> input[2];
