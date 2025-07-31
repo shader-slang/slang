@@ -172,8 +172,7 @@ struct MatrixTypeLoweringContext
             "Matrix dimensions must be compile-time constants for lowering");
 
         SLANG_ASSERT(
-            inst->getOperandCount() == 1 &&
-            "makeMatrixFromScalar should have exactly one operand");
+            inst->getOperandCount() == 1 && "makeMatrixFromScalar should have exactly one operand");
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
