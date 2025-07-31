@@ -1044,6 +1044,9 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32,
         DenormalModeFp64,
 
+        // Bitfield options
+        UseMSVCStyleBitfieldPacking, // bool
+
         CountOf,
     };
 
