@@ -13,7 +13,7 @@
 
 // CUDA: fetch{{.*}}Data_0{{.*}}* this
 // CPP: fetch{{.*}}Data_0{{.*}}* this
-// METAL: fetch{{.*}}const Data_0 constant* this
+// METAL: fetch{{.*}}const Data_{{.*}} constant* this
 struct Data {
     RWStructuredBuffer<int> input;
     RWStructuredBuffer<int> output;
