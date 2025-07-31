@@ -504,8 +504,8 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     {
         const auto& category = categories[categoryIndex];
 
-        // Omit the value categories
-        if (category.kind != CategoryKind::Value)
+        // Omit the value categories and the "Internal" category for text output
+        if (category.kind != CategoryKind::Value && category.name != toSlice("Internal"))
         {
             _appendDescriptionForCategory(categoryIndex);
         }
