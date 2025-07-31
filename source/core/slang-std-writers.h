@@ -24,10 +24,8 @@ enum class DebugMessageSource
 class IDebugCallback
 {
 public:
-    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
-        DebugMessageType type,
-        DebugMessageSource source,
-        const char* message) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
 };
 
 /* Holds standard writers for the channels */

@@ -24,6 +24,7 @@
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
+#include "../render-test/slang-support.h"
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
@@ -31,7 +32,6 @@
 #include "slangi-tool.h"
 #include "test-context.h"
 #include "test-reporter.h"
-#include "../render-test/slang-support.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -4778,7 +4778,7 @@ static SlangResult runUnitTestModule(
     unitTestContext.enabledApis = context->options.enabledApis;
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-    unitTestContext.debugCallback = &rhiDebugBridge; 
+    unitTestContext.debugCallback = &rhiDebugBridge;
 
     auto testCount = testModule->getTestCount();
 

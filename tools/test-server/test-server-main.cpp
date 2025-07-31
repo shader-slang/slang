@@ -10,12 +10,12 @@
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-writer.h"
+#include "../render-test/slang-support.h"
+#include "gfx-unit-test/gfx-test-util.h"
 #include "slang-com-helper.h"
+#include "slang-rhi.h"
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
-#include "gfx-unit-test/gfx-test-util.h"
-#include "../render-test/slang-support.h"
-#include "slang-rhi.h"
 
 #include <stdio.h>
 #include <stdlib.h>

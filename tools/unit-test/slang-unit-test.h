@@ -39,7 +39,7 @@ ITestReporter* getTestReporter();
 
 namespace rhi
 {
-    class IDebugCallback;
+class IDebugCallback;
 }
 
 struct UnitTestContext

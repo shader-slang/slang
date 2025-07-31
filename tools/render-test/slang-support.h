@@ -1,10 +1,10 @@
 // slang-support.h
 #pragma once
 
+#include "core/slang-std-writers.h"
 #include "options.h"
 #include "shader-input-layout.h"
 #include "slang.h"
-#include "core/slang-std-writers.h"
 
 #include <slang-rhi.h>
 
@@ -47,7 +47,7 @@ public:
         const char* message) override
     {
         SLANG_UNUSED(source);
-        
+
         // Only capture error messages
         if (type == Slang::DebugMessageType::Error)
         {
