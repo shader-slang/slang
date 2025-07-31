@@ -1,4 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -entry meshMain -stage mesh -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -entry meshMain -stage mesh -target metallib
+
+//METALLIB: @meshMain
 
 //
 // Mesh shader
@@ -43,7 +46,7 @@ const static uint MAX_PRIMS = 4;
 void meshMain(
     in uint tig: SV_GroupIndex,
     in payload MeshPayload meshPayload,
-    // METAL: MeshPayload_0 object_data* meshPayload_0
+    // METAL: const MeshPayload_0 object_data* meshPayload_0
     OutputVertices<Vertex, MAX_VERTS> verts,
     OutputIndices<uint3, MAX_PRIMS> triangles,
     OutputPrimitives<Primitive, MAX_PRIMS> primitives
