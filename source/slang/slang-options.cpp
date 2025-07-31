@@ -123,6 +123,10 @@ void initCommandOptions(CommandOptions& options)
     options.addCategory(CategoryKind::Option, "Repro", "Slang repro system related");
     options.addCategory(
         CategoryKind::Option,
+        "Discouraged",
+        "Options that are discouraged (and may be deprecated in future)");
+    options.addCategory(
+        CategoryKind::Option,
         "Experimental",
         "Experimental options (use at your own risk)");
     options.addCategory(
@@ -392,10 +396,6 @@ void initCommandOptions(CommandOptions& options)
          "-specialize",
          "-specialize <typename>",
          "Specialize the last entrypoint with <typename>.\n"},
-        {OptionKind::EmitIr,
-         "-emit-ir",
-         nullptr,
-         "Emit IR typically as a '.slang-module' when outputting to a container."},
         {OptionKind::Help,
          "-h,-help,--help",
          "-h or -h <help-category>",
@@ -507,58 +507,10 @@ void initCommandOptions(CommandOptions& options)
          "--",
          nullptr,
          "Treat the rest of the command line as input files."},
-        {OptionKind::ReportDownstreamTime,
-         "-report-downstream-time",
-         nullptr,
-         "Reports the time spent in the downstream compiler."},
-        {OptionKind::ReportPerfBenchmark,
-         "-report-perf-benchmark",
-         nullptr,
-         "Reports compiler performance benchmark results."},
-        {OptionKind::ReportCheckpointIntermediates,
-         "-report-checkpoint-intermediates",
-         nullptr,
-         "Reports information about checkpoint contexts used for reverse-mode automatic "
-         "differentiation."},
         {OptionKind::SkipSPIRVValidation,
          "-skip-spirv-validation",
          nullptr,
          "Skips spirv validation."},
-        {OptionKind::SourceEmbedStyle,
-         "-source-embed-style",
-         "-source-embed-style <source-embed-style>",
-         "If source embedding is enabled, defines the style used. When enabled (with any style "
-         "other than `none`), "
-         "will write compile results into embeddable source for the target language. "
-         "If no output file is specified, the output is written to stdout. If an output file is "
-         "specified "
-         "it is written either to that file directly (if it is appropriate for the target "
-         "language), "
-         "or it will be output to the filename with an appropriate extension.\n\n"
-         "Note for C/C++ with u16/u32/u64 types it is necessary to have \"#include <stdint.h>\" "
-         "before the generated file.\n"},
-        {OptionKind::SourceEmbedName,
-         "-source-embed-name",
-         "-source-embed-name <name>",
-         "The name used as the basis for variables output for source embedding."},
-        {OptionKind::SourceEmbedLanguage,
-         "-source-embed-language",
-         "-source-embed-language <language>",
-         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ "
-         "are supported"},
-        {OptionKind::DisableShortCircuit,
-         "-disable-short-circuit",
-         nullptr,
-         "Disable short-circuiting for \"&&\" and \"||\" operations"},
-        {OptionKind::UnscopedEnum,
-         "-unscoped-enum",
-         nullptr,
-         "Treat enums types as unscoped by default."},
-        {OptionKind::PreserveParameters,
-         "-preserve-params",
-         nullptr,
-         "Preserve all resource parameters in the output code, even if they are not used by the "
-         "shader."},
         {OptionKind::TypeConformance,
          "-conformance",
          "-conformance <typeName>:<interfaceName>[=<sequentialID>]",
@@ -567,11 +519,7 @@ void initCommandOptions(CommandOptions& options)
          "-reflection-json",
          "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."},
-        {OptionKind::UseMSVCStyleBitfieldPacking,
-         "-msvc-style-bitfield-packing",
-         nullptr,
-         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
-         "changes) rather than gcc-style (lsb first)"}};
+    };
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -705,18 +653,6 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-gl-layout",
          nullptr,
          "Use std430 layout instead of D3D buffer layout for raw buffer load/stores."},
-        {OptionKind::VulkanEmitReflection,
-         "-fspv-reflect",
-         nullptr,
-         "Include reflection decorations in the resulting SPIRV for shader parameters."},
-        {OptionKind::EnableEffectAnnotations,
-         "-enable-effect-annotations",
-         nullptr,
-         "Enables support for legacy effect annotation syntax."},
-        {OptionKind::EmitSpirvViaGLSL,
-         "-emit-spirv-via-glsl",
-         nullptr,
-         "Generate SPIR-V output by compiling generated GLSL with glslang"},
         {OptionKind::EmitSpirvDirectly,
          "-emit-spirv-directly",
          nullptr,
@@ -775,13 +711,6 @@ void initCommandOptions(CommandOptions& options)
          "Pass arguments to downstream <compiler>. Just -X<compiler> passes just the next argument "
          "to the downstream compiler. -X<compiler>... options -X. will pass *all* of the options "
          "inbetween the opening -X and -X. to the downstream compiler."},
-        {OptionKind::PassThrough,
-         "-pass-through",
-         "-pass-through <compiler>",
-         "Pass the input through mostly unmodified to the "
-         "existing compiler <compiler>.\n"
-         "These are intended for debugging/testing purposes, when you want to be able to see what "
-         "these existing compilers do with the \"same\" input and options"},
     };
 
     _addOptions(makeConstArrayView(downstreamOpts), options);
@@ -858,10 +787,6 @@ void initCommandOptions(CommandOptions& options)
          "-output-includes",
          nullptr,
          "Print the hierarchy of the processed source files."},
-        {OptionKind::REMOVED_SerialIR,
-         "-serial-ir",
-         nullptr,
-         "[REMOVED] Serialize the IR between front-end and back-end."},
         {OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase."},
         {OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases."},
         {OptionKind::VerbosePaths,
@@ -869,10 +794,6 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "When displaying diagnostic output aim to display more detailed path information. "
          "In practice this is typically the complete 'canonical' path to the source file used."},
-        {OptionKind::VerifyDebugSerialIr,
-         "-verify-debug-serial-ir",
-         nullptr,
-         "Verify IR in the front-end."},
         {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
         {OptionKind::GetModuleInfo,
          "-get-module-info",
@@ -889,27 +810,10 @@ void initCommandOptions(CommandOptions& options)
     options.setCategory("Experimental");
 
     const Option experimentalOpts[] = {
-        {OptionKind::FileSystem,
-         "-file-system",
-         "-file-system <file-system-type>",
-         "Set the filesystem hook to use for a compile request."},
         {OptionKind::Heterogeneous,
          "-heterogeneous",
          nullptr,
          "Output heterogeneity-related code."},
-        {OptionKind::NoMangle,
-         "-no-mangle",
-         nullptr,
-         "Do as little mangling of names as possible."},
-        {OptionKind::NoHLSLBinding,
-         "-no-hlsl-binding",
-         nullptr,
-         "Do not include explicit parameter binding semantics in the output HLSL code,"
-         "except for parameters that has explicit bindings in the input source."},
-        {OptionKind::NoHLSLPackConstantBufferElements,
-         "-no-hlsl-pack-constant-buffer-elements",
-         nullptr,
-         "Do not pack elements of constant buffers into structs in the output HLSL code."},
         {OptionKind::ValidateUniformity,
          "-validate-uniformity",
          nullptr,
@@ -935,30 +839,7 @@ void initCommandOptions(CommandOptions& options)
     options.setCategory("Internal");
 
     const Option internalOpts[] = {
-        {OptionKind::ArchiveType,
-         "-archive-type",
-         "-archive-type <archive-type>",
-         "Set the archive type for -save-core-module. Default is zip."},
-        {OptionKind::CompileCoreModule,
-         "-compile-core-module",
-         nullptr,
-         "Compile the core module from embedded sources. "
-         "Will return a failure if there is already a core module available."},
-        {OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-core-module"},
-        {OptionKind::IrCompression,
-         "-ir-compression",
-         "-ir-compression <type>",
-         "Set compression for IR and AST outputs.\n"
-         "Accepted compression types: none, lite"},
-        {OptionKind::LoadCoreModule,
-         "-load-core-module",
-         "-load-core-module <filename>",
-         "Load the core module from file."},
         {OptionKind::ReferenceModule, "-r", "-r <name>", "reference module <name>"},
-        {OptionKind::SaveCoreModule,
-         "-save-core-module",
-         "-save-core-module <filename>",
-         "Save the core module to an archive file."},
         {OptionKind::SaveCoreModuleBinSource,
          "-save-core-module-bin-source",
          "-save-core-module-bin-source <filename>",
@@ -978,8 +859,60 @@ void initCommandOptions(CommandOptions& options)
          "-loop-inversion",
          nullptr,
          "Enable loop inversion in the code-gen optimization. Default is off"},
+         {OptionKind::ReportDownstreamTime,
+         "-report-downstream-time",
+         nullptr,
+         "Reports the time spent in the downstream compiler."},
+        {OptionKind::ReportPerfBenchmark,
+         "-report-perf-benchmark",
+         nullptr,
+         "Reports compiler performance benchmark results."},
+        {OptionKind::ReportCheckpointIntermediates,
+         "-report-checkpoint-intermediates",
+         nullptr,
+         "Reports information about checkpoint contexts used for reverse-mode automatic "
+         "differentiation."},
+
     };
     _addOptions(makeConstArrayView(internalOpts), options);
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! "Considered Harmful" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    options.setCategory("Discouraged");
+
+    const Option discouragedOpts[] = {
+        {OptionKind::DisableShortCircuit,
+         "-disable-short-circuit",
+         nullptr,
+         "Disable short-circuiting for \"&&\" and \"||\" operations"},
+        {OptionKind::UnscopedEnum,
+         "-unscoped-enum",
+         nullptr,
+         "Treat enums types as unscoped by default."},
+        {OptionKind::PreserveParameters,
+         "-preserve-params",
+         nullptr,
+         "Preserve all resource parameters in the output code, even if they are not used by the "
+         "shader."},
+        {OptionKind::UseMSVCStyleBitfieldPacking,
+         "-msvc-style-bitfield-packing",
+         nullptr,
+         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
+         "changes) rather than gcc-style (lsb first)"},
+        {OptionKind::VulkanEmitReflection,
+         "-fspv-reflect",
+         nullptr,
+         "Include reflection decorations in the resulting SPIRV for shader parameters."},
+        {OptionKind::EnableEffectAnnotations,
+         "-enable-effect-annotations",
+         nullptr,
+         "Enables support for legacy effect annotation syntax."},
+        {OptionKind::EmitSpirvViaGLSL,
+         "-emit-spirv-via-glsl",
+         nullptr,
+         "Generate SPIR-V output by compiling generated GLSL with glslang"},
+    };
+    _addOptions(makeConstArrayView(discouragedOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Deprecated !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -997,6 +930,87 @@ void initCommandOptions(CommandOptions& options)
          "Structs will set all struct-fields without an init expression to 0."
          "All variables will call their default constructor if not explicitly initialized as "
          "usual."},
+        {OptionKind::EmitIr,
+        "-emit-ir",
+        nullptr,
+        "Emit IR typically as a '.slang-module' when outputting to a container."},
+        {OptionKind::SourceEmbedStyle,
+         "-source-embed-style",
+         "-source-embed-style <source-embed-style>",
+         "If source embedding is enabled, defines the style used. When enabled (with any style "
+         "other than `none`), "
+         "will write compile results into embeddable source for the target language. "
+         "If no output file is specified, the output is written to stdout. If an output file is "
+         "specified "
+         "it is written either to that file directly (if it is appropriate for the target "
+         "language), "
+         "or it will be output to the filename with an appropriate extension.\n\n"
+         "Note for C/C++ with u16/u32/u64 types it is necessary to have \"#include <stdint.h>\" "
+         "before the generated file.\n"},
+        {OptionKind::SourceEmbedName,
+         "-source-embed-name",
+         "-source-embed-name <name>",
+         "The name used as the basis for variables output for source embedding."},
+        {OptionKind::SourceEmbedLanguage,
+         "-source-embed-language",
+         "-source-embed-language <language>",
+         "The language to be used for source embedding. Defaults to C/C++. Currently only C/C++ "
+         "are supported"},
+        {OptionKind::PassThrough,
+         "-pass-through",
+         "-pass-through <compiler>",
+         "Pass the input through mostly unmodified to the "
+         "existing compiler <compiler>.\n"
+         "These are intended for debugging/testing purposes, when you want to be able to see what "
+         "these existing compilers do with the \"same\" input and options"},
+        {OptionKind::REMOVED_SerialIR,
+         "-serial-ir",
+         nullptr,
+         "[REMOVED] Serialize the IR between front-end and back-end."},
+        {OptionKind::VerifyDebugSerialIr,
+         "-verify-debug-serial-ir",
+         nullptr,
+         "Verify IR in the front-end."},
+        {OptionKind::FileSystem,
+         "-file-system",
+         "-file-system <file-system-type>",
+         "Set the filesystem hook to use for a compile request."},
+        {OptionKind::NoMangle,
+         "-no-mangle",
+         nullptr,
+         "Do as little mangling of names as possible."},
+        {OptionKind::NoHLSLBinding,
+         "-no-hlsl-binding",
+         nullptr,
+         "Do not include explicit parameter binding semantics in the output HLSL code,"
+         "except for parameters that has explicit bindings in the input source."},
+        {OptionKind::NoHLSLPackConstantBufferElements,
+         "-no-hlsl-pack-constant-buffer-elements",
+         nullptr,
+         "Do not pack elements of constant buffers into structs in the output HLSL code."},
+        {OptionKind::ArchiveType,
+         "-archive-type",
+         "-archive-type <archive-type>",
+         "Set the archive type for -save-core-module. Default is zip."},
+        {OptionKind::CompileCoreModule,
+         "-compile-core-module",
+         nullptr,
+         "Compile the core module from embedded sources. "
+         "Will return a failure if there is already a core module available."},
+        {OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-core-module"},
+        {OptionKind::IrCompression,
+         "-ir-compression",
+         "-ir-compression <type>",
+         "Set compression for IR and AST outputs.\n"
+         "Accepted compression types: none, lite"},
+        {OptionKind::LoadCoreModule,
+         "-load-core-module",
+         "-load-core-module <filename>",
+         "Load the core module from file."},
+        {OptionKind::SaveCoreModule,
+         "-save-core-module",
+         "-save-core-module <filename>",
+         "Save the core module to an archive file."},
     };
     _addOptions(makeConstArrayView(deprecatedOpts), options);
 
@@ -2291,8 +2305,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Load the file
                 ScopedAllocation contents;
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
+                SLANG_ALLOW_DEPRECATED_BEGIN
                 SLANG_RETURN_ON_FAIL(
                     m_session->loadCoreModule(contents.getData(), contents.getSizeInBytes()));
+                SLANG_ALLOW_DEPRECATED_END
 
                 // Ensure that the linkage's AST builder is up-to-date.
                 linkage->getASTBuilder()->m_cachedNodes =
@@ -2315,7 +2331,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 ComPtr<ISlangBlob> blob;
 
+                SLANG_ALLOW_DEPRECATED_BEGIN
                 SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
+                SLANG_ALLOW_DEPRECATED_END
                 SLANG_RETURN_ON_FAIL(File::writeAllBytes(
                     fileName.value,
                     blob->getBufferPointer(),
@@ -2332,14 +2350,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 if (optionKind == OptionKind::SaveCoreModuleBinSource)
                 {
+                    SLANG_ALLOW_DEPRECATED_BEGIN
                     SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
+                    SLANG_ALLOW_DEPRECATED_END
                 }
                 else
                 {
+                    SLANG_ALLOW_DEPRECATED_BEGIN
                     SLANG_RETURN_ON_FAIL(m_session->saveBuiltinModule(
                         slang::BuiltinModuleName::GLSL,
                         m_archiveType,
                         blob.writeRef()));
+                    SLANG_ALLOW_DEPRECATED_END
                 }
                 StringBuilder builder;
                 StringWriter writer(&builder, 0);
@@ -3127,7 +3149,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     ComPtr<slang::IBlob> blob;
                     blob = RawBlob::create(buffer.getBuffer(), size);
 
-                    module = session->loadModuleFromIRBlob(
+                    module = session->loadModuleFromBinaryBlob(
                         "module",
                         "path",
                         blob,
@@ -3259,7 +3281,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     if (m_compileCoreModule)
     {
+        SLANG_ALLOW_DEPRECATED_BEGIN
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
+        SLANG_ALLOW_DEPRECATED_END
     }
 
     // TODO(JS): This is a restriction because of how setting of state works for load repro

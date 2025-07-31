@@ -249,10 +249,12 @@ static void* _findRepresentation(const ConstArrayView<ICastable*>& castables, co
 {
     for (const auto& cur : castables)
     {
+        SLANG_ALLOW_DEPRECATED_BEGIN
         if (auto ptr = cur->castAs(guid))
         {
             return ptr;
         }
+        SLANG_ALLOW_DEPRECATED_END
     }
     return nullptr;
 }

@@ -88,7 +88,9 @@ static SlangResult _addCPPPrelude(const String& rootPath, slang::IGlobalSession*
     SLANG_RETURN_ON_FAIL(res);
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
+    SLANG_ALLOW_DEPRECATED_END
     return SLANG_OK;
 }
 
@@ -106,7 +108,9 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     SLANG_RETURN_ON_FAIL(res);
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
+    SLANG_ALLOW_DEPRECATED_END
     return SLANG_OK;
 }
 

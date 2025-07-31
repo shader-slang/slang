@@ -105,7 +105,7 @@ public:
         slang::IBlob* source,
         ModuleBlobType blobType,
         slang::IBlob** outDiagnostics = nullptr);
-    SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
+    SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromBinaryBlob(
         const char* moduleName,
         const char* path,
         slang::IBlob* source,

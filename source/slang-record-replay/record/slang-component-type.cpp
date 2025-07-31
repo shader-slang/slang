@@ -174,8 +174,10 @@ SLANG_NO_THROW SlangResult IComponentTypeRecorder::getResultAsFileSystem(
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res =
         m_actualComponentType->getResultAsFileSystem(entryPointIndex, targetIndex, outFileSystem);
+    SLANG_ALLOW_DEPRECATED_END
 
     {
         recorder->recordAddress(*outFileSystem);

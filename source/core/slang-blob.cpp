@@ -142,11 +142,13 @@ void* StringBlob::getObject(const Guid& guid)
     {
         return this;
     }
+    SLANG_ALLOW_DEPRECATED_BEGIN
     // Can always be accessed as terminated char*
     if (guid == SlangTerminatedChars::getTypeGuid())
     {
         return const_cast<char*>(m_slice.begin());
     }
+    SLANG_ALLOW_DEPRECATED_END
     return nullptr;
 }
 
@@ -164,10 +166,12 @@ void* RawBlob::castAs(const SlangUUID& guid)
 void* RawBlob::getObject(const Guid& guid)
 {
     // If the data has 0 termination, we can return the pointer
+    SLANG_ALLOW_DEPRECATED_BEGIN
     if (guid == SlangTerminatedChars::getTypeGuid() && m_data.isTerminated())
     {
         return (char*)m_data.getData();
     }
+    SLANG_ALLOW_DEPRECATED_END
     return nullptr;
 }
 
@@ -184,11 +188,13 @@ void* ScopeBlob::castAs(const SlangUUID& guid)
         return obj;
     }
 
+SLANG_ALLOW_DEPRECATED_BEGIN
     // If the contained thing is castable, ask it
     if (m_castable)
     {
         return m_castable->castAs(guid);
     }
+SLANG_ALLOW_DEPRECATED_END
 
     return nullptr;
 }
@@ -206,6 +212,7 @@ void* ListBlob::castAs(const SlangUUID& guid)
 
 void* ListBlob::getObject(const Guid& guid)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     // If the data is terminated return the pointer
     if (guid == SlangTerminatedChars::getTypeGuid())
     {
@@ -219,6 +226,7 @@ void* ListBlob::getObject(const Guid& guid)
             }
         }
     }
+    SLANG_ALLOW_DEPRECATED_END
     return nullptr;
 }
 

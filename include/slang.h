@@ -661,9 +661,9 @@ typedef uint32_t SlangSizeT;
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
-    /* Defines an archive type used to holds a 'file system' type structure. */
-    typedef int SlangArchiveTypeIntegral;
-    enum SlangArchiveType : SlangArchiveTypeIntegral
+    /* DEPRECATED: Defines an archive type used to holds a 'file system' type structure. */
+    typedef int SlangArchiveTypeIntegral /*DEPRECATED*/;
+    enum /*DEPRECATED*/ SlangArchiveType : SlangArchiveTypeIntegral
     {
         SLANG_ARCHIVE_TYPE_UNDEFINED,
         SLANG_ARCHIVE_TYPE_ZIP,
@@ -1294,7 +1294,10 @@ public:                                                              \
 
 
     /* An interface to provide a mechanism to cast, that doesn't require ref counting
-    and doesn't have to return a pointer to a ISlangUnknown derived class */
+    and doesn't have to return a pointer to a ISlangUnknown derived class.
+    
+    This interface is DEPRECATED.
+    */
     class ISlangCastable : public ISlangUnknown
     {
         SLANG_COM_INTERFACE(
@@ -1306,9 +1309,12 @@ public:                                                              \
         /// Can be used to cast to interfaces without reference counting.
         /// Also provides access to internal implementations, when they provide a guid
         /// Can simulate a 'generated' interface as long as kept in scope by cast from.
-        virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) = 0;
+        virtual SLANG_NO_THROW [[deprecated]] void* SLANG_MCALL castAs(const SlangUUID& guid) = 0;
     };
 
+    /*
+    This interface is DEPRECATED.
+    */
     class ISlangClonable : public ISlangCastable
     {
         SLANG_COM_INTERFACE(
@@ -1321,7 +1327,7 @@ public:                                                              \
         /// The object is returned *not* ref counted. Any type that can implements the interface,
         /// derives from ICastable, and so (not withstanding some other issue) will always return
         /// an ICastable interface which other interfaces/types are accessible from via castAs
-        SLANG_NO_THROW virtual void* SLANG_MCALL clone(const SlangUUID& guid) = 0;
+        SLANG_NO_THROW virtual [[deprecated]] void* SLANG_MCALL clone(const SlangUUID& guid) = 0;
     };
 
     /** A "blob" of binary data.
@@ -1340,20 +1346,6 @@ public:                                                              \
         virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() = 0;
     };
 #define SLANG_UUID_ISlangBlob ISlangBlob::getTypeGuid()
-
-    /* Can be requested from ISlangCastable cast to indicate the contained chars are null
-     * terminated.
-     */
-    struct SlangTerminatedChars
-    {
-        SLANG_CLASS_GUID(
-            0xbe0db1a8,
-            0x3594,
-            0x4603,
-            {0xa7, 0x8b, 0xc4, 0x86, 0x84, 0x30, 0xdf, 0xbb});
-        operator const char*() const { return chars; }
-        char chars[1];
-    };
 
     /** A (real or virtual) file system.
 
@@ -1457,307 +1449,6 @@ public:                                                              \
     };
 #define SLANG_UUID_ISlangSharedLibraryLoader ISlangSharedLibraryLoader::getTypeGuid()
 
-    /* Type that identifies how a path should be interpreted */
-    typedef unsigned int SlangPathTypeIntegral;
-    enum SlangPathType : SlangPathTypeIntegral
-    {
-        SLANG_PATH_TYPE_DIRECTORY, /**< Path specified specifies a directory. */
-        SLANG_PATH_TYPE_FILE,      /**< Path specified is to a file. */
-    };
-
-    /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
-    The name is the name of a file system object (directory/file) in the specified path (ie it is
-    without a path) */
-    typedef void (
-        *FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
-
-    /* Determines how paths map to files on the OS file system */
-    enum class OSPathKind : uint8_t
-    {
-        None,            ///< Paths do not map to the file system
-        Direct,          ///< Paths map directly to the file system
-        OperatingSystem, ///< Only paths gained via PathKind::OperatingSystem map to the operating
-                         ///< system file system
-    };
-
-    /* Used to determine what kind of path is required from an input path */
-    enum class PathKind
-    {
-        /// Given a path, returns a simplified version of that path.
-        /// This typically means removing '..' and/or '.' from the path.
-        /// A simplified path must point to the same object as the original.
-        Simplified,
-
-        /// Given a path, returns a 'canonical path' to the item.
-        /// This may be the operating system 'canonical path' that is the unique path to the item.
-        ///
-        /// If the item exists the returned canonical path should always be usable to access the
-        /// item.
-        ///
-        /// If the item the path specifies doesn't exist, the canonical path may not be returnable
-        /// or be a path simplification.
-        /// Not all file systems support canonical paths.
-        Canonical,
-
-        /// Given a path returns a path such that it is suitable to be displayed to the user.
-        ///
-        /// For example if the file system is a zip file - it might include the path to the zip
-        /// container as well as the path to the specific file.
-        ///
-        /// NOTE! The display path won't necessarily work on the file system to access the item
-        Display,
-
-        /// Get the path to the item on the *operating system* file system, if available.
-        OperatingSystem,
-
-        CountOf,
-    };
-
-    /** An extended file system abstraction.
-
-    Implementing and using this interface over ISlangFileSystem gives much more control over how
-    paths are managed, as well as how it is determined if two files 'are the same'.
-
-    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
-    Blobs that contain strings are always zero terminated.
-    */
-    struct ISlangFileSystemExt : public ISlangFileSystem
-    {
-        SLANG_COM_INTERFACE(
-            0x5fb632d2,
-            0x979d,
-            0x4481,
-            {0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1})
-
-        /** Get a uniqueIdentity which uniquely identifies an object of the file system.
-
-        Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same object
-        on the file system.
-
-        The uniqueIdentity is used to compare if two paths are the same - which amongst other things
-        allows Slang to cache source contents internally. It is also used for #pragma once
-        functionality.
-
-        A *requirement* is for any implementation is that two paths can only return the same
-        uniqueIdentity if the contents of the two files are *identical*. If an implementation breaks
-        this constraint it can produce incorrect compilation. If an implementation cannot *strictly*
-        identify *the same* files, this will only have an effect on #pragma once behavior.
-
-        The string for the uniqueIdentity is held zero terminated in the ISlangBlob of
-        outUniqueIdentity.
-
-        Note that there are many ways a uniqueIdentity may be generated for a file. For example it
-        could be the 'canonical path' - assuming it is available and unambiguous for a file system.
-        Another possible mechanism could be to store the filename combined with the file date time
-        to uniquely identify it.
-
-        The client must ensure the blob be released when no longer used, otherwise memory will leak.
-
-        NOTE! Ideally this method would be called 'getPathUniqueIdentity' but for historical reasons
-        and backward compatibility it's name remains with 'File' even though an implementation
-        should be made to work with directories too.
-
-        @param path
-        @param outUniqueIdentity
-        @returns A `SlangResult` to indicate success or failure getting the uniqueIdentity.
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) = 0;
-
-        /** Calculate a path combining the 'fromPath' with 'path'
-
-        The client must ensure the blob be released when no longer used, otherwise memory will leak.
-
-        @param fromPathType How to interpret the from path - as a file or a directory.
-        @param fromPath The from path.
-        @param path Path to be determined relative to the fromPath
-        @param pathOut Holds the string which is the relative path. The string is held in the blob
-        zero terminated.
-        @returns A `SlangResult` to indicate success or failure in loading the file.
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
-            SlangPathType fromPathType,
-            const char* fromPath,
-            const char* path,
-            ISlangBlob** pathOut) = 0;
-
-        /** Gets the type of path that path is on the file system.
-        @param path
-        @param pathTypeOut
-        @returns SLANG_OK if located and type is known, else an error. SLANG_E_NOT_FOUND if not
-        found.
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        getPathType(const char* path, SlangPathType* pathTypeOut) = 0;
-
-        /** Get a path based on the kind.
-
-        @param kind The kind of path wanted
-        @param path The input path
-        @param outPath The output path held in a blob
-        @returns SLANG_OK if successfully simplified the path (SLANG_E_NOT_IMPLEMENTED if not
-        implemented, or some other error code)
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        getPath(PathKind kind, const char* path, ISlangBlob** outPath) = 0;
-
-        /** Clears any cached information */
-        virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
-
-        /** Enumerate the contents of the path
-
-        Note that for normal Slang operation it isn't necessary to enumerate contents this can
-        return SLANG_E_NOT_IMPLEMENTED.
-
-        @param The path to enumerate
-        @param callback This callback is called for each entry in the path.
-        @param userData This is passed to the callback
-        @returns SLANG_OK if successful
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
-            const char* path,
-            FileSystemContentsCallBack callback,
-            void* userData) = 0;
-
-        /** Returns how paths map to the OS file system
-
-        @returns OSPathKind that describes how paths map to the Operating System file system
-        */
-        virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
-    };
-
-#define SLANG_UUID_ISlangFileSystemExt ISlangFileSystemExt::getTypeGuid()
-
-    struct ISlangMutableFileSystem : public ISlangFileSystemExt
-    {
-        SLANG_COM_INTERFACE(
-            0xa058675c,
-            0x1d65,
-            0x452a,
-            {0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5})
-
-        /** Write data to the specified path.
-
-        @param path The path for data to be saved to
-        @param data The data to be saved
-        @param size The size of the data in bytes
-        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other
-        error code)
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        saveFile(const char* path, const void* data, size_t size) = 0;
-
-        /** Write data in the form of a blob to the specified path.
-
-        Depending on the implementation writing a blob might be faster/use less memory. It is
-        assumed the blob is *immutable* and that an implementation can reference count it.
-
-        It is not guaranteed loading the same file will return the *same* blob - just a blob with
-        same contents.
-
-        @param path The path for data to be saved to
-        @param dataBlob The data to be saved
-        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other
-        error code)
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        saveFileBlob(const char* path, ISlangBlob* dataBlob) = 0;
-
-        /** Remove the entry in the path (directory of file). Will only delete an empty directory,
-        if not empty will return an error.
-
-        @param path The path to remove
-        @returns SLANG_OK if successful
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) = 0;
-
-        /** Create a directory.
-
-        The path to the directory must exist
-
-        @param path To the directory to create. The parent path *must* exist otherwise will return
-        an error.
-        @returns SLANG_OK if successful
-        */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) = 0;
-    };
-
-#define SLANG_UUID_ISlangMutableFileSystem ISlangMutableFileSystem::getTypeGuid()
-
-    /* Identifies different types of writer target*/
-    typedef unsigned int SlangWriterChannelIntegral;
-    enum SlangWriterChannel : SlangWriterChannelIntegral
-    {
-        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
-        SLANG_WRITER_CHANNEL_STD_OUTPUT,
-        SLANG_WRITER_CHANNEL_STD_ERROR,
-        SLANG_WRITER_CHANNEL_COUNT_OF,
-    };
-
-    typedef unsigned int SlangWriterModeIntegral;
-    enum SlangWriterMode : SlangWriterModeIntegral
-    {
-        SLANG_WRITER_MODE_TEXT,
-        SLANG_WRITER_MODE_BINARY,
-    };
-
-    /** A stream typically of text, used for outputting diagnostic as well as other information.
-     */
-    struct ISlangWriter : public ISlangUnknown
-    {
-        SLANG_COM_INTERFACE(
-            0xec457f0e,
-            0x9add,
-            0x4e6b,
-            {0x85, 0x1c, 0xd7, 0xfa, 0x71, 0x6d, 0x15, 0xfd})
-
-        /** Begin an append buffer.
-        NOTE! Only one append buffer can be active at any time.
-        @param maxNumChars The maximum of chars that will be appended
-        @returns The start of the buffer for appending to. */
-        virtual SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) = 0;
-        /** Ends the append buffer, and is equivalent to a write of the append buffer.
-        NOTE! That an endAppendBuffer is not necessary if there are no characters to write.
-        @param buffer is the start of the data to append and must be identical to last value
-        returned from beginAppendBuffer
-        @param numChars must be a value less than or equal to what was returned from last call to
-        beginAppendBuffer
-        @returns Result, will be SLANG_OK on success */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        endAppendBuffer(char* buffer, size_t numChars) = 0;
-        /** Write text to the writer
-        @param chars The characters to write out
-        @param numChars The amount of characters
-        @returns SLANG_OK on success */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        write(const char* chars, size_t numChars) = 0;
-        /** Flushes any content to the output */
-        virtual SLANG_NO_THROW void SLANG_MCALL flush() = 0;
-        /** Determines if the writer stream is to the console, and can be used to alter the output
-        @returns Returns true if is a console writer */
-        virtual SLANG_NO_THROW SlangBool SLANG_MCALL isConsole() = 0;
-        /** Set the mode for the writer to use
-        @param mode The mode to use
-        @returns SLANG_OK on success */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMode(SlangWriterMode mode) = 0;
-    };
-
-#define SLANG_UUID_ISlangWriter ISlangWriter::getTypeGuid()
-
-    struct ISlangProfiler : public ISlangUnknown
-    {
-        SLANG_COM_INTERFACE(
-            0x197772c7,
-            0x0155,
-            0x4b91,
-            {0x84, 0xe8, 0x66, 0x68, 0xba, 0xff, 0x06, 0x19})
-        virtual SLANG_NO_THROW size_t SLANG_MCALL getEntryCount() = 0;
-        virtual SLANG_NO_THROW const char* SLANG_MCALL getEntryName(uint32_t index) = 0;
-        virtual SLANG_NO_THROW long SLANG_MCALL getEntryTimeMS(uint32_t index) = 0;
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryInvocationTimes(uint32_t index) = 0;
-    };
-#define SLANG_UUID_ISlangProfiler ISlangProfiler::getTypeGuid()
-
     namespace slang
     {
     struct IGlobalSession;
@@ -1777,12 +1468,6 @@ public:                                                              \
     @brief A request for one or more compilation actions to be performed.
     */
     typedef struct slang::ICompileRequest SlangCompileRequest;
-
-
-    /*!
-@brief Callback type used for diagnostic output.
-*/
-    typedef void (*SlangDiagnosticCallback)(char const* message, void* userData);
 
     /*!
     @brief Get the build version 'tag' string. The string is the same as
@@ -3557,8 +3242,8 @@ struct DeclReflection
     IteratedList getChildren() { return IteratedList{getChildrenCount(), (DeclReflection*)this}; }
 };
 
-typedef uint32_t CompileCoreModuleFlags;
-struct CompileCoreModuleFlag
+typedef uint32_t CompileCoreModuleFlags /*DEPRECATED*/;
+struct /*DEPRECATED*/ CompileCoreModuleFlag
 {
     enum Enum : CompileCoreModuleFlags
     {
@@ -3577,7 +3262,7 @@ struct SessionDesc;
 struct SpecializationArg;
 struct TargetDesc;
 
-enum class BuiltinModuleName
+enum class /*DEPRECATED*/ BuiltinModuleName
 {
     Core,
     GLSL
@@ -3630,7 +3315,7 @@ struct IGlobalSession : public ISlangUnknown
 
     That for pass-through usage, prelude is not pre-pended, preludes are for code generation only.
     */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* preludeText) = 0;
 
     /** DEPRECATED: Use getLanguagePrelude
@@ -3640,7 +3325,7 @@ struct IGlobalSession : public ISlangUnknown
     to it.
     @param outPrelude  On exit holds a blob that holds the string of the prelude.
     */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     getDownstreamCompilerPrelude(SlangPassThrough passThrough, ISlangBlob** outPrelude) = 0;
 
     /** Get the build version 'tag' string. The string is the same as produced via `git describe
@@ -3681,14 +3366,14 @@ struct IGlobalSession : public ISlangUnknown
     Note! That for pass-through usage, prelude is not pre-pended, preludes are for code generation
     only.
     */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     setLanguagePrelude(SlangSourceLanguage sourceLanguage, const char* preludeText) = 0;
 
     /** Get the 'prelude' associated with a specific source language.
     @param sourceLanguage The language the prelude should be inserted on.
     @param outPrelude  On exit holds a blob that holds the string of the prelude.
     */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     getLanguagePrelude(SlangSourceLanguage sourceLanguage, ISlangBlob** outPrelude) = 0;
 
     /** Create a compile request.
@@ -3698,7 +3383,7 @@ struct IGlobalSession : public ISlangUnknown
 
     /** Add new builtin declarations to be used in subsequent compiles.
      */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     addBuiltins(char const* sourcePath, char const* sourceString) = 0;
 
     /** Set the session shared library loader. If this changes the loader, it may cause shared
@@ -3730,7 +3415,7 @@ struct IGlobalSession : public ISlangUnknown
     SLANG_E_NOT_IMPLEMENTED if not implemented in this build
     SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work
     could not be found SLANG_FAIL other kinds of failures */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     checkPassThroughSupport(SlangPassThrough passThrough) = 0;
 
     /** Compile from (embedded source) the core module on the session.
@@ -3738,7 +3423,7 @@ struct IGlobalSession : public ISlangUnknown
     NOTE! API is experimental and not ready for production code
     @param flags to control compilation
     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     compileCoreModule(CompileCoreModuleFlags flags) = 0;
 
     /** Load the core module. Currently loads modules from the file system.
@@ -3747,7 +3432,7 @@ struct IGlobalSession : public ISlangUnknown
 
     NOTE! API is experimental and not ready for production code
     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) = 0;
 
     /** Save the core module to the file system
@@ -3755,7 +3440,7 @@ struct IGlobalSession : public ISlangUnknown
     @param outBlob The serialized blob containing the core module
 
     NOTE! API is experimental and not ready for production code  */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) = 0;
 
     /** Look up the internal ID of a capability by its `name`.
@@ -3788,7 +3473,7 @@ struct IGlobalSession : public ISlangUnknown
 
     /** Get the time in seconds spent in the slang and downstream compiler.
      */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] void SLANG_MCALL
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) = 0;
 
     /** Specify a spirv.core.grammar.json file to load and use when
@@ -3820,7 +3505,7 @@ struct IGlobalSession : public ISlangUnknown
     @param module The builtin module name.
     @param flags to control compilation
     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     compileBuiltinModule(BuiltinModuleName module, CompileCoreModuleFlags flags) = 0;
 
     /** Load a builtin module. Currently loads modules from the file system.
@@ -3830,7 +3515,7 @@ struct IGlobalSession : public ISlangUnknown
 
     NOTE! API is experimental and not ready for production code
     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     loadBuiltinModule(BuiltinModuleName module, const void* moduleData, size_t sizeInBytes) = 0;
 
     /** Save the builtin module to the file system
@@ -3839,7 +3524,7 @@ struct IGlobalSession : public ISlangUnknown
     @param outBlob The serialized blob containing the builtin module
 
     NOTE! API is experimental and not ready for production code  */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL saveBuiltinModule(
         BuiltinModuleName module,
         SlangArchiveType archiveType,
         ISlangBlob** outBlob) = 0;
@@ -4091,7 +3776,7 @@ struct ISession : public ISlangUnknown
 
     /** Create a request to load/compile front-end code.
      */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL
     createCompileRequest(SlangCompileRequest** outCompileRequest) = 0;
 
 
@@ -4120,13 +3805,22 @@ struct ISession : public ISlangUnknown
         SlangInt conformanceIdOverride,
         ISlangBlob** outDiagnostics) = 0;
 
-    /** Load a module from a Slang module blob.
+    /** Load a module from a blob containing a Slang binary module.
      */
-    virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromIRBlob(
+    virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromBinaryBlob(
         const char* moduleName,
         const char* path,
-        slang::IBlob* source,
+        slang::IBlob* blob,
         slang::IBlob** outDiagnostics = nullptr) = 0;
+
+    SLANG_FORCE_INLINE [[deprecated]] IModule* loadModuleFromIRBlob(
+        const char* moduleName,
+        const char* path,
+        slang::IBlob* blob,
+        slang::IBlob** outDiagnostics = nullptr)
+    {
+        return loadModuleFromBinaryBlob(moduleName, path, blob, outDiagnostics);
+    }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() = 0;
     virtual SLANG_NO_THROW IModule* SLANG_MCALL getLoadedModule(SlangInt index) = 0;
@@ -4350,7 +4044,7 @@ struct IComponentType : public ISlangUnknown
     The result is not written to the actual OS file system, but is made available as an
     in memory representation.
     */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
+    virtual SLANG_NO_THROW [[deprecated]] SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
         ISlangMutableFileSystem** outFileSystem) = 0;
@@ -4686,7 +4380,7 @@ then be loaded via loadCoreModule or compileCoreModule
 
 NOTE! API is experimental and not ready for production code
 */
-SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
+SLANG_EXTERN_C SLANG_API [[deprecated]] SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession);
 
@@ -4695,7 +4389,7 @@ Returns nullptr if there isn't an embedded core module.
 
 NOTE! API is experimental and not ready for production code
 */
-SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
+SLANG_API [[deprecated]] ISlangBlob* slang_getEmbeddedCoreModule();
 
 
 /* Cleanup all global allocations used by Slang, to prevent memory leak detectors from

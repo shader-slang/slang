@@ -15,6 +15,324 @@ extern "C"
 {
 #endif
 
+    /* DEPRECATED: Type that identifies how a path should be interpreted */
+    typedef unsigned int SlangPathTypeIntegral;
+    enum /*DEPRECATED*/ SlangPathType : SlangPathTypeIntegral
+    {
+        SLANG_PATH_TYPE_DIRECTORY, /**< Path specified specifies a directory. */
+        SLANG_PATH_TYPE_FILE,      /**< Path specified is to a file. */
+    };
+
+    /* DEPRECATED: Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
+    The name is the name of a file system object (directory/file) in the specified path (ie it is
+    without a path)
+    */
+    typedef void (
+        *FileSystemContentsCallBack /*DEPRECATED*/)(SlangPathType pathType, const char* name, void* userData);
+
+    /* Determines how paths map to files on the OS file system */
+    enum class /*DEPRECATED*/ OSPathKind : uint8_t
+    {
+        None,            ///< Paths do not map to the file system
+        Direct,          ///< Paths map directly to the file system
+        OperatingSystem, ///< Only paths gained via PathKind::OperatingSystem map to the operating
+        ///< system file system
+    };
+
+    /* Used to determine what kind of path is required from an input path */
+    enum class /*DEPRECATED*/ PathKind
+    {
+        /// Given a path, returns a simplified version of that path.
+        /// This typically means removing '..' and/or '.' from the path.
+        /// A simplified path must point to the same object as the original.
+        Simplified,
+
+        /// Given a path, returns a 'canonical path' to the item.
+        /// This may be the operating system 'canonical path' that is the unique path to the item.
+        ///
+        /// If the item exists the returned canonical path should always be usable to access the
+        /// item.
+        ///
+        /// If the item the path specifies doesn't exist, the canonical path may not be returnable
+        /// or be a path simplification.
+        /// Not all file systems support canonical paths.
+        Canonical,
+
+        /// Given a path returns a path such that it is suitable to be displayed to the user.
+        ///
+        /// For example if the file system is a zip file - it might include the path to the zip
+        /// container as well as the path to the specific file.
+        ///
+        /// NOTE! The display path won't necessarily work on the file system to access the item
+        Display,
+
+        /// Get the path to the item on the *operating system* file system, if available.
+        OperatingSystem,
+
+        CountOf,
+    };
+
+    /** DEPRECATED: An extended file system abstraction.
+
+    Implementing and using this interface over ISlangFileSystem gives much more control over how
+    paths are managed, as well as how it is determined if two files 'are the same'.
+
+    All paths as input char*, or output as ISlangBlobs are always encoded as UTF-8 strings.
+    Blobs that contain strings are always zero terminated.
+    */
+    struct /*DEPRECATED*/ ISlangFileSystemExt : public ISlangFileSystem
+    {
+        SLANG_COM_INTERFACE(
+            0x5fb632d2,
+            0x979d,
+            0x4481,
+            { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 })
+
+            /** Get a uniqueIdentity which uniquely identifies an object of the file system.
+
+            Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same object
+            on the file system.
+
+            The uniqueIdentity is used to compare if two paths are the same - which amongst other things
+            allows Slang to cache source contents internally. It is also used for #pragma once
+            functionality.
+
+            A *requirement* is for any implementation is that two paths can only return the same
+            uniqueIdentity if the contents of the two files are *identical*. If an implementation breaks
+            this constraint it can produce incorrect compilation. If an implementation cannot *strictly*
+            identify *the same* files, this will only have an effect on #pragma once behavior.
+
+            The string for the uniqueIdentity is held zero terminated in the ISlangBlob of
+            outUniqueIdentity.
+
+            Note that there are many ways a uniqueIdentity may be generated for a file. For example it
+            could be the 'canonical path' - assuming it is available and unambiguous for a file system.
+            Another possible mechanism could be to store the filename combined with the file date time
+            to uniquely identify it.
+
+            The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+            NOTE! Ideally this method would be called 'getPathUniqueIdentity' but for historical reasons
+            and backward compatibility it's name remains with 'File' even though an implementation
+            should be made to work with directories too.
+
+            @param path
+            @param outUniqueIdentity
+            @returns A `SlangResult` to indicate success or failure getting the uniqueIdentity.
+            */
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) = 0;
+
+        /** Calculate a path combining the 'fromPath' with 'path'
+
+        The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+        @param fromPathType How to interpret the from path - as a file or a directory.
+        @param fromPath The from path.
+        @param path Path to be determined relative to the fromPath
+        @param pathOut Holds the string which is the relative path. The string is held in the blob
+        zero terminated.
+        @returns A `SlangResult` to indicate success or failure in loading the file.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
+            SlangPathType fromPathType,
+            const char* fromPath,
+            const char* path,
+            ISlangBlob** pathOut) = 0;
+
+        /** Gets the type of path that path is on the file system.
+        @param path
+        @param pathTypeOut
+        @returns SLANG_OK if located and type is known, else an error. SLANG_E_NOT_FOUND if not
+        found.
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            getPathType(const char* path, SlangPathType* pathTypeOut) = 0;
+
+        /** Get a path based on the kind.
+
+        @param kind The kind of path wanted
+        @param path The input path
+        @param outPath The output path held in a blob
+        @returns SLANG_OK if successfully simplified the path (SLANG_E_NOT_IMPLEMENTED if not
+        implemented, or some other error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            getPath(PathKind kind, const char* path, ISlangBlob** outPath) = 0;
+
+        /** Clears any cached information */
+        virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
+
+        /** Enumerate the contents of the path
+
+        Note that for normal Slang operation it isn't necessary to enumerate contents this can
+        return SLANG_E_NOT_IMPLEMENTED.
+
+        @param The path to enumerate
+        @param callback This callback is called for each entry in the path.
+        @param userData This is passed to the callback
+        @returns SLANG_OK if successful
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
+            const char* path,
+            FileSystemContentsCallBack callback,
+            void* userData) = 0;
+
+        /** Returns how paths map to the OS file system
+
+        @returns OSPathKind that describes how paths map to the Operating System file system
+        */
+        virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() = 0;
+    };
+
+#define SLANG_UUID_ISlangFileSystemExt ISlangFileSystemExt::getTypeGuid()
+
+    struct /*DEPRECATED*/ ISlangMutableFileSystem : public ISlangFileSystemExt
+    {
+        SLANG_COM_INTERFACE(
+            0xa058675c,
+            0x1d65,
+            0x452a,
+            { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 })
+
+            /** Write data to the specified path.
+
+            @param path The path for data to be saved to
+            @param data The data to be saved
+            @param size The size of the data in bytes
+            @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other
+            error code)
+            */
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            saveFile(const char* path, const void* data, size_t size) = 0;
+
+        /** Write data in the form of a blob to the specified path.
+
+        Depending on the implementation writing a blob might be faster/use less memory. It is
+        assumed the blob is *immutable* and that an implementation can reference count it.
+
+        It is not guaranteed loading the same file will return the *same* blob - just a blob with
+        same contents.
+
+        @param path The path for data to be saved to
+        @param dataBlob The data to be saved
+        @returns SLANG_OK if successful (SLANG_E_NOT_IMPLEMENTED if not implemented, or some other
+        error code)
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            saveFileBlob(const char* path, ISlangBlob* dataBlob) = 0;
+
+        /** Remove the entry in the path (directory of file). Will only delete an empty directory,
+        if not empty will return an error.
+
+        @param path The path to remove
+        @returns SLANG_OK if successful
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) = 0;
+
+        /** Create a directory.
+
+        The path to the directory must exist
+
+        @param path To the directory to create. The parent path *must* exist otherwise will return
+        an error.
+        @returns SLANG_OK if successful
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) = 0;
+    };
+
+#define SLANG_UUID_ISlangMutableFileSystem ISlangMutableFileSystem::getTypeGuid()
+
+    /* DEPRECATED: Identifies different types of writer target*/
+    typedef unsigned int SlangWriterChannelIntegral /*DEPRECATED*/;
+    enum /*DEPRECATED*/ SlangWriterChannel : SlangWriterChannelIntegral
+    {
+        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
+        SLANG_WRITER_CHANNEL_STD_OUTPUT,
+        SLANG_WRITER_CHANNEL_STD_ERROR,
+        SLANG_WRITER_CHANNEL_COUNT_OF,
+    };
+
+    typedef unsigned int SlangWriterModeIntegral /*DEPRECATED*/;
+    enum /*DEPRECATED*/ SlangWriterMode : SlangWriterModeIntegral
+    {
+        SLANG_WRITER_MODE_TEXT,
+        SLANG_WRITER_MODE_BINARY,
+    };
+
+    /** DEPRECATED: A stream typically of text, used for outputting diagnostic as well as other information.
+     */
+    struct /*DEPRECATED*/ ISlangWriter : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(
+            0xec457f0e,
+            0x9add,
+            0x4e6b,
+            { 0x85, 0x1c, 0xd7, 0xfa, 0x71, 0x6d, 0x15, 0xfd })
+
+            /** Begin an append buffer.
+            NOTE! Only one append buffer can be active at any time.
+            @param maxNumChars The maximum of chars that will be appended
+            @returns The start of the buffer for appending to. */
+            virtual SLANG_NO_THROW char* SLANG_MCALL beginAppendBuffer(size_t maxNumChars) = 0;
+        /** Ends the append buffer, and is equivalent to a write of the append buffer.
+        NOTE! That an endAppendBuffer is not necessary if there are no characters to write.
+        @param buffer is the start of the data to append and must be identical to last value
+        returned from beginAppendBuffer
+        @param numChars must be a value less than or equal to what was returned from last call to
+        beginAppendBuffer
+        @returns Result, will be SLANG_OK on success */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            endAppendBuffer(char* buffer, size_t numChars) = 0;
+        /** Write text to the writer
+        @param chars The characters to write out
+        @param numChars The amount of characters
+        @returns SLANG_OK on success */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+            write(const char* chars, size_t numChars) = 0;
+        /** Flushes any content to the output */
+        virtual SLANG_NO_THROW void SLANG_MCALL flush() = 0;
+        /** Determines if the writer stream is to the console, and can be used to alter the output
+        @returns Returns true if is a console writer */
+        virtual SLANG_NO_THROW SlangBool SLANG_MCALL isConsole() = 0;
+        /** Set the mode for the writer to use
+        @param mode The mode to use
+        @returns SLANG_OK on success */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMode(SlangWriterMode mode) = 0;
+    };
+
+#define SLANG_UUID_ISlangWriter ISlangWriter::getTypeGuid()
+
+    struct /*DEPRECATED*/ ISlangProfiler : public ISlangUnknown
+    {
+        SLANG_COM_INTERFACE(
+            0x197772c7,
+            0x0155,
+            0x4b91,
+            { 0x84, 0xe8, 0x66, 0x68, 0xba, 0xff, 0x06, 0x19 })
+            virtual SLANG_NO_THROW size_t SLANG_MCALL getEntryCount() = 0;
+        virtual SLANG_NO_THROW const char* SLANG_MCALL getEntryName(uint32_t index) = 0;
+        virtual SLANG_NO_THROW long SLANG_MCALL getEntryTimeMS(uint32_t index) = 0;
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryInvocationTimes(uint32_t index) = 0;
+    };
+#define SLANG_UUID_ISlangProfiler ISlangProfiler::getTypeGuid()
+
+    /* Can be requested from ISlangCastable cast to indicate the contained chars are null
+     * terminated.
+     */
+    struct [[deprecated]] SlangTerminatedChars
+    {
+        SLANG_CLASS_GUID(
+            0xbe0db1a8,
+            0x3594,
+            0x4603,
+            { 0xa7, 0x8b, 0xc4, 0x86, 0x84, 0x30, 0xdf, 0xbb });
+        operator const char* () const { return chars; }
+        char chars[1];
+    };
+
+
+
     /*!
     @brief Initialize an instance of the Slang library.
     */
@@ -163,6 +481,11 @@ extern "C"
 
     /*! @see slang::ICompileRequest::setPassThrough */
     SLANG_API void spSetPassThrough(SlangCompileRequest* request, SlangPassThrough passThrough);
+
+    /*!
+    @brief DEPRECATED: Callback type used for diagnostic output.
+    */
+    typedef void (*SlangDiagnosticCallback /*DEPRECATED*/)(char const* message, void* userData);
 
     /*! @see slang::ICompileRequest::setDiagnosticCallback */
     SLANG_API void spSetDiagnosticCallback(

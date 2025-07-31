@@ -151,7 +151,9 @@ SLANG_NO_THROW void SLANG_MCALL GlobalSessionRecorder::setDownstreamCompilerPrel
         m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->setDownstreamCompilerPrelude(inPassThrough, prelude);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_NO_THROW void SLANG_MCALL GlobalSessionRecorder::getDownstreamCompilerPrelude(
@@ -169,7 +171,9 @@ SLANG_NO_THROW void SLANG_MCALL GlobalSessionRecorder::getDownstreamCompilerPrel
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->getDownstreamCompilerPrelude(inPassThrough, outPrelude);
+    SLANG_ALLOW_DEPRECATED_END
 
     {
         recorder->recordAddress(*outPrelude);
@@ -242,7 +246,9 @@ GlobalSessionRecorder::setLanguagePrelude(SlangSourceLanguage inSourceLanguage, 
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->setLanguagePrelude(inSourceLanguage, prelude);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_NO_THROW void SLANG_MCALL GlobalSessionRecorder::getLanguagePrelude(
@@ -260,7 +266,9 @@ SLANG_NO_THROW void SLANG_MCALL GlobalSessionRecorder::getLanguagePrelude(
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->getLanguagePrelude(inSourceLanguage, outPrelude);
+    SLANG_ALLOW_DEPRECATED_END
 
     {
         recorder->recordAddress(*outPrelude);
@@ -307,7 +315,9 @@ GlobalSessionRecorder::addBuiltins(char const* sourcePath, char const* sourceStr
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_NO_THROW void SLANG_MCALL
@@ -358,7 +368,9 @@ GlobalSessionRecorder::checkPassThroughSupport(SlangPassThrough passThrough)
     // No need to record this function. It's just a query function and it won't impact the internal
     // state.
     slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->checkPassThroughSupport(passThrough);
+    SLANG_ALLOW_DEPRECATED_END
     return res;
 }
 
@@ -376,7 +388,9 @@ GlobalSessionRecorder::compileCoreModule(slang::CompileCoreModuleFlags flags)
         m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->compileCoreModule(flags);
+    SLANG_ALLOW_DEPRECATED_END
     return res;
 }
 
@@ -394,7 +408,9 @@ GlobalSessionRecorder::loadCoreModule(const void* coreModule, size_t coreModuleS
         m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->loadCoreModule(coreModule, coreModuleSizeInBytes);
+    SLANG_ALLOW_DEPRECATED_END
     return res;
 }
 
@@ -412,7 +428,9 @@ GlobalSessionRecorder::saveCoreModule(SlangArchiveType archiveType, ISlangBlob**
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->saveCoreModule(archiveType, outBlob);
+    SLANG_ALLOW_DEPRECATED_END
 
     {
         recorder->recordAddress(*outBlob);
@@ -437,7 +455,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileBuiltinModu
         m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->compileBuiltinModule(module, flags);
+    SLANG_ALLOW_DEPRECATED_END
     return res;
 }
 
@@ -458,7 +478,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadBuiltinModule(
         m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->loadBuiltinModule(module, moduleData, sizeInBytes);
+    SLANG_ALLOW_DEPRECATED_END
     return res;
 }
 SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveBuiltinModule(
@@ -477,7 +499,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveBuiltinModule(
         recorder->recordEnumValue(archiveType);
         recorder = m_recordManager->endMethodRecord();
     }
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult res = m_actualGlobalSession->saveBuiltinModule(module, archiveType, outBlob);
+    SLANG_ALLOW_DEPRECATED_END
     {
         recorder->recordAddress(*outBlob);
         m_recordManager->apendOutput();
@@ -534,7 +558,9 @@ GlobalSessionRecorder::getCompilerElapsedTime(double* outTotalTime, double* outD
     // No need to record this function. It's just a query function and it won't impact the internal
     // state.
     slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
+    SLANG_ALLOW_DEPRECATED_BEGIN
     m_actualGlobalSession->getCompilerElapsedTime(outTotalTime, outDownstreamTime);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
