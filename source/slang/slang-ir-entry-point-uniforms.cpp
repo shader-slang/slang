@@ -221,14 +221,6 @@ bool shouldSkipStructuredBufferCollectionForMetal(
     if (as<IRHLSLStructuredBufferTypeBase>(paramType))
         return true;
 
-    // ByteAddressBuffer types (device* uint32_t)
-    if (as<IRUntypedBufferResourceType>(paramType))
-        return true;
-
-    // ConstantBuffer types (constant* T)
-    if (as<IRUniformParameterGroupType>(paramType))
-        return true;
-
     return false;
 }
 
@@ -563,14 +555,6 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 
             // StructuredBuffer types (device* T) - preserve for all targets for safety
             if (as<IRHLSLStructuredBufferTypeBase>(paramDataType))
-                continue;
-
-            // ByteAddressBuffer types (device* uint32_t) - preserve for all targets for safety
-            if (as<IRUntypedBufferResourceType>(paramDataType))
-                continue;
-
-            // ConstantBuffer types (constant* T) - preserve for all targets for safety
-            if (as<IRUniformParameterGroupType>(paramDataType))
                 continue;
 
             auto paramType = param->getFullType();
