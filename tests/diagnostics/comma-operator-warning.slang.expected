@@ -1,0 +1,20 @@
+result code = 0
+standard error = {
+tests/diagnostics/comma-operator-warning.slang(6): warning 41024: comma operator used in expression (may be unintended)
+    float4 vColor = (0.f, 0.f, 0.f, 1.f);
+                        ^
+tests/diagnostics/comma-operator-warning.slang(6): warning 41024: comma operator used in expression (may be unintended)
+    float4 vColor = (0.f, 0.f, 0.f, 1.f);
+                             ^
+tests/diagnostics/comma-operator-warning.slang(6): warning 41024: comma operator used in expression (may be unintended)
+    float4 vColor = (0.f, 0.f, 0.f, 1.f);
+                                  ^
+tests/diagnostics/comma-operator-warning.slang(14): warning 41024: comma operator used in expression (may be unintended)
+    int x = (1, 2, 3);
+              ^
+tests/diagnostics/comma-operator-warning.slang(14): warning 41024: comma operator used in expression (may be unintended)
+    int x = (1, 2, 3);
+                 ^
+}
+standard output = {
+}

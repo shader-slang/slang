@@ -1080,6 +1080,17 @@ public:
 
     bool getInForLoopSideEffect() { return m_inForLoopSideEffect; }
 
+    // Setup the flag to indicate we're in a return statement context where comma operators are
+    // allowed
+    SemanticsContext withInReturnStmt()
+    {
+        SemanticsContext result(*this);
+        result.m_inReturnStmt = true;
+        return result;
+    }
+
+    bool getInReturnStmt() { return m_inReturnStmt; }
+
     TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
     SemanticsContext withEnclosingTryClauseType(TryClauseType tryClauseType)
@@ -1216,6 +1227,10 @@ protected:
     // Flag to track when we're in a for-loop side effect expression where comma operators are
     // allowed
     bool m_inForLoopSideEffect = false;
+
+    // Flag to track when we're in a return statement expression where comma operators are
+    // allowed
+    bool m_inReturnStmt = false;
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 

@@ -3234,9 +3234,9 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         {
             if (varExpr->name && varExpr->name->text == ",")
             {
-                // Allow comma operators in for-loop side effects and expand expressions without
-                // warning
-                if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+                // Allow comma operators in for-loop side effects, expand expressions, and return
+                // statements without warning
+                if (!getInForLoopSideEffect() && !m_parentExpandExpr && !getInReturnStmt())
                 {
                     getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
                 }

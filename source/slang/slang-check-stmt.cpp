@@ -569,7 +569,10 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     }
     else
     {
-        stmt->expression = CheckTerm(stmt->expression);
+        // Use special context for return statement to allow comma operators without warning
+        SemanticsContext returnContext = withInReturnStmt();
+        SemanticsExprVisitor subExprVisitor(returnContext);
+        stmt->expression = subExprVisitor.CheckTerm(stmt->expression);
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
