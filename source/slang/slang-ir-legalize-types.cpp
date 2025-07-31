@@ -2762,13 +2762,12 @@ private:
 // (split up the struct and split-out resource-members) but do not legalize
 // `ParameterBlock<T>`. This causes a mismatch in parameters.
 // 
-// This function implements the trivial solution to this problem (for sake of
-// finishing the overall feature before siggraph), if we have this senario, 
-// just "copy" a `ParameterBlock<T>` to a `T` so we don't have to deal with
-// the legalization of parameter-block being different depending on context.
+// This function implements the trivial solution to this problem (due to 
+// limitation on time). Just "copy" a `ParameterBlock<T>` to a `T` so we 
+// don't have to deal with the legalization of parameter-block.
 // This has the downside that we are not passing certain values by pointer,
 // potentially wasting performance with a unneeded copy.
-// This handles our problem cases though:
+// This handles our problem cases:
 // * `const_ref T` as param-type getting copied into
 //     * `const_ref ParameterBlock<T>` as param
 //     OR
@@ -2776,12 +2775,11 @@ private:
 // 
 // This solution should eventually be changed into a more formal solution
 // of a new `LegalType::declAndAccess` where we essentially: (1) use 
-// `LegalType::declAndAccess->decl` as our LegalType for declaration sites 
-// (we should emit the same type as we do now for this parameter);
-// (2) implement uses of `ParameterBlock<T>` to non-param blocks as 
-// member-variable references through the `LegalType::flavor::wrappedBuffer`
-// stored in `LegalType::declAndAccess->access`.
-// This change will require significantly more time & effort.
+// `LegalType::declAndAccess->decl` as our LegalType for declaration sites;
+// (2) implement how to legalize uses of `ParameterBlock<T>` copying to 
+// non-param blocks via `LegalType::declAndAccess->access`. We would legalize
+// a copy into field-accesses via `LegalType::flavor::wrappedBuffer` so we can
+// still pass data around as a pointer.
 static void transformConstRefParameterBlockToConstRefStructIntoLoad(
     IRFunc* irFunc)
 {
