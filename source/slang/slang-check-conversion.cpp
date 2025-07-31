@@ -1734,7 +1734,7 @@ bool SemanticsVisitor::_coerce(
 
         if (outCost)
             *outCost = bestCost;
-        return true;
+        return false;
     }
     else if (overloadContext.bestCandidate)
     {
