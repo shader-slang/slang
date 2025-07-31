@@ -34,7 +34,7 @@ struct MatData : IMatData
 
 // This used to cause a segfault before the fix
 [shader("closesthit")]
-void chit_main_with_paramblock(ParameterBlock<RtParams<MatData>> params, in BuiltInTriangleIntersectionAttributes attr, out RtPayload payload)
+void chit_main_with_paramblock(uniform ParameterBlock<RtParams<MatData>> params, in BuiltInTriangleIntersectionAttributes attr, out RtPayload payload)
 {
     payload = {};
     payload.emission = float3(1, 0, 0);
