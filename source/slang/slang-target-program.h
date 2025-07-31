@@ -108,7 +108,7 @@ public:
 
     bool shouldEmitSPIRVDirectly()
     {
-        return isKhronosTarget(m_targetReq) && getOptionSet().shouldEmitSPIRVDirectly();
+        return isSPIRV(m_targetReq->getTarget()) && getOptionSet().shouldEmitSPIRVDirectly();
     }
 
 private:

@@ -2509,6 +2509,11 @@ bool isKhronosTarget(CodeGenTarget target)
     }
 }
 
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
 bool isKhronosTarget(TargetRequest* targetReq)
 {
     return isKhronosTarget(targetReq->getTarget());
