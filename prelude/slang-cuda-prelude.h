@@ -685,6 +685,7 @@ struct GetVectorTypeImpl
     GET_VECTOR_TYPE_IMPL(T, 4)
 
 GET_VECTOR_TYPE_IMPL_N(int)
+GET_VECTOR_TYPE_IMPL_N(bool)
 GET_VECTOR_TYPE_IMPL_N(uint)
 GET_VECTOR_TYPE_IMPL_N(short)
 GET_VECTOR_TYPE_IMPL_N(ushort)
@@ -1130,6 +1131,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
     SLANG_SELECT_IMPL(T, 4)
 
 SLANG_SELECT_T(int)
+SLANG_SELECT_T(bool)
 SLANG_SELECT_T(uint)
 SLANG_SELECT_T(short)
 SLANG_SELECT_T(ushort)
@@ -1137,38 +1139,6 @@ SLANG_SELECT_T(char)
 SLANG_SELECT_T(uchar)
 SLANG_SELECT_T(float)
 SLANG_SELECT_T(double)
-
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_select(bool condition, T v0, T v1)
-{
-    return condition ? v0 : v1;
-}
-
-// _slang_select overloads for the new boolean struct types
-// Since we need to support _slang_select(bool2, bool2, bool2) style calls
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 _slang_select(bool1 condition, bool1 v0, bool1 v1)
-{
-    return bool1{condition.x ? v0.x : v1.x};
-}
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 _slang_select(bool2 condition, bool2 v0, bool2 v1)
-{
-    return bool2{condition.x ? v0.x : v1.x, condition.y ? v0.y : v1.y};
-}
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool3 _slang_select(bool3 condition, bool3 v0, bool3 v1)
-{
-    return bool3{condition.x ? v0.x : v1.x, condition.y ? v0.y : v1.y, condition.z ? v0.z : v1.z};
-}
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 _slang_select(bool4 condition, bool4 v0, bool4 v1)
-{
-    return bool4{
-        condition.x ? v0.x : v1.x,
-        condition.y ? v0.y : v1.y,
-        condition.z ? v0.z : v1.z,
-        condition.w ? v0.w : v1.w};
-}
 
 //
 // Half support
