@@ -1157,9 +1157,19 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             auto ptrType = cast<IRPtrTypeBase>(type);
 
             // Note: metal considers `int device* thread*` incompatible 
-            // to cast to `int device* thread* v1`.
-            // 
-            if (type->getOp() == kIROp_ConstRefType)
+            // to cast to `const int device* thread* v1` specifically 
+            // for arg to parameter.
+            //
+            // Metal also requires `const` for some objects.
+            //
+            // Due to this we need a more robust system to manage
+            // the `const` of values with metal.
+            // Currently, we will just be percise by adding `const`
+            // when mandatory.
+            //
+            // `object_data` must be const if in `mesh` stage
+            if (ptrType->getAddressSpace() == AddressSpace::MetalObjectData
+                && this->m_entryPointStage == Stage::Mesh)
             {
                 m_writer->emit("const ");
             }
