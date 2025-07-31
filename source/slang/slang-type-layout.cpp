@@ -2235,6 +2235,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
         {
@@ -2255,6 +2256,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return &kCUDALayoutRulesFamilyImpl;
         }
@@ -2528,6 +2530,7 @@ bool isCUDATarget(TargetRequest* targetReq)
         return false;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         return true;
     }
@@ -2599,6 +2602,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
         {
@@ -2607,6 +2611,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         }
     case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             return SourceLanguage::CUDA;
