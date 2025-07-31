@@ -10,7 +10,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-int selectDims<let N : int, let M : int>(bool cond)
+int selectDims<int N, int M>(bool cond)
 {
     return select(
         matrix<bool, N, M>(cond),
@@ -19,7 +19,7 @@ int selectDims<let N : int, let M : int>(bool cond)
     )[0][0];
 }
 
-int selectDimsDigit<let N : int, let M : int, let D : int>(int x)
+int selectDimsDigit<int N, int M, int D>(int x)
 {
     return selectDims<N, M>(((x >> D) & 0b1) == 0b1) << D;
 }

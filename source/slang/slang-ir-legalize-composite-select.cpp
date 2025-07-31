@@ -10,14 +10,7 @@
 namespace Slang
 {
 
-bool requiresLegalization(IRInst* type)
-{
-    return !as<IRBasicType>(type) &&
-        !as<IRVectorType>(type) &&
-        !as<IRMatrixType>(type);
-}
-
-void legalizeASingleNonVectorCompositeSelect(IRBuilder& builder, IRSelect* selectInst)
+void legalizeCompositeSelect(IRBuilder& builder, IRSelect* selectInst)
 {
     SLANG_ASSERT(selectInst);
 
@@ -74,8 +67,12 @@ void legalizeNonVectorCompositeSelect(IRModule* module)
                 if (auto select = as<IRSelect>(inst))
                 {
                     // Replace OpSelect with if/else branch (same process as glslang)
-                    if (requiresLegalization(select->getFullType()))
-                        legalizeASingleNonVectorCompositeSelect(builder, select);
+                    bool requiresLegalization = !as<IRBasicType>(select->getFullType()) &&
+                        !as<IRVectorType>(select->getFullType()) &&
+                        !as<IRMatrixType>(select->getFullType());
+                    
+                    if (requiresLegalization)
+                        legalizeCompositeSelect(builder, select);
                 }
             }
         }
