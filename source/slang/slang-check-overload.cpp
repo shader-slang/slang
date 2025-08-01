@@ -1358,6 +1358,24 @@ int SemanticsVisitor::CompareLookupResultItems(
     LookupResultItem const& left,
     LookupResultItem const& right)
 {
+    // It is possible for lookup to return both an interface requirement
+    // and the concrete function that satisfies that requirement.
+    // We always want to favor a concrete method over an interface
+    // requirement it might override.
+    //
+    // TODO: This should turn into a more detailed check such that
+    // a candidate for declaration A is always better than a candidate
+    // for declaration B if A is an override of B. We can't
+    // easily make that check right now because we aren't tracking
+    // this kind of "is an override of ..." information on declarations
+    // directly (it is only visible through the requirement witness
+    // information for inheritance declarations).
+    //
+    bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
+    bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
+    if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
+        return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+
     auto leftDeclRefParent = getParentDeclRef(left.declRef);
     auto rightDeclRefParent = getParentDeclRef(right.declRef);
 
@@ -1373,11 +1391,7 @@ int SemanticsVisitor::CompareLookupResultItems(
     if ((genericsLeft && as<CallableDecl>(genericsLeft->inner)) ||
         (genericsRight && as<CallableDecl>(genericsRight->inner)))
     {
-        bool isLeftInterfaceType = as<InterfaceDecl>(leftDeclRefParent.getDecl()) != nullptr;
-        bool isRightInterfaceType = as<InterfaceDecl>(rightDeclRefParent.getDecl()) != nullptr;
-        // Always prefer the generic defined in concrete type instead of interface type. For other
-        // cases, we cannot decide which one is better, so we return 0.
-        return (isLeftInterfaceType - isRightInterfaceType);
+        return 0;
     }
 
     // If both left and right are extern, then they are equal.
@@ -1411,24 +1425,6 @@ int SemanticsVisitor::CompareLookupResultItems(
     // a non-free-form extension.
     if (leftIsFreeFormExtension != rightIsFreeFormExtension)
         return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
-
-    // It is possible for lookup to return both an interface requirement
-    // and the concrete function that satisfies that requirement.
-    // We always want to favor a concrete method over an interface
-    // requirement it might override.
-    //
-    // TODO: This should turn into a more detailed check such that
-    // a candidate for declaration A is always better than a candidate
-    // for declaration B if A is an override of B. We can't
-    // easily make that check right now because we aren't tracking
-    // this kind of "is an override of ..." information on declarations
-    // directly (it is only visible through the requirement witness
-    // information for inheritance declarations).
-    //
-    bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
-    bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
-    if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
-        return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
 
     // Prefer non-extension declarations over extension declarations.
     if (leftIsExtension != rightIsExtension)
