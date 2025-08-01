@@ -214,6 +214,7 @@ struct DocMarkdownWriter
     String _getFullName(Decl* decl);
     String _getDocFilePath(Decl* decl);
     String _getName(InheritanceDecl* decl);
+    String _getName(ExtensionDecl* extDecl);
 
     NameAndText _getNameAndText(ASTMarkup::Entry* entry, Decl* decl);
     NameAndText _getNameAndText(Decl* decl);
