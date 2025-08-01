@@ -230,7 +230,7 @@ void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
     if (fnExpected)
     {
         auto fn = std::move(*fnExpected);
-        return (void*)fn.getAddress();
+        return (void*)fn.getValue();
     }
     return nullptr;
 }
@@ -784,9 +784,9 @@ SlangResult LLVMDownstreamCompiler::compile(
             includes.push_back(includePath.begin());
         }
 
-        clang::CompilerInvocation::setLangDefaults(
+        clang::LangOptions::setLangDefaults(
             *opts,
-            inputKind,
+            inputKind.getLanguage(),
             targetTriple,
             includes,
             langStd);
