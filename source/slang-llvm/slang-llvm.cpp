@@ -785,7 +785,7 @@ SlangResult LLVMDownstreamCompiler::compile(
         }
 
         clang::LangOptions::setLangDefaults(
-            *opts,
+            opts,
             inputKind.getLanguage(),
             targetTriple,
             includes,
@@ -793,7 +793,7 @@ SlangResult LLVMDownstreamCompiler::compile(
 
         if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Fast)
         {
-            opts->FastMath = true;
+            opts.FastMath = true;
         }
     }
 
