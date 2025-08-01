@@ -9,6 +9,7 @@ struct RayPayload
 [shader("closesthit")]
 void closestHitShaderA(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
+    //CHECK-PTX: _optix_read_primitive_idx
     uint primitiveIndex = PrimitiveIndex();
     float4 color = float4(0, 0, 0, 1);
     color[primitiveIndex] = 1;
