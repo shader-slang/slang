@@ -135,6 +135,8 @@ cmake_arguments_for_slang=(
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
   "-DLLVM_USE_CRT_RELEASE=MT"
   "-DLLVM_USE_CRT_DEBUG=MTd"
+  # Allow building with newer compilers
+  -DCMAKE_CXX_FLAGS="-include cstdint"
 )
 build_dir=$source_dir/build
 mkdir -p "$build_dir"
