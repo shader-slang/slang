@@ -8,6 +8,7 @@
 #include <core/slang-com-object.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/FileCheck/FileCheck.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
 #include <slang-test/filecheck.h>
 
