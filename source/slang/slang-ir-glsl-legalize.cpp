@@ -885,6 +885,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             name = "gl_PrimitiveShadingRateEXT";
         }
     }
+    else if (semanticName == "sv_fragsize")
+    {
+        name = "gl_FragSizeEXT";
+    }
+    else if (semanticName == "sv_fraginvocationcount")
+    {
+        name = "gl_FragInvocationCountEXT";
+    }
     else if (semanticName == "sv_startvertexlocation")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_460);
