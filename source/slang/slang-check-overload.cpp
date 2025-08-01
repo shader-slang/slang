@@ -1368,18 +1368,6 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
     bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
 
-    // If both left and right are extern, then they are equal.
-    // If only one of them is extern, then the other one is preferred.
-    // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
-    {
-        return (rigthIsExtern ? 0 : 1);
-    }
-    if (rigthIsExtern)
-    {
-        return (leftIsExtern ? -1 : 0);
-    }
-
     // Prefer declarations that are not in free-form generic extensions, i.e.
     // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
     if (auto leftExt = as<ExtensionDecl>(leftDeclRefParent.getDecl()))
@@ -1394,11 +1382,6 @@ int SemanticsVisitor::CompareLookupResultItems(
         if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
             rightIsFreeFormExtension = true;
     }
-
-    // If one of the candidates is a free-form extension, it is always worse than
-    // a non-free-form extension.
-    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
-        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
@@ -1416,7 +1399,15 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
-        return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+    {
+        // Normally we should always choose the non-Interface candidate, but it's the
+        // non-Interface candidate is coming free-form extension, it will still worse than
+        // the interface candidate, so we should weight that in this case.
+        int diff = int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
+
+        return diff == 0 ? int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement)
+                         : diff;
+    }
 
     // If both candidates are generic functions, we cannot decide which one is better if
     // above two rules cannot resolve them.
@@ -1427,6 +1418,23 @@ int SemanticsVisitor::CompareLookupResultItems(
     {
         return 0;
     }
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
+
+    // If one of the candidates is a free-form extension, it is always worse than
+    // a non-free-form extension.
+    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // Prefer non-extension declarations over extension declarations.
     if (leftIsExtension != rightIsExtension)
