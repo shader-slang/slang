@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //CHECK: __global__ void __closesthit__closestHitShaderA
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 struct RayPayload
 {
     float4 color;

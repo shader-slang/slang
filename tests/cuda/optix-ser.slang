@@ -2,6 +2,7 @@
 
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry rayGenerationMain -stage raygeneration
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/" -entry rayGenerationMain -stage raygeneration
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
@@ -36,7 +37,7 @@ uint calcValue(HitObject hit)
         // CHECK: optixHitObjectGetSbtRecordIndex
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
-        // CHECK: optixHitObjectSetSbtRecordIndex((0U))
+        // CHECK: optixHitObjectSetSbtRecordIndex({{.*}}0U)
         uint setShaderTableIndex = hit.SetShaderTableIndex(0);
 
         // CHECK: optixHitObjectGetSbtDataPointer()+(0U)
@@ -83,6 +84,7 @@ void rayGenerationMain()
     uint multiplierForGeometryContributionToHitGroupIndex = 4;
     uint missShaderIndex = 0;
     // CHECK: optixTraverse
+    // CHECK-PTX:_optix_hitobject_traverse
     HitObject hit = HitObject::TraceRay(
         scene,
         rayFlags,

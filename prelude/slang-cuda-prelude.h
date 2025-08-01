@@ -3829,6 +3829,12 @@ static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(OptixTrav
     return ::optixHitObjectGetSbtRecordIndex();
 }
 
+static __forceinline__ __device__ uint
+optixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+{
+    ::optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
+    return sbtRecordIndex;
+}
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
 
