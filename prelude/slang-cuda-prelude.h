@@ -1106,6 +1106,12 @@ SLANG_SELECT_T(uchar)
 SLANG_SELECT_T(float)
 SLANG_SELECT_T(double)
 
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_select(bool condition, T v0, T v1)
+{
+    return condition ? v0 : v1;
+}
+
 //
 // Half support
 //
