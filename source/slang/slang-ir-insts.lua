@@ -2026,7 +2026,7 @@ local insts = {
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
 	},
 	-- DebugInfo
-	{ DebugSource = { min_operands = 2, hoistable = true } },
+	{ DebugSource = { min_operands = 3, hoistable = true } },
 	{
 		DebugLine = {
 			min_operands = 5,
