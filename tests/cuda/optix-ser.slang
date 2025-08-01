@@ -20,24 +20,24 @@ uint calcValue(HitObject hit)
 {
     uint r = 0;
 
-    // CHECK: optixHitObjectIsHit
+    // CHECK: slangOptixHitObjectIsHit
     if (hit.IsHit())
     {
-        // CHECK: optixHitObjectGetInstanceIndex
+        // CHECK: slangOptixHitObjectGetInstanceIndex
         uint instanceIndex = hit.GetInstanceIndex();
-        // CHECK: optixHitObjectGetInstanceId
+        // CHECK: slangOptixHitObjectGetInstanceId
         uint instanceID = hit.GetInstanceID();
-        // CHECK: optixHitObjectGetSbtGASIndex
+        // CHECK: slangOptixHitObjectGetSbtGASIndex
         uint geometryIndex = hit.GetGeometryIndex();
 
-        // CHECK: optixHitObjectGetPrimitiveIndex
+        // CHECK: slangOptixHitObjectGetPrimitiveIndex
         uint primitiveIndex = hit.GetPrimitiveIndex();
-        // CHECK: optixHitObjectGetClusterId
+        // CHECK: slangOptixHitObjectGetClusterId
         int clusterID = hit.GetClusterID();
-        // CHECK: optixHitObjectGetSbtRecordIndex
+        // CHECK: slangOptixHitObjectGetSbtRecordIndex
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
-        // CHECK: optixHitObjectSetSbtRecordIndex({{.*}}0U)
+        // CHECK: slangOptixHitObjectSetSbtRecordIndex({{.*}}0U)
         uint setShaderTableIndex = hit.SetShaderTableIndex(0);
 
         // CHECK: optixHitObjectGetSbtDataPointer()+(0U)
@@ -126,9 +126,9 @@ void rayGenerationMain()
         hitKind,
         ray,
         attr);
-    // CHECK: optixMakeNopHitObject
+    // CHECK: slangOptixMakeNopHitObject
     HitObject nopObj = HitObject::MakeNop();
-    // CHECK: optixHitObjectIsNop
+    // CHECK: slangOptixHitObjectIsNop
     outputBuffer[idx] = uint(nopObj.IsNop());
 
     outputBuffer[idx] += calcValue(hit);
