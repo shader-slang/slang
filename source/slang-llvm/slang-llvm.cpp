@@ -28,7 +28,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/Timer.h"
@@ -231,7 +230,7 @@ void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
     if (fnExpected)
     {
         auto fn = std::move(*fnExpected);
-        return (void*)fn.getAddress();
+        return (void*)fn.getValue();
     }
     return nullptr;
 }
@@ -239,12 +238,12 @@ void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
 
 static void _ensureSufficientStack() {}
 
-static void _llvmErrorHandler(void* userData, const std::string& message, bool genCrashDiag)
+static void _llvmErrorHandler(void* userData, const char* message, bool genCrashDiag)
 {
     // DiagnosticsEngine& diags = *static_cast<DiagnosticsEngine*>(userData);
     // diags.Report(diag::err_fe_error_backend) << message;
 
-    printf("Clang/LLVM fatal error: %s\n", message.c_str());
+    printf("Clang/LLVM fatal error: %s\n", message);
 
     // Run the interrupt handlers to make sure any special cleanups get done, in
     // particular that we remove files registered with RemoveFileOnSignal.
@@ -785,9 +784,9 @@ SlangResult LLVMDownstreamCompiler::compile(
             includes.push_back(includePath.begin());
         }
 
-        clang::CompilerInvocation::setLangDefaults(
+        clang::LangOptions::setLangDefaults(
             *opts,
-            inputKind,
+            inputKind.getLanguage(),
             targetTriple,
             includes,
             langStd);
