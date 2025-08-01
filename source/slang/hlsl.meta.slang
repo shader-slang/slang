@@ -20472,7 +20472,7 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
-        case cuda: __intrinsic_asm "optixMakeNopHitObject";
+        case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spirv:
             spirv_asm 
             {
@@ -20561,7 +20561,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20582,7 +20582,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsHit";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20603,7 +20603,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsNop";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20655,7 +20655,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20675,7 +20675,7 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".SetShaderTableIndex";
-        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
@@ -20689,7 +20689,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20711,7 +20711,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20733,7 +20733,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20755,7 +20755,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20799,7 +20799,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetClusterId";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
         case spirv:
             return spirv_asm
             {
