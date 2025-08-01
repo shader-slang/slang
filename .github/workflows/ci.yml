@@ -86,7 +86,6 @@ jobs:
             server-count: 8
           # Enable debug layers for all by default
           - enable-debug-layers: true
-          - { os: windows, config: debug, enable-debug-alyers: false } # issue 7965
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
