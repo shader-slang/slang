@@ -1132,7 +1132,6 @@ Vulkan Shift
 A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 
 * `spirv_1_{ 0`, `1`, `2`, `3`, `4`, `5 }` : minimum supported SPIR - V version 
-* `Invalid` 
 * `textualTarget` 
 * `hlsl` 
 * `glsl` 

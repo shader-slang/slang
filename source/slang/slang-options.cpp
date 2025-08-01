@@ -282,7 +282,7 @@ void initCommandOptions(CommandOptions& options)
 
         for (auto name : names)
         {
-            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_"))
+            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_") || name == "Invalid")
             {
                 continue;
             }
