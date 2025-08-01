@@ -55,15 +55,6 @@ public:
     }
 };
 
-class SilentDebugCallback : public rhi::IDebugCallback
-{
-public:
-    virtual SLANG_NO_THROW void SLANG_MCALL
-    handleMessage(rhi::DebugMessageType type, rhi::DebugMessageSource source, const char* message) override
-    {
-        // Ignore all debug messages in test mode to prevent output pollution
-    }
-};
 
 Slang::Result WindowedAppBase::initializeBase(
     const char* title,
@@ -77,11 +68,9 @@ Slang::Result WindowedAppBase::initializeBase(
     // Enable validation when not in test mode to avoid output pollution during testing
     deviceDesc.enableValidation = !isTestMode();
 
-    // Set appropriate debug callback based on test mode
-    static DebugCallback regularCallback;
-    static SilentDebugCallback silentCallback;
-    deviceDesc.debugCallback = isTestMode() ? static_cast<rhi::IDebugCallback*>(&silentCallback)
-                                            : static_cast<rhi::IDebugCallback*>(&regularCallback);
+    // Set debug callback (only used when validation is enabled, i.e., non-test mode)
+    static DebugCallback debugCallback;
+    deviceDesc.debugCallback = &debugCallback;
 
     slang::CompilerOptionEntry slangOptions[] = {
         {slang::CompilerOptionName::EmitSpirvDirectly, {slang::CompilerOptionValueKind::Int, 1}},
