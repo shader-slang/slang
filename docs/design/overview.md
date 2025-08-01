@@ -236,7 +236,7 @@ We expect that over time it will be valuable for Slang to support a wider array 
 
 ### Emission
 
-Once we have transformed the IR code into something that should be legal for the chosen target, we emit high-level source code in either HLSL or GLSL.
+Once we have transformed the IR code into something that should be legal for the chosen target, we emit code in the appropriate format for the target. This can be high-level source code (such as HLSL, GLSL, Metal, WGSL, C++, or CUDA) or binary formats (such as SPIR-V, DXIL, or PTX) depending on the compilation target.
 
 The emit logic is mostly just a scan over the IR code to emit a high-level declaration for each item: an IR structure type becomes a `struct` declaration, and IR function becomes a function definition, etc.
 
@@ -249,9 +249,14 @@ A future version of the compiler might implement something more complete like th
 
 ### Downstream Compiler Execution
 
-Once we have source code, we can invoke downstream compilers like fxc, dxc, and glslang to generate binary code (and optionally to disassemble that code for console output).
+For certain targets and compilation paths, we invoke downstream compilers to generate binary code (and optionally to disassemble that code for console output). For example:
+- DXIL and DXBC targets use dxc and fxc respectively
+- SPIR-V, although generated directly from the Slang IR by default, can instead use glslang if the `-emit-spirv-via-glsl` option is specified for `slangc`. If that option is used, GLSL is emmitted from the Slang IR to pass to glslang for SPIR-V generation
+- PTX generation uses NVRTC
 
-The Slang compiler also supports a "pass through" mode where it skips most of the steps outlined so far and just passes text along to these downstream compilers directly. This is primarily intended as a debugging aid for developers working on Slang, since it lets you use the same command-line arguments to invoke both Slang compilation and compilation with these other compilers.
+Other targets like Metal, WGSL, and the default SPIR-V path have their output generated directly from the Slang IR without requiring external compilers.
+
+The Slang compiler also supports a "pass through" mode where it skips most of the steps outlined so far and just passes text along to downstream compilers directly. This is primarily intended as a debugging aid for developers working on Slang, since it lets you use the same command-line arguments to invoke both Slang compilation and compilation with these other compilers.
 
 Conclusion
 ----------
