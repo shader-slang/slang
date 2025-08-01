@@ -1250,7 +1250,8 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                 expr->loc = context.loc;
-                expr->originalExpr = baseExpr;
+                expr->originalExpr = context.originalExpr;
+                expr->baseExpr = baseExpr;
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
@@ -2726,6 +2727,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2734,16 +2736,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
             {
                 Expr* resultExpr = nullptr;
-                DiagnosticSink tempSink(getSourceManager(), nullptr);
                 ConversionCost conversionCost = kConversionCost_None;
-                auto coerceResult = SemanticsVisitor(withSink(&tempSink))
+                auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
                                             typeType->getType(),
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            &tempSink,
+                                            &collectedErrorsSink,
                                             &conversionCost);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
@@ -2962,6 +2963,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
+                // Drain our error sink of "saved errors"
+                if (collectedErrorsSink.getErrorCount())
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
@@ -2975,6 +2986,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     // Nothing at all was found that we could even consider invoking.
     // In all other cases, this is an error.
+    if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
+    {
+        if (overloadExpr->lookupResult2.isValid())
+        {
+            diagnoseAmbiguousReference(funcExpr);
+            return CreateErrorExpr(expr);
+        }
+    }
     getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;

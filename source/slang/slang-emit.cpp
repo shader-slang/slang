@@ -35,6 +35,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-detect-uninitialized-resources.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -1111,6 +1112,8 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    detectUninitializedResources(irModule, sink);
+
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
         removeAvailableInDownstreamModuleDecorations(target, irModule);
@@ -1345,7 +1348,10 @@ Result linkAndOptimizeIR(
     }
 
     legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
     legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

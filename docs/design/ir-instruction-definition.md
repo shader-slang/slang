@@ -95,7 +95,9 @@ To add a new IR instruction:
 
    - Run the validation script:
 
+     **Note**: Skip make command if lua is already built.
      ```bash
+     make -C external/lua MYCFLAGS="-DLUA_USE_POSIX" MYLIBS=""
      ./external/lua/lua extras/check-ir-stable-names.lua update
      ```
 
@@ -285,7 +287,9 @@ The traversal:
 
 **Stable name validation failures**: Run the update script and commit the changes:
 
+**Note**: Skip make command if lua is already built.
 ```bash
+make -C external/lua MYCFLAGS="-DLUA_USE_POSIX" MYLIBS=""
 ./external/lua/lua extras/check-ir-stable-names.lua update
 ```
 

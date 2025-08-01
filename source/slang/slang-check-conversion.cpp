@@ -1711,6 +1711,8 @@ bool SemanticsVisitor::_coerce(
             }
         }
 
+        bool result = true;
+
         // Conceptually, we want to treat the conversion as
         // possible, but report it as ambiguous if we actually
         // need to reify the result as an expression.
@@ -1730,6 +1732,7 @@ bool SemanticsVisitor::_coerce(
             }
 
             *outToExpr = CreateErrorExpr(fromExpr);
+            result = false;
         }
 
         if (!cachedMethod)
@@ -1741,7 +1744,7 @@ bool SemanticsVisitor::_coerce(
 
         if (outCost)
             *outCost = bestCost;
-        return true;
+        return result;
     }
     else if (overloadContext.bestCandidate)
     {

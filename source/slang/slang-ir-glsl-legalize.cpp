@@ -2566,6 +2566,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
         // Replace parameter uses with field address
         _param->replaceUsesWith(fieldAddr);
+        _param->removeAndDeallocate();
     }
 }
 
@@ -2583,6 +2584,9 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
 
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
+        auto paramLayout = findVarLayout(param);
+        if (!isVaryingParameter(paramLayout))
+            continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
         {
@@ -2597,7 +2601,6 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         for (auto param : params)
         {
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
@@ -2613,7 +2616,6 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
                 continue;
             }
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
@@ -4188,10 +4190,6 @@ void legalizeEntryPointForGLSL(
     {
         for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
-            if (isRayTracingShader)
-            {
-                continue;
-            }
             // Any initialization code we insert for parameters needs
             // to be at the start of the "ordinary" instructions in the block:
             builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());

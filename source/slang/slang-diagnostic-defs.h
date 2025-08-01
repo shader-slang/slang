@@ -43,6 +43,7 @@ DIAGNOSTIC(
     "parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeDefinitionOfStruct, "see definition of struct '$0'")
 DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
 DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
@@ -72,23 +73,7 @@ DIAGNOSTIC(
     seeDeclarationOfInterfaceRequirement,
     "see interface requirement declaration of '$0'")
 
-DIAGNOSTIC(
-    -1,
-    Note,
-    genericSignatureDoesNotMatchRequirement,
-    "generic signature of '$0' does not match interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    cannotResolveOverloadForMethodRequirement,
-    "none of the overloads of '$0' match the interface requirement.")
-
-DIAGNOSTIC(
-    -1,
-    Note,
-    parameterDirectionDoesNotMatchRequirement,
-    "parameter '$0' is '$1' in the implementing member, but the interface requires '$2'.")
+DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
@@ -1532,6 +1517,12 @@ DIAGNOSTIC(
     constGlobalVarWithInitRequiresStatic,
     "global const variable with initializer must be declared static: '$0'")
 
+DIAGNOSTIC(
+    31225,
+    Error,
+    staticConstVariableRequiresInitializer,
+    "static const variable '$0' must have an initializer")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -2084,6 +2075,22 @@ DIAGNOSTIC(
     memberDoesNotMatchRequirementSignature,
     "member '$0' does not match interface requirement.")
 DIAGNOSTIC(
+    38106,
+    Error,
+    memberReturnTypeMismatch,
+    "member '$0' return type '$1' does not match interface requirement return type '$2'.")
+DIAGNOSTIC(
+    38107,
+    Error,
+    genericSignatureDoesNotMatchRequirement,
+    "generic signature of '$0' does not match interface requirement.")
+DIAGNOSTIC(
+    38108,
+    Error,
+    parameterDirectionDoesNotMatchRequirement,
+    "parameter '$0' direction '$1' does not match interface requirement '$2'.")
+
+DIAGNOSTIC(
     38101,
     Error,
     thisExpressionOutsideOfTypeDecl,
@@ -2512,6 +2519,24 @@ DIAGNOSTIC(
     Warning,
     methodNeverMutates,
     "method marked `[mutable]` but never modifies `this`")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeResource,
+    "cannot default-initialize $0 with '{}'. Resource types must be explicitly initialized")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeStructWithUninitializedResource,
+    "cannot default-initialize struct '$0' with '{}' because it contains an uninitialized $1 field")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeStructContainingResources,
+    "cannot default-initialize struct '$0' with '{}' because it contains resource fields")
 
 DIAGNOSTIC(
     41011,

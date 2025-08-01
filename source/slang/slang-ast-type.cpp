@@ -1154,6 +1154,8 @@ SlangResourceShape ResourceType::getShape()
         baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_SHADOW_FLAG);
     if (isFeedback())
         baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_FEEDBACK_FLAG);
+    if (isCombined())
+        baseShape = (SlangResourceShape)((uint32_t)baseShape | SLANG_TEXTURE_COMBINED_FLAG);
     return baseShape;
 }
 

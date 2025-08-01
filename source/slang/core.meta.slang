@@ -958,6 +958,31 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
+[require(hlsl)]
+__generic<T, let N : int, let M : int> __intrinsic_op(select) matrix<T,N,M> __hlsl_select(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse);
+
+__generic<T, let N : int, let M : int>
+matrix<T,N,M> select(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse)
+{
+    __target_switch
+    {
+    case hlsl:
+        return __hlsl_select(condition, ifTrue, ifFalse);
+    default:
+        matrix<T,N,M> result;
+        [[unroll]]
+        for (uint32_t i = 0; i < N; i++)
+            result[i] = select(condition[i], ifTrue[i], ifFalse[i]);
+        return result;
+    }
+}
+
+__generic<T, let N : int, let M : int>
+matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matrix<T,N,M> ifFalse)
+{
+    return select(condition, ifTrue, ifFalse);
+}
+
 [ForceInline]
 __generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
 {
@@ -973,7 +998,8 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
-    T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+T __realCast<T : __BuiltinRealType, U : __BuiltinRealType>(U val);
+
 //@hidden:
 __intrinsic_op($(kIROp_CastIntToFloat))
 T __realCast<T : __BuiltinRealType, U : __BuiltinIntegerType>(U val);
