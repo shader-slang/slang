@@ -524,6 +524,12 @@ DIAGNOSTIC(
     Error,
     missingLayoutBindingModifier,
     "Expecting 'binding' modifier in the layout qualifier here")
+DIAGNOSTIC(
+    20017,
+    Error,
+    disallowConstAsModifierOfCppPtr,
+    "cannot use 'const' on 'T*', prefer to use the syntax 'const Ptr<T>' instead")
+DIAGNOSTIC(20018, Error, disallowConstAsTypeModifier, "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -697,11 +703,6 @@ DIAGNOSTIC(
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(
-    30078,
-    Error,
-    cannotTakeConstantPointers,
-    "Not allowed to take pointer of an immutable object")
-DIAGNOSTIC(
     30048,
     Error,
     argumentHasMoreMemoryQualifiersThanParam,
@@ -818,7 +819,17 @@ DIAGNOSTIC(
     "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
-
+DIAGNOSTIC(
+    30078,
+    Error,
+    coherentKeywordOnAPointer,
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent "
+    "operations instead")
+DIAGNOSTIC(
+    30079,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take pointer of an immutable object")
 DIAGNOSTIC(
     30100,
     Error,
@@ -922,11 +933,7 @@ DIAGNOSTIC(
     Note,
     noteExplicitConversionPossible,
     "explicit conversion from '$0' to '$1' is possible")
-DIAGNOSTIC(
-    30080,
-    Error,
-    ambiguousConversion,
-    "more than one implicit conversion exists from '$0' to '$1'")
+DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one conversion exists from '$0' to '$1'")
 DIAGNOSTIC(
     30081,
     Warning,
@@ -2660,6 +2667,8 @@ DIAGNOSTIC(
     invalidAtomicDestinationPointer,
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
+
+DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
 
 //
 // 5xxxx - Target code generation.
