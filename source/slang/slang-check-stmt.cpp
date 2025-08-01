@@ -281,7 +281,10 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
     }
     if (stmt->sideEffectExpression)
     {
-        stmt->sideEffectExpression = CheckExpr(stmt->sideEffectExpression);
+        // Use special context for for-loop side effect to allow comma operators without warning
+        SemanticsContext sideEffectContext = withInForLoopSideEffect();
+        SemanticsExprVisitor subExprVisitor(sideEffectContext);
+        stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
     }
     subContext.checkStmt(stmt->statement);
 
