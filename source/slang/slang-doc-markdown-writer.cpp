@@ -356,26 +356,29 @@ String DocMarkdownWriter::_getName(InheritanceDecl* decl)
     return buf.produceString();
 }
 
-String DocMarkdownWriter::_getName(ExtensionDecl* decl)
+String DocMarkdownWriter::_getName(ExtensionDecl* extDecl)
 {
     StringBuilder buf;
-    buf << "extension " << decl->targetType->toString();
+    buf.clear();
 
-    List<InheritanceDecl*> inheritanceDecls;
-    _getDecls(decl, inheritanceDecls);
-
-    const Index count = inheritanceDecls.getCount();
-    if (count)
+    if (auto declRef = isDeclRefTypeOf<Decl>(extDecl->targetType))
     {
-        buf << " : ";
-        for (Index i = 0; i < count; ++i)
+        buf << "extension " << _getName(declRef.getDecl()).getUnownedSlice();
+
+        List<InheritanceDecl*> inheritanceDecls;
+        _getDecls(extDecl, inheritanceDecls);
+
+        const Index count = inheritanceDecls.getCount();
+        if (count)
         {
-            InheritanceDecl* inheritanceDecl = inheritanceDecls[i];
-            if (i > 0)
+            buf << " : ";
+
+            List<String> baseNames;
+            for (Index i = 0; i < count; ++i)
             {
-                buf << ", ";
+                baseNames.add(_getName(inheritanceDecls[i]));
             }
-            buf << inheritanceDecl->base->toString();
+            StringUtil::join(baseNames, UnownedStringSlice(", "), buf);
         }
     }
 
@@ -2997,15 +3000,16 @@ DocumentPage* DocMarkdownWriter::getPage(Decl* decl)
     page = new DocumentPage();
     page->title = _getFullName(decl);
     page->path = path;
+    page->shortName = _getName(decl);
+    page->decl = decl;
     if (auto extDecl = as<ExtensionDecl>(decl))
     {
         page->shortName = _getName(extDecl);
+        if (auto declRef = isDeclRefTypeOf<Decl>(extDecl->targetType))
+        {
+            page->decl = declRef.getDecl();
+        }
     }
-    else
-    {
-        page->shortName = _getName(decl);
-    }
-    page->decl = decl;
     m_output[path] = page;
 
     // If parent page exists, add this page to it's children
