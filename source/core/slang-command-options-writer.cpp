@@ -504,8 +504,8 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     {
         const auto& category = categories[categoryIndex];
 
-        // Omit the value categories
-        if (category.kind != CategoryKind::Value)
+        // Omit the value categories and the "Internal" category for text output
+        if (category.kind != CategoryKind::Value && category.name != toSlice("Internal"))
         {
             _appendDescriptionForCategory(categoryIndex);
         }
@@ -599,14 +599,9 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
 
                 m_builder << m_options.indent << m_options.indent;
 
-                m_builder << "<" << usageCat.name << "> can be: ";
-
-                List<UnownedStringSlice> optionNames;
-                options.getCategoryOptionNames(usageCategoryIndex, optionNames);
-
-                _appendWrappedIndented(2, optionNames, toSlice(", "));
-
-                m_builder << "\n";
+                m_builder << "To get a list of values that can be used for <" << usageCat.name
+                          << ">, ";
+                m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
             }
         }
     }

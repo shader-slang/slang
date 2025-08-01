@@ -36,6 +36,7 @@ static const StructRttiInfo _makeExecutionResultRtti()
     StructRttiBuilder builder(&obj, "TestServerProtocol::ExecutionResult", nullptr);
     builder.addField("stdOut", &obj.stdOut);
     builder.addField("stdError", &obj.stdError);
+    builder.addField("debugLayer", &obj.debugLayer);
     builder.addField("result", &obj.result);
     builder.addField("returnCode", &obj.returnCode);
     return builder.make();

@@ -32,7 +32,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     //SM5:(all({{.*}}&&
     //HLSL2018:(all({{.*}}&&
     //SM6:(all(and(
-    //WGS:(all(select(vec2<bool>(false),
+    //WGS:(all((select(vec2<bool>(false),
     //MTL:(all({{.*}}&&
     if (all(bool2(index >= 1) && assignFunc(index)))
     {
@@ -54,7 +54,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     //SM5:(all({{.*}}?{{.*}}:
     //HLSL2018:(all({{.*}}?{{.*}}:
     //SM6:(all(select(
-    //WGS:(all(select(vec2<bool>(false),
+    //WGS:(all((select(vec2<bool>(false),
     //MTL:(all(select(bool2(false)
     if (all(bool2(index >= 3) ? assignFunc(index) : bool2(false)))
     {

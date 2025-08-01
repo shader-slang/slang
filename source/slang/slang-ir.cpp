@@ -5995,14 +5995,14 @@ IRInst* IRBuilder::emitIfElseWithBlocks(
     outTrueBlock = createBlock();
     outAfterBlock = createBlock();
     outFalseBlock = createBlock();
+
     auto f = getFunc();
-    SLANG_ASSERT(f);
-    if (f)
-    {
-        f->addBlock(outTrueBlock);
-        f->addBlock(outAfterBlock);
-        f->addBlock(outFalseBlock);
-    }
+
+    SLANG_ASSERT(f && "Expected function");
+    f->addBlock(outTrueBlock);
+    f->addBlock(outAfterBlock);
+    f->addBlock(outFalseBlock);
+
     auto result = emitIfElse(val, outTrueBlock, outFalseBlock, outAfterBlock);
     setInsertInto(outTrueBlock);
     return result;

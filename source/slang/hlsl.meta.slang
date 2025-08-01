@@ -6481,13 +6481,9 @@ bool all(T x)
 {
     __target_switch
     {
-    default:
-        __intrinsic_asm "bool($0)";
     case hlsl:
         __intrinsic_asm "all";
     case metal:
-        __intrinsic_asm "all";
-    case wgsl:
         __intrinsic_asm "all";
     case spirv:
         let zero = __default<T>();
@@ -6505,6 +6501,8 @@ bool all(T x)
             return __slang_noop_cast<bool>(x);
         else
             return false;
+    default:
+        __intrinsic_asm "bool($0)";
     }
 }
 
@@ -6550,9 +6548,17 @@ bool all(vector<T,N> x)
             };
         }
     case wgsl:
+        // WGSL all() only works with boolean vectors
         if (__isBool<T>())
-            __intrinsic_asm "all";
-        __intrinsic_asm "all(vec$N0<bool>($0))";
+            __intrinsic_asm "all($0)";
+        else
+        {
+            // Fall back to loop for non-boolean types since WGSL doesn't support direct conversion
+            bool result = true;
+            for(int i = 0; i < N; ++i)
+                result = result && all(x[i]);
+            return result;
+        }
     default:
         bool result = true;
         for(int i = 0; i < N; ++i)
@@ -6563,7 +6569,7 @@ bool all(vector<T,N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool all(matrix<T,N,M> x)
 {
     __target_switch
@@ -6655,7 +6661,8 @@ bool any(T x)
     case metal:
         __intrinsic_asm "any";
     case wgsl:
-        __intrinsic_asm "any";
+        // For scalars, any() doesn't exist in WGSL, just convert to bool
+        __intrinsic_asm "bool($0)";
     case spirv:
         let zero = __default<T>();
         if (__isInt<T>())
@@ -6686,7 +6693,17 @@ bool any(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "any";
     case metal:
-        __intrinsic_asm "any";
+        if (__isBool<T>())
+            __intrinsic_asm "any";
+        else
+        {
+            // For non-bool types, convert to bool vector first
+            // Metal's any() only works with bool vectors
+            bool result = false;
+            for(int i = 0; i < N; ++i)
+                result = result || any(x[i]);
+            return result;
+        }
     case glsl:
         __intrinsic_asm "any(bvec$N0($0))";
     case spirv:
@@ -6714,7 +6731,17 @@ bool any(vector<T, N> x)
             };
         }
     case wgsl:
-        __intrinsic_asm "any";
+        // WGSL any() only works with boolean vectors
+        if (__isBool<T>())
+            __intrinsic_asm "any($0)";
+        else
+        {
+            // Fall back to loop for non-boolean types since WGSL doesn't support direct conversion
+            bool result = false;
+            for(int i = 0; i < N; ++i)
+                result = result || any(x[i]);
+            return result;
+        }
     default:
         bool result = false;
         for(int i = 0; i < N; ++i)
@@ -6725,7 +6752,7 @@ bool any(vector<T, N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch
@@ -8626,11 +8653,8 @@ T determinant(matrix<T,N,N> m)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "determinant";
     case hlsl: __intrinsic_asm "determinant";
-    case metal: __intrinsic_asm "determinant";
-    case wgsl: __intrinsic_asm "determinant";
-    // SPIR-V doesn't support integer determinants, so we need to implement it manually
+    // GLSL, WGSL, and SPIR-V don't support integer determinants for lowered matrices, so we need to implement it manually
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -13804,16 +13828,14 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
-    case wgsl: __intrinsic_asm "transpose";
-    // SPIRV-V doenst't support integer matrices, so transpose it manually
+    // GLSL, WGSL, SPIR-V, and Metal don't support integer matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)
@@ -13824,19 +13846,18 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
     case spirv: return spirv_asm {
         OpTranspose $$matrix<T, M, N> result $x
     };
-    case wgsl: __intrinsic_asm "transpose";
+    // GLSL, WGSL, and Metal don't support bool matrices when lowered, so transpose it manually
     default:
         matrix<T, M, N> result;
         for (int r = 0; r < M; ++r)

@@ -2356,6 +2356,37 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Check for static const variables without initializers
+    if (!varDecl->initExpr)
+    {
+        bool isStatic = false;
+        bool isConst = false;
+        bool isExtern = false;
+        for (auto modifier : varDecl->modifiers)
+        {
+            if (as<HLSLStaticModifier>(modifier))
+                isStatic = true;
+            else if (as<ConstModifier>(modifier))
+                isConst = true;
+            else if (as<ExternModifier>(modifier))
+                isExtern = true;
+
+            if (isStatic && isConst && isExtern)
+                break;
+        }
+        if (isStatic && isConst &&
+            // Don't error for extern variables
+            // Don't error for interface member variables
+            !isExtern && !as<InterfaceDecl>(varDecl->parentDecl))
+        {
+            getSink()->diagnose(
+                varDecl,
+                Diagnostics::staticConstVariableRequiresInitializer,
+                varDecl);
+        }
+    }
+
     checkVisibility(varDecl);
 }
 
@@ -13989,6 +14020,10 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         checkRayPayloadStructFields(structDecl);
     }
 
+    // Check if we should use MSVC-style bitfield packing
+    const bool useMSVCPacking =
+        getOptionSet().getBoolOption(CompilerOptionName::UseMSVCStyleBitfieldPacking);
+
     int backingWidth = 0;
     [[maybe_unused]] int totalWidth = 0;
     struct BitFieldInfo
@@ -14024,15 +14059,32 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
-            int bottomOfMember = 0;
-            for (const auto m : groupInfo)
+            if (useMSVCPacking)
             {
-                SLANG_ASSERT(bottomOfMember <= backingWidth);
+                // MSVC packs from MSB to LSB
+                int currentBitPosition = backingWidth;
+                for (const auto& m : groupInfo)
+                {
+                    currentBitPosition -= m.bitWidth;
+                    SLANG_ASSERT(currentBitPosition >= 0);
 
-                m.bitFieldModifier->backingDeclRef = backingMemberDeclRef;
-                m.bitFieldModifier->offset = bottomOfMember;
+                    m.bitFieldModifier->backingDeclRef = backingMemberDeclRef;
+                    m.bitFieldModifier->offset = currentBitPosition;
+                }
+            }
+            else
+            {
+                // GCC/Clang pack from LSB to MSB
+                int bottomOfMember = 0;
+                for (const auto& m : groupInfo)
+                {
+                    SLANG_ASSERT(bottomOfMember <= backingWidth);
 
-                bottomOfMember += m.bitWidth;
+                    m.bitFieldModifier->backingDeclRef = backingMemberDeclRef;
+                    m.bitFieldModifier->offset = bottomOfMember;
+
+                    bottomOfMember += m.bitWidth;
+                }
             }
 
             const auto backingMemberIndex = groupInfo[0].memberIndex;
@@ -14049,6 +14101,9 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         totalWidth = 0;
         groupInfo.clear();
     };
+
+    int previousFieldTypeWidth = 0; // Track the type width of the previous bitfield for MSVC mode
+
     for (; memberIndex < structDecl->getDirectMemberDeclCount(); ++memberIndex)
     {
         const auto& m = structDecl->getDirectMemberDecl(memberIndex);
@@ -14110,7 +14165,17 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 
         // If there's a 0 width type, dispatch the current group
         if (thisFieldWidth == 0)
+        {
             dispatchSomeBitPackedMembers();
+            previousFieldTypeWidth = 0;
+        }
+
+        // MSVC-specific behavior: start a new backing field if the type size changes
+        if (useMSVCPacking && groupInfo.getCount() > 0 &&
+            thisFieldTypeWidth != previousFieldTypeWidth)
+        {
+            dispatchSomeBitPackedMembers();
+        }
 
         // If this member wouldn't fit into the current group, dispatch
         // everything so far;
@@ -14123,6 +14188,9 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         // Grow the total width
         totalWidth += int(thisFieldWidth);
         groupInfo.add({memberIndex, int(thisFieldWidth), t, bfm});
+
+        // Track the type width for MSVC mode
+        previousFieldTypeWidth = thisFieldTypeWidth;
     }
     // If the struct ended with a bitpacked member, then make sure we don't forget the last
     // group
