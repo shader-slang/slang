@@ -277,7 +277,8 @@ jobs:
               -enable-debug-layers ${{ matrix.enable-debug-layers }}
           fi
       - name: Run Slang examples
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -290,7 +291,8 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm' && matrix.config != 'debug'
+        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release' && github.event_name == 'pull_request'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -304,11 +306,14 @@ jobs:
             -skip-reference-image-generation \
             -show-adapter-info
       - name: Run slang-rhi tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        # Run slang-rhi tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
+        # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices
+          "$bin_dir/slang-rhi-tests" -check-devices -tce=cmd-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*
       - name: Run slangpy tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
         shell: pwsh
         run: |
           python --version
@@ -338,7 +343,8 @@ jobs:
           Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
+          # Disable some slangpy tests temporarily. This should be enabled back when https://github.com/shader-slang/slangpy/issues/274 is closed.
+          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v -k "not (test_nested_structs and DeviceType.cuda) and not (test_cursor_read_write and DeviceType.cuda) and not (test_fill_from_kernel and DeviceType.cuda) and not (test_wrap_buffer and DeviceType.cuda) and not (test_apply_changes and DeviceType.cuda) and not (test_shader_cursor and DeviceType.cuda)"
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
