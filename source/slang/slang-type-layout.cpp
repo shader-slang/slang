@@ -2514,6 +2514,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     return isKhronosTarget(targetReq->getTarget());
 }
 
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
 bool isCPUTarget(TargetRequest* targetReq)
 {
     return ArtifactDescUtil::isCpuLikeTarget(
