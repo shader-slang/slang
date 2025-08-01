@@ -250,42 +250,6 @@ struct __align__(4) bool4
     }
 };
 
-// Vector element pointer functions for boolean vectors
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool* _slang_vector_get_element_ptr(bool1* x, int index)
-{
-    return ((bool*)(x)) + index;
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool* _slang_vector_get_element_ptr(bool2* x, int index)
-{
-    return ((bool*)(x)) + index;
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool* _slang_vector_get_element_ptr(bool3* x, int index)
-{
-    return ((bool*)(x)) + index;
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool* _slang_vector_get_element_ptr(bool4* x, int index)
-{
-    return ((bool*)(x)) + index;
-}
-
-// Vector element get functions for boolean vectors
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool _slang_vector_get_element(bool1 x, int index)
-{
-    return x[index];
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool _slang_vector_get_element(bool2 x, int index)
-{
-    return x[index];
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool _slang_vector_get_element(bool3 x, int index)
-{
-    return x[index];
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool _slang_vector_get_element(bool4 x, int index)
-{
-    return x[index];
-}
-
 #if SLANG_CUDA_RTC
 
 typedef signed char int8_t;
@@ -373,6 +337,7 @@ struct __align__(4) __half4
         return ((T*)(&x))[index];                                                     \
     }
 SLANG_VECTOR_GET_ELEMENT(int)
+SLANG_VECTOR_GET_ELEMENT(bool)
 SLANG_VECTOR_GET_ELEMENT(uint)
 SLANG_VECTOR_GET_ELEMENT(short)
 SLANG_VECTOR_GET_ELEMENT(ushort)
@@ -401,6 +366,7 @@ SLANG_VECTOR_GET_ELEMENT(double)
         return ((T*)(x)) + index;                                                            \
     }
 SLANG_VECTOR_GET_ELEMENT_PTR(int)
+SLANG_VECTOR_GET_ELEMENT_PTR(bool)
 SLANG_VECTOR_GET_ELEMENT_PTR(uint)
 SLANG_VECTOR_GET_ELEMENT_PTR(short)
 SLANG_VECTOR_GET_ELEMENT_PTR(ushort)
