@@ -4878,9 +4878,14 @@ TokenList preprocessSource(
         desc.contentAssistInfo = &linkage->contentAssistInfo.preprocessorInfo;
     }
 
-    preprocessor::WarningStateTracker* wst =
-        new preprocessor::WarningStateTracker(desc.sourceManager);
-    desc.sink->setSourceWarningStateTracker(wst);
+    // Only create a new WarningStateTracker if the sink doesn't already have one.
+    // This ensures pragma warning states are preserved across included files.
+    if (!desc.sink->getSourceWarningStateTracker())
+    {
+        preprocessor::WarningStateTracker* wst =
+            new preprocessor::WarningStateTracker(desc.sourceManager);
+        desc.sink->setSourceWarningStateTracker(wst);
+    }
 
     return preprocessSource(file, desc, outDetectedLanguage, outLanguageVersion);
 }
