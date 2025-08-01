@@ -2746,11 +2746,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0],
                                             &collectedErrorsSink,
                                             &conversionCost);
-                //if (collectedErrorsSink.getErrorCount())
-                //{
-                //    // failed, do not consider the result to have been "coerced"
-                //    coerceResult = false;
-                //}
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
