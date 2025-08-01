@@ -659,6 +659,42 @@ protected:
         //
         auto localVar = builder.emitVar(materialized->getDataType());
         builder.emitStore(localVar, materialized);
+
+        // Create debug information for the entry point parameter before removing it.
+        // This ensures that debuggers can inspect the original shader input parameter.
+        if (auto func = param->getParent()->getParent())
+        {
+            if (auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>())
+            {
+                // Find the parameter index for debug info
+                Index paramIndex = 0;
+                auto block = as<IRBlock>(param->getParent());
+                if (block)
+                {
+                    for (auto p : block->getParams())
+                    {
+                        if (p == param)
+                            break;
+                        paramIndex++;
+                    }
+                }
+
+                // Create a DebugVar instruction for the entry point parameter
+                auto debugVar = builder.emitDebugVar(
+                    paramType,
+                    funcDebugLoc->getSource(),
+                    funcDebugLoc->getLine(),
+                    funcDebugLoc->getCol(),
+                    builder.getIntValue(builder.getUIntType(), paramIndex));
+
+                // Copy name hints and debug decorations from the original parameter
+                copyNameHintAndDebugDecorations(debugVar, param);
+
+                // Associate the materialized value with the debug variable
+                builder.emitDebugValue(debugVar, materialized);
+            }
+        }
+
         param->replaceUsesWith(localVar);
         param->removeAndDeallocate();
     }
