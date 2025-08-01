@@ -6,6 +6,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -205,6 +206,25 @@ bool isVaryingParameter(IRVarLayout* varLayout)
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 
+// Helper function to determine if a buffer parameter should bypass
+// EntryPointParams collection for Metal targets
+bool shouldSkipStructuredBufferCollectionForMetal(
+    IRParam* param,
+    CollectEntryPointUniformParamsOptions const& options)
+{
+    // Only apply this logic for Metal targets
+    if (!isMetalTarget(options.targetReq))
+        return false;
+
+    auto paramType = param->getDataType();
+
+    // StructuredBuffer types (device* T)
+    if (as<IRHLSLStructuredBufferTypeBase>(paramType))
+        return true;
+
+    return false;
+}
+
 struct CollectEntryPointUniformParams : PerEntryPointPass
 {
     CollectEntryPointUniformParamsOptions m_options;
@@ -307,6 +327,13 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             // parameters.
             //
             if (isVaryingParameter(paramLayout))
+                continue;
+
+            // For Metal targets, skip collection of StructuredBuffer parameters
+            // so they remain as direct entry point parameters and can generate
+            // proper [[buffer(N)]] attributes
+            //
+            if (shouldSkipStructuredBufferCollectionForMetal(param, m_options))
                 continue;
 
             for (auto offsetAttr : paramLayout->getOffsetAttrs())
@@ -622,6 +649,15 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             // parameters.
             //
             if (isVaryingParameter(paramLayout))
+                continue;
+
+            // For Metal targets, skip buffer parameters that should remain
+            // as direct parameters (consistent with collection pass)
+            //
+            auto paramDataType = param->getDataType();
+
+            // StructuredBuffer types (device* T) - preserve for all targets for safety
+            if (as<IRHLSLStructuredBufferTypeBase>(paramDataType))
                 continue;
 
             auto paramType = param->getFullType();
