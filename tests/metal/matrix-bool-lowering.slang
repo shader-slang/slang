@@ -1,4 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -emit-spirv-directly
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -mtl -shaderobj
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -22,6 +24,9 @@ bool elementAnd(bool2x2 matrix)
         && matrix[1][0]
         && matrix[1][1];
 }
+
+// METAL: array<bool2, int(2)>
+// METALLIB: @computeMain
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -111,4 +116,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 0
     outputBuffer[16] = test_any_mixed;
     // CHECK-NEXT: 1
-}
+} 

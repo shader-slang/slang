@@ -1,5 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -vk -shaderobj -xslang -emit-spirv-directly -xslang -DTYPE=int
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -vk -shaderobj -xslang -emit-spirv-directly -xslang -DTYPE=uint
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -DTYPE=int
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain -DTYPE=int
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=int
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=uint
 
 #ifndef TYPE
 #define TYPE int
@@ -27,6 +29,9 @@ TYPE elementAdd(m2x2 matrix)
         + matrix[1][0]
         + matrix[1][1];
 }
+
+// METAL: array<{{(int|uint)}}2, int(2)>
+// METALLIB: @computeMain
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -190,10 +195,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 0
     outputBuffer[36] = TYPE(equal_to[0][0]);
     // CHECK-NEXT: 0
-    outputBuffer[37] = TYPE(not_equal[0][0]);
+    outputBuffer[37] = TYPE(negated[0][0] == expectedBuffer[0]);
     // CHECK-NEXT: 1
-    outputBuffer[38] = TYPE(negated[0][0] == expectedBuffer[0]);
+    outputBuffer[38] = TYPE(negated[1][1] == expectedBuffer[1]);
     // CHECK-NEXT: 1
-    outputBuffer[39] = TYPE(negated[1][1] == expectedBuffer[1]);
-    // CHECK-NEXT: 1
-}
+} 

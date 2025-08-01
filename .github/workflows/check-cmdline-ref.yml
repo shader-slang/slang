@@ -1,8 +1,6 @@
 name: Check Command Line Reference (comment /regenerate-cmdline-ref to auto-fix)
 
 on:
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
 

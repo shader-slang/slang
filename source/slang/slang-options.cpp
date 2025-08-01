@@ -567,7 +567,12 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "-reflection-json <path>",
-         "Emit reflection data in JSON format to a file."}};
+         "Emit reflection data in JSON format to a file."},
+        {OptionKind::UseMSVCStyleBitfieldPacking,
+         "-msvc-style-bitfield-packing",
+         nullptr,
+         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
+         "changes) rather than gcc-style (lsb first)"}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -2265,6 +2270,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
+        case OptionKind::UseMSVCStyleBitfieldPacking:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::MatrixLayoutRow:

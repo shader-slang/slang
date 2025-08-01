@@ -7,12 +7,36 @@
 namespace Slang
 {
 
+enum class DebugMessageType
+{
+    Info,
+    Warning,
+    Error
+};
+
+enum class DebugMessageSource
+{
+    Layer,
+    Driver,
+    Slang
+};
+
+class IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
+};
+
 /* Holds standard writers for the channels */
 class StdWriters : public RefObject
 {
 public:
     ISlangWriter* getWriter(SlangWriterChannel chan) const { return m_writers[chan]; }
     void setWriter(SlangWriterChannel chan, ISlangWriter* writer) { m_writers[chan] = writer; }
+
+    IDebugCallback* getDebugCallback() const { return m_debugCallback; }
+    void setDebugCallback(IDebugCallback* callback) { m_debugCallback = callback; }
 
     /// Flush all the set writers
     void flushWriters();
@@ -42,6 +66,7 @@ public:
 
 protected:
     ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF];
+    IDebugCallback* m_debugCallback = nullptr;
 
     static StdWriters* s_singleton;
 };
