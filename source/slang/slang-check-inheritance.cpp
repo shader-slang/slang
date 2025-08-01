@@ -858,13 +858,37 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             SubtypeWitness* baseIsSubtypeOfFacet = foundFacet->subtypeWitness;
 
-            auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
-                selfIsSubtypeOfBase,
-                baseIsSubtypeOfFacet);
+            // Check if this would create an unwanted struct->struct->interface conformance
+            // We want to prevent transitive witnesses of the form: struct Child -> struct Parent ->
+            // interface IFoo
+            bool shouldSkipTransitiveWitness = false;
 
-            indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+            auto selfType = selfIsSubtypeOfBase->getSub();
+            auto baseType = selfIsSubtypeOfBase->getSup();
+            auto facetType = baseIsSubtypeOfFacet->getSup();
 
-            ioMergedFacets.add(indirectFacet);
+            if (selfType && baseType && facetType)
+            {
+                auto selfDeclRef = isDeclRefTypeOf<StructDecl>(selfType);
+                auto baseDeclRef = isDeclRefTypeOf<StructDecl>(baseType);
+                auto facetDeclRef = isDeclRefTypeOf<InterfaceDecl>(facetType);
+
+                // Only skip if we have struct->struct->interface
+                // and the struct->struct witness is not the identity witness
+                shouldSkipTransitiveWitness = selfDeclRef && baseDeclRef && facetDeclRef &&
+                                              !isTypeEqualityWitness(selfIsSubtypeOfBase);
+            }
+
+            if (!shouldSkipTransitiveWitness)
+            {
+                auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
+                    selfIsSubtypeOfBase,
+                    baseIsSubtypeOfFacet);
+
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+
+                ioMergedFacets.add(indirectFacet);
+            }
         }
 
         // We picked one `foundFacet` above to be added to the merged

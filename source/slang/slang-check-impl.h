@@ -1436,7 +1436,7 @@ public:
         OverloadedExpr* overloadedExpr,
         LookupResult const& lookupResult);
     void diagnoseAmbiguousReference(Expr* overloadedExpr);
-
+    bool maybeDiagnoseAmbiguousReference(Expr* overloadedExpr);
 
     Expr* ExpectATypeRepr(Expr* expr);
 
@@ -1814,11 +1814,6 @@ public:
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
     void checkVisibility(Decl* decl);
 
-    bool doesSignatureMatchRequirement(
-        DeclRef<CallableDecl> satisfyingMemberDeclRef,
-        DeclRef<CallableDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool doesAccessorMatchRequirement(
         DeclRef<AccessorDecl> satisfyingMemberDeclRef,
         DeclRef<AccessorDecl> requiredMemberDeclRef);
@@ -1859,10 +1854,6 @@ public:
     //
     // If it does, then inserts a witness into `witnessTable`
     // and returns `true`, otherwise returns `false`
-    bool doesMemberSatisfyRequirement(
-        DeclRef<Decl> memberDeclRef,
-        DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     // State used while checking if a declaration (either a type declaration
     // or an extension of that type) conforms to the interfaces it claims
@@ -1879,11 +1870,41 @@ public:
         /// declaration)
         ContainerDecl* parentDecl;
 
-        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
-        DiagnosticSink innerSink;
-
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };
+
+    /// Reasons why witness synthesis can fail
+    enum class WitnessSynthesisFailureReason
+    {
+        General,                  // Generic failure (default)
+        MethodResultTypeMismatch, // Method return type doesn't match interface requirement
+        ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
+        GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
+    };
+
+    /// Details about method witness synthesis failure
+    struct MethodWitnessSynthesisFailureDetails
+    {
+        WitnessSynthesisFailureReason reason = WitnessSynthesisFailureReason::General;
+        DeclRef<Decl> candidateMethod; // The method that was considered but failed
+        Type* actualType = nullptr;    // For type mismatches: the actual type found
+        Type* expectedType = nullptr;  // For type mismatches: the expected type
+        ParameterDirection actualDir =
+            kParameterDirection_In; // For direction mismatches: the actual direction
+        ParameterDirection expectedDir =
+            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
+    };
+
+    bool doesSignatureMatchRequirement(
+        DeclRef<CallableDecl> satisfyingMemberDeclRef,
+        DeclRef<CallableDecl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool doesMemberSatisfyRequirement(
+        DeclRef<Decl> memberDeclRef,
+        DeclRef<Decl> requiredMemberDeclRef,
+        RefPtr<WitnessTable> witnessTable);
 
     void addModifiersToSynthesizedDecl(
         ConformanceCheckingContext* context,
@@ -1937,12 +1958,14 @@ public:
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<FuncDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     bool trySynthesizeConstructorRequirementWitness(
         ConformanceCheckingContext* context,
@@ -1994,13 +2017,14 @@ public:
     /// `lookupResult`.
     ///
     /// On success, installs the syntethesized declaration in `witnessTable` and returns `true`.
-    /// Otherwise, returns `false`.
+    /// Otherwise, returns `false` and sets `outFailureDetails` with information about why
+    /// synthesis failed.
     bool trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const& lookupResult,
         DeclRef<Decl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
+        RefPtr<WitnessTable> witnessTable,
+        MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     enum SynthesisPattern
     {
@@ -3236,5 +3260,20 @@ bool getExtensionTargetDeclList(
     DeclRefType* targetDeclRefType,
     ExtensionDecl* extDeclRef,
     ShortList<AggTypeDecl*>& targetDecls);
+
+void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+RefPtr<ComponentType> createUnspecializedGlobalComponentType(
+    FrontEndCompileRequest* compileRequest);
+
+RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
+    FrontEndCompileRequest* compileRequest,
+    List<RefPtr<ComponentType>>& outUnspecializedEntryPoints);
+
+RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileRequest* endToEndReq);
+
+RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
+    EndToEndCompileRequest* endToEndReq,
+    List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
 
 } // namespace Slang

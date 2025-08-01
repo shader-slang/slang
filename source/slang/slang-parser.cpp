@@ -2356,14 +2356,27 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
 
     genericApp->loc = base->loc;
     genericApp->functionExpr = base;
-    parser->ReadToken(TokenType::OpLess);
+    auto opLess = parser->ReadToken(TokenType::OpLess);
+    genericApp->argumentDelimeterLocs.add(opLess.loc);
     parser->genericDepth++;
-    // For now assume all generics have at least one argument
-    genericApp->arguments.add(_parseGenericArg(parser));
-    while (AdvanceIf(parser, TokenType::Comma))
+
+    for (;;)
     {
+        if (parser->LookAheadToken(TokenType::OpGreater) ||
+            parser->LookAheadToken(TokenType::OpRsh))
+            break;
         genericApp->arguments.add(_parseGenericArg(parser));
+        if (parser->LookAheadToken(TokenType::Comma))
+        {
+            auto commaToken = parser->ReadToken(TokenType::Comma);
+            genericApp->argumentDelimeterLocs.add(commaToken.loc);
+        }
+        else
+        {
+            break;
+        }
     }
+    genericApp->argumentDelimeterLocs.add(parser->tokenReader.peekLoc());
     parser->genericDepth--;
 
     if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
@@ -4972,6 +4985,15 @@ static void CompleteDecl(
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+
+                    // Copy visibility modifiers from the enum declaration
+                    if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
+                    {
+                        auto newVisibilityModifier = as<VisibilityModifier>(
+                            parser->astBuilder->createByNodeType(visibilityModifier->astNodeType));
+                        addModifier(staticConstDecl, newVisibilityModifier);
+                    }
+
                     auto valueExpr = parser->astBuilder->create<VarExpr>();
                     valueExpr->declRef = DeclRef<Decl>(enumCase);
                     staticConstDecl->initExpr = valueExpr;

@@ -361,6 +361,11 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
+<a id="msvc-style-bitfield-packing"></a>
+### -msvc-style-bitfield-packing
+Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+
+
 
 <a id="Target"></a>
 ## Target
@@ -1089,7 +1094,7 @@ Target
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
-* `Metal Library Bytecode assembly` 
+* `metallib-asm` : Metal Library Bytecode assembly 
 * `wgsl` : WebGPU shading language source 
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
