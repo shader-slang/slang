@@ -206,6 +206,7 @@ SlangResult passthroughDownstreamDiagnostics(
     IDownstreamCompiler* compiler,
     IArtifact* artifact);
 
+
 // helpers for error/warning reporting
 enum class DiagnosticCategory
 {
