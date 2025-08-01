@@ -1400,13 +1400,13 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
     {
-        // Normally we should always choose the non-Interface candidate, but it's the
-        // non-Interface candidate is coming free-form extension, it will still worse than
-        // the interface candidate, so we should weight that in this case.
-        int diff = int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
-
-        return diff == 0 ? int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement)
-                         : diff;
+        // Normally we should always choose the non-Interface candidate, but if one
+        // of the candidate is a free-form extension, this rule doesn't apply, and we
+        // will let free-form extension rule to decide which one is better later.
+        if (!leftIsFreeFormExtension && !rightIsFreeFormExtension)
+        {
+            return (int)(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+        }
     }
 
     // If both candidates are generic functions, we cannot decide which one is better if
