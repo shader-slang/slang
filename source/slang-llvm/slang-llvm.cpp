@@ -1048,7 +1048,9 @@ SlangResult LLVMDownstreamCompiler::compile(
                         {
                             symbolMap.insert(std::make_pair(
                                 mangler(func.name),
-                                JITEvaluatedSymbol::fromPointer(func.func)));
+                                ExecutorSymbolDef(
+                                    ExecutorAddr::fromPtr(func.func),
+                                    JITSymbolFlags::Exported)));
                         }
                     }
 
