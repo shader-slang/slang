@@ -784,9 +784,9 @@ SlangResult LLVMDownstreamCompiler::compile(
             includes.push_back(includePath.begin());
         }
 
-        clang::CompilerInvocation::setLangDefaults(
+        clang::LangOptions::setLangDefaults(
             *opts,
-            inputKind,
+            inputKind.getLanguage(),
             targetTriple,
             includes,
             langStd);
