@@ -14,6 +14,57 @@
 using namespace Slang;
 using namespace rhi;
 
+class DebugCallback : public rhi::IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    handleMessage(rhi::DebugMessageType type, rhi::DebugMessageSource source, const char* message) override
+    {
+        const char* typeStr = "";
+        switch (type)
+        {
+        case rhi::DebugMessageType::Info:
+            typeStr = "INFO: ";
+            break;
+        case rhi::DebugMessageType::Warning:
+            typeStr = "WARNING: ";
+            break;
+        case rhi::DebugMessageType::Error:
+            typeStr = "ERROR: ";
+            break;
+        default:
+            break;
+        }
+        const char* sourceStr = "[GraphicsLayer]: ";
+        switch (source)
+        {
+        case rhi::DebugMessageSource::Slang:
+            sourceStr = "[Slang]: ";
+            break;
+        case rhi::DebugMessageSource::Driver:
+            sourceStr = "[Driver]: ";
+            break;
+        }
+        printf("%s%s%s\n", sourceStr, typeStr, message);
+#ifdef _WIN32
+        OutputDebugStringA(sourceStr);
+        OutputDebugStringA(typeStr);
+        OutputDebugStringW(String(message).toWString());
+        OutputDebugStringW(L"\n");
+#endif
+    }
+};
+
+class SilentDebugCallback : public rhi::IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    handleMessage(rhi::DebugMessageType type, rhi::DebugMessageSource source, const char* message) override
+    {
+        // Ignore all debug messages in test mode to prevent output pollution
+    }
+};
+
 Slang::Result WindowedAppBase::initializeBase(
     const char* title,
     int width,
@@ -22,15 +73,22 @@ Slang::Result WindowedAppBase::initializeBase(
 {
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
-#ifdef _DEBUG
-    deviceDesc.enableValidation = true;
-#endif
+
+    // Enable validation when not in test mode to avoid output pollution during testing
+    deviceDesc.enableValidation = !isTestMode();
+
+    // Set appropriate debug callback based on test mode
+    static DebugCallback regularCallback;
+    static SilentDebugCallback silentCallback;
+    deviceDesc.debugCallback = isTestMode() ? static_cast<rhi::IDebugCallback*>(&silentCallback)
+                                            : static_cast<rhi::IDebugCallback*>(&regularCallback);
 
     slang::CompilerOptionEntry slangOptions[] = {
         {slang::CompilerOptionName::EmitSpirvDirectly, {slang::CompilerOptionValueKind::Int, 1}},
         {slang::CompilerOptionName::DebugInformation,
          {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD}}};
     deviceDesc.slang.compilerOptionEntries = slangOptions;
+
     // When in test mode, don't include debug information to avoid altering hash values during
     // testing Otherwise, include debug information for better debugging experience
     deviceDesc.slang.compilerOptionEntryCount = isTestMode() ? 1 : 2;
@@ -222,46 +280,6 @@ int64_t getTimerFrequency()
     return std::chrono::high_resolution_clock::period::den;
 }
 
-class DebugCallback : public IDebugCallback
-{
-public:
-    virtual SLANG_NO_THROW void SLANG_MCALL
-    handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
-    {
-        const char* typeStr = "";
-        switch (type)
-        {
-        case DebugMessageType::Info:
-            typeStr = "INFO: ";
-            break;
-        case DebugMessageType::Warning:
-            typeStr = "WARNING: ";
-            break;
-        case DebugMessageType::Error:
-            typeStr = "ERROR: ";
-            break;
-        default:
-            break;
-        }
-        const char* sourceStr = "[GraphicsLayer]: ";
-        switch (source)
-        {
-        case DebugMessageSource::Slang:
-            sourceStr = "[Slang]: ";
-            break;
-        case DebugMessageSource::Driver:
-            sourceStr = "[Driver]: ";
-            break;
-        }
-        printf("%s%s%s\n", sourceStr, typeStr, message);
-#ifdef _WIN32
-        OutputDebugStringA(sourceStr);
-        OutputDebugStringA(typeStr);
-        OutputDebugStringW(String(message).toWString());
-        OutputDebugStringW(L"\n");
-#endif
-    }
-};
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str)
