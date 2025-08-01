@@ -937,6 +937,24 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             return true;
         }
+    case kIROp_PtrLit:
+        {
+            auto ptrVal = as<IRPtrLit>(inst)->getValue();
+            if (ptrVal == nullptr)
+            {
+                m_writer->emit("nullptr");
+            }
+            else
+            {
+                // Handle non-null pointer values if needed
+                m_writer->emit("reinterpret_cast<");
+                emitType(inst->getFullType());
+                m_writer->emit(">(");
+                m_writer->emitUInt64((uint64_t)ptrVal);
+                m_writer->emit(")");
+            }
+            return true;
+        }
     default:
         break;
     }
