@@ -19,134 +19,6 @@ struct ApplyCopyElisionContext
     {
     }
 
-    bool isOnlyReadingFromVar(IRInst* var)
-    {
-        // TODO: add more insts to the list of "only reading" insts
-
-        // Track if the param is only being read from
-        bool onlyReading = true;
-        traverseUsers(var, [&](IRInst* user)
-        {
-            if (!onlyReading)
-                return;
-
-            switch (user->getOp())
-            {
-            case kIROp_Load:
-            case kIROp_MakeDifferentialPair:
-            case kIROp_MakeDifferentialPairUserCode:
-            case kIROp_MakeDifferentialPtrPair:
-            case kIROp_MakeUInt64:
-            case kIROp_MakeVector:
-            case kIROp_MakeMatrix:
-            case kIROp_MakeMatrixFromScalar:
-            case kIROp_MatrixReshape:
-            case kIROp_VectorReshape:
-            case kIROp_MakeArray:
-            case kIROp_MakeArrayFromElement:
-            case kIROp_MakeCoopVector:
-            case kIROp_MakeCoopVectorFromValuePack:
-            case kIROp_MakeStruct:
-            case kIROp_MakeTuple:
-            case kIROp_MakeTargetTuple:
-            case kIROp_MakeValuePack:
-            case kIROp_ImageLoad:
-            case kIROp_ByteAddressBufferLoad:
-            case kIROp_RWStructuredBufferLoad:
-            case kIROp_StructuredBufferLoad:
-            case kIROp_RWStructuredBufferLoadStatus:
-            case kIROp_StructuredBufferLoadStatus:
-            case kIROp_RWStructuredBufferGetElementPtr:
-            case kIROp_AtomicLoad:
-            case kIROp_Return:
-            case kIROp_Add:
-            case kIROp_Sub:
-            case kIROp_Mul:
-            case kIROp_Div:
-            case kIROp_IRem:
-            case kIROp_FRem:
-            case kIROp_Lsh:
-            case kIROp_Rsh:
-            case kIROp_BitAnd:
-            case kIROp_BitOr:
-            case kIROp_BitXor:
-            case kIROp_And:
-            case kIROp_Or:
-            case kIROp_Neg:
-            case kIROp_Not:
-            case kIROp_BitNot:
-            case kIROp_Select:
-                return;
-
-            case kIROp_Store:
-            {
-                auto store = as<IRStore>(user);
-                if(store->getPtr() == var)
-                    onlyReading = false;
-                return;
-            }
-
-            case kIROp_AtomicStore:
-            case kIROp_AtomicExchange:
-            case kIROp_AtomicCompareExchange:
-            case kIROp_AtomicAdd:
-            case kIROp_AtomicSub:
-            case kIROp_AtomicAnd:
-            case kIROp_AtomicOr:
-            case kIROp_AtomicXor:
-            case kIROp_AtomicMin:
-            case kIROp_AtomicMax:
-            case kIROp_AtomicInc:
-            case kIROp_AtomicDec:
-            {
-                auto atomicOp = as<IRAtomicOperation>(user);
-                if(atomicOp->getPtr() == var)
-                    onlyReading = false;
-                return;
-            }
-            case kIROp_Call:
-            {
-                // Considered "only reading" if the argument is to a
-                // `constref` parameter or `in` parameter
-                auto call = as<IRCall>(user);
-                auto callee = as<IRFunc>(call->getCallee());
-                if(!callee)
-                {
-                    onlyReading = false;
-                    return;
-                }
-                
-                for(UInt argNum = 0; argNum < call->getArgCount(); argNum++)
-                {
-                    auto arg = call->getArg(argNum);
-                    if(arg != var)
-                        continue;
-                    auto paramType = callee->getParamType(argNum);
-                    if(as<IROutTypeBase>(paramType) || as<IRRefType>(paramType))
-                    {
-                        onlyReading = false;
-                        return;
-                    }
-                    return;
-                }
-                return;
-            }
-            case kIROp_FieldExtract:
-            case kIROp_GetElement:
-                // recurse into the member/element
-                if(!isOnlyReadingFromVar(user))
-                    onlyReading = false;
-                return;
-
-            default:
-                // any other inst is assumed to modify the var
-                onlyReading = false;
-                return;
-            }
-        });
-        return onlyReading;
-    }
-
     // Check if a type should be transformed (struct, array, or other composite types)
     bool shouldTransformParam(IRParam* param)
     {
@@ -170,11 +42,6 @@ struct ApplyCopyElisionContext
         }
 
         return true;
-        //Next we must ensure that the param is only read from given the params `uses`.
-        //This is necissary to ensure since otherwise we cannot optimize our `in` into a
-        //`constref` (storing into a `in` is like storing into a local-var, storing in a
-        //`constref` does not have the same effect).
-        //return isOnlyReadingFromVar(param);
     }
 
     void rewriteParamUseSitesToSupportConstRefUsage(HashSet<IRParam*>& updatedParams)
@@ -244,14 +111,14 @@ struct ApplyCopyElisionContext
         {
         case kIROp_Var:
         case kIROp_GlobalVar:
-        case kIROp_GlobalParam:
-        case kIROp_Param:
-            return inst;
-        
-        case kIROp_FieldExtract:
-        case kIROp_GetElement:
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
+            return inst;
+        case kIROp_GlobalParam:
+            return builder.emitLoad(inst);
+        case kIROp_FieldExtract:
+        case kIROp_GetElement:
+        case kIROp_Param:
             return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
         case kIROp_Load:
             // Check if the load is from an addressable source
@@ -372,8 +239,8 @@ struct ApplyCopyElisionContext
                 // 3. constref is not 100% stable, so we need to be selective on what we let 
                 //    transform into constref.
                 //
-                // This allows us to pass the address of variables directly into the function
-                // if possible (this will be determined by the third pass).
+                // This allows us to pass the address of variables directly into a function,
+                // giving us the choice to remove copies into a parameter.
                 auto paramType = param->getDataType();
                 auto constRefType = builder.getConstRefType(paramType);
                 param->setFullType(constRefType);
@@ -423,7 +290,6 @@ struct ApplyCopyElisionContext
 
 SlangResult applyCopyElision(IRModule* module, DiagnosticSink* sink)
 {
-    // TODO: implement NRVO
     ApplyCopyElisionContext context(module, sink);
     return context.processModule();
 }
