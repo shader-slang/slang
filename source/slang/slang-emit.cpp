@@ -109,7 +109,7 @@
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
-#include "slang-ir-struct-param-to-constref.h"
+#include "slang-ir-apply-copy-elision.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-undo-param-copy.h"
@@ -1718,7 +1718,7 @@ Result linkAndOptimizeIR(
         // Transform struct parameters to use ConstRef for better performance
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
         {
-            transformStructParamsToConstRef(irModule, codeGenContext->getSink());
+            applyCopyElision(irModule, codeGenContext->getSink());
         }
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
