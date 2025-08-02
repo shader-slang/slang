@@ -424,10 +424,6 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
-
-// Check if a function is differentiable (has autodiff decorations)
-bool isDifferentiableFunc(IRFunc* func);
-
 } // namespace Slang
 
 #endif

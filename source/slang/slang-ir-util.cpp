@@ -2483,25 +2483,4 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-bool isDifferentiableFunc(IRFunc* func)
-{
-    for (auto decoration : func->getDecorations())
-    {
-        switch (decoration->getOp())
-        {
-        case kIROp_ForwardDifferentiableDecoration:
-        case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_BackwardDerivativePrimalDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_BackwardDerivativePropagateDecoration:
-            return true;
-        default:
-            break;
-        }
-    }
-    return false;
-}
-
 } // namespace Slang

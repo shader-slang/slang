@@ -119,6 +119,26 @@ static bool isAliasable(IRInst* inst)
     return false;
 }
 
+static bool isDifferentiableFunc(IRInst* func)
+{
+    for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_ForwardDifferentiableDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_BackwardDifferentiableDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
 // The `upper` field contains the struct that the type is
 // is contained in. It is used to check for empty structs.
 static bool canIgnoreType(IRType* type, IRType* upper)
