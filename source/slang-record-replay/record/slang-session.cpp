@@ -60,7 +60,7 @@ SLANG_NO_THROW slang::IModule* SessionRecorder::loadModule(
     return static_cast<slang::IModule*>(pModuleRecorder);
 }
 
-SLANG_NO_THROW slang::IModule* SessionRecorder::loadModuleFromIRBlob(
+SLANG_NO_THROW slang::IModule* SessionRecorder::loadModuleFromBinaryBlob(
     const char* moduleName,
     const char* path,
     slang::IBlob* source,
@@ -80,7 +80,7 @@ SLANG_NO_THROW slang::IModule* SessionRecorder::loadModuleFromIRBlob(
     }
 
     slang::IModule* pModule =
-        m_actualSession->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
+        m_actualSession->loadModuleFromBinaryBlob(moduleName, path, source, outDiagnostics);
 
     {
         recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
@@ -499,7 +499,9 @@ SessionRecorder::createCompileRequest(SlangCompileRequest** outCompileRequest)
         recorder = m_recordManager->endMethodRecord();
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SlangResult result = m_actualSession->createCompileRequest(outCompileRequest);
+    SLANG_ALLOW_DEPRECATED_END
 
     {
         recorder->recordAddress(*outCompileRequest);

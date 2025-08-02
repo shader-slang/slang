@@ -58,10 +58,12 @@ SlangResult tryLoadBuiltinModuleFromCache(
     auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
     if (cacheTimestamp != currentLibTimestamp)
         return SLANG_FAIL;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
         builtinModuleName,
         (uint8_t*)cacheData.getData() + sizeof(uint64_t),
         cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    SLANG_ALLOW_DEPRECATED_END
     return SLANG_OK;
 }
 
@@ -84,10 +86,12 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     typedef ISlangBlob*(GetEmbeddedModuleFunc)();
     auto getEmbeddedModule = (GetEmbeddedModuleFunc*)ptr;
     auto blob = getEmbeddedModule();
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
         builtinModuleName,
         (uint8_t*)blob->getBufferPointer(),
         blob->getBufferSize()));
+    SLANG_ALLOW_DEPRECATED_END
     return SLANG_OK;
 }
 
@@ -99,11 +103,13 @@ SlangResult trySaveBuiltinModuleToCache(
 {
     if (dllTimestamp != 0 && cacheFilename.getLength() != 0)
     {
+        SLANG_ALLOW_DEPRECATED_BEGIN
         Slang::ComPtr<ISlangBlob> coreModuleBlobPtr;
         SLANG_RETURN_ON_FAIL(globalSession->saveBuiltinModule(
             builtinModuleName,
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
+        SLANG_ALLOW_DEPRECATED_END
 
         Slang::FileStream fileStream;
         SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
@@ -138,16 +144,22 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
     Slang::_debugGetIRAllocCounter() = 0x80000000;
 #endif
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(
         slang_createGlobalSessionWithoutCoreModule(desc->apiVersion, globalSession.writeRef()));
+    SLANG_ALLOW_DEPRECATED_END
 
     // If we have the embedded core module, load from that, else compile it
+    SLANG_ALLOW_DEPRECATED_BEGIN
     ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule();
+    SLANG_ALLOW_DEPRECATED_END
     if (coreModuleBlob)
     {
+        SLANG_ALLOW_DEPRECATED_BEGIN
         SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(
             coreModuleBlob->getBufferPointer(),
             coreModuleBlob->getBufferSize()));
+        SLANG_ALLOW_DEPRECATED_END
     }
     else
     {
@@ -164,9 +176,11 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
         if (loadFromCacheResult != SLANG_OK)
         {
+            SLANG_ALLOW_DEPRECATED_BEGIN
             // Compile std lib from embeded source.
             SLANG_RETURN_ON_FAIL(
                 globalSession->compileBuiltinModule(slang::BuiltinModuleName::Core, 0));
+            SLANG_ALLOW_DEPRECATED_END
             // Store the compiled core module to cache file.
             trySaveBuiltinModuleToCache(
                 globalSession,
@@ -196,8 +210,10 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
         if (SLANG_FAILED(loadFromCacheResult))
         {
+            SLANG_ALLOW_DEPRECATED_BEGIN
             SLANG_RETURN_ON_FAIL(
                 globalSession->compileBuiltinModule(slang::BuiltinModuleName::GLSL, 0));
+            SLANG_ALLOW_DEPRECATED_END
 
             // Store the compiled core module to cache file.
             trySaveBuiltinModuleToCache(
@@ -292,7 +308,9 @@ SLANG_API void spAddBuiltins(
     char const* sourcePath,
     char const* sourceString)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
@@ -316,7 +334,9 @@ spSessionCheckCompileTargetSupport(SlangSession* session, SlangCompileTarget tar
 SLANG_API SlangResult
 spSessionCheckPassThroughSupport(SlangSession* session, SlangPassThrough passThrough)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     return session->checkPassThroughSupport(passThrough);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(SlangSession* session)

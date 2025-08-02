@@ -255,7 +255,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSourceString(
     return loadModuleFromSource(moduleName, path, sourceBlob.get(), outDiagnostics);
 }
 
-SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromIRBlob(
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromBinaryBlob(
     const char* moduleName,
     const char* path,
     slang::IBlob* source,
@@ -789,6 +789,7 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
         const SourceLanguage sourceLanguage =
             getDefaultSourceLanguageForDownstreamCompiler(passThroughMode);
 
+        SLANG_ALLOW_DEPRECATED_BEGIN
         // Add prelude for the given downstream compiler.
         ComPtr<ISlangBlob> prelude;
         getGlobalSession()->getLanguagePrelude(
@@ -798,6 +799,7 @@ void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)
         {
             builder.append(prelude);
         }
+        SLANG_ALLOW_DEPRECATED_END
 
         // TODO: Downstream compilers (specifically dxc) can currently #include additional
         // dependencies. This is currently the case for NVAPI headers included in the prelude. These
