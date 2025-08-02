@@ -45,7 +45,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "vertexCB",
@@ -53,7 +53,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "vertexCC",
@@ -65,7 +65,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "vertexCD",
@@ -77,7 +77,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                         }
                     ]
                 },
@@ -98,7 +98,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "vertexCB",
@@ -106,7 +106,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "vertexCC",
@@ -118,7 +118,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "vertexCD",
@@ -130,11 +130,11 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 40}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
                 }
             }
         },
@@ -179,7 +179,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "fragmentCB",
@@ -187,7 +187,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "fragmentCC",
@@ -199,7 +199,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "fragmentCD",
@@ -211,7 +211,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                         }
                     ]
                 },
@@ -232,7 +232,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "fragmentCB",
@@ -240,7 +240,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "fragmentCC",
@@ -252,7 +252,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "fragmentCD",
@@ -264,11 +264,11 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 40}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
                 }
             }
         },
@@ -313,7 +313,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "sharedCB",
@@ -321,7 +321,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "sharedCC",
@@ -333,7 +333,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "sharedCD",
@@ -345,7 +345,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                         }
                     ]
                 },
@@ -366,7 +366,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "sharedCB",
@@ -374,7 +374,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "sharedCC",
@@ -386,7 +386,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "sharedCD",
@@ -398,11 +398,11 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 32, "size": 8}
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 40}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
                 }
             }
         },

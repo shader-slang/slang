@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "inputBuffer",
-            "binding": {"kind": "uniform", "offset": 0, "size": 16},
+            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -21,7 +21,7 @@ standard output = {
                                 "kind": "pointer",
                                 "valueType": "int"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                         },
                         {
                             "name": "ptrInt2",
@@ -29,7 +29,7 @@ standard output = {
                                 "kind": "pointer",
                                 "valueType": "int"
                             },
-                            "binding": {"kind": "uniform", "offset": 8, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
                         },
                         {
                             "name": "anInt",
@@ -37,7 +37,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "int32"
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "another",
@@ -51,7 +51,7 @@ standard output = {
                                             "kind": "scalar",
                                             "scalarType": "float32"
                                         },
-                                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                                     },
                                     {
                                         "name": "b",
@@ -59,7 +59,7 @@ standard output = {
                                             "kind": "scalar",
                                             "scalarType": "int32"
                                         },
-                                        "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                        "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                                     },
                                     {
                                         "name": "ptrC",
@@ -67,11 +67,11 @@ standard output = {
                                             "kind": "pointer",
                                             "valueType": "int"
                                         },
-                                        "binding": {"kind": "uniform", "offset": 8, "size": 8}
+                                        "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
                                     }
                                 ]
                             },
-                            "binding": {"kind": "uniform", "offset": 24, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 24, "size": 16, "elementStride": 0}
                         },
                         {
                             "name": "anotherPtr",
@@ -79,7 +79,7 @@ standard output = {
                                 "kind": "pointer",
                                 "valueType": "AnotherStruct"
                             },
-                            "binding": {"kind": "uniform", "offset": 40, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 40, "size": 8, "elementStride": 0}
                         }
                     ]
                 }
@@ -87,7 +87,7 @@ standard output = {
         },
         {
             "name": "outputBuffer",
-            "binding": {"kind": "uniform", "offset": 16, "size": 16},
+            "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
