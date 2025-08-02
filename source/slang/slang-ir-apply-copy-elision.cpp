@@ -157,23 +157,24 @@ struct ApplyCopyElisionContext
             // Transform arguments to match the updated-parameter
             UInt i = 0;
             auto param = func->getFirstParam();
-            auto nextIter = [&]()
-            {
-                i++;
-                param = param->getNextParam();
-            };
             auto argCount = call->getArgCount();
-            for (; i < argCount; nextIter())
+            while(i < argCount)
             {
                 auto arg = call->getArg(i);                
                 if(!updatedParams.contains(param))
                 {
                     newArgs.add(arg);
+
+                    i++;
+                    param = param->getNextParam();
                     continue;
                 }
 
                 auto addr = prepareArgForConstRefParam(arg);
                 newArgs.add(addr);
+                
+                i++;
+                param = param->getNextParam();
             }
 
             // Create new call with updated arguments
