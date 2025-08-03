@@ -58,40 +58,40 @@ struct TransformParamsToConstRefContext
                     switch (user->getOp())
                     {
                     case kIROp_FieldExtract:
-                    {
-                        // Transform the IRFieldExtract into a IRFieldAddress
-                        auto fieldExtract = as<IRFieldExtract>(use->getUser());
-                        builder.setInsertBefore(fieldExtract);
-                        auto fieldAddr = builder.emitFieldAddress(
-                            fieldExtract->getBase(),
-                            fieldExtract->getField());
-                        auto loadInst = builder.emitLoad(fieldAddr);
-                        fieldExtract->replaceUsesWith(loadInst);
-                        fieldExtract->removeAndDeallocate();
-                        break;
-                    }
+                        {
+                            // Transform the IRFieldExtract into a IRFieldAddress
+                            auto fieldExtract = as<IRFieldExtract>(use->getUser());
+                            builder.setInsertBefore(fieldExtract);
+                            auto fieldAddr = builder.emitFieldAddress(
+                                fieldExtract->getBase(),
+                                fieldExtract->getField());
+                            auto loadInst = builder.emitLoad(fieldAddr);
+                            fieldExtract->replaceUsesWith(loadInst);
+                            fieldExtract->removeAndDeallocate();
+                            break;
+                        }
                     case kIROp_GetElement:
-                    {
-                        // Transform the IRGetElement into a IRGetElementPtr
-                        auto getElement = as<IRGetElement>(use->getUser());
-                
-                        builder.setInsertBefore(getElement);
-                        auto elemAddr = builder.emitElementAddress(
-                            getElement->getBase(),
-                            getElement->getIndex());
-                        auto loadInst = builder.emitLoad(elemAddr);
-                        getElement->replaceUsesWith(loadInst);
-                        getElement->removeAndDeallocate();
-                        break;
-                    }
+                        {
+                            // Transform the IRGetElement into a IRGetElementPtr
+                            auto getElement = as<IRGetElement>(use->getUser());
+
+                            builder.setInsertBefore(getElement);
+                            auto elemAddr = builder.emitElementAddress(
+                                getElement->getBase(),
+                                getElement->getIndex());
+                            auto loadInst = builder.emitLoad(elemAddr);
+                            getElement->replaceUsesWith(loadInst);
+                            getElement->removeAndDeallocate();
+                            break;
+                        }
                     default:
-                    {
-                        // Insert a load before the user and replace the user with the load
-                        builder.setInsertBefore(user);
-                        auto loadInst = builder.emitLoad(param);
-                        use->set(loadInst);
-                        break;
-                    }
+                        {
+                            // Insert a load before the user and replace the user with the load
+                            builder.setInsertBefore(user);
+                            auto loadInst = builder.emitLoad(param);
+                            use->set(loadInst);
+                            break;
+                        }
                     }
                 });
         }

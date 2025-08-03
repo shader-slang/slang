@@ -386,15 +386,17 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
             break;
         }
     }
-    
+
     // If a load has a getAddress use without side-effect,
     // we can remove the getAddr. Goal is to let DCE iterate and
     // remove an unused load. through elimination of uses.
-    traverseUsers<IRGetAddress>(load, [&](IRGetAddress* getAddr)
-    {
-        getAddr->replaceUsesWith(load->getPtr());
-        changed = true;
-    });
+    traverseUsers<IRGetAddress>(
+        load,
+        [&](IRGetAddress* getAddr)
+        {
+            getAddr->replaceUsesWith(load->getPtr());
+            changed = true;
+        });
 
     return changed;
 }
@@ -418,24 +420,25 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {
                 // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
-                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized out.
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
                 traverseUsers<IRLoad>(
                     getElementPtr,
                     [&](IRLoad* load)
                     {
                         traverseUsers<IRGetElement>(
-                        load,
-                        [&](IRGetElement* getElement)
-                        { 
-                            IRBuilder builder(getElement);
-                            builder.setInsertBefore(getElement);
-                            auto newGetElementPtr = builder.emitElementAddress(
-                                getElementPtr,
-                                getElement->getIndex());
-                            auto newLoad = builder.emitLoad(newGetElementPtr);
-                            getElement->replaceUsesWith(newLoad);
-                            changed = true;
-                        }); 
+                            load,
+                            [&](IRGetElement* getElement)
+                            {
+                                IRBuilder builder(getElement);
+                                builder.setInsertBefore(getElement);
+                                auto newGetElementPtr = builder.emitElementAddress(
+                                    getElementPtr,
+                                    getElement->getIndex());
+                                auto newLoad = builder.emitLoad(newGetElementPtr);
+                                getElement->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
                     });
             }
             else if (auto fieldAddress = as<IRFieldAddress>(inst))
