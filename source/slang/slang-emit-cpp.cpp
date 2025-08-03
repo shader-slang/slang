@@ -603,12 +603,16 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     if (auto constRefType = as<IRConstRefType>(type))
     {
         auto valueType = constRefType->getValueType();
+
+        // Note:
         // We currently do not propegate/manage "constness" for locals.
-        // This causes the following issues: 
-        // * variable of const pointer must also be a const pointer 
-        //   or optimized out.
-        // * taking address of member of const pointer
-        //   must be a const pointer, or optimized out.
+        // This is important since it means that we rely on opimization
+        // passes to remove all temporary pointer-variables created from
+        // our constref, otherwise we will generate invalid code like
+        // `T* var = const_ptr` or `T* var = &const_ptr->member`.
+        //
+        // If emitting `constref` fails due to this error, it is likely
+        // a missing compiler-optimization.
         m_writer->emit("const ");
         emitType(valueType);
         m_writer->emit(" *");

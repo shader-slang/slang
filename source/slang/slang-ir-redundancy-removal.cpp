@@ -415,6 +415,53 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             {
                 changed |= tryRemoveRedundantStore(func, store);
             }
+            else if (auto getElementPtr = as<IRGetElementPtr>(inst))
+            {
+                // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized out.
+                traverseUsers<IRLoad>(
+                    getElementPtr,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRGetElement>(
+                        load,
+                        [&](IRGetElement* getElement)
+                        { 
+                            IRBuilder builder(getElement);
+                            builder.setInsertBefore(getElement);
+                            auto newGetElementPtr = builder.emitElementAddress(
+                                getElementPtr,
+                                getElement->getIndex());
+                            auto newLoad = builder.emitLoad(newGetElementPtr);
+                            getElement->replaceUsesWith(newLoad);
+                            changed = true;
+                        }); 
+                    });
+            }
+            else if (auto fieldAddress = as<IRFieldAddress>(inst))
+            {
+                // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
+                traverseUsers<IRLoad>(
+                    fieldAddress,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRFieldExtract>(
+                            load,
+                            [&](IRFieldExtract* fieldExtract)
+                            {
+                                IRBuilder builder(fieldExtract);
+                                builder.setInsertBefore(fieldExtract);
+                                auto newGetFieldAddress = builder.emitFieldAddress(
+                                    fieldAddress,
+                                    fieldExtract->getField());
+                                auto newLoad = builder.emitLoad(newGetFieldAddress);
+                                fieldExtract->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
+            }
             inst = nextInst;
         }
     }
