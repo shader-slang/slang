@@ -2206,6 +2206,17 @@ void assign(
                     }
                     break;
                 }
+            case ScalarizedVal::Flavor::typeAdapter:
+                {
+                    auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(right.impl);
+                    auto adaptedRight = adaptType(
+                        builder,
+                        typeAdapter->val,
+                        typeAdapter->actualType,
+                        typeAdapter->pretendType);
+                    assign(builder, left, adaptedRight, index);
+                    break;
+                }
 
             default:
                 SLANG_UNEXPECTED("unimplemented");
@@ -3557,8 +3568,9 @@ void legalizeEntryPointParameterForGLSL(
     else if (auto ptrType = as<IRPtrTypeBase>(paramType))
     {
         // This is the case where the parameter is passed by const
-        // reference. We simply replace existing uses of the parameter
-        // with the real global variable.
+        // reference. For struct types, we create a local variable to replace 
+        // the parameter and populate it from the global variable for better 
+        // debug info. For other types, we use the original behavior.
         SLANG_ASSERT(
             ptrType->getOp() == kIROp_ConstRefType ||
             ptrType->getAddressSpace() == AddressSpace::Input ||
@@ -3573,7 +3585,24 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-        tryReplaceUsesOfStageInput(context, globalValue, pp);
+
+        // Create a local variable to replace the parameter
+        setInsertAfterOrdinaryInst(builder, pp);
+        auto localVariable = builder->emitVar(valueType);
+        auto localVal = ScalarizedVal::address(localVariable);
+
+        // Copy name hint and other debug decorations from the parameter
+        if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
+        {
+            builder->addNameHintDecoration(localVariable, nameHint->getName());
+        }
+
+        // Assign from the global variable to the local variable
+        assign(builder, localVal, globalValue);
+
+        // Replace uses of the original parameter with the local variable
+        pp->replaceUsesWith(localVariable);
+
         for (auto dec : pp->getDecorations())
         {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
