@@ -102,7 +102,7 @@ struct ApplyCopyElisionContext
     }
 
     // Check if an instruction represents an addressable value
-    IRInst* getAddressable(IRInst* inst)
+    IRInst* getAddressable(IRInst* inst, bool isDeref)
     {
         if (!inst)
             return nullptr;
@@ -121,8 +121,13 @@ struct ApplyCopyElisionContext
         case kIROp_Param:
             return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
         case kIROp_Load:
-            // Check if the load is from an addressable source
-            return getAddressable(inst->getOperand(0));
+            if (isDeref)
+                return inst;
+            // Check if the load is from an addressable source.
+            // Track the target operand since if we have a
+            // load(load(x)), we want to pass load(x) as our result
+            // since `load(x)` would be the address of `load(load(x))`.
+            return getAddressable(inst->getOperand(0), true);
         default:
             return nullptr;
         }
@@ -131,7 +136,7 @@ struct ApplyCopyElisionContext
     IRInst* prepareArgForConstRefParam(IRInst* arg)
     {
         // If the arg is addressable, we can pass the arg directly.
-        if(auto addr = getAddressable(arg))
+        if (auto addr = getAddressable(arg, false))
             return addr;
         
         // Unable to pass the arg directly, create a temporary.
