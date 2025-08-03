@@ -85,13 +85,13 @@ struct ApplyCopyElisionContext
                         break;
                     }
                     default:
-                        {
-                            // Insert a load before the user and replace the user with the load
-                            builder.setInsertBefore(user);
-                            auto loadInst = builder.emitLoad(param);
-                            use->set(loadInst);
-                            break;
-                        }
+                    {
+                        // Insert a load before the user and replace the user with the load
+                        builder.setInsertBefore(user);
+                        auto loadInst = builder.emitLoad(param);
+                        use->set(loadInst);
+                        break;
+                    }
                     }
                 });
         }
