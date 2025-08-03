@@ -55,49 +55,48 @@ struct ApplyCopyElisionContext
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
-                    switch(user->getOp())
+                    switch (user->getOp())
                     {
                     case kIROp_FieldExtract:
-                    {
-                        // Transform the IRFieldExtract into a IRFieldAddress
-                        auto fieldExtract = as<IRFieldExtract>(use->getUser());
+                        {
+                            // Transform the IRFieldExtract into a IRFieldAddress
+                            auto fieldExtract = as<IRFieldExtract>(use->getUser());
 
-                        builder.setInsertBefore(fieldExtract);
-                        auto fieldAddr = builder.emitFieldAddress(
-                            fieldExtract->getBase(),
-                            fieldExtract->getField());
-                        auto loadInst = builder.emitLoad(fieldAddr);
+                            builder.setInsertBefore(fieldExtract);
+                            auto fieldAddr = builder.emitFieldAddress(
+                                fieldExtract->getBase(),
+                                fieldExtract->getField());
+                            auto loadInst = builder.emitLoad(fieldAddr);
 
-                        fieldExtract->replaceUsesWith(loadInst);
-                        fieldExtract->removeAndDeallocate();
-                        break;
-                    }
+                            fieldExtract->replaceUsesWith(loadInst);
+                            fieldExtract->removeAndDeallocate();
+                            break;
+                        }
                     case kIROp_GetElement:
-                    {
-                        // Transform the IRGetElement into a IRGetElementPtr
-                        auto getElement = as<IRGetElement>(use->getUser());
-                
-                        builder.setInsertBefore(getElement);
-                        auto elemAddr = builder.emitElementAddress(
-                            getElement->getBase(),
-                            getElement->getIndex());
-                        auto loadInst = builder.emitLoad(elemAddr);
-                
-                        getElement->replaceUsesWith(loadInst);
-                        getElement->removeAndDeallocate();
-                        break;
-                    }
+                        {
+                            // Transform the IRGetElement into a IRGetElementPtr
+                            auto getElement = as<IRGetElement>(use->getUser());
+
+                            builder.setInsertBefore(getElement);
+                            auto elemAddr = builder.emitElementAddress(
+                                getElement->getBase(),
+                                getElement->getIndex());
+                            auto loadInst = builder.emitLoad(elemAddr);
+
+                            getElement->replaceUsesWith(loadInst);
+                            getElement->removeAndDeallocate();
+                            break;
+                        }
                     default:
-                    {
-                        // Insert a load before the user and replace the user with the load
-                        builder.setInsertBefore(user);
-                        auto loadInst = builder.emitLoad(param);
-                        use->set(loadInst);
-                        break;
+                        {
+                            // Insert a load before the user and replace the user with the load
+                            builder.setInsertBefore(user);
+                            auto loadInst = builder.emitLoad(param);
+                            use->set(loadInst);
+                            break;
+                        }
                     }
-                    }
-                }
-            );
+                });
         }
     }
 
@@ -125,10 +124,8 @@ struct ApplyCopyElisionContext
                 // should just be returned as is.
                 //
                 // Same for pointers.
-                if (isResourceType(instType) ||
-                    as<IRConstRefType>(instType) ||
-                    as<IROutTypeBase>(instType) ||
-                    as<IRRefType>(instType))
+                if (isResourceType(instType) || as<IRConstRefType>(instType) ||
+                    as<IROutTypeBase>(instType) || as<IRRefType>(instType))
                     return inst;
                 return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
             }
@@ -150,16 +147,14 @@ struct ApplyCopyElisionContext
         // If the arg is addressable, we can pass the arg directly.
         if (auto addr = getAddressable(arg, false))
             return addr;
-        
+
         // Unable to pass the arg directly, create a temporary.
         auto tempVar = builder.emitVar(arg->getFullType());
         builder.emitStore(tempVar, arg);
         return tempVar;
     }
     // Update call sites to pass an address instead of value for each updated-param
-    void updateCallSites(
-        IRFunc* func,
-        HashSet<IRParam*>& updatedParams)
+    void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
         // Find all calls which use `func`.
         List<IRCall*> callsToUpdate;
@@ -175,10 +170,10 @@ struct ApplyCopyElisionContext
             UInt i = 0;
             auto param = func->getFirstParam();
             auto argCount = call->getArgCount();
-            while(i < argCount)
+            while (i < argCount)
             {
-                auto arg = call->getArg(i);                
-                if(!updatedParams.contains(param))
+                auto arg = call->getArg(i);
+                if (!updatedParams.contains(param))
                 {
                     newArgs.add(arg);
 
@@ -189,7 +184,7 @@ struct ApplyCopyElisionContext
 
                 auto addr = prepareArgForConstRefParam(arg);
                 newArgs.add(addr);
-                
+
                 i++;
                 param = param->getNextParam();
             }
@@ -268,7 +263,7 @@ struct ApplyCopyElisionContext
                 // We are selective about what we will transform for a few reasons:
                 // 1. no reason to transform simple primitives like `int`.
                 // 2. not every type makes sense as constref. For example, `ParameterBlock`.
-                // 3. constref is not 100% stable, so we need to be selective on what we let 
+                // 3. constref is not 100% stable, so we need to be selective on what we let
                 //    transform into constref.
                 //
                 // This allows us to pass the address of variables directly into a function,
