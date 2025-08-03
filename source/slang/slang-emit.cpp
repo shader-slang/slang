@@ -22,7 +22,7 @@
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
-#include "slang-ir-apply-copy-elision.h"
+#include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
