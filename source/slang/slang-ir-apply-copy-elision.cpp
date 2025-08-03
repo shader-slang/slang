@@ -219,6 +219,20 @@ struct ApplyCopyElisionContext
             func->findDecoration<IRStreamOutputTypeDecoration>())
             return false;
 
+        // Skip functions with `kIROp_GenericAsm` since
+        // these instructions inject target specific code
+        // using parameters in an unpredictable way, relying
+        // on assumptions that parameters do not change type.
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (!as<IRGenericAsm>(inst))
+                    continue;
+                return false;
+            }
+        }
+
         return true;
     }
 
