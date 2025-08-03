@@ -1718,7 +1718,7 @@ Result linkAndOptimizeIR(
         // Transform struct parameters to use ConstRef for better performance
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
         {
-            applyCopyElision(irModule, codeGenContext->getSink());
+            transformParamsToConstRef(irModule, codeGenContext->getSink());
         }
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");

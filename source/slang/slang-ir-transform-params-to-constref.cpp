@@ -1,4 +1,4 @@
-#include "slang-ir-apply-copy-elision.h"
+#include "slang-ir-transform-params-to-constref.h"
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -7,14 +7,14 @@
 namespace Slang
 {
 
-struct ApplyCopyElisionContext
+struct TransformParamsToConstRefContext
 {
     IRModule* module;
     DiagnosticSink* sink;
     IRBuilder builder;
     bool changed = false;
 
-    ApplyCopyElisionContext(IRModule* module, DiagnosticSink* sink)
+    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
         : module(module), sink(sink), builder(module)
     {
     }
@@ -312,9 +312,9 @@ struct ApplyCopyElisionContext
     }
 };
 
-SlangResult applyCopyElision(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
 {
-    ApplyCopyElisionContext context(module, sink);
+    TransformParamsToConstRefContext context(module, sink);
     return context.processModule();
 }
 
