@@ -602,7 +602,7 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     // Handle ConstRef types specially for C++/CUDA targets
     if (auto constRefType = as<IRConstRefType>(type))
     {
-        auto valueType = constRefType->getValueType();w
+        auto valueType = constRefType->getValueType();
         // We currently do not propegate/manage "constness" for locals.
         // This causes the following issues: 
         // * variable of const pointer must also be a const pointer 
