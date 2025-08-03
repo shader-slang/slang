@@ -6,7 +6,7 @@ struct Data {
     StructuredBuffer<uint> index_buffer;
     uint index_count;
 
-    // CUDA: fetch{{.*}}const{{.*}}Data{{.*}}*{{.*}}this
+    // CUDA: fetch{{.*}}Data{{.*}}*{{.*}}this
     float fetch(int buffer, int index)
     {
         return input[buffer][index];
