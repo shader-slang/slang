@@ -605,11 +605,13 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         auto valueType = constRefType->getValueType();
         
         // TODO: we cannot emit `const` as of right now
-        // because a `const` pointer type can only copy into another
-        //`const` pointer type. This is a problem since we currently
-        // do not propegate/manage "constness" in a very robust way,
-        // causing many downstream issues.
-        //m_writer->emit("const ");
+        // We currently do not propegate/manage "constness" for locals.
+        // This causes limiations in the following ways: 
+        // * variable of const pointer must also be a const pointer 
+        //   or optimized out.
+        // * taking address of member of const pointer
+        //   must be a const pointer, or optimized out.
+        m_writer->emit("const ");
         emitType(valueType);
         m_writer->emit(" *");
         if (name.getLength() > 0)

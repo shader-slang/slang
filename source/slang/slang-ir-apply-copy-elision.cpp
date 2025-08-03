@@ -67,7 +67,6 @@ struct ApplyCopyElisionContext
                             fieldExtract->getBase(),
                             fieldExtract->getField());
                         auto loadInst = builder.emitLoad(fieldAddr);
-
                         fieldExtract->replaceUsesWith(loadInst);
                         fieldExtract->removeAndDeallocate();
                         break;
@@ -82,7 +81,6 @@ struct ApplyCopyElisionContext
                             getElement->getBase(),
                             getElement->getIndex());
                         auto loadInst = builder.emitLoad(elemAddr);
-                
                         getElement->replaceUsesWith(loadInst);
                         getElement->removeAndDeallocate();
                         break;

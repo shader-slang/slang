@@ -361,6 +361,44 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     return false;
 }
 
+bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
+{
+    bool changed = false;
+
+    // If the load is preceeded by a store without any side-effect insts
+    // in-between, remove the load.
+    for (auto prev = load->getPrevInst(); prev; prev = prev->getPrevInst())
+    {
+        if (auto store = as<IRStore>(prev))
+        {
+            if (store->getPtr() == load->getPtr())
+            {
+                auto value = store->getVal();
+                load->replaceUsesWith(value);
+                load->removeAndDeallocate();
+                changed = true;
+                break;
+            }
+        }
+
+        if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
+        {
+            break;
+        }
+    }
+    
+    // If a load has a getAddress use without side-effect,
+    // we can remove the getAddr. Goal is to let DCE iterate and
+    // remove an unused load. through elimination of uses.
+    traverseUsers<IRGetAddress>(load, [&](IRGetAddress* getAddr)
+    {
+        getAddr->replaceUsesWith(load->getPtr());
+        changed = true;
+    });
+
+    return changed;
+}
+
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
 {
     bool changed = false;
@@ -371,27 +409,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             auto nextInst = inst->getNextInst();
             if (auto load = as<IRLoad>(inst))
             {
-                for (auto prev = inst->getPrevInst(); prev; prev = prev->getPrevInst())
-                {
-                    if (auto store = as<IRStore>(prev))
-                    {
-                        if (store->getPtr() == load->getPtr())
-                        {
-                            // If the load is preceeded by a store without any side-effect insts
-                            // in-between, remove the load.
-                            auto value = store->getVal();
-                            load->replaceUsesWith(value);
-                            load->removeAndDeallocate();
-                            changed = true;
-                            break;
-                        }
-                    }
-
-                    if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
-                    {
-                        break;
-                    }
-                }
+                changed |= tryRemoveRedundantLoad(func, load);
             }
             else if (auto store = as<IRStore>(inst))
             {
