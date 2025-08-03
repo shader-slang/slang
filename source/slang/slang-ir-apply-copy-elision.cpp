@@ -119,6 +119,10 @@ struct ApplyCopyElisionContext
         case kIROp_FieldExtract:
         case kIROp_GetElement:
         case kIROp_Param:
+            // Types we tend to treat as pointers
+            // should just be returned as is.
+            if (isResourceType(inst->getDataType()))
+                return inst;
             return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
         case kIROp_Load:
             if (isDeref)
