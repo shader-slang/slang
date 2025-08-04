@@ -85,7 +85,7 @@ Available APIs:
 
 Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`
 
-To ignore a test, use `//IGNORE_TEST:` instead of `//TEST:`.
+To ignore a test, use `//DISABLE_TEST` instead of `//TEST`.
 
 Available test types:
 - `SIMPLE`: Runs the slangc compiler with specified options after the command
