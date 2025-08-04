@@ -6993,6 +6993,13 @@ static NodeBase* parseReturnValExpr(Parser* parser, void* /*userData*/)
     return expr;
 }
 
+static NodeBase* parseIRBytesExpr(Parser* parser, void* /*userData*/)
+{
+    IRBytesExpr* expr = parser->astBuilder->create<IRBytesExpr>();
+    expr->scope = parser->currentScope;
+    return expr;
+}
+
 static Expr* parseBoolLitExpr(Parser* parser, bool value)
 {
     BoolLiteralExpr* expr = parser->astBuilder->create<BoolLiteralExpr>();
@@ -9629,6 +9636,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("true", parseTrueExpr),
     _makeParseExpr("false", parseFalseExpr),
     _makeParseExpr("__return_val", parseReturnValExpr),
+    _makeParseExpr("__ir_bytes", parseIRBytesExpr),
     _makeParseExpr("nullptr", parseNullPtrExpr),
     _makeParseExpr("none", parseNoneExpr),
     _makeParseExpr("try", parseTryExpr),

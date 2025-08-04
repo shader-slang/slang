@@ -4610,6 +4610,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitReturnValExpr(ReturnValExpr*) { return context->returnDestination; }
 
+    LoweredValInfo visitIRBytesExpr(IRBytesExpr*)
+    {
+        auto builder = context->irBuilder;
+        auto type = builder->getUnsizedArrayType(builder->getUInt8Type());
+        auto moduleName = builder->getModule()->getName()->text.getUnownedSlice();
+        IRInst* args[] = {builder->getStringValue(moduleName)};
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(type, kIROp_IRBytes, 1, args));
+    }
+
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);

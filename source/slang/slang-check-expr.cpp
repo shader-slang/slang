@@ -5660,6 +5660,12 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitIRBytesExpr(IRBytesExpr* expr)
+{
+    expr->type = m_astBuilder->getArrayType(m_astBuilder->getUInt8Type(), nullptr);
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
 {
     // The left and right sides of an `&` for types must both be types.
