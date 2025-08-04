@@ -12,6 +12,6 @@ RWStructuredBuffer<float4> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    //CHK: [[TEX]].Sample({{.*}}->[[SMP]]
+    //CHK:[[VAR:[A-Za-z_][A-Za-z_0-9]*]].[[TEX]].Sample([[VAR]].[[SMP]]
     outputBuffer[0] = s2D.Sample(float2(0.5f, 0.5f));
 }

@@ -98,7 +98,7 @@ struct TransformParamsToConstRefContext
     }
 
     // Check if an instruction represents an addressable value
-    IRInst* getAddressable(IRInst* inst, bool isDeref)
+    IRInst* getAddressable(IRInst* inst)
     {
         if (!inst)
             return nullptr;
@@ -117,13 +117,11 @@ struct TransformParamsToConstRefContext
         case kIROp_Param:
             return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
         case kIROp_Load:
-            if (isDeref)
-                return inst;
             // Check if the load is from an addressable source.
             // Track the target operand since if we have a
-            // load(load(x)), we want to pass load(x) as our result
-            // since `load(x)` would be the address of `load(load(x))`.
-            return getAddressable(inst->getOperand(0), true);
+            // `load(x)`, we want to pass x as our result
+            // since `x` would be the address of `load(x)`.
+            return as<IRLoad>(inst)->getPtr();
         default:
             return nullptr;
         }
@@ -132,7 +130,7 @@ struct TransformParamsToConstRefContext
     IRInst* makeArgAddressable(IRInst* arg)
     {
         // If the arg is addressable, we can pass the arg directly.
-        if (auto addr = getAddressable(arg, false))
+        if (auto addr = getAddressable(arg))
             return addr;
 
         // Unable to pass the arg directly, create a temporary.
@@ -180,17 +178,26 @@ struct TransformParamsToConstRefContext
     // Check if function should be excluded from transformation
     bool shouldProcessFunction(IRFunc* func)
     {
-        // Skip functions with target intrinsic decorations (backend-specific functions)
-        if (func->findDecoration<IRTargetIntrinsicDecoration>())
-            return false;
-
-        // Skip entry point functions (interface with runtime)
-        if (func->findDecoration<IREntryPointDecoration>())
-            return false;
-
         // Skip functions without definitions
         if (!func->isDefinition())
             return false;
+        
+        // Skip if we find any of these decorations
+        for (auto decoration : func->getDecorations())
+        {
+            // Skip functions with target intrinsic decorations.
+            // These functions cannot be properly legalized after
+            // transformation.
+            if (as<IRTargetIntrinsicDecoration>(decoration))
+                return false;
+
+            // Skip entry-point and pseudo-entry-point functions
+            // since we cannot legalize the input parameters.
+            if (as<IREntryPointDecoration>(decoration)
+                || as<IRCudaKernelDecoration>(decoration)
+                || as<IRAutoPyBindCudaDecoration>(decoration))
+                return false;
+        }
 
         // Skip functions with `kIROp_GenericAsm` since
         // these instructions inject target specific code
