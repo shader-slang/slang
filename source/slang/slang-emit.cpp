@@ -698,6 +698,16 @@ Result linkAndOptimizeIR(
     auto targetProgram = codeGenContext->getTargetProgram();
     auto targetCompilerOptions = targetRequest->getOptionSet();
 
+    Dictionary<String, ComPtr<ISlangBlob>> moduleBlobs;
+    codeGenContext->getProgram()->enumerateModules(
+        [&](Module* module)
+        {
+            auto name = module->getIRModule()->getName()->text;
+            ComPtr<ISlangBlob> blob;
+            module->serialize(blob.writeRef());
+            moduleBlobs.add(name, blob);
+        });
+
     // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
@@ -1048,6 +1058,27 @@ Result linkAndOptimizeIR(
     }
 
     finalizeSpecialization(irModule);
+
+    {
+        List<IRInst*> removeList;
+        IRBuilder builder(irModule);
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_IRBytes)
+            {
+                auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+                auto& blob = moduleBlobs.getValue(moduleName);
+                // TODO: replace with an array value instead of an integer value
+                auto value = builder.getIntValue(builder.getUIntType(), blob->getBufferSize());
+                inst->replaceUsesWith(value);
+                removeList.add(inst);
+            }
+        }
+        for (auto inst : removeList)
+        {
+            inst->removeAndDeallocate();
+        }
+    }
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
