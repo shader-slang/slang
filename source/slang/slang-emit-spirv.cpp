@@ -1840,7 +1840,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             (IRPtrTypeBase*)inst))
                         emitOpTypeForwardPointer(resultSpvType, storageClass);
                 }
-                if (storageClass == SpvStorageClassPhysicalStorageBuffer)
+                if (storageClass == SpvStorageClassPhysicalStorageBuffer || storageClass == SpvStorageClassStorageBuffer)
                 {
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
@@ -3964,6 +3964,49 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    void maybeRequireVMMDeviceScope(IRCoherentOperation* op)
+    {
+        if ((MemoryScope)op->getMemoryScope()->getValue() == MemoryScope::Device)
+            requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScopeKHR);         
+    }
+
+    enum class CoherentMemoryAccessMaskOperationType : int
+    {
+        None = 0,
+        Store = 1,
+    };
+    
+    template<CoherentMemoryAccessMaskOperationType operationType>
+    void calcCoherentMemoryAccessMask(IRPtrTypeBase* type, IRInst* ptr, int& maskOut)
+    {
+        SLANG_ASSERT(type);
+        auto addrSpace = type->getAddressSpace();
+        if (addrSpace == AddressSpace::Image)
+        {
+            maskOut |= SpvImageOperandsNonPrivateTexelMask;
+
+            if constexpr ((int)operationType & (int)CoherentMemoryAccessMaskOperationType::Store)
+                maskOut |= SpvImageOperandsMakeTexelAvailableMask;
+            else
+                maskOut |= SpvImageOperandsMakeTexelVisibleMask;
+
+            auto imageSubscriptPtr = as<IRImageSubscript>(ptr);
+            if (!imageSubscriptPtr)
+                return;
+            if (imageSubscriptPtr->hasSampleCoord())
+                maskOut |= SpvImageOperandsSampleMask;
+        }
+        else
+        {
+            maskOut |= SpvMemoryAccessNonPrivatePointerMask;
+            if constexpr ((int)operationType & (int)CoherentMemoryAccessMaskOperationType::Store)
+                maskOut |= SpvMemoryAccessMakePointerAvailableMask;
+            else
+                maskOut |= SpvMemoryAccessMakePointerVisibleMask;
+            maskOut |= SpvMemoryAccessAlignedMask;
+        }
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -4326,7 +4369,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SLANG_ASSERT(numElems);
                 result = emitSplat(parent, inst, scalar, numElems->getValue());
             }
-            break;
+        break;
         case kIROp_MakeCoopVector:
             result = emitConstruct(parent, inst);
             break;
@@ -4378,6 +4421,147 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ImageSubscript:
             result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
             break;
+        case kIROp_CoherentLoad:
+        {
+            if (m_memoryModel != SpvMemoryModelVulkan)
+                SLANG_UNEXPECTED("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
+            
+            auto op = as<IRCoherentLoad>(inst);
+            maybeRequireVMMDeviceScope(op);
+
+            int memoryAccessMask = 0;
+            IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
+            SLANG_ASSERT(type);
+            calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::None>(
+                type,
+                op->getPtr(),
+                memoryAccessMask);
+
+            switch (type->getAddressSpace())
+            {
+            case AddressSpace::Image:
+                {
+                    SLANG_UNEXPECTED(
+                        "Coherent operations with an image is currently unimplemented");
+
+                    // TODO: 
+                    // Image-Pointers can only be used for Atomics, either: (1) we encode offsets+ptr logic ourselves;
+                    // (2) or we have a large legalization pass; (3) do atomic operations
+
+                    //auto imageSubscriptPtr = as<IRImageSubscript>(op->getPtr());
+                    //auto textureType =
+                    //    as<IRPtrTypeBase>(imageSubscriptPtr->getImage()->getDataType())->getValueType();
+                    //if (!imageSubscriptPtr)
+
+                    //auto image = emitOpLoad(
+                    //    parent,
+                    //    nullptr, textureType,
+                    //    imageSubscriptPtr->getImage());
+
+                    //result = emitInstCustomOperandFunc(
+                    //    image,
+                    //    inst,
+                    //    SpvOpImageRead,
+                    //    [&]()
+                    //    {
+                    //        emitOperand(inst->getFullType());
+                    //        emitOperand(kResultID);
+                    //        emitOperand(image);
+                    //        emitOperand(imageSubscriptPtr->getCoord());
+                    //        emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                    //        if (imageSubscriptPtr->hasSampleCoord())
+                    //            emitOperand(imageSubscriptPtr->getSampleCoord());
+                    //        emitOperand(op->getMemoryScope());
+                    //    });
+                    break;
+                }
+            default:
+                {
+                    result = emitInstCustomOperandFunc(
+                        parent,
+                        inst,
+                        SpvOpLoad,
+                        [&]()
+                        {
+                            emitOperand(inst->getFullType());
+                            emitOperand(kResultID);
+                            emitOperand(op->getPtr());
+                            emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                            if (as<IRIntLit>(op->getAlignment()))
+                                emitOperand(SpvLiteralInteger::from32(
+                                    (uint32_t)getIntVal(op->getAlignment())));
+                            else
+                                emitOperand(op->getAlignment());
+                            emitOperand(op->getMemoryScope());
+                        });
+                    break;
+                }
+            }
+            break;
+        }
+        case kIROp_CoherentStore:
+        {
+            if (m_memoryModel != SpvMemoryModelVulkan)
+                SLANG_UNEXPECTED("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
+            
+            auto op = as<IRCoherentStore>(inst);
+            maybeRequireVMMDeviceScope(op);
+
+            int memoryAccessMask = 0;
+            IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
+            SLANG_ASSERT(type);
+            calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::Store>(
+                type,
+                op->getPtr(),
+                memoryAccessMask);
+
+            switch (type->getAddressSpace())
+            {
+            case AddressSpace::Image:
+                {
+                    SLANG_UNEXPECTED(
+                        "Coherent operations with an image is currently unimplemented");
+                    // TODO:
+                    // Image-Pointers can only be used for Atomics, either: (1) we encode
+                    // offsets+ptr logic ourselves; (2) or we have a large legalization pass; (3) do
+                    // atomic operations
+
+                    // result = emitInstCustomOperandFunc(
+                    //     image,
+                    //     inst,
+                    //     SpvOpAtomicStore,
+                    //     [&]()
+                    //     {
+                    //         emitOperand(op->getPtr());
+                    //         emitOperand(ensureInst(op->getSrc()));
+                    //         emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                    //         emitOperand(op->getMemoryScope());
+                    //     });
+                    break;
+                }
+            default:
+                {
+                    result = emitInstCustomOperandFunc(
+                        parent,
+                        inst,
+                        SpvOpStore,
+                        [&]()
+                        {
+                            emitOperand(op->getPtr());
+                            emitOperand(op->getSrc());
+                            emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                            if (as<IRIntLit>(op->getAlignment()))
+                                emitOperand(SpvLiteralInteger::from32(
+                                    (uint32_t)getIntVal(op->getAlignment())));
+                            else
+                                emitOperand(op->getAlignment());
+                            emitOperand(op->getMemoryScope());
+                        });
+                    break;
+                }
+            }
+            break;
+        }
         case kIROp_AtomicInc:
             {
                 if (m_memoryModel == SpvMemoryModelVulkan)
@@ -6898,6 +7082,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitGetOffsetPtr(SpvInstParent* parent, IRInst* inst)
     {
+        auto typeOfPtr = as<IRPtrTypeBase>(inst->getDataType());
+        switch (typeOfPtr->getAddressSpace())
+        {
+        case AddressSpace::StorageBuffer:
+        {
+            requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+            break;
+        }
+        default:
+            requireSPIRVCapability(SpvCapabilityVariablePointers);
+            break;
+        }
+        
         return emitOpPtrAccessChain(
             parent,
             inst,
@@ -7128,11 +7325,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(
-            kIROp_PtrType,
-            sourceElementType,
-            AccessQualifier::ReadWrite,
-            addrSpace);
+        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, AccessQualifier::ReadWrite, addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);

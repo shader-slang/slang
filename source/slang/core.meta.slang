@@ -1386,6 +1386,23 @@ struct Ptr<
     }
 };
 
+// `ptr` is the value to be loaded.
+// `alignment` is the alignment to load with. Must be a power of two. Not always used.
+// `scope` controls the memory scope that an operation is coherent to.
+[require(SPV_KHR_vulkan_memory_model)]
+__intrinsic_op($(kIROp_CoherentLoad))
+__generic<T, Access access, AddressSpace addrSpace> 
+T coherentLoad(Ptr<T, access, addrSpace> ptr, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
+
+// `ptr` is the dst for the store.
+// `val` is the value to store into `ptr`.
+// `alignment` is the alignment to load with. Must be a power of two. Not always used.
+// `scope` controls the memory scope that an operation is coherent to.
+[require(SPV_KHR_vulkan_memory_model)]
+__intrinsic_op($(kIROp_CoherentStore))
+__generic<T, AddressSpace addrSpace> 
+void coherentStore(Ptr<T, Access::ReadWrite, addrSpace> ptr, T val, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
+
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
 void __align_attr(int alignment);
@@ -2700,12 +2717,10 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*($(fullPtrType) value);
 
-// Cannot infer generic from use-site, therefore only T can be 
-// used in the generic parameter list.
-__generic<T>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__prefix Ptr<T> operator&(__ref T value);
+[OverloadRank(0)]
+__prefix Ptr<T> operator&<T>(__ref T value);
 
 __generic<T>
 __intrinsic_op(0)
@@ -4197,6 +4212,7 @@ attribute_syntax [ForceInline] : ForceInlineAttribute;
 
 /// @internal
 /// Specify the overload rank of a function for overload resolution.
+/// @remarks Higher rank functions are preferred during overload resolution.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [OverloadRank] : OverloadRankAttribute;
 

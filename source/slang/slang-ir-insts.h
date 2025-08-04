@@ -2200,6 +2200,30 @@ struct IRLoad : IRInst
 };
 
 FIDDLE()
+struct IRCoherentOperation : IRInst
+{
+    FIDDLE(baseInst())
+    IRInst* getPtr() { return getOperand(0); }
+    IRIntLit* getMemoryScope() { return cast<IRIntLit>(getOperand(getOperandCount()-1)); }
+};
+
+FIDDLE()
+struct IRCoherentLoad : IRCoherentOperation
+{
+    FIDDLE(leafInst())
+    IRInst* getAlignment() { return getOperand(1); }
+};
+
+FIDDLE()
+struct IRCoherentStore : IRCoherentOperation
+{
+    FIDDLE(leafInst())
+    IRInst* getSrc() { return getOperand(1); }
+    IRInst* getAlignment() { return getOperand(2); }
+};
+
+
+FIDDLE()
 struct IRAtomicOperation : IRInst
 {
     FIDDLE(baseInst())

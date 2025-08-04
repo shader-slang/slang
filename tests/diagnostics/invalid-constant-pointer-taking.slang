@@ -16,7 +16,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     // TODO: taking a pointer from `StructuredBuffer` should be Access::Read
     // Constant pointers arent a thing in slang
-    // CHECK: error 30047:
+    // CHECK: error 30079:
     float* ptr = &constant_float_buffer[threadId.x];
 
 

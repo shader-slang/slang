@@ -301,7 +301,8 @@ PtrType* ASTBuilder::getPtrType(
     AccessQualifier accessQualifier,
     AddressSpace addrSpace)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
+    return dynamicCast<PtrType>(
+        getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -343,7 +344,8 @@ RefType* ASTBuilder::getRefType(
     AccessQualifier accessQualifier,
     AddressSpace addrSpace)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, accessQualifier, addrSpace, "RefType"));
+    return dynamicCast<RefType>(
+        getPtrType(valueType, accessQualifier, addrSpace, "RefType"));
 }
 
 ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
@@ -375,7 +377,8 @@ PtrTypeBase* ASTBuilder::getPtrType(
             (IntegerLiteralValue)accessQualifier),
         getIntVal(
             DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("AddressSpace")),
-            (IntegerLiteralValue)addrSpace)};
+            (IntegerLiteralValue)addrSpace)
+    };
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 

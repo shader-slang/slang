@@ -529,7 +529,11 @@ DIAGNOSTIC(
     Error,
     disallowConstAsModifierOfCppPtr,
     "cannot use 'const' on 'T*', prefer to use the syntax 'const Ptr<T>' instead")
-DIAGNOSTIC(20018, Error, disallowConstAsTypeModifier, "cannot use 'const' as a type modifier")
+DIAGNOSTIC(
+    20018,
+    Error,
+    disallowConstAsTypeModifier,
+    "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -823,8 +827,7 @@ DIAGNOSTIC(
     30078,
     Error,
     coherentKeywordOnAPointer,
-    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent "
-    "operations instead")
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent operations instead")
 DIAGNOSTIC(
     30079,
     Error,
@@ -933,7 +936,11 @@ DIAGNOSTIC(
     Note,
     noteExplicitConversionPossible,
     "explicit conversion from '$0' to '$1' is possible")
-DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one conversion exists from '$0' to '$1'")
+DIAGNOSTIC(
+    30080,
+    Error,
+    ambiguousConversion,
+    "more than one conversion exists from '$0' to '$1'")
 DIAGNOSTIC(
     30081,
     Warning,

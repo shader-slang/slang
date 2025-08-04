@@ -749,9 +749,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if (block == func->getFirstBlock())
             {
-                // A pointer typed function parameter should always be in the storage buffer address
-                // space.
-                addressSpace = AddressSpace::UserPointer;
+                // A pointer typed function parameter is in the storage buffer address
+                // space or groupshared.
+                if (as<IRGroupSharedRate>(inst->getRate()))
+                    addressSpace = AddressSpace::GroupShared;
+                else
+                    addressSpace = AddressSpace::UserPointer;
             }
             else
             {
@@ -780,7 +783,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     oldPtrType->getOp(),
                     oldPtrType->getValueType(),
                     AccessQualifier::ReadWrite,
-                    AddressSpace::UserPointer);
+                    addressSpace);
                 inst->setFullType(newPtrType);
                 addUsersToWorkList(inst);
             }
@@ -1863,9 +1866,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                    inst->removeAndDeallocate();
-                break;
+                {
+                    auto debugValue = as<IRDebugValue>(inst);
+                    auto debugVar = debugValue->getDebugVar();
+                    auto value = debugValue->getValue();
+                    if (auto valueDataTypePtr = as<IRPtrTypeBase>(value->getDataType()))
+                    {
+                        if (auto debugVarDataTypePtr =
+                                as<IRPtrTypeBase>(debugVar->getDataType()))
+                        {
+                            // Ensure they both have the same type (in-case we changed addr-space)
+                            debugVar->setFullType(
+                                value->getFullType());
+                        }
+                    }
+                    if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
+                        inst->removeAndDeallocate();
+                    break;
+                }
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
                 {

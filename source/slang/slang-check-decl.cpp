@@ -2364,6 +2364,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 MemoryQualifierSetModifier::Flags::kCoherent)
                 getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
 
+
     // Check for static const variables without initializers
     if (!varDecl->initExpr)
     {

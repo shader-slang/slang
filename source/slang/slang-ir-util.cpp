@@ -271,8 +271,27 @@ bool isSimpleDataType(IRType* type)
     case kIROp_MatrixType:
     case kIROp_InterfaceType:
     case kIROp_AnyValueType:
-    case kIROp_PtrType:
         return true;
+    case kIROp_PtrType:
+        {
+            auto ptrType = as<IRPtrType>(type);
+            auto addrSpace = ptrType->getAddressSpace();
+            // Prefer to produce valid code-gen,
+            // must specify what is a "simple" typed pointer.
+            switch (addrSpace)
+            {
+            case AddressSpace::ThreadLocal:
+            case AddressSpace::Global:
+            case AddressSpace::GroupShared:
+            case AddressSpace::Input:
+            case AddressSpace::BuiltinInput:
+            case AddressSpace::Function:
+            case AddressSpace::SpecializationConstant:
+                return true;
+            default:
+                return false;
+            }
+        }
     case kIROp_EnumType:
         {
             auto enumType = as<IREnumType>(type);
