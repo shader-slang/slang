@@ -115,17 +115,7 @@ struct TransformParamsToConstRefContext
         case kIROp_FieldExtract:
         case kIROp_GetElement:
         case kIROp_Param:
-            {
-                auto instType = inst->getDataType();
-                // Types we tend to treat as pointers
-                // should just be returned as is.
-                //
-                // Same for pointers.
-                if (isResourceType(instType) || as<IRConstRefType>(instType) ||
-                    as<IROutTypeBase>(instType) || as<IRRefType>(instType))
-                    return inst;
-                return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
-            }
+            return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
         case kIROp_Load:
             if (isDeref)
                 return inst;
@@ -139,7 +129,7 @@ struct TransformParamsToConstRefContext
         }
     }
 
-    IRInst* prepareArgForConstRefParam(IRInst* arg)
+    IRInst* makeArgAddressable(IRInst* arg)
     {
         // If the arg is addressable, we can pass the arg directly.
         if (auto addr = getAddressable(arg, false))
@@ -150,6 +140,7 @@ struct TransformParamsToConstRefContext
         builder.emitStore(tempVar, arg);
         return tempVar;
     }
+
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -165,25 +156,18 @@ struct TransformParamsToConstRefContext
 
             // Transform arguments to match the updated-parameter
             UInt i = 0;
-            auto param = func->getFirstParam();
-            auto argCount = call->getArgCount();
-            while (i < argCount)
+            for (auto param : func->getParams())
             {
                 auto arg = call->getArg(i);
                 if (!updatedParams.contains(param))
                 {
                     newArgs.add(arg);
-
                     i++;
-                    param = param->getNextParam();
                     continue;
                 }
-
-                auto addr = prepareArgForConstRefParam(arg);
+                auto addr = makeArgAddressable(arg);
                 newArgs.add(addr);
-
                 i++;
-                param = param->getNextParam();
             }
 
             // Create new call with updated arguments
@@ -200,32 +184,12 @@ struct TransformParamsToConstRefContext
         if (func->findDecoration<IRTargetIntrinsicDecoration>())
             return false;
 
-        // Skip functions without definitions
-        if (!func->isDefinition())
-            return false;
-
         // Skip entry point functions (interface with runtime)
         if (func->findDecoration<IREntryPointDecoration>())
             return false;
 
-        // Skip CUDA kernel functions (marked with [CudaKernel])
-        if (func->findDecoration<IRCudaKernelDecoration>())
-            return false;
-
-        // Skip PyTorch entry point functions
-        if (func->findDecoration<IRTorchEntryPointDecoration>())
-            return false;
-
-        // Skip functions with compute shader specific decorations
-        if (func->findDecoration<IRNumThreadsDecoration>())
-            return true;
-
-        // Skip functions with other shader stage decorations
-        if (func->findDecoration<IRMaxVertexCountDecoration>() ||
-            func->findDecoration<IRInstanceDecoration>() ||
-            func->findDecoration<IRWaveSizeDecoration>() ||
-            func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>() ||
-            func->findDecoration<IRStreamOutputTypeDecoration>())
+        // Skip functions without definitions
+        if (!func->isDefinition())
             return false;
 
         // Skip functions with `kIROp_GenericAsm` since
@@ -289,17 +253,39 @@ struct TransformParamsToConstRefContext
 
     SlangResult processModule()
     {
-        // Collect all functions that need processing
+        // Collect all functions that need processing.
+        // Process all callee's before callers; otherwise we introduce bugs
+        
+        HashSet<IRFunc*> visitedCandidates;
         List<IRFunc*> functionsToProcess;
-
         for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
         {
             auto func = as<IRFunc>(inst);
             if (!func)
                 continue;
-            if (!shouldProcessFunction(func))
+
+            if (visitedCandidates.contains(func))
                 continue;
-            functionsToProcess.add(func);
+
+            for (auto block : func->getBlocks())
+            {
+                for (auto blockInst : block->getChildren())
+                {
+                    auto call = as<IRCall>(blockInst);
+                    if (!call)
+                        continue;
+                    auto callee = as<IRFunc>(call->getCallee());
+                    if (!callee)
+                        continue;
+
+                    visitedCandidates.add(func);
+
+                    if (!shouldProcessFunction(func))
+                        continue;
+
+                    functionsToProcess.add(callee);
+                }
+            }
         }
 
         // Process each function

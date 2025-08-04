@@ -389,7 +389,7 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
 
     // If a load has a getAddress use without side-effect,
     // we can remove the getAddr. Goal is to let DCE iterate and
-    // remove an unused load. through elimination of uses.
+    // remove an unused load through elimination of uses.
     traverseUsers<IRGetAddress>(
         load,
         [&](IRGetAddress* getAddr)
