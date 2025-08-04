@@ -347,7 +347,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 // load was not something with an addr-space, infer from store->ptr
                                 // since `store(globalVar,intLit)` means the addr-space of the target is
                                 // unchanged.
-                                auto dstAddrSpace = getAddrSpace(store->getPtr());
                                 auto dstType = as<IRPtrTypeBase>(store->getPtr()->getDataType());
                                 if (dstType)
                                 {
