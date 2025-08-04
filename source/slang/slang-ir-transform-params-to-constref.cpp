@@ -251,6 +251,39 @@ struct TransformParamsToConstRefContext
         updateCallSites(func, updatedParams);
     }
 
+    void addFuncsToCallListInTopologicalOrder(
+        IRFunc* root,
+        List<IRFunc*>& functionsToProcess,
+        HashSet<IRFunc*>& visitedCandidates)
+    {
+        if (visitedCandidates.contains(root))
+            return;
+
+        visitedCandidates.add(root);
+
+        for (auto block : root->getBlocks())
+        {
+            for (auto blockInst : block->getChildren())
+            {
+                auto call = as<IRCall>(blockInst);
+                if (!call)
+                    continue;
+
+                auto callee = as<IRFunc>(call->getCallee());
+                if (!callee)
+                    continue;
+                
+                addFuncsToCallListInTopologicalOrder(callee, functionsToProcess, visitedCandidates);
+            }
+        }
+
+        // We do not support recursion, no need to check
+        // `visitedCandidates` again
+        if (!shouldProcessFunction(root))
+            return;
+        functionsToProcess.add(root);
+    }
+
     SlangResult processModule()
     {
         // Collect all functions that need processing.
@@ -263,29 +296,7 @@ struct TransformParamsToConstRefContext
             auto func = as<IRFunc>(inst);
             if (!func)
                 continue;
-
-            if (visitedCandidates.contains(func))
-                continue;
-
-            for (auto block : func->getBlocks())
-            {
-                for (auto blockInst : block->getChildren())
-                {
-                    auto call = as<IRCall>(blockInst);
-                    if (!call)
-                        continue;
-                    auto callee = as<IRFunc>(call->getCallee());
-                    if (!callee)
-                        continue;
-
-                    visitedCandidates.add(func);
-
-                    if (!shouldProcessFunction(func))
-                        continue;
-
-                    functionsToProcess.add(callee);
-                }
-            }
+            addFuncsToCallListInTopologicalOrder(func, functionsToProcess, visitedCandidates);
         }
 
         // Process each function
