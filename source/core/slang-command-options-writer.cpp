@@ -504,7 +504,8 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     {
         const auto& category = categories[categoryIndex];
 
-        // Omit the value categories as well as the "Internal" and "Repro" categories from the text output
+        // Omit the value categories as well as the "Internal" and "Repro" categories from the text
+        // output
         if (category.kind != CategoryKind::Value && category.name != toSlice("Internal") &&
             category.name != toSlice("Repro"))
         {
