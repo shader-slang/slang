@@ -3488,6 +3488,13 @@ struct DeclReflection
         return (DeclReflection*)spReflectionDecl_getParent((SlangReflectionDecl*)this);
     }
 
+    Modifier* findModifier(Modifier::ID id)
+    {
+        return (Modifier*)spReflectionDecl_FindModifier(
+            (SlangReflectionDecl*)this,
+            (SlangModifierID)id);
+    }
+
     template<Kind K>
     struct FilteredList
     {

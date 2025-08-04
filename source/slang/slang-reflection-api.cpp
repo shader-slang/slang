@@ -3740,6 +3740,22 @@ SLANG_API SlangReflectionGeneric* spReflectionDecl_castToGeneric(SlangReflection
     return nullptr;
 }
 
+
+SLANG_API SlangReflectionModifier* spReflectionDecl_FindModifier(
+    SlangReflectionDecl* decl,
+    SlangModifierID modifierID)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (!slangDecl)
+        return nullptr;
+
+    auto varRefl = convert(DeclRef<Decl>(slangDecl));
+    if (!varRefl)
+        return nullptr;
+
+    return spReflectionVariable_FindModifier(varRefl, modifierID);
+}
+
 SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangReflectionDecl* decl)
 {
     Decl* slangDecl = (Decl*)decl;
