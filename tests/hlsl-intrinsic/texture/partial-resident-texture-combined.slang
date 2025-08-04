@@ -1,5 +1,5 @@
 // TODO: There are issues running tests combined texture samplers in DX12. (Github issue #6982)
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12 -Xslang -DTARGET_DX12
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12 -Xslang -DTARGET_DX12
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device -xslang -DVK
 
