@@ -648,31 +648,6 @@ struct DynamicInstLoweringContext
             {
                 return builder.emitMakeTuple(upcastedElements);
             }
-
-            /*if (getCollectionCount(as<IRCollectionTaggedUnionType>(argInfo)) !=
-                getCollectionCount(as<IRCollectionTaggedUnionType>(destInfo)))
-            {
-                // If the sets of witness tables are not equal, reinterpret to the parameter type
-                IRBuilder builder(module);
-                builder.setInsertAfter(arg);
-
-                auto argTupleType = as<IRTupleType>(arg->getDataType());
-                auto tag =
-                    builder.emitGetTupleElement((IRType*)argTupleType->getOperand(0), arg, 0);
-                auto value =
-                    builder.emitGetTupleElement((IRType*)argTupleType->getOperand(1), arg, 1);
-
-                auto newTag = upcastCollection(
-                    context,
-                    tag,
-                    makeTagType(cast<IRTableCollection>(destInfo->getOperand(1))));
-                auto newValue = upcastCollection(
-                    context,
-                    value,
-                    cast<IRTypeCollection>(destInfo->getOperand(0)));
-
-                return builder.emitMakeTuple(newTag, newValue);
-            }*/
         }
         else if (as<IRCollectionTagType>(argInfo) && as<IRCollectionTagType>(destInfo))
         {
@@ -705,166 +680,6 @@ struct DynamicInstLoweringContext
 
         return arg; // Can use as-is.
     }
-
-    /*
-    IRInst* maybeReinterpret(IRInst* context, IRInst* arg, IRTypeFlowData* destInfo)
-    {
-        auto argInfo = tryGetInfo(context, arg);
-
-        if (!argInfo || !destInfo)
-            return arg;
-
-        if (as<IRCollectionTaggedUnionType>(argInfo) && as<IRCollectionTaggedUnionType>(destInfo))
-        {
-            if (getCollectionCount(as<IRCollectionTaggedUnionType>(argInfo)) !=
-                getCollectionCount(as<IRCollectionTaggedUnionType>(destInfo)))
-            {
-                // If the sets of witness tables are not equal, reinterpret to the parameter type
-                IRBuilder builder(module);
-                builder.setInsertAfter(arg);
-
-                // We'll use nulltype for the reinterpret since the type is going to be re-written
-                // and if it doesn't, this will help catch it before code-gen.
-                //
-                auto reinterpret = builder.emitReinterpret(nullptr, arg);
-                propagationMap[Element(reinterpret)] = destInfo;
-                return reinterpret; // Return the reinterpret instruction
-            }
-        }
-
-        return arg; // Can use as-is.
-    }
-
-    bool insertReinterprets()
-    {
-        bool changed = false;
-        // Process each function in the module
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (auto func = as<IRFunc>(inst))
-            {
-                auto context = func;
-                // Skip the first block as it contains function parameters, not phi parameters
-                for (auto block = func->getFirstBlock()->getNextBlock(); block;
-                     block = block->getNextBlock())
-                {
-                    // Process each parameter in this block (these are phi parameters)
-                    for (auto param : block->getParams())
-                    {
-                        auto paramInfo = tryGetInfo(param);
-                        if (!paramInfo)
-                            continue;
-
-                        // Check all predecessors and their corresponding arguments
-                        Index paramIndex = 0;
-                        for (auto p : block->getParams())
-                        {
-                            if (p == param)
-                                break;
-                            paramIndex++;
-                        }
-
-                        // Find all predecessors of this block
-                        for (auto pred : block->getPredecessors())
-                        {
-                            auto terminator = pred->getTerminator();
-                            if (!terminator)
-                                continue;
-
-                            if (auto unconditionalBranch = as<IRUnconditionalBranch>(terminator))
-                            {
-                                // Get the argument at the same index as this parameter
-                                if (paramIndex < unconditionalBranch->getArgCount())
-                                {
-                                    auto arg = unconditionalBranch->getArg(paramIndex);
-                                    auto newArg = maybeReinterpret(context, arg, tryGetInfo(param));
-
-                                    if (newArg != arg)
-                                    {
-                                        changed = true;
-                                        // Replace the argument in the branch instruction
-                                        SLANG_ASSERT(!as<IRLoop>(unconditionalBranch));
-                                        unconditionalBranch->setOperand(1 + paramIndex, newArg);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Is the terminator a return instruction?
-                    if (auto returnInst = as<IRReturn>(block->getTerminator()))
-                    {
-                        if (!as<IRVoidType>(returnInst->getVal()->getDataType()))
-                        {
-                            auto funcReturnInfo = tryGetFuncReturnInfo(func);
-                            auto newReturnVal =
-                                maybeReinterpret(context, returnInst->getVal(), funcReturnInfo);
-                            if (newReturnVal != returnInst->getVal())
-                            {
-                                // Replace the return value with the reinterpreted value
-                                changed = true;
-                                returnInst->setOperand(0, newReturnVal);
-                            }
-                        }
-                    }
-
-                    List<IRCall*> callInsts;
-                    List<IRStore*> storeInsts;
-                    // Collect all call instructions in this block
-                    for (auto inst : block->getChildren())
-                    {
-                        if (auto callInst = as<IRCall>(inst))
-                            callInsts.add(callInst);
-                        else if (auto storeInst = as<IRStore>(inst))
-                            storeInsts.add(storeInst);
-                    }
-
-                    // Look at all the args and reinterpret them if necessary
-                    for (auto callInst : callInsts)
-                    {
-                        if (auto irFunc = as<IRFunc>(callInst->getCallee()))
-                        {
-                            List<IRInst*> params;
-                            List<IRInst*> args;
-                            Index i = 0;
-                            for (auto param : irFunc->getParams())
-                            {
-                                auto newArg = maybeReinterpret(
-                                    context,
-                                    callInst->getArg(i),
-                                    tryGetInfo(param));
-                                if (newArg != callInst->getArg(i))
-                                {
-                                    // Replace the argument in the call instruction
-                                    changed = true;
-                                    callInst->setArg(i, newArg);
-                                }
-                                i++;
-                            }
-                        }
-                    }
-
-                    // Look at all the stores and reinterpret them if necessary
-                    for (auto storeInst : storeInsts)
-                    {
-                        auto newValToStore = maybeReinterpret(
-                            context,
-                            storeInst->getVal(),
-                            tryGetInfo(storeInst->getPtr()));
-                        if (newValToStore != storeInst->getVal())
-                        {
-                            // Replace the value in the store instruction
-                            changed = true;
-                            storeInst->setOperand(1, newValToStore);
-                        }
-                    }
-                }
-            }
-        }
-
-        return changed;
-    }
-    */
 
     void processInstForPropagation(IRInst* context, IRInst* inst, LinkedList<WorkItem>& workQueue)
     {
@@ -1717,120 +1532,19 @@ struct DynamicInstLoweringContext
         return hasChanges;
     }
 
-    /*
-    bool lowerInstsInFunc(IRFunc* func)
-    {
-        // Collect all instructions that need lowering
-        List<Element> typeInstsToLower;
-        List<Element> valueInstsToLower;
-        List<Element> instWithReplacementTypes;
-        List<IRFunc*> funcTypesToProcess;
-
-        bool hasChanges = false;
-        auto context = func;
-        // Process each function's instructions
-        for (auto block : func->getBlocks())
-        {
-            for (auto child : block->getChildren())
-            {
-                if (as<IRTerminatorInst>(child))
-                    continue; // Skip parameters and terminators
-
-                switch (child->getOp())
-                {
-                case kIROp_LookupWitnessMethod:
-                    {
-                        if (child->getDataType()->getOp() == kIROp_TypeKind)
-                            typeInstsToLower.add(Element(context, child));
-                        else
-                            valueInstsToLower.add(Element(context, child));
-                        break;
-                    }
-                case kIROp_ExtractExistentialType:
-                    typeInstsToLower.add(Element(context, child));
-                    break;
-                case kIROp_ExtractExistentialWitnessTable:
-                case kIROp_ExtractExistentialValue:
-                case kIROp_MakeExistential:
-                case kIROp_CreateExistentialObject:
-                    valueInstsToLower.add(Element(context, child));
-                    break;
-                case kIROp_Call:
-                    {
-                        auto callee = as<IRCall>(child)->getCallee();
-                        if (auto info = tryGetInfo(context, child))
-                            if (as<IRCollectionTaggedUnionType>(info))
-                                instWithReplacementTypes.add(Element(context, child));
-
-                        if (auto calleeInfo = tryGetInfo(context, callee))
-                            if (as<IRCollectionBase>(calleeInfo))
-                                valueInstsToLower.add(Element(context, child));
-
-                        if (as<IRSpecialize>(callee))
-                            valueInstsToLower.add(Element(context, child));
-                    }
-                    break;
-                default:
-                    if (auto info = tryGetInfo(context, child))
-                        if (as<IRCollectionTaggedUnionType>(info))
-                            // If this instruction has a set of types, tables, or funcs,
-                            // we need to lower it to a unified type.
-                            instWithReplacementTypes.add(Element(context, child));
-                }
-            }
-        }
-
-        for (auto instWithCtx : typeInstsToLower)
-        {
-            if (instWithCtx.inst->getParent() == nullptr)
-                continue;
-            hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
-        }
-
-        for (auto instWithCtx : valueInstsToLower)
-        {
-            if (instWithCtx.inst->getParent() == nullptr)
-                continue;
-            hasChanges |= lowerInst(instWithCtx.context, instWithCtx.inst);
-        }
-
-        for (auto instWithCtx : instWithReplacementTypes)
-        {
-            if (instWithCtx.inst->getParent() == nullptr)
-                continue;
-            hasChanges |= replaceType(instWithCtx.context, instWithCtx.inst);
-        }
-
-        return hasChanges;
-    }
-    */
-
     bool performDynamicInstLowering()
     {
-        // List<IRFunc*> funcsForTypeReplacement;
         List<IRFunc*> funcsToProcess;
 
         for (auto globalInst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(globalInst))
             {
-                // funcsForTypeReplacement.add(func);
                 funcsToProcess.add(func);
             }
 
         bool hasChanges = false;
         do
         {
-            /*
-            while (funcsForTypeReplacement.getCount() > 0)
-            {
-                auto func = funcsForTypeReplacement.getLast();
-                funcsForTypeReplacement.removeLast();
-
-                // Replace the function type with a concrete type if it has existential return types
-                hasChanges |= replaceFuncType(func, this->funcReturnInfo[func]);
-            }
-            */
-
             while (funcsToProcess.getCount() > 0)
             {
                 auto func = funcsToProcess.getLast();
@@ -1839,73 +1553,16 @@ struct DynamicInstLoweringContext
                 // Lower the instructions in the function
                 hasChanges |= lowerFunc(func);
             }
-
-            // The above loops might have added new contexts to lower.
-            /*for (auto context : this->contextsToLower)
-            {
-                hasChanges |= lowerContext(context);
-                auto newFunc = cast<IRFunc>(this->loweredContexts[context]);
-                funcsToProcess.add(newFunc);
-            }
-            this->contextsToLower.clear();*/
-
         } while (funcsToProcess.getCount() > 0);
 
         return hasChanges;
     }
-
-    /*
-    bool replaceFuncType(IRFunc* func, IRTypeFlowData* returnTypeInfo)
-    {
-        IRFuncType* origFuncType = as<IRFuncType>(func->getFullType());
-        IRType* returnType = origFuncType->getResultType();
-        if (auto taggedUnion = as<IRCollectionTaggedUnionType>(returnTypeInfo))
-        {
-            // If the return type is existential, we need to replace it with a tuple type
-            returnType = getTypeForExistential(taggedUnion);
-        }
-
-        List<IRType*> paramTypes;
-        for (auto param : func->getFirstBlock()->getParams())
-        {
-            // Extract the existential type from the parameter if it exists
-            auto paramInfo = tryGetInfo(param);
-            if (auto paramTaggedUnion = as<IRCollectionTaggedUnionType>(paramInfo))
-            {
-                paramTypes.add(getTypeForExistential(paramTaggedUnion));
-            }
-            else
-                paramTypes.add(param->getDataType());
-        }
-
-        IRBuilder builder(module);
-        builder.setInsertBefore(func);
-
-        auto newFuncType = builder.getFuncType(paramTypes, returnType);
-        if (newFuncType == func->getFullType())
-            return false; // No change
-
-        func->setFullType(newFuncType);
-        return true;
-    }
-    */
 
     IRType* getTypeForExistential(IRCollectionTaggedUnionType* taggedUnion)
     {
         // Replace type with Tuple<CollectionTagType(collection), TypeCollection>
         IRBuilder builder(module);
         builder.setInsertInto(module);
-
-        /*HashSet<IRInst*> types;
-        auto tableCollection = as<IRCollectionBase>(taggedUnion->getOperand(1));
-        forEachInCollection(
-            tableCollection,
-            [&](IRInst* table)
-            {
-                if (auto witnessTable = as<IRWitnessTable>(table))
-                    if (auto concreteType = witnessTable->getConcreteType())
-                        types.add(concreteType);
-            });*/
 
         auto typeCollection = cast<IRTypeCollection>(taggedUnion->getOperand(0));
         auto tableCollection = cast<IRTableCollection>(taggedUnion->getOperand(1));
@@ -2059,34 +1716,6 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        /*if (auto collection = as<IRCollectionBase>(info))
-        {
-            if (getCollectionCount(collection) == 1)
-            {
-                // Found a single possible type. Simple replacement.
-                inst->replaceUsesWith(getCollectionElement(collection, 0));
-                inst->removeAndDeallocate();
-                return true;
-            }
-            else if (auto typeCollection = as<IRTypeCollection>(collection))
-            {
-                // Set of types.
-                // Create an any-value type based on the set of types
-                auto typeSet = collectionToHashSet(collection);
-                auto unionType = typeSet.getCount() > 1 ? createAnyValueTypeFromInsts(typeSet)
-                                                        : *typeSet.begin();
-
-                // Store the mapping for later use
-                loweredInstToAnyValueType[inst] = unionType;
-
-                // Replace the instruction with the any-value type
-                inst->replaceUsesWith(typeCollection);
-                inst->removeAndDeallocate();
-                return true;
-            }
-        }
-        else*/
-
         if (getCollectionCount(collectionTagType) == 1)
         {
             // Found a single possible type. Simple replacement.
@@ -2120,25 +1749,6 @@ struct DynamicInstLoweringContext
         inst->replaceUsesWith(newInst);
         propagationMap[Element(context, newInst)] = info;
         inst->removeAndDeallocate();
-
-        /*if (auto witnessTableCollection = as<IRCollectionBase>(witnessTableInfo))
-        {
-            // Create a key mapping function
-            auto keyMappingFunc = createKeyMappingFunc(
-                inst->getRequirementKey(),
-                collectionToHashSet(witnessTableCollection),
-                collectionToHashSet(collection));
-
-            // Replace with call to key mapping function
-            auto witnessTableId = builder.emitCallInst(
-                builder.getUIntType(),
-                keyMappingFunc,
-                List<IRInst*>({inst->getWitnessTable()}));
-            inst->replaceUsesWith(witnessTableId);
-            propagationMap[Element(context, witnessTableId)] = info;
-            inst->removeAndDeallocate();
-            return true;
-        }*/
 
         return false;
     }
@@ -2184,15 +1794,6 @@ struct DynamicInstLoweringContext
         if (!taggedUnion)
             return false;
 
-        /*
-        // Check if we have a lowered any-value type for the result
-        auto resultType = inst->getDataType();
-        auto loweredType = loweredInstToAnyValueType.tryGetValue(inst);
-        if (loweredType)
-        {
-            resultType = (IRType*)*loweredType;
-        }*/
-
         auto info = tryGetInfo(context, inst);
         auto typeCollection = as<IRTypeCollection>(info);
         if (!typeCollection)
@@ -2225,16 +1826,8 @@ struct DynamicInstLoweringContext
             auto singletonValue = getCollectionElement(collectionTagType, 0);
             inst->replaceUsesWith(singletonValue);
             inst->removeAndDeallocate();
-            // loweredInstToAnyValueType[inst] = singletonValue;
             return true;
         }
-
-        // Create an any-value type based on the set of types
-        /*
-        auto anyValueType = createAnyValueTypeFromInsts(collectionToHashSet(collection));
-
-        // Store the mapping for later use
-        loweredInstToAnyValueType[inst] = anyValueType;*/
 
         // Replace the instruction with the collection type.
         inst->replaceUsesWith(collectionTagType->getOperand(0));
@@ -2481,80 +2074,6 @@ struct DynamicInstLoweringContext
         return builder.getFuncType(allParamTypes, resultType);
     }
 
-    /*IRFuncType* getExpectedFuncType(IRInst* context, IRCall* inst)
-    {
-        IRBuilder builder(module);
-        builder.setInsertInto(module);
-
-        // We'll retreive just the parameter directions from the callee's func-type,
-        // since that can't be different before & after the type-flow lowering.
-        //
-        List<ParameterDirection> paramDirections;
-        auto calleeInfo = tryGetInfo(context, inst->getCallee());
-        auto calleeCollection = as<IRCollectionBase>(calleeInfo);
-        if (!calleeCollection)
-            return nullptr;
-
-        auto funcType = as<IRFuncType>(getCollectionElement(calleeCollection, 0)->getDataType());
-        for (auto paramType : funcType->getParamTypes())
-        {
-            auto [direction, type] = getParameterDirectionAndType(paramType);
-            paramDirections.add(direction);
-        }
-
-        // Translate argument types into expected function type.
-        List<IRType*> paramTypes;
-        for (UInt i = 0; i < inst->getArgCount(); i++)
-        {
-            auto arg = inst->getArg(i);
-
-            switch (paramDirections[i])
-            {
-            case ParameterDirection::kParameterDirection_In:
-                {
-                    auto argInfo = tryGetInfo(context, arg);
-                    if (auto argTaggedUnion = as<IRCollectionTaggedUnionType>(argInfo))
-                        paramTypes.add(getTypeForExistential(argTaggedUnion));
-                    else
-                        paramTypes.add(arg->getDataType());
-                    break;
-                }
-            case ParameterDirection::kParameterDirection_Out:
-                {
-                    auto argInfo = tryGetInfo(context, arg);
-                    if (auto argTaggedUnion = as<IRCollectionTaggedUnionType>(argInfo))
-                        paramTypes.add(builder.getOutType(getTypeForExistential(argTaggedUnion)));
-                    else
-                        paramTypes.add(builder.getOutType(
-                            as<IRPtrTypeBase>(arg->getDataType())->getValueType()));
-                    break;
-                }
-            case ParameterDirection::kParameterDirection_InOut:
-                {
-                    auto argInfo = tryGetInfo(context, arg);
-                    if (auto argTaggedUnion = as<IRCollectionTaggedUnionType>(argInfo))
-                        paramTypes.add(builder.getInOutType(getTypeForExistential(argTaggedUnion)));
-                    else
-                        paramTypes.add(builder.getInOutType(
-                            as<IRPtrTypeBase>(arg->getDataType())->getValueType()));
-                    break;
-                }
-            default:
-                SLANG_UNEXPECTED("Unhandled parameter direction in getExpectedFuncType");
-            }
-        }
-
-        // Translate result type.
-        IRType* resultType = inst->getDataType();
-        auto returnInfo = tryGetInfo(context, inst);
-        if (auto returnTaggedUnion = as<IRCollectionTaggedUnionType>(returnInfo))
-        {
-            resultType = getTypeForExistential(returnTaggedUnion);
-        }
-
-        return builder.getFuncType(paramTypes, resultType);
-    }*/
-
     bool isDynamicGeneric(IRInst* callee)
     {
         // If the callee is a specialization, and at least one of its arguments
@@ -2573,156 +2092,6 @@ struct DynamicInstLoweringContext
 
         return false;
     }
-
-    /*
-    bool lowerContext(IRInst* context)
-    {
-        auto specializeInst = cast<IRSpecialize>(context);
-        auto generic = cast<IRGeneric>(specializeInst->getBase());
-        auto genericReturnVal = findGenericReturnVal(generic);
-
-        IRBuilder builder(module);
-        builder.setInsertInto(module);
-
-        // Let's start by creating the function itself.
-        auto loweredFunc = builder.createFunc();
-        builder.setInsertInto(loweredFunc);
-        builder.setInsertInto(builder.emitBlock());
-        // loweredFunc->setFullType(context->getFullType());
-
-        IRCloneEnv cloneEnv;
-        Index argIndex = 0;
-        List<IRType*> extraParamTypes;
-        // Map the generic's parameters to the specialized arguments.
-        for (auto param : generic->getFirstBlock()->getParams())
-        {
-            auto specArg = specializeInst->getArg(argIndex++);
-            if (auto collection = as<IRCollectionBase>(specArg))
-            {
-                // We're dealing with a set of types.
-                if (as<IRTypeType>(param->getDataType()))
-                {
-                    // auto unionType = createAnyValueTypeFromInsts(collectionSet);
-                    cloneEnv.mapOldValToNew[param] = collection;
-                }
-                else if (as<IRWitnessTableType>(param->getDataType()))
-                {
-                    // Add an integer param to the func.
-                    auto tagType = (IRType*)makeTagType(collection);
-                    cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
-                    extraParamTypes.add(tagType);
-                    // extraIndices++;
-                }
-            }
-            else
-            {
-                // For everything else, just set the parameter type to the argument;
-                SLANG_ASSERT(specArg->getParent()->getOp() == kIROp_ModuleInst);
-                cloneEnv.mapOldValToNew[param] = specArg;
-            }
-        }
-
-        // Clone in the rest of the generic's body including the blocks of the returned func.
-        for (auto inst = generic->getFirstBlock()->getFirstOrdinaryInst(); inst;
-             inst = inst->getNextInst())
-        {
-            if (inst == genericReturnVal)
-            {
-                auto returnedFunc = cast<IRFunc>(inst);
-                auto funcFirstBlock = returnedFunc->getFirstBlock();
-
-                // cloneEnv.mapOldValToNew[funcFirstBlock] = loweredFunc->getFirstBlock();
-                builder.setInsertInto(loweredFunc);
-                for (auto block : returnedFunc->getBlocks())
-                {
-                    // Merge the first block of the generic with the first block of the
-                    // returned function to merge the parameter lists.
-                    //
-                    // if (block != funcFirstBlock)
-                    //{
-                    cloneEnv.mapOldValToNew[block] =
-                        cloneInstAndOperands(&cloneEnv, &builder, block);
-                    //}
-                }
-
-                builder.setInsertInto(loweredFunc->getFirstBlock());
-                builder.emitBranch(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
-
-                for (auto param : funcFirstBlock->getParams())
-                {
-                    // Clone the parameters of the first block.
-                    builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
-                    cloneInst(&cloneEnv, &builder, param);
-                }
-
-                builder.setInsertInto(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
-                for (auto inst = funcFirstBlock->getFirstOrdinaryInst(); inst;
-                     inst = inst->getNextInst())
-                {
-                    // Clone the instructions in the first block.
-                    cloneInst(&cloneEnv, &builder, inst);
-                }
-
-                for (auto block : returnedFunc->getBlocks())
-                {
-                    if (block == funcFirstBlock)
-                        continue; // Already cloned the first block
-                    cloneInstDecorationsAndChildren(
-                        &cloneEnv,
-                        builder.getModule(),
-                        block,
-                        cloneEnv.mapOldValToNew[block]);
-                }
-
-                builder.setInsertInto(builder.getModule());
-                auto loweredFuncType = as<IRFuncType>(
-                    cloneInst(&cloneEnv, &builder, as<IRFuncType>(returnedFunc->getFullType())));
-
-                // Add extra indices to the func-type parameters
-                List<IRType*> funcTypeParams;
-                for (Index i = 0; i < extraParamTypes.getCount(); i++)
-                    funcTypeParams.add(extraParamTypes[i]);
-
-                for (auto paramType : loweredFuncType->getParamTypes())
-                    funcTypeParams.add(paramType);
-
-                // Set the new function type with the extra indices
-                loweredFunc->setFullType(
-                    builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
-            }
-            else if (!as<IRReturn>(inst))
-            {
-                // Keep cloning insts in the generic
-                cloneInst(&cloneEnv, &builder, inst);
-            }
-        }
-
-        // Transfer propagation info.
-        for (auto& [oldVal, newVal] : cloneEnv.mapOldValToNew)
-        {
-            if (propagationMap.containsKey(Element(context, oldVal)))
-            {
-                // If we have propagation info for the old value, transfer it to the new value
-                if (auto info = propagationMap[Element(context, oldVal)])
-                {
-                    if (newVal->getParent()->getOp() != kIROp_ModuleInst)
-                        propagationMap[Element(loweredFunc, newVal)] = info;
-                }
-            }
-        }
-
-        // Transfer func-return value info.
-        if (this->funcReturnInfo.containsKey(context))
-        {
-            this->funcReturnInfo[loweredFunc] = this->funcReturnInfo[context];
-        }
-
-        context->replaceUsesWith(loweredFunc);
-        // context->removeAndDeallocate();
-        this->loweredContexts[context] = loweredFunc;
-        return true;
-    }
-    */
 
     IRInst* getCalleeForContext(IRInst* context)
     {
@@ -2900,19 +2269,6 @@ struct DynamicInstLoweringContext
                     if (argValueType != paramType)
                     {
                         SLANG_UNEXPECTED("ptr-typed parameters should have matching types");
-                        /*
-                        IRBuilder varBuilder(inst->getModule());
-                        varBuilder.setInsertAfter(arg);
-                        auto callVar = varBuilder.emitVar(paramType);
-
-                        if (paramDirection == kParameterDirection_InOut)
-                        {
-                            varBuilder.emitStore(
-                                callVar,
-                                upcastCollection(context, varBuilder.emitLoad(arg), paramType));
-                        }
-
-                        varBuilder.emitStore(arg, varBuilder.emitLoad(callVar));*/
                     }
                     else
                     {
@@ -2923,32 +2279,10 @@ struct DynamicInstLoweringContext
             default:
                 SLANG_UNEXPECTED("Unhandled parameter direction in lowerCall");
             }
-
-            /*if (newArg != arg)
-            {
-                // If the argument changed, replace the old one.
-                changed = true;
-                IRBuilder builder(inst->getModule());
-                builder.setInsertBefore(inst);
-                builder.replaceOperand(&inst->getArgs()[i + 1], newArg);
-            }*/
         }
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-
-        /* Create dispatch function
-        auto dispatchFunc =
-            createDispatchFunc(collectionToHashSet(calleeCollection), expectedFuncType);*/
-
-
-        // Replace call with dispatch
-        /*List<IRInst*> newArgs;
-        newArgs.add(callee); // Add the lookup as first argument (will get lowered into an uint tag)
-        for (UInt i = 1; i < inst->getOperandCount(); i++)
-        {
-            newArgs.add(inst->getOperand(i));
-        }*/
 
         bool changed = false;
         for (UInt i = 0; i < newArgs.getCount(); i++)
@@ -2998,8 +2332,6 @@ struct DynamicInstLoweringContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        // auto witnessTableInfo = tryGetInfo(context, inst->getWitnessTable());
-
         // Collect types from the witness tables to determine the any-value type
         auto tableCollection = as<IRTableCollection>(taggedUnion->getOperand(1));
         auto typeCollection = as<IRTypeCollection>(taggedUnion->getOperand(0));
@@ -3007,10 +2339,6 @@ struct DynamicInstLoweringContext
         IRInst* witnessTableID = nullptr;
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            // Get unique ID for the witness table.
-            /*witnessTableID = builder.getIntValue(
-                builder.getUIntType(),
-                getUniqueID(getCollectionElement(witnessTableCollection, 0)));*/
             auto singletonTagType = makeTagType(makeSingletonSet(witnessTable));
             auto zeroValueOfTagType = builder.getIntValue((IRType*)singletonTagType, 0);
             witnessTableID = builder.emitIntrinsicInst(
@@ -3041,11 +2369,6 @@ struct DynamicInstLoweringContext
         // Create tuple (table_unique_id, PackAnyValue(val))
         IRInst* tupleArgs[] = {witnessTableID, packedValue};
         auto tuple = builder.emitMakeTuple(taggedUnionTupleType, 2, tupleArgs);
-
-        /*
-        if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(context, tuple)] = info;
-        */
 
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
@@ -3106,52 +2429,6 @@ struct DynamicInstLoweringContext
         return false;
     }
 
-    /*bool _lowerCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
-    {
-        auto info = tryGetInfo(context, inst);
-        auto taggedUnion = as<IRCollectionTaggedUnionType>(info);
-        if (!taggedUnion)
-            return false;
-
-        Dictionary<UInt, UInt> mapping;
-        auto tableCollection = as<IRCollectionBase>(taggedUnion->getOperand(1));
-        forEachInCollection(
-            tableCollection,
-            [&](IRInst* table)
-            {
-                // Get unique ID for the witness table
-                auto witnessTable = cast<IRWitnessTable>(table);
-                auto outputId = getUniqueID(witnessTable);
-                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
-                if (seqDecoration)
-                {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping[inputId] = outputId; // Map ID to itself for now
-                }
-            });
-
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        auto translatedID = builder.emitCallInst(
-            builder.getUIntType(),
-            createIntegerMappingFunc(mapping),
-            List<IRInst*>({inst->getTypeID()}));
-
-        auto existentialTupleType = as<IRTupleType>(getTypeForExistential(taggedUnion));
-        auto existentialTuple = builder.emitMakeTuple(
-            existentialTupleType,
-            List<IRInst*>(
-                {translatedID,
-                 builder.emitReinterpret(existentialTupleType->getOperand(1), inst->getValue())}));
-
-        if (auto info = tryGetInfo(context, inst))
-            propagationMap[Element(context, existentialTuple)] = info;
-
-        inst->replaceUsesWith(existentialTuple);
-        inst->removeAndDeallocate();
-        return true;
-    }*/
-
     UInt getUniqueID(IRInst* funcOrTable)
     {
         auto existingId = uniqueIds.tryGetValue(funcOrTable);
@@ -3162,26 +2439,6 @@ struct DynamicInstLoweringContext
         uniqueIds[funcOrTable] = newId;
         return newId;
     }
-
-    /*
-    IRFunc* createKeyMappingFunc(
-        IRInst* key,
-        const HashSet<IRInst*>& inputTables,
-        const HashSet<IRInst*>& outputVals)
-    {
-        Dictionary<UInt, UInt> mapping;
-
-        // Create a mapping.
-        for (auto table : inputTables)
-        {
-            auto inputId = getUniqueID(table);
-            auto outputId = getUniqueID(findEntryInConcreteTable(table, key));
-            mapping[inputId] = outputId;
-        }
-
-        return createIntegerMappingFunc(module, mapping);
-    }
-    */
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }
 
@@ -3222,74 +2479,6 @@ struct DynamicInstLoweringContext
 
         return tables;
     }
-
-    /*bool lowerTypeCollections()
-    {
-        bool hasChanges = false;
-
-        // Lower all global scope ``IRCollectionBase`` objects that
-        // are made up of types.
-        //
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (auto collection = as<IRCollectionBase>(inst))
-            {
-                if (collection->getOp() == kIROp_TypeCollection)
-                {
-                    HashSet<IRType*> types;
-                    for (UInt i = 0; i < collection->getOperandCount(); i++)
-                    {
-                        if (auto type = as<IRType>(collection->getOperand(i)))
-                        {
-                            types.add(type);
-                        }
-                    }
-                    auto anyValueType = createAnyValueType(types);
-                    collection->replaceUsesWith(anyValueType);
-                    hasChanges = true;
-                }
-            }
-        }
-
-        return hasChanges;
-    }*/
-
-    /*
-    bool transferDataToInstTypes()
-    {
-        bool hasChanges = false;
-
-        for (auto& pair : propagationMap)
-        {
-            auto instWithContext = pair.first;
-            auto flowData = pair.second;
-
-            if (!flowData)
-                continue; // No propagation data
-
-            if (as<IRUnboundedCollection>(flowData))
-            {
-                // If the flow data is an unbounded collection, don't touch
-                // the types.
-                continue;
-            }
-
-            auto inst = instWithContext.inst;
-            auto context = instWithContext.context;
-
-            // Only transfer data for insts that are in top-level
-            // contexts. We'll come back to specialized contexts later.
-            //
-            if (context->getOp() == kIROp_Func)
-            {
-                inst->setFullType((IRType*)flowData);
-                hasChanges = true;
-            }
-        }
-
-        return hasChanges;
-    }
-    */
 
     bool processModule()
     {
@@ -3375,14 +2564,6 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
 
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(collection->getModule());
-
-    /*List<IRType*> paramTypes;
-    paramTypes.add(builder.getUIntType()); // ID parameter
-    for (UInt i = 0; i < expectedFuncType->getParamCount(); i++)
-        paramTypes.add(expectedFuncType->getParamType(i));*/
-
-    // auto resultType = expectedFuncType->getResultType();
-    // auto funcType = builder.getFuncType(paramTypes, resultType);
 
     // Consume the first parameter of the expected function type
     List<IRType*> innerParamTypes;
