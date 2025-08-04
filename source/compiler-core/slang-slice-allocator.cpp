@@ -38,6 +38,7 @@ namespace Slang
         return chars;
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     // See if it has a castable interface
     ComPtr<ICastable> castable;
     if (SLANG_SUCCEEDED(blob->queryInterface(SLANG_IID_PPV_ARGS(castable.writeRef()))))
@@ -48,6 +49,7 @@ namespace Slang
             return chars;
         }
     }
+    SLANG_ALLOW_DEPRECATED_END
 
     return nullptr;
 }

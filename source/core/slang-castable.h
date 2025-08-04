@@ -28,7 +28,9 @@ SLANG_FORCE_INLINE T* as(ICastable* castable)
 {
     if (castable)
     {
+        SLANG_ALLOW_DEPRECATED_BEGIN
         void* obj = castable->castAs(T::getTypeGuid());
+        SLANG_ALLOW_DEPRECATED_END
         return obj ? reinterpret_cast<T*>(obj) : ((T*)nullptr);
     }
     return nullptr;

@@ -24,7 +24,7 @@ public:
     SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override;
     SLANG_NO_THROW slang::IModule* SLANG_MCALL
     loadModule(const char* moduleName, slang::IBlob** outDiagnostics = nullptr) override;
-    SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
+    SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromBinaryBlob(
         const char* moduleName,
         const char* path,
         slang::IBlob* source,
