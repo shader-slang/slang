@@ -97,48 +97,6 @@ struct TransformParamsToConstRefContext
         }
     }
 
-    // Check if an instruction represents an addressable value
-    IRInst* getAddressable(IRInst* inst)
-    {
-        if (!inst)
-            return nullptr;
-
-        switch (inst->getOp())
-        {
-        case kIROp_Var:
-        case kIROp_GlobalVar:
-        case kIROp_FieldAddress:
-        case kIROp_GetElementPtr:
-            return inst;
-        case kIROp_GlobalParam:
-            return builder.emitLoad(inst);
-        case kIROp_FieldExtract:
-        case kIROp_GetElement:
-        case kIROp_Param:
-            return builder.emitGetAddress(builder.getPtrType(inst->getDataType()), inst);
-        case kIROp_Load:
-            // Check if the load is from an addressable source.
-            // Track the target operand since if we have a
-            // `load(x)`, we want to pass x as our result
-            // since `x` would be the address of `load(x)`.
-            return as<IRLoad>(inst)->getPtr();
-        default:
-            return nullptr;
-        }
-    }
-
-    IRInst* makeArgAddressable(IRInst* arg)
-    {
-        // If the arg is addressable, we can pass the arg directly.
-        if (auto addr = getAddressable(arg))
-            return addr;
-
-        // Unable to pass the arg directly, create a temporary.
-        auto tempVar = builder.emitVar(arg->getFullType());
-        builder.emitStore(tempVar, arg);
-        return tempVar;
-    }
-
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -153,19 +111,25 @@ struct TransformParamsToConstRefContext
             List<IRInst*> newArgs;
 
             // Transform arguments to match the updated-parameter
+            IRParam* param = func->getFirstParam();
             UInt i = 0;
-            for (auto param : func->getParams())
+            auto iterate = [&]()
+            {
+                param = param->getNextParam();
+                i++;
+            };
+            for (; param; iterate())
             {
                 auto arg = call->getArg(i);
                 if (!updatedParams.contains(param))
                 {
                     newArgs.add(arg);
-                    i++;
                     continue;
                 }
-                auto addr = makeArgAddressable(arg);
-                newArgs.add(addr);
-                i++;
+                
+                auto tempVar = builder.emitVar(arg->getFullType());
+                builder.emitStore(tempVar, arg);
+                newArgs.add(tempVar);
             }
 
             // Create new call with updated arguments
@@ -286,6 +250,9 @@ struct TransformParamsToConstRefContext
 
         // We do not support recursion, no need to check
         // `visitedCandidates` again
+        if(visitedCandidates.contains(root))
+            return;
+
         if (!shouldProcessFunction(root))
             return;
         functionsToProcess.add(root);

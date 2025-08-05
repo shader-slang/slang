@@ -349,22 +349,6 @@ SLANG_VECTOR_GET_ELEMENT(float)
 SLANG_VECTOR_GET_ELEMENT(double)
 
 #define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                            \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1 * x, int index)       \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##2 * x, int index)       \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##3 * x, int index)       \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##4 * x, int index)       \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##1 * x, int index) \
     {                                                                                              \
         return ((T*)(x)) + index;                                                                  \

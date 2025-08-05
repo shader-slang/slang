@@ -34,7 +34,7 @@ RWStructuredBuffer<int> input;
 //TEST_INPUT: set output = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> output;
 
-// CUDA: addCopyElision{{.*}}const{{.*}}Data{{.*}}*{{.*}}data
+// CUDA: addCopyElision{{.*}}Data{{.*}}*{{.*}}data
 int addCopyElision(Data data, int val)
 {
     // ensure we do not introduce a temporary
@@ -42,14 +42,14 @@ int addCopyElision(Data data, int val)
     return data.val + val;
 }
 
-// CUDA: nested{{.*}}const{{.*}}Data{{.*}}*{{.*}}data
+// CUDA: nested{{.*}}Data{{.*}}*{{.*}}data
 int nested(Data data, int val)
 {
 
     return addCopyElision(data, val);
 }
 
-// CUDA: addCopyElision{{.*}}const{{.*}}FixedArray{{.*}}*{{.*}}data
+// CUDA: addCopyElision{{.*}}FixedArray{{.*}}*{{.*}}data
 int addCopyElision(int data[10], int val)
 {
 // ensure we do not introduce a temporary
@@ -57,7 +57,7 @@ int addCopyElision(int data[10], int val)
     return data[1] + val;
 }
 
-// CUDA: nested{{.*}}const{{.*}}Array{{.*}}*{{.*}}data
+// CUDA: nested{{.*}}Array{{.*}}*{{.*}}data
 int nested(int data[10], int val)
 {
     return addCopyElision(data, val);
@@ -67,7 +67,7 @@ void modify(inout int data[10])
 {
     data[1] = input[0];
 }
-// CUDA: notDirectlyUsingParam{{.*}}const{{.*}}Array{{.*}}*{{.*}}data
+// CUDA: notDirectlyUsingParam{{.*}}Array{{.*}}*{{.*}}data
 int notDirectlyUsingParam(int data[10], int val)
 {
 // ensure we create a temporary for the array

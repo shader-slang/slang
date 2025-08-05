@@ -613,7 +613,17 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         //
         // If emitting `constref` fails due to this error, it is likely
         // a missing compiler-optimization.
-        m_writer->emit("const ");
+        //
+        // Additionally, for C++/CUDA, downstream methods also are required
+        // to be `const` if we want to use const pointers. This is also not
+        // handled robustly.
+        //
+        // Due to this cascading issues, we do not emit const for cuda/c++
+        auto targetReq = this->getTargetReq();
+        if (!isCUDATarget(targetReq) && !isCPUTarget(targetReq))
+        {
+            m_writer->emit("const ");
+        }
         emitType(valueType);
         m_writer->emit(" *");
         if (name.getLength() > 0)

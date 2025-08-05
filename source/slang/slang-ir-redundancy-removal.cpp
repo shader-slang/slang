@@ -361,19 +361,23 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     return false;
 }
 
-// Checks if ptr is a source of unpredictable side-effects, primarily,
-// if device or groupshared memory (interthread communicating memory).
-bool doesAddrHaveUnpredictableSideEffects(IRInst* rootVar)
+// Checks if we can change or have a modified rootVar
+// at some point.
+bool canRootAddrBeChanged(IRInst* rootVar)
 {
     if (!rootVar)
         return false;
-    if (auto ptr = as<IRPtrTypeBase>(rootVar->getDataType()))
-    {
-        auto addrSpace = ptr->getAddressSpace();
-        if (addrSpace == AddressSpace::UserPointer || addrSpace == AddressSpace::GroupShared ||
-            addrSpace == AddressSpace::Image || addrSpace == AddressSpace::StorageBuffer)
-            return true;
-    }
+
+    auto ptr = as<IRConstRefType>(rootVar->getDataType());
+    if(!ptr)
+        return true;
+
+    // Only a UserPointer can potentially be modified and changed to point to a different address
+    // if constRef. This may happen from a different thread even if constref to the current thread.
+    auto addrSpace = ptr->getAddressSpace();
+    if (addrSpace == AddressSpace::UserPointer)
+        return true;
+    
     return false;
 }
 
@@ -403,26 +407,6 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
         }
     }
 
-    // If a load has a getAddress use without side-effect
-    // (constref is not modifiable, so no side-effects) we can
-    // remove the getAddr.
-    // Goal is to let DCE iterate and remove a unused load through
-    // elimination of uses.
-    auto rootAddr = getRootAddr(load->getPtr());
-    if (doesAddrHaveUnpredictableSideEffects(rootAddr))
-        return false;
-
-    if (as<IRConstRefType>(rootAddr->getDataType()))
-    {
-        traverseUsers<IRGetAddress>(
-            load,
-            [&](IRGetAddress* getAddr)
-            {
-                getAddr->replaceUsesWith(load->getPtr());
-                changed = true;
-            });
-    }
-
     return changed;
 }
 
@@ -445,7 +429,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {
                 auto rootAddr = getRootAddr(getElementPtr);
-                if (doesAddrHaveUnpredictableSideEffects(rootAddr))
+                if (canRootAddrBeChanged(rootAddr))
                     return false;
 
                 // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
@@ -454,59 +438,54 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                 //
                 // This can only be done if we have no side-effects. `constref` never has
                 // single-invocation side-effects.
-                if (as<IRConstRefType>(rootAddr->getDataType()))
-                {
-                    traverseUsers<IRLoad>(
-                        getElementPtr,
-                        [&](IRLoad* load)
-                        {
-                            traverseUsers<IRGetElement>(
-                                load,
-                                [&](IRGetElement* getElement)
-                                {
-                                    IRBuilder builder(getElement);
-                                    builder.setInsertBefore(getElement);
-                                    auto newGetElementPtr = builder.emitElementAddress(
-                                        getElementPtr,
-                                        getElement->getIndex());
-                                    auto newLoad = builder.emitLoad(newGetElementPtr);
-                                    getElement->replaceUsesWith(newLoad);
-                                    changed = true;
-                                });
-                        });
-                }
+                traverseUsers<IRLoad>(
+                    getElementPtr,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRGetElement>(
+                            load,
+                            [&](IRGetElement* getElement)
+                            {
+                                IRBuilder builder(getElement);
+                                builder.setInsertBefore(getElement);
+                                auto newGetElementPtr = builder.emitElementAddress(
+                                    getElementPtr,
+                                    getElement->getIndex());
+                                auto newLoad = builder.emitLoad(newGetElementPtr);
+                                getElement->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
             }
             else if (auto fieldAddress = as<IRFieldAddress>(inst))
             {
                 auto rootAddr = getRootAddr(fieldAddress);
-                if (doesAddrHaveUnpredictableSideEffects(rootAddr))
+                if (canRootAddrBeChanged(rootAddr))
                     return false;
+
                 // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
                 // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
                 // out.
                 // This can only be done if we have no side-effects. `constref` never has
                 // single-invocation side-effects.
-                if (as<IRConstRefType>(rootAddr->getDataType()))
-                {
-                    traverseUsers<IRLoad>(
-                        fieldAddress,
-                        [&](IRLoad* load)
-                        {
-                            traverseUsers<IRFieldExtract>(
-                                load,
-                                [&](IRFieldExtract* fieldExtract)
-                                {
-                                    IRBuilder builder(fieldExtract);
-                                    builder.setInsertBefore(fieldExtract);
-                                    auto newGetFieldAddress = builder.emitFieldAddress(
-                                        fieldAddress,
-                                        fieldExtract->getField());
-                                    auto newLoad = builder.emitLoad(newGetFieldAddress);
-                                    fieldExtract->replaceUsesWith(newLoad);
-                                    changed = true;
-                                });
-                        });
-                }
+                traverseUsers<IRLoad>(
+                    fieldAddress,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRFieldExtract>(
+                            load,
+                            [&](IRFieldExtract* fieldExtract)
+                            {
+                                IRBuilder builder(fieldExtract);
+                                builder.setInsertBefore(fieldExtract);
+                                auto newGetFieldAddress = builder.emitFieldAddress(
+                                    fieldAddress,
+                                    fieldExtract->getField());
+                                auto newLoad = builder.emitLoad(newGetFieldAddress);
+                                fieldExtract->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
             }
             inst = nextInst;
         }
