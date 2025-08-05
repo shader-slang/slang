@@ -20,11 +20,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // This is important for 2 reasons:
         // 1. Sometimes we have to figure out the address-space of an inst 
         //    at a later point in the program (globals)
-        // 2. e-calculating address-spaces if we change an
-        // address-space other inst's relied on
-        // to determine their addrspace.
-        // Note: when we fill this struct, we do not store a chain of inst1->inst2->inst3. We
-        // compress this list immediatly into inst1->inst3.
+        // 2. calculating address-spaces if we change an
+        //    address-space other inst's relied on
+        // TODO: store all addr space sources; if mismatch, fail.
         Indirect
     };
     
@@ -236,13 +234,29 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         switch (inst->getOp())
         {
+        // `Add` preserves address space information
+        // for the case: `BitCast<FunctionPtr_int>(BitCast<int>(PhysicalPtr_int)+1)`
+        case kIROp_Add:
+            {
+                if (!mapInstToAddrSpace.containsKey(inst))
+                {
+                    // Note: this case is only to handle Slang's internal handling of byte-offsets
+                    // to a physical buffer. We derives addr-space from operand(0).
+                    mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
+                    return true;
+                }
+            }
+        case kIROp_BitCast:
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
         case kIROp_GetOffsetPtr:
-        case kIROp_BitCast:
             if (!mapInstToAddrSpace.containsKey(inst))
             {
-                // derives addr-space from base-inst
+                // Derives addr-space from base-inst.
+                // We do not assume anything from the
+                // inst since it may not have a concrete
+                // address-space until this entire legalization
+                // pass is over.
                 mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
                 return true;
             }
@@ -315,9 +329,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         }
                     case kIROp_Load:
                         {
-                            // If we are not loading from a ptr, the addr-space is the same as
-                            // source. Ex: GlobalParam<vec2> ==> addr-space of
-                            // load(GlobalParam<vec2>) is same as parent
+                            // The addr-space is the same as source.
                             mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
                             changed = true;
                         }
