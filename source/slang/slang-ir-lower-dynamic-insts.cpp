@@ -386,7 +386,7 @@ struct DynamicInstLoweringContext
         return result;
     }
 
-    IRTypeFlowData* tryGetInfo(Element element)
+    IRInst* tryGetInfo(Element element)
     {
         // For non-global instructions, look up in the map
         auto found = propagationMap.tryGetValue(element);
@@ -395,7 +395,7 @@ struct DynamicInstLoweringContext
         return none();
     }
 
-    IRTypeFlowData* tryGetInfo(IRInst* context, IRInst* inst)
+    IRInst* tryGetInfo(IRInst* context, IRInst* inst)
     {
         if (auto typeFlowData = as<IRTypeFlowData>(inst->getDataType()))
         {
@@ -432,7 +432,7 @@ struct DynamicInstLoweringContext
         return tryGetInfo(Element(context, inst));
     }
 
-    IRTypeFlowData* tryGetFuncReturnInfo(IRFunc* func)
+    IRInst* tryGetFuncReturnInfo(IRFunc* func)
     {
         auto found = funcReturnInfo.tryGetValue(func);
         if (found)
@@ -443,11 +443,7 @@ struct DynamicInstLoweringContext
     // Centralized method to update propagation info and manage work queue
     // Use this when you want to propagate new information to an existing instruction
     // This will union the new info with existing info and add users to work queue if changed
-    void updateInfo(
-        IRInst* context,
-        IRInst* inst,
-        IRTypeFlowData* newInfo,
-        LinkedList<WorkItem>& workQueue)
+    void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, LinkedList<WorkItem>& workQueue)
     {
         auto existingInfo = tryGetInfo(context, inst);
         auto unionedInfo = unionPropagationInfo(existingInfo, newInfo);
@@ -468,7 +464,7 @@ struct DynamicInstLoweringContext
     void addUsersToWorkQueue(
         IRInst* context,
         IRInst* inst,
-        IRTypeFlowData* info,
+        IRInst* info,
         LinkedList<WorkItem>& workQueue)
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -525,10 +521,7 @@ struct DynamicInstLoweringContext
     }
 
     // Helper method to update function return info and propagate to call sites
-    void updateFuncReturnInfo(
-        IRInst* callable,
-        IRTypeFlowData* returnInfo,
-        LinkedList<WorkItem>& workQueue)
+    void updateFuncReturnInfo(IRInst* callable, IRInst* returnInfo, LinkedList<WorkItem>& workQueue)
     {
         auto existingReturnInfo = getFuncReturnInfo(callable);
         auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnInfo);
@@ -740,7 +733,7 @@ struct DynamicInstLoweringContext
 
     void processInstForPropagation(IRInst* context, IRInst* inst, LinkedList<WorkItem>& workQueue)
     {
-        IRTypeFlowData* info;
+        IRInst* info;
 
         switch (inst->getOp())
         {
@@ -779,7 +772,7 @@ struct DynamicInstLoweringContext
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
             break;
         case kIROp_GetElementPtr:
-            info = analyzeGetElementPtr(context, as<IRGetElementPtr>(inst), workQueue);
+            info = analyzeGetElementPtr(context, as<IRGetElementPtr>(inst));
             break;
         default:
             info = analyzeDefault(context, inst);
@@ -789,7 +782,7 @@ struct DynamicInstLoweringContext
         updateInfo(context, inst, info, workQueue);
     }
 
-    IRTypeFlowData* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
+    IRInst* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
         //
         // TODO: Actually use the integer<->type map present in the linkage to
@@ -815,7 +808,7 @@ struct DynamicInstLoweringContext
         return none();
     }
 
-    IRTypeFlowData* analyzeMakeExistential(IRInst* context, IRMakeExistential* inst)
+    IRInst* analyzeMakeExistential(IRInst* context, IRMakeExistential* inst)
     {
         auto witnessTable = inst->getWitnessTable();
         auto value = inst->getWrappedValue();
@@ -845,7 +838,7 @@ struct DynamicInstLoweringContext
                inst->getOp() == kIROp_RWStructuredBufferGetElementPtr;
     }
 
-    IRTypeFlowData* analyzeLoad(IRInst* context, IRInst* inst)
+    IRInst* analyzeLoad(IRInst* context, IRInst* inst)
     {
         // Default: Transfer the prop info from the address to the loaded value
         if (auto loadInst = as<IRLoad>(inst))
@@ -873,7 +866,10 @@ struct DynamicInstLoweringContext
 
             // If the load is from a pointer, we can transfer the info directly
             auto address = as<IRLoad>(loadInst)->getPtr();
-            return tryGetInfo(context, address);
+            if (auto addrInfo = tryGetInfo(context, address))
+                return as<IRPtrTypeBase>(addrInfo)->getValueType();
+            else
+                return none(); // No info for the address
         }
         else if (as<IRRWStructuredBufferLoad>(inst) || as<IRStructuredBufferLoad>(inst))
         {
@@ -898,18 +894,43 @@ struct DynamicInstLoweringContext
         return none(); // No info for other load types
     }
 
-    IRTypeFlowData* analyzeStore(
-        IRInst* context,
-        IRStore* storeInst,
-        LinkedList<WorkItem>& workQueue)
+    IRInst* analyzeStore(IRInst* context, IRStore* storeInst, LinkedList<WorkItem>& workQueue)
     {
         // Transfer the prop info from stored value to the address
         auto address = storeInst->getPtr();
-        updateInfo(context, address, tryGetInfo(context, storeInst->getVal()), workQueue);
+        if (auto valInfo = tryGetInfo(context, storeInst->getVal()))
+        {
+            IRBuilder builder(module);
+            auto ptrInfo = builder.getPtrTypeWithAddressSpace(
+                (IRType*)valInfo,
+                as<IRPtrTypeBase>(address->getDataType()));
+
+            // Update the base instruction for the entire access chain
+            maybeUpdatePtr(context, address, ptrInfo, workQueue);
+        }
+
         return none(); // The store itself doesn't have any info.
     }
 
-    IRTypeFlowData* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
+    IRInst* analyzeGetElementPtr(IRInst* context, IRGetElementPtr* getElementPtr)
+    {
+        // The base info should be in Ptr<Array<T>> form, so we just need to unpack and
+        // return Ptr<T> as the result.
+        //
+        IRBuilder builder(module);
+        builder.setInsertAfter(getElementPtr);
+        auto basePtr = getElementPtr->getBase();
+        if (auto ptrType = as<IRPtrTypeBase>(tryGetInfo(context, basePtr)))
+        {
+            auto arrayType = as<IRArrayType>(ptrType->getValueType());
+            SLANG_ASSERT(arrayType);
+            return builder.getPtrTypeWithAddressSpace(arrayType->getElementType(), ptrType);
+        }
+
+        return none(); // No info for the base pointer
+    }
+
+    IRInst* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
         auto key = inst->getRequirementKey();
 
@@ -934,7 +955,7 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
     }
 
-    IRTypeFlowData* analyzeExtractExistentialWitnessTable(
+    IRInst* analyzeExtractExistentialWitnessTable(
         IRInst* context,
         IRExtractExistentialWitnessTable* inst)
     {
@@ -953,7 +974,7 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
 
-    IRTypeFlowData* analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
+    IRInst* analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
         auto operand = inst->getOperand(0);
         auto operandInfo = tryGetInfo(context, operand);
@@ -970,7 +991,7 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
     }
 
-    IRTypeFlowData* analyzeExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
+    IRInst* analyzeExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
         auto operand = inst->getOperand(0);
         auto operandInfo = tryGetInfo(context, operand);
@@ -985,7 +1006,7 @@ struct DynamicInstLoweringContext
             return cast<IRTypeCollection>(taggedUnion->getOperand(0));
     }
 
-    IRTypeFlowData* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
+    IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
     {
         auto operand = inst->getOperand(0);
         auto operandInfo = tryGetInfo(context, operand);
@@ -1194,7 +1215,7 @@ struct DynamicInstLoweringContext
         }
     }
 
-    IRTypeFlowData* analyzeCall(IRInst* context, IRCall* inst, LinkedList<WorkItem>& workQueue)
+    IRInst* analyzeCall(IRInst* context, IRCall* inst, LinkedList<WorkItem>& workQueue)
     {
         auto callee = inst->getCallee();
         auto calleeInfo = tryGetInfo(context, callee);
@@ -1249,14 +1270,41 @@ struct DynamicInstLoweringContext
             return none();
     }
 
-    IRTypeFlowData* analyzeGetElementPtr(
+    void maybeUpdatePtr(
         IRInst* context,
-        IRGetElementPtr* inst,
+        IRInst* inst,
+        IRInst* info,
         LinkedList<WorkItem>& workQueue)
     {
-        IRTypeFlowData* thisInstInfo = tryGetInfo(context, inst);
-        updateInfo(context, inst->getBase(), thisInstInfo, workQueue);
-        return thisInstInfo;
+        if (auto getElementPtr = as<IRGetElementPtr>(inst))
+        {
+            if (auto thisPtrInfo = as<IRPtrTypeBase>(info))
+            {
+                auto thisValueType = thisPtrInfo->getValueType();
+
+                IRInst* baseValueType =
+                    as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType())->getValueType();
+                SLANG_ASSERT(as<IRArrayType>(baseValueType));
+
+                // Propagate 'this' information to the base by wrapping it as a pointer to array.
+                IRBuilder builder(module);
+                auto baseInfo = builder.getPtrTypeWithAddressSpace(
+                    builder.getArrayType(
+                        (IRType*)thisValueType,
+                        as<IRArrayType>(baseValueType)->getElementCount()),
+                    as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
+                maybeUpdatePtr(context, getElementPtr->getBase(), baseInfo, workQueue);
+            }
+        }
+        else if (auto var = as<IRVar>(inst))
+        {
+            updateInfo(context, var, info, workQueue);
+        }
+        else
+        {
+            // Do nothing..
+            return;
+        }
     }
 
     void propagateWithinFuncEdge(IRInst* context, IREdge edge, LinkedList<WorkItem>& workQueue)
@@ -1321,7 +1369,7 @@ struct DynamicInstLoweringContext
         UIndex idx = 0;
         for (auto param : func->getParams())
         {
-            if (auto newType = tryGetInfo(context, param))
+            /*if (auto newType = tryGetInfo(context, param))
                 effectiveTypes.add((IRType*)newType);
             else
             {
@@ -1329,16 +1377,21 @@ struct DynamicInstLoweringContext
                     as<IRFuncType>(context->getDataType())->getParamType(idx));
                 SLANG_ASSERT(isGlobalInst(type));
                 effectiveTypes.add((IRType*)type);
-            }
+            }*/
+            if (auto newType = tryGetInfo(context, param))
+                effectiveTypes.add((IRType*)newType);
+            else
+                effectiveTypes.add(
+                    (IRType*)as<IRFuncType>(context->getDataType())->getParamType(idx));
             idx++;
         }
 
         return effectiveTypes;
     }
 
-    List<IRTypeFlowData*> getParamInfos(IRInst* context)
+    List<IRInst*> getParamInfos(IRInst* context)
     {
-        List<IRTypeFlowData*> infos;
+        List<IRInst*> infos;
         if (as<IRFunc>(context))
         {
             for (auto param : as<IRFunc>(context)->getParams())
@@ -1423,8 +1476,29 @@ struct DynamicInstLoweringContext
                                 continue;
                             }
 
-                            // Use centralized update method
-                            updateInfo(edge.targetContext, param, argInfo, workQueue);
+                            switch (paramDirection)
+                            {
+                            case kParameterDirection_Out:
+                            case kParameterDirection_InOut:
+                                {
+                                    IRBuilder builder(module);
+                                    auto newInfo = fromDirectionAndType(
+                                        &builder,
+                                        paramDirection,
+                                        as<IRPtrTypeBase>(argInfo)->getValueType());
+                                    updateInfo(edge.targetContext, param, newInfo, workQueue);
+                                    break;
+                                }
+                            case kParameterDirection_In:
+                                {
+                                    // Use centralized update method
+                                    updateInfo(edge.targetContext, param, argInfo, workQueue);
+                                    break;
+                                }
+                            default:
+                                SLANG_UNEXPECTED(
+                                    "Unhandled parameter direction in interprocedural edge");
+                            }
                         }
                     }
                     argIndex++;
@@ -1450,9 +1524,13 @@ struct DynamicInstLoweringContext
                     if (paramDirections[argIndex] == kParameterDirection_Out ||
                         paramDirections[argIndex] == kParameterDirection_InOut)
                     {
+                        auto arg = callInst->getArg(argIndex);
+                        auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
+
+                        IRBuilder builder(module);
                         updateInfo(
                             edge.callerContext,
-                            callInst->getArg(argIndex),
+                            builder.getPtrTypeWithAddressSpace((IRType*)paramInfo, argPtrType),
                             paramInfo,
                             workQueue);
                     }
@@ -1467,7 +1545,7 @@ struct DynamicInstLoweringContext
         }
     }
 
-    IRTypeFlowData* getFuncReturnInfo(IRInst* callee)
+    IRInst* getFuncReturnInfo(IRInst* callee)
     {
         funcReturnInfo.addIfNotExists(callee, none());
         return funcReturnInfo[callee];
@@ -1524,12 +1602,35 @@ struct DynamicInstLoweringContext
             allValues)); // Create a new collection with the union of values
     }
 
-    IRTypeFlowData* unionPropagationInfo(IRTypeFlowData* info1, IRTypeFlowData* info2)
+    IRInst* unionPropagationInfo(IRInst* info1, IRInst* info2)
     {
         if (!info1)
             return info2;
         if (!info2)
             return info1;
+
+        if (as<IRArrayType>(info1) && as<IRArrayType>(info2))
+        {
+            SLANG_ASSERT(info1->getOperand(1) == info2->getOperand(1));
+            // If both are array types, union their element types
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            return builder.getArrayType(
+                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
+                info1->getOperand(1)); // Keep the same size
+        }
+
+        if (as<IRPtrTypeBase>(info1) && as<IRPtrTypeBase>(info2))
+        {
+            SLANG_ASSERT(info1->getOp() == info2->getOp());
+
+            // If both are array types, union their element types
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            return builder.getPtrTypeWithAddressSpace(
+                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
+                as<IRPtrTypeBase>(info1));
+        }
 
         if (as<IRUnboundedCollection>(info1) && as<IRUnboundedCollection>(info2))
         {
@@ -1721,25 +1822,29 @@ struct DynamicInstLoweringContext
             List<IRType*>({(IRType*)makeTagType(tableCollection), (IRType*)typeCollection}));
     }
 
-    IRType* lowerTypeForInst(IRInst* context, IRInst* inst)
-    {
-        if (auto info = tryGetInfo(context, inst))
-        {
-            return getLoweredType(info);
-        }
-        else
-        {
-            return inst->getDataType(); // If no info, return the original type
-        }
-    }
-
-    IRType* getLoweredType(IRTypeFlowData* info)
+    IRType* getLoweredType(IRInst* info)
     {
         if (!info)
             return nullptr;
 
         if (as<IRUnboundedCollection>(info))
             return nullptr;
+
+        if (auto ptrType = as<IRPtrTypeBase>(info))
+        {
+            IRBuilder builder(module);
+            return builder.getPtrTypeWithAddressSpace(
+                (IRType*)getLoweredType(ptrType->getValueType()),
+                ptrType);
+        }
+
+        if (auto arrayType = as<IRArrayType>(info))
+        {
+            IRBuilder builder(module);
+            return builder.getArrayType(
+                (IRType*)getLoweredType(arrayType->getElementType()),
+                arrayType->getElementCount());
+        }
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(info))
         {
@@ -1773,37 +1878,22 @@ struct DynamicInstLoweringContext
             return nullptr;
         }
 
-        SLANG_UNEXPECTED("Unhandled IRTypeFlowData type in getLoweredType");
+        return (IRType*)info;
+        // SLANG_UNEXPECTED("Unhandled IRTypeFlowData type in getLoweredType");
     }
 
     bool replaceType(IRInst* context, IRInst* inst)
     {
         if (auto info = tryGetInfo(context, inst))
         {
-            if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+            if (auto loweredType = getLoweredType(info))
             {
-                IRBuilder builder(module);
-                if (auto loweredType = getLoweredType(info))
-                {
-                    auto loweredPtrType = builder.getPtrTypeWithAddressSpace(loweredType, ptrType);
-                    if (loweredPtrType == inst->getDataType())
-                        return false; // No change
-                    inst->setFullType(loweredPtrType);
-                    return true;
-                }
-            }
-            else
-            {
-                if (auto loweredType = getLoweredType(info))
-                {
-                    if (loweredType == inst->getDataType())
-                        return false; // No change
-                    inst->setFullType(loweredType);
-                    return true;
-                }
+                if (loweredType == inst->getDataType())
+                    return false; // No change
+                inst->setFullType(loweredType);
+                return true;
             }
         }
-
         return false;
     }
 
@@ -2165,22 +2255,16 @@ struct DynamicInstLoweringContext
             auto paramDirections = getParamDirections(context);
             for (UInt i = 0; i < paramEffectiveTypes.getCount(); i++)
             {
-                if (auto collectionType = as<IRTypeFlowData>(paramEffectiveTypes[i]))
-                    updateParamType(
-                        i,
-                        fromDirectionAndType(
-                            &builder,
-                            paramDirections[i],
-                            getLoweredType(collectionType)));
+                updateParamType(i, getLoweredType(paramEffectiveTypes[i]));
+                /*if (auto collectionType = as<IRTypeFlowData>(paramEffectiveTypes[i]))
+
                 else if (paramEffectiveTypes[i] != nullptr)
                     updateParamType(
                         i,
                         fromDirectionAndType(
                             &builder,
                             paramDirections[i],
-                            (IRType*)paramEffectiveTypes[i]));
-                else
-                    SLANG_UNEXPECTED("Unhandled parameter type in getEffectiveFuncType");
+                            (IRType*)paramEffectiveTypes[i]));*/
             }
 
             auto returnType = getFuncReturnInfo(context);
@@ -2785,10 +2869,10 @@ struct DynamicInstLoweringContext
     DiagnosticSink* sink;
 
     // Mapping from instruction to propagation information
-    Dictionary<Element, IRTypeFlowData*> propagationMap;
+    Dictionary<Element, IRInst*> propagationMap;
 
     // Mapping from function to return value propagation information
-    Dictionary<IRInst*, IRTypeFlowData*> funcReturnInfo;
+    Dictionary<IRInst*, IRInst*> funcReturnInfo;
 
     // Mapping from functions to call-sites.
     Dictionary<IRInst*, HashSet<Element>> funcCallSites;
