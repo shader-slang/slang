@@ -3345,8 +3345,7 @@ struct ShaderReflection
             name);
     }
 
-    [[deprecated]]
-    FunctionReflection* tryResolveOverloadedFunction(
+    [[deprecated]] FunctionReflection* tryResolveOverloadedFunction(
         uint32_t candidateCount,
         FunctionReflection** candidates)
     {
