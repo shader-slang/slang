@@ -898,7 +898,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
                         }
                     }
                 }
-                if (hasNoPerspective) break;
+                if (hasNoPerspective)
+                    break;
             }
         }
         name = hasNoPerspective ? "gl_BaryCoordNoPerspEXT" : "gl_BaryCoordEXT";

@@ -6212,14 +6212,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
 
-                    auto interpolationModeDecor = inst->findDecoration<IRInterpolationModeDecoration>();
-                    if (interpolationModeDecor && interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    auto interpolationModeDecor =
+                        inst->findDecoration<IRInterpolationModeDecoration>();
+                    if (interpolationModeDecor &&
+                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
                     {
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordNoPerspKHR, inst);
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordNoPerspKHR,
+                            inst);
                     }
                     else
                     {
-                        return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordKHR,
+                            inst);
                     }
                 }
                 else if (semanticName == "sv_cullprimitive")
