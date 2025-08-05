@@ -3051,7 +3051,7 @@ void finalizeSpecialization(IRModule* module)
         }
     }
 
-    lowerCollectionAndTagInsts(module, nullptr);
+    // lowerCollectionAndTagInsts(module, nullptr);
 }
 
 

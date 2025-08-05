@@ -9,9 +9,11 @@
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir.h"
 
+
 namespace Slang
 {
 
+constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 // Elements for which we keep track of propagation information.
 struct Element
 {
@@ -605,6 +607,32 @@ struct DynamicInstLoweringContext
         }
     }
 
+    IRIntegerValue getInterfaceAnyValueSize(IRInst* type)
+    {
+        if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            return decor->getSize();
+        }
+
+        // We could conceivably make it an error to have an interface
+        // without an `[anyValueSize(...)]` attribute, but then we risk
+        // producing error messages even when doing 100% static specialization.
+        //
+        // It is simpler to use a reasonable default size and treat any
+        // type without an explicit attribute as using that size.
+        //
+        return kDefaultAnyValueSize;
+    }
+
+    IRType* lowerInterfaceType(IRInterfaceType* interfaceType)
+    {
+        IRBuilder builder(module);
+        auto anyValueType = builder.getAnyValueType(getInterfaceAnyValueSize(interfaceType));
+        auto witnessTableType = builder.getWitnessTableIDType((IRType*)interfaceType);
+        auto rttiType = builder.getRTTIHandleType();
+        return builder.getTupleType({rttiType, witnessTableType, anyValueType});
+    }
+
     IRInst* upcastCollection(IRInst* context, IRInst* arg, IRType* destInfo)
     {
         auto argInfo = arg->getDataType();
@@ -677,6 +705,35 @@ struct DynamicInstLoweringContext
             builder.setInsertAfter(arg);
             return builder.emitPackAnyValue((IRType*)destInfo, arg);
         }
+        else if (as<IRInterfaceType>(argInfo) && as<IRCollectionTaggedUnionType>(destInfo))
+        {
+            auto loweredInterfaceType = lowerInterfaceType(as<IRInterfaceType>(argInfo));
+            IRBuilder builder(module);
+            builder.setInsertAfter(arg);
+            auto witnessTable =
+                builder.emitGetTupleElement(builder.getWitnessTableIDType(argInfo), arg, 1);
+            auto tableID = builder.emitGetSequentialIDInst(witnessTable);
+            auto tableCollection = cast<IRTableCollection>(destInfo->getOperand(1));
+            auto typeCollection = cast<IRTypeCollection>(destInfo->getOperand(0));
+
+            List<IRInst*> getTagOperands;
+            getTagOperands.add(argInfo);
+            getTagOperands.add(tableID);
+            auto tableTag = builder.emitIntrinsicInst(
+                (IRType*)makeTagType(tableCollection),
+                kIROp_GetTagFromSequentialID,
+                getTagOperands.getCount(),
+                getTagOperands.getBuffer());
+
+            return builder.emitMakeTuple(
+                {tableTag,
+                 builder.emitReinterpret(
+                     (IRType*)typeCollection,
+                     builder.emitGetTupleElement(
+                         (IRType*)loweredInterfaceType->getOperand(0),
+                         arg,
+                         2))});
+        }
 
         return arg; // Can use as-is.
     }
@@ -714,10 +771,15 @@ struct DynamicInstLoweringContext
             info = analyzeSpecialize(context, as<IRSpecialize>(inst));
             break;
         case kIROp_Load:
-            info = analyzeLoad(context, as<IRLoad>(inst));
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_StructuredBufferLoad:
+            info = analyzeLoad(context, inst);
             break;
         case kIROp_Store:
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
+            break;
+        case kIROp_GetElementPtr:
+            info = analyzeGetElementPtr(context, as<IRGetElementPtr>(inst), workQueue);
             break;
         default:
             info = analyzeDefault(context, inst);
@@ -736,19 +798,18 @@ struct DynamicInstLoweringContext
 
         if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
         {
-            if (!interfaceType->findDecoration<IRComInterfaceDecoration>())
+            if (isComInterfaceType(interfaceType) || isBuiltin(interfaceType))
             {
-                auto tables = collectExistentialTables(interfaceType);
-                if (tables.getCount() > 0)
-                    return makeExistential(
-                        as<IRTableCollection>(createCollection(kIROp_TableCollection, tables)));
-                else
-                    return none();
-            }
-            else
-            {
+                // If this is a COM interface, we treat it as unbounded
                 return makeUnbounded();
             }
+
+            auto tables = collectExistentialTables(interfaceType);
+            if (tables.getCount() > 0)
+                return makeExistential(
+                    as<IRTableCollection>(createCollection(kIROp_TableCollection, tables)));
+            else
+                return none();
         }
 
         return none();
@@ -778,11 +839,63 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
     }
 
-    IRTypeFlowData* analyzeLoad(IRInst* context, IRLoad* loadInst)
+    bool isResourcePointer(IRInst* inst)
     {
-        // Transfer the prop info from the address to the loaded value
-        auto address = loadInst->getPtr();
-        return tryGetInfo(context, address);
+        return isPointerToResourceType(inst->getDataType()) ||
+               inst->getOp() == kIROp_RWStructuredBufferGetElementPtr;
+    }
+
+    IRTypeFlowData* analyzeLoad(IRInst* context, IRInst* inst)
+    {
+        // Default: Transfer the prop info from the address to the loaded value
+        if (auto loadInst = as<IRLoad>(inst))
+        {
+            if (isResourcePointer(loadInst->getPtr()))
+            {
+                if (auto interfaceType = as<IRInterfaceType>(loadInst->getDataType()))
+                {
+                    if (!isComInterfaceType(interfaceType) && !isBuiltin(interfaceType))
+                    {
+                        auto tables = collectExistentialTables(interfaceType);
+                        if (tables.getCount() > 0)
+                            return makeExistential(
+                                as<IRTableCollection>(
+                                    createCollection(kIROp_TableCollection, tables)));
+                        else
+                            return none();
+                    }
+                    else
+                    {
+                        return makeUnbounded();
+                    }
+                }
+            }
+
+            // If the load is from a pointer, we can transfer the info directly
+            auto address = as<IRLoad>(loadInst)->getPtr();
+            return tryGetInfo(context, address);
+        }
+        else if (as<IRRWStructuredBufferLoad>(inst) || as<IRStructuredBufferLoad>(inst))
+        {
+            if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
+            {
+                if (!isComInterfaceType(interfaceType) && !isBuiltin(interfaceType))
+                {
+                    auto tables = collectExistentialTables(interfaceType);
+                    if (tables.getCount() > 0)
+                        return makeExistential(
+                            as<IRTableCollection>(createCollection(kIROp_TableCollection, tables)));
+                    else
+                        return none();
+                }
+                else
+                {
+                    return makeUnbounded();
+                }
+            }
+        }
+
+        return none(); // No info for other load types
     }
 
     IRTypeFlowData* analyzeStore(
@@ -1054,7 +1167,11 @@ struct DynamicInstLoweringContext
                         }
                         else if (as<IRType>(arg) || as<IRWitnessTable>(arg))
                         {
-                            updateInfo(context, param, makeSingletonSet(arg), workQueue);
+                            updateInfo(
+                                context,
+                                param,
+                                makeTagType(makeSingletonSet(arg)),
+                                workQueue);
                         }
                         else
                         {
@@ -1130,6 +1247,16 @@ struct DynamicInstLoweringContext
             return callInfo;
         else
             return none();
+    }
+
+    IRTypeFlowData* analyzeGetElementPtr(
+        IRInst* context,
+        IRGetElementPtr* inst,
+        LinkedList<WorkItem>& workQueue)
+    {
+        IRTypeFlowData* thisInstInfo = tryGetInfo(context, inst);
+        updateInfo(context, inst->getBase(), thisInstInfo, workQueue);
+        return thisInstInfo;
     }
 
     void propagateWithinFuncEdge(IRInst* context, IREdge edge, LinkedList<WorkItem>& workQueue)
@@ -1362,7 +1489,7 @@ struct DynamicInstLoweringContext
 
             if (auto interfaceType = as<IRInterfaceType>(paramType))
             {
-                if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+                if (isComInterfaceType(interfaceType) || isBuiltin(interfaceType))
                     propagationMap[Element(context, param)] = makeUnbounded();
                 else
                     propagationMap[Element(context, param)] = none(); // Initialize to none.
@@ -1438,13 +1565,30 @@ struct DynamicInstLoweringContext
 
     IRTypeFlowData* analyzeDefault(IRInst* context, IRInst* inst)
     {
-        // Check if this is a global type, witness table, or function.
+        // Check if this is a global concrete type, witness table, or function.
         // If so, it's a concrete element. We'll create a singleton set for it.
-        if (inst->getParent()->getOp() == kIROp_ModuleInst &&
-            (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst)))
+        if (isGlobalInst(inst) &&
+            (!as<IRInterfaceType>(inst) &&
+             (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))))
             return makeSingletonSet(inst);
-        else
-            return none(); // Default case, no propagation info
+
+        auto instType = inst->getDataType();
+        if (isGlobalInst(inst))
+        {
+            if (as<IRType>(instType) && !(as<IRInterfaceType>(instType)))
+                return none(); // We'll avoid storing propagation info for concrete insts. (can just
+                               // use the inst directly)
+
+            if (as<IRInterfaceType>(instType))
+            {
+                // As a general rule, if none of the non-default cases handled this inst that is
+                // producing an existential type, then we assume that we can't constrain it
+                //
+                return makeUnbounded();
+            }
+        }
+
+        return none(); // Default case, no propagation info
     }
 
     bool lowerInstsInBlock(IRInst* context, IRBlock* block)
@@ -1683,6 +1827,11 @@ struct DynamicInstLoweringContext
             return lowerMakeExistential(context, as<IRMakeExistential>(inst));
         case kIROp_CreateExistentialObject:
             return lowerCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_StructuredBufferLoad:
+            return lowerStructuredBufferLoad(context, inst);
+        case kIROp_Load:
+            return lowerLoad(context, inst);
         case kIROp_Store:
             return lowerStore(context, as<IRStore>(inst));
         default:
@@ -1781,7 +1930,7 @@ struct DynamicInstLoweringContext
             auto operand = inst->getOperand(0);
             auto element = builder.emitGetTupleElement((IRType*)collectionTagType, operand, 0);
             inst->replaceUsesWith(element);
-            propagationMap[Element(context, element)] = info;
+            // propagationMap[Element(context, element)] = info;
             inst->removeAndDeallocate();
             return true;
         }
@@ -1789,6 +1938,22 @@ struct DynamicInstLoweringContext
 
     bool lowerExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
+        auto existential = inst->getOperand(0);
+        auto existentialInfo = existential->getDataType();
+        if (isTaggedUnionType(existentialInfo))
+        {
+            auto valType = existentialInfo->getOperand(1);
+            IRBuilder builder(inst);
+            builder.setInsertAfter(inst);
+
+            auto val = builder.emitGetTupleElement((IRType*)valType, existential, 1);
+            inst->replaceUsesWith(val);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
+        /*
         auto operandInfo = tryGetInfo(context, inst->getOperand(0));
         auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo);
         if (!taggedUnion)
@@ -1807,7 +1972,7 @@ struct DynamicInstLoweringContext
         auto element = builder.emitGetTupleElement((IRType*)info, operand, 1);
         inst->replaceUsesWith(element);
         inst->removeAndDeallocate();
-        return true;
+        return true;*/
     }
 
     bool lowerExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
@@ -2188,9 +2353,23 @@ struct DynamicInstLoweringContext
         if (auto collectionTag = as<IRCollectionTagType>(callee->getDataType()))
         {
             if (getCollectionCount(collectionTag) > 1)
+            {
                 calleeTagInst = callee; // Only keep the tag if there are multiple elements.
+
+                // If we're placing a specialized call, use the base tag since the
+                // specialization arguments will also become arguments to the call.
+                //
+                if (auto specializedTag = as<IRSpecialize>(calleeTagInst))
+                    calleeTagInst = specializedTag->getBase();
+            }
             callee = collectionTag->getOperand(0);
         }
+
+        // If by this point, we haven't resolved our callee into a global inst (
+        // either a collection or a single function), then we can't lower it (likely unbounded)
+        //
+        if (!isGlobalInst(callee))
+            return false;
 
         auto expectedFuncType = getEffectiveFuncType(callee);
 
@@ -2396,9 +2575,17 @@ struct DynamicInstLoweringContext
             args.getCount(),
             args.getBuffer());
 
-        auto packedValue = builder.emitPackAnyValue(
-            (IRType*)taggedUnionTupleType->getOperand(1),
-            inst->getValue());
+        IRInst* packedValue = nullptr;
+        if (auto collection = as<IRTypeCollection>(taggedUnionTupleType->getOperand(1)))
+        {
+            packedValue = builder.emitPackAnyValue((IRType*)collection, inst->getValue());
+        }
+        else
+        {
+            packedValue = builder.emitReinterpret(
+                (IRType*)taggedUnionTupleType->getOperand(1),
+                inst->getValue());
+        }
 
         auto newInst = builder.emitMakeTuple(
             taggedUnionTupleType,
@@ -2409,6 +2596,92 @@ struct DynamicInstLoweringContext
         return true;
     }
 
+    bool lowerStructuredBufferLoad(IRInst* context, IRInst* inst)
+    {
+        auto valInfo = tryGetInfo(context, inst);
+
+        if (!valInfo)
+            return false;
+
+        auto bufferType = (IRType*)inst->getOperand(0)->getDataType();
+        auto bufferBaseType = (IRType*)bufferType->getOperand(0);
+
+        if (bufferBaseType != (IRType*)getLoweredType(valInfo))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertAfter(inst);
+
+            IRCloneEnv cloneEnv;
+            auto newLoad = cloneInst(&cloneEnv, &builder, inst);
+
+            auto loweredVal = upcastCollection(context, newLoad, (IRType*)valInfo);
+
+            // TODO: this is a hack. Encode this in the type-flow-data.
+            if (as<IRInterfaceType>(bufferBaseType) && !isComInterfaceType(inst->getDataType()) &&
+                !isBuiltin(inst->getDataType()))
+            {
+                newLoad->setFullType(lowerInterfaceType(as<IRInterfaceType>(bufferBaseType)));
+            }
+
+            inst->replaceUsesWith(loweredVal);
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (inst->getDataType() != bufferBaseType)
+        {
+            // If the data type is not the same, we need to update it.
+            inst->setFullType((IRType*)getLoweredType(valInfo));
+            return true;
+        }
+        else
+        {
+            // No change needed.
+            return false;
+        }
+    }
+
+    bool lowerLoad(IRInst* context, IRInst* inst)
+    {
+        auto valInfo = tryGetInfo(context, inst);
+
+        if (!valInfo)
+            return false;
+
+        IRType* ptrValType = nullptr;
+        ptrValType = as<IRPtrTypeBase>(as<IRLoad>(inst)->getPtr()->getDataType())->getValueType();
+
+        if (ptrValType != (IRType*)getLoweredType(valInfo))
+        {
+            SLANG_ASSERT(!as<IRParam>(inst));
+            IRBuilder builder(inst);
+            builder.setInsertAfter(inst);
+
+            IRCloneEnv cloneEnv;
+            auto newLoad = cloneInst(&cloneEnv, &builder, inst);
+
+            auto loweredVal = upcastCollection(context, newLoad, (IRType*)valInfo);
+
+            // TODO: this is a hack. Encode this in the type-flow-data.
+            if (as<IRInterfaceType>(ptrValType) && !isComInterfaceType(inst->getDataType()) &&
+                !isBuiltin(inst->getDataType()))
+            {
+                newLoad->setFullType(lowerInterfaceType(as<IRInterfaceType>(ptrValType)));
+            }
+
+            inst->replaceUsesWith(loweredVal);
+            inst->removeAndDeallocate();
+
+            return true;
+        }
+        else if (inst->getDataType() != ptrValType)
+        {
+            inst->setFullType((IRType*)getLoweredType(valInfo));
+            return true;
+        }
+
+        return false;
+    }
+
     bool lowerStore(IRInst* context, IRStore* inst)
     {
         auto ptr = inst->getPtr();
@@ -2416,7 +2689,7 @@ struct DynamicInstLoweringContext
 
         auto valInfo = inst->getVal()->getDataType();
 
-        auto loweredVal = upcastCollection(context, inst->getVal(), valInfo);
+        auto loweredVal = upcastCollection(context, inst->getVal(), ptrInfo);
 
         if (loweredVal != inst->getVal())
         {
@@ -2749,44 +3022,6 @@ struct TagOpsLoweringContext : public InstPassBase
     {
     }
 
-    void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
-    {
-        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
-        auto srcSeqID = inst->getOperand(1);
-
-        Dictionary<UInt, UInt> mapping;
-
-        // Map from sequential ID to unique ID
-        auto destCollection =
-            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
-
-        UIndex dstSeqID = 0;
-        forEachInCollection(
-            destCollection,
-            [&](IRInst* table)
-            {
-                // Get unique ID for the witness table
-                auto witnessTable = cast<IRWitnessTable>(table);
-                auto outputId = dstSeqID++;
-                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
-                if (seqDecoration)
-                {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping[inputId] = outputId; // Map ID to itself for now
-                }
-            });
-
-        IRBuilder builder(inst);
-        builder.setInsertAfter(inst);
-        auto translatedID = builder.emitCallInst(
-            inst->getDataType(),
-            createIntegerMappingFunc(builder.getModule(), mapping),
-            List<IRInst*>({srcSeqID}));
-
-        inst->replaceUsesWith(translatedID);
-        inst->removeAndDeallocate();
-    }
-
     void lowerGetTagForSuperCollection(IRGetTagForSuperCollection* inst)
     {
         auto srcCollection = cast<IRCollectionBase>(
@@ -2885,9 +3120,6 @@ struct TagOpsLoweringContext : public InstPassBase
     {
         switch (inst->getOp())
         {
-        case kIROp_GetTagFromSequentialID:
-            lowerGetTagFromSequentialID(as<IRGetTagFromSequentialID>(inst));
-            break;
         case kIROp_GetTagForSuperCollection:
             lowerGetTagForSuperCollection(as<IRGetTagForSuperCollection>(inst));
             break;
@@ -2957,13 +3189,93 @@ struct CollectionLoweringContext : public InstPassBase
         collection->replaceUsesWith(anyValueType);
     }
 
-
     void processModule()
     {
         processInstsOfType<IRTypeCollection>(
             kIROp_TypeCollection,
             [&](IRTypeCollection* inst) { return lowerTypeCollection(inst); });
+    }
+};
 
+void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
+{
+    CollectionLoweringContext context(module);
+    context.processModule();
+}
+
+struct SequentialIDTagLoweringContext : public InstPassBase
+{
+    SequentialIDTagLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+    void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
+    {
+        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
+        auto srcSeqID = inst->getOperand(1);
+
+        Dictionary<UInt, UInt> mapping;
+
+        // Map from sequential ID to unique ID
+        auto destCollection =
+            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+
+        UIndex dstSeqID = 0;
+        forEachInCollection(
+            destCollection,
+            [&](IRInst* table)
+            {
+                // Get unique ID for the witness table
+                auto witnessTable = cast<IRWitnessTable>(table);
+                auto outputId = dstSeqID++;
+                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
+                if (seqDecoration)
+                {
+                    auto inputId = seqDecoration->getSequentialID();
+                    mapping[inputId] = outputId; // Map ID to itself for now
+                }
+            });
+
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+        auto translatedID = builder.emitCallInst(
+            inst->getDataType(),
+            createIntegerMappingFunc(builder.getModule(), mapping),
+            List<IRInst*>({srcSeqID}));
+
+        inst->replaceUsesWith(translatedID);
+        inst->removeAndDeallocate();
+    }
+
+    void processModule()
+    {
+        processInstsOfType<IRGetTagFromSequentialID>(
+            kIROp_GetTagFromSequentialID,
+            [&](IRGetTagFromSequentialID* inst) { return lowerGetTagFromSequentialID(inst); });
+    }
+};
+
+void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
+{
+    SequentialIDTagLoweringContext context(module);
+    context.processModule();
+}
+
+void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
+{
+    TagOpsLoweringContext tagContext(module);
+    tagContext.processModule();
+}
+
+struct TagTypeLoweringContext : public InstPassBase
+{
+    TagTypeLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    void processModule()
+    {
         processInstsOfType<IRCollectionTagType>(
             kIROp_CollectionTagType,
             [&](IRCollectionTagType* inst)
@@ -2974,12 +3286,9 @@ struct CollectionLoweringContext : public InstPassBase
     }
 };
 
-void lowerCollectionAndTagInsts(IRModule* module, DiagnosticSink* sink)
+void lowerTagTypes(IRModule* module)
 {
-    TagOpsLoweringContext tagContext(module);
-    tagContext.processModule();
-
-    CollectionLoweringContext context(module);
+    TagTypeLoweringContext context(module);
     context.processModule();
 }
 

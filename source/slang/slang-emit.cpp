@@ -1133,6 +1133,9 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
+    lowerTagInsts(irModule, sink);
+    lowerTypeCollections(irModule, sink);
+
     if (requiredLoweringPassSet.reinterpret)
         lowerReinterpret(targetProgram, irModule, sink);
 
