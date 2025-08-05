@@ -227,6 +227,7 @@ struct TransformParamsToConstRefContext
         List<IRFunc*>& functionsToProcess,
         HashSet<IRFunc*>& visitedCandidates)
     {
+        // We added 'root' already, leave
         if (visitedCandidates.contains(root))
             return;
 
@@ -247,11 +248,6 @@ struct TransformParamsToConstRefContext
                 addFuncsToCallListInTopologicalOrder(callee, functionsToProcess, visitedCandidates);
             }
         }
-
-        // We do not support recursion, no need to check
-        // `visitedCandidates` again
-        if(visitedCandidates.contains(root))
-            return;
 
         if (!shouldProcessFunction(root))
             return;
