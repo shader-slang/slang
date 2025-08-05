@@ -243,14 +243,6 @@ void createMemberDebugInfo(
     ScalarizedVal globalValue,
     IRDebugVar* parentDebugVar)
 {
-    // Only handle tuple values (struct members)
-    if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-        return;
-
-    auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl);
-    if (!tupleVal)
-        return;
-
     // Get debug location from the parent debug variable
     IRInst* debugSource = nullptr;
     IRInst* debugLine = nullptr;
@@ -3347,55 +3339,6 @@ void legalizeEntryPointParameterForGLSL(
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
-    IRDebugVar* entryPointDebugVar = nullptr;
-
-    // Generate debug information for entry point parameters before they are legalized away.
-    // This ensures that entry point parameters are visible to debuggers as DebugLocalVariable
-    // instead of being lost during parameter-to-global conversion.
-    if (codeGenContext->getTargetProgram()->getOptionSet().getDebugInfoLevel() !=
-        DebugInfoLevel::None)
-    {
-        // Find the parameter index for debug info
-        Index paramIndex = 0;
-        auto block = as<IRBlock>(pp->getParent());
-        if (block)
-        {
-            for (auto p : block->getParams())
-            {
-                if (p == pp)
-                    break;
-                paramIndex++;
-            }
-        }
-
-        // Get parameter type (handle pointer types for out/inout parameters)
-        auto paramType = pp->getDataType();
-        auto valueType = paramType;
-        if (auto ptrType = as<IRPtrTypeBase>(paramType))
-        {
-            valueType = ptrType->getValueType();
-        }
-
-        // Create debug information for the entry point parameter
-        if (auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>())
-        {
-            // Create a DebugVar instruction for the entry point parameter
-            auto debugVarInst = builder->emitDebugVar(
-                valueType,
-                funcDebugLoc->getSource(),
-                funcDebugLoc->getLine(),
-                funcDebugLoc->getCol(),
-                builder->getIntValue(builder->getUIntType(), paramIndex));
-            entryPointDebugVar = as<IRDebugVar>(debugVarInst);
-
-            // Copy name hints from the original parameter
-            if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
-            {
-                builder->addNameHintDecoration(entryPointDebugVar, nameHint->getName());
-            }
-        }
-    }
-
     // (JS): In the legalization process parameters are moved from the entry point.
     // So when we get to emit we have a problem in that we can't use parameters to find important
     // decorations And in the future we will not have front end 'Layout' available. To work around
@@ -3722,13 +3665,29 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-        // Generate member-level debug info for entry point struct parameters
-        if (entryPointDebugVar && codeGenContext->getTargetProgram()->getOptionSet().getDebugInfoLevel() != DebugInfoLevel::None)
+        // Create debug information for the entry point parameter
+        IRDebugVar* entryPointDebugVar = nullptr;
+        if (auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>())
         {
-            if (auto structType = as<IRStructType>(valueType))
+            // Create a DebugVar instruction for the entry point parameter
+            auto debugVarInst = builder->emitDebugVar(
+                valueType,
+                funcDebugLoc->getSource(),
+                funcDebugLoc->getLine(),
+                funcDebugLoc->getCol());
+            entryPointDebugVar = as<IRDebugVar>(debugVarInst);
+
+            // Copy name hints from the original parameter
+            if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
             {
-                createMemberDebugInfo(builder, structType, globalValue, entryPointDebugVar);
+                builder->addNameHintDecoration(entryPointDebugVar, nameHint->getName());
             }
+        }
+
+        // Generate member-level debug info for entry point struct parameters
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            createMemberDebugInfo(builder, structType, globalValue, entryPointDebugVar);
         }
 
         tryReplaceUsesOfStageInput(context, globalValue, pp);
@@ -3833,90 +3792,6 @@ void legalizeEntryPointParameterForGLSL(
         // struct will replace the no longer needed global variable which proxied as a
         // GlobalParam.
         IRInst* materialized = materializeValue(builder, globalValue);
-
-        // Generate member-level debug info for entry point parameters.
-        // This creates DebugLocalVariable for individual struct members and connects
-        // them to the actual global variables via DebugValue.
-        if (entryPointDebugVar && materialized &&
-            codeGenContext->getTargetProgram()->getOptionSet().getDebugInfoLevel() !=
-                DebugInfoLevel::None)
-        {
-            // Check if this is a struct type that needs member-level debug info
-            auto entryParamType = pp->getDataType();
-            auto entryValueType = entryParamType;
-            if (auto entryPtrType = as<IRPtrTypeBase>(entryParamType))
-            {
-                entryValueType = entryPtrType->getValueType();
-            }
-
-            if (auto structType = as<IRStructType>(entryValueType))
-            {
-                // Create debug variables for each struct member that maps to global variables
-                for (auto field : structType->getFields())
-                {
-                    auto fieldKey = field->getKey();
-                    auto fieldType = field->getFieldType();
-
-                    // Find the global variable that corresponds to this struct member
-                    IRInst* memberGlobalVar = nullptr;
-                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
-                    {
-                        for (auto elem : tupleVal->elements)
-                        {
-                            if (elem.key == fieldKey)
-                            {
-                                memberGlobalVar = elem.val.irValue;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (memberGlobalVar)
-                    {
-                        // Create debug variable for this struct member
-                        if (auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>())
-                        {
-                            String memberName;
-                            if (auto paramNameHint = pp->findDecoration<IRNameHintDecoration>())
-                            {
-                                memberName = paramNameHint->getName();
-                                memberName.append(".");
-                                if (auto keyName = as<IRStructKey>(fieldKey))
-                                {
-                                    if (auto nameHint =
-                                            keyName->findDecoration<IRNameHintDecoration>())
-                                    {
-                                        memberName.append(nameHint->getName());
-                                    }
-                                }
-                            }
-
-                            auto memberDebugVar = builder->emitDebugVar(
-                                fieldType,
-                                funcDebugLoc->getSource(),
-                                funcDebugLoc->getLine(),
-                                funcDebugLoc->getCol(),
-                                builder->getIntValue(builder->getUIntType(), 0));
-
-                            builder->addNameHintDecoration(
-                                as<IRDebugVar>(memberDebugVar),
-                                memberName.getUnownedSlice());
-
-                            // Create DebugValue to connect the global variable to the member
-                            // debug variable
-                            builder->emitDebugValue(
-                                as<IRDebugVar>(memberDebugVar),
-                                memberGlobalVar);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // For non-struct types, use the original approach
-                builder->emitDebugValue(entryPointDebugVar, materialized);
-            }
-        }
 
         // We next need to replace all uses of the proxy variable with the actual GlobalParam
         pp->replaceUsesWith(materialized);
