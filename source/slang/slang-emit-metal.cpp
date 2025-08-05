@@ -937,6 +937,11 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             }
             return true;
         }
+    case kIROp_PtrLit:
+        {
+            m_writer->emit("nullptr");
+            return true;
+        }
     default:
         break;
     }
