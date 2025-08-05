@@ -216,6 +216,9 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
 public in int gl_BaseInstance : SV_StartInstanceLocation;
 
+public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
+public in int2 gl_FragSizeEXT : SV_FragSize;
+
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
