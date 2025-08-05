@@ -1,0 +1,359 @@
+name: "Claude Code Runner"
+description: "Complete Claude Code execution with authentication, setup, execution, and results handling"
+inputs:
+  # Authentication inputs
+  llmgw-id:
+    description: "LLMGW ID for token generation"
+    required: true
+  llmgw-secret:
+    description: "LLMGW secret for token generation"
+    required: true
+  llmgw-token-url:
+    description: "LLMGW token URL for authentication"
+    required: true
+  github-token-fallback:
+    description: "Fallback GitHub token if App token fails"
+    required: false
+    default: ""
+
+  # Claude configuration
+  model:
+    description: "Anthropic model to use"
+    required: false
+    default: "claude-3-5-sonnet-20241022"
+  max-turns:
+    description: "Maximum number of turns for Claude"
+    required: false
+    default: "50000"
+  timeout-minutes:
+    description: "Timeout for Claude action in minutes"
+    required: false
+    default: "600"
+  trigger-phrase:
+    description: "Trigger phrase to activate Claude"
+    required: false
+    default: "@claude"
+  assignee-trigger:
+    description: "Assignee trigger name"
+    required: false
+    default: "claude"
+
+  # Environment and setup
+  custom-instructions:
+    description: "Custom instructions for Claude"
+    required: true
+  mcp-config:
+    description: "MCP server configuration JSON"
+    required: false
+    default: ""
+  allowed-tools:
+    description: "Comma-separated list of allowed tools"
+    required: false
+    default: "Bash,View,GlobTool,GrepTool,BatchTool,Write"
+  setup-commands:
+    description: "Setup commands to run before Claude (multiline string)"
+    required: false
+    default: ""
+  continue-on-setup-error:
+    description: "Continue if setup commands fail"
+    required: false
+    default: "false"
+
+  # AWS/Bedrock configuration
+  use-bedrock:
+    description: "Use AWS Bedrock for Claude"
+    required: false
+    default: "true"
+  aws-region:
+    description: "AWS region"
+    required: false
+    default: ""
+  bedrock-base-url:
+    description: "Anthropic Bedrock base URL"
+    required: false
+    default: ""
+  small-fast-model:
+    description: "Small fast model for Anthropic"
+    required: false
+    default: ""
+
+outputs:
+  auth-token:
+    description: "Generated authentication token"
+    value: ${{ steps.auth-token.outputs.token }}
+  github-token:
+    description: "Final GitHub token (App or fallback)"
+    value: ${{ steps.auth-config.outputs.github-token }}
+  token-expires:
+    description: "Token expiration time (if available)"
+    value: ${{ steps.auth-token.outputs.token-expires }}
+  github-app-token-outcome:
+    description: "Outcome of GitHub App token generation"
+    value: ${{ steps.github-app-token.outcome }}
+  claude-outcome:
+    description: "Outcome of Claude Code execution"
+    value: ${{ steps.claude-action.outcome }}
+
+runs:
+  using: "composite"
+  steps:
+    # Validate environment and inputs
+    - name: Validate Environment
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Check required secrets
+        if [ -z "${{ inputs.llmgw-id }}" ] || [ -z "${{ inputs.llmgw-secret }}" ] || [ -z "${{ inputs.llmgw-token-url }}" ]; then
+          echo "::error::Missing required secrets: LLMGW_ID or LLMGW_SECRET or LLMGW_TOKEN_URL"
+          exit 1
+        fi
+
+        # Install required tools
+        command -v jq >/dev/null 2>&1 || { echo "::error::jq is required but not installed"; exit 1; }
+        command -v curl >/dev/null 2>&1 || { echo "::error::curl is required but not installed"; exit 1; }
+
+        echo "✅ Environment validation passed"
+
+    # Generate custom auth token
+    - name: Generate Custom Auth Token
+      id: auth-token
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "🔐 Generating authentication token..."
+
+        # Set up error handling
+        cleanup() {
+          local exit_code=$?
+          echo "🧹 Cleaning up temporary files..."
+          rm -f /tmp/token_response.json 2>/dev/null || true
+          if [ $exit_code -ne 0 ]; then
+            echo "::error::Authentication failed - check your credentials and endpoint"
+          fi
+          exit $exit_code
+        }
+        trap cleanup EXIT
+
+        # Generate token with comprehensive error handling (using Basic auth like original)
+        HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/token_response.json --fail-with-body \
+          --max-time 30 \
+          --retry 3 \
+          --retry-delay 2 \
+          --location "${{ inputs.llmgw-token-url }}" \
+          --header 'Content-Type: application/x-www-form-urlencoded' \
+          --header "Authorization: Basic $(echo -n ${{ inputs.llmgw-id }}:${{ inputs.llmgw-secret }} | base64 -w0)" \
+          --data-urlencode 'grant_type=client_credentials' \
+          --data-urlencode 'scope=awsanthropic-readwrite azureopenai-readwrite' \
+          2>/dev/null)
+
+        # Check HTTP response code
+        if [ "$HTTP_CODE" -ne 200 ]; then
+          echo "::error::Authentication failed with HTTP code: $HTTP_CODE"
+          if [ -f /tmp/token_response.json ]; then
+            echo "::error::Response: $(cat /tmp/token_response.json | head -c 200)"
+          fi
+          exit 1
+        fi
+
+        # Extract and validate token
+        if [ ! -f /tmp/token_response.json ]; then
+          echo "::error::No response file generated"
+          exit 1
+        fi
+
+        ANTHROPIC_AUTH_TOKEN=$(jq -r '.access_token // empty' /tmp/token_response.json 2>/dev/null)
+
+        # Validate token format and length
+        if [ -z "$ANTHROPIC_AUTH_TOKEN" ] || [ "$ANTHROPIC_AUTH_TOKEN" = "null" ]; then
+          echo "::error::Failed to extract access token from response"
+          exit 1
+        fi
+
+        # Basic token validation
+        if [ ${#ANTHROPIC_AUTH_TOKEN} -lt 10 ]; then
+          echo "::error::Token appears to be too short (${#ANTHROPIC_AUTH_TOKEN} characters)"
+          exit 1
+        fi
+
+        # CRITICAL: Mask the token BEFORE any output
+        echo "::add-mask::$ANTHROPIC_AUTH_TOKEN"
+
+        # Set outputs
+        echo "token=$ANTHROPIC_AUTH_TOKEN" >> $GITHUB_OUTPUT
+
+        # Set token expiry if available
+        TOKEN_EXPIRES=$(jq -r '.expires_in // empty' /tmp/token_response.json 2>/dev/null)
+        if [ -n "$TOKEN_EXPIRES" ]; then
+          echo "::add-mask::$TOKEN_EXPIRES"
+          echo "token-expires=$TOKEN_EXPIRES" >> $GITHUB_OUTPUT
+        fi
+
+        echo "✅ Authentication token generated and masked successfully"
+
+        # Clean up response file
+        rm -f /tmp/token_response.json
+
+    # Configure authentication
+    - name: Configure Authentication
+      id: auth-config
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Use GitHub App token if available, otherwise use GITHUB_TOKEN
+        if [ -n "${{ steps.github-app-token.outputs.token }}" ]; then
+          echo "github-token=${{ steps.github-app-token.outputs.token }}" >> $GITHUB_OUTPUT
+          echo "✅ Using GitHub App authentication"
+        else
+          echo "github-token=${{ inputs.github-token-fallback }}" >> $GITHUB_OUTPUT
+          echo "⚠️  Using fallback GITHUB_TOKEN authentication"
+        fi
+
+    # Run setup commands if provided
+    - name: Run setup commands
+      id: setup-commands
+      if: inputs.setup-commands != ''
+      shell: bash
+      continue-on-error: ${{ inputs.continue-on-setup-error == 'true' }}
+      run: ${{ inputs.setup-commands }}
+
+    # Security cleanup
+    - name: Security Cleanup
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "🧹 Performing security cleanup..."
+
+        # Clear any temporary files that might contain sensitive data
+        find /tmp -name "*token*" -type f -delete 2>/dev/null || true
+        find /tmp -name "*auth*" -type f -delete 2>/dev/null || true
+        find /tmp -name "*response*" -type f -delete 2>/dev/null || true
+
+        # Clear environment variables (belt and suspenders approach)
+        unset ANTHROPIC_API_KEY 2>/dev/null || true
+        unset ANTHROPIC_AUTH_TOKEN 2>/dev/null || true
+
+        echo "✅ Security cleanup completed"
+
+    # Workflow summary
+    - name: Generate Workflow Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## Claude Code Runner Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Authentication" >> $GITHUB_STEP_SUMMARY
+        echo "- **Auth Token**: ✅ Generated" >> $GITHUB_STEP_SUMMARY
+        echo "- **Token Expiry**: ${{ steps.auth-token.outputs.token-expires || 'Not provided' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **GitHub Token**: ${{ steps.github-app-token.outcome == 'success' && '✅ GitHub App' || '⚠️ Fallback' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- **Model**: ${{ inputs.model }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Max Turns**: ${{ inputs.max-turns }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout**: ${{ inputs.timeout-minutes }} minutes" >> $GITHUB_STEP_SUMMARY
+        echo "- **Bedrock**: ${{ inputs.use-bedrock == 'true' && '✅ Enabled' || '❌ Disabled' }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.use-bedrock }}" = "true" ]; then
+          echo "- **AWS Region**: ${{ inputs.aws-region || 'Default' }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Setup" >> $GITHUB_STEP_SUMMARY
+        echo "- **Setup Commands**: ${{ inputs.setup-commands != '' && '✅ Executed' || '⏭️ Skipped' }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ inputs.setup-commands }}" != "" ]; then
+          echo "- **Setup Result**: ${{ steps.setup-commands.outcome || 'Unknown' }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- **Security Cleanup**: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+
+    # Execute Claude Code Action
+    - name: Execute Claude Code Action
+      id: claude-action
+      uses: anthropics/claude-code-action@beta
+      with:
+        custom_instructions: ${{ inputs.custom-instructions }}
+        mcp_config: ${{ inputs.mcp-config }}
+        allowed_tools: ${{ inputs.allowed-tools }}
+        trigger_phrase: ${{ inputs.trigger-phrase }}
+        assignee_trigger: ${{ inputs.assignee-trigger }}
+        timeout_minutes: ${{ inputs.timeout-minutes }}
+        github_token: ${{ steps.auth-config.outputs.github-token }}
+        use_bedrock: ${{ inputs.use-bedrock }}
+        model: ${{ inputs.model }}
+        max_turns: ${{ inputs.max-turns }}
+        # Use claude_env for custom environment variables
+        claude_env: |
+          ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
+          ANTHROPIC_SMALL_FAST_MODEL: ${{ inputs.small-fast-model }}
+          AWS_REGION: ${{ inputs.aws-region }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          ANTHROPIC_AUTH_TOKEN: ${{ steps.auth-token.outputs.token }}
+          DISABLE_TELEMETRY: 1
+      continue-on-error: true
+
+    # Handle Claude results
+    - name: Handle Claude Results
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "🔍 Processing Claude action results..."
+
+        # Check if Claude action succeeded
+        if [ "${{ steps.claude-action.outcome }}" = "success" ]; then
+          echo "✅ Claude Code action completed successfully"
+        elif [ "${{ steps.claude-action.outcome }}" = "failure" ]; then
+          echo "❌ Claude Code action failed"
+
+          # Create error summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Claude Execution Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The Claude Code action encountered an error. Common causes:" >> $GITHUB_STEP_SUMMARY
+          echo "- Authentication issues" >> $GITHUB_STEP_SUMMARY
+          echo "- Network connectivity problems" >> $GITHUB_STEP_SUMMARY
+          echo "- Model availability issues" >> $GITHUB_STEP_SUMMARY
+          echo "- Rate limiting" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the workflow logs for detailed error information." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️  Claude Code action was cancelled or skipped"
+        fi
+
+    # Add execution summary
+    - name: Add Claude Execution Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Claude Execution Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Event information
+        echo "#### Event Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Actor**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Execution status
+        echo "#### Execution Status" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.claude-action.outcome }}" = "success" ]; then
+          echo "- **Claude Action**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ steps.claude-action.outcome }}" = "failure" ]; then
+          echo "- **Claude Action**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Claude Action**: ⚠️ ${{ steps.claude-action.outcome }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "- **Model Used**: ${{ inputs.model }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Max Turns**: ${{ inputs.max-turns }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+        # Add timestamp
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Timestamp" >> $GITHUB_STEP_SUMMARY
+        echo "- **Completed at**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
