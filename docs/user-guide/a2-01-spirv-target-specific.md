@@ -97,7 +97,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_VulkanInstanceID`         | `BuiltIn InstanceIndex`           |
 | `SV_VulkanVertexID`           | `BuiltIn VertexIndex`             |
 
-*Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
+*Note* that `SV_DrawIndex`, `SV_FragInvocationCount`, `SV_FragSize`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
 Also *Note* that `SV_InstanceID`/`SV_VertexID` counts all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
 See [Using SV_InstanceID/SV_VertexID with SPIR-V target](#using-sv_instanceid-and-sv_vertexid-with-spir-v-target)
 
