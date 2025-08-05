@@ -22665,7 +22665,7 @@ struct ConstBufferPointer<T, int alignment = 16>
     [ForceInline]
     static ConstBufferPointer<T> fromUInt(uint64_t val)
     {
-        return {(T*)val};
+        return ConstBufferPointer<T>(val);
     }
 
     [ForceInline]
@@ -22679,8 +22679,17 @@ struct ConstBufferPointer<T, int alignment = 16>
     {
         return _ptr != nullptr;
     }
-}
 
+    __init(T* val)
+    {
+        _ptr = val;
+    }
+
+    __init(uint64_t val)
+    {
+        _ptr = (T*)val;
+    }
+}
 //
 // HLSL-like dynamic resources
 // https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html
