@@ -112,6 +112,6 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           bedrock-base-url: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
           small-fast-model: ${{ vars.ANTHROPIC_SMALL_FAST_MODEL }}
-          
+
           # Additional tools for deepwiki
           allowed-tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"
