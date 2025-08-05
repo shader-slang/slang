@@ -16,9 +16,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Points to the correct address-space
         Direct,
 
-        // Stores the new mappings of inst<->addrspace, where we fetch `addrspace` from an
-        // inst with a concrete-addrspace.
-        // This is important since it saves us from re-calculating address-spaces if we change an
+        // Stores an `Inst` the current `Inst` derives its mappings of inst<->addrspace from.
+        // This is important for 2 reasons:
+        // 1. Sometimes we have to figure out the address-space of an inst 
+        //    at a later point in the program (globals)
+        // 2. e-calculating address-spaces if we change an
         // address-space other inst's relied on
         // to determine their addrspace.
         // Note: when we fill this struct, we do not store a chain of inst1->inst2->inst3. We
@@ -220,7 +222,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     // some inst's always need to be updated, specifically,
     // insts that derive their addr-space from another inst.
-    bool earlyUpdateInst(IRInst* inst)
+    bool indirectAddressSpaceInst(IRInst* inst)
     {
         // Ex of cases being handled:
         /*
@@ -234,28 +236,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         switch (inst->getOp())
         {
-        case kIROp_Load:
-            if (!mapInstToAddrSpace.containsKey(inst))
-            {
-                if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
-                {
-                    mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
-                }
-                else
-                {
-                    // If we are not loading from a ptr, the addr-space is the same as source. Ex:
-                    // GlobalParam<vec2> ==> addr-space of load(GlobalParam<vec2>) is same as parent
-                    mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                }
-                return true;
-            }
-            break;
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
         case kIROp_GetOffsetPtr:
         case kIROp_BitCast:
             if (!mapInstToAddrSpace.containsKey(inst))
             {
+                // derives addr-space from base-inst
                 mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
                 return true;
             }
@@ -293,7 +280,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         continue;
                     }
 
-                    if (earlyUpdateInst(inst))
+                    if (indirectAddressSpaceInst(inst))
                     {
                         changed = true;
                         continue;
@@ -305,7 +292,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                         if (ptrType->hasAddressSpace())
                         {
-                            mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
+                             mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
                             continue;
                         }
                     }
@@ -326,50 +313,54 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             }
                             break;
                         }
+                    case kIROp_Load:
+                        {
+                            // If we are not loading from a ptr, the addr-space is the same as
+                            // source. Ex: GlobalParam<vec2> ==> addr-space of
+                            // load(GlobalParam<vec2>) is same as parent
+                            mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
+                            changed = true;
+                        }
+                        break;
                     case kIROp_Store:
                         {
                             auto store = as<IRStore>(inst);
+                            auto ptr = store->getPtr();
 
-                            // ptr gets its addr-space from `store`
-                            mapInstToAddrSpace[store->getPtr()] = AddressSpaceNode(store);
-                            // store gets its addr-space from its ptr
-
-                            auto srcAddrSpace = getAddrSpace(store->getVal());
-                            auto srcType = as<IRPtrTypeBase>(store->getVal()->getDataType());
-                            if (srcType && srcAddrSpace != AddressSpace::Generic)
+                            // Store gets its addr-space from its ptr or val,
+                            // which-ever has a address-space to share.
+                            auto dstAddrSpace = getAddrSpace(ptr);
+                            if (dstAddrSpace != AddressSpace::Generic)
                             {
-                                // The object stored into must share the pointer-addr-space with src
-                                mapInstToAddrSpace[store] = AddressSpaceNode(srcAddrSpace);
+                                // ptr has an addr-space.
+                                // This has priority since we can store a groupshared into a local.
+                                mapInstToAddrSpace[store] = AddressSpaceNode(dstAddrSpace);
                                 changed = true;
                             }
                             else
                             {
-                                // load was not something with an addr-space, infer from store->ptr
-                                // since `store(globalVar,intLit)` means the addr-space of the target is
-                                // unchanged.
-                                auto dstType = as<IRPtrTypeBase>(store->getPtr()->getDataType());
-                                if (dstType)
-                                {
-                                    mapInstToAddrSpace[store] =
-                                        AddressSpaceNode(dstType->getAddressSpace());
-                                    changed = true;
-                                }
+                                // dst did not have an addr-space. This means we infer from the val.
+                                mapInstToAddrSpace[store] = AddressSpaceNode(store->getVal());
+                                mapInstToAddrSpace[ptr] = AddressSpaceNode(store);
+                                changed = true;
                             }
 
                             // We now know the correct address-space of the inner pointer
                             // This means we must ensure all Loads have correct address-space.
                             // We need to always run this logic given an `IRStore` since
-                            // address-space-specialization may introduce new `IRLoad`s
-                            traverseUsers<IRLoad>(
-                                store->getPtr(),
-                                [&](IRLoad* load)
-                                { 
-                                    if (!mapInstToAddrSpace.containsKey(load))
-                                    {
-                                        mapInstToAddrSpace[load] = AddressSpaceNode(store);
-                                        changed = true;
-                                    }
-                                });
+                            // address-space-specialization may introduce new `IRLoad`s.
+                            // 
+                            // TODO: do I still need this?
+                            //traverseUsers<IRLoad>(
+                            //    store->getPtr(),
+                            //    [&](IRLoad* load)
+                            //    { 
+                            //        if (!mapInstToAddrSpace.containsKey(load))
+                            //        {
+                            //            mapInstToAddrSpace[load] = AddressSpaceNode(store);
+                            //            changed = true;
+                            //        }
+                            //    });
                         }
                         break;
                     case kIROp_Param:
