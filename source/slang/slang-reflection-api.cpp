@@ -78,12 +78,17 @@ static inline SlangReflectionVariable* convert(DeclRef<Decl> var)
 static inline DeclRef<FunctionDeclBase> convertToFunc(SlangReflectionFunction* func)
 {
     NodeBase* nodeBase = (NodeBase*)func;
-    if (DeclRefBase* declRefBase = as<DeclRefBase>(nodeBase))
+
+    // Check if this is an OverloadedExpr first
+    if (as<OverloadedExpr>(nodeBase))
     {
-        return DeclRef<FunctionDeclBase>(declRefBase);
+        // Can't convert OverloadedExpr to a single DeclRef
+        return DeclRef<FunctionDeclBase>();
     }
 
-    return DeclRef<FunctionDeclBase>();
+    // Otherwise, treat it as a DeclRefBase* directly (like other convert functions)
+    DeclRefBase* declRefBase = (DeclRefBase*)func;
+    return DeclRef<FunctionDeclBase>(declRefBase);
 }
 
 static inline OverloadedExpr* convertToOverloadedFunc(SlangReflectionFunction* func)
@@ -3430,11 +3435,24 @@ SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFuncti
 
 SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFunc)
 {
+    // First try to convert as a single function
     auto func = convertToFunc(inFunc);
-    if (!func)
-        return nullptr;
+    if (func)
+    {
+        return getText(func.getDecl()->getName()).getBuffer();
+    }
 
-    return getText(func.getDecl()->getName()).getBuffer();
+    // If that fails, try to handle as an overloaded function
+    auto overloadedFunc = convertToOverloadedFunc(inFunc);
+    if (overloadedFunc && overloadedFunc->lookupResult2.items.getCount() > 0)
+    {
+        // Get the name from the first overload (all should have the same name)
+        auto firstItem = overloadedFunc->lookupResult2.items[0];
+        auto declRef = firstItem.declRef;
+        return getText(declRef.getName()).getBuffer();
+    }
+
+    return nullptr;
 }
 
 SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* inFunc)
