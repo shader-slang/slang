@@ -994,6 +994,28 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(
     return nullptr;
 }
 
+
+SLANG_API SlangReflectionFunction* pReflection_TryResolveOverloadedFunction(
+    SlangReflection* reflection,
+    SlangReflectionFunction* func)
+{
+    auto overloadedFunc = convertToOverloadedFunc(func);
+    if (!overloadedFunc)
+        return func;
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+    try
+    {
+        auto result = program->tryResolveOverloadedExpr(overloadedFunc);
+        auto astBuilder = program->getLinkage()->getASTBuilder();
+        return tryConvertExprToFunctionReflection(astBuilder, result);
+    }
+    catch (...)
+    {
+    }
+    return func;
+}
+
 SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(
     SlangReflection* reflection,
     SlangReflectionType* reflType,

@@ -8,6 +8,7 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-lookup.h"
 #include "slang-mangle.h"
 
 namespace Slang
@@ -772,6 +773,14 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     return type;
 }
 
+Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
+{
+    auto linkage = getLinkage();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    SemanticsVisitor visitor(context);
+    return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
+}
+
 Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink)
 {
     // If we've looked up this type name before,
@@ -905,39 +914,16 @@ Expr* ComponentType::findDeclFromStringInType(
 
     auto checkedTerm = visitor.CheckTerm(expr);
 
-    // Check if checkedTerm is overloaded functions and avoid resolving if so
-    // to preserve all function overloads with different signatures
-    Expr* resolvedTerm = checkedTerm;
     if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
     {
-        // Check if all candidates are function references
-        bool allAreFunctions = true;
-        for (auto item : overloadedExpr->lookupResult2.items)
-        {
-            if (!as<FunctionDeclBase>(item.declRef.getDecl()))
-            {
-                allAreFunctions = false;
-                break;
-            }
-        }
-
-        // If not all are functions, resolve the overload as usual
-        if (!allAreFunctions)
-        {
-            resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
-        }
-    }
-    else
-    {
-        // Not overloaded, resolve as usual
-        resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
-    }
-
-    if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))
-    {
+        // For functions, since we don't know the argument list yet, we will have to defer
+        // non-parameter-related candidate comparison logic into its separate step.
+        if (mask != LookupMask::Function)
+            return visitor.maybeResolveOverloadedExpr(checkedTerm, mask, nullptr);
+        overloadedExpr->lookupResult2 = refineLookup(overloadedExpr->lookupResult2, mask);
         return overloadedExpr;
     }
-    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
     {
         return declRefExpr;
     }
