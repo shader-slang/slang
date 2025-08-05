@@ -237,15 +237,17 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // `Add` preserves address space information
         // for the case: `BitCast<FunctionPtr_int>(BitCast<int>(PhysicalPtr_int)+1)`
         case kIROp_Add:
+            if (!mapInstToAddrSpace.containsKey(inst))
             {
-                if (!mapInstToAddrSpace.containsKey(inst))
-                {
-                    // Note: this case is only to handle Slang's internal handling of byte-offsets
-                    // to a physical buffer. We derives addr-space from operand(0).
-                    mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                    return true;
-                }
+                // Note: this case is only to handle Slang's internal handling of byte-offsets
+                // to a physical buffer. We derives addr-space from operand(0).
+                //
+                // To handle users using bit-cast and addition will require us to associate with integers
+                // address-space info lost when bit-casting (and to propegate across additions/math)
+                mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
+                return true;
             }
+            break;
         case kIROp_BitCast:
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
