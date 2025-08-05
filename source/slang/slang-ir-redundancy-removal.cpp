@@ -379,10 +379,6 @@ bool doesAddrHaveUnpredictableSideEffects(IRInst* rootVar)
 
 bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
 {
-    auto rootAddr = getRootAddr(load->getPtr());
-    if (doesAddrHaveUnpredictableSideEffects(rootAddr))
-        return false;
-
     bool changed = false;
 
     // If the load is preceeded by a store without any side-effect insts
@@ -412,6 +408,10 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
     // remove the getAddr.
     // Goal is to let DCE iterate and remove a unused load through
     // elimination of uses.
+    auto rootAddr = getRootAddr(load->getPtr());
+    if (doesAddrHaveUnpredictableSideEffects(rootAddr))
+        return false;
+
     if (as<IRConstRefType>(rootAddr->getDataType()))
     {
         traverseUsers<IRGetAddress>(
