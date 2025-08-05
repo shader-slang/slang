@@ -64,6 +64,17 @@ SLANG_UNIT_TEST(functionLookupResolution)
     SLANG_CHECK_ABORT(type != nullptr);
 
     auto func = layout->findFunctionByNameInType(type, "step");
+    if (func->isOverloaded())
+    {
+        List<slang::FunctionReflection*> candidates;
+        for (uint32_t i = 0; i < func->getOverloadCount(); i++)
+        {
+            candidates.add(func->getOverload(i));
+        }
+        func = layout->tryResolveOverloadedFunction(
+            (uint32_t)candidates.getCount(),
+            candidates.getBuffer());
+    }
     SLANG_CHECK_ABORT(!func->isOverloaded());
 
     SLANG_CHECK(String(func->getName()) == "step");

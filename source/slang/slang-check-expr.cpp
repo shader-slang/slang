@@ -354,7 +354,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
-    diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+    if (getSink())
+        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
@@ -389,7 +390,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             auto expr = m_astBuilder->create<StaticMemberExpr>();
             expr->loc = loc;
             expr->type = type;
-            if (!isDeclUsableAsStaticMember(declRef.getDecl()))
+            if (getSink() && !isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
                     loc,

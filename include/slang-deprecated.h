@@ -904,9 +904,10 @@ extern "C"
         SlangReflection* reflection,
         SlangReflectionType* reflType,
         char const* name);
-    SLANG_API SlangReflectionFunction* pReflection_TryResolveOverloadedFunction(
+    SLANG_API SlangReflectionFunction* spReflection_TryResolveOverloadedFunction(
         SlangReflection* reflection,
-        SlangReflectionFunction* func);
+        uint32_t candidateCount,
+        SlangReflectionFunction** candidiates);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(

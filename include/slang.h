@@ -3345,6 +3345,17 @@ struct ShaderReflection
             name);
     }
 
+    [[deprecated]]
+    FunctionReflection* tryResolveOverloadedFunction(
+        uint32_t candidateCount,
+        FunctionReflection** candidates)
+    {
+        return (FunctionReflection*)spReflection_TryResolveOverloadedFunction(
+            (SlangReflection*)this,
+            candidateCount,
+            (SlangReflectionFunction**)candidates);
+    }
+
     VariableReflection* findVarByNameInType(TypeReflection* type, const char* name)
     {
         return (VariableReflection*)spReflection_FindVarByNameInType(
