@@ -1314,7 +1314,9 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
-        legalizeResourceTypes(targetProgram, irModule, sink);
+        if (target != CodeGenTarget::Metal) {
+            legalizeResourceTypes(targetProgram, irModule, sink);
+        }
 
         // We also need to legalize empty types for Metal targets.
         switch (target)
