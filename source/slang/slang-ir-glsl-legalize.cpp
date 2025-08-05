@@ -888,10 +888,20 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "sv_fragsize")
     {
         name = "gl_FragSizeEXT";
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_fragment_invocation_density"));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Int),
+            builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_fraginvocationcount")
     {
         name = "gl_FragInvocationCountEXT";
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_fragment_invocation_density"));
+        requiredType = builder->getIntType();
     }
     else if (semanticName == "sv_startvertexlocation")
     {
