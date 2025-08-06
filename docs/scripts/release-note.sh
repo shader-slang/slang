@@ -55,13 +55,6 @@ do
       use_hash=true
       shift 2
       ;;
-    -*)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [--since DATE | --previous-hash HASH]"
-      echo "  --since DATE          Generate notes since the given date (e.g., 2025-08-06)"
-      echo "  --previous-hash HASH  Generate notes since the given commit hash"
-      exit 1
-      ;;
     *)
       # Legacy positional argument support
       if [ "$since" = "" ] && [ "$previous_hash" = "" ]
