@@ -44,8 +44,12 @@ float4 main(FragmentInput input) : SV_Target
 // CHECK: %input_position = OpExtInst %void %{{[0-9]+}} DebugLocalVariable
 // CHECK: %input_color{{(_[0-9]+)?}} = OpExtInst %void %{{[0-9]+}} DebugLocalVariable
 
-// Verify that DebugValue instructions map the debug variables correctly
+// Verify that DebugValue instructions are generated for the entry point param
 // CHECK: DebugValue %input
+
+// Verify that DebugValue instructions are generated for the members
+// CHECK: DebugDeclare %input_position
+// CHECK: DebugDeclare %input_color
 
 // Verify GetAttributeAtVertex generates proper SPIR-V access patterns
 // The key test: ensure it accesses the global variable directly, not a local copy
