@@ -136,8 +136,62 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         IRInst* paramVal = nullptr;
         if (!isRefParam)
             paramVal = param;
-        else if (as<IRInOutType>(param->getDataType()) || as<IRConstRefType>(param->getDataType()))
+        else if (as<IRInOutType>(param->getDataType()))
+        {
             paramVal = builder.emitLoad(param);
+        }
+        else if (as<IRConstRefType>(param->getDataType()))
+        {
+            paramVal = builder.emitLoad(param);
+
+            // Unlike the case above for `IRInOutType`, when an entry point param
+            // is IRConstRefType, each member of the param will be directly inlined
+            // to where they are used. And the entry point param itself will be
+            // removed because it will be unused.
+            //
+            // However, we still want to emit the debug information in the form of
+            // the end user expects.
+            //
+            // We are going to emit the debug-variable explicitly for each member
+            // of the entry point param if its type is a struct.
+            // 
+        if (auto structType = as<IRStructType>(paramType))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                if (!isDebuggableType(fieldType))
+                    continue;
+                
+                // Create debug var for struct member with naming like "input.pos"
+                auto memberDebugVar = builder.emitDebugVar(
+                    fieldType,
+                    funcDebugLoc->getSource(),
+                    funcDebugLoc->getLine(),
+                    funcDebugLoc->getCol());
+                
+                // Set name hint combining parameter and field names
+                if (auto paramNameHint = param->findDecoration<IRNameHintDecoration>())
+                {
+                    if (auto fieldNameHint = field->getKey()->findDecoration<IRNameHintDecoration>())
+                    {
+                        String memberName = paramNameHint->getName();
+                        memberName.append(".");
+                        memberName.append(fieldNameHint->getName());
+                        builder.addNameHintDecoration(memberDebugVar, memberName.getUnownedSlice());
+                    }
+                }
+                
+                // Store the member debug var for later use
+                // We'll emit DebugValue for it when we have the field value
+                if (paramVal)
+                {
+                    auto fieldVal = builder.emitFieldExtract(paramVal, field->getKey());
+                    builder.emitDebugValue(memberDebugVar, fieldVal);
+                }
+            }
+        }
+        }
         if (paramVal)
         {
             builder.emitDebugValue(debugVar, paramVal);
