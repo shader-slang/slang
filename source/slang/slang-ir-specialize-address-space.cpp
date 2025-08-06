@@ -51,6 +51,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     Dictionary<IRInst*, AddressSpace> mapInstPtrValueTypeToAddress;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
     HashSet<IRFunc*> functionsToConsiderRemoving;
+    HashSet<IRDebugValue*> debugValuesToMaybeRemove;
 
     AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
         : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
@@ -234,11 +235,26 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         switch (inst->getOp())
         {
-        // `Add` preserves address space information
-        // for the case: `BitCast<FunctionPtr_int>(BitCast<int>(PhysicalPtr_int)+1)`
+        case kIROp_DebugValue:
+            {
+                // Ensure the debug var shares address-space with debug value.
+                // This legalization takes priority over debugVar's existing addr-space
+                auto debugValue = as<IRDebugValue>(inst);
+                auto debugVar = debugValue->getDebugVar();
+                if (!mapInstToAddrSpace.containsKey(debugValue))
+                {
+                    mapInstToAddrSpace[debugVar] = AddressSpaceNode(debugValue->getValue());
+                    debugValuesToMaybeRemove.add(debugValue);
+                }
+                break;
+            }
         case kIROp_Add:
             if (!mapInstToAddrSpace.containsKey(inst))
             {
+                // `Add` needs to preserve address space information
+                // for the case: `BitCast<FunctionPtr_int>(BitCast<int>(PhysicalPtr_int)+1)`
+                // which is code Slang produces during IR legalization passes.
+                //
                 // Note: this case is only to handle Slang's internal handling of byte-offsets
                 // to a physical buffer. We derives addr-space from operand(0).
                 //
@@ -586,6 +602,25 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
 
         applyAddressSpaceToInstType();
+
+		// remove invalid DebugValues
+		for (auto inst : debugValuesToMaybeRemove)
+		{
+			//
+            auto ptrType = as<IRPtrTypeBase>(inst->getDebugVar()->getDataType());
+            if (!ptrType)
+                continue;
+            auto addrSpace = ptrType->getAddressSpace();
+            switch (addrSpace)
+            {
+            case AddressSpace::Function:
+                break;
+            default:
+				// by default, destroy
+                inst->removeAndDeallocate();
+                break;
+			}
+		}
 
         for (IRFunc* func : functionsToConsiderRemoving)
         {
