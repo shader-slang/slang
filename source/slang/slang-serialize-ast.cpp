@@ -14,8 +14,49 @@
 //
 #include "slang-serialize-ast.cpp.fiddle"
 
+// By default, the declarations in a serialized AST module will be
+// deserialized on-demand, in order to improve startup times.
+//
+// The on-demand loading logic understandably introduces more
+// complexity, and it is possible that there will be debugging
+// (or even deployment reasons) scenarios where it is desirable
+// to be sure that all the AST nodes for a given module are
+// fully deserialized by the time `readSerailizedModuleAST()`
+// returns. For those cases, we provide a macro that can be
+// used to force up-front loading.
+//
+// Note: this macro does *not* disable most of the infrastructure
+// code related to on-demand loading; things like lookup on
+// a `ContainerDecl` will still check for the on-demand loading
+// case at runtime. All that setting this flag to `1` does is
+// extend the "fixup" logic that runs when an AST node has been
+// deserialized to also force deserialization of any direct
+// member declarations of a `ContainerDecl` that has just been
+// deserialized.
+//
+// The macro is being defined conditionally here, so that we
+// have the option of introducing an option to control its
+// value as part of configuration for the build of the compiler
+// itself (if that ever becomes relevant).
+//
+#ifndef SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION
+#define SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION 0
+#endif
+
+// In the case where on-demand deserialization is enabled, it
+// can be helpful to know what fraction of the declarations
+// from any given module end up getting deserialized (e.g.,
+// at the time this comment was written, compiling a small
+// `.slang` file typically causes about 17-20% of the
+// top-level declarations in the core module to get deserialized.
+//
+// Enabling this flag causes a message to be emitted every
+// time a new top-level declaration gets deserialized for *any*
+// module, so it generates a lot of output and is best seen
+// as just a debugging option for use when trying to reduce
+// the fraction of declarations that must be deserialized.
+//
 #define SLANG_ENABLE_AST_DESERIALIZATION_STATS 0
-#define SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION 1
 
 FIDDLE()
 namespace Slang
@@ -1663,7 +1704,7 @@ void ASTSerialReadContext::_cleanUpASTNode(NodeBase* node)
 #if SLANG_ENABLE_AST_DESERIALIZATION_STATS
         if (auto moduleDecl = as<ModuleDecl>(decl->parentDecl))
         {
-            auto& deserializedCount = _sharedContext->_deserializedTopLevelDeclCount;
+            auto& deserializedCount = _deserializedTopLevelDeclCount;
             deserializedCount++;
 
             Count totalCount = moduleDecl->getDirectMemberDeclCount();
