@@ -880,27 +880,21 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         context->requireGLSLExtension(
             UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
 
-        bool hasNoPerspective = false;
-        // Look for interpolation mode decoration in the param chain
+        name = "gl_BaryCoordEXT";
+
+        // Search for nointerpolation keyword to use no-perspective variant of BaryCoord
         for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
         {
-            if (!paramInfo->outerParam)
+            auto outerParam = paramInfo->outerParam;
+            auto decorParent = outerParam;
+            if (auto field = as<IRStructField>(decorParent))
+                decorParent = field->getKey();
+            auto interpolation = decorParent->findDecoration<IRInterpolationModeDecoration>();
+            if (!interpolation || interpolation->getMode() != IRInterpolationMode::NoPerspective)
                 continue;
-            for (auto dd : paramInfo->outerParam->getDecorations())
-            {
-                auto decoration = as<IRInterpolationModeDecoration>(dd);
-                if (!decoration)
-                    continue;
-                if (decoration->getMode() == IRInterpolationMode::NoPerspective)
-                {
-                    hasNoPerspective = true;
-                    break;
-                }
-            }
-            if (hasNoPerspective)
-                break;
+            name = "gl_BaryCoordNoPerspEXT";
+            break;
         }
-        name = hasNoPerspective ? "gl_BaryCoordNoPerspEXT" : "gl_BaryCoordEXT";
 
         requiredType = builder->getVectorType(
             builder->getBasicType(BaseType::Float),
