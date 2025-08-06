@@ -3858,7 +3858,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_UnsizedArrayType:
             return false;
         case kIROp_ArrayType:
-            return isLegalType(as<IRArrayType>(type)->getElementType());
+            return isLegalDebugType(as<IRArrayType>(type)->getElementType());
         case kIROp_VectorType:
         case kIROp_StructType:
         case kIROp_MatrixType:
