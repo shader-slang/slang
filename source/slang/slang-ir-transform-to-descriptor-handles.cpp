@@ -32,27 +32,71 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         return (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, resourceType);
     }
 
-    void processStructType(IRStructType* structType)
+    IRInst* createCastDescriptorHandleToResource(IRType* resourceType, IRInst* descriptorHandle)
+    {
+        builder.setInsertBefore(descriptorHandle->getNextInst());
+        return builder.emitIntrinsicInst(
+            resourceType,
+            kIROp_CastDescriptorHandleToResource,
+            1,
+            &descriptorHandle);
+    }
+
+    void processParameterBlockType(IRParameterBlockType* paramBlockType)
+    {
+        auto elementType = paramBlockType->getElementType();
+        if (auto structType = as<IRStructType>(elementType))
+        {
+            processStructTypeInParameterBlock(structType);
+        }
+    }
+
+    void processStructTypeInParameterBlock(IRStructType* structType)
     {
         for (auto field : structType->getFields())
         {
-            if (isResourceType(field->getFieldType()))
+            auto fieldType = field->getFieldType();
+            if (auto innerStructType = as<IRStructType>(fieldType))
             {
-                auto fieldType = field->getFieldType();
+                processStructTypeInParameterBlock(innerStructType);
+            }
+            else if (auto arrayType = as<IRArrayTypeBase>(fieldType))
+            {
+                if (auto innerStructType = as<IRStructType>(arrayType->getElementType()))
+                {
+                    processStructTypeInParameterBlock(innerStructType);
+                }
+            }
+            if (isResourceType(fieldType))
+            {
                 auto descriptorHandleType = createDescriptorHandleType(fieldType);
                 field->setFieldType(descriptorHandleType);
+
+                // The use of field now returns a descriptor handle, but users expect the resource
+                // type. Insert a cast instruction after this field extract
+                auto castInst =
+                    createCastDescriptorHandleToResource(fieldType, descriptorHandleType);
+
+                // Replace all uses of the field with the cast instruction
+                for (auto use = field->firstUse; use; use = use->nextUse)
+                {
+                    // Don't replace the use in the cast instruction itself
+                    if (use->getUser() != castInst)
+                    {
+                        use->set(castInst);
+                    }
+                }
             }
         }
     }
 
     void processModule()
     {
-        // Process all struct types in the module
-        processInstsOfType<IRStructType>(kIROp_StructType, 
-            [this](IRStructType* structType)
-        {
-            processStructType(structType);
-        });
+        // First pass: Process parameter block types and transform struct field types within them
+        processInstsOfType<IRParameterBlockType>(
+            kIROp_ParameterBlockType,
+            [this](IRParameterBlockType* paramBlockType)
+            { processParameterBlockType(paramBlockType); });
     }
 };
 
@@ -61,9 +105,6 @@ void transformResourceTypesToDescriptorHandles(
     IRModule* module, 
     DiagnosticSink* sink)
 {
-    // Only apply this transformation for Metal targets
-    if (!isMetalTarget(targetProgram->getTargetReq()))
-        return;
 
     ResourceToDescriptorHandleContext context(targetProgram, module, sink);
     context.processModule();
