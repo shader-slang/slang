@@ -452,6 +452,14 @@ public:
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Double)];
     }
+    SLANG_FORCE_INLINE Type* getInt8Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int8)];
+    }
+    SLANG_FORCE_INLINE Type* getInt16Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int16)];
+    }
     SLANG_FORCE_INLINE Type* getIntType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int)];
@@ -464,6 +472,14 @@ public:
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::IntPtr)];
     }
+    SLANG_FORCE_INLINE Type* getUInt8Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt8)];
+    }
+    SLANG_FORCE_INLINE Type* getUInt16Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt16)];
+    }
     SLANG_FORCE_INLINE Type* getUIntType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt)];
@@ -475,6 +491,10 @@ public:
     SLANG_FORCE_INLINE Type* getUIntPtrType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UIntPtr)];
+    }
+    SLANG_FORCE_INLINE Type* getCharType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Char)];
     }
     SLANG_FORCE_INLINE Type* getVoidType()
     {

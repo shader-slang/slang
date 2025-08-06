@@ -6228,6 +6228,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvBuiltInCullPrimitiveEXT,
                         inst);
                 }
+                else if (semanticName == "sv_fragsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragSizeEXT, inst);
+                }
+                else if (semanticName == "sv_fraginvocationcount")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(
+                        inst->getFullType(),
+                        SpvBuiltInFragInvocationCountEXT,
+                        inst);
+                }
                 else if (semanticName == "sv_shadingrate")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentShadingRateKHR);

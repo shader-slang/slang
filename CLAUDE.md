@@ -2,15 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Repository**: shader-slang/slang - A shading language for GPU programming
+**Primary Language**: C++ with custom Slang language
+**MCP Tool Available**: `mcp__deepwiki__ask_question` with repoName: "shader-slang/slang"
+
 Reference other instruction files as well:
-- `.github/copilot-instructions.md`
-- `.github/workflows/claude.yml`
+
+- @.github/copilot-instructions.md
 
 ## Build System and Common Commands
 
 **IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.
 
 ### Building the Project
+
 ```bash
 # Configure with default settings (Ninja Multi-Config)
 cmake --preset default
@@ -22,9 +27,19 @@ cmake.exe --preset vs2022
 # It can take from 5 minutes to 20 minutes depending on the machine.
 cmake --build --preset debug # Debug binary
 cmake --build --preset release # Release binary
+
+# Build specific targets
+cmake --build --preset debug --target slangc
+cmake --build --preset debug --target slang-test
 ```
 
+### PR Workflow
+
+1. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+2. **Include tests**: Add regression tests as `.slang` files under `tests/`
+
 ### Testing
+
 slang-test must run from repository root
 
 ```bash
@@ -39,39 +54,39 @@ slang-test must run from repository root
 ./build/Release/bin/slang-test slang-unit-test-tool/
 ```
 
-Many of the Slang tests requires a GPU to run. However your local environment may not have a GPU. Prefer crafting the
-test that runs on the CPU with `//TEST:COMPARE_COMPUTE(filecheck=CHECK): -cpu -output-using-type`, or with
-`//TEST:INTERPRET(filecheck=CHECK):`. Prefer creating executable tests over compile-only tests, unless the test is to
-check for a specific form of downstream code or diagnostics output.
+**Writing Tests Without GPU**:
 
-When using `slangc` to produce SPIRV, you should set the `SLANG_RUN_SPIRV_VALIDATION` environment variable to `1` to ensure
-that slangc runs SPIRV validation on the generated SPIRV. If you don't see any errors you are good.
-Don't use the system's `spirv-val` tool to validate the SPIRV because it is not up-to-date.
+- Use CPU compute: `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type`
+- Use interpreter: `//TEST:INTERPRET(filecheck=CHECK):`
+- Example test structure in `tests/language-feature/lambda/lambda-0.slang`
 
+**SPIRV Validation**:
+
+- Set `SLANG_RUN_SPIRV_VALIDATION=1` when using `slangc -target spirv`
+- Don't use system's `spirv-val` tool (may be outdated)
 
 ### Slang Command Line Usage
+
 **IMPORTANT:** Slang uses single dashes for multi-character options (not double dashes like most tools):
+
 - Use `-help` (not `--help`)
 - Use `-target spirv` (not `--target spirv`)
 - Use `-dump-ir` (not `--dump-ir`)
 - Use `-stage compute` (not `--stage compute`)
 
 ### AVOID These Debugging Options
+
 **DO NOT USE** these options as they are unmaintained, unreliable or unnecessary:
+
 - slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`, `-dump-ir-ids`, `-serial-ir`, `-dump-repro`, `-load-repro` and `-extract-repro`.
 - slang-test with `-category` and `-api`
-
-### Code Formatting
-```bash
-# Format code before submitting PR
-./extras/formatting.sh --no-version-check --cpp --since HEAD
-```
 
 ## Architecture Overview
 
 ### Core Components
 
 **Compiler Pipeline**:
+
 - **Lexer** (`source/compiler-core/slang-lexer.cpp`): Tokenizes source code
 - **Preprocessor** (`source/slang/slang-preprocessor.cpp`): Handles #include, macros, conditionals
 - **Parser** (`source/slang/slang-parser.cpp`): Recursive descent parser producing AST
@@ -81,6 +96,7 @@ Don't use the system's `spirv-val` tool to validate the SPIRV because it is not 
 - **Code Emission** (`source/slang/slang-emit-*.cpp`): Target-specific code generation
 
 **Key Directories**:
+
 - `source/core/`: Core utilities (strings, containers, file system, platform abstractions)
 - `source/compiler-core/`: Compiler infrastructure (diagnostics, downstream compilers)
 - `source/slang/`: Main compiler implementation (frontend, IR, backend)
@@ -96,12 +112,14 @@ Don't use the system's `spirv-val` tool to validate the SPIRV because it is not 
 ### Compilation Model
 
 **Key Concepts**:
+
 - **CompileRequest**: Bundles options, input files, and code generation requests
 - **TranslationUnit**: Collection of source files (HLSL: one per file, Slang: all files together)
 - **EntryPoint**: Function name + pipeline stage to compile
 - **Target**: Output format (DXIL, SPIR-V, etc.) + capability profile
 
 **Supported Targets**:
+
 - Direct3D 11/12 (HLSL output)
 - Vulkan (SPIR-V, GLSL output)
 - Metal (MSL output) - experimental
@@ -111,17 +129,25 @@ Don't use the system's `spirv-val` tool to validate the SPIRV because it is not 
 
 ## Development Workflow
 
-### Slang internal steps, as an example
-1. Update lexer for new tokens (slang-lexer.cpp)
-2. Extend parser for new syntax (slang-parser.cpp)
-3. Add semantic analysis (slang-check-*.cpp)
-4. Implement IR generation (slang-ir-*.cpp)
-5. Add code generation for each target backend
-6. Write comprehensive tests
+### Adding New Language Features
+
+1. Update lexer for new tokens (`source/compiler-core/slang-lexer.cpp`)
+2. Extend parser for new syntax (`source/slang/slang-parser.cpp`)
+3. Add semantic analysis (`source/slang/slang-check-*.cpp`)
+4. Implement IR generation (`source/slang/slang-ir-*.cpp`)
+5. Add code generation for each target backend (`source/slang/slang-emit-*.cpp`)
+6. Write comprehensive tests under `tests/`
+
+### Common Development Tasks
+
+- **Adding an IR instruction**: Update the Lua definition files in `source/slang/slang-ir-insts.lua`, then regenerate
+- **Adding a built-in function**: Add to appropriate module in `prelude/`
+- **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
 
 ### Debugging tools
 
 #### slangc with `-dump-ir`
+
 slangc with `-dump-ir` option is most efficient way to investigate problems that can be observed at IR level.
 
 It will often require a use of `-target` and the most common combination is `-dump-ir -target spirv-asm`.
@@ -157,6 +183,7 @@ python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang 
 ```
 
 #### slangc with `-target spirv-asm`
+
 slangc with `-target spirv-asm` is the most common way to see how the given slang shader is compiled into spirv code.
 
 When an environment variable, `SLANG_RUN_SPIRV_VALIDATION=1`, is set, it will also run a static SPIRV valdiation.
@@ -166,31 +193,37 @@ When SPIRV validation fails, the actual spirv code is not printed.
 You can skip the validation with the option and print the spirv code even when it fails the validation.
 
 #### slangc with `-target spirv-asm -emit-spirv-via-glsl`
+
 By default, slang uses `-emit-spirv-directly` and slang emits from slang shader to spirv directly.
 When `-emit-spirv-via-glsl` is used, slang will translate the input slang shader to glsl and let glslang to generate spirv code.
 This can be useful when we want to generate a reference spirv code for a comparison.
 
 ### IR System
+
 - Slang uses a custom SSA-based IR (not LLVM)
 - IR instructions defined in `slang-ir-insts.h` (generated from Lua)
 - Extensive IR pass framework for optimization and lowering
 - Target-specific legalization passes before code emission
 
 ### Language Server
+
 - Language Server Protocol implementation in `source/slang/slang-language-server.cpp`
 - Supports IntelliSense, completion, diagnostics, formatting
 - Used by VS Code and Visual Studio extensions
 
 ### Module System
+
 - Slang supports separate compilation via modules
 - Modules can be compiled to IR and linked at runtime
 - Optional obfuscation for distributed modules
 - Core language features defined as modules in `prelude/`
 
 ### Generated files
+
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
 
 ### Git commit message
+
 - Don't mention Claude on the commit message
 
 ## Cross-Platform Considerations
@@ -210,6 +243,7 @@ There is a dedicated repo, https://github.com/shader-slang/spec.git
 If needed, you should clone the repo under `external/` directory.
 
 ### Formal Specification (`external/spec/specification/`)
+
 - `specification/index.bs` - Main specification document
 - `specification/types.md` - Type system specification
 - `specification/generics.md` - Generics and templates specification
@@ -234,7 +268,9 @@ If needed, you should clone the repo under `external/` directory.
 - `specification/visibility.md` - Visibility and access control
 
 ### Feature Proposals (`external/spec/proposals/`)
+
 **Template and Active Proposals:**
+
 - `000-template.md` - Template for new proposals
 - `001-where-clauses.md` - `where` clauses for generic constraints (Partially implemented)
 - `002-type-equality-constraints.md` - Type equality constraints in generics
@@ -264,4 +300,3 @@ If needed, you should clone the repo under `external/` directory.
 - `028-cooperative-matrix-2.md` - Extended cooperative matrix support
 - `029-conditional.md` - Conditional compilation features
 - `030-interface-method-default-impl.md` - Default interface method implementations (In Experiment)
-
