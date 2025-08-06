@@ -7,7 +7,7 @@ standard output = {
         {
             "name": "g_data",
             "bindings": [
-                {"kind": "uniform", "offset": 0, "size": 32},
+                {"kind": "uniform", "offset": 0, "size": 32, "elementStride": 16},
                 {"kind": "shaderResource", "index": 10},
                 {"kind": "unorderedAccess", "index": 100}
             ],
@@ -53,7 +53,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "b",
@@ -61,7 +61,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "int32"
                             },
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
                     ]
                 },
@@ -90,7 +90,7 @@ standard output = {
                 {
                     "name": "g_data",
                     "bindings": [
-                        {"kind": "uniform", "offset": 0, "size": 32},
+                        {"kind": "uniform", "offset": 0, "size": 32, "elementStride": 16},
                         {"kind": "shaderResource", "index": 10, "used": 0},
                         {"kind": "unorderedAccess", "index": 100, "used": 0}
                     ]

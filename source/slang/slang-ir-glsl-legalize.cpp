@@ -391,6 +391,20 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
     SLANG_UNREACHABLE("Unhandled mesh output indices type");
 }
 
+// Hold the in-stack linked list that represents the access chain
+// to the current global varying parameter being created.
+// e.g. if the user code has:
+//    struct Params { in float member; }
+//    void main(in Params inParams);
+// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
+// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
+//
+struct OuterParamInfoLink
+{
+    IRInst* outerParam;
+    OuterParamInfoLink* next;
+};
+
 GLSLSystemValueInfo* getGLSLSystemValueInfo(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -399,7 +413,8 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     Stage stage,
     IRType* type,
     GlobalVaryingDeclarator* declarator,
-    GLSLSystemValueInfo* inStorage)
+    GLSLSystemValueInfo* inStorage,
+    OuterParamInfoLink* outerParamInfo)
 {
     SLANG_UNUSED(codeGenContext);
 
@@ -864,11 +879,26 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
         context->requireGLSLExtension(
             UnownedStringSlice::fromLiteral("GL_EXT_fragment_shader_barycentric"));
+
         name = "gl_BaryCoordEXT";
 
-        // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-        // we ought to use if the `noperspective` modifier has been
-        // applied to this varying input.
+        // Search for nointerpolation keyword to use no-perspective variant of BaryCoord
+        for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
+        {
+            auto outerParam = paramInfo->outerParam;
+            auto decorParent = outerParam;
+            if (auto field = as<IRStructField>(decorParent))
+                decorParent = field->getKey();
+            auto interpolation = decorParent->findDecoration<IRInterpolationModeDecoration>();
+            if (!interpolation || interpolation->getMode() != IRInterpolationMode::NoPerspective)
+                continue;
+            name = "gl_BaryCoordNoPerspEXT";
+            break;
+        }
+
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 3));
     }
     else if (semanticName == "sv_cullprimitive")
     {
@@ -884,6 +914,24 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         {
             name = "gl_PrimitiveShadingRateEXT";
         }
+    }
+    else if (semanticName == "sv_fragsize")
+    {
+        name = "gl_FragSizeEXT";
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_fragment_invocation_density"));
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Int),
+            builder->getIntValue(builder->getIntType(), 2));
+    }
+    else if (semanticName == "sv_fraginvocationcount")
+    {
+        name = "gl_FragInvocationCountEXT";
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
+        context->requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_fragment_invocation_density"));
+        requiredType = builder->getIntType();
     }
     else if (semanticName == "sv_startvertexlocation")
     {
@@ -919,20 +967,6 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         semanticNameSpelling);
     return nullptr;
 }
-
-// Hold the in-stack linked list that represents the access chain
-// to the current global varying parameter being created.
-// e.g. if the user code has:
-//    struct Params { in float member; }
-//    void main(in Params inParams);
-// Then the `outerParamInfo` when we get to `createSimpleGLSLVarying` for `member`
-// will be:  {IRStructField member} -> {IRParam inParams} -> {IRFunc main}.
-//
-struct OuterParamInfoLink
-{
-    IRInst* outerParam;
-    OuterParamInfoLink* next;
-};
 
 void createVarLayoutForLegalizedGlobalParam(
     GLSLLegalizationContext* context,
@@ -1300,7 +1334,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         stage,
         inType,
         declarator,
-        &systemValueInfoStorage);
+        &systemValueInfoStorage,
+        outerParamInfo);
 
     {
 
@@ -2561,6 +2596,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
         // Replace parameter uses with field address
         _param->replaceUsesWith(fieldAddr);
+        _param->removeAndDeallocate();
     }
 }
 
@@ -2578,6 +2614,9 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
 
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
+        auto paramLayout = findVarLayout(param);
+        if (!isVaryingParameter(paramLayout))
+            continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
         {
@@ -2592,7 +2631,6 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         for (auto param : params)
         {
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
@@ -2608,7 +2646,6 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
                 continue;
             }
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(paramLayoutDecoration);
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             handleSingleParam(context, func, param, paramLayout);
         }
@@ -4182,10 +4219,6 @@ void legalizeEntryPointForGLSL(
     {
         for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
-            if (isRayTracingShader)
-            {
-                continue;
-            }
             // Any initialization code we insert for parameters needs
             // to be at the start of the "ordinary" instructions in the block:
             builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());

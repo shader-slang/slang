@@ -502,6 +502,12 @@ convention for interface methods.
     #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+#ifdef SLANG_NO_DEPRECATION
+    #define SLANG_DEPRECATED
+#else
+    #define SLANG_DEPRECATED [[deprecated]]
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -1043,6 +1049,9 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp16,
         DenormalModeFp32,
         DenormalModeFp64,
+
+        // Bitfield options
+        UseMSVCStyleBitfieldPacking, // bool
 
         CountOf,
     };
@@ -3340,6 +3349,16 @@ struct ShaderReflection
             (SlangReflection*)this,
             (SlangReflectionType*)type,
             name);
+    }
+
+    SLANG_DEPRECATED FunctionReflection* tryResolveOverloadedFunction(
+        uint32_t candidateCount,
+        FunctionReflection** candidates)
+    {
+        return (FunctionReflection*)spReflection_TryResolveOverloadedFunction(
+            (SlangReflection*)this,
+            candidateCount,
+            (SlangReflectionFunction**)candidates);
     }
 
     VariableReflection* findVarByNameInType(TypeReflection* type, const char* name)

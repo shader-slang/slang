@@ -1250,7 +1250,8 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                 expr->loc = context.loc;
-                expr->originalExpr = baseExpr;
+                expr->originalExpr = context.originalExpr;
+                expr->baseExpr = baseExpr;
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
@@ -1367,18 +1368,6 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
     bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
 
-    // If both left and right are extern, then they are equal.
-    // If only one of them is extern, then the other one is preferred.
-    // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
-    {
-        return (rigthIsExtern ? 0 : 1);
-    }
-    if (rigthIsExtern)
-    {
-        return (leftIsExtern ? -1 : 0);
-    }
-
     // Prefer declarations that are not in free-form generic extensions, i.e.
     // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
     if (auto leftExt = as<ExtensionDecl>(leftDeclRefParent.getDecl()))
@@ -1393,11 +1382,6 @@ int SemanticsVisitor::CompareLookupResultItems(
         if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
             rightIsFreeFormExtension = true;
     }
-
-    // If one of the candidates is a free-form extension, it is always worse than
-    // a non-free-form extension.
-    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
-        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
@@ -1415,7 +1399,42 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
-        return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+    {
+        // Normally we should always choose the non-Interface candidate, but if one
+        // of the candidate is a free-form extension, this rule doesn't apply, and we
+        // will let free-form extension rule to decide which one is better later.
+        if (!leftIsFreeFormExtension && !rightIsFreeFormExtension)
+        {
+            return (int)(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+        }
+    }
+
+    // If both candidates are generic functions, we cannot decide which one is better if
+    // above two rules cannot resolve them.
+    auto genericsLeft = as<GenericDecl>(left.declRef.getDecl());
+    auto genericsRight = as<GenericDecl>(right.declRef.getDecl());
+    if ((genericsLeft && as<CallableDecl>(genericsLeft->inner)) ||
+        (genericsRight && as<CallableDecl>(genericsRight->inner)))
+    {
+        return 0;
+    }
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
+
+    // If one of the candidates is a free-form extension, it is always worse than
+    // a non-free-form extension.
+    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // Prefer non-extension declarations over extension declarations.
     if (leftIsExtension != rightIsExtension)
@@ -2473,7 +2492,7 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             AddOverloadCandidates(item, context);
         }
@@ -2726,6 +2745,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2734,16 +2754,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
             {
                 Expr* resultExpr = nullptr;
-                DiagnosticSink tempSink(getSourceManager(), nullptr);
                 ConversionCost conversionCost = kConversionCost_None;
-                auto coerceResult = SemanticsVisitor(withSink(&tempSink))
+                auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
                                             typeType->getType(),
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            &tempSink,
+                                            &collectedErrorsSink,
                                             &conversionCost);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
@@ -2962,6 +2981,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
+                // Drain our error sink of "saved errors"
+                if (collectedErrorsSink.getErrorCount())
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
@@ -2975,6 +3004,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     // Nothing at all was found that we could even consider invoking.
     // In all other cases, this is an error.
+    if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
+    {
+        if (overloadExpr->lookupResult2.isValid())
+        {
+            diagnoseAmbiguousReference(funcExpr);
+            return CreateErrorExpr(expr);
+        }
+    }
     getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;
@@ -3105,7 +3142,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             for (auto candidate : context.bestCandidates)
             {
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                overloadedExpr->candidiateExprs.add(candidateExpr);
+                overloadedExpr->candidateExprs.add(candidateExpr);
             }
             return overloadedExpr;
         }

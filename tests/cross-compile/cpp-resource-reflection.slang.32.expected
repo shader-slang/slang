@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "thing3",
-            "binding": {"kind": "uniform", "offset": 0, "size": 4},
+            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -19,7 +19,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "int32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "b",
@@ -27,7 +27,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "c",
@@ -35,12 +35,12 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                         }
                     ]
                 },
                 "containerVarLayout": {
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                 },
                 "elementVarLayout": {
                     "type": {
@@ -53,7 +53,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "int32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "b",
@@ -61,7 +61,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "c",
@@ -69,17 +69,17 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 0}
                 }
             }
         },
         {
             "name": "outputBuffer",
-            "binding": {"kind": "uniform", "offset": 4, "size": 8},
+            "binding": {"kind": "uniform", "offset": 4, "size": 8, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -92,7 +92,7 @@ standard output = {
         },
         {
             "name": "tex",
-            "binding": {"kind": "uniform", "offset": 12, "size": 4},
+            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D"
@@ -100,7 +100,7 @@ standard output = {
         },
         {
             "name": "sampler",
-            "binding": {"kind": "uniform", "offset": 16, "size": 4},
+            "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "samplerState"
             }
@@ -125,7 +125,7 @@ standard output = {
                 },
                 {
                     "name": "thing",
-                    "binding": {"kind": "uniform", "offset": 0, "size": 12},
+                    "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 0},
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
@@ -136,7 +136,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "int32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "b",
@@ -144,7 +144,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "c",
@@ -152,14 +152,14 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                             }
                         ]
                     }
                 },
                 {
                     "name": "thing2",
-                    "binding": {"kind": "uniform", "offset": 12, "size": 12},
+                    "binding": {"kind": "uniform", "offset": 12, "size": 12, "elementStride": 0},
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
@@ -170,7 +170,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "int32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "b",
@@ -178,7 +178,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "c",
@@ -186,7 +186,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                             }
                         ]
                     }

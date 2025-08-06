@@ -190,10 +190,65 @@ typedef size_t NonUniformResourceIndex;
 template<typename T, int ROWS, int COLS>
 struct Matrix;
 
-typedef int1 bool1;
-typedef int2 bool2;
-typedef int3 bool3;
-typedef int4 bool4;
+// Boolean vector types should follow CUDA's builtin vector alignment rules
+// Align boolX the same as charX according to CUDA spec:
+// char1/uchar1: 1-byte aligned, char2/uchar2: 2-byte aligned
+// char3/uchar3: 1-byte aligned, char4/uchar4: 4-byte aligned
+struct __align__(1) bool1
+{
+    bool x;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(2) bool2
+{
+    bool x, y;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(1) bool3
+{
+    bool x, y, z;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(4) bool4
+{
+    bool x, y, z, w;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
 
 #if SLANG_CUDA_RTC
 
@@ -282,6 +337,7 @@ struct __align__(4) __half4
         return ((T*)(&x))[index];                                                     \
     }
 SLANG_VECTOR_GET_ELEMENT(int)
+SLANG_VECTOR_GET_ELEMENT(bool)
 SLANG_VECTOR_GET_ELEMENT(uint)
 SLANG_VECTOR_GET_ELEMENT(short)
 SLANG_VECTOR_GET_ELEMENT(ushort)
@@ -310,6 +366,7 @@ SLANG_VECTOR_GET_ELEMENT(double)
         return ((T*)(x)) + index;                                                            \
     }
 SLANG_VECTOR_GET_ELEMENT_PTR(int)
+SLANG_VECTOR_GET_ELEMENT_PTR(bool)
 SLANG_VECTOR_GET_ELEMENT_PTR(uint)
 SLANG_VECTOR_GET_ELEMENT_PTR(short)
 SLANG_VECTOR_GET_ELEMENT_PTR(ushort)
@@ -334,15 +391,14 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
                 _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
         return result;                                                                        \
     }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
-    {                                                                                \
-        bool##n result;                                                              \
-        for (int i = 0; i < n; i++)                                                  \
-            *_slang_vector_get_element_ptr(&result, i) =                             \
-                (int)(_slang_vector_get_element(thisVal, i)                          \
-                          op _slang_vector_get_element(other, i));                   \
-        return result;                                                               \
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
+    {                                                                                           \
+        bool##n result;                                                                         \
+        for (int i = 0; i < n; i++)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
+        return result;                                                                          \
     }
 #define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
@@ -382,6 +438,7 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
     SLANG_CUDA_VECTOR_INT_OP(T, 4)
 
 SLANG_CUDA_VECTOR_INT_OPS(int)
+SLANG_CUDA_VECTOR_INT_OPS(bool)
 SLANG_CUDA_VECTOR_INT_OPS(uint)
 SLANG_CUDA_VECTOR_INT_OPS(ushort)
 SLANG_CUDA_VECTOR_INT_OPS(short)
@@ -594,6 +651,7 @@ struct GetVectorTypeImpl
     GET_VECTOR_TYPE_IMPL(T, 4)
 
 GET_VECTOR_TYPE_IMPL_N(int)
+GET_VECTOR_TYPE_IMPL_N(bool)
 GET_VECTOR_TYPE_IMPL_N(uint)
 GET_VECTOR_TYPE_IMPL_N(short)
 GET_VECTOR_TYPE_IMPL_N(ushort)
@@ -1039,6 +1097,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
     SLANG_SELECT_IMPL(T, 4)
 
 SLANG_SELECT_T(int)
+SLANG_SELECT_T(bool)
 SLANG_SELECT_T(uint)
 SLANG_SELECT_T(short)
 SLANG_SELECT_T(ushort)
@@ -2081,8 +2140,24 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double U32_asdouble(uint32_t low, uint32_t hi
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
 {
-    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
     return __popc(v);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
+{
+    // __ffs returns 1-based bit position or 0 if no bits set
+    // firstbitlow should return 0-based bit position or ~0u if no bits set
+    return v == 0 ? ~0u : (__ffs(v) - 1);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
+{
+    // maps to hlsl firstbithigh
+    if ((int32_t)v < 0)
+        v = ~v;
+    if (v == 0)
+        return ~0u;
+    return 31 - __clz(v);
 }
 
 // ----------------------------- I32 -----------------------------------------
@@ -2125,6 +2200,16 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
     return U32_countbits(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
+{
+    return U32_firstbitlow(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
+{
+    return U32_firstbithigh(uint32_t(v));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2143,7 +2228,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_max(uint64_t a, uint64_t b)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
 {
-    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
     return __popcll(v);
 }
 
