@@ -1235,7 +1235,8 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     DiagnosticSink* diagSink)
 {
     auto lookupResult = overloadedExpr->lookupResult2;
-    SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
+    if (!lookupResult.isValid() || !lookupResult.isOverloaded())
+        return overloadedExpr;
 
     // Take the lookup result we had, and refine it based on what is expected in context.
     //

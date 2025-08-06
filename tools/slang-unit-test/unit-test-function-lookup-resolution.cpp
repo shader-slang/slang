@@ -27,6 +27,7 @@ SLANG_UNIT_TEST(functionLookupResolution)
         public interface IBase
         {
             public void step(inout float f);
+            public void method(int x) {}
         }
 
         public struct Impl : IBase
@@ -35,6 +36,10 @@ SLANG_UNIT_TEST(functionLookupResolution)
             {
                 f += 1.0f;
             }
+            public override void method(int x) {}
+        }
+        public extension<T : IBase> T {
+            public void method(int x) {}
         }
         )";
 
@@ -64,18 +69,23 @@ SLANG_UNIT_TEST(functionLookupResolution)
     SLANG_CHECK_ABORT(type != nullptr);
 
     auto func = layout->findFunctionByNameInType(type, "step");
-    if (func->isOverloaded())
+    SLANG_CHECK_ABORT(func && !func->isOverloaded());
+
+
+    auto func1 = layout->findFunctionByNameInType(type, "method");
+    SLANG_CHECK_ABORT(func1->isOverloaded());
+    SLANG_CHECK(func1->getOverloadCount() == 3);
+    if (func1->isOverloaded())
     {
         List<slang::FunctionReflection*> candidates;
-        for (uint32_t i = 0; i < func->getOverloadCount(); i++)
+        for (uint32_t i = 0; i < func1->getOverloadCount(); i++)
         {
-            candidates.add(func->getOverload(i));
+            candidates.add(func1->getOverload(i));
         }
-        func = layout->tryResolveOverloadedFunction(
+        func1 = layout->tryResolveOverloadedFunction(
             (uint32_t)candidates.getCount(),
             candidates.getBuffer());
     }
-    SLANG_CHECK_ABORT(!func->isOverloaded());
-
-    SLANG_CHECK(String(func->getName()) == "step");
+    SLANG_CHECK(!func1->isOverloaded());
+    SLANG_CHECK(String(func1->getName()) == "method");
 }

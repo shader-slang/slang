@@ -936,9 +936,14 @@ Expr* ComponentType::findDeclFromStringInType(
                 }
                 AddToLookupResult(filteredResult, candidate);
             }
+            if (filteredResult.isValid() && !filteredResult.isOverloaded())
+            {
+                // If there are exactly one candidate after filtering, we can
+                // safely return resolved expr.
+                return visitor.maybeResolveOverloadedExpr(checkedTerm, mask, nullptr);
+            }
             overloadedExpr->lookupResult2 = filteredResult;
         }
-
         return overloadedExpr;
     }
     if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
