@@ -1510,6 +1510,12 @@ DIAGNOSTIC(
     constGlobalVarWithInitRequiresStatic,
     "global const variable with initializer must be declared static: '$0'")
 
+DIAGNOSTIC(
+    31225,
+    Error,
+    staticConstVariableRequiresInitializer,
+    "static const variable '$0' must have an initializer")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")

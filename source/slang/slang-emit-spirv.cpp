@@ -6211,11 +6211,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    auto interpolationModeDecor =
+                        inst->findDecoration<IRInterpolationModeDecoration>();
+                    if (interpolationModeDecor &&
+                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordNoPerspKHR,
+                            inst);
+                    }
+                    else
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordKHR,
+                            inst);
+                    }
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
@@ -6224,6 +6237,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return getBuiltinGlobalVar(
                         inst->getFullType(),
                         SpvBuiltInCullPrimitiveEXT,
+                        inst);
+                }
+                else if (semanticName == "sv_fragsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragSizeEXT, inst);
+                }
+                else if (semanticName == "sv_fraginvocationcount")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(
+                        inst->getFullType(),
+                        SpvBuiltInFragInvocationCountEXT,
                         inst);
                 }
                 else if (semanticName == "sv_shadingrate")

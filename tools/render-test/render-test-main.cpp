@@ -4,6 +4,7 @@
 
 #include "../../source/core/slang-test-tool-util.h"
 #include "../source/core/slang-io.h"
+#include "../source/core/slang-std-writers.h"
 #include "../source/core/slang-string-util.h"
 #include "core/slang-token-reader.h"
 #include "options.h"
@@ -1322,23 +1323,6 @@ static void renderDocBeginFrame() {}
 static void renderDocEndFrame() {}
 #endif
 
-class StdWritersDebugCallback : public rhi::IDebugCallback
-{
-public:
-    Slang::StdWriters* writers;
-    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
-        rhi::DebugMessageType type,
-        rhi::DebugMessageSource source,
-        const char* message) override
-    {
-        SLANG_UNUSED(source);
-        if (type == rhi::DebugMessageType::Error)
-        {
-            writers->getOut().print("%s\n", message);
-        }
-    }
-};
-
 static SlangResult _innerMain(
     Slang::StdWriters* stdWriters,
     SlangSession* session,
@@ -1456,8 +1440,8 @@ static SlangResult _innerMain(
         }
     }
 
-    StdWritersDebugCallback debugCallback;
-    debugCallback.writers = stdWriters;
+    renderer_test::CoreToRHIDebugBridge debugCallback;
+    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;

@@ -354,7 +354,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
-    diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+    if (getSink())
+        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
@@ -389,7 +390,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             auto expr = m_astBuilder->create<StaticMemberExpr>();
             expr->loc = loc;
             expr->type = type;
-            if (!isDeclUsableAsStaticMember(declRef.getDecl()))
+            if (getSink() && !isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
                     loc,
@@ -1234,7 +1235,8 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     DiagnosticSink* diagSink)
 {
     auto lookupResult = overloadedExpr->lookupResult2;
-    SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
+    if (!lookupResult.isValid() || !lookupResult.isOverloaded())
+        return overloadedExpr;
 
     // Take the lookup result we had, and refine it based on what is expected in context.
     //
@@ -3848,7 +3850,7 @@ static Expr* _checkHigherOrderInvokeExpr(
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -3857,12 +3859,12 @@ static Expr* _checkHigherOrderInvokeExpr(
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
     {
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, item);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -5202,7 +5204,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
     }
     else if (auto overloaded2 = as<OverloadedExpr2>(baseExpression))
     {
-        for (auto candidate : overloaded2->candidiateExprs)
+        for (auto candidate : overloaded2->candidateExprs)
         {
             handleLeafExpr(candidate);
         }

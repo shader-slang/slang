@@ -154,6 +154,59 @@ struct MatrixTypeLoweringContext
         return builder.emitMakeArray(arrayType, rowVectors.getCount(), rowVectors.getBuffer());
     }
 
+    IRInst* legalizeMakeMatrixFromScalar(IRInst* inst)
+    {
+        auto matrixType = as<IRMatrixType>(inst->getDataType());
+
+        SLANG_ASSERT(matrixType && "Matrix type is expected");
+        SLANG_ASSERT(
+            shouldLowerMatrixType(matrixType) && "Matrix type is expected to need legalization");
+
+        // Lower makeMatrixFromScalar to makeArray of makeVectors from scalar
+        auto elementType = matrixType->getElementType();
+        auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+        auto columnCount = as<IRIntLit>(matrixType->getColumnCount());
+
+        SLANG_ASSERT(
+            rowCount && columnCount &&
+            "Matrix dimensions must be compile-time constants for lowering");
+
+        SLANG_ASSERT(
+            inst->getOperandCount() == 1 && "makeMatrixFromScalar should have exactly one operand");
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        // Get the scalar operand
+        auto scalarOperand = getReplacement(inst->getOperand(0));
+
+        // Create vector type for rows: vector<T, C>
+        auto vectorType = builder.getVectorType(elementType, columnCount);
+
+        // Create array type: vector<T, C>[R]
+        auto arrayType = builder.getArrayType(vectorType, rowCount);
+
+        // Create a vector from the scalar (replicated C times)
+        List<IRInst*> vectorElements;
+        for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
+        {
+            vectorElements.add(scalarOperand);
+        }
+        auto rowVector = builder.emitMakeVector(vectorType, vectorElements);
+
+        // Create array with R copies of the same vector
+        List<IRInst*> rowVectors;
+        for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
+        {
+            rowVectors.add(rowVector);
+        }
+
+        SLANG_ASSERT(
+            rowVectors.getCount() == rowCount->getValue() &&
+            "Row vectors count must match matrix row count");
+        return builder.emitMakeArray(arrayType, rowVectors.getCount(), rowVectors.getBuffer());
+    }
+
     IRInst* legalizeMatrixMatrixBinaryOperation(
         IRBuilder& builder,
         IRInst* legalizedA,
@@ -450,6 +503,8 @@ struct MatrixTypeLoweringContext
         {
         case kIROp_MakeMatrix:
             return legalizeMakeMatrix(inst);
+        case kIROp_MakeMatrixFromScalar:
+            return legalizeMakeMatrixFromScalar(inst);
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
