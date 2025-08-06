@@ -114,8 +114,11 @@ jobs:
           else
             BASE=HEAD^1
           fi
-          if git diff --name-only -z $BASE...HEAD | 
-            grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+          # Check if git diff succeeds and capture the result
+          if ! git diff --name-only -z $BASE...HEAD > /tmp/changed_files 2>/dev/null; then
+            echo "Git diff failed, conservatively running all tests"
+            echo "should-run=true" >> $GITHUB_OUTPUT
+          elif cat /tmp/changed_files | grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
             echo "should-run=true" >> $GITHUB_OUTPUT
           else
             echo "Only documentation files changed, skipping remaining steps"
