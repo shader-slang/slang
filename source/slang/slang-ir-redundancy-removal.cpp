@@ -369,7 +369,7 @@ bool canRootAddrBeChanged(IRInst* rootVar)
         return false;
 
     auto ptr = as<IRConstRefType>(rootVar->getDataType());
-    if(!ptr)
+    if (!ptr)
         return true;
 
     // Only a UserPointer can potentially be modified and changed to point to a different address
@@ -377,7 +377,7 @@ bool canRootAddrBeChanged(IRInst* rootVar)
     auto addrSpace = ptr->getAddressSpace();
     if (addrSpace == AddressSpace::UserPointer)
         return true;
-    
+
     return false;
 }
 
