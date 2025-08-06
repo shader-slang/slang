@@ -363,7 +363,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
 
 // Checks if we can change or have a modified rootVar
 // at some point.
-bool canRootAddrBeChanged(IRInst* rootVar)
+bool isExternallyModifiableAddr(IRInst* rootVar)
 {
     if (!rootVar)
         return false;
@@ -429,7 +429,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {
                 auto rootAddr = getRootAddr(getElementPtr);
-                if (!canRootAddrBeChanged(rootAddr))
+                if (!isExternallyModifiableAddr(rootAddr))
                 {
 
                     // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
@@ -461,7 +461,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             else if (auto fieldAddress = as<IRFieldAddress>(inst))
             {
                 auto rootAddr = getRootAddr(fieldAddress);
-                if (!canRootAddrBeChanged(rootAddr))
+                if (!isExternallyModifiableAddr(rootAddr))
                 {
 
                     // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
