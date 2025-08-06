@@ -1716,7 +1716,8 @@ Result linkAndOptimizeIR(
         // pointers
         undoParameterCopy(irModule);
         // Transform struct parameters to use ConstRef for better performance
-        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) || isMetalTarget(targetRequest))
+        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
+            isMetalTarget(targetRequest))
         {
             transformParamsToConstRef(irModule, codeGenContext->getSink());
         }
