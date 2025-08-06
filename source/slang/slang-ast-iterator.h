@@ -181,7 +181,7 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
-            for (auto candidate : expr->candidiateExprs)
+            for (auto candidate : expr->candidateExprs)
             {
                 dispatchIfNotNull(candidate);
             }

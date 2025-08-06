@@ -264,6 +264,7 @@ public:
     Type* getTypeFromString(String const& typeStr, DiagnosticSink* sink);
 
     Expr* findDeclFromString(String const& name, DiagnosticSink* sink);
+    Expr* tryResolveOverloadedExpr(Expr* exprIn);
 
     Expr* findDeclFromStringInType(
         Type* type,
