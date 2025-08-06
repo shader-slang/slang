@@ -2,7 +2,7 @@
 
 // Basic test for `GetAttributeAtVertex` function
 
-//TEST:SIMPLE(filecheck=CHECK-SPIRV):-emit-spirv-directly -target spirv -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
+//TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 //TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 
 // CHECK-SPIRV: OpCapability FragmentBarycentricKHR

@@ -884,25 +884,27 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // Look for interpolation mode decoration in the param chain
         for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
         {
-            if (paramInfo->outerParam)
+            if (!paramInfo->outerParam)
+                continue;
+            for (auto dd : paramInfo->outerParam->getDecorations())
             {
-                for (auto dd : paramInfo->outerParam->getDecorations())
+                auto decoration = as<IRInterpolationModeDecoration>(dd);
+                if (!decoration)
+                    continue;
+                if (decoration->getMode() == IRInterpolationMode::NoPerspective)
                 {
-                    if (dd->getOp() == kIROp_InterpolationModeDecoration)
-                    {
-                        auto decoration = (IRInterpolationModeDecoration*)dd;
-                        if (decoration->getMode() == IRInterpolationMode::NoPerspective)
-                        {
-                            hasNoPerspective = true;
-                            break;
-                        }
-                    }
-                }
-                if (hasNoPerspective)
+                    hasNoPerspective = true;
                     break;
+                }
             }
+            if (hasNoPerspective)
+                break;
         }
         name = hasNoPerspective ? "gl_BaryCoordNoPerspEXT" : "gl_BaryCoordEXT";
+
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 3));
     }
     else if (semanticName == "sv_cullprimitive")
     {
