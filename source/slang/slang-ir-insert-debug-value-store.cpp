@@ -154,43 +154,46 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             //
             // We are going to emit the debug-variable explicitly for each member
             // of the entry point param if its type is a struct.
-            // 
-        if (auto structType = as<IRStructType>(paramType))
-        {
-            for (auto field : structType->getFields())
+            //
+            if (auto structType = as<IRStructType>(paramType))
             {
-                auto fieldType = field->getFieldType();
-                if (!isDebuggableType(fieldType))
-                    continue;
-                
-                // Create debug var for struct member with naming like "input.pos"
-                auto memberDebugVar = builder.emitDebugVar(
-                    fieldType,
-                    funcDebugLoc->getSource(),
-                    funcDebugLoc->getLine(),
-                    funcDebugLoc->getCol());
-                
-                // Set name hint combining parameter and field names
-                if (auto paramNameHint = param->findDecoration<IRNameHintDecoration>())
+                for (auto field : structType->getFields())
                 {
-                    if (auto fieldNameHint = field->getKey()->findDecoration<IRNameHintDecoration>())
+                    auto fieldType = field->getFieldType();
+                    if (!isDebuggableType(fieldType))
+                        continue;
+
+                    // Create debug var for struct member with naming like "input.pos"
+                    auto memberDebugVar = builder.emitDebugVar(
+                        fieldType,
+                        funcDebugLoc->getSource(),
+                        funcDebugLoc->getLine(),
+                        funcDebugLoc->getCol());
+
+                    // Set name hint combining parameter and field names
+                    if (auto paramNameHint = param->findDecoration<IRNameHintDecoration>())
                     {
-                        String memberName = paramNameHint->getName();
-                        memberName.append(".");
-                        memberName.append(fieldNameHint->getName());
-                        builder.addNameHintDecoration(memberDebugVar, memberName.getUnownedSlice());
+                        if (auto fieldNameHint =
+                                field->getKey()->findDecoration<IRNameHintDecoration>())
+                        {
+                            String memberName = paramNameHint->getName();
+                            memberName.append(".");
+                            memberName.append(fieldNameHint->getName());
+                            builder.addNameHintDecoration(
+                                memberDebugVar,
+                                memberName.getUnownedSlice());
+                        }
+                    }
+
+                    // Store the member debug var for later use
+                    // We'll emit DebugValue for it when we have the field value
+                    if (paramVal)
+                    {
+                        auto fieldVal = builder.emitFieldExtract(paramVal, field->getKey());
+                        builder.emitDebugValue(memberDebugVar, fieldVal);
                     }
                 }
-                
-                // Store the member debug var for later use
-                // We'll emit DebugValue for it when we have the field value
-                if (paramVal)
-                {
-                    auto fieldVal = builder.emitFieldExtract(paramVal, field->getKey());
-                    builder.emitDebugValue(memberDebugVar, fieldVal);
-                }
             }
-        }
         }
         if (paramVal)
         {
