@@ -3,11 +3,11 @@
 # It prints information about breaking-changes first and the rest.
 # The content is mostly based on `git log --oneline --since 202X-YY-ZZ`.
 
-# Usage: the script takes one command-line argument that will be used on '-since' option of git command.
-# As an example, you can run a script with a following command, and it will print commit titles between today and 2024-07-01.
-# ```
-# docs/scripts/release-note.sh 2024-07-01
-# ```
+# Usage: the script takes command-line arguments to specify the range of commits to include.
+# You can use either:
+# 1. Date-based range with --since: docs/scripts/release-note.sh --since 2025-08-06
+# 2. Hash-based range with --previous-release-hash: docs/scripts/release-note.sh --previous-release-hash abc123
+# 3. Legacy positional argument (deprecated): docs/scripts/release-note.sh 2024-07-01
 
 # This script is supposed to work on all Windows based shell systems including WSL and git-bash.
 # If you make any modifications, please test them, because CI doesn't test this script.
@@ -16,27 +16,79 @@ verbose=true
 $verbose && echo "Reminder: PLEASE make sure your local repo is up-to-date before running the script." >&2
 
 gh=""
-for candidate in "$(which gh.exe)" "/mnt/c/Program Files/GitHub CLI/gh.exe" "/c/Program Files/GitHub CLI/gh.exe" "/cygdrive/c/Program Files/GitHub CLI/gh.exe"; do
+for candidate in \
+  "$(which gh)" \
+  "$(which gh.exe)" \
+  "/mnt/c/Program Files/GitHub CLI/gh.exe" \
+  "/c/Program Files/GitHub CLI/gh.exe" \
+  "/cygdrive/c/Program Files/GitHub CLI/gh.exe"; do
   if [ -x "$candidate" ]; then
     gh="$candidate"
     break
   fi
 done
 if [ "x$gh" = "x" ] || ! [ -x "$gh" ]; then
-  echo "File not found: gh.exe"
-  echo "gh.exe can be downloaded from https://cli.github.com"
+  echo "File not found: gh or gh.exe"
+  echo "GitHub CLI can be downloaded from https://cli.github.com"
   exit 1
 fi
-$verbose && echo "gh.exe is found from: $gh" >&2
+$verbose && echo "gh is found from: $gh" >&2
 
-if [ "x$1" = "x" ]; then
-  echo "This script requires 'since' information for git-log command."
-  echo "Usage: $0 2024-07-30"
+# Parse command-line arguments
+use_hash=false
+since=""
+previous_hash=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --since)
+      since="$2"
+      use_hash=false
+      shift 2
+      ;;
+    --previous-release-hash)
+      previous_hash="$2"
+      use_hash=true
+      shift 2
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--since DATE | --previous-release-hash HASH]"
+      echo "  --since DATE                    Generate notes since the given date (e.g., 2025-08-06)"
+      echo "  --previous-release-hash HASH    Generate notes since the given commit hash"
+      exit 1
+      ;;
+    *)
+      # Legacy positional argument support
+      if [ "x$since" = "x" ] && [ "x$previous_hash" = "x" ]; then
+        since="$1"
+        use_hash=false
+      else
+        echo "Too many arguments or mixed argument styles"
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Validate arguments
+if [ "x$since" = "x" ] && [ "x$previous_hash" = "x" ]; then
+  echo "This script requires either --since or --previous-release-hash option."
+  echo "Usage: $0 [--since DATE | --previous-release-hash HASH]"
+  echo "  --since DATE                    Generate notes since the given date (e.g., 2025-08-06)"
+  echo "  --previous-release-hash HASH    Generate notes since the given commit hash"
+  echo ""
+  echo "Legacy usage (deprecated): $0 DATE"
   exit 1
 fi
-since="$1"
 
-commits="$(git log --oneline --since $since)"
+# Get commits based on the specified range
+if [ "$use_hash" = true ]; then
+  commits="$(git log --oneline $previous_hash..HEAD)"
+else
+  commits="$(git log --oneline --since $since)"
+fi
 commitsCount="$(echo "$commits" | wc -l)"
 
 echo "=== Breaking changes ==="
