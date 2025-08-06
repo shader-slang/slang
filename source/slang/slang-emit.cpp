@@ -442,6 +442,10 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_PtrType:
+        if (as<IRPtrType>(inst)->getAccessQualifier() == AccessQualifier::Read)
+            result.validateReadOnlyPtr = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1068,6 +1072,11 @@ Result linkAndOptimizeIR(
         default:
             break;
         }
+    }
+
+    if (requiredLoweringPassSet.validateReadOnlyPtr)
+    {
+        validatePointerAccess(sink, irModule->getModuleInst());
     }
 
     switch (target)
