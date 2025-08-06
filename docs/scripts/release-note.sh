@@ -6,7 +6,7 @@
 # Usage: the script takes command-line arguments to specify the range of commits to include.
 # You can use either:
 # 1. Date-based range with --since: docs/scripts/release-note.sh --since 2025-08-06
-# 2. Hash-based range with --previous-release-hash: docs/scripts/release-note.sh --previous-release-hash abc123
+# 2. Hash-based range with --previous-hash: docs/scripts/release-note.sh --previous-hash abc123
 # 3. Legacy positional argument (deprecated): docs/scripts/release-note.sh 2024-07-01
 
 # This script is supposed to work on all Windows based shell systems including WSL and git-bash.
@@ -50,16 +50,16 @@ do
       use_hash=false
       shift 2
       ;;
-    --previous-release-hash)
+    --previous-hash)
       previous_hash="$2"
       use_hash=true
       shift 2
       ;;
     -*)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--since DATE | --previous-release-hash HASH]"
-      echo "  --since DATE                    Generate notes since the given date (e.g., 2025-08-06)"
-      echo "  --previous-release-hash HASH    Generate notes since the given commit hash"
+      echo "Usage: $0 [--since DATE | --previous-hash HASH]"
+      echo "  --since DATE          Generate notes since the given date (e.g., 2025-08-06)"
+      echo "  --previous-hash HASH  Generate notes since the given commit hash"
       exit 1
       ;;
     *)
@@ -80,10 +80,10 @@ done
 # Validate arguments
 if [ "$since" = "" ] && [ "$previous_hash" = "" ]
 then
-  echo "This script requires either --since or --previous-release-hash option."
-  echo "Usage: $0 [--since DATE | --previous-release-hash HASH]"
-  echo "  --since DATE                    Generate notes since the given date (e.g., 2025-08-06)"
-  echo "  --previous-release-hash HASH    Generate notes since the given commit hash"
+  echo "This script requires either --since or --previous-hash option."
+  echo "Usage: $0 [--since DATE | --previous-hash HASH]"
+  echo "  --since DATE          Generate notes since the given date (e.g., 2025-08-06)"
+  echo "  --previous-hash HASH  Generate notes since the given commit hash"
   echo ""
   echo "Legacy usage (deprecated): $0 DATE"
   exit 1
