@@ -579,17 +579,57 @@ int invalidTest()
 
 Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
+### Pointer Access
+
+Pointers can be specified with an `Access` qualifier: `Ptr<T, Access::Read>`.
+A pointer specified as `Access::Read` cannot be read from. A pointer specified as `Access::ReadWrite` can be read/written to. 
+
+By default, `T*` and `Ptr<T>` are both `Access::ReadWrite`.
+
+```C#
+RWStructuredBuffer<int> buffer;
+
+typealias ReadPtr = Ptr<int, Access::Read>;
+[numthreads(1, 1, 1)]
+void computeMain(int id : SV_DispatchThreadID)
+{
+    ReadPtr ptrReadOnly = ReadPtr(&buffer[0]);
+    Ptr<int> ptrReadWrite = Ptr<int, Access::ReadWrite>(&buffer[0]);
+    output[0] = ptrReadOnly[0] // error: cannot read from a `Access::Read` pointer
+    output[1] = ptrReadWrite[0] // allowed
+}
+```
+
+### Coherent Operations
+
+Slang supports coherence to specific memory-scopes on a per operation basis when working with pointers.
+To use coherent operations, `vk_mem_model` is required.
+
+Textures are not currently supported.
+
+```c#
+RWStructuredBuffer<int> outputBuffer;
+groupshared int[32] shared;
+
+[numthreads(1, 1, 1)]
+void computeMain(uint3 group_thread_id: SV_GroupThreadID)
+{
+    Ptr<int> ptr = &shared[0];
+    coherentStore(ptr, 0, 4, MemoryScope::Workgroup);
+    GroupMemoryBarrierWithGroupSync();
+    outputBuffer[0] = coherentLoad(ptr, 4, MemoryScope::Workgroup);
+}
+```
+
 ### Limitations
 
-- Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
+- Slang supports pointers to global memory and shared-memory, but not local memory. For example, it is invalid to define a pointer to a local variable.
 
 - Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
 - Slang can produce pointers using the & operator from data in global memory.
 
 - Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
-
-- Slang doesn't support coherent load/stores.
 
 - Slang doesn't support custom alignment specification.
 
