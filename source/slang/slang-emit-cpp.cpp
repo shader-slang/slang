@@ -307,6 +307,25 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
     case kIROp_PtrType:
     case kIROp_ConstRefType:
         {
+            // Special note on `constref` types and why they are not emitted
+            // as a `const` pointer:
+            //
+            // We currently do not propegate/manage "constness" for locals.
+            // This is important since it means that we rely on opimization
+            // passes to remove all temporary pointer-variables created from
+            // our constref, otherwise we will generate invalid code like
+            // `T* var = const_ptr` or `T* var = &const_ptr->member`.
+            //
+            // If emitting `constref` fails due to this error, it is likely
+            // a missing compiler-optimization.
+            //
+            // Additionally, for C++/CUDA, downstream methods are required
+            // to be `const` if we want to use const pointers. This is currently
+            // not handled robustly.
+            //
+            // Due to these cascading issues, we do not emit const and instead
+            // emit as a regular pointer for the time being.
+
             auto elementType = (IRType*)type->getOperand(0);
             SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
             out << "*";
@@ -599,37 +618,7 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc)
 
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
-    // Handle ConstRef types specially for C++/CUDA targets
-    if (auto constRefType = as<IRConstRefType>(type))
-    {
-        auto valueType = constRefType->getValueType();
-
-        // Note:
-        // We currently do not propegate/manage "constness" for locals.
-        // This is important since it means that we rely on opimization
-        // passes to remove all temporary pointer-variables created from
-        // our constref, otherwise we will generate invalid code like
-        // `T* var = const_ptr` or `T* var = &const_ptr->member`.
-        //
-        // If emitting `constref` fails due to this error, it is likely
-        // a missing compiler-optimization.
-        //
-        // Additionally, for C++/CUDA, downstream methods also are required
-        // to be `const` if we want to use const pointers. This is also not
-        // handled robustly.
-        //
-        // Due to this cascading issues, we do not emit const.
-        emitType(valueType);
-        m_writer->emit(" *");
-        if (name.getLength() > 0)
-        {
-            m_writer->emit(" ");
-            m_writer->emit(name);
-        }
-        return;
-    }
-
-    // For all other types, use the CPP-specific emitType implementation
+    // For use the CPP-specific emitType implementation
     emitType(type, name);
 }
 
