@@ -20,6 +20,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-emit-torch.h"
 #include "slang-emit-vm.h"
+#include "slang-ir-transform-to-descriptor-handles.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-autodiff.h"
@@ -1315,6 +1316,12 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
+        // For Metal targets, transform resource types to descriptor handles first
+        if (isMetalTarget(targetRequest))
+        {
+            transformResourceTypesToDescriptorHandles(targetProgram, irModule, sink);
+        }
+        
         legalizeResourceTypes(targetProgram, irModule, sink);
 
         // We also need to legalize empty types for Metal targets.
