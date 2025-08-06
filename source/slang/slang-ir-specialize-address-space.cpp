@@ -308,7 +308,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                         if (ptrType->hasAddressSpace())
                         {
-                             mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
+                            mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
                             continue;
                         }
                     }

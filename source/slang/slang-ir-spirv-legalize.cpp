@@ -965,7 +965,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             // If we reach here, we need to allocate a temp var.
-            auto tempVar = builder.emitVar(ptrType->getValueType());
+            auto tempVar = builder.emitVar(ptrType->getValueType(), AddressSpace::Function);
             auto load = builder.emitLoad(arg);
             builder.emitStore(tempVar, load);
             newArgs.add(tempVar);
@@ -1870,10 +1870,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     auto debugValue = as<IRDebugValue>(inst);
                     auto debugVar = debugValue->getDebugVar();
                     auto value = debugValue->getValue();
-                    if (auto valueDataTypePtr = as<IRPtrTypeBase>(value->getDataType()))
+                    if (as<IRPtrTypeBase>(value->getDataType()))
                     {
-                        if (auto debugVarDataTypePtr =
-                                as<IRPtrTypeBase>(debugVar->getDataType()))
+                        if (as<IRPtrTypeBase>(debugVar->getDataType()))
                         {
                             // Ensure they both have the same type (in-case we changed addr-space)
                             debugVar->setFullType(

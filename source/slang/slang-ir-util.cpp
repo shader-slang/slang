@@ -280,6 +280,7 @@ bool isSimpleDataType(IRType* type)
             // must specify what is a "simple" typed pointer.
             switch (addrSpace)
             {
+            case AddressSpace::Generic:
             case AddressSpace::ThreadLocal:
             case AddressSpace::Global:
             case AddressSpace::GroupShared:
