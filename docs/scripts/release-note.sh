@@ -21,13 +21,16 @@ for candidate in \
   "$(which gh.exe)" \
   "/mnt/c/Program Files/GitHub CLI/gh.exe" \
   "/c/Program Files/GitHub CLI/gh.exe" \
-  "/cygdrive/c/Program Files/GitHub CLI/gh.exe"; do
-  if [ -x "$candidate" ]; then
+  "/cygdrive/c/Program Files/GitHub CLI/gh.exe"
+do
+  if [ -x "$candidate" ]
+  then
     gh="$candidate"
     break
   fi
 done
-if [ "x$gh" = "x" ] || ! [ -x "$gh" ]; then
+if [ "$gh" = "" ] || ! [ -x "$gh" ]
+then
   echo "File not found: gh or gh.exe"
   echo "GitHub CLI can be downloaded from https://cli.github.com"
   exit 1
@@ -39,7 +42,8 @@ use_hash=false
 since=""
 previous_hash=""
 
-while [[ $# -gt 0 ]]; do
+while [[ $# -gt 0 ]]
+do
   case $1 in
     --since)
       since="$2"
@@ -60,7 +64,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       # Legacy positional argument support
-      if [ "x$since" = "x" ] && [ "x$previous_hash" = "x" ]; then
+      if [ "$since" = "" ] && [ "$previous_hash" = "" ]
+      then
         since="$1"
         use_hash=false
       else
@@ -73,7 +78,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate arguments
-if [ "x$since" = "x" ] && [ "x$previous_hash" = "x" ]; then
+if [ "$since" = "" ] && [ "$previous_hash" = "" ]
+then
   echo "This script requires either --since or --previous-release-hash option."
   echo "Usage: $0 [--since DATE | --previous-release-hash HASH]"
   echo "  --since DATE                    Generate notes since the given date (e.g., 2025-08-06)"
@@ -84,28 +90,32 @@ if [ "x$since" = "x" ] && [ "x$previous_hash" = "x" ]; then
 fi
 
 # Get commits based on the specified range
-if [ "$use_hash" = true ]; then
-  commits="$(git log --oneline $previous_hash..HEAD)"
+if [ "$use_hash" = true ]
+then
+  commits="$(git log --oneline "$previous_hash"..HEAD)"
 else
-  commits="$(git log --oneline --since $since)"
+  commits="$(git log --oneline --since "$since")"
 fi
 commitsCount="$(echo "$commits" | wc -l)"
 
 echo "=== Breaking changes ==="
 breakingChanges=""
-for i in $(seq $commitsCount); do
-  line="$(echo "$commits" | head -$i | tail -1)"
+for i in $(seq "$commitsCount")
+do
+  line="$(echo "$commits" | head -n "$i" | tail -1)"
 
   # Get PR number from the git commit title
   pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
-  [ "x$pr" = "x" ] && continue
+  [ "$pr" = "" ] && continue
 
   # Check if the PR is marked as a breaking change
-  if "$gh" issue view $pr --json labels | grep -q 'pr: breaking change'; then
+  if "$gh" issue view "$pr" --json labels | grep -q 'pr: breaking change'
+  then
     breakingChanges+="$line"
   fi
 done
-if [ "x$breakingChanges" = "x" ]; then
+if [ "$breakingChanges" = "" ]
+then
   echo "No breaking changes"
 else
   echo "$breakingChanges"
@@ -113,19 +123,20 @@ fi
 echo ""
 
 echo "=== All changes for this release ==="
-for i in $(seq $commitsCount); do
-  line="$(echo "$commits" | head -$i | tail -1)"
+for i in $(seq "$commitsCount")
+do
+  line="$(echo "$commits" | head -n "$i" | tail -1)"
 
   result="$line"
-  for dummy in 1; do
-    # Get PR number from the git commit title
-    pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
-    [ "x$pr" = "x" ] && break
-
+  # Get PR number from the git commit title
+  pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
+  if [ "$pr" != "" ]
+  then
     # Mark breaking changes with "[BREAKING]"
-    if "$gh" issue view $pr --json labels | grep -q 'pr: breaking change'; then
+    if "$gh" issue view "$pr" --json labels | grep -q 'pr: breaking change'
+    then
       result="[BREAKING] $line"
     fi
-  done
+  fi
   echo "$result"
 done
