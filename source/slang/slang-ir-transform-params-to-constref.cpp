@@ -126,7 +126,7 @@ struct TransformParamsToConstRefContext
                     newArgs.add(arg);
                     continue;
                 }
-                
+
                 auto tempVar = builder.emitVar(arg->getFullType());
                 builder.emitStore(tempVar, arg);
                 newArgs.add(tempVar);
@@ -145,7 +145,7 @@ struct TransformParamsToConstRefContext
         // Skip functions without definitions
         if (!func->isDefinition())
             return false;
-        
+
         // Skip if we find any of these decorations
         for (auto decoration : func->getDecorations())
         {
@@ -157,9 +157,8 @@ struct TransformParamsToConstRefContext
 
             // Skip entry-point and pseudo-entry-point functions
             // since we cannot legalize the input parameters.
-            if (as<IREntryPointDecoration>(decoration)
-                || as<IRCudaKernelDecoration>(decoration)
-                || as<IRAutoPyBindCudaDecoration>(decoration))
+            if (as<IREntryPointDecoration>(decoration) || as<IRCudaKernelDecoration>(decoration) ||
+                as<IRAutoPyBindCudaDecoration>(decoration))
                 return false;
         }
 
@@ -244,7 +243,7 @@ struct TransformParamsToConstRefContext
                 auto callee = as<IRFunc>(call->getCallee());
                 if (!callee)
                     continue;
-                
+
                 addFuncsToCallListInTopologicalOrder(callee, functionsToProcess, visitedCandidates);
             }
         }
@@ -258,7 +257,7 @@ struct TransformParamsToConstRefContext
     {
         // Collect all functions that need processing.
         // Process all callee's before callers; otherwise we introduce bugs
-        
+
         HashSet<IRFunc*> visitedCandidates;
         List<IRFunc*> functionsToProcess;
         for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
