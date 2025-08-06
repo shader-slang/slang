@@ -3851,7 +3851,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
-    bool isLegalType(IRInst* type)
+    bool isLegalDebugType(IRInst* type)
     {
         switch (type->getOp())
         {
@@ -3865,8 +3865,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return true;
         case kIROp_PtrType:
             return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer ||
-                   as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::Function ||
-                    as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
+                as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
         default:
             if (as<IRBasicType>(type))
                 return true;
@@ -3884,7 +3883,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
 
-        if (!isLegalType(varType))
+        if (!isLegalDebugType(varType))
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;
@@ -4448,7 +4447,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     // TODO: 
                     // Image-Pointers can only be used for Atomics, either: (1) we encode offsets+ptr logic ourselves;
-                    // (2) or we have a large legalization pass; (3) do atomic operations
+                    // (2) or we have a large legalization pass; (3) do atomic operations. Issue #7880
 
                     //auto imageSubscriptPtr = as<IRImageSubscript>(op->getPtr());
                     //auto textureType =
@@ -4523,22 +4522,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     SLANG_UNEXPECTED(
                         "Coherent operations with an image is currently unimplemented");
-                    // TODO:
-                    // Image-Pointers can only be used for Atomics, either: (1) we encode
-                    // offsets+ptr logic ourselves; (2) or we have a large legalization pass; (3) do
-                    // atomic operations
-
-                    // result = emitInstCustomOperandFunc(
-                    //     image,
-                    //     inst,
-                    //     SpvOpAtomicStore,
-                    //     [&]()
-                    //     {
-                    //         emitOperand(op->getPtr());
-                    //         emitOperand(ensureInst(op->getSrc()));
-                    //         emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
-                    //         emitOperand(op->getMemoryScope());
-                    //     });
                     break;
                 }
             default:
