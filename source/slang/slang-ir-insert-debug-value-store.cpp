@@ -150,10 +150,10 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             // removed because it will be unused.
             //
             // However, we still want to emit the debug information in the form of
-            // the end user expects.
-            //
-            // We are going to emit the debug-variable explicitly for each member
-            // of the entry point param if its type is a struct.
+            // what the end user expects. That means emitting DebugVar for the
+	    // entry point parameter may not be enough. If its type is struct,
+            // we are going to emit the debug-variable explicitly for each member
+            // of the entry point param.
             //
             if (auto structType = as<IRStructType>(paramType))
             {
