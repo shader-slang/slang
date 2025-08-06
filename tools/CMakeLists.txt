@@ -377,7 +377,9 @@ if(SLANG_ENABLE_TESTS)
         slang-unit-test
         MODULE
         EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL SLANG_NO_DEPRECATION
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            SLANG_SHARED_LIBRARY_TOOL
+            SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
         OUTPUT_NAME slang-unit-test-tool
