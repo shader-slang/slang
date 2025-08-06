@@ -1866,23 +1866,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                {
-                    auto debugValue = as<IRDebugValue>(inst);
-                    auto debugVar = debugValue->getDebugVar();
-                    auto value = debugValue->getValue();
-                    if (as<IRPtrTypeBase>(value->getDataType()))
-                    {
-                        if (as<IRPtrTypeBase>(debugVar->getDataType()))
-                        {
-                            // Ensure they both have the same type (in-case we changed addr-space)
-                            debugVar->setFullType(
-                                value->getFullType());
-                        }
-                    }
-                    if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                        inst->removeAndDeallocate();
-                    break;
-                }
+                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
+                    inst->removeAndDeallocate();
+                break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
                 {

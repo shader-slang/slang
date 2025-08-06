@@ -1,7 +1,7 @@
 //DISABLE_TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv -capability vk_mem_model
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -profile spirv_1_3 -capability vk_mem_model
-// These tests are expected to fail, pointers to texels is
-// currently a broken feature.
+// These tests are expected to fail, pointers to texels are
+// currently a broken feature and do not work.
 
 
 // Ensure SPIRV emits coherent operations here

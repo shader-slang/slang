@@ -3864,7 +3864,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MatrixType:
             return true;
         case kIROp_PtrType:
-            return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer;
+            return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer ||
+                   as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::Function ||
+                    as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
         default:
             if (as<IRBasicType>(type))
                 return true;
@@ -7107,7 +7109,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
             break;
         }
-        default:
+        case AddressSpace::GroupShared:
             requireSPIRVCapability(SpvCapabilityVariablePointers);
             break;
         }
