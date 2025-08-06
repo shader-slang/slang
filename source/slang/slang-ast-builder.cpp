@@ -207,9 +207,7 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 static const size_t kASTBuilderMemoryArenaBlockSize = 2 * 1024 * 1024;
 
 ASTBuilder::ASTBuilder(ASTBuilder* parent, String const& debugName)
-    : m_parent(parent)
-    , m_name(debugName)
-    , m_arena(kASTBuilderMemoryArenaBlockSize)
+    : m_parent(parent), m_name(debugName), m_arena(kASTBuilderMemoryArenaBlockSize)
 {
     SLANG_ASSERT(parent);
     auto sharedASTBuilder = parent->getSharedASTBuilder();
@@ -367,9 +365,7 @@ ASTBuilder* ASTBuilder::_findAppropriateASTBuilderForVal(ValNodeDesc const& desc
         // is in some kind of ancestor/descendent relationship
         // with the builder being used to make the request.
         //
-        SLANG_ASSERT(
-            nodeBuilder->isDescendentOf(this)
-            || this->isDescendentOf(nodeBuilder));
+        SLANG_ASSERT(nodeBuilder->isDescendentOf(this) || this->isDescendentOf(nodeBuilder));
 
         // If the builder we are looking at is deeper than the
         // deepest builder we've seen previously, then we update
