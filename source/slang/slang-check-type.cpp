@@ -6,6 +6,16 @@
 
 namespace Slang
 {
+
+static bool shouldCheckIfBaseInterfaceHasDyn(SemanticsVisitor* visitor)
+{
+    return visitor->isSlang2026OrLater();
+}
+static bool shouldImplicitlySetInterfacesToSome(SemanticsVisitor* visitor)
+{
+    return visitor->isSlang2026OrLater();
+}
+
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
     SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
@@ -375,6 +385,92 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = DeclRefType::create(
             getASTBuilder(),
             getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+    }
+
+    // Implicitly make a `some`/`dyn` type
+    // validate if `some`/`dyn` are a proper-type
+    {
+        bool isDyn = false;
+
+        // Implicitly make a `some`/`dyn` type.
+        // Important to note:
+        // `dyn` only works with a parent `decl`,`some` works with types and decl.
+        auto interfaceDecl = isDeclRefTypeOf<InterfaceDecl>(type);
+        auto astBuilder = getASTBuilder();
+        if (interfaceDecl)
+        {
+            auto modifierPropTarget = as<Decl>(getModifierPropagationTarget());
+            if (modifierPropTarget)
+            {
+                ensureDecl(modifierPropTarget, DeclCheckState::ModifiersChecked);
+                isDyn = modifierPropTarget->hasModifier<DynModifier>();
+            }
+            if (!isDyn)
+            {
+                if (shouldImplicitlySetInterfacesToSome(this))
+                {
+                    // Logic mirroring `visitSomeTypeExpr` to generate a SomeTypeDecl
+                    SomeTypeDecl* decl;
+                    if (hasSemanticsContextState(SemanticsContextState::SomeTypeIsUnbound))
+                        decl = m_astBuilder->create<UnboundSomeTypeDecl>();
+                    else
+                        decl = m_astBuilder->create<SomeTypeDecl>();
+                    decl->loc = expr->loc;
+                    decl->parentDecl = getOuterScope()->containerDecl;
+                    result = m_astBuilder->getTypeType(DeclRefType::create(m_astBuilder, decl));
+
+                    auto inheritanceDecl = m_astBuilder->create<InheritanceDecl>();
+                    inheritanceDecl->base = typeExp;
+                    inheritanceDecl->loc = decl->loc;
+                    decl->addMember(inheritanceDecl);
+
+                    result = DeclRefType::create(astBuilder, decl);
+                }
+                else if (modifierPropTarget)
+                {
+                    // Push a `dyn` modifier to the target decl
+                    isDyn = true;
+                    addModifier(modifierPropTarget, getASTBuilder()->create<DynModifier>());
+                    result = type;
+                }
+            }
+        }
+
+        // validate `dyn`
+        if (isDyn)
+        {
+            if (!hasSemanticsContextState(SemanticsContextState::DynTypeIsAllowed))
+            {
+                getSink()->diagnose(expr, Diagnostics::cannotHaveDynTypeHere);
+                result = getASTBuilder()->getErrorType();
+            }
+
+            // interface type of a `dyn` varDecl must have `dyn` modifier
+            if (shouldCheckIfBaseInterfaceHasDyn(this) &&
+                !interfaceDecl.getDecl()->hasModifier<DynModifier>())
+            {
+                getSink()->diagnose(
+                    expr,
+                    Diagnostics::cannotSpecifyDynDeclIfBaseIsNotDyn,
+                    interfaceDecl.getDecl());
+                result = getASTBuilder()->getErrorType();
+            }
+        }
+
+        // validate `some`
+        auto validateSomeType = [&](Type* maybeSomeTypeDecl)
+        {
+            if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(maybeSomeTypeDecl))
+            {
+                if (!hasSemanticsContextState(SemanticsContextState::SomeTypeIsAllowed))
+                {
+                    getSink()->diagnose(expr, Diagnostics::cannotHaveSomeTypeHere);
+                    result = getASTBuilder()->getErrorType();
+                }
+            }
+        };
+        validateSomeType(type);
+        validateSomeType(result);
     }
 
     // default case: we expect this to already be a proper type

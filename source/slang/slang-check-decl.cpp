@@ -34,30 +34,30 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-bool isSlang2026OrLater(SemanticsVisitor* visitor)
-{
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
-           SLANG_LANGUAGE_VERSION_2026;
-}
-
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           !isSlang2026OrLater(visitor);
+           !visitor->isSlang2026OrLater();
 }
 
-static void validateDynInterfaceUsage(
-    SemanticsDeclVisitorBase* visitor,
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet,
-    InterfaceDecl* decl)
+static void validateDynInterfaceUsage(SemanticsDeclVisitorBase* visitor, InterfaceDecl* decl)
 {
+    auto sink = visitor->getSink();
+    auto optionSet = visitor->getOptionSet();
+    bool isDyn = decl->hasModifier<DynModifier>();
+
+    // Automatically make an InterfaceDecl a `dyn interface` if
+    if (!isDyn && decl->hasModifier<AnyValueSizeAttribute>())
+    {
+        isDyn = true;
+        addModifier(decl, visitor->getASTBuilder()->create<DynModifier>());
+    }
     if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
-    if (!decl->hasModifier<DynModifier>())
+    if (!isDyn)
         return;
 
     // validate members inside `dyn interface`
@@ -66,6 +66,7 @@ static void validateDynInterfaceUsage(
         if (isAssociatedTypeDecl(m))
         {
             sink->diagnose(m, Diagnostics::cannotHaveAssociatedTypeInDynInterface);
+            sink->diagnose(decl, Diagnostics::seeDeclarationOf, decl);
             continue;
         }
         else if (auto genericDecl = as<GenericDecl>(m))
@@ -73,6 +74,7 @@ static void validateDynInterfaceUsage(
             if (as<FuncDecl>(genericDecl->inner))
             {
                 sink->diagnose(m, Diagnostics::cannotHaveGenericMethodInDynInterface);
+                sink->diagnose(decl, Diagnostics::seeDeclarationOf, decl);
             }
             continue;
         }
@@ -84,10 +86,12 @@ static void validateDynInterfaceUsage(
                 if (as<MutatingAttribute>(modifier))
                 {
                     sink->diagnose(m, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+                    sink->diagnose(decl, Diagnostics::seeDeclarationOf, decl);
                 }
                 else if (as<DifferentiableAttribute>(modifier))
                 {
                     sink->diagnose(m, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+                    sink->diagnose(decl, Diagnostics::seeDeclarationOf, decl);
                 }
             }
             continue;
@@ -102,11 +106,14 @@ static void validateDynInterfaceUsage(
 
             auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
             if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
+            {
                 sink->diagnose(
                     m,
                     Diagnostics::DynInterfaceCannotInheritNonDynInterface,
                     decl,
                     inheritedInterfaceDecl);
+                sink->diagnose(decl, Diagnostics::seeDeclarationOf, decl);
+            }
         }
     }
 
@@ -117,7 +124,36 @@ static void validateDynInterfaceUsage(
     }
 }
 
-static void validateDynInterfaceUseWithInheritanceDecl(
+static void validateDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, FuncDecl* funcDecl)
+{
+    CompilerOptionSet& optionSet = visitor->getOptionSet();
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
+        return;
+
+    // The rest of the function validates use of the `funcDecl`
+    // as a child of a `dyn interface` type.
+    if (!funcDecl->parentDecl->hasModifier<DynModifier>())
+        return;
+
+    DiagnosticSink* sink = visitor->getSink();
+
+    // given 'dyn':
+    // not allowed mutating attribute
+    // not allowed differentiable attribute
+    for (auto modifier : funcDecl->modifiers)
+    {
+        if (as<MutatingAttribute>(modifier))
+        {
+            sink->diagnose(funcDecl, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+        }
+        else if (as<DifferentiableAttribute>(modifier))
+        {
+            sink->diagnose(funcDecl, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+        }
+    }
+}
+
+static void validateDynInterfaceWithInheritanceDeclUsage(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
@@ -776,6 +812,11 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->right.type);
     }
     void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+
+    void visitSomeTypeExpr(SomeTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+
+    void visitDynTypeExpr(DynTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         dispatchIfNotNull(expr->value);
@@ -1739,10 +1780,7 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 {
     visitDecl(interfaceDecl);
 
-    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
-        addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
-
-    validateDynInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
+    validateDynInterfaceUsage(this, interfaceDecl);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2150,9 +2188,23 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
     else
     {
-        // A variable with an explicit type is simpler, for the
-        // most part.
+        // A variable with an explicit type is handled here
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+        subVisitor = subVisitor.withModifierPropagationTarget(varDecl);
+
+        SemanticsContextState semanticsContextState = {};
+        // Setup visitor for visiting the type expr of a varDecl
+        if (as<VarDecl>(varDecl))
+        {
+            // `some` cannot be a struct member.
+            // `some` cannot be a global.
+            if (!as<StructDecl>(varDecl->parentDecl) && !isGlobalDecl(varDecl))
+                semanticsContextState = SemanticsContextState::SomeTypeIsAllowed;
+            semanticsContextState = SemanticsContextState(
+                (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsUnbound |
+                (UInt)SemanticsContextState::DynTypeIsAllowed);
+        }
+        subVisitor = subVisitor.withSemanticsContextState(semanticsContextState);
         TypeExp typeExp = subVisitor.CheckUsableType(varDecl->type, varDecl);
         varDecl->type = typeExp;
         if (varDecl->type.equals(m_astBuilder->getVoidType()))
@@ -3241,8 +3293,8 @@ bool isProperConstraineeType(Type* type)
         return false;
     if (as<InterfaceDecl>(declRef.getDecl()))
         return false;
-    // TODO: `some` type and `dyn` types are also inproper constrainee types.
-
+    if (as<SomeTypeDecl>(declRef.getDecl()))
+        return false;
     return true;
 }
 
@@ -3599,15 +3651,15 @@ struct SemanticsDeclDifferentialConformanceVisitor
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
-        validateDynInterfaceUseWithInheritanceDecl(
+        validateDynInterfaceWithInheritanceDeclUsage(
             this,
             getSink(),
             getOptionSet(),
             inheritanceDecl);
 
-        if (as<InterfaceDecl>(inheritanceDecl->parentDecl))
+        if (as<InterfaceDecl>(inheritanceDecl->parentDecl) ||
+            as<SomeTypeDecl>(inheritanceDecl->parentDecl))
             return;
-
         if (!inheritanceDecl->witnessTable)
             return;
         auto baseType = as<DeclRefType>(inheritanceDecl->witnessTable->baseType);
@@ -8388,7 +8440,7 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
             if (!isFromCoreModule(decl))
             {
                 // In Slang 2026, we no longer allow structs to inherit from other structs.
-                if (isSlang2026OrLater(this))
+                if (isSlang2026OrLater())
                 {
                     getSink()->diagnose(
                         inheritanceDecl,
@@ -9857,6 +9909,44 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     if (typeExpr.exp)
     {
         SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(paramDecl));
+        subVisitor = withModifierPropagationTarget(paramDecl);
+
+        SemanticsContextState semanticsContextState = SemanticsContextState::DynTypeIsAllowed;
+
+        auto parentScope = getScope(paramDecl)->parent;
+
+        // only allowed a `some` type param if parentDecl is not a dyn interface or
+        // if we allow experimental dynamic dispatch.
+        if (allowExperimentalDynamicDispatch(this, getOptionSet()) ||
+            parentScope && parentScope->containerDecl &&
+                !parentScope->containerDecl->hasModifier<DynModifier>())
+        {
+            bool setState = false;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<InOutModifier>(modifier) || as<InModifier>(modifier))
+                {
+                    setState = true;
+                    semanticsContextState = SemanticsContextState(
+                        (UInt)semanticsContextState |
+                        (UInt)SemanticsContextState::SomeTypeIsAllowed);
+                    break;
+                }
+                if (as<OutModifier>(modifier))
+                {
+                    setState = true;
+                    semanticsContextState = SemanticsContextState(
+                        (UInt)semanticsContextState |
+                        (UInt)SemanticsContextState::SomeTypeIsUnbound |
+                        (UInt)SemanticsContextState::SomeTypeIsAllowed);
+                    break;
+                }
+            }
+            if (!setState)
+                semanticsContextState = SemanticsContextState(
+                    (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsAllowed);
+        }
+        subVisitor = subVisitor.withSemanticsContextState(semanticsContextState);
         typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
         paramDecl->type = typeExpr;
         checkMeshOutputDecl(paramDecl);
@@ -10659,9 +10749,26 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
 {
     auto resultType = funcDecl->returnType;
+
+    SemanticsContextState semanticsContextState = {};
     if (resultType.exp)
     {
-        resultType = CheckProperType(resultType);
+        // Allowed to return a `dyn`. This semantically means nothing
+        // Result is an unbound-some-type if we allow a some-type
+        semanticsContextState = SemanticsContextState(
+            (UInt)SemanticsContextState::DynTypeIsAllowed |
+            (UInt)SemanticsContextState::SomeTypeIsUnbound);
+
+        // Not allowed `some` for return-type if we have a `dyn` type parent
+        if (allowExperimentalDynamicDispatch(this, getOptionSet()) ||
+            !funcDecl->parentDecl->hasModifier<DynModifier>())
+            semanticsContextState = SemanticsContextState(
+                (UInt)semanticsContextState | (UInt)SemanticsContextState::SomeTypeIsAllowed);
+
+        auto subVisitor =
+            (SemanticsDeclHeaderVisitor)withSemanticsContextState(semanticsContextState)
+                .withModifierPropagationTarget(funcDecl);
+        resultType = subVisitor.CheckProperType(resultType);
     }
     else if (!funcDecl->returnType.type)
     {
@@ -10670,6 +10777,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     funcDecl->returnType = resultType;
 
     checkCallableDeclCommon(funcDecl);
+    validateDynFuncDeclUsage(this, funcDecl);
 }
 
 IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
@@ -14735,7 +14843,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     }
 }
 
-DeclVisibility getDeclVisibility(Decl* decl)
+DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
 {
     if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
         as<GenericTypeConstraintDecl>(decl))
@@ -14768,6 +14876,10 @@ DeclVisibility getDeclVisibility(Decl* decl)
             return DeclVisibility::Internal;
         else if (as<PrivateModifier>(modifier))
             return DeclVisibility::Private;
+    }
+    if (as<SomeTypeDecl>(decl))
+    {
+        return getDeclVisibility(decl->parentDecl);
     }
     // Interface members will always have the same visibility as the interface itself.
     if (auto interfaceDecl = findParentInterfaceDecl(decl))

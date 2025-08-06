@@ -485,7 +485,12 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
                 ConversionCost cost = kConversionCost_None;
-                if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, arg, &cost))
+                if (!canCoerce(
+                        getType(m_astBuilder, valParamRef),
+                        arg->type,
+                        arg,
+                        CoercionSite::Argument,
+                        &cost))
                 {
                     success = false;
                 }
@@ -721,7 +726,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 if (!paramType->equals(argType))
                     return {nullptr, nullptr};
             }
-            else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
+            else if (!canCoerce(paramType, argType, arg.argExpr, CoercionSite::Argument, &cost))
             {
                 return {nullptr, nullptr};
             }
@@ -3059,23 +3064,27 @@ Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
 {
     // Start by checking the base expression and arguments.
 
+    // Disallow `dyn`, `some`, and unbound types
+    auto subVisitor = (SemanticsExprVisitor)withoutSemanticsContextState(SemanticsContextState(
+        (UInt)SemanticsContextState::SomeTypeIsUnbound |
+        (UInt)SemanticsContextState::SomeTypeIsAllowed));
+
     // Disable the short-circuiting logic expression when the experssion is in
     // the generic parameter.
     if (this->m_shouldShortCircuitLogicExpr)
     {
-        auto subContext = disableShortCircuitLogicalExpr();
+        auto subContext = subVisitor.disableShortCircuitLogicalExpr();
         return dispatchExpr(genericAppExpr, subContext);
     }
-
     auto& baseExpr = genericAppExpr->functionExpr;
-    baseExpr = CheckTerm(baseExpr);
+    baseExpr = subVisitor.CheckTerm(baseExpr);
     auto& args = genericAppExpr->arguments;
     for (auto& arg : args)
     {
-        arg = CheckTerm(arg);
+        arg = subVisitor.CheckTerm(arg);
     }
 
-    return checkGenericAppWithCheckedArgs(genericAppExpr);
+    return subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
 }
 
 /// Check a generic application where the operands have already been checked.

@@ -98,7 +98,7 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // is possible (a type conversion exists).
     //
     ConversionCost cost;
-    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    if (canCoerce(toType, fromExpr->type, fromExpr, CoercionSite::Initializer, &cost))
     {
         if (cost >= kConversionCost_Explicit)
         {
@@ -251,7 +251,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         return cacheResult(true);
 
     // Slang 2026 language fix: an interface type is not C-style.
-    if (isSlang2026OrLater(this))
+    if (isSlang2026OrLater())
     {
         // TODO: some/dyn types are also not C-style.
         if (isDeclRefTypeOf<InterfaceDecl>(type))
@@ -948,7 +948,7 @@ bool SemanticsVisitor::_coerceInitializerList(
     // the initializer list itself; assuming that coercion is closed under
     // composition this shouldn't fail.
     if (!as<InitializerListType>(fromInitializerListExpr->type) &&
-        !canCoerce(toType, fromInitializerListExpr->type, nullptr))
+        !canCoerce(toType, fromInitializerListExpr->type, nullptr, CoercionSite::Initializer))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr, getSink());
 
     // Try to invoke the user-defined constructor if it exists. This call will
@@ -1219,6 +1219,28 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
+        // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
+        if (!validateSomeTypeCoerce(site, toType, fromType, fromExpr, sink))
+            return false;
+
+        // simple copy of 2 equal `some` Types. `unbound_some<T> = some<T>` means `unbound_some<T>` is the same
+        // type as `some<T>`.
+        auto toSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(toType);
+        auto fromSomeTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType);
+        if (fromSomeTypeDeclRef && toSomeTypeDeclRef)
+        {
+            if (getInterfaceType(m_astBuilder, toSomeTypeDeclRef)
+                    ->equals(getInterfaceType(m_astBuilder, fromSomeTypeDeclRef)))
+            {
+                if (outToExpr)
+                    *outToExpr = fromExpr;
+                return true;
+            }
+        }
+    }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1560,7 +1582,7 @@ bool SemanticsVisitor::_coerce(
     if (auto refType = as<RefTypeBase>(toType))
     {
         ConversionCost cost;
-        if (!canCoerce(refType->getValueType(), fromType, fromExpr, &cost))
+        if (!canCoerce(refType->getValueType(), fromType, fromExpr, site, &cost))
             return false;
         if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
             return false;
@@ -1904,6 +1926,46 @@ bool SemanticsVisitor::_coerce(
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }
 
+bool SemanticsVisitor::validateSomeTypeCoerce(
+    CoercionSite site,
+    Type* toType,
+    QualType fromType,
+    Expr* fromExpr,
+    DiagnosticSink* sink)
+{
+    // Restrictions
+    if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
+    {
+        // TODO: remove all `CoercionSite` checks.
+        //
+        //  Handles the following case: `some T = some U` `some T = unbound_some U`.
+        //  We do not error if `some` is an argument since `some` can be passed as an argument to a
+        //  `some` parameter.
+        if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
+        {
+            if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
+                return false;
+            }
+        }
+        // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
+        // A `dyn` is a simple `InterfaceDecl`
+        else if (isDeclRefTypeOf<InterfaceDecl>(fromType))
+        {
+            sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
+            return false;
+        }
+    }
+
+    // If we have a `some T` on RHS, we are only allowed to copy if LHS is `dyn T`,
+    // we do not need explicit validation for this since `dyn` should be within
+    // `some T` InheritanceInfo (implicitly covering this case)
+    return true;
+}
+
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     DeclRef<StructDecl> lambdaStruct,
     FuncType* toFuncType,
@@ -1971,7 +2033,11 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     }
 
     // Verify that the return type of the function is convertible to the function type.
-    if (!canCoerce(toFuncType->getResultType(), invokeFunc->returnType.type, nullptr))
+    if (!canCoerce(
+            toFuncType->getResultType(),
+            invokeFunc->returnType.type,
+            nullptr,
+            CoercionSite::General))
     {
         return false;
     }
@@ -2039,6 +2105,7 @@ bool SemanticsVisitor::canCoerce(
     Type* toType,
     QualType fromType,
     Expr* fromExpr,
+    CoercionSite site,
     ConversionCost* outCost)
 {
     // As an optimization, we will maintain a cache of conversion results
@@ -2074,7 +2141,7 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
-    bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
+    bool rs = _coerce(site, toType, nullptr, fromType, fromExpr, getSink(), &cost);
 
     if (outCost)
         *outCost = cost;
@@ -2172,7 +2239,7 @@ bool SemanticsVisitor::canConvertImplicitly(Type* toType, QualType fromType)
 ConversionCost SemanticsVisitor::getConversionCost(Type* toType, QualType fromType)
 {
     ConversionCost conversionCost = kConversionCost_Impossible;
-    if (!canCoerce(toType, fromType, nullptr, &conversionCost))
+    if (!canCoerce(toType, fromType, nullptr, CoercionSite::General, &conversionCost))
         return kConversionCost_Impossible;
     return conversionCost;
 }

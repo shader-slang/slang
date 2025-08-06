@@ -363,7 +363,7 @@ public:
                 break;
             }
         }
-        else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
+        else if (as<DirectDeclRef>(parent.declRefBase))
         {
             return makeDeclRef(memberDecl);
         }
