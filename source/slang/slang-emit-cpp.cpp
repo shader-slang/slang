@@ -622,7 +622,6 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
-
 void CPPSourceEmitter::emitGlobalRTTISymbolPrefix()
 {
     m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT");
