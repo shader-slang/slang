@@ -2492,7 +2492,7 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             AddOverloadCandidates(item, context);
         }
@@ -3142,7 +3142,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             for (auto candidate : context.bestCandidates)
             {
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                overloadedExpr->candidiateExprs.add(candidateExpr);
+                overloadedExpr->candidateExprs.add(candidateExpr);
             }
             return overloadedExpr;
         }

@@ -502,6 +502,12 @@ convention for interface methods.
     #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+#ifdef SLANG_NO_DEPRECATION
+    #define SLANG_DEPRECATED
+#else
+    #define SLANG_DEPRECATED [[deprecated]]
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -3345,7 +3351,7 @@ struct ShaderReflection
             name);
     }
 
-    [[deprecated]] FunctionReflection* tryResolveOverloadedFunction(
+    SLANG_DEPRECATED FunctionReflection* tryResolveOverloadedFunction(
         uint32_t candidateCount,
         FunctionReflection** candidates)
     {

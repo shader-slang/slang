@@ -3828,7 +3828,7 @@ static Expr* _checkHigherOrderInvokeExpr(
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -3837,12 +3837,12 @@ static Expr* _checkHigherOrderInvokeExpr(
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
     {
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, item);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -5182,7 +5182,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
     }
     else if (auto overloaded2 = as<OverloadedExpr2>(baseExpression))
     {
-        for (auto candidate : overloaded2->candidiateExprs)
+        for (auto candidate : overloaded2->candidateExprs)
         {
             handleLeafExpr(candidate);
         }

@@ -921,6 +921,24 @@ Expr* ComponentType::findDeclFromStringInType(
         if (mask != LookupMask::Function)
             return visitor.maybeResolveOverloadedExpr(checkedTerm, mask, nullptr);
         overloadedExpr->lookupResult2 = refineLookup(overloadedExpr->lookupResult2, mask);
+
+        // Filter out abstract base interface method implementations for reflection.
+        if (!isInterfaceType(type))
+        {
+            LookupResult filteredResult;
+            for (auto candidate : overloadedExpr->lookupResult2)
+            {
+                if (as<InterfaceDecl>(getParentDecl(candidate.declRef.getDecl())))
+                {
+                    if (!candidate.declRef.getDecl()
+                             ->hasModifier<HasInterfaceDefaultImplModifier>())
+                        continue;
+                }
+                AddToLookupResult(filteredResult, candidate);
+            }
+            overloadedExpr->lookupResult2 = filteredResult;
+        }
+
         return overloadedExpr;
     }
     if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
