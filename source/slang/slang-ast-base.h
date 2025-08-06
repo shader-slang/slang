@@ -17,7 +17,7 @@ FIDDLE()
 namespace Slang
 {
 
-class ASTBuilder; 
+class ASTBuilder;
 struct SemanticsVisitor;
 
 FIDDLE(abstract)
