@@ -311,7 +311,7 @@ public:
             return true;
         bool result = false;
         PushNode pushNode(context, expr);
-        for (auto candidate : expr->candidiateExprs)
+        for (auto candidate : expr->candidateExprs)
         {
             result |= dispatchIfNotNull(candidate);
         }

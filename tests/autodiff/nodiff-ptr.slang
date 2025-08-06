@@ -6,6 +6,7 @@ float sumOfSquares(float x, float y, no_diff float4* test)
 }
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -compile-arg -skip-spirv-validation -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT: set ptr = ubuffer(data=[1.0 2.0 3.0], stride=4)
 uniform float* ptr;

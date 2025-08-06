@@ -844,6 +844,13 @@ class GenericDecl : public ContainerDecl
     FIDDLE(...)
     // The decl that is genericized...
     FIDDLE() Decl* inner = nullptr;
+
+    /// A cached list of arguments that can be used when forming
+    /// a reference to the inner declaration with "default
+    /// substitutions" (for each generic parameter, the coresponding
+    /// argument will be a reference to the parameter itself).
+    ///
+    List<Val*> _cachedArgsForDefaultSubstitution;
 };
 
 FIDDLE()

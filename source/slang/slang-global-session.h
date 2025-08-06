@@ -232,12 +232,21 @@ public:
     Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }
     //
 
+    /// Get the AST builder associated with this global session.
+    ///
+    /// This is the AST builder used for builtin modules.
+    ///
+    RefPtr<ASTBuilder> getASTBuilder() { return m_rootASTBuilder; }
+
+    /// Get the shared AST builder state associated with this global session.
+    ///
+    /// Equivalent to `this->getASTBuilder()->getSharedASTBuilder()`.
+    ///
+    SharedASTBuilder* getSharedASTBuilder();
+
     /// This AST Builder should only be used for creating AST nodes that are global across requests
     /// not doing so could lead to memory being consumed but not used.
-    ASTBuilder* getGlobalASTBuilder() { return globalAstBuilder; }
-    void finalizeSharedASTBuilder();
-
-    RefPtr<ASTBuilder> globalAstBuilder;
+    ASTBuilder* getGlobalASTBuilder() { return m_rootASTBuilder; }
 
     // Generated code for core module, etc.
     String coreModulePath;
@@ -256,8 +265,6 @@ public:
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
     void getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName moduleName);
-
-    RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
     SPIRVCoreGrammarInfo& getSPIRVCoreGrammarInfo()
     {
@@ -356,6 +363,10 @@ private:
 
     double m_downstreamCompileTime = 0.0;
     double m_totalCompileTime = 0.0;
+
+    /// The AST builder that will be used for builtin modules.
+    ///
+    RefPtr<ASTBuilder> m_rootASTBuilder;
 };
 
 /* Returns SLANG_OK if pass through support is available */
