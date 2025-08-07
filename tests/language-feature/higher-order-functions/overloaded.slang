@@ -13,7 +13,8 @@ int bit<T, let N : int>(vector<T, N>) {
 }
 
 int zit() {
-    // In an ideal world in this case we could infer that we want bit<T>
+    // even though foo is overloaded, we should still be able to infer that we want bit<T>
+    // based on the parameter (expected) type.
     return foo(bit<float>);
 }
 
