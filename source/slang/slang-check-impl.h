@@ -2840,6 +2840,10 @@ public:
 
     void AddGenericOverloadCandidates(Expr* baseExpr, OverloadResolveContext& context);
 
+    // Given an argument list, expand all `expand` expressions, if the type/value pack being
+    // expanded is already specialized.
+    void maybeExpandArgList(List<Expr*>& args);
+
     template<class T>
     void trySetGenericToRayTracingWithParamAttribute(
         LookupResultItem genericItem,
