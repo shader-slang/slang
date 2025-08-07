@@ -12,7 +12,7 @@ public typedef int GfxCount;
 public typedef intptr_t Size;
 public typedef intptr_t Offset;
 
-public const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
+public static const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
 public enum class StructType
 {

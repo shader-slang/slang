@@ -3736,7 +3736,7 @@ void registerBuiltinDecl(ASTBuilder* astBuilder, Decl* decl)
 ///
 static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
 {
-    SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+    SharedASTBuilder* sharedASTBuilder = session->getSharedASTBuilder();
 
     registerBuiltinDecl(sharedASTBuilder, decl);
 
@@ -9376,10 +9376,10 @@ List<Val*> getDefaultSubstitutionArgs(
     SemanticsVisitor* semantics,
     GenericDecl* genericDecl)
 {
-    List<Val*> args;
-    if (astBuilder->m_cachedGenericDefaultArgs.tryGetValue(genericDecl, args))
-        return args;
+    if (genericDecl->_cachedArgsForDefaultSubstitution.getCount() != 0)
+        return genericDecl->_cachedArgsForDefaultSubstitution;
 
+    List<Val*> args;
     for (auto mm : genericDecl->getDirectMemberDecls())
     {
         if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
@@ -9439,7 +9439,7 @@ List<Val*> getDefaultSubstitutionArgs(
     }
 
     if (shouldCache)
-        astBuilder->m_cachedGenericDefaultArgs[genericDecl] = args;
+        genericDecl->_cachedArgsForDefaultSubstitution = args;
 
     return args;
 }

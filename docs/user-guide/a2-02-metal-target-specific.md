@@ -29,6 +29,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_DepthGreaterEqual`      | `[[depth(greater)]]`                                 |
 | `SV_DepthLessEqual`         | `[[depth(less)]]`                                    |
 | `SV_DispatchThreadID`       | `[[thread_position_in_grid]]`                        |
+| `SV_FragInvocationCount`    | `(Not supported)`                                    |
+| `SV_FragSize`               | `(Not supported)`                                    |
 | `SV_GroupID`                | `[[threadgroup_position_in_grid]]`                   |
 | `SV_GroupThreadID`          | `[[thread_position_in_threadgroup]]`                 |
 | `SV_GroupIndex`             | Calculated from `SV_GroupThreadID` and group extents |
