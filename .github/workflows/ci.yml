@@ -116,14 +116,13 @@ jobs:
           fi
           # Default to running tests (conservative approach)
           echo "should-run=true" >> $GITHUB_OUTPUT
+          set -e
           
           # Only skip if we can successfully determine that only documentation files changed
-          if result="$(git diff --name-only -z $BASE...HEAD 2>/dev/null)"; then
-            # Git diff succeeded, check if only documentation files changed
-            if ! echo "$result" | grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
-              echo "Only documentation files changed, skipping remaining steps"
-              echo "should-run=false" >> $GITHUB_OUTPUT
-            fi
+          result="$(git diff --name-only -z $BASE...HEAD)"
+          if ! echo "$result" | grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+            echo "Only documentation files changed, skipping remaining steps"
+            echo "should-run=false" >> $GITHUB_OUTPUT
           fi
       - name: Install dependencies
         run: |
