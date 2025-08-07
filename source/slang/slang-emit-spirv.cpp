@@ -3753,7 +3753,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3781,7 +3781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
