@@ -1281,7 +1281,12 @@ struct __none_t
 __builtin_enum(AddressSpace)
 enum AddressSpace : uint64_t
 {
-    Device = $( (uint64_t)AddressSpace::UserPointer),
+    // It is used to represent a pointer that is not associated with any
+    // specific address space. Users should not use this address space.
+    Generic = $((uint64_t)AddressSpace::Generic),
+
+    Device = $((uint64_t)AddressSpace::UserPointer),
+    NodePayloadAMDX = $((uint64_t)AddressSpace::NodePayloadAMDX),
 };
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
@@ -1513,7 +1518,7 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, Access::ReadWrite, AddressSpace::Generic>;
+typealias __Addr<T> = Ptr<T, Access::ReadWrite, $((uint64_t)AddressSpace::Generic)>;
 
 //@public:
 
