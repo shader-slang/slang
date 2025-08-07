@@ -4416,7 +4416,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         {
             goto error;
         }
-        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>() && !as<TupleType>(baseType))
         {
             goto error;
         }

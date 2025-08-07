@@ -11,7 +11,7 @@ int f(int x, float y) { return x + int(y); }
 [numthreads(1,1,1)]
 void computeMain()
 {
-    let x = (2, 3.0f);
+    Tuple<expand each Tuple<int, float>> x = (2, 3.0f);
     // CHECK: 5
     outputBuffer[0] = f(expand each x);
 }

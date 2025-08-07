@@ -2107,7 +2107,7 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
                 {
                     auto expandArg = m_astBuilder->create<SharedTypeExpr>();
                     expandArg->loc = expr->loc;
-                    expandArg->type = typePack->getElementType(i);
+                    expandArg->type = m_astBuilder->getTypeType(typePack->getElementType(i));
                     result.add(expandArg);
                 }
                 return true;
@@ -3231,6 +3231,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             // to complete all of them and create an overloaded expression as a result.
 
             auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
+            overloadedExpr->type = m_astBuilder->getOverloadedType();
             overloadedExpr->base = context.baseExpr;
             for (auto candidate : context.bestCandidates)
             {
