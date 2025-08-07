@@ -1281,57 +1281,7 @@ struct __none_t
 __builtin_enum(AddressSpace)
 enum AddressSpace : uint64_t
 {
-    Generic = $( (uint64_t)AddressSpace::Generic),
-    // Corresponds to SPIR-V's SpvStorageClassPrivate
-    ThreadLocal = $( (uint64_t)AddressSpace::ThreadLocal),
-    Global = $( (uint64_t)AddressSpace::Global),
-    // Corresponds to SPIR-V's SpvStorageClassWorkgroup
-    GroupShared = $( (uint64_t)AddressSpace::GroupShared),
-    // Corresponds to SPIR-V's SpvStorageClassUniform
-    Uniform = $( (uint64_t)AddressSpace::Uniform),
-    // specific address space for payload data in metal
-    MetalObjectData = $( (uint64_t)AddressSpace::MetalObjectData),
-    // Corresponds to SPIR-V's SpvStorageClassInput
-    Input = $( (uint64_t)AddressSpace::Input),
-    // Same as `Input`, but used for builtin input variables
-    BuiltinInput = $( (uint64_t)AddressSpace::BuiltinInput),
-    // Corresponds to SPIR-V's SpvStorageClassOutput
-    Output = $( (uint64_t)AddressSpace::Output),
-    // Same as `Output`, but used for builtin output variables
-    BuiltinOutput = $( (uint64_t)AddressSpace::BuiltinOutput),
-    // Corresponds to SPIR-V's SpvStorageClassTaskPayloadWorkgroupEXT
-    TaskPayloadWorkgroup = $( (uint64_t)AddressSpace::TaskPayloadWorkgroup),
-    // Corresponds to SPIR-V's SpvStorageClassFunction
-    Function = $( (uint64_t)AddressSpace::Function),
-    // Corresponds to SPIR-V's SpvStorageClassStorageBuffer
-    StorageBuffer = $( (uint64_t)AddressSpace::StorageBuffer),
-    // Corresponds to SPIR-V's SpvStorageClassPushConstant
-    PushConstant = $( (uint64_t)AddressSpace::PushConstant),
-    // Corresponds to SPIR-V's SpvStorageClassRayPayloadKHR
-    RayPayloadKHR = $( (uint64_t)AddressSpace::RayPayloadKHR),
-    // Corresponds to SPIR-V's SpvStorageClassIncomingRayPayloadKHR
-    IncomingRayPayload = $( (uint64_t)AddressSpace::IncomingRayPayload),
-    // Corresponds to SPIR-V's SpvStorageClassCallableDataKHR
-    CallableDataKHR = $( (uint64_t)AddressSpace::CallableDataKHR),
-    // Corresponds to SPIR-V's SpvStorageClassIncomingCallableDataKHR
-    IncomingCallableData = $( (uint64_t)AddressSpace::IncomingCallableData),
-    // Corresponds to SPIR-V's SpvStorageClassHitObjectAttributeNV
-    HitObjectAttribute = $( (uint64_t)AddressSpace::HitObjectAttribute),
-    // Corresponds to SPIR-V's SpvStorageClassHitAttributeKHR
-    HitAttribute = $( (uint64_t)AddressSpace::HitAttribute),
-    // Corresponds to SPIR-V's SpvStorageClassShaderRecordBufferKHR
-    ShaderRecordBuffer = $( (uint64_t)AddressSpace::ShaderRecordBuffer),
-    // Corresponds to SPIR-V's SpvStorageClassUniformConstant
-    UniformConstant = $( (uint64_t)AddressSpace::UniformConstant),
-    // Corresponds to SPIR-V's SpvStorageClassImage
-    Image = $( (uint64_t)AddressSpace::Image),
-    // Represents a SPIR-V specialization constant
-    SpecializationConstant = $( (uint64_t)AddressSpace::SpecializationConstant),
-    // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX
-    NodePayloadAMDX = $( (uint64_t)AddressSpace::NodePayloadAMDX),
-
-    // Default address space for a user-defined pointer
-    UserPointer = $( (uint64_t)AddressSpace::UserPointer),
+    Device = $( (uint64_t)AddressSpace::UserPointer),
 };
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
@@ -1364,7 +1314,7 @@ __intrinsic_type($(kIROp_PtrType))
 struct Ptr<
     T, 
     Access access = Access::ReadWrite, 
-    AddressSpace addrSpace = AddressSpace::UserPointer>
+    AddressSpace addrSpace = AddressSpace::Device>
 {
     // A user is allowed to explicitly cast between any pointer type.
     __intrinsic_op($(kIROp_BitCast))
