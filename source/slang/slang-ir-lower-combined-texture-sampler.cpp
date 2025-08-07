@@ -172,7 +172,8 @@ void lowerCombinedTextureSamplers(
             // with the new StructTypeVarLayout.
             if (auto arrayTypeLayout = as<IRArrayTypeLayout>(oldTypeLayout))
             {
-                newTypeLayout = IRArrayTypeLayout::Builder(&subBuilder, typeInfo.typeLayout).build();
+                newTypeLayout =
+                    IRArrayTypeLayout::Builder(&subBuilder, typeInfo.typeLayout).build();
             }
 
             IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, newTypeLayout);
