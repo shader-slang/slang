@@ -26,3 +26,12 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PRIVATE ${glsl_module_generated_header_dir}
     INSTALL
 )
+set_target_properties(
+    slang-glsl-module
+    PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON
+)
+add_supported_cxx_linker_flags(
+    slang-glsl-module
+    PRIVATE
+    "-Wl,--exclude-libs,ALL"
+)
