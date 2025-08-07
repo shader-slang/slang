@@ -49,6 +49,13 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         {
             processStructTypeInParameterBlock(structType);
         }
+        else if (auto arrayType = as<IRArrayTypeBase>(elementType))
+        {
+            if (auto innerArrayStructType = as<IRStructType>(arrayType->getElementType()))
+            {
+                processStructTypeInParameterBlock(innerArrayStructType);
+            }
+        }
     }
 
     void processStructTypeInParameterBlock(IRStructType* structType)
@@ -62,9 +69,9 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
             }
             else if (auto arrayType = as<IRArrayTypeBase>(fieldType))
             {
-                if (auto innerStructType = as<IRStructType>(arrayType->getElementType()))
+                if (auto innerArrayStructType = as<IRStructType>(arrayType->getElementType()))
                 {
-                    processStructTypeInParameterBlock(innerStructType);
+                    processStructTypeInParameterBlock(innerArrayStructType);
                 }
             }
             if (isResourceType(fieldType))
