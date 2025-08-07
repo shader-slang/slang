@@ -2744,22 +2744,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         return CreateErrorExpr(expr);
     }
-    // If any of the arguments is an error, then we should bail out, to avoid
-    // cascading errors where we successfully pick an overload, but not the one
-    // the user meant.
-    for (auto arg : expr->arguments)
-    {
-        if (IsErrorExpr(arg))
-            return CreateErrorExpr(expr);
-
-        // If this argument is itself an overloaded value without a type
-        // then we can't sensibly continue
-        if (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg))
-        {
-            getSink()->diagnose(expr->loc, Diagnostics::overloadedArgument);
-            return CreateErrorExpr(expr);
-        }
-    }
 
     maybeExpandArgList(expr->arguments);
 
