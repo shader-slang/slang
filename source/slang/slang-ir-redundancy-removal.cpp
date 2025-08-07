@@ -415,9 +415,10 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
     bool changed = false;
     for (auto block : func->getBlocks())
     {
-        for (auto inst = block->getFirstInst(); inst;)
+        IRInst* nextInst = nullptr;
+        for (auto inst = block->getFirstInst(); inst; inst = nextInst)
         {
-            auto nextInst = inst->getNextInst();
+            nextInst = inst->getNextInst();
             if (auto load = as<IRLoad>(inst))
             {
                 changed |= tryRemoveRedundantLoad(func, load);
@@ -429,67 +430,63 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {
                 auto rootAddr = getRootAddr(getElementPtr);
-                if (!isExternallyModifiableAddr(rootAddr))
-                {
+                if (isExternallyModifiableAddr(rootAddr))
+                    continue;
 
-                    // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
-                    // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
-                    // out.
-                    //
-                    // This can only be done if we have no side-effects. `constref` never has
-                    // single-invocation side-effects.
-                    traverseUsers<IRLoad>(
-                        getElementPtr,
-                        [&](IRLoad* load)
-                        {
-                            traverseUsers<IRGetElement>(
-                                load,
-                                [&](IRGetElement* getElement)
-                                {
-                                    IRBuilder builder(getElement);
-                                    builder.setInsertBefore(getElement);
-                                    auto newGetElementPtr = builder.emitElementAddress(
-                                        getElementPtr,
-                                        getElement->getIndex());
-                                    auto newLoad = builder.emitLoad(newGetElementPtr);
-                                    getElement->replaceUsesWith(newLoad);
-                                    changed = true;
-                                });
-                        });
-                }
+                // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
+                // This can only be done if we have no side-effects. `constref` never has
+                // single-invocation side-effects.
+                traverseUsers<IRLoad>(
+                    getElementPtr,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRGetElement>(
+                            load,
+                            [&](IRGetElement* getElement)
+                            {
+                                IRBuilder builder(getElement);
+                                builder.setInsertBefore(getElement);
+                                auto newGetElementPtr = builder.emitElementAddress(
+                                    getElementPtr,
+                                    getElement->getIndex());
+                                auto newLoad = builder.emitLoad(newGetElementPtr);
+                                getElement->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
             }
             else if (auto fieldAddress = as<IRFieldAddress>(inst))
             {
                 auto rootAddr = getRootAddr(fieldAddress);
-                if (!isExternallyModifiableAddr(rootAddr))
-                {
+                if (isExternallyModifiableAddr(rootAddr))
+                    continue;
 
-                    // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
-                    // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
-                    // out.
-                    // This can only be done if we have no side-effects. `constref` never has
-                    // single-invocation side-effects.
-                    traverseUsers<IRLoad>(
-                        fieldAddress,
-                        [&](IRLoad* load)
-                        {
-                            traverseUsers<IRFieldExtract>(
-                                load,
-                                [&](IRFieldExtract* fieldExtract)
-                                {
-                                    IRBuilder builder(fieldExtract);
-                                    builder.setInsertBefore(fieldExtract);
-                                    auto newGetFieldAddress = builder.emitFieldAddress(
-                                        fieldAddress,
-                                        fieldExtract->getField());
-                                    auto newLoad = builder.emitLoad(newGetFieldAddress);
-                                    fieldExtract->replaceUsesWith(newLoad);
-                                    changed = true;
-                                });
-                        });
-                }
+                // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
+                // This can only be done if we have no side-effects. `constref` never has
+                // single-invocation side-effects.
+                traverseUsers<IRLoad>(
+                    fieldAddress,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRFieldExtract>(
+                            load,
+                            [&](IRFieldExtract* fieldExtract)
+                            {
+                                IRBuilder builder(fieldExtract);
+                                builder.setInsertBefore(fieldExtract);
+                                auto newGetFieldAddress = builder.emitFieldAddress(
+                                    fieldAddress,
+                                    fieldExtract->getField());
+                                auto newLoad = builder.emitLoad(newGetFieldAddress);
+                                fieldExtract->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
             }
-            inst = nextInst;
         }
     }
     return changed;
