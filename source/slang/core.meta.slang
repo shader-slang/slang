@@ -1519,7 +1519,7 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, Access::ReadWrite, $((uint64_t)AddressSpace::Generic)>;
+typealias __Addr<T> = Ptr<T, Access::ReadWrite, AddressSpace::Generic>;
 
 //@public:
 
