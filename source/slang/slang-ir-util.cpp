@@ -175,8 +175,29 @@ IRInst* specializeWithGeneric(
     {
         genArgs.add(param);
     }
+
+    // Default to type kind for now.
+    IRType* typeForSpecialization = builder.getTypeKind();
+
+    auto dataType = genericToSpecialize->getDataType();
+    if (dataType)
+    {
+        if (dataType->getOp() == kIROp_TypeKind || dataType->getOp() == kIROp_GenericKind)
+        {
+            typeForSpecialization = (genericToSpecialize)->getDataType();
+        }
+        else if (dataType->getOp() == kIROp_Generic)
+        {
+            typeForSpecialization = (IRType*)builder.emitSpecializeInst(
+                builder.getTypeKind(),
+                (genericToSpecialize)->getDataType(),
+                genArgs.getCount(),
+                genArgs.getBuffer());
+        }
+    }
+
     return builder.emitSpecializeInst(
-        builder.getTypeKind(),
+        typeForSpecialization,
         genericToSpecialize,
         (UInt)genArgs.getCount(),
         genArgs.getBuffer());

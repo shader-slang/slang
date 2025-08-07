@@ -1142,7 +1142,7 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst());
+                // eliminateDeadCode(module->getModuleInst());
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
             }
 
@@ -1160,7 +1160,24 @@ struct SpecializationContext
             {
                 iterChanged = lowerDynamicInsts(module, sink);
                 if (iterChanged)
+                {
+                    // We'll write out the specialization info to an inst,
+                    // and read it back again so we can remove entries
+                    // for specializations that are no longer needed.
+                    //
+                    // If we don't do this, we'll end up with deallocated
+                    // references in the specialization dictionaries, and
+                    // can't reliably handle situations where the same specialization
+                    // is requested again in the future once a different function
+                    // has been specialized.
+                    //
+                    writeSpecializationDictionaries();
+                    genericSpecializations.clear();
+                    existentialSpecializedFuncs.clear();
+                    existentialSpecializedStructs.clear();
                     eliminateDeadCode(module->getModuleInst());
+                    readSpecializationDictionaries();
+                }
             }
 
             if (!iterChanged || sink->getErrorCount())
@@ -3063,6 +3080,12 @@ static bool isDynamicGeneric(IRInst* callee)
     //
     if (auto specialize = as<IRSpecialize>(callee))
     {
+        auto generic = as<IRGeneric>(specialize->getBase());
+
+        // Only functions need dynamic-aware specialization.
+        if (getGenericReturnVal(generic)->getOp() != kIROp_Func)
+            return false;
+
         for (UInt i = 0; i < specialize->getArgCount(); i++)
         {
             auto arg = specialize->getArg(i);
@@ -3096,9 +3119,16 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
     auto loweredFunc = builder.createFunc();
     builder.setInsertInto(loweredFunc);
     builder.setInsertInto(builder.emitBlock());
-    // loweredFunc->setFullType(context->getFullType());
 
     IRCloneEnv cloneEnv;
+    cloneEnv.squashChildrenMapping = true;
+
+    IRCloneEnv staticCloningEnv;
+    // Use this as the child to 'override' certain elements in the parent environment with
+    // their static versions.
+    //
+    staticCloningEnv.parent = &cloneEnv;
+
     Index argIndex = 0;
     List<IRType*> extraParamTypes;
     // Map the generic's parameters to the specialized arguments.
@@ -3115,11 +3145,17 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
             {
-                // Add an integer param to the func.
+                // For cloning parameter types, we want to just use the
+                // collection.
+                //
+                staticCloningEnv.mapOldValToNew[param] = collection;
+
+                // We'll create an integer parameter for all the rest of
+                // the insts which will may need the runtime tag.
+                //
                 auto tagType = (IRType*)makeTagType(collection);
                 cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
                 extraParamTypes.add(tagType);
-                // extraIndices++;
             }
         }
         else
@@ -3146,10 +3182,7 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                 // Merge the first block of the generic with the first block of the
                 // returned function to merge the parameter lists.
                 //
-                // if (block != funcFirstBlock)
-                //{
                 cloneEnv.mapOldValToNew[block] = cloneInstAndOperands(&cloneEnv, &builder, block);
-                //}
             }
 
             builder.setInsertInto(loweredFunc->getFirstBlock());
@@ -3159,7 +3192,8 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             {
                 // Clone the parameters of the first block.
                 builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
-                cloneInst(&cloneEnv, &builder, param);
+                auto newParam = cloneInst(&staticCloningEnv, &builder, param);
+                cloneEnv.mapOldValToNew[param] = newParam; // Transfer the param to the dynamic env
             }
 
             builder.setInsertInto(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
@@ -3174,6 +3208,7 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             {
                 if (block == funcFirstBlock)
                     continue; // Already cloned the first block
+
                 cloneInstDecorationsAndChildren(
                     &cloneEnv,
                     builder.getModule(),
@@ -3199,37 +3234,22 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
         }
         else if (!as<IRReturn>(inst))
         {
-            // Keep cloning insts in the generic
+            // Clone insts in the generic under two different environments:
+            // One that is "static" (for cloning types), and one that is "dynamic"
+            // which uses tags for witness tables instead of a static collection.
+            //
+            // We'll want to use the dynamic environment for cloning everything in the function
+            // body, but the static environment for cloning parameter types.
+            //
+            // Note that this can result in some types inside the function (i.e. not used in the
+            // parameter types) being cloned under the dynamic environment, but
+            // a subsequent pass of dynamic-inst-lowering will convert those to the static form.
+            //
+            cloneInst(&staticCloningEnv, &builder, inst);
             cloneInst(&cloneEnv, &builder, inst);
         }
     }
 
-    /*
-    // Transfer propagation info.
-    for (auto& [oldVal, newVal] : cloneEnv.mapOldValToNew)
-    {
-        if (propagationMap.containsKey(Element(context, oldVal)))
-        {
-            // If we have propagation info for the old value, transfer it to the new value
-            if (auto info = propagationMap[Element(context, oldVal)])
-            {
-                if (newVal->getParent()->getOp() != kIROp_ModuleInst)
-                    propagationMap[Element(loweredFunc, newVal)] = info;
-            }
-        }
-    }
-
-    // Transfer func-return value info.
-    if (this->funcReturnInfo.containsKey(context))
-    {
-        this->funcReturnInfo[loweredFunc] = this->funcReturnInfo[context];
-    }
-
-
-    context->replaceUsesWith(loweredFunc);
-    */
-    // context->removeAndDeallocate();
-    // this->loweredContexts[context] = loweredFunc;
     return loweredFunc;
 }
 
