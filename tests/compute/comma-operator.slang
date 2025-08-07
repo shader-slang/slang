@@ -1,7 +1,7 @@
 // comma-operator.slang
 
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -xslang -Wno-41024
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -xslang -Wno-41024
 
 // Test that the "comma operator" behaves as expected
 
@@ -9,7 +9,7 @@
 // confirm that the generated SPIR-V (and by extension DXIL/DXBC)
 // doesn't include a subroutine defintion/call for `operator,`
 
-//TEST:CROSS_COMPILE:-target spirv-assembly -entry computeMain -stage compute
+//TEST:CROSS_COMPILE:-target spirv-assembly -entry computeMain -stage compute -Wno-41024
 
 int test(int inVal)
 {

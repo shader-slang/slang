@@ -21,13 +21,13 @@ struct PSout
 PSout main(PSin stage, bool isFrontFacing : SV_IsFrontFace)
 {
   // CHECK: %image{{.*}} = OpImage
-  // CHECK: OpImageQuerySizeLod %{{.*}} %image{{.*}}
+  // CHECK: OpImageQuerySizeLod %{{.*}} %image{{.*}} %uint_1
   PSout output;
   // Find normal at position
   uint3 dim;
   uint levels;
-  g_Volume.GetDimensions(0, dim.x, dim.y, dim.z, levels);
+  g_Volume.GetDimensions(1, dim.x, dim.y, dim.z, levels);
   output.color = g_Volume.Sample(float3(dim));
-  
+
   return output;
 }
