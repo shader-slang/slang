@@ -3473,7 +3473,7 @@ SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFu
     auto func = convertToFunc(inFunc);
     if (func)
         return getText(func.getDecl()->getName()).getBuffer();
-    
+
     // If convertToFunc failed, this might be an overloaded function.
     // Try to get the name from the first overload candidate.
     auto overloadedFunc = convertToOverloadedFunc(inFunc);
