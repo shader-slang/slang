@@ -1422,7 +1422,11 @@ public:
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
     /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
-    LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
+    LookupResult resolveOverloadedLookup(LookupResult const& lookupResult, Type* targetType);
+    inline LookupResult resolveOverloadedLookup(LookupResult const& lookupResult)
+    {
+        return resolveOverloadedLookup(lookupResult, nullptr);
+    }
 
     /// Attempt to resolve `expr` into an expression that refers to a single declaration/value.
     /// If `expr` isn't overloaded, then it will be returned as-is.
@@ -1434,19 +1438,33 @@ public:
     /// appropriate "ambiguous reference" error will be reported, and an error expression will be
     /// returned. Otherwise, the original expression is returned if resolution fails.
     ///
-    Expr* maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink);
+    Expr* maybeResolveOverloadedExpr(
+        Expr* expr,
+        LookupMask mask,
+        Type* targetType,
+        DiagnosticSink* diagSink);
+
+    inline Expr* maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink)
+    {
+        return maybeResolveOverloadedExpr(expr, mask, nullptr, diagSink);
+    }
 
     /// Attempt to resolve `overloadedExpr` into an expression that refers to a single
     /// declaration/value.
     ///
     /// Equivalent to `maybeResolveOverloadedExpr` with `diagSink` bound to the sink for the
     /// `SemanticsVisitor`.
-    Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask);
+    Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, Type* targetType, LookupMask mask);
+    inline Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask)
+    {
+        return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
+    }
 
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
         OverloadedExpr* overloadedExpr,
         LookupMask mask,
+        Type* targetType,
         DiagnosticSink* diagSink);
 
     void diagnoseAmbiguousReference(
@@ -2856,6 +2874,10 @@ public:
     void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
 
     void AddGenericOverloadCandidates(Expr* baseExpr, OverloadResolveContext& context);
+
+    // Given an argument list, expand all `expand` expressions, if the type/value pack being
+    // expanded is already specialized.
+    void maybeExpandArgList(List<Expr*>& args);
 
     template<class T>
     void trySetGenericToRayTracingWithParamAttribute(
