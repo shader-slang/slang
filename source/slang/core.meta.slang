@@ -1281,8 +1281,9 @@ struct __none_t
 __builtin_enum(AddressSpace)
 enum AddressSpace : uint64_t
 {
-    // It is used to represent a pointer that is not associated with any
-    // specific address space. Users should not use this address space.
+    // Used to represent a pointer that is not associated with any
+    // specific address space and requires addr-space-specialization.
+    // Users should not use this address space directly.
     Generic = $((uint64_t)AddressSpace::Generic),
 
     Device = $((uint64_t)AddressSpace::UserPointer),
