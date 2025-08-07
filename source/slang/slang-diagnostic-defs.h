@@ -2999,15 +2999,43 @@ DIAGNOSTIC(
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
-DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
-DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unimplemented,
+    "unimplemented feature in Slang compiler: $0\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unexpected,
+    "unexpected condition encountered in Slang compiler: $0\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    internalCompilerError,
+    "Slang internal compiler error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Error,
+    compilationAborted,
+    "Slang compilation aborted due to internal error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Error,
     compilationAbortedDueToException,
-    "Slang compilation aborted due to an exception of $0: $1")
+    "Slang compilation aborted due to an exception of $0: $1\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Internal,
