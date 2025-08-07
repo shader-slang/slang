@@ -3233,19 +3233,32 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     // Skip warning in Slang 2026+ mode where parentheses create tuples
     if (!isSlang2026OrLater(this))
     {
-        if (auto infixExpr = as<InfixExpr>(expr))
+        bool exprIsInfixExpr = false;
+        InfixExpr* infixExpr = nullptr;
+        if (auto candidateInfixExpr = as<InfixExpr>(expr))
         {
-            if (auto varExpr = as<VarExpr>(infixExpr->functionExpr))
+            exprIsInfixExpr = true;
+            infixExpr = candidateInfixExpr;
+        }
+
+        bool functionExprIsVarExpr = false;
+        VarExpr* varExpr = nullptr;
+        if (exprIsInfixExpr)
+        {
+            if (auto candidateVarExpr = as<VarExpr>(infixExpr->functionExpr))
             {
-                if (varExpr->name && varExpr->name->text == ",")
-                {
-                    // Allow comma operators in for-loop side effects and expand expressions without
-                    // warning
-                    if (!getInForLoopSideEffect() && !m_parentExpandExpr)
-                    {
-                        getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
-                    }
-                }
+                functionExprIsVarExpr = true;
+                varExpr = candidateVarExpr;
+            }
+        }
+
+        if (functionExprIsVarExpr && varExpr->name && varExpr->name->text == ",")
+        {
+            // Allow comma operators in for-loop side effects and expand expressions without
+            // warning
+            if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+            {
+                getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
             }
         }
     }
