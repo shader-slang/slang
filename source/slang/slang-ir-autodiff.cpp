@@ -648,11 +648,17 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
 
         // Replace the interface maps in the caches.
         if (this->pairTypeCache.containsKey(interfaceType))
-            this->pairTypeCache[newInterfaceType] = this->pairTypeCache[interfaceType];
+        {
+            if (!this->pairTypeCache.containsKey(newInterfaceType))
+                this->pairTypeCache[newInterfaceType] = this->pairTypeCache[interfaceType];
+        }
 
         if (this->existentialPairTypeCache.containsKey(interfaceType))
-            this->existentialPairTypeCache[newInterfaceType] =
-                this->existentialPairTypeCache[interfaceType];
+        {
+            if (!this->existentialPairTypeCache.containsKey(newInterfaceType))
+                this->existentialPairTypeCache[newInterfaceType] =
+                    this->existentialPairTypeCache[interfaceType];
+        }
 
         interfaceType->removeAndDeallocate();
         interfaceType = newInterfaceType;
@@ -877,7 +883,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
         if (!existentialPairTypeCache.tryGetValue(cacheKey, pairReqKey))
         {
             pairReqKey = _createDiffPairInterfaceRequirement(primalType, (IRType*)diffType);
-            existentialPairTypeCache.add(cacheKey, pairReqKey);
+            existentialPairTypeCache.addIfNotExists(cacheKey, pairReqKey);
         }
 
         auto baseWitnessTable = getExistentialBaseWitnessTable(builder, primalType);
@@ -940,13 +946,13 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             // Lower the diff pair type.
             auto loweredPairType = (IRType*)_createDiffPairType(type, diffType);
 
-            pairTypeCache.add(type, loweredPairType);
+            pairTypeCache.addIfNotExists(type, loweredPairType);
             args.add(loweredPairType);
         }
 
         auto loweredTypePack = builder->getTypePack(args.getCount(), args.getBuffer());
         // TODO: Unify the cache between the three cases.
-        pairTypeCache.add(cacheKey, loweredTypePack);
+        pairTypeCache.addIfNotExists(cacheKey, loweredTypePack);
 
         return loweredTypePack;
     }
@@ -977,7 +983,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
 
         // Concrete case.
         result = _createDiffPairType(primalType, (IRType*)diffType);
-        pairTypeCache.add(cacheKey, result);
+        pairTypeCache.addIfNotExists(cacheKey, result);
 
         return result;
     }
@@ -2800,7 +2806,7 @@ struct AutoDiffPass : public InstPassBase
                                     auto bwdFuncDecor = func->findDecoration<
                                         IRBackwardDerivativePropagateDecoration>();
 
-                                    typeToBwdFuncMap.add(
+                                    typeToBwdFuncMap.addIfNotExists(
                                         type,
                                         cast<IRGlobalValueWithCode>(
                                             as<IRSpecialize>(
@@ -2812,7 +2818,7 @@ struct AutoDiffPass : public InstPassBase
                                     auto bwdFuncDecor = func->findDecoration<
                                         IRBackwardDerivativePropagateDecoration>();
 
-                                    typeToBwdFuncMap.add(
+                                    typeToBwdFuncMap.addIfNotExists(
                                         type,
                                         cast<IRGlobalValueWithCode>(
                                             bwdFuncDecor->getBackwardDerivativePropagateFunc()));
