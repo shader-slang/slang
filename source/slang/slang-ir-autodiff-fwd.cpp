@@ -1194,7 +1194,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         // the generic args to specialize the primal function. This is true for all of our core
         // module functions, but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBaseSpecialize->getBase()->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBaseSpecialize->getBase(),
             args.getCount(),
             args.getBuffer());
@@ -1209,7 +1213,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         }
         diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBase->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBase,
             args.getCount(),
             args.getBuffer());

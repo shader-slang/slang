@@ -13,6 +13,9 @@
 namespace Slang
 {
 
+// Forward-declare.. (TODO: Just include this from the header instead)
+IRInst* specializeGeneric(IRSpecialize* specializeInst);
+
 constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 // Elements for which we keep track of propagation information.
 struct Element
@@ -287,7 +290,7 @@ struct DynamicInstLoweringContext
         else if (as<IRWitnessTableType>(inst->getDataType()))
             return kIROp_TableCollection;
         else
-            SLANG_UNEXPECTED("Unsupported collection type for instruction");
+            return kIROp_Invalid; // Return invalid IROp when not supported
     }
 
     // Factory methods for PropagationInfo
@@ -423,6 +426,9 @@ struct DynamicInstLoweringContext
                 if (as<IRGeneric>(inst) && as<IRInterfaceType>(getGenericReturnVal(inst)))
                     return none();
 
+                // TODO: We really should return something like Singleton(collectionInst) here
+                // instead of directly returning the collection.
+                //
                 return makeSingletonSet(inst);
             }
             else
@@ -641,7 +647,7 @@ struct DynamicInstLoweringContext
             bool hasUpcastedElements = false;
 
             IRBuilder builder(module);
-            builder.setInsertAfter(arg);
+            setInsertAfterOrdinaryInst(&builder, arg);
 
             // Upcast each element of the tuple
             for (UInt i = 0; i < argTupleType->getOperandCount(); ++i)
@@ -768,11 +774,20 @@ struct DynamicInstLoweringContext
         case kIROp_StructuredBufferLoad:
             info = analyzeLoad(context, inst);
             break;
+        case kIROp_MakeStruct:
+            info = analyzeMakeStruct(context, as<IRMakeStruct>(inst), workQueue);
+            break;
         case kIROp_Store:
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
             break;
         case kIROp_GetElementPtr:
             info = analyzeGetElementPtr(context, as<IRGetElementPtr>(inst));
+            break;
+        case kIROp_FieldAddress:
+            info = analyzeFieldAddress(context, as<IRFieldAddress>(inst));
+            break;
+        case kIROp_FieldExtract:
+            info = analyzeFieldExtract(context, as<IRFieldExtract>(inst));
             break;
         default:
             info = analyzeDefault(context, inst);
@@ -830,6 +845,41 @@ struct DynamicInstLoweringContext
             return makeExistential(cast<IRTableCollection>(collectionTag->getOperand(0)));
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
+    }
+
+    IRInst* analyzeMakeStruct(
+        IRInst* context,
+        IRMakeStruct* makeStruct,
+        LinkedList<WorkItem>& workQueue)
+    {
+        // We'll process this in the same way as a field-address, but for
+        // all fields of the struct.
+        //
+        auto structType = as<IRStructType>(makeStruct->getDataType());
+        UIndex operandIndex = 0;
+        for (auto field : structType->getFields())
+        {
+            auto operand = makeStruct->getOperand(operandIndex);
+            if (auto fieldInfo = tryGetInfo(context, operand))
+            {
+                IRInst* existingInfo = nullptr;
+                this->fieldInfo.tryGetValue(field, existingInfo);
+                auto newInfo = unionPropagationInfo(existingInfo, fieldInfo);
+                if (newInfo && !areInfosEqual(existingInfo, newInfo))
+                {
+                    // Update the field info map
+                    this->fieldInfo[field] = newInfo;
+
+                    if (this->fieldUseSites.containsKey(field))
+                        for (auto useSite : this->fieldUseSites[field])
+                            workQueue.addLast(WorkItem(useSite.context, useSite.inst));
+                }
+            }
+
+            operandIndex++;
+        }
+
+        return none(); // the make struct itself doesn't have any info.
     }
 
     bool isResourcePointer(IRInst* inst)
@@ -928,6 +978,57 @@ struct DynamicInstLoweringContext
         }
 
         return none(); // No info for the base pointer
+    }
+
+    IRInst* analyzeFieldAddress(IRInst* context, IRFieldAddress* fieldAddress)
+    {
+        // The base info should be in Ptr<T> form, so we just need to return Ptr<T> as the result.
+        //
+        IRBuilder builder(module);
+        builder.setInsertAfter(fieldAddress);
+        auto basePtr = fieldAddress->getBase();
+
+        if (auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType()))
+        {
+            auto structType = as<IRStructType>(basePtrType->getValueType());
+            SLANG_ASSERT(structType);
+            auto structField =
+                findStructField(structType, as<IRStructKey>(fieldAddress->getField()));
+
+            // Register this as a user of the field so updates will invoke this function again.
+            this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
+            this->fieldUseSites[structField].add(Element(context, fieldAddress));
+
+            if (this->fieldInfo.containsKey(structField))
+            {
+                IRBuilder builder(module);
+                return builder.getPtrTypeWithAddressSpace(
+                    (IRType*)this->fieldInfo[structField],
+                    as<IRPtrTypeBase>(fieldAddress->getDataType()));
+            }
+        }
+        return none();
+    }
+
+    IRInst* analyzeFieldExtract(IRInst* context, IRFieldExtract* fieldExtract)
+    {
+        IRBuilder builder(module);
+
+        auto structType = as<IRStructType>(fieldExtract->getBase()->getDataType());
+        SLANG_ASSERT(structType);
+        auto structField = findStructField(structType, as<IRStructKey>(fieldExtract->getField()));
+
+        // Register this as a user of the field so updates will invoke this function again.
+        this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
+        this->fieldUseSites[structField].add(Element(context, fieldExtract));
+
+        if (this->fieldInfo.containsKey(structField))
+        {
+            IRBuilder builder(module);
+            return this->fieldInfo[structField];
+        }
+
+        return none();
     }
 
     IRInst* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
@@ -1105,9 +1206,30 @@ struct DynamicInstLoweringContext
                     newParamTypes.getBuffer(),
                     (IRType*)substituteSets(funcType->getResultType()));
             }
+            else if (auto typeInfo = tryGetInfo(context, inst->getDataType()))
+            {
+                // There's one other case we'd like to handle, where the func-type itself is a
+                // dynamic IRSpecialize. In this situation, we'd want to use the type inst's info to
+                // find the collection-based specialization and create a func-type from it.
+                //
+                if (auto tag = as<IRCollectionTagType>(typeInfo))
+                {
+                    SLANG_ASSERT(getCollectionCount(tag) == 1);
+                    auto specializeInst = as<IRSpecialize>(getCollectionElement(tag, 0));
+                    auto funcType = as<IRFuncType>(specializeGeneric(specializeInst));
+                    if (!funcType)
+                    {
+                        SLANG_UNEXPECTED(
+                            "Unexpected IRSpecialize in analyzeSpecialize for func type");
+                        return none();
+                    }
+                    typeOfSpecialization = funcType;
+                }
+            }
             else
             {
-                SLANG_ASSERT_FAILURE("Unexpected data type for specialization instruction");
+                // We don't have a type we can work with just yet.
+                return none(); // No info for the type
             }
 
             IRCollectionBase* collection = nullptr;
@@ -1294,6 +1416,47 @@ struct DynamicInstLoweringContext
                         as<IRArrayType>(baseValueType)->getElementCount()),
                     as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
                 maybeUpdatePtr(context, getElementPtr->getBase(), baseInfo, workQueue);
+            }
+        }
+        else if (auto fieldAddress = as<IRFieldAddress>(inst))
+        {
+            // If this is a field address, update the fieldInfos map.
+            if (auto thisPtrInfo = as<IRPtrTypeBase>(info))
+            {
+                auto thisValueType = thisPtrInfo->getValueType();
+                IRBuilder builder(module);
+                auto baseStructPtrType = as<IRPtrTypeBase>(fieldAddress->getBase()->getDataType());
+                auto baseStructType = as<IRStructType>(baseStructPtrType->getValueType());
+                if (!baseStructType)
+                    return; // Do nothing..
+
+                if (auto fieldKey = as<IRStructKey>(fieldAddress->getField()))
+                {
+                    IRStructField* foundField = findStructField(baseStructType, fieldKey);
+                    IRInst* existingInfo = nullptr;
+                    this->fieldInfo.tryGetValue(foundField, existingInfo);
+
+                    if (existingInfo)
+                        existingInfo = builder.getPtrTypeWithAddressSpace(
+                            (IRType*)existingInfo,
+                            as<IRPtrTypeBase>(fieldAddress->getDataType()));
+
+                    if (auto newInfo = unionPropagationInfo(info, existingInfo))
+                    {
+                        if (newInfo != existingInfo)
+                        {
+                            auto newInfoValType = cast<IRPtrTypeBase>(newInfo)->getValueType();
+
+                            // Update the field info map
+                            this->fieldInfo[foundField] = newInfoValType;
+
+                            // Add a work item to update the field extract
+                            if (this->fieldUseSites.containsKey(foundField))
+                                for (auto useSite : this->fieldUseSites[foundField])
+                                    workQueue.addLast(WorkItem(useSite.context, useSite.inst));
+                        }
+                    }
+                }
             }
         }
         else if (auto var = as<IRVar>(inst))
@@ -1701,7 +1864,30 @@ struct DynamicInstLoweringContext
 
         UIndex paramIndex = 0;
         for (auto inst : instsToLower)
+        {
             hasChanges |= lowerInst(context, inst);
+        }
+
+        return hasChanges;
+    }
+
+    bool lowerStructType(IRStructType* structType)
+    {
+        bool hasChanges = false;
+        for (auto field : structType->getFields())
+        {
+            IRInst* info = nullptr;
+            this->fieldInfo.tryGetValue(field, info);
+            if (!info)
+                continue;
+
+            auto loweredFieldType = getLoweredType(info);
+            if (loweredFieldType != field->getDataType())
+            {
+                hasChanges = true;
+                field->setFieldType(loweredFieldType);
+            }
+        }
 
         return hasChanges;
     }
@@ -1780,25 +1966,26 @@ struct DynamicInstLoweringContext
     bool performDynamicInstLowering()
     {
         List<IRFunc*> funcsToProcess;
+        List<IRStructType*> structsToProcess;
 
         for (auto globalInst : module->getGlobalInsts())
+        {
             if (auto func = as<IRFunc>(globalInst))
-            {
                 funcsToProcess.add(func);
-            }
+            else if (auto structType = as<IRStructType>(globalInst))
+                structsToProcess.add(structType);
+        }
 
         bool hasChanges = false;
-        do
-        {
-            while (funcsToProcess.getCount() > 0)
-            {
-                auto func = funcsToProcess.getLast();
-                funcsToProcess.removeLast();
 
-                // Lower the instructions in the function
-                hasChanges |= lowerFunc(func);
-            }
-        } while (funcsToProcess.getCount() > 0);
+        // Lower struct types first so that data access can be
+        // marshalled properly during func lowering.
+        //
+        for (auto structType : structsToProcess)
+            hasChanges |= lowerStructType(structType);
+
+        for (auto func : funcsToProcess)
+            hasChanges |= lowerFunc(func);
 
         return hasChanges;
     }
@@ -1884,8 +2071,32 @@ struct DynamicInstLoweringContext
 
     bool replaceType(IRInst* context, IRInst* inst)
     {
+        if (as<IRModuleInst>(inst->getParent()))
+        {
+            if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst) ||
+                as<IRGeneric>(inst))
+            {
+                // Don't replace global concrete vals.
+                return false;
+            }
+        }
+
         if (auto info = tryGetInfo(context, inst))
         {
+            /* // Special cast for type collections.
+            if (auto collectionTagType = as<IRCollectionTagType>(info))
+            {
+                if (as<IRTypeCollection>(collectionTagType->getOperand(0)))
+                {
+                    // Remove the tag and replace the inst itself with the type
+                    // in the collection.
+                    //
+                    inst->replaceUsesWith(getLoweredType(collectionTagType->getOperand(0)));
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+            }*/
+
             if (auto loweredType = getLoweredType(info))
             {
                 if (loweredType == inst->getDataType())
@@ -1915,15 +2126,21 @@ struct DynamicInstLoweringContext
             return lowerCall(context, as<IRCall>(inst));
         case kIROp_MakeExistential:
             return lowerMakeExistential(context, as<IRMakeExistential>(inst));
+        case kIROp_MakeStruct:
+            return lowerMakeStruct(context, as<IRMakeStruct>(inst));
         case kIROp_CreateExistentialObject:
             return lowerCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
             return lowerStructuredBufferLoad(context, inst);
+        case kIROp_Specialize:
+            return lowerSpecialize(context, as<IRSpecialize>(inst));
         case kIROp_Load:
             return lowerLoad(context, inst);
         case kIROp_Store:
             return lowerStore(context, as<IRStore>(inst));
+        case kIROp_GetSequentialID:
+            return lowerGetSequentialID(context, as<IRGetSequentialID>(inst));
         default:
             {
                 if (auto info = tryGetInfo(context, inst))
@@ -2529,14 +2746,14 @@ struct DynamicInstLoweringContext
             case kParameterDirection_InOut:
                 {
                     auto argValueType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
-                    if (argValueType != paramType)
+                    /*if (argValueType != paramType)
                     {
                         SLANG_UNEXPECTED("ptr-typed parameters should have matching types");
                     }
                     else
-                    {
-                        newArgs.add(arg);
-                    }
+                    {*/
+                    newArgs.add(arg);
+                    //}
                     break;
                 }
             default:
@@ -2548,12 +2765,17 @@ struct DynamicInstLoweringContext
         builder.setInsertBefore(inst);
 
         bool changed = false;
-        for (UInt i = 0; i < newArgs.getCount(); i++)
+        if (newArgs.getCount() != inst->getArgCount())
+            changed = true;
+        else
         {
-            if (newArgs[i] != inst->getArg(i))
+            for (UInt i = 0; i < newArgs.getCount(); i++)
             {
-                changed = true;
-                break;
+                if (newArgs[i] != inst->getArg(i))
+                {
+                    changed = true;
+                    break;
+                }
             }
         }
 
@@ -2583,6 +2805,30 @@ struct DynamicInstLoweringContext
             // Nothing changed.
             return false;
         }
+    }
+
+    bool lowerMakeStruct(IRInst* context, IRMakeStruct* inst)
+    {
+        auto structType = as<IRStructType>(inst->getDataType());
+
+        // Reinterpret any of the arguments as necessary.
+        bool changed = false;
+        UIndex operandIndex = 0;
+        for (auto field : structType->getFields())
+        {
+            auto arg = inst->getOperand(operandIndex);
+            auto newArg = upcastCollection(context, arg, field->getFieldType());
+
+            if (arg != newArg)
+            {
+                changed = true;
+                inst->setOperand(operandIndex, newArg);
+            }
+
+            operandIndex++;
+        }
+
+        return changed;
     }
 
     bool lowerMakeExistential(IRInst* context, IRMakeExistential* inst)
@@ -2724,6 +2970,72 @@ struct DynamicInstLoweringContext
         }
     }
 
+    bool lowerSpecialize(IRInst* context, IRSpecialize* inst)
+    {
+        auto returnVal = getGenericReturnVal(inst->getBase());
+
+        // Functions should be handled at the call site (in lowerCall)
+        // since witness table specialization arguments must be inlined into the call.
+        //
+        if (as<IRFunc>(returnVal))
+        {
+            // TODO: Maybe make this the 'default' behavior if a lowering call
+            // returns false.
+            //
+            if (auto info = tryGetInfo(context, inst))
+                return replaceType(context, inst);
+            else
+                return false;
+        }
+
+        // For all other specializations, we'll 'drop' the dyanamic tag information.
+        bool changed = false;
+        List<IRInst*> args;
+        for (UIndex i = 0; i < inst->getArgCount(); i++)
+        {
+            auto arg = inst->getArg(i);
+            auto argDataType = arg->getDataType();
+            if (auto collectionTagType = as<IRCollectionTagType>(argDataType))
+            {
+                // If this is a tag type, replace with collection.
+                changed = true;
+                args.add(collectionTagType->getOperand(0));
+            }
+            else
+            {
+                args.add(arg);
+            }
+        }
+
+        /*IRType* typeForSpecialization = nullptr;
+        if (auto info = tryGetInfo(context, inst))
+        {
+            changed = true;
+            typeForSpecialization = getLoweredType(info);
+        }
+        else
+        {
+            typeForSpecialization = inst->getDataType();
+        }*/
+        IRBuilder builder(inst);
+        IRType* typeForSpecialization = builder.getTypeKind();
+
+        if (changed)
+        {
+            auto newInst = builder.emitSpecializeInst(
+                typeForSpecialization,
+                inst->getBase(),
+                args.getCount(),
+                args.getBuffer());
+
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
+    }
+
     bool lowerLoad(IRInst* context, IRInst* inst)
     {
         auto valInfo = tryGetInfo(context, inst);
@@ -2766,12 +3078,38 @@ struct DynamicInstLoweringContext
         return false;
     }
 
+    bool handleDefaultStore(IRInst* context, IRStore* inst)
+    {
+        SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
+        auto ptr = inst->getPtr();
+        auto destInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
+        auto valInfo = inst->getVal()->getDataType();
+
+        // "Legalize" the store type.
+        if (destInfo != valInfo)
+        {
+            inst->getVal()->setFullType(destInfo);
+            return true;
+        }
+        else
+            return false;
+    }
+
     bool lowerStore(IRInst* context, IRStore* inst)
     {
         auto ptr = inst->getPtr();
         auto ptrInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
 
         auto valInfo = inst->getVal()->getDataType();
+
+        // Special case for default initialization:
+        //
+        // Raw default initialization has been almost entirely
+        // removed from Slang, but the auto-diff process can sometimes
+        // produce a store of default-constructed value.
+        //
+        if (auto defaultConstruct = as<IRDefaultConstruct>(inst->getVal()))
+            return handleDefaultStore(context, inst);
 
         auto loweredVal = upcastCollection(context, inst->getVal(), ptrInfo);
 
@@ -2786,15 +3124,41 @@ struct DynamicInstLoweringContext
         return false;
     }
 
-    UInt getUniqueID(IRInst* funcOrTable)
+    bool lowerGetSequentialID(IRInst* context, IRGetSequentialID* inst)
     {
-        auto existingId = uniqueIds.tryGetValue(funcOrTable);
+        auto arg = inst->getOperand(0);
+        if (auto tagType = as<IRCollectionTagType>(arg->getDataType()))
+        {
+            IRBuilder builder(inst);
+            setInsertAfterOrdinaryInst(&builder, inst);
+            auto firstElement =
+                getCollectionElement(as<IRCollectionBase>(tagType->getOperand(0)), 0);
+            auto interfaceType =
+                as<IRInterfaceType>(as<IRWitnessTable>(firstElement)->getConformanceType());
+            List<IRInst*> args = {interfaceType, arg};
+            auto newInst = builder.emitIntrinsicInst(
+                (IRType*)builder.getUIntType(),
+                kIROp_GetSequentialIDFromTag,
+                args.getCount(),
+                args.getBuffer());
+
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
+    }
+
+    UInt getUniqueID(IRInst* inst)
+    {
+        auto existingId = uniqueIds.tryGetValue(inst);
         if (existingId)
             return *existingId;
 
-        UInt newId = nextUniqueId++;
-        uniqueIds[funcOrTable] = newId;
-        return newId;
+        // If we reach here, this instruction wasn't assigned an ID during initialization
+        // This should only happen for instructions that don't support collection types
+        SLANG_UNEXPECTED("getUniqueID called on instruction without pre-assigned ID");
     }
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }
@@ -2862,6 +3226,22 @@ struct DynamicInstLoweringContext
     DynamicInstLoweringContext(IRModule* module, DiagnosticSink* sink)
         : module(module), sink(sink)
     {
+        initializeUniqueIDs();
+    }
+
+    // Initialize unique IDs for all global instructions that can be part of collections
+    void initializeUniqueIDs()
+    {
+        UInt currentID = 1;
+        for (auto inst : module->getGlobalInsts())
+        {
+            // Only assign IDs to instructions that can be part of collections
+            IROp collectionType = getCollectionTypeForInst(inst);
+            if (collectionType != kIROp_Invalid)
+            {
+                uniqueIds[inst] = currentID++;
+            }
+        }
     }
 
     // Basic context
@@ -2874,8 +3254,14 @@ struct DynamicInstLoweringContext
     // Mapping from function to return value propagation information
     Dictionary<IRInst*, IRInst*> funcReturnInfo;
 
+    // Mapping from struct fields to propagation information
+    Dictionary<IRStructField*, IRInst*> fieldInfo;
+
     // Mapping from functions to call-sites.
     Dictionary<IRInst*, HashSet<Element>> funcCallSites;
+
+    // Mapping from fields to use-sites.
+    Dictionary<IRStructField*, HashSet<Element>> fieldUseSites;
 
     // Unique ID assignment for functions and witness tables
     Dictionary<IRInst*, UInt> uniqueIds;
@@ -3293,6 +3679,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         : InstPassBase(module)
     {
     }
+
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
         auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
@@ -3331,11 +3718,54 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+
+    void lowerGetSequentialIDFromTag(IRGetSequentialIDFromTag* inst)
+    {
+        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
+        auto srcTagInst = inst->getOperand(1);
+
+        Dictionary<UInt, UInt> mapping;
+
+        // Map from sequential ID to unique ID
+        auto destCollection = cast<IRCollectionBase>(
+            cast<IRCollectionTagType>(srcTagInst->getDataType())->getOperand(0));
+
+        UIndex dstSeqID = 0;
+        forEachInCollection(
+            destCollection,
+            [&](IRInst* table)
+            {
+                // Get unique ID for the witness table
+                auto witnessTable = cast<IRWitnessTable>(table);
+                auto outputId = dstSeqID++;
+                auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
+                if (seqDecoration)
+                {
+                    auto inputId = seqDecoration->getSequentialID();
+                    mapping.add({outputId, inputId});
+                }
+            });
+
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+        auto translatedID = builder.emitCallInst(
+            inst->getDataType(),
+            createIntegerMappingFunc(builder.getModule(), mapping),
+            List<IRInst*>({srcTagInst}));
+
+        inst->replaceUsesWith(translatedID);
+        inst->removeAndDeallocate();
+    }
+
     void processModule()
     {
         processInstsOfType<IRGetTagFromSequentialID>(
             kIROp_GetTagFromSequentialID,
             [&](IRGetTagFromSequentialID* inst) { return lowerGetTagFromSequentialID(inst); });
+
+        processInstsOfType<IRGetSequentialIDFromTag>(
+            kIROp_GetSequentialIDFromTag,
+            [&](IRGetSequentialIDFromTag* inst) { return lowerGetSequentialIDFromTag(inst); });
     }
 };
 

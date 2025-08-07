@@ -2191,8 +2191,9 @@ local insts = {
 	{ GetTagForSuperCollection = {} }, -- Translate a tag from a set to its equivalent in a super-set
 	{ GetTagForMappedCollection = {} }, -- Translate a tag from a set to its equivalent in a different set
 	                                   -- based on a mapping induced by a lookup key
-	{ GetTagFromSequentialID = {} } -- Translate an existing sequential ID & and interface type into a tag
+	{ GetTagFromSequentialID = {} }, -- Translate an existing sequential ID & and interface type into a tag
 	                                 -- the provided collection.
+	{ GetSequentialIDFromTag = {} } -- Translate a tag from the given collection to a sequential ID.
 }
 
 -- A function to calculate some useful properties and put it in the table,
