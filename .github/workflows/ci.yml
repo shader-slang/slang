@@ -114,20 +114,16 @@ jobs:
           else
             BASE=HEAD^1
           fi
-          # Check git diff separately to handle failures conservatively
-          # First check if git diff command succeeds
-          if git diff --name-only -z $BASE...HEAD >/dev/null 2>&1; then
-            # Git diff succeeded, now check the actual file changes
-            if git diff --name-only -z $BASE...HEAD | 
-              grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
-              echo "should-run=true" >> $GITHUB_OUTPUT
-            else
+          # Default to running tests (conservative approach)
+          echo "should-run=true" >> $GITHUB_OUTPUT
+          
+          # Only skip if we can successfully determine that only documentation files changed
+          if result="$(git diff --name-only -z $BASE...HEAD 2>/dev/null)"; then
+            # Git diff succeeded, check if only documentation files changed
+            if ! echo "$result" | grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
               echo "Only documentation files changed, skipping remaining steps"
               echo "should-run=false" >> $GITHUB_OUTPUT
             fi
-          else
-            echo "Git diff failed, conservatively running all tests"
-            echo "should-run=true" >> $GITHUB_OUTPUT
           fi
       - name: Install dependencies
         run: |
