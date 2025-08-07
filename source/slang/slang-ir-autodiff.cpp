@@ -539,9 +539,9 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
     IRStructKey* getDiffRequirementKey = builder.createStructKey();
     IRStructKey* makePairRequirementKey = builder.createStructKey();
 
-    makePairKeyMap[diffPairRequirementKey] = makePairRequirementKey;
-    getPrimalKeyMap[diffPairRequirementKey] = getPrimalRequirementKey;
-    getDiffKeyMap[diffPairRequirementKey] = getDiffRequirementKey;
+    makePairKeyMap.addIfNotExists(diffPairRequirementKey, makePairRequirementKey);
+    getPrimalKeyMap.addIfNotExists(diffPairRequirementKey, getPrimalRequirementKey);
+    getDiffKeyMap.addIfNotExists(diffPairRequirementKey, getDiffRequirementKey);
 
     List<IRInst*> entries;
 
@@ -577,7 +577,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         auto entry =
             builder.createInterfaceRequirementEntry(getPrimalRequirementKey, entryFuncType);
 
-        getPrimalFuncTypeMap[getPrimalRequirementKey] = entryFuncType;
+        getPrimalFuncTypeMap.addIfNotExists(getPrimalRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_getPrimal";
@@ -601,7 +601,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         auto entryFuncType = builder.getFuncType(paramTypes, resultType);
         auto entry = builder.createInterfaceRequirementEntry(getDiffRequirementKey, entryFuncType);
 
-        getDiffFuncTypeMap[getDiffRequirementKey] = entryFuncType;
+        getDiffFuncTypeMap.addIfNotExists(getDiffRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_getDiff";
@@ -627,7 +627,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
             builder.getAssociatedType(resultConstraintTypes.getArrayView()));
         auto entry = builder.createInterfaceRequirementEntry(makePairRequirementKey, entryFuncType);
 
-        makePairFuncTypeMap[makePairRequirementKey] = entryFuncType;
+        makePairFuncTypeMap.addIfNotExists(makePairRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_makePair";
@@ -892,8 +892,10 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             baseWitnessTable,
             pairReqKey);
 
-        primalTypeMap[result] = primalType;
-        diffTypeMap[result] = (IRType*)diffType;
+        if (!primalTypeMap.containsKey(result))
+            primalTypeMap[result] = primalType;
+        if (!diffTypeMap.containsKey(result))
+            diffTypeMap[result] = (IRType*)diffType;
 
         return result;
     }
@@ -2972,7 +2974,7 @@ struct AutoDiffPass : public InstPassBase
                 builder.setInsertBefore(t);
                 auto diffInfo = fillDifferentialTypeImplementation(&ctx, diffTypes, t);
                 if (!diffTypes.containsKey(t))
-                    diffTypes[t] = diffInfo;
+                    diffTypes.addIfNotExists(t, diffInfo);
             }
             else if (auto specialize = as<IRSpecialize>(t))
             {
@@ -2997,7 +2999,7 @@ struct AutoDiffPass : public InstPassBase
                     (UInt)args.getCount(),
                     args.getBuffer());
                 if (!diffTypes.containsKey(t))
-                    diffTypes[t] = info;
+                    diffTypes.addIfNotExists(t, info);
             }
             else
             {
