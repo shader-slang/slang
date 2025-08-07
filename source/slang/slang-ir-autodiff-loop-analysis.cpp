@@ -935,7 +935,8 @@ StatementSet collectImplications(
     // We'll keep track of the predicates for each block.
     Dictionary<IRBlock*, StatementSet> blockPredicates;
 
-    blockPredicates[block] = Predicates;
+    if (!blockPredicates.containsKey(block))
+        blockPredicates[block] = Predicates;
 
     while (workList.getCount() > 0)
     {
