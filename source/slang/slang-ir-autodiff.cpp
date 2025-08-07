@@ -71,7 +71,8 @@ static IRInst* _getDiffTypeFromPairType(
     IRDifferentialPairTypeBase* type)
 {
     // Special case when the primal type is an InterfaceType/AssociatedType
-    // For these types, we don't need a witness and can return the appropriate interface type directly
+    // For these types, we don't need a witness and can return the appropriate interface type
+    // directly
     if (as<IRInterfaceType>(type->getValueType()) || as<IRAssociatedType>(type->getValueType()))
     {
         // The differential type is the IDifferentiable interface type.
@@ -705,6 +706,15 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
             &builder,
             concretePrimalType,
             DiffConformanceKind::Value);
+
+        // Special case for interface types - they don't need a witness
+        if (!witness &&
+            (as<IRInterfaceType>(concretePrimalType) || as<IRAssociatedType>(concretePrimalType)))
+        {
+            // For interface types, we can create a special pair type without a witness
+            // or skip this particular witness table since interface types are handled specially
+            continue;
+        }
 
         // Really should not see a case where the original interface is differentiable, but
         // we can't find the witness table.
