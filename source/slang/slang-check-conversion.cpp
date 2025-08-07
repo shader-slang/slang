@@ -1695,110 +1695,49 @@ bool SemanticsVisitor::_coerce(
         // If all of the candidates in `bestCandidates` are applicable,
         // then we have an ambiguity.
         //
-        // However, for constructor overload resolution, we can try to resolve
-        // the ambiguity by preferring constructors that don't require argument
-        // conversions (i.e., direct matches).
+        // We will compute a nominal conversion cost as the minimum over
+        // all the conversions available.
         //
-        OverloadCandidate* preferredCandidate = nullptr;
-        ConversionCost preferredCandidateCost = kConversionCost_Explicit;
-        
-        for (Index i = 0; i < overloadContext.bestCandidates.getCount(); i++)
+        ConversionCost bestCost = kConversionCost_Explicit;
+        ImplicitCastMethod method;
+        for (auto candidate : overloadContext.bestCandidates)
         {
-            auto& candidate = overloadContext.bestCandidates[i];
-            
-            // For constructor candidates, prefer those with parameter types that 
-            // exactly match the argument type (without requiring built-in conversions)
-            if (candidate.item.declRef.is<ConstructorDecl>())
+            ConversionCost candidateCost =
+                getImplicitConversionCostWithKnownArg(candidate.item.declRef, toType, fromExpr);
+            if (candidateCost < bestCost)
             {
-                auto ctorDecl = candidate.item.declRef.as<ConstructorDecl>();
-                auto params = getParameters(m_astBuilder, ctorDecl);
-                
-                // Check if this is a single-parameter constructor
-                bool isDirectMatch = false;
-                if (params.getCount() == 1)
-                {
-                    auto paramType = getParamType(m_astBuilder, params[0]);
-                    
-                    // Check if parameter type exactly matches argument type
-                    if (paramType->equals(fromType.type))
-                    {
-                        isDirectMatch = true;
-                    }
-                }
-                
-                // If we found a direct match, prefer it over any previous candidates
-                if (isDirectMatch)
-                {
-                    if (!preferredCandidate || 
-                        candidate.conversionCostSum <= preferredCandidateCost)
-                    {
-                        preferredCandidate = &candidate;
-                        preferredCandidateCost = candidate.conversionCostSum;
-                    }
-                }
-                else if (!preferredCandidate)
-                {
-                    // Only consider non-direct matches if we haven't found a direct match yet
-                    preferredCandidate = &candidate;
-                    preferredCandidateCost = candidate.conversionCostSum;
-                }
+                method.conversionFuncOverloadCandidate = candidate;
+                bestCost = candidateCost;
             }
         }
-        
-        // If we found a clearly preferred constructor, use it instead of reporting ambiguity
-        if (preferredCandidate)
+
+        bool result = true;
+
+        // Conceptually, we want to treat the conversion as
+        // possible, but report it as ambiguous if we actually
+        // need to reify the result as an expression.
+        //
+        if (outToExpr)
         {
-            overloadContext.bestCandidate = preferredCandidate;
-            overloadContext.bestCandidates.clear();
+            if (sink)
+            {
+                sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+            }
+
+            *outToExpr = CreateErrorExpr(fromExpr);
+            result = false;
         }
-        
-        // If we still have multiple candidates, proceed with the original ambiguity logic
-        if (overloadContext.bestCandidates.getCount() != 0)
+
+        if (!cachedMethod)
         {
-            // We will compute a nominal conversion cost as the minimum over
-            // all the conversions available.
-            //
-            ConversionCost bestCost = kConversionCost_Explicit;
-            ImplicitCastMethod method;
-            for (auto candidate : overloadContext.bestCandidates)
-            {
-                ConversionCost candidateCost =
-                    getImplicitConversionCostWithKnownArg(candidate.item.declRef, toType, fromExpr);
-                if (candidateCost < bestCost)
-                {
-                    method.conversionFuncOverloadCandidate = candidate;
-                    bestCost = candidateCost;
-                }
-            }
-
-            bool result = true;
-
-            // Conceptually, we want to treat the conversion as
-            // possible, but report it as ambiguous if we actually
-            // need to reify the result as an expression.
-            //
-            if (outToExpr)
-            {
-                if (sink)
-                {
-                    sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
-                }
-
-                *outToExpr = CreateErrorExpr(fromExpr);
-                result = false;
-            }
-
-            if (!cachedMethod)
-            {
-                method.isAmbiguous = true;
-                method.cost = bestCost;
-                getShared()->cacheImplicitCastMethod(implicitCastKey, method);
-            }
-
-            if (outCost)
-                *outCost = bestCost;
-            return result;
+            method.isAmbiguous = true;
+            method.cost = bestCost;
+            getShared()->cacheImplicitCastMethod(implicitCastKey, method);
         }
+
+        if (outCost)
+            *outCost = bestCost;
+        return result;
     }
     else if (overloadContext.bestCandidate)
     {
