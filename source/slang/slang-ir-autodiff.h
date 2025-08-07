@@ -230,7 +230,7 @@ struct DifferentiableTypeConformanceContext
     {
         // Populate dictionary with null differential type.
         if (sharedContext->nullDifferentialStructType)
-            differentiableTypeWitnessDictionary.add(
+            differentiableTypeWitnessDictionary.addIfNotExists(
                 sharedContext->nullDifferentialStructType,
                 sharedContext->nullDifferentialWitness);
     }

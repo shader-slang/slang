@@ -2641,7 +2641,8 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     {
         if (isTypeEqual(type.key, (IRType*)typeInst))
         {
-            context.differentiableTypeWitnessDictionary[(IRType*)typeInst] = type.value;
+            // Use addIfNotExists to avoid crashes when key already exists
+            context.differentiableTypeWitnessDictionary.addIfNotExists((IRType*)typeInst, type.value);
             return true;
         }
     }
@@ -2964,7 +2965,8 @@ struct AutoDiffPass : public InstPassBase
                 SLANG_RELEASE_ASSERT(t->getParent() && t->getParent()->getOp() == kIROp_ModuleInst);
                 builder.setInsertBefore(t);
                 auto diffInfo = fillDifferentialTypeImplementation(&ctx, diffTypes, t);
-                diffTypes[t] = diffInfo;
+                if (!diffTypes.containsKey(t))
+                    diffTypes[t] = diffInfo;
             }
             else if (auto specialize = as<IRSpecialize>(t))
             {
@@ -2988,7 +2990,8 @@ struct AutoDiffPass : public InstPassBase
                     baseInfo.diffWitness,
                     (UInt)args.getCount(),
                     args.getBuffer());
-                diffTypes[t] = info;
+                if (!diffTypes.containsKey(t))
+                    diffTypes[t] = info;
             }
             else
             {
