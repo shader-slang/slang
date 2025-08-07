@@ -2126,7 +2126,6 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
                 varDecl->nameAndLoc.loc = expr->loc;
                 varDecl->initExpr = expr;
                 varDecl->type.type = expr->type.type;
-                auto varDeclRef = makeDeclRef(varDecl);
                 LetExpr* letExpr = m_astBuilder->create<LetExpr>();
                 letExpr->decl = varDecl;
                 localScope->addBinding(letExpr);
@@ -2140,7 +2139,7 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
                     expandedArg->base = varExpr;
                     expandedArg->type = typePack->getElementType(i);
                     expandedArg->type.isLeftValue = false;
-                    expandedArg->elementIndices.add(i);
+                    expandedArg->elementIndices.add((uint32_t)i);
                     result.add(expandedArg);
                 }
                 return true;
