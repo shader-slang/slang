@@ -1706,74 +1706,41 @@ bool SemanticsVisitor::_coerce(
         {
             auto& candidate = overloadContext.bestCandidates[i];
             
-            // For constructor candidates, prefer those that don't need implicit conversions
+            // For constructor candidates, prefer those with parameter types that 
+            // exactly match the argument type (without requiring built-in conversions)
             if (candidate.item.declRef.is<ConstructorDecl>())
             {
                 auto ctorDecl = candidate.item.declRef.as<ConstructorDecl>();
                 auto params = getParameters(m_astBuilder, ctorDecl);
                 
-                // Check if this constructor has direct parameter matches
-                bool isDirectMatch = true;
+                // Check if this is a single-parameter constructor
+                bool isDirectMatch = false;
                 if (params.getCount() == 1)
                 {
                     auto paramType = getParamType(m_astBuilder, params[0]);
                     
-                    // Check if the argument type matches the parameter type exactly
-                    if (!paramType->equals(fromType.type))
+                    // Check if parameter type exactly matches argument type
+                    if (paramType->equals(fromType.type))
                     {
-                        isDirectMatch = false;
+                        isDirectMatch = true;
                     }
                 }
                 
-                // Prefer direct matches over conversions
-                if (isDirectMatch && !preferredCandidate)
+                // If we found a direct match, prefer it over any previous candidates
+                if (isDirectMatch)
                 {
+                    if (!preferredCandidate || 
+                        candidate.conversionCostSum <= preferredCandidateCost)
+                    {
+                        preferredCandidate = &candidate;
+                        preferredCandidateCost = candidate.conversionCostSum;
+                    }
+                }
+                else if (!preferredCandidate)
+                {
+                    // Only consider non-direct matches if we haven't found a direct match yet
                     preferredCandidate = &candidate;
                     preferredCandidateCost = candidate.conversionCostSum;
-                }
-                else if (!isDirectMatch && preferredCandidate)
-                {
-                    // Keep the direct match we already found
-                    continue;
-                }
-                else if (candidate.conversionCostSum < preferredCandidateCost)
-                {
-                    preferredCandidate = &candidate;
-                    preferredCandidateCost = candidate.conversionCostSum;
-                }
-                else if (candidate.conversionCostSum == preferredCandidateCost && preferredCandidate)
-                {
-                    // If we have multiple direct matches or multiple conversions with same cost
-                    // Only consider it ambiguous if we haven't already found a direct match
-                    if (isDirectMatch)
-                    {
-                        auto preferredCtorDecl = preferredCandidate->item.declRef.as<ConstructorDecl>();
-                        auto preferredParams = getParameters(m_astBuilder, preferredCtorDecl);
-                        if (preferredParams.getCount() == 1)
-                        {
-                            auto preferredParamType = getParamType(m_astBuilder, preferredParams[0]);
-                            bool preferredIsDirectMatch = preferredParamType->equals(fromType.type);
-                            
-                            if (!preferredIsDirectMatch)
-                            {
-                                // Replace non-direct match with direct match
-                                preferredCandidate = &candidate;
-                                preferredCandidateCost = candidate.conversionCostSum;
-                            }
-                            else
-                            {
-                                // Both are direct matches - ambiguous
-                                preferredCandidate = nullptr;
-                                break;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Multiple conversion candidates with same cost
-                        preferredCandidate = nullptr;
-                        break;
-                    }
                 }
             }
         }

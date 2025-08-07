@@ -1812,6 +1812,40 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
         if (leftIsImplicitConversion != rightIsImplicitConversion)
             return rightIsImplicitConversion - leftIsImplicitConversion;
 
+        // Special handling for constructor overload resolution ambiguity.
+        // When we have multiple constructors with the same cost, prefer the one
+        // where the parameter types exactly match the argument types.
+        if (left->item.declRef.is<ConstructorDecl>() && right->item.declRef.is<ConstructorDecl>())
+        {
+            auto leftCtor = left->item.declRef.as<ConstructorDecl>();
+            auto rightCtor = right->item.declRef.as<ConstructorDecl>();
+            
+            auto leftParams = getParameters(m_astBuilder, leftCtor);
+            auto rightParams = getParameters(m_astBuilder, rightCtor);
+            
+            // For single-parameter constructors, check if one has an exact type match
+            if (leftParams.getCount() == 1 && rightParams.getCount() == 1)
+            {
+                // This is a heuristic: if we're in a context where we're comparing
+                // constructors and they have the same cost, prefer the one that
+                // likely has a direct parameter type match over one that requires conversion.
+                // We can identify this by looking at parameter types vs common scalar types.
+                
+                auto leftParamType = getParamType(m_astBuilder, leftParams[0]);
+                auto rightParamType = getParamType(m_astBuilder, rightParams[0]);
+                
+                // Prefer scalar types over vector types when costs are equal
+                // This handles the case where scalar constructor competes with vector constructor
+                bool leftIsScalar = as<BasicExpressionType>(leftParamType) != nullptr;
+                bool rightIsScalar = as<BasicExpressionType>(rightParamType) != nullptr;
+                
+                if (leftIsScalar && !rightIsScalar)
+                    return -1; // prefer left (scalar)
+                if (!leftIsScalar && rightIsScalar)
+                    return 1;  // prefer right (scalar)
+            }
+        }
+
         auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
         if (specificityDiff)
             return specificityDiff;
