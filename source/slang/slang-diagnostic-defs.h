@@ -2512,6 +2512,11 @@ DIAGNOSTIC(
     Warning,
     methodNeverMutates,
     "method marked `[mutable]` but never modifies `this`")
+DIAGNOSTIC(
+    41024,
+    Warning,
+    commaOperatorUsedInExpression,
+    "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
     41024,
