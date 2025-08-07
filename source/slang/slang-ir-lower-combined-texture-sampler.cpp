@@ -28,14 +28,7 @@ struct LowerCombinedSamplerContext
         {
             return findCombinedTextureSamplerTypeInArray(arrayType->getElementType());
         }
-        else if (auto textureType = as<IRTextureTypeBase>(type))
-        {
-            return textureType;
-        }
-        else
-        {
-            return nullptr;
-        }
+        return as<IRTextureTypeBase>(type);
     }
 
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
@@ -170,7 +163,8 @@ void lowerCombinedTextureSamplers(
             // If the user of the type is an array, then we update the element layout
             // to use the new StructTypeVarLayout. Otherwise, we replace the VarLayout
             // with the new StructTypeVarLayout.
-            if (auto arrayTypeLayout = as<IRArrayTypeLayout>(oldTypeLayout))
+            auto arrayTypeLayout = as<IRArrayTypeLayout>(oldTypeLayout);
+            if (arrayTypeLayout)
             {
                 newTypeLayout =
                     IRArrayTypeLayout::Builder(&subBuilder, typeInfo.typeLayout).build();
