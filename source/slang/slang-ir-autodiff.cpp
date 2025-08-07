@@ -70,10 +70,8 @@ static IRInst* _getDiffTypeFromPairType(
     IRBuilder* builder,
     IRDifferentialPairTypeBase* type)
 {
-    auto witness = type->getWitness();
-    SLANG_RELEASE_ASSERT(witness);
-
     // Special case when the primal type is an InterfaceType/AssociatedType
+    // For these types, we don't need a witness and can return the appropriate interface type directly
     if (as<IRInterfaceType>(type->getValueType()) || as<IRAssociatedType>(type->getValueType()))
     {
         // The differential type is the IDifferentiable interface type.
@@ -84,6 +82,9 @@ static IRInst* _getDiffTypeFromPairType(
         else
             SLANG_UNEXPECTED("Unexpected differential pair type");
     }
+
+    auto witness = type->getWitness();
+    SLANG_RELEASE_ASSERT(witness);
 
     if (as<IRDifferentialPairType>(type) || as<IRDifferentialPairUserCodeType>(type))
         return _lookupWitness(

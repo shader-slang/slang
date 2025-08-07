@@ -237,8 +237,39 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(
 
 IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRInst* originalType)
 {
+    // Special case for interface types - we don't need a witness for these
+    // Check both the original type and the primal type
+    if (as<IRInterfaceType>(originalType) || as<IRAssociatedType>(originalType))
+    {
+        if (differentiableTypeConformanceContext.lookUpConformanceForType(
+                originalType,
+                DiffConformanceKind::Value))
+            return autoDiffSharedContext->differentiableInterfaceType;
+        else if (differentiableTypeConformanceContext.lookUpConformanceForType(
+                     originalType,
+                     DiffConformanceKind::Ptr))
+            return autoDiffSharedContext->differentiablePtrInterfaceType;
+        else
+            return (IRType*)originalType; // Return original type if not differentiable
+    }
+
     auto primalType = lookupPrimalInst(builder, originalType, originalType);
     SLANG_RELEASE_ASSERT(primalType);
+
+    // Special case for interface types after primal lookup - we don't need a witness for these
+    if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
+    {
+        if (differentiableTypeConformanceContext.lookUpConformanceForType(
+                primalType,
+                DiffConformanceKind::Value))
+            return autoDiffSharedContext->differentiableInterfaceType;
+        else if (differentiableTypeConformanceContext.lookUpConformanceForType(
+                     primalType,
+                     DiffConformanceKind::Ptr))
+            return autoDiffSharedContext->differentiablePtrInterfaceType;
+        else
+            return (IRType*)primalType; // Return original type if not differentiable
+    }
 
     IRInst* witness = nullptr;
 
