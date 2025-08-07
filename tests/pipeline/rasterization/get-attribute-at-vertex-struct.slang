@@ -1,6 +1,6 @@
-// get-attribute-at-vertex.slang
+// get-attribute-at-vertex-struct.slang
 
-// Basic test for `GetAttributeAtVertex` function
+// Test GetAttributeAtVertex and SV_Barycentrics on struct members
 
 //TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 //TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry main -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
@@ -19,15 +19,20 @@
 // CHECK-GLSL-DAG: gl_BaryCoordEXT
 // CHECK-GLSL-DAG: gl_BaryCoordNoPerspEXT
 
+struct Input
+{
+    pervertex float4 color : COLOR;
+    float3 bary : SV_Barycentrics;
+    noperspective float3 baryNoPerspective : SV_Barycentrics;
+}
+
 [shader("fragment")]
 void main(
-    pervertex float4 color : COLOR,
-    float3 bary : SV_Barycentrics,
-    noperspective float3 baryNoPerspective : SV_Barycentrics,
+    Input input,
     out float4 result : SV_Target)
 {
-    result = bary.x * GetAttributeAtVertex(color, 0)
-           + bary.y * GetAttributeAtVertex(color, 1)
-           + bary.z * GetAttributeAtVertex(color, 2)
-           + baryNoPerspective.x * 0.1f;
+    result = input.bary.x * GetAttributeAtVertex(input.color, 0)
+        + input.bary.y * GetAttributeAtVertex(input.color, 1)
+        + input.bary.z * GetAttributeAtVertex(input.color, 2)
+        + input.baryNoPerspective.x * 0.1f;
 }
