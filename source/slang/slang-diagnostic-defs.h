@@ -1989,8 +1989,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    overloadedParameterToHigherOrderFunction,
-    "passing overloaded functions to higher order functions is not supported")
+    overloadedArgument,
+    "passing an overloaded value as argument is not supported")
 
 DIAGNOSTIC(
     39999,

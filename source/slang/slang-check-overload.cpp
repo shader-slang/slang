@@ -2754,9 +2754,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
         // If this argument is itself an overloaded value without a type
         // then we can't sensibly continue
-        if (!arg->type && (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg)))
+        if (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg))
         {
-            getSink()->diagnose(expr->loc, Diagnostics::overloadedParameterToHigherOrderFunction);
+            getSink()->diagnose(expr->loc, Diagnostics::overloadedArgument);
             return CreateErrorExpr(expr);
         }
     }
