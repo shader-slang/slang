@@ -3471,23 +3471,21 @@ SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFuncti
 SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFunc)
 {
     auto func = convertToFunc(inFunc);
-    if (!func)
+    if (func)
+        return getText(func.getDecl()->getName()).getBuffer();
+    
+    // If convertToFunc failed, this might be an overloaded function.
+    // Try to get the name from the first overload candidate.
+    auto overloadedFunc = convertToOverloadedFunc(inFunc);
+    if (overloadedFunc && overloadedFunc->lookupResult2.items.getCount() > 0)
     {
-        // If convertToFunc failed, this might be an overloaded function.
-        // Try to get the name from the first overload candidate.
-        auto overloadedFunc = convertToOverloadedFunc(inFunc);
-        if (overloadedFunc && overloadedFunc->lookupResult2.items.getCount() > 0)
+        auto firstOverload = overloadedFunc->lookupResult2.items[0].declRef;
+        if (auto funcDeclRef = firstOverload.as<FunctionDeclBase>())
         {
-            auto firstOverload = overloadedFunc->lookupResult2.items[0].declRef;
-            if (auto funcDeclRef = firstOverload.as<FunctionDeclBase>())
-            {
-                return getText(funcDeclRef.getDecl()->getName()).getBuffer();
-            }
+            return getText(funcDeclRef.getDecl()->getName()).getBuffer();
         }
-        return nullptr;
     }
-
-    return getText(func.getDecl()->getName()).getBuffer();
+    return nullptr;
 }
 
 SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* inFunc)
