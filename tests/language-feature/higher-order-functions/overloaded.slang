@@ -17,7 +17,7 @@ int zit() {
     return foo(bit<float>);
 }
 
-int main()
+void main()
 {
     // CHECK: 10
     printf("%d\n", zit());
