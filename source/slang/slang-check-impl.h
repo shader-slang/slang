@@ -71,8 +71,8 @@ int getTypeBitSize(Type* t);
 struct BasicTypeKey
 {
     uint32_t baseType : 8;
-    uint32_t dim1 : 4;
-    uint32_t dim2 : 4;
+    uint32_t dim1 : 8;
+    uint32_t dim2 : 8;
     uint32_t knownConstantBitCount : 8;
     uint32_t knownNegative : 1;
     uint32_t isLValue : 1;
