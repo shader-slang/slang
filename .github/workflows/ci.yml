@@ -113,7 +113,8 @@ jobs:
               "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
               "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}" \
               "-DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}" \
-              "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
+              "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}" \
+              -DSLANG_ENABLE_TESTS=ON
             cmake --workflow --preset "${{matrix.config}}"
           else
             # Otherwise, use the "system" llvm we have just build or got from the
@@ -122,7 +123,8 @@ jobs:
               -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
               "-DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}" \
-              "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
+              "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}" \
+              -DSLANG_ENABLE_TESTS=ON
             cmake --workflow --preset "${{matrix.config}}"
           fi
 
@@ -192,9 +194,6 @@ jobs:
           unzip -q slang.zip
           cd ../../
           echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
-          echo "Contents after extraction:"
-          ls -la build/dist-${{matrix.config}}/
-          ls -la build/dist-${{matrix.config}}/bin/ || echo "Still no bin directory"
 
       - name: Test Slang
         run: |
