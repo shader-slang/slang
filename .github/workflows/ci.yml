@@ -31,6 +31,7 @@ jobs:
 
     outputs:
       should-run-release: ${{ steps.filter.outputs.should-run }}
+      run-id: ${{ github.run_id }}
 
     steps:
       - name: Add bash to PATH
@@ -186,6 +187,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
@@ -193,7 +195,8 @@ jobs:
           cd build/dist-${{matrix.config}}
           unzip -q slang.zip
           cd ../../
-          echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          # Set bin_dir to the CMake build output directory which should contain test executables
+          echo "bin_dir=$(pwd)/build/Release/bin" >> $GITHUB_ENV
 
       - name: Test Slang
         run: |
@@ -266,6 +269,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
@@ -319,6 +323,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
@@ -372,6 +377,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
@@ -433,6 +439,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
@@ -440,7 +447,8 @@ jobs:
           cd build/dist-${{matrix.config}}
           unzip -q slang.zip
           cd ../../
-          echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          # Set bin_dir to the CMake build output directory which should contain test executables
+          echo "bin_dir=$(pwd)/build/Release/bin" >> $GITHUB_ENV
 
       - name: Run slang-rhi tests
         run: |
@@ -484,6 +492,7 @@ jobs:
         with:
           name: slang-build-windows-${{matrix.config}}
           path: ./
+          run-id: ${{ needs.build-slang.outputs.run-id }}
 
       - name: Setup environment variables
         run: |
