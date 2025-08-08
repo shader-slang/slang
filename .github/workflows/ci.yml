@@ -29,7 +29,7 @@ jobs:
             full-gpu-tests: true
             server-count: 8
       fail-fast: false
-    runs-on: ["Windows", "self-hosted", "GCP-T4"]
+    runs-on: ["Windows", "self-hosted", "GCP-T4", "test"]
 
     defaults:
       run:
@@ -80,7 +80,7 @@ jobs:
 
       # Don't need to check this on every config
       - name: Check Stable Names Table
-        if: ${{ matrix.config == 'debug' && steps.filter.outputs.should-run == 'true' }}
+        if: ${{ matrix.config == 'linux' && matrix.config == 'debug' }}
         run: ./extras/check-ir-stable-names-gh-actions.sh
 
       - name: Check Version Constants
