@@ -16,6 +16,10 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
     DiagnosticSink* sink;
     IRBuilder builder;
 
+    // Track FieldAddress instructions that now return descriptor handles
+    List<IRInst*> descriptorHandleFieldAccessList;
+    Dictionary<IRInst*, IRInst*> fieldAccessToField;
+
     ResourceToDescriptorHandleContext(TargetProgram* inTargetProgram, IRModule* module, DiagnosticSink* inSink)
         : InstPassBase(module)
         , targetProgram(inTargetProgram)
@@ -32,18 +36,69 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         return (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, resourceType);
     }
 
-    IRInst* createCastDescriptorHandleToResource(IRType* resourceType, IRInst* descriptorHandle)
-    {
-        builder.setInsertBefore(descriptorHandle);
-        return builder.emitIntrinsicInst(
-            resourceType,
-            kIROp_CastDescriptorHandleToResource,
-            1,
-            &descriptorHandle);
-    }
 
+    void processLoadOperationsForFieldAccess()
+    {
+        // For each fieldAccess (fieldExtract or fieldAddress)
+        // that now returns descriptor handle or ptr to descriptor handle
+        for (auto fieldAccess : descriptorHandleFieldAccessList)
+        {
+            auto field = fieldAccessToField[fieldAccess];
+
+            if (auto fieldExtract = as<IRFieldExtract>(fieldAccess))
+            {
+                // this fieldExtract returns a handler now, but its users still expect a resource
+                // type insert a cast inst. after fieldExtract to convert the descriptor handle to
+                // resource type and update the user inst. to use this cast inst.
+                builder.setInsertAfter(fieldExtract);
+                auto fieldType = fieldExtract->getFullType();
+
+
+                if (auto descriptorHandleType = as<IRDescriptorHandleType>(fieldType))
+                {
+                    auto castInst = builder.emitIntrinsicInst(
+                        descriptorHandleType->getResourceType(),
+                        kIROp_CastDescriptorHandleToResource,
+                        1,
+                        &field);
+                    // TODO: how to update the users of fieldExtract?
+                    // for (auto use = fieldExtract->firstUse; use; use = use->nextUse)
+                    //{
+                    //    use->getUser()->setOperand(0, castInst);
+                    //}
+                }
+            }
+            else if (auto fieldAddress = as<IRFieldAddress>(fieldAccess))
+            {
+
+                // Load (user of fieldAddress) now returns a pointer to descriptor handle
+                // the result of Load should be casted back to the resource type.
+
+                auto ptrType = fieldAddress->getFullType();
+                auto fieldType = as<IRPtrTypeBase>(ptrType)->getOperand(0);
+                if (auto descriptorHandleType = as<IRDescriptorHandleType>(fieldType))
+                {
+                    auto castInst = builder.emitIntrinsicInst(
+                        descriptorHandleType->getResourceType(),
+                        kIROp_CastDescriptorHandleToResource,
+                        1,
+                        &field);
+
+                    for (auto use = fieldAddress->firstUse; use; use = use->nextUse)
+                    {
+                        if (auto load = as<IRLoad>(use->getUser()))
+                        {
+                            // TODO: How to update the user of fieldAddress?
+                        }
+                    }
+                }
+            }
+        }
+    }
     void processParameterBlockType(IRParameterBlockType* paramBlockType)
     {
+        // TODO: make a clone of the struct type inside parameter block to avoid modifying the
+        // original type.
         auto elementType = paramBlockType->getElementType();
         if (auto structType = as<IRStructType>(elementType))
         {
@@ -55,7 +110,11 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
             {
                 processStructTypeInParameterBlock(innerArrayStructType);
             }
-        }
+        } // else {} TODO: other forms of nested struct inside parameter block?
+
+        // Second mini-pass: Find operations that target these FieldAddress or FieldExtract
+        // instructions
+        processLoadOperationsForFieldAccess();
     }
 
     void processStructTypeInParameterBlock(IRStructType* structType)
@@ -87,6 +146,10 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                     if (auto fieldExtract = as<IRFieldExtract>(use->getUser()))
                     {
                         fieldExtract->setFullType(descriptorHandleType);
+                        //// Track this field extract for Load processing
+                        // TODO
+                        descriptorHandleFieldAccessList.add(fieldExtract);
+                        fieldAccessToField[fieldExtract] = field;
                     }
                     else if (auto fieldAddress = as<IRFieldAddress>(use->getUser()))
                     {
@@ -100,6 +163,10 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
 
                         // Update the field address type
                         fieldAddress->setFullType(descriptorHandlePtrType);
+
+                        // Track this field address for Load processing
+                        descriptorHandleFieldAccessList.add(fieldAddress);
+                        fieldAccessToField[fieldAddress] = field;
                     }
                 }
             }
