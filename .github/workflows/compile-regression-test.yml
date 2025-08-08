@@ -56,10 +56,16 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
+          # Setup ccache compiler launchers for MSVC
+          export CMAKE_C_COMPILER_LAUNCHER="${{ env.ccache_symlinks_path }}"
+          export CMAKE_CXX_COMPILER_LAUNCHER="${{ env.ccache_symlinks_path }}"
+          
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
-            -DSLANG_ENABLE_CUDA=1
+            -DSLANG_ENABLE_CUDA=1 \
+            "-DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}" \
+            "-DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}"
           cmake --workflow --preset "${{matrix.config}}"
       - name: Run compile and validation test
         run: |

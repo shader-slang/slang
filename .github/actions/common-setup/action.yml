@@ -108,6 +108,20 @@ runs:
           echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
 
+    # Setup ccache for compilation caching
+    - name: Setup ccache
+      uses: Chocobo1/setup-ccache-action@v1
+      with:
+        update_packager_index: false
+        install_ccache: true
+        prepend_symlinks_to_path: false
+        windows_compile_environment: ${{ inputs.os == 'windows' && 'msvc' || '' }}
+        ccache_options: |
+          max_size=2G
+          compression=true
+          compression_level=6
+          sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime,file_stat_matches
+
     # Put spirv-tools in path
     - shell: bash
       run: |
