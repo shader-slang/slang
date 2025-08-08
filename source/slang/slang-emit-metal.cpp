@@ -400,7 +400,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         else
             m_writer->emit(");\n");
     };
-    auto diagnoseFloatAtommic = [&]()
+    auto diagnoseFloatAtomic = [&]()
     {
         getSink()->diagnose(
             inst,
@@ -433,7 +433,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicLoad:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitInstResultDecl(inst);
             bool isImageOp = false;
@@ -488,7 +488,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicExchange:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
@@ -496,7 +496,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicCompareExchange:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             bool isImageOp = false;
             auto imageSubscript = isTextureAccess(inst);
@@ -543,17 +543,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicAdd:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
-
             emitAtomicOp("atomic_fetch_add", "atomic_fetch_add_explicit");
             return true;
         }
     case kIROp_AtomicSub:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
-
             emitAtomicOp("atomic_fetch_sub", "atomic_fetch_sub_explicit");
             return true;
         }
@@ -575,7 +569,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMin:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
@@ -583,7 +577,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMax:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
