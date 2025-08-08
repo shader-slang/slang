@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/autodiff
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/07-autodiff.html
 ---
 
 # Automatic Differentiation
