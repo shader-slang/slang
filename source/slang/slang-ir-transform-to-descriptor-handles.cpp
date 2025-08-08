@@ -16,9 +16,11 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
     DiagnosticSink* sink;
     IRBuilder builder;
 
-    // Track FieldAddress instructions that now return descriptor handles
-    List<IRInst*> descriptorHandleFieldAccessList;
-    Dictionary<IRInst*, IRInst*> fieldAccessToField;
+    // Dictionary mapping original types to lowered types
+    Dictionary<IRType*, IRType*> typeLoweringMap;
+    
+    // Track cloned structs and their field mapping for conversion logic
+    Dictionary<IRStructType*, IRStructType*> clonedStructMap;
 
     ResourceToDescriptorHandleContext(TargetProgram* inTargetProgram, IRModule* module, DiagnosticSink* inSink)
         : InstPassBase(module)
@@ -28,160 +30,161 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
     {
     }
 
-    IRType* createDescriptorHandleType(IRType* resourceType)
+    // Recursive type lowering function
+    IRType* convertTypeToHandler(IRType* originalType)
     {
-        builder.setInsertBefore(resourceType);
+        // Check if we've already lowered this type
+        if (auto existing = typeLoweringMap.tryGetValue(originalType))
+            return *existing;
+
+        IRType* loweredType = nullptr;
+
+        if (isResourceType(originalType))
+        {
+            // Lower resource types to DescriptorHandle<ResourceType>
+            builder.setInsertBefore(originalType);
+            loweredType = (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, originalType);
+        }
+        else if (auto structType = as<IRStructType>(originalType))
+        {
+            // Check if this struct contains any resource types that need lowering
+            bool needsLowering = false;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                if (convertTypeToHandler(fieldType) != fieldType)
+                {
+                    needsLowering = true;
+                    break;
+                }
+            }
+
+            if (needsLowering)
+            {
+                // Clone the struct with lowered field types
+                builder.setInsertBefore(structType);
+                auto newStructType = builder.createStructType();
+                
+                // Copy decorations from original
+                copyNameHintAndDebugDecorations(newStructType, structType);
+                
+                // derive a distinct name
+                StringBuilder sb;
+                if (auto nameDeco = structType->findDecoration<IRNameHintDecoration>())
+                {
+                    auto name = as<IRStringLit>(nameDeco->getOperand(0))->getStringSlice();
+                    sb << name << "_new";
+
+                    // Create the string literal IR inst
+                    auto strLit = builder.getStringValue(sb.getUnownedSlice());
+
+                    // Option A: update existing name decoration
+                    if (auto nameDeco = newStructType->findDecoration<IRNameHintDecoration>())
+                    {
+                        nameDeco->setOperand(0, strLit);
+                    }
+                }
+                
+                // Clone all fields with potentially lowered types
+                for (auto originalField : structType->getFields())
+                {
+                    auto fieldType = originalField->getFieldType();
+                    auto loweredFieldType = convertTypeToHandler(fieldType);
+                    auto fieldKey = originalField->getKey();
+                    
+                    auto newField = builder.createStructField(newStructType, fieldKey, loweredFieldType);
+
+                }
+                
+                loweredType = newStructType;
+                clonedStructMap[structType] = newStructType;
+            }
+            else
+            {
+                // No lowering needed
+                loweredType = originalType;
+            }
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(originalType))
+        {
+            auto elementType = arrayType->getElementType();
+            auto loweredElementType = convertTypeToHandler(elementType);
+            
+            if (loweredElementType != elementType)
+            {
+                builder.setInsertBefore(originalType);
+                loweredType = builder.getArrayType(loweredElementType, arrayType->getElementCount());
+            }
+            else
+            {
+                loweredType = originalType;
+            }
+        }
+        else if (auto ptrType = as<IRPtrTypeBase>(originalType))
+        {
+            auto valueType = ptrType->getValueType();
+            auto loweredValueType = convertTypeToHandler(valueType);
+            
+            if (loweredValueType != valueType)
+            {
+                builder.setInsertBefore(originalType);
+                loweredType = builder.getPtrTypeWithAddressSpace(loweredValueType, ptrType);
+            }
+            else
+            {
+                loweredType = originalType;
+            }
+        }
+        else
+        {
+            // No lowering needed for this type
+            loweredType = originalType;
+        }
+
+        // Cache the result
+        typeLoweringMap[originalType] = loweredType;
+
+        return loweredType;
+    }
+
+    // Pass 1: Clone parameter block structs with lowered types
+    void cloneParameterBlockStructs()
+    {
+        List<IRParameterBlockType*> paramBlockTypesToReplace;
         
-        // Create DescriptorHandle<ResourceType>
-        return (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, resourceType);
-    }
-
-
-    void processLoadOperationsForFieldAccess()
-    {
-        // For each fieldAccess (fieldExtract or fieldAddress)
-        // that now returns descriptor handle or ptr to descriptor handle
-        for (auto fieldAccess : descriptorHandleFieldAccessList)
+        // First, collect all parameter block types that need replacement
+        for (auto globalInst : module->getGlobalInsts())
         {
-            auto field = fieldAccessToField[fieldAccess];
-
-            if (auto fieldExtract = as<IRFieldExtract>(fieldAccess))
+            if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
             {
-                // this fieldExtract returns a handler now, but its users still expect a resource
-                // type insert a cast inst. after fieldExtract to convert the descriptor handle to
-                // resource type and update the user inst. to use this cast inst.
-                builder.setInsertAfter(fieldExtract);
-                auto fieldType = fieldExtract->getFullType();
-
-
-                if (auto descriptorHandleType = as<IRDescriptorHandleType>(fieldType))
+                auto elementType = paramBlockType->getElementType();
+                auto loweredElementType = convertTypeToHandler(elementType);
+                
+                if (loweredElementType != elementType)
                 {
-                    auto castInst = builder.emitIntrinsicInst(
-                        descriptorHandleType->getResourceType(),
-                        kIROp_CastDescriptorHandleToResource,
-                        1,
-                        &field);
-                    // TODO: how to update the users of fieldExtract?
-                    // for (auto use = fieldExtract->firstUse; use; use = use->nextUse)
-                    //{
-                    //    use->getUser()->setOperand(0, castInst);
-                    //}
-                }
-            }
-            else if (auto fieldAddress = as<IRFieldAddress>(fieldAccess))
-            {
-
-                // Load (user of fieldAddress) now returns a pointer to descriptor handle
-                // the result of Load should be casted back to the resource type.
-
-                auto ptrType = fieldAddress->getFullType();
-                auto fieldType = as<IRPtrTypeBase>(ptrType)->getOperand(0);
-                if (auto descriptorHandleType = as<IRDescriptorHandleType>(fieldType))
-                {
-                    auto castInst = builder.emitIntrinsicInst(
-                        descriptorHandleType->getResourceType(),
-                        kIROp_CastDescriptorHandleToResource,
-                        1,
-                        &field);
-
-                    for (auto use = fieldAddress->firstUse; use; use = use->nextUse)
-                    {
-                        if (auto load = as<IRLoad>(use->getUser()))
-                        {
-                            // TODO: How to update the user of fieldAddress?
-                        }
-                    }
+                    paramBlockTypesToReplace.add(paramBlockType);
                 }
             }
         }
-    }
-    void processParameterBlockType(IRParameterBlockType* paramBlockType)
-    {
-        // TODO: make a clone of the struct type inside parameter block to avoid modifying the
-        // original type.
-        auto elementType = paramBlockType->getElementType();
-        if (auto structType = as<IRStructType>(elementType))
+        
+        // Then replace each parameter block type with a new one
+        for (auto paramBlockType : paramBlockTypesToReplace)
         {
-            processStructTypeInParameterBlock(structType);
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(elementType))
-        {
-            if (auto innerArrayStructType = as<IRStructType>(arrayType->getElementType()))
-            {
-                processStructTypeInParameterBlock(innerArrayStructType);
-            }
-        } // else {} TODO: other forms of nested struct inside parameter block?
+            auto elementType = paramBlockType->getElementType();
+            auto loweredElementType = convertTypeToHandler(elementType);
+            
+            // Create a new parameter block type with the lowered element type
+            builder.setInsertAfter(paramBlockType);
+            auto newParamBlockType = builder.getType(kIROp_ParameterBlockType, loweredElementType);
 
-        // Second mini-pass: Find operations that target these FieldAddress or FieldExtract
-        // instructions
-        processLoadOperationsForFieldAccess();
-    }
-
-    void processStructTypeInParameterBlock(IRStructType* structType)
-    {
-        for (auto field : structType->getFields())
-        {
-            auto fieldType = field->getFieldType();
-            if (auto innerStructType = as<IRStructType>(fieldType))
-            {
-                processStructTypeInParameterBlock(innerStructType);
-            }
-            else if (auto arrayType = as<IRArrayTypeBase>(fieldType))
-            {
-                if (auto innerArrayStructType = as<IRStructType>(arrayType->getElementType()))
-                {
-                    processStructTypeInParameterBlock(innerArrayStructType);
-                }
-            }
-            if (isResourceType(fieldType))
-            {
-                auto descriptorHandleType = createDescriptorHandleType(fieldType);
-                field->setFieldType(descriptorHandleType);
-
-                // field itself has no uses; we need to look at all uses of the field's StructKey inst.
-                auto structKey = field->getKey();
-                for (auto use = structKey->firstUse; use; use = use->nextUse)
-                {
-                    //  If the use is a FieldAddress or FieldExtract, update the type of the inst accordingly.
-                    if (auto fieldExtract = as<IRFieldExtract>(use->getUser()))
-                    {
-                        fieldExtract->setFullType(descriptorHandleType);
-                        //// Track this field extract for Load processing
-                        // TODO
-                        descriptorHandleFieldAccessList.add(fieldExtract);
-                        fieldAccessToField[fieldExtract] = field;
-                    }
-                    else if (auto fieldAddress = as<IRFieldAddress>(use->getUser()))
-                    {
-                        auto currentPtrType = as<IRPtrTypeBase>(fieldAddress->getFullType());
-                        auto ptrOp = currentPtrType->getOp();
-
-                        // Create new pointer type pointing to descriptor handle
-                        auto descriptorHandlePtrType = builder.getPtrTypeWithAddressSpace(
-                            descriptorHandleType,    // new value type
-                            currentPtrType);         // preserves op + address space
-
-                        // Update the field address type
-                        fieldAddress->setFullType(descriptorHandlePtrType);
-
-                        // Track this field address for Load processing
-                        descriptorHandleFieldAccessList.add(fieldAddress);
-                        fieldAccessToField[fieldAddress] = field;
-                    }
-                }
-            }
+                        paramBlockType->replaceUsesWith(newParamBlockType);
+            paramBlockType->removeAndDeallocate();
         }
     }
 
     void processModule()
     {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
-            {
-                processParameterBlockType(paramBlockType);
-            }
-        }
+        cloneParameterBlockStructs();
 
 
     }
@@ -192,9 +195,16 @@ void transformResourceTypesToDescriptorHandles(
     IRModule* module, 
     DiagnosticSink* sink)
 {
-
     ResourceToDescriptorHandleContext context(targetProgram, module, sink);
     context.processModule();
+
+// Dump IR after transform
+IRDumpOptions opt;
+opt.mode = IRDumpOptions::Mode::Detailed; // or Simplified
+opt.flags = IRDumpOptions::Flag::DumpDebugIds;
+
+DiagnosticSinkWriter writer(sink);
+dumpIR(module, opt, "AFTER-DESC-HANDLE-TRANSFORM", nullptr, &writer);
 }
 
 } 
