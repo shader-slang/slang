@@ -236,6 +236,97 @@ struct GLSLSystemValueInfo
     IRTargetBuiltinVarName targetVarName = IRTargetBuiltinVarName::Unknown;
 };
 
+// Helper function to create member-level debug info for entry point struct parameters
+void createMemberDebugInfo(
+    IRBuilder* builder,
+    IRStructType* structType,
+    ScalarizedVal globalValue,
+    IRDebugVar* parentDebugVar)
+{
+    // Get debug location from the parent debug variable
+    IRInst* debugSource = nullptr;
+    IRInst* debugLine = nullptr;
+    IRInst* debugCol = nullptr;
+
+    // Try to find debug location information from the parent function
+    if (auto parentFunc = getParentFunc(parentDebugVar))
+    {
+        if (auto funcDebugLoc = parentFunc->findDecoration<IRDebugLocationDecoration>())
+        {
+            debugSource = funcDebugLoc->getSource();
+            debugLine = funcDebugLoc->getLine();
+            debugCol = funcDebugLoc->getCol();
+        }
+    }
+
+    // If we don't have debug location info, we can't create proper debug variables
+    if (!debugSource || !debugLine || !debugCol)
+        return;
+
+    // Create DebugVar instructions for each struct member
+    for (const auto& element : tupleVal->elements)
+    {
+        // Get the struct field for this element
+        IRStructField* field = nullptr;
+        for (auto structField : structType->getFields())
+        {
+            if (structField->getKey() == element.key)
+            {
+                field = structField;
+                break;
+            }
+        }
+
+        if (!field)
+            continue;
+
+        // Get the actual global variable for this member
+        IRInst* memberGlobalVar = nullptr;
+        if (element.val.flavor == ScalarizedVal::Flavor::address)
+        {
+            memberGlobalVar = element.val.irValue;
+        }
+
+        if (memberGlobalVar)
+        {
+            // Create member name from parent name + field name
+            String memberName;
+            if (auto parentNameHint = parentDebugVar->findDecoration<IRNameHintDecoration>())
+            {
+                memberName = parentNameHint->getName();
+                memberName.append(".");
+            }
+
+            if (auto fieldKey = field->getKey())
+            {
+                if (auto keyNameHint = fieldKey->findDecoration<IRNameHintDecoration>())
+                {
+                    memberName.append(keyNameHint->getName());
+                }
+            }
+
+            // Create DebugVar for this struct member
+            auto memberDebugVar = builder->emitDebugVar(
+                field->getFieldType(),
+                debugSource,
+                debugLine,
+                debugCol,
+                builder->getIntValue(builder->getUIntType(), 0));
+
+            // Add name hint to the member debug variable
+            if (memberName.getLength() > 0)
+            {
+                builder->addNameHintDecoration(
+                    as<IRDebugVar>(memberDebugVar),
+                    memberName.getUnownedSlice());
+            }
+
+            // Create DebugValue to connect the member debug variable to its global variable
+            builder->emitDebugValue(as<IRDebugVar>(memberDebugVar), memberGlobalVar);
+        }
+    }
+}
+
 static void leafAddressesImpl(List<IRInst*>& ret, const ScalarizedVal& v)
 {
     switch (v.flavor)
@@ -3608,6 +3699,32 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
+
+        // Create debug information for the entry point parameter
+        IRDebugVar* entryPointDebugVar = nullptr;
+        if (auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>())
+        {
+            // Create a DebugVar instruction for the entry point parameter
+            auto debugVarInst = builder->emitDebugVar(
+                valueType,
+                funcDebugLoc->getSource(),
+                funcDebugLoc->getLine(),
+                funcDebugLoc->getCol());
+            entryPointDebugVar = as<IRDebugVar>(debugVarInst);
+
+            // Copy name hints from the original parameter
+            if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
+            {
+                builder->addNameHintDecoration(entryPointDebugVar, nameHint->getName());
+            }
+        }
+
+        // Generate member-level debug info for entry point struct parameters
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            createMemberDebugInfo(builder, structType, globalValue, entryPointDebugVar);
+        }
+
         tryReplaceUsesOfStageInput(context, globalValue, pp);
         for (auto dec : pp->getDecorations())
         {
