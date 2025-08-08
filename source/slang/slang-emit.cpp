@@ -836,6 +836,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostVM:
             break;
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
             collectOptiXEntryPointUniformParams(irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
@@ -844,6 +845,7 @@ Result linkAndOptimizeIR(
             break;
 
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -867,7 +869,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::HostVM:
         break;
     }
@@ -875,6 +879,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         break;
 
@@ -923,6 +928,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         {
             // Generate any requested derivative wrappers
@@ -1074,6 +1080,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
         {
             lowerComInterfaces(irModule, artifactDesc.style, sink);
@@ -1096,6 +1103,7 @@ Result linkAndOptimizeIR(
         handleAutoBindNames(irModule);
         break;
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
         removeTorchKernels(irModule);
         handleAutoBindNames(irModule);
@@ -1548,6 +1556,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             synthesizeActiveMask(irModule, codeGenContext->getSink());
@@ -1617,12 +1626,14 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
         {
             legalizeEntryPointVaryingParamsForCPU(irModule, codeGenContext->getSink());
         }
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
         }
@@ -1711,7 +1722,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
@@ -1727,7 +1740,7 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
-        if (target == CodeGenTarget::CPPSource)
+        if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
             convertEntryPointPtrParamsToRawPtrs(irModule);
         }

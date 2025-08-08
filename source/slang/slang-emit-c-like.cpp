@@ -79,12 +79,14 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
@@ -123,6 +125,10 @@ SlangResult CLikeSourceEmitter::init()
 void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
 }
 
 void CLikeSourceEmitter::emitPreModuleImpl()
@@ -3854,7 +3860,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
-    if (isDefinition(func))
+    if (!shouldEmitOnlyHeader() && isDefinition(func))
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
@@ -4000,6 +4006,11 @@ bool shouldWrapInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
+    if (shouldEmitOnlyHeader() && !func->findDecoration<IRExternCppDecoration>())
+    {
+        return;
+    }
+
     // Target-intrinsic functions should never be emitted
     // even if they happen to have a body.
     //
@@ -4413,6 +4424,11 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
+    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRExternCppDecoration>())
+    {
+        return;
+    }
+
     ensureTypePrelude(structType);
 
     // If the selected `struct` type is actually an intrinsic
@@ -4870,11 +4886,20 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
 
             m_writer->emit("\n");
             emitType(varType, initFuncName);
-            m_writer->emit("()\n{\n");
-            m_writer->indent();
-            emitFunctionBody(varDecl);
-            m_writer->dedent();
-            m_writer->emit("}\n");
+            
+            // When emiting header, emit only declaration.
+            if (shouldEmitOnlyHeader())
+            {
+                m_writer->emit(";\n");
+            }
+            else
+            {
+                m_writer->emit("()\n{\n");
+                m_writer->indent();
+                emitFunctionBody(varDecl);
+                m_writer->dedent();
+                m_writer->emit("}\n");
+            }
         }
     }
 
