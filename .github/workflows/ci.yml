@@ -216,6 +216,7 @@ jobs:
           fi
 
       - name: Check documented compiler versions
+        if: steps.filter.outputs.should-run == 'true'
         run: bash extras/verify-documented-compiler-version.sh
 
       - name: Test Slang
