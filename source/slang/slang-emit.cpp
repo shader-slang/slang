@@ -89,6 +89,7 @@
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
+#include "slang-ir-potential-infinite-loop.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
@@ -769,6 +770,12 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Check for potential infinite loops after global constants are replaced
+    // but before simplifyIR which might replace them with unreachable
+    if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+    {
+        checkForPotentialInfiniteLoops(irModule, sink, true);
+    }
 
     // When there are top-level existential-type parameters
     // to the shader, we need to take the side-band information
