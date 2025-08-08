@@ -650,6 +650,11 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30027,
+    Error,
+    disallowedArrayOfParameterBlock,
+    "Arrays of ParameterBlock are not allowed")
+DIAGNOSTIC(
     30029,
     Error,
     arrayIndexOutOfBounds,
@@ -1989,12 +1994,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    overloadedParameterToHigherOrderFunction,
-    "passing overloaded functions to higher order functions is not supported")
-
-DIAGNOSTIC(
-    39999,
-    Error,
     matrixColumnOrRowCountIsOne,
     "matrices with 1 column or row are not supported by the current code generation target")
 
@@ -2512,6 +2511,11 @@ DIAGNOSTIC(
     Warning,
     methodNeverMutates,
     "method marked `[mutable]` but never modifies `this`")
+DIAGNOSTIC(
+    41024,
+    Warning,
+    commaOperatorUsedInExpression,
+    "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
     41024,
