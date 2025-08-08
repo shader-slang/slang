@@ -481,6 +481,15 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             load,
                             [&](IRFieldExtract* fieldExtract)
                             {
+                                // Only optimize if the load
+                                // is the base; not strictly
+                                // needed for field extract,
+                                // but it will prevent future
+                                // regressions if a field ever
+                                // becomes a non-struct-key
+                                if (fieldExtract->getBase() != load)
+                                    return;
+
                                 IRBuilder builder(fieldExtract);
                                 builder.setInsertBefore(fieldExtract);
                                 auto newGetFieldAddress = builder.emitFieldAddress(
