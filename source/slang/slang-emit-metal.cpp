@@ -405,7 +405,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         getSink()->diagnose(
             inst,
             Diagnostics::unsupportedTargetIntrinsic,
-            "floating point atomic operation");
+            "Unsupported floating point atomic operation");
     };
     switch (inst->getOp())
     {
