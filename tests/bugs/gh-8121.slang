@@ -8,8 +8,8 @@ RWStructuredBuffer<int> outputBuffer;
 
 void math(int data[2])
 {
-    int4 vec;
-    vec[0] = 1;
+    // Tests that the following IR pattern of `getElement(...,load(getElementPtr(...)))` does not optimize incorrectly:
+    // Expected IR: store(outputBuffer[0], getElement(Array<int,2>(5,6), load(getElementPtr(data,0))))
     outputBuffer[0] = Array<int,2>(5,6)[data[0]];
 }
 [shader("compute")]
