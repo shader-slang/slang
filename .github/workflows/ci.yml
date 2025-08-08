@@ -195,8 +195,23 @@ jobs:
           cd build/dist-${{matrix.config}}
           unzip -q slang.zip
           cd ../../
-          # Set bin_dir to the CMake build output directory which should contain test executables
-          echo "bin_dir=$(pwd)/build/Release/bin" >> $GITHUB_ENV
+          
+          # Find slang-test executable dynamically
+          SLANG_TEST_PATH=$(find . -name "slang-test.exe" -type f 2>/dev/null | head -1)
+          if [ -n "$SLANG_TEST_PATH" ]; then
+            # Extract directory path from the found executable
+            BIN_DIR=$(dirname "$SLANG_TEST_PATH")
+            echo "Found slang-test at: $SLANG_TEST_PATH"
+            echo "bin_dir=$(pwd)/$BIN_DIR" >> $GITHUB_ENV
+          else
+            # Fallback to extracted slang.zip bin directory
+            echo "slang-test not found, using fallback path"
+            echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          fi
+          
+          # Debug: List contents of the chosen bin directory
+          echo "Contents of chosen bin directory:"
+          ls -la "$(echo $GITHUB_ENV | grep bin_dir | cut -d'=' -f2)" || echo "bin_dir not accessible"
 
       - name: Test Slang
         run: |
@@ -447,8 +462,19 @@ jobs:
           cd build/dist-${{matrix.config}}
           unzip -q slang.zip
           cd ../../
-          # Set bin_dir to the CMake build output directory which should contain test executables
-          echo "bin_dir=$(pwd)/build/Release/bin" >> $GITHUB_ENV
+          
+          # Find slang-rhi-tests executable dynamically
+          SLANG_RHI_TEST_PATH=$(find . -name "slang-rhi-tests.exe" -type f 2>/dev/null | head -1)
+          if [ -n "$SLANG_RHI_TEST_PATH" ]; then
+            # Extract directory path from the found executable
+            BIN_DIR=$(dirname "$SLANG_RHI_TEST_PATH")
+            echo "Found slang-rhi-tests at: $SLANG_RHI_TEST_PATH"
+            echo "bin_dir=$(pwd)/$BIN_DIR" >> $GITHUB_ENV
+          else
+            # Fallback to extracted slang.zip bin directory
+            echo "slang-rhi-tests not found, using fallback path"
+            echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          fi
 
       - name: Run slang-rhi tests
         run: |
