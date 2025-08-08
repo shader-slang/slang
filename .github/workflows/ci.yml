@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
-  build-and-test-slang:
+  build-slang:
     strategy:
       matrix:
         config: [release]
@@ -135,8 +135,61 @@ jobs:
         run: |
           echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
 
-      - name: Test Slang
+      - name: Upload build artifacts for test jobs
         if: steps.filter.outputs.should-run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: slang-build-windows-${{matrix.config}}
+          path: |
+            build/dist-${{matrix.config}}/
+            tests/
+            tools/
+            extras/
+            external/spirv-tools/
+            external/vulkan/
+          retention-days: 1
+
+  test-slang:
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true'
+    strategy:
+      matrix:
+        config: [release]
+        include:
+          - config: release
+            test-category: full
+            full-gpu-tests: true
+            server-count: 8
+      fail-fast: false
+    runs-on: ["Windows", "self-hosted", "GCP-T4"]
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-build-windows-${{matrix.config}}
+          path: ./
+
+      - name: Setup environment variables
+        run: |
+          echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+
+      - name: Test Slang
         run: |
           smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
           supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
@@ -167,23 +220,16 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -skip-reference-image-generation \
             -show-adapter-info \
-            -enable-debug-layers ${{ matrix.enable-debug-layers }}
+            -enable-debug-layers true
 
-      - name: Upload build artifacts for other test jobs
-        if: steps.filter.outputs.should-run == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: slang-build-windows-${{matrix.config}}
-          path: |
-            build/dist-${{matrix.config}}/
-            tests/
-            tools/
-            extras/
-          retention-days: 1
+      - name: Cleanup artifacts
+        if: always()
+        run: |
+          rm -rf build/ tests/ tools/ extras/
 
   test-examples:
-    needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-release == 'true' && github.event_name == 'pull_request'
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true' && github.event_name == 'pull_request'
     strategy:
       matrix:
         config: [release]
@@ -234,8 +280,8 @@ jobs:
           rm -rf build/ tests/ tools/ extras/
 
   test-slangc:
-    needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
         config: [release]
@@ -278,8 +324,8 @@ jobs:
           rm -rf build/ tests/ tools/ extras/
 
   test-glsl:
-    needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-release == 'true' && github.event_name == 'pull_request'
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true' && github.event_name == 'pull_request'
     strategy:
       matrix:
         config: [release]
@@ -337,8 +383,8 @@ jobs:
           rm -rf build/ tests/ tools/ extras/
 
   test-rhi:
-    needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
         config: [release]
@@ -384,8 +430,8 @@ jobs:
           rm -rf build/ tests/ tools/ extras/
 
   test-slangpy:
-    needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
+    needs: build-slang
+    if: needs.build-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
         config: [release]
