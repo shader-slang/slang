@@ -196,8 +196,6 @@ RefPtr<ComponentType::SpecializationInfo> CompositeComponentType::_validateSpeci
             argCount - offset,
             consumedArgCount,
             sink);
-        if (!childInfo)
-            return nullptr;
         specializationInfo->childInfos.add(childInfo);
         offset += consumedArgCount;
     }

@@ -377,9 +377,6 @@ RefPtr<ComponentType> ComponentType::specialize(
         specializationArgCount,
         consumedArgCount,
         sink);
-    if (!specializationInfo)
-        return nullptr;
-
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 
@@ -430,9 +427,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     sink.getBlobIfNeeded(outDiagnostics);
 
     *outSpecializedComponentType = specializedComponentType.detach();
-    if (specializedComponentType)
-        return SLANG_OK;
-    return SLANG_FAIL;
+    if (sink.getErrorCount() != 0)
+        return SLANG_FAIL;
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
