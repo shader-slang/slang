@@ -2943,11 +2943,6 @@ IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
     return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
 }
 
-IRConstRefType* IRBuilder::getConstRefType(IRType* valueType, AddressSpace addrSpace)
-{
-    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, addrSpace);
-}
-
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
 {
     IRInst* operands[] = {type};

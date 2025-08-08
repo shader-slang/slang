@@ -348,22 +348,22 @@ SLANG_VECTOR_GET_ELEMENT(ulonglong)
 SLANG_VECTOR_GET_ELEMENT(float)
 SLANG_VECTOR_GET_ELEMENT(double)
 
-#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                            \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##1 * x, int index) \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##2 * x, int index) \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##3 * x, int index) \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
-    }                                                                                              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##4 * x, int index) \
-    {                                                                                              \
-        return ((T*)(x)) + index;                                                                  \
+#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                      \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1 * x, int index) \
+    {                                                                                        \
+        return ((T*)(x)) + index;                                                            \
+    }                                                                                        \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##2 * x, int index) \
+    {                                                                                        \
+        return ((T*)(x)) + index;                                                            \
+    }                                                                                        \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##3 * x, int index) \
+    {                                                                                        \
+        return ((T*)(x)) + index;                                                            \
+    }                                                                                        \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##4 * x, int index) \
+    {                                                                                        \
+        return ((T*)(x)) + index;                                                            \
     }
 SLANG_VECTOR_GET_ELEMENT_PTR(int)
 SLANG_VECTOR_GET_ELEMENT_PTR(bool)
@@ -686,11 +686,6 @@ struct Matrix
 {
     Vector<T, COLS> rows[ROWS];
     SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, COLS>& operator[](size_t index)
-    {
-        return rows[index];
-    }
-
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const Vector<T, COLS>& operator[](size_t index) const
     {
         return rows[index];
     }
@@ -2317,7 +2312,7 @@ struct StructuredBuffer
     }
 
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) const
+    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride)
     {
         *outNumStructs = uint32_t(count);
         *outStride = uint32_t(sizeof(T));
