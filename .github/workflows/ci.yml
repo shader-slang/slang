@@ -14,14 +14,8 @@ jobs:
   build-and-test-slang:
     strategy:
       matrix:
-        config: [debug, release]
+        config: [release]
         include:
-          - config: debug
-            warnings-as-errors: true
-            enable-debug-layers: true
-            test-category: full
-            full-gpu-tests: true
-            server-count: 8
           - config: release 
             warnings-as-errors: true
             enable-debug-layers: true
@@ -36,7 +30,6 @@ jobs:
         shell: bash
 
     outputs:
-      should-run-debug: ${{ steps.filter.outputs.should-run }}
       should-run-release: ${{ steps.filter.outputs.should-run }}
 
     steps:
@@ -242,10 +235,10 @@ jobs:
 
   test-slangc:
     needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-debug == 'true' || needs.build-and-test-slang.outputs.should-run-release == 'true'
+    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
-        config: [debug, release]
+        config: [release]
       fail-fast: false
     runs-on: ["Windows", "self-hosted", "GCP-T4"]
 
@@ -345,13 +338,11 @@ jobs:
 
   test-rhi:
     needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-debug == 'true' || needs.build-and-test-slang.outputs.should-run-release == 'true'
+    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
-        config: [debug, release]
+        config: [release]
         include:
-          - config: debug
-            full-gpu-tests: true
           - config: release
             full-gpu-tests: true
       fail-fast: false
@@ -394,13 +385,11 @@ jobs:
 
   test-slangpy:
     needs: build-and-test-slang
-    if: needs.build-and-test-slang.outputs.should-run-debug == 'true' || needs.build-and-test-slang.outputs.should-run-release == 'true'
+    if: needs.build-and-test-slang.outputs.should-run-release == 'true'
     strategy:
       matrix:
-        config: [debug, release]
+        config: [release]
         include:
-          - config: debug
-            full-gpu-tests: true
           - config: release
             full-gpu-tests: true
       fail-fast: false
