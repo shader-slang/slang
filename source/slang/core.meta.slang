@@ -1278,37 +1278,28 @@ struct __none_t
 {
 };
 
-__builtin_enum(AddressSpace)
+__builtin_type($((int)BaseType::AddressSpace))
 enum AddressSpace : uint64_t
 {
-    // Used to represent a pointer that is not associated with any
-    // specific address space and requires addr-space-specialization.
-    // Users should not use this address space directly.
-    Generic = $((uint64_t)AddressSpace::Generic),
-
     Device = $((uint64_t)AddressSpace::UserPointer),
-    NodePayloadAMDX = $((uint64_t)AddressSpace::NodePayloadAMDX),
 };
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
-__builtin_enum(MemoryScope)
+__builtin_type($((int)BaseType::MemoryScope))
 enum MemoryScope : int32_t
 {
-    CrossDevice = $( (int32_t)MemoryScope::CrossDevice),
-    Device = $( (int32_t)MemoryScope::Device),
-    Workgroup = $( (int32_t)MemoryScope::Workgroup),
-    Subgroup = $( (int32_t)MemoryScope::Subgroup),
-    Invocation = $( (int32_t)MemoryScope::Invocation),
-    QueueFamily = $( (int32_t)MemoryScope::QueueFamily),
-    ShaderCall = $( (int32_t)MemoryScope::ShaderCall),
-    ShaderCallKHR = $( (int32_t)MemoryScope::ShaderCall),
+    CrossDevice = $((int32_t)MemoryScope::CrossDevice),
+    Device = $((int32_t)MemoryScope::Device),
+    Workgroup = $((int32_t)MemoryScope::Workgroup),
+    Subgroup = $((int32_t)MemoryScope::Subgroup),
+    Invocation = $((int32_t)MemoryScope::Invocation),
+    QueueFamily = $((int32_t)MemoryScope::QueueFamily),
 }
 
-__builtin_enum(Access)
+__builtin_type($((int)BaseType::AccessQualifier))
 enum Access : uint64_t
 {
-    ReadWrite = $( (uint64_t)AccessQualifier::ReadWrite),
-    Read = $( (uint64_t)AccessQualifier::Read),
+    ReadWrite = $((uint64_t)AccessQualifier::ReadWrite),
+    Read = $((uint64_t)AccessQualifier::Read),
 }
 
 //@public:
@@ -1322,13 +1313,15 @@ struct Ptr<
     Access access = Access::ReadWrite, 
     AddressSpace addrSpace = AddressSpace::Device>
 {
-    // A user is allowed to explicitly cast between any pointer type.
+    // A user is allowed to explicitly cast between any pointer type of
+    // the same address space
     __intrinsic_op($(kIROp_BitCast))
     __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
 
+    [OverloadRank(1)]
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
@@ -1519,7 +1512,9 @@ __intrinsic_type($(kIROp_ConstRefType))
 struct ConstRef
 {};
 
-typealias __Addr<T> = Ptr<T, Access::ReadWrite, AddressSpace::Generic>;
+// __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space
+// internally to a concrete address-space.
+typealias __Addr<T> = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Generic)>;
 
 //@public:
 
@@ -1877,11 +1872,11 @@ struct NativeString
     __init() { this = NativeString(""); }
 };
 
-extension Ptr<void>
+extension<Access _access> Ptr<void, _access>
 {
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     [__unsafeForceInlineEarly]
-    __init(NativeString nativeStr) { this = nativeStr.getBuffer(); }
+    __init(NativeString nativeStr) { this = Ptr<void, _access>(nativeStr.getBuffer()); }
 
     __generic<$(ptrArgListDef)>
     __intrinsic_op($(kIROp_BitCast))
@@ -4341,7 +4336,7 @@ __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
 __generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, AddressSpace::NodePayloadAMDX>;
+typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
 
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;

@@ -9,14 +9,6 @@
       <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
     </Expand>
   </Type>
-  <Type Name="Slang::ValNodeOperand">
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ConstantValue">Constant {intOperand}</DisplayString>
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ValNode">{(Slang::Val*)nodeOperand}</DisplayString>
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ASTNode">{nodeOperand}</DisplayString>
-    <Expand>
-        <ExpandedItem>*(Slang::Val*)nodeOperand</ExpandedItem>
-    </Expand>
-  </Type>
   <Type Name="Slang::DeclRef&lt;*&gt;">
     <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
 
@@ -482,15 +474,15 @@
         </Expand>
     </Type>
     <Type Name="Slang::ValNodeOperand">
-        <DisplayString Optional="true" Condition="kind==Slang::ValNodeOperandKind::ConstantValue">Const({values.intOperand})#{_debugUID}</DisplayString>
+        <DisplayString Condition="kind==Slang::ValNodeOperandKind::ConstantValue">ConstantValue ({this->values.intOperand}) #{((Val*)this)->_debugUID}</DisplayString>
         <DisplayString Condition="kind==Slang::ValNodeOperandKind::ValNode">{*(Val*)values.nodeOperand}</DisplayString>
         <DisplayString>{values.nodeOperand}</DisplayString>
         <Expand>
-            <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ConstantValue">values</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
             <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ASTNode">*(Decl*)values.nodeOperand</ExpandedItem>
         </Expand>
     </Type>
-
     <Type Name="Slang::Facet">
         <SmartPointer Usage="Minimal">_impl</SmartPointer>
         <DisplayString Condition="_impl == 0">nullptr</DisplayString>
@@ -516,7 +508,7 @@
       </LinkedListItems>
     </Expand>
   </Type>
-     <Type Name="Slang::ConstantIntVal">
+    <Type Name="Slang::ConstantIntVal">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand}) </DisplayString>
         <DisplayString>ConstantIntVal ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>

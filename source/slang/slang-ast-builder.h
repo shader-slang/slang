@@ -24,7 +24,6 @@ public:
     void registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier);
     void registerBuiltinRequirementDecl(Decl* decl, BuiltinRequirementModifier* modifier);
     void registerMagicDecl(Decl* decl, MagicTypeModifier* modifier);
-    void registerBuiltinEnum(Decl* decl, BuiltinEnumModifier* modifier);
 
     /// Get the string type
     Type* getStringType();
@@ -58,8 +57,6 @@ public:
     Decl* findMagicDecl(String const& name);
 
     Decl* tryFindMagicDecl(String const& name);
-
-    EnumDecl* getBuiltinEnum(String const& name);
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
@@ -133,8 +130,6 @@ protected:
     RootASTBuilder* m_astBuilder = nullptr;
 
     Session* m_session = nullptr;
-
-    Dictionary<String, EnumDecl*> m_builtinEnumDecls;
 
     Index m_id = 1;
 };

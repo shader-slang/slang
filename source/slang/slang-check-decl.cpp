@@ -3728,10 +3728,6 @@ void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl)
     {
         sharedASTBuilder->registerBuiltinRequirementDecl(decl, builtinRequirement);
     }
-    if (auto builtinEnum = decl->findModifier<BuiltinEnumModifier>())
-    {
-        sharedASTBuilder->registerBuiltinEnum(decl, builtinEnum);
-    }
 }
 
 
@@ -3783,10 +3779,6 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
         ioDecls.add(decl);
     }
     else if (decl->findModifier<BuiltinRequirementModifier>())
-    {
-        ioDecls.add(decl);
-    }
-    else if (decl->findModifier<BuiltinEnumModifier>())
     {
         ioDecls.add(decl);
     }

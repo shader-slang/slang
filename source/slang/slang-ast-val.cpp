@@ -1435,6 +1435,10 @@ Val* TypeCastIntVal::tryFoldImpl(
         case BaseType::UInt8:
             resultValue = (uint8_t)resultValue;
             return true;
+        case BaseType::AddressSpace:
+        case BaseType::AccessQualifier:
+        case BaseType::MemoryScope:
+            return true;
         default:
             return false;
         }

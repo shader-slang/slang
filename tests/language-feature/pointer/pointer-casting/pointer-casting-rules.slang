@@ -37,11 +37,11 @@ void computeMain(int id : SV_DispatchThreadID)
 
     // TODO: Enable this when we allow user-defined group-shared address space.
     // Cannot cast between different address spaces.
-    // CHECK: ([[# @LINE+1]]): error
-    //Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p7 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(rwPtr);
-    // CHECK: ([[# @LINE+1]]): error
+    // DISABLED-CHECK: ([[# @LINE+1]]): error
+    // Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p7 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(rwPtr);
+    // DISABLED-CHECK: ([[# @LINE+1]]): error
     //Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p8 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(p1);
-    // CHECK: ([[# @LINE+1]]): error
+    // DISABLED-CHECK: ([[# @LINE+1]]): error
     //Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p9 = rwPtr;
 
     output[id] = *rwPtr;

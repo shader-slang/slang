@@ -121,7 +121,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
     ConversionCost bestCost = kConversionCost_Explicit;
     if (auto basicType = dynamicCast<BasicExpressionType>(type))
     {
-        for (Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf);
+        for (Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOfPrimitives);
              baseTypeFlavorIndex++)
         {
             // Don't consider `type`, since we already know it doesn't work.
@@ -820,28 +820,38 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    // if both values are constant integers, then compare them
-    if (auto fstIntVal = as<ConstantIntVal>(fst))
-    {
-        if (auto sndIntVal = as<ConstantIntVal>(snd))
-        {
-            return fstIntVal->getValue() == sndIntVal->getValue();
-        }
-    }
-
     // Check if both are integer values in general
     const auto fstInt = as<IntVal>(fst);
     const auto sndInt = as<IntVal>(snd);
+
     if (fstInt && sndInt)
     {
-        const auto paramUnderCast = [](IntVal* i)
+        const auto paramUnderCastToConstant = [](IntVal* i)
+        {
+            if (const auto c = as<TypeCastIntVal>(i))
+                i = as<IntVal>(c->getBase());
+            return i;
+        };
+
+        // if both values are constant integers, then compare them
+        if (auto fstIntVal = as<ConstantIntVal>(paramUnderCastToConstant(fstInt)))
+        {
+            if (auto sndIntVal = as<ConstantIntVal>(paramUnderCastToConstant(sndInt)))
+            {
+                return fstIntVal->getValue() == sndIntVal->getValue();
+            }
+        }
+
+
+        const auto paramUnderCastToGeneric = [](IntVal* i)
         {
             if (const auto c = as<TypeCastIntVal>(i))
                 i = as<IntVal>(c->getBase());
             return as<DeclRefIntVal>(i);
         };
-        auto fstParam = paramUnderCast(fstInt);
-        auto sndParam = paramUnderCast(sndInt);
+
+        auto fstParam = paramUnderCastToGeneric(fstInt);
+        auto sndParam = paramUnderCastToGeneric(sndInt);
 
         bool okay = false;
         if (fstParam)
@@ -850,7 +860,6 @@ bool SemanticsVisitor::TryUnifyVals(
             okay |= TryUnifyIntParam(constraints, unifyCtx, sndParam->getDeclRef(), fstInt);
         return okay;
     }
-
     if (auto fstWit = as<DeclaredSubtypeWitness>(fst))
     {
         if (auto sndWit = as<DeclaredSubtypeWitness>(snd))

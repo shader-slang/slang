@@ -177,15 +177,6 @@ void SharedASTBuilder::registerBuiltinRequirementDecl(
     m_builtinRequirementDecls[modifier->kind] = decl;
 }
 
-void SharedASTBuilder::registerBuiltinEnum(Decl* decl, BuiltinEnumModifier* modifier)
-{
-    // The goal here is to register an enum so it is efficent to generate on the fly
-    // EnumCase's as constants in the AST
-    auto enumDecl = as<EnumDecl>(decl);
-    SLANG_ASSERT(enumDecl);
-    m_builtinEnumDecls[modifier->name] = enumDecl;
-}
-
 void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier)
 {
     // In some cases the modifier will have been applied to the
@@ -208,13 +199,6 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 {
     auto d = m_magicDecls.tryGetValue(name);
     return d ? *d : nullptr;
-}
-
-EnumDecl* SharedASTBuilder::getBuiltinEnum(String const& name)
-{
-    EnumDecl** decl = m_builtinEnumDecls.tryGetValue(name);
-    SLANG_ASSERT(decl);
-    return *decl;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -552,10 +536,10 @@ PtrTypeBase* ASTBuilder::getPtrType(
     Val* args[] = {
         valueType,
         getIntVal(
-            DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("Access")),
+            getBuiltinType(BaseType::AccessQualifier),
             (IntegerLiteralValue)accessQualifier),
         getIntVal(
-            DeclRefType::create(this, getSharedASTBuilder()->getBuiltinEnum("AddressSpace")),
+            getBuiltinType(BaseType::AddressSpace),
             (IntegerLiteralValue)addrSpace)};
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
