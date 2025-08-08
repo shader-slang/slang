@@ -650,6 +650,11 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30027,
+    Error,
+    disallowedArrayOfParameterBlock,
+    "Arrays of ParameterBlock are not allowed")
+DIAGNOSTIC(
     30029,
     Error,
     arrayIndexOutOfBounds,
@@ -1985,12 +1990,6 @@ DIAGNOSTIC(
     Error,
     unableToFindSymbolInModule,
     "unable to find the mangled symbol '$0' in module '$1'")
-
-DIAGNOSTIC(
-    39999,
-    Error,
-    overloadedParameterToHigherOrderFunction,
-    "passing overloaded functions to higher order functions is not supported")
 
 DIAGNOSTIC(
     39999,
