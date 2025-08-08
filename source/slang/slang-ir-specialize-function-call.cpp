@@ -666,6 +666,7 @@ struct FunctionParameterSpecializationContext
             resultType = getBuilder()->getPtrType(
                 paramType->getOp(),
                 argType,
+                AccessQualifier::ReadWrite,
                 as<IRPtrTypeBase>(paramType)->getAddressSpace());
             break;
         }

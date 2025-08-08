@@ -3253,6 +3253,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getPtrType(
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
+                AccessQualifier::ReadWrite,
                 AddressSpace::BuiltinInput),
             kind,
             spvAsmBuiltinVar);
@@ -3888,7 +3889,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
-            auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
+            auto debugVarPtrType =
+                builder.getPtrType(varType, AccessQualifier::ReadWrite, AddressSpace::Function);
             auto actualHelperVar =
                 emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
             maybeEmitPointerDecoration(actualHelperVar, debugVar);
@@ -7156,7 +7158,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+        auto ptrElementType = builder.getPtrType(
+            kIROp_PtrType,
+            sourceElementType,
+            AccessQualifier::ReadWrite,
+            addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
@@ -7237,6 +7243,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
+            AccessQualifier::ReadWrite,
             addressSpace);
     }
 
@@ -7303,7 +7310,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }

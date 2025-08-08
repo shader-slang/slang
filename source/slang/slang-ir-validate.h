@@ -80,6 +80,8 @@ private:
 // lead back to in/inout parameters that we can't validate.
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
+void validatePointerAccess(DiagnosticSink* sink, IRInst* inst);
+
 void validateVectorsAndMatrices(
     IRModule* module,
     DiagnosticSink* sink,

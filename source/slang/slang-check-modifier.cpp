@@ -1677,6 +1677,18 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstModifier>(m))
+    {
+        if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+        {
+            if (as<PointerTypeExpr>(varDeclBase->type.exp))
+            {
+                // Disallow `const T*` syntax.
+                getSink()->diagnose(m, Diagnostics::disallowConstAsModifierOfCppPtr);
+                return nullptr;
+            }
+        }
+    }
     if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
     {
         return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
