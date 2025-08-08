@@ -134,6 +134,13 @@ jobs:
         if: steps.filter.outputs.should-run == 'true'
         run: |
           echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          echo "=== Build job debugging ==="
+          echo "Checking build results:"
+          ls -la build/ || echo "No build directory"
+          ls -la build/dist-${{matrix.config}}/ || echo "No dist directory"
+          ls -la build/dist-${{matrix.config}}/bin/ || echo "No bin directory"
+          echo "Contents of bin directory:"
+          ls -la build/dist-${{matrix.config}}/bin/ || echo "Cannot list bin contents"
 
       - name: Upload build artifacts for test jobs
         if: steps.filter.outputs.should-run == 'true'
@@ -188,6 +195,16 @@ jobs:
       - name: Setup environment variables
         run: |
           echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          echo "=== Debugging artifact download ==="
+          echo "Current directory contents:"
+          ls -la
+          echo "Build directory contents:"
+          ls -la build/ || echo "No build directory"
+          echo "Checking for dist directory:"
+          ls -la build/dist-${{matrix.config}}/ || echo "No dist-${{matrix.config}} directory"
+          echo "Checking for bin directory:"
+          ls -la build/dist-${{matrix.config}}/bin/ || echo "No bin directory"
+          echo "bin_dir value: $bin_dir"
 
       - name: Test Slang
         run: |
@@ -264,6 +281,11 @@ jobs:
       - name: Setup environment variables
         run: |
           echo "bin_dir=$(pwd)/build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+          echo "=== test-examples debugging ==="
+          echo "Current directory contents:"
+          ls -la
+          echo "bin_dir value: $bin_dir"
+          ls -la "$bin_dir" || echo "bin_dir path does not exist"
 
       - name: Run Slang examples
         run: |
