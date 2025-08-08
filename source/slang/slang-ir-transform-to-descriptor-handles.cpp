@@ -34,7 +34,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
 
     IRInst* createCastDescriptorHandleToResource(IRType* resourceType, IRInst* descriptorHandle)
     {
-        builder.setInsertBefore(descriptorHandle->getNextInst());
+        builder.setInsertBefore(descriptorHandle);
         return builder.emitIntrinsicInst(
             resourceType,
             kIROp_CastDescriptorHandleToResource,
@@ -79,18 +79,27 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                 auto descriptorHandleType = createDescriptorHandleType(fieldType);
                 field->setFieldType(descriptorHandleType);
 
-                // The use of field now returns a descriptor handle, but users expect the resource
-                // type. Insert a cast instruction after this field extract
-                auto castInst =
-                    createCastDescriptorHandleToResource(fieldType, descriptorHandleType);
-
-                // Replace all uses of the field with the cast instruction
-                for (auto use = field->firstUse; use; use = use->nextUse)
+                // field itself has no uses; we need to look at all uses of the field's StructKey inst.
+                auto structKey = field->getKey();
+                for (auto use = structKey->firstUse; use; use = use->nextUse)
                 {
-                    // Don't replace the use in the cast instruction itself
-                    if (use->getUser() != castInst)
+                    //  If the use is a FieldAddress or FieldExtract, update the type of the inst accordingly.
+                    if (auto fieldExtract = as<IRFieldExtract>(use->getUser()))
                     {
-                        use->set(castInst);
+                        fieldExtract->setFullType(descriptorHandleType);
+                    }
+                    else if (auto fieldAddress = as<IRFieldAddress>(use->getUser()))
+                    {
+                        auto currentPtrType = as<IRPtrTypeBase>(fieldAddress->getFullType());
+                        auto ptrOp = currentPtrType->getOp();
+
+                        // Create new pointer type pointing to descriptor handle
+                        auto descriptorHandlePtrType = builder.getPtrTypeWithAddressSpace(
+                            descriptorHandleType,    // new value type
+                            currentPtrType);         // preserves op + address space
+
+                        // Update the field address type
+                        fieldAddress->setFullType(descriptorHandlePtrType);
                     }
                 }
             }
@@ -99,11 +108,15 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
 
     void processModule()
     {
-        // First pass: Process parameter block types and transform struct field types within them
-        processInstsOfType<IRParameterBlockType>(
-            kIROp_ParameterBlockType,
-            [this](IRParameterBlockType* paramBlockType)
-            { processParameterBlockType(paramBlockType); });
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
+            {
+                processParameterBlockType(paramBlockType);
+            }
+        }
+
+
     }
 };
 
