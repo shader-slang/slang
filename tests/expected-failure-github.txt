@@ -1,7 +1,5 @@
 
 tests/cooperative-vector/matrix-mul-bias-mut.slang (vk)
-tests/cooperative-vector/matrix-mul-bias-packed-mut.slang (vk)
-tests/cooperative-vector/matrix-mul-bias-packed.slang (vk)
 tests/cooperative-vector/matrix-mul-bias-rw-packed.slang (vk)
 tests/cooperative-vector/matrix-mul-bias-rw.slang (vk)
 tests/cooperative-vector/matrix-mul-bias-rwbyteaddress-packed.slang (vk)

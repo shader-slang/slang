@@ -71,7 +71,7 @@ jobs:
             # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: true
             # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
-            runs-on: ["Windows", "self-hosted", "GCP-T4"]
+            runs-on: ["Windows", "self-hosted", "GCP-T4", "test"]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
