@@ -239,6 +239,33 @@ static IRInst* findEntryInConcreteTable(IRInst* witnessTable, IRInst* key)
     return nullptr; // Not found
 }
 
+struct WorkQueue
+{
+    List<WorkItem> enqueueList;
+    List<WorkItem> dequeueList;
+    UIndex dequeueIndex = 0;
+
+    void enqueue(const WorkItem& item) { enqueueList.add(item); }
+
+    WorkItem dequeue()
+    {
+        if (dequeueList.getCount() <= dequeueIndex)
+        {
+            dequeueList.swapWith(enqueueList);
+            enqueueList.clear();
+            dequeueIndex = 0;
+        }
+
+        SLANG_ASSERT(dequeueIndex < dequeueList.getCount());
+        return dequeueList[dequeueIndex++];
+    }
+
+    bool hasItems() const
+    {
+        return (dequeueIndex < dequeueList.getCount()) || (enqueueList.getCount() > 0);
+    }
+};
+
 struct DynamicInstLoweringContext
 {
     // Helper methods for creating canonical collections
@@ -449,7 +476,7 @@ struct DynamicInstLoweringContext
     // Centralized method to update propagation info and manage work queue
     // Use this when you want to propagate new information to an existing instruction
     // This will union the new info with existing info and add users to work queue if changed
-    void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, LinkedList<WorkItem>& workQueue)
+    void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue& workQueue)
     {
         auto existingInfo = tryGetInfo(context, inst);
         auto unionedInfo = unionPropagationInfo(existingInfo, newInfo);
@@ -467,11 +494,7 @@ struct DynamicInstLoweringContext
 
     // Helper to add users of an instruction to the work queue based on how they use it
     // This handles intra-procedural edges, inter-procedural edges, and return value propagation
-    void addUsersToWorkQueue(
-        IRInst* context,
-        IRInst* inst,
-        IRInst* info,
-        LinkedList<WorkItem>& workQueue)
+    void addUsersToWorkQueue(IRInst* context, IRInst* inst, IRInst* info, WorkQueue& workQueue)
     {
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
@@ -480,7 +503,7 @@ struct DynamicInstLoweringContext
             // If user is in a different block (or the inst is a param), add that block to work
             // queue.
             //
-            workQueue.addLast(WorkItem(context, user));
+            workQueue.enqueue(WorkItem(context, user));
 
             // If user is a terminator, add intra-procedural edges
             if (auto terminator = as<IRTerminatorInst>(user))
@@ -492,7 +515,7 @@ struct DynamicInstLoweringContext
                     for (auto succIter = successors.begin(); succIter != successors.end();
                          ++succIter)
                     {
-                        workQueue.addLast(WorkItem(context, succIter.getEdge()));
+                        workQueue.enqueue(WorkItem(context, succIter.getEdge()));
                     }
                 }
             }
@@ -515,7 +538,7 @@ struct DynamicInstLoweringContext
                     if (this->funcCallSites.containsKey(context))
                         for (auto callSite : this->funcCallSites[context])
                         {
-                            workQueue.addLast(WorkItem(
+                            workQueue.enqueue(WorkItem(
                                 InterproceduralEdge::Direction::FuncToCall,
                                 callSite.context,
                                 as<IRCall>(callSite.inst),
@@ -527,7 +550,7 @@ struct DynamicInstLoweringContext
     }
 
     // Helper method to update function return info and propagate to call sites
-    void updateFuncReturnInfo(IRInst* callable, IRInst* returnInfo, LinkedList<WorkItem>& workQueue)
+    void updateFuncReturnInfo(IRInst* callable, IRInst* returnInfo, WorkQueue& workQueue)
     {
         auto existingReturnInfo = getFuncReturnInfo(callable);
         auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnInfo);
@@ -541,7 +564,7 @@ struct DynamicInstLoweringContext
             {
                 for (auto callSite : funcCallSites[callable])
                 {
-                    workQueue.addLast(WorkItem(
+                    workQueue.enqueue(WorkItem(
                         InterproceduralEdge::Direction::FuncToCall,
                         callSite.context,
                         as<IRCall>(callSite.inst),
@@ -551,7 +574,7 @@ struct DynamicInstLoweringContext
         }
     }
 
-    void processBlock(IRInst* context, IRBlock* block, LinkedList<WorkItem>& workQueue)
+    void processBlock(IRInst* context, IRBlock* block, WorkQueue& workQueue)
     {
         for (auto inst : block->getChildren())
         {
@@ -571,7 +594,7 @@ struct DynamicInstLoweringContext
     void performInformationPropagation()
     {
         // Global worklist for interprocedural analysis
-        LinkedList<WorkItem> workQueue;
+        WorkQueue workQueue;
 
         // Add all global functions to worklist
         for (auto inst : module->getGlobalInsts())
@@ -579,11 +602,9 @@ struct DynamicInstLoweringContext
                 discoverContext(func, workQueue);
 
         // Process until fixed point
-        while (workQueue.getCount() > 0)
+        while (workQueue.hasItems())
         {
-            // Pop work item from front
-            auto item = workQueue.getFirst();
-            workQueue.getFirstNode()->removeAndDelete();
+            auto item = workQueue.dequeue();
 
             switch (item.type)
             {
@@ -724,10 +745,14 @@ struct DynamicInstLoweringContext
                 getTagOperands.getCount(),
                 getTagOperands.getBuffer());
 
+            auto effectiveValType = getCollectionCount(typeCollection) > 1
+                                        ? typeCollection
+                                        : getCollectionElement(typeCollection, 0);
+
             return builder.emitMakeTuple(
                 {tableTag,
                  builder.emitReinterpret(
-                     (IRType*)typeCollection,
+                     (IRType*)effectiveValType,
                      builder.emitGetTupleElement(
                          (IRType*)loweredInterfaceType->getOperand(0),
                          arg,
@@ -737,7 +762,7 @@ struct DynamicInstLoweringContext
         return arg; // Can use as-is.
     }
 
-    void processInstForPropagation(IRInst* context, IRInst* inst, LinkedList<WorkItem>& workQueue)
+    void processInstForPropagation(IRInst* context, IRInst* inst, WorkQueue& workQueue)
     {
         IRInst* info;
 
@@ -829,6 +854,12 @@ struct DynamicInstLoweringContext
         auto value = inst->getWrappedValue();
         auto valueType = value->getDataType();
 
+        // If we're building an existential for a COM pointer,
+        // we won't try to lower that.
+        //
+        if (isComInterfaceType(inst->getDataType()))
+            return makeUnbounded();
+
         // Get the witness table info
         auto witnessTableInfo = tryGetInfo(context, witnessTable);
 
@@ -847,10 +878,7 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
     }
 
-    IRInst* analyzeMakeStruct(
-        IRInst* context,
-        IRMakeStruct* makeStruct,
-        LinkedList<WorkItem>& workQueue)
+    IRInst* analyzeMakeStruct(IRInst* context, IRMakeStruct* makeStruct, WorkQueue& workQueue)
     {
         // We'll process this in the same way as a field-address, but for
         // all fields of the struct.
@@ -872,7 +900,7 @@ struct DynamicInstLoweringContext
 
                     if (this->fieldUseSites.containsKey(field))
                         for (auto useSite : this->fieldUseSites[field])
-                            workQueue.addLast(WorkItem(useSite.context, useSite.inst));
+                            workQueue.enqueue(WorkItem(useSite.context, useSite.inst));
                 }
             }
 
@@ -884,8 +912,20 @@ struct DynamicInstLoweringContext
 
     bool isResourcePointer(IRInst* inst)
     {
-        return isPointerToResourceType(inst->getDataType()) ||
-               inst->getOp() == kIROp_RWStructuredBufferGetElementPtr;
+        if (isPointerToResourceType(inst->getDataType()) ||
+            inst->getOp() == kIROp_RWStructuredBufferGetElementPtr)
+            return true;
+
+        if (as<IRGlobalParam>(inst))
+            return true;
+
+        if (auto ptr = as<IRGetElementPtr>(inst))
+            return isResourcePointer(ptr->getBase());
+
+        if (auto fieldAddress = as<IRFieldAddress>(inst))
+            return isResourcePointer(fieldAddress->getBase());
+
+        return false;
     }
 
     IRInst* analyzeLoad(IRInst* context, IRInst* inst)
@@ -944,7 +984,7 @@ struct DynamicInstLoweringContext
         return none(); // No info for other load types
     }
 
-    IRInst* analyzeStore(IRInst* context, IRStore* storeInst, LinkedList<WorkItem>& workQueue)
+    IRInst* analyzeStore(IRInst* context, IRStore* storeInst, WorkQueue& workQueue)
     {
         // Transfer the prop info from stored value to the address
         auto address = storeInst->getPtr();
@@ -990,21 +1030,22 @@ struct DynamicInstLoweringContext
 
         if (auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType()))
         {
-            auto structType = as<IRStructType>(basePtrType->getValueType());
-            SLANG_ASSERT(structType);
-            auto structField =
-                findStructField(structType, as<IRStructKey>(fieldAddress->getField()));
-
-            // Register this as a user of the field so updates will invoke this function again.
-            this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
-            this->fieldUseSites[structField].add(Element(context, fieldAddress));
-
-            if (this->fieldInfo.containsKey(structField))
+            if (auto structType = as<IRStructType>(basePtrType->getValueType()))
             {
-                IRBuilder builder(module);
-                return builder.getPtrTypeWithAddressSpace(
-                    (IRType*)this->fieldInfo[structField],
-                    as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                auto structField =
+                    findStructField(structType, as<IRStructKey>(fieldAddress->getField()));
+
+                // Register this as a user of the field so updates will invoke this function again.
+                this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
+                this->fieldUseSites[structField].add(Element(context, fieldAddress));
+
+                if (this->fieldInfo.containsKey(structField))
+                {
+                    IRBuilder builder(module);
+                    return builder.getPtrTypeWithAddressSpace(
+                        (IRType*)this->fieldInfo[structField],
+                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
+                }
             }
         }
         return none();
@@ -1014,20 +1055,21 @@ struct DynamicInstLoweringContext
     {
         IRBuilder builder(module);
 
-        auto structType = as<IRStructType>(fieldExtract->getBase()->getDataType());
-        SLANG_ASSERT(structType);
-        auto structField = findStructField(structType, as<IRStructKey>(fieldExtract->getField()));
-
-        // Register this as a user of the field so updates will invoke this function again.
-        this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
-        this->fieldUseSites[structField].add(Element(context, fieldExtract));
-
-        if (this->fieldInfo.containsKey(structField))
+        if (auto structType = as<IRStructType>(fieldExtract->getBase()->getDataType()))
         {
-            IRBuilder builder(module);
-            return this->fieldInfo[structField];
-        }
+            auto structField =
+                findStructField(structType, as<IRStructKey>(fieldExtract->getField()));
 
+            // Register this as a user of the field so updates will invoke this function again.
+            this->fieldUseSites.addIfNotExists(structField, HashSet<Element>());
+            this->fieldUseSites[structField].add(Element(context, fieldExtract));
+
+            if (this->fieldInfo.containsKey(structField))
+            {
+                IRBuilder builder(module);
+                return this->fieldInfo[structField];
+            }
+        }
         return none();
     }
 
@@ -1265,7 +1307,7 @@ struct DynamicInstLoweringContext
         SLANG_UNEXPECTED("Unhandled PropagationJudgment in analyzeExtractExistentialWitnessTable");
     }
 
-    void discoverContext(IRInst* context, LinkedList<WorkItem>& workQueue)
+    void discoverContext(IRInst* context, WorkQueue& workQueue)
     {
         if (this->availableContexts.add(context))
         {
@@ -1283,7 +1325,7 @@ struct DynamicInstLoweringContext
 
                     // Add all blocks to the work queue
                     for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
-                        workQueue.addLast(WorkItem(context, block));
+                        workQueue.enqueue(WorkItem(context, block));
                     break;
                 }
             case kIROp_Specialize:
@@ -1328,16 +1370,16 @@ struct DynamicInstLoweringContext
                     // Add all blocks to the work queue for an initial sweep
                     for (auto block = generic->getFirstBlock(); block;
                          block = block->getNextBlock())
-                        workQueue.addLast(WorkItem(context, block));
+                        workQueue.enqueue(WorkItem(context, block));
 
                     for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
-                        workQueue.addLast(WorkItem(context, block));
+                        workQueue.enqueue(WorkItem(context, block));
                 }
             }
         }
     }
 
-    IRInst* analyzeCall(IRInst* context, IRCall* inst, LinkedList<WorkItem>& workQueue)
+    IRInst* analyzeCall(IRInst* context, IRCall* inst, WorkQueue& workQueue)
     {
         auto callee = inst->getCallee();
         auto calleeInfo = tryGetInfo(context, callee);
@@ -1368,10 +1410,10 @@ struct DynamicInstLoweringContext
             {
                 // If this is a new call site, add a propagation task to the queue (in case there's
                 // already information about this function)
-                workQueue.addLast(
+                workQueue.enqueue(
                     WorkItem(InterproceduralEdge::Direction::FuncToCall, context, inst, callee));
             }
-            workQueue.addLast(
+            workQueue.enqueue(
                 WorkItem(InterproceduralEdge::Direction::CallToFunc, context, inst, callee));
         };
 
@@ -1392,11 +1434,7 @@ struct DynamicInstLoweringContext
             return none();
     }
 
-    void maybeUpdatePtr(
-        IRInst* context,
-        IRInst* inst,
-        IRInst* info,
-        LinkedList<WorkItem>& workQueue)
+    void maybeUpdatePtr(IRInst* context, IRInst* inst, IRInst* info, WorkQueue& workQueue)
     {
         if (auto getElementPtr = as<IRGetElementPtr>(inst))
         {
@@ -1453,7 +1491,7 @@ struct DynamicInstLoweringContext
                             // Add a work item to update the field extract
                             if (this->fieldUseSites.containsKey(foundField))
                                 for (auto useSite : this->fieldUseSites[foundField])
-                                    workQueue.addLast(WorkItem(useSite.context, useSite.inst));
+                                    workQueue.enqueue(WorkItem(useSite.context, useSite.inst));
                         }
                     }
                 }
@@ -1470,7 +1508,7 @@ struct DynamicInstLoweringContext
         }
     }
 
-    void propagateWithinFuncEdge(IRInst* context, IREdge edge, LinkedList<WorkItem>& workQueue)
+    void propagateWithinFuncEdge(IRInst* context, IREdge edge, WorkQueue& workQueue)
     {
         // Handle intra-procedural edge (original logic)
         auto predecessorBlock = edge.getPredecessor();
@@ -1509,6 +1547,24 @@ struct DynamicInstLoweringContext
 
     bool isGlobalInst(IRInst* inst) { return inst->getParent()->getOp() == kIROp_ModuleInst; }
 
+    bool isIntrinsic(IRInst* inst)
+    {
+        auto func = as<IRFunc>(inst);
+        if (auto specialize = as<IRSpecialize>(inst))
+        {
+            auto generic = specialize->getBase();
+            func = as<IRFunc>(getGenericReturnVal(generic));
+        }
+
+        if (!func)
+            return false;
+
+        if (func->getFirstBlock() == nullptr)
+            return true;
+
+        return false;
+    }
+
     List<IRType*> getParamEffectiveTypes(IRInst* context)
     {
         List<IRType*> effectiveTypes;
@@ -1545,7 +1601,8 @@ struct DynamicInstLoweringContext
                 effectiveTypes.add((IRType*)newType);
             else
                 effectiveTypes.add(
-                    (IRType*)as<IRFuncType>(context->getDataType())->getParamType(idx));
+                    //(IRType*)as<IRFuncType>(context->getDataType())->getParamType(idx)
+                    param->getDataType());
             idx++;
         }
 
@@ -1606,7 +1663,7 @@ struct DynamicInstLoweringContext
         return directions;
     }
 
-    void propagateInterproceduralEdge(InterproceduralEdge edge, LinkedList<WorkItem>& workQueue)
+    void propagateInterproceduralEdge(InterproceduralEdge edge, WorkQueue& workQueue)
     {
         // Handle interprocedural edge
         auto callInst = edge.callInst;
@@ -2135,6 +2192,8 @@ struct DynamicInstLoweringContext
             return lowerStructuredBufferLoad(context, inst);
         case kIROp_Specialize:
             return lowerSpecialize(context, as<IRSpecialize>(inst));
+        case kIROp_GetValueFromBoundInterface:
+            return lowerGetValueFromBoundInterface(context, as<IRGetValueFromBoundInterface>(inst));
         case kIROp_Load:
             return lowerLoad(context, inst);
         case kIROp_Store:
@@ -2669,7 +2728,7 @@ struct DynamicInstLoweringContext
         // If by this point, we haven't resolved our callee into a global inst (
         // either a collection or a single function), then we can't lower it (likely unbounded)
         //
-        if (!isGlobalInst(callee))
+        if (!isGlobalInst(callee) || isIntrinsic(callee))
             return false;
 
         auto expectedFuncType = getEffectiveFuncType(callee);
@@ -2744,16 +2803,10 @@ struct DynamicInstLoweringContext
                 break;
             case kParameterDirection_Out:
             case kParameterDirection_InOut:
+            case kParameterDirection_ConstRef:
+            case kParameterDirection_Ref:
                 {
-                    auto argValueType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
-                    /*if (argValueType != paramType)
-                    {
-                        SLANG_UNEXPECTED("ptr-typed parameters should have matching types");
-                    }
-                    else
-                    {*/
                     newArgs.add(arg);
-                    //}
                     break;
                 }
             default:
@@ -2972,12 +3025,22 @@ struct DynamicInstLoweringContext
 
     bool lowerSpecialize(IRInst* context, IRSpecialize* inst)
     {
-        auto returnVal = getGenericReturnVal(inst->getBase());
+        bool isFuncReturn = false;
 
-        // Functions should be handled at the call site (in lowerCall)
+        // TODO: Would checking this inst's info be enough instead?
+        // This seems long-winded.
+        if (auto concreteGeneric = as<IRGeneric>(inst->getBase()))
+            isFuncReturn = as<IRFunc>(getGenericReturnVal(concreteGeneric)) != nullptr;
+        else if (auto tagType = as<IRCollectionTagType>(inst->getBase()->getDataType()))
+        {
+            auto firstConcreteGeneric = as<IRGeneric>(getCollectionElement(tagType, 0));
+            isFuncReturn = as<IRFunc>(getGenericReturnVal(firstConcreteGeneric)) != nullptr;
+        }
+
+        // Functions/Collections of Functions should be handled at the call site (in lowerCall)
         // since witness table specialization arguments must be inlined into the call.
         //
-        if (as<IRFunc>(returnVal))
+        if (isFuncReturn)
         {
             // TODO: Maybe make this the 'default' behavior if a lowering call
             // returns false.
@@ -3007,16 +3070,6 @@ struct DynamicInstLoweringContext
             }
         }
 
-        /*IRType* typeForSpecialization = nullptr;
-        if (auto info = tryGetInfo(context, inst))
-        {
-            changed = true;
-            typeForSpecialization = getLoweredType(info);
-        }
-        else
-        {
-            typeForSpecialization = inst->getDataType();
-        }*/
         IRBuilder builder(inst);
         IRType* typeForSpecialization = builder.getTypeKind();
 
@@ -3033,6 +3086,25 @@ struct DynamicInstLoweringContext
             return true;
         }
 
+        return false;
+    }
+
+
+    bool lowerGetValueFromBoundInterface(IRInst* context, IRGetValueFromBoundInterface* inst)
+    {
+        auto destType = inst->getDataType();
+        auto operandInfo = inst->getOperand(0)->getDataType();
+        if (auto taggedUnionTupleType = as<IRTupleType>(operandInfo))
+        {
+            SLANG_ASSERT(taggedUnionTupleType->getOperand(1) == destType);
+
+            IRBuilder builder(inst);
+            setInsertAfterOrdinaryInst(&builder, inst);
+            auto newInst = builder.emitGetTupleElement((IRType*)destType, inst->getOperand(0), 1);
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
         return false;
     }
 
@@ -3156,9 +3228,20 @@ struct DynamicInstLoweringContext
         if (existingId)
             return *existingId;
 
+        // If we reach here, the instruction was not assigned an ID during initialization.
+        // This can happen for instructions that are generated during the dynamic analysis
+        // process.
+        //
+        // We will ensure that they are moved to the end of the module, and assign them a new ID.
+        // This will ensure a stable ordering on subsequent passes.
+        //
+        inst->moveToEnd();
+        uniqueIds[inst] = nextUniqueId;
+        return nextUniqueId++;
+
         // If we reach here, this instruction wasn't assigned an ID during initialization
         // This should only happen for instructions that don't support collection types
-        SLANG_UNEXPECTED("getUniqueID called on instruction without pre-assigned ID");
+        // SLANG_UNEXPECTED("getUniqueID called on instruction without pre-assigned ID");
     }
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }

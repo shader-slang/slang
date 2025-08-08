@@ -12,15 +12,22 @@ typealias IDFloat = __BuiltinFloatingPointType & IDifferentiable;
 namespace myintrinsiclib
 {
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl, "exp($0)")
-    __target_intrinsic(glsl, "exp($0)")
-    __target_intrinsic(cuda, "$P_exp($0)")
-    __target_intrinsic(cpp, "$P_exp($0)")
-    __target_intrinsic(spirv, "12 resultType resultId glsl450 27 _0")
-    __target_intrinsic(metal, "exp($0)")
-    __target_intrinsic(wgsl, "exp($0)")
     [ForwardDerivative(d_myexp<T>)]
-    T myexp(T x);
+    T myexp(T x)
+    {
+        __target_switch
+        {
+            case cpp: __intrinsic_asm "$P_exp($0)";
+            case cuda: __intrinsic_asm "$P_exp($0)";
+            case glsl: __intrinsic_asm "exp";
+            case hlsl: __intrinsic_asm "exp";
+            case metal: __intrinsic_asm "exp";
+            case spirv: return spirv_asm {
+                    OpExtInst $$T result glsl450 27 $x
+            };
+            case wgsl: __intrinsic_asm "exp";
+        }
+    }
 
     __generic<T : IDFloat>
     DifferentialPair<T> d_myexp(DifferentialPair<T> dpx)
@@ -33,15 +40,22 @@ namespace myintrinsiclib
     
     // Sine
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl, "sin($0)")
-    __target_intrinsic(glsl, "sin($0)")
-    __target_intrinsic(metal, "sin($0)")
-    __target_intrinsic(cuda, "$P_sin($0)")
-    __target_intrinsic(cpp, "$P_sin($0)")
-    __target_intrinsic(spirv, "12 resultType resultId glsl450 13 _0")
-    __target_intrinsic(wgsl, "sin($0)")
     [ForwardDerivative(d_mysin<T>)]
-    T mysin(T x);
+    T mysin(T x)
+    {
+        __target_switch
+        {
+            case hlsl: __intrinsic_asm "sin($0)";
+            case glsl: __intrinsic_asm "sin($0)";
+            case metal: __intrinsic_asm "sin($0)";
+            case cuda: __intrinsic_asm "$P_sin($0)";
+            case cpp: __intrinsic_asm "$P_sin($0)";
+            case spirv: return spirv_asm {
+                    OpExtInst $$T result glsl450 13 $x
+            };
+            case wgsl: __intrinsic_asm "sin($0)";
+        }
+    }
 
     __generic<T : IDFloat>
     DifferentialPair<T> d_mysin(DifferentialPair<T> dpx)
@@ -53,15 +67,22 @@ namespace myintrinsiclib
 
     // Cosine
     __generic<T : IDFloat>
-    __target_intrinsic(hlsl, "cos($0)")
-    __target_intrinsic(glsl, "cos($0)")
-    __target_intrinsic(metal, "cos($0)")
-    __target_intrinsic(cuda, "$P_cos($0)")
-    __target_intrinsic(cpp, "$P_cos($0)")
-    __target_intrinsic(spirv, "12 resultType resultId glsl450 14 _0")
-    __target_intrinsic(wgsl, "cos($0)")
     [ForwardDerivative(d_mycos<T>)]
-    T mycos(T x);
+    T mycos(T x)
+    {
+        __target_switch
+        {
+            case hlsl: __intrinsic_asm "cos($0)";
+            case glsl: __intrinsic_asm "cos($0)";
+            case metal: __intrinsic_asm "cos($0)";
+            case cuda: __intrinsic_asm "$P_cos($0)";
+            case cpp: __intrinsic_asm "$P_cos($0)";
+            case spirv: return spirv_asm {
+                OpExtInst $$T result glsl450 14 $x
+            };
+            case wgsl: __intrinsic_asm "cos($0)";
+        }
+    }
 
     __generic<T : IDFloat>
     DifferentialPair<T> d_mycos(DifferentialPair<T> dpx)
