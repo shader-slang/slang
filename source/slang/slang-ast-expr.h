@@ -609,6 +609,15 @@ class ReturnValExpr : public Expr
     Scope* scope = nullptr;
 };
 
+// An array of the bytes in the current module.
+FIDDLE()
+class IRBytesExpr : public Expr
+{
+    FIDDLE(...)
+
+    Scope* scope = nullptr;
+};
+
 // An expression that binds a temporary variable in a local expression context
 FIDDLE()
 class LetExpr : public Expr
