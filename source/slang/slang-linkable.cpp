@@ -391,21 +391,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
 {
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    // First let's check if the number of arguments given matches
-    // the number of parameters that are present on this component type.
-    //
-    auto specializationParamCount = getSpecializationParamCount();
-    if (specializationArgCount < specializationParamCount)
-    {
-        sink.diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            specializationParamCount,
-            specializationArgCount);
-        sink.getBlobIfNeeded(outDiagnostics);
-        return SLANG_FAIL;
-    }
-
     List<SpecializationArg> expandedArgs;
     for (Int aa = 0; aa < specializationArgCount; ++aa)
     {
@@ -445,8 +430,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     sink.getBlobIfNeeded(outDiagnostics);
 
     *outSpecializedComponentType = specializedComponentType.detach();
-
-    return SLANG_OK;
+    if (specializedComponentType)
+        return SLANG_OK;
+    return SLANG_FAIL;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL

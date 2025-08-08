@@ -104,4 +104,39 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
             UnownedStringSlice((char*)code->getBufferPointer())
                 .indexOf(toSlice("vec4(float(X_getValue_0()), 2.0, 8.0, 1.0)")) != -1);
     }
+
+    // Test 3: corner case: specialize variadic param with 0 types.
+    {
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findAndCheckEntryPoint(
+            "vertMain",
+            SLANG_STAGE_VERTEX,
+            entryPoint.writeRef(),
+            diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(entryPoint != nullptr);
+        ComPtr<slang::IComponentType> specializedEntryPoint;
+        slang::SpecializationArg args[] = {
+            slang::SpecializationArg::fromType(module->getLayout()->findTypeByName("X")),
+            slang::SpecializationArg::fromExpr("8")};
+
+        entryPoint->specialize(args, 2, specializedEntryPoint.writeRef(), nullptr);
+        SLANG_CHECK_ABORT(specializedEntryPoint != nullptr);
+        slang::IComponentType* componentTypes[2] = {module, specializedEntryPoint.get()};
+        ComPtr<slang::IComponentType> composedProgram;
+        session->createCompositeComponentType(
+            componentTypes,
+            2,
+            composedProgram.writeRef(),
+            diagnosticBlob.writeRef());
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        composedProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+
+        ComPtr<slang::IBlob> code;
+        linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
+
+        SLANG_CHECK(
+            UnownedStringSlice((char*)code->getBufferPointer())
+                .indexOf(toSlice("vec4(float(X_getValue_0()), 0.0, 8.0, 1.0)")) != -1);
+    }
 }

@@ -1513,16 +1513,6 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     auto existentialSpecializationParamCount = getExistentialSpecializationParamCount();
     auto genericSpecializationParamCount = getGenericSpecializationParamCount();
 
-    if (argCount < genericSpecializationParamCount + existentialSpecializationParamCount)
-    {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            genericSpecializationParamCount + existentialSpecializationParamCount,
-            argCount);
-        return nullptr;
-    }
-
     RefPtr<EntryPointSpecializationInfo> info = new EntryPointSpecializationInfo();
 
     DeclRef<FuncDecl> specializedFuncDeclRef = m_funcDeclRef;
@@ -1543,6 +1533,16 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         // If function is variadic generic, it will consume all the provided arguments.
         if (isVariadic)
             genericArgCount = argCount - existentialSpecializationParamCount;
+
+        if (genericArgCount < 0)
+        {
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::mismatchSpecializationArguments,
+                genericSpecializationParamCount + existentialSpecializationParamCount,
+                argCount);
+            return nullptr;
+        }
 
         List<Expr*> genericArgs;
 
@@ -1567,11 +1567,26 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         genAppExpr->functionExpr = genExpr;
         genAppExpr->arguments = _Move(genericArgs);
         auto checkedExpr = visitor.CheckTerm(genAppExpr);
-        auto declRefExpr = as<DeclRefExpr>(checkedExpr);
-        if (!declRefExpr)
-            return nullptr;
+        if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
+        {
+            // If checked generic is partially applied generic, we try to force conversion into
+            // a fully defined declref by calling `trySolveConstraintSystem`.
+            SemanticsVisitor::ConstraintSystem system;
+            system.genericDecl = genericDeclRef.getDecl();
+            ConversionCost outCost;
+            specializedFuncDeclRef = visitor
+                                         .trySolveConstraintSystem(
+                                             &system,
+                                             genericDeclRef,
+                                             partiallyAppliedExpr->knownGenericArgs.getArrayView(),
+                                             outCost)
+                                         .as<FuncDecl>();
+        }
+        else if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            specializedFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
+        }
 
-        specializedFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
         if (!specializedFuncDeclRef)
             return nullptr;
     }
@@ -1587,7 +1602,15 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     argCount -= genericArgCount;
     outConsumedArgCount = genericArgCount + existentialSpecializationParamCount;
 
-    SLANG_ASSERT(argCount == existentialSpecializationParamCount);
+    if (argCount != existentialSpecializationParamCount)
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            genericSpecializationParamCount + existentialSpecializationParamCount,
+            argCount);
+        return nullptr;
+    }
 
     for (Index ii = 0; ii < existentialSpecializationParamCount; ++ii)
     {
