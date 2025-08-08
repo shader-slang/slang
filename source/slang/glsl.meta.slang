@@ -2117,7 +2117,7 @@ public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p, float bias)
         result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.x / p.y, bias);
+        return texture(sampler, p.x / p.y);
     }
 }
 
@@ -2151,7 +2151,7 @@ public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p, float bias)
         result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.x / p.w, bias);
+        return texture(sampler, p.x / p.w);
     }
 }
 
@@ -2185,7 +2185,7 @@ public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p, float bias)
         result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xy / p.z, bias);
+        return texture(sampler, p.xy / p.z);
     }
 }
 
@@ -2219,7 +2219,7 @@ public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p, float bias)
         result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xy / p.w, bias);
+        return texture(sampler, p.xy / p.w);
     }
 }
 
@@ -2253,7 +2253,7 @@ public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
         result:$$vector<T.Element,4> = OpImageSampleProjImplicitLod $sampler $p Bias $bias
     };
     default:
-        return texture(sampler, p.xyz / p.w, bias);
+        return texture(sampler, p.xyz / p.w);
     }
 }
 
@@ -2295,7 +2295,7 @@ public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
         };
     }
     default:
-        return texture(sampler, p.xyz / p.w, bias);
+        return texture(sampler, p.xyz / p.w);
     }
 }
 
@@ -2337,7 +2337,7 @@ public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
         };
     }
     default:
-        return texture(sampler, p.xyz / p.w, bias);
+        return texture(sampler, p.xyz / p.w);
     }
 }
 
@@ -3981,7 +3981,7 @@ public vec4 texture1D(sampler1D sampler, float coord)
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture1D(sampler1D sampler, float coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
@@ -4035,7 +4035,7 @@ public vec4 texture2D(sampler2D sampler, vec2 coord)
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture2D(sampler2D sampler, vec2 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
@@ -4089,7 +4089,7 @@ public vec4 texture3D(sampler3D sampler, vec3 coord)
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 texture3D(sampler3D sampler, vec3 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture(sampler, coord);
 }
 
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
@@ -4125,7 +4125,7 @@ public vec4 textureCube(samplerCube sampler, vec3 coord)
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vec4 textureCube(samplerCube sampler, vec3 coord, float bias)
 {
-    return texture(sampler, coord, bias);
+    return texture(sampler, coord);
 }
 
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
