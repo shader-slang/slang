@@ -5,8 +5,8 @@
 // CHECK: OpEntryPoint
 // CHECK-NOT: error
 
-RWStructuredBuffer<int> processMemory;
-RWStructuredBuffer<int> output;
+int* processMemory;
+int* output;
 
 typealias ReadPtr = Ptr<int, Access::Read, AddressSpace::Device>;
 

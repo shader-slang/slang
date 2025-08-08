@@ -2,9 +2,6 @@
 
 // Tests for invalid use of `globallycoherent` with Ptr/T*
 
-RWStructuredBuffer<int> processMemory;
-RWStructuredBuffer<int> output;
-
 cbuffer Globals
 {
     // CHECK: ([[# @LINE+1]]): error 30078

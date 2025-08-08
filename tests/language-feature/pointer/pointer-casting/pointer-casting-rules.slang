@@ -2,7 +2,7 @@
 
 // Tests pointer casting rules: Only explicit casting is allowed between pointer types.
 // All implicit conversions between pointer types should fail.
-RWStructuredBuffer<int> processMemory;
+int* processMemory;
 RWStructuredBuffer<int> output;
 
 [numthreads(1, 1, 1)]

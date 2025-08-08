@@ -2,7 +2,7 @@
 
 // Writing with a read-only pointer should be an error
 
-RWStructuredBuffer<int> processMemory;
+int* processMemory;
 RWStructuredBuffer<int> output;
 
 typealias ReadPtr = Ptr<int, Access::Read, AddressSpace::Device>;

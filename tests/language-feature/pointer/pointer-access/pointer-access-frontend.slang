@@ -3,8 +3,8 @@
 //CHECK: OpEntryPoint
 //CHECK-NOT: error
 
-RWStructuredBuffer<int> processMemory;
-RWStructuredBuffer<int> output;
+int* processMemory;
+int* output;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
