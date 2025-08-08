@@ -2187,6 +2187,10 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // arrays in specific cases)
         //
         validateArraySizeForVariable(varDecl);
+        //
+        // Similarly, we want to check the element type for any restrictions
+        //
+        validateArrayElementTypeForVariable(varDecl);
     }
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
@@ -10742,6 +10746,20 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
     if (elementCount->isLinkTimeVal())
     {
         getSink()->diagnose(varDecl, Diagnostics::linkTimeConstantArraySize);
+    }
+}
+
+void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
+{
+    auto arrayType = as<ArrayExpressionType>(varDecl->type);
+    if (!arrayType)
+        return;
+
+    const auto elementType = arrayType->getElementType();
+    if (as<ParameterBlockType>(elementType))
+    {
+        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock);
+        return;
     }
 }
 
