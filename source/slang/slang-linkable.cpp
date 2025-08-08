@@ -377,6 +377,13 @@ RefPtr<ComponentType> ComponentType::specialize(
         specializationArgCount,
         consumedArgCount,
         sink);
+    if (consumedArgCount != specializationArgCount)
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            Math::Max(consumedArgCount, getSpecializationParamCount(), specializationArgCount));
+    }
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 

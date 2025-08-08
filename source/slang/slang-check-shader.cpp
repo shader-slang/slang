@@ -1602,7 +1602,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     argCount -= genericArgCount;
     outConsumedArgCount = genericArgCount + existentialSpecializationParamCount;
 
-    if (argCount != existentialSpecializationParamCount)
+    if (argCount < existentialSpecializationParamCount)
     {
         sink->diagnose(
             SourceLoc(),
