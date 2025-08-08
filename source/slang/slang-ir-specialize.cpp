@@ -1142,6 +1142,12 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
+                writeSpecializationDictionaries();
+                genericSpecializations.clear();
+                existentialSpecializedFuncs.clear();
+                existentialSpecializedStructs.clear();
+                eliminateDeadCode(module->getModuleInst());
+                readSpecializationDictionaries();
                 // eliminateDeadCode(module->getModuleInst());
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
             }
