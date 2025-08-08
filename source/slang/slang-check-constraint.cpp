@@ -843,15 +843,15 @@ bool SemanticsVisitor::TryUnifyVals(
         }
 
 
-        const auto paramUnderCastToGeneric = [](IntVal* i)
+        const auto tryParamUnderCastToDeclRefIntVal = [](IntVal* i)
         {
             if (const auto c = as<TypeCastIntVal>(i))
                 i = as<IntVal>(c->getBase());
             return as<DeclRefIntVal>(i);
         };
 
-        auto fstParam = paramUnderCastToGeneric(fstInt);
-        auto sndParam = paramUnderCastToGeneric(sndInt);
+        auto fstParam = tryParamUnderCastToDeclRefIntVal(fstInt);
+        auto sndParam = tryParamUnderCastToDeclRefIntVal(sndInt);
 
         bool okay = false;
         if (fstParam)
