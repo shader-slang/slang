@@ -2241,6 +2241,17 @@ void assign(
                     }
                     break;
                 }
+            case ScalarizedVal::Flavor::typeAdapter:
+                {
+                    auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(right.impl);
+                    auto adaptedRight = adaptType(
+                        builder,
+                        typeAdapter->val,
+                        typeAdapter->pretendType,
+                        typeAdapter->actualType);
+                    assign(builder, left, adaptedRight);
+                    break;
+                }
 
             default:
                 SLANG_UNEXPECTED("unimplemented");
@@ -3591,9 +3602,7 @@ void legalizeEntryPointParameterForGLSL(
     }
     else if (auto ptrType = as<IRPtrTypeBase>(paramType))
     {
-        // This is the case where the parameter is passed by const
-        // reference. We simply replace existing uses of the parameter
-        // with the real global variable.
+        // This is the case where the parameter is passed by const reference.
         SLANG_ASSERT(
             ptrType->getOp() == kIROp_ConstRefType ||
             ptrType->getAddressSpace() == AddressSpace::Input ||
@@ -3608,7 +3617,101 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-        tryReplaceUsesOfStageInput(context, globalValue, pp);
+
+        // Create a local variable to replace the parameter
+        setInsertAfterOrdinaryInst(builder, pp);
+        auto localVariable = builder->emitVar(valueType);
+        auto localVal = ScalarizedVal::address(localVariable);
+
+        bool needToAssign = true;
+        if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
+        {
+            if (auto arrayType = as<IRArrayType>(valueType))
+            {
+                auto elementType = arrayType->getElementType();
+                auto elementCount = arrayType->getElementCount();
+                
+                if (auto structType = as<IRStructType>(elementType))
+                {
+                    // Copy name hint and other debug decorations from the parameter
+                    if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
+                    {
+                        builder->addNameHintDecoration(localVariable, nameHint->getName());
+                    }
+                    
+                    // Convert from SOA (global) to AOS (local) by initializing each array element
+                    auto globalTuple = as<ScalarizedTupleValImpl>(globalValue.impl);
+                    auto arrayElementCount = (UInt)getIntVal(elementCount);
+                    
+                    for (UInt arrayIndex = 0; arrayIndex < arrayElementCount; arrayIndex++)
+                    {
+                        // Get the address of the array element: localArray[arrayIndex]
+                        auto indexVal = builder->getIntValue(builder->getIntType(), (IRIntegerValue)arrayIndex);
+                        auto elementAddr = builder->emitElementAddress(
+                            builder->getPtrType(elementType),
+                            localVariable,
+                            indexVal);
+                        
+                        // For each struct field, get the value from the global SOA and store to local AOS
+                        for (auto field : structType->getFields())
+                        {
+                            // Find the corresponding global field array
+                            IRInst* globalFieldValue = nullptr;
+                            for (auto& globalElement : globalTuple->elements)
+                            {
+                                if (globalElement.key == field->getKey())
+                                {
+                                    // Extract the value at arrayIndex from the global field array
+                                    if (globalElement.val.flavor == ScalarizedVal::Flavor::address)
+                                    {
+                                        auto fieldElementAddr = builder->emitElementAddress(
+                                            builder->getPtrType(field->getFieldType()),
+                                            globalElement.val.irValue,
+                                            indexVal);
+                                        globalFieldValue = builder->emitLoad(fieldElementAddr);
+                                    }
+                                    else if (globalElement.val.flavor == ScalarizedVal::Flavor::value)
+                                    {
+                                        globalFieldValue = builder->emitElementExtract(
+                                            field->getFieldType(),
+                                            globalElement.val.irValue,
+                                            indexVal);
+                                    }
+                                    break;
+                                }
+                            }
+                            
+                            if (globalFieldValue)
+                            {
+                                // Store the field value to the local struct element
+                                auto localFieldAddr = builder->emitFieldAddress(
+                                    builder->getPtrType(field->getFieldType()),
+                                    elementAddr,
+                                    field->getKey());
+                                builder->emitStore(localFieldAddr, globalFieldValue);
+                            }
+                        }
+                    }
+                    needToAssign = false;
+                }
+            }
+        }
+
+        if (needToAssign)
+        {
+            // Copy name hint and other debug decorations from the parameter
+            if (auto nameHint = pp->findDecoration<IRNameHintDecoration>())
+            {
+                builder->addNameHintDecoration(localVariable, nameHint->getName());
+            }
+            
+            // Assign from the global variable to the local variable
+            assign(builder, localVal, globalValue);
+        }
+
+        // Replace uses of the original parameter with the local variable
+        pp->replaceUsesWith(localVariable);
+
         for (auto dec : pp->getDecorations())
         {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
