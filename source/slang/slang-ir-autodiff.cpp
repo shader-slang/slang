@@ -373,8 +373,14 @@ IRInst* DifferentialPairTypeBuilder::emitPrimalFieldAccess(
             baseWitness,
             getPrimalKey);
 
+        IRType* primalType;
+        if (!primalTypeMap.tryGetValue(loweredPairType, primalType))
+        {
+            SLANG_UNEXPECTED("Primal type not found in map");
+            return nullptr;
+        }
         auto primalFieldVal =
-            builder->emitCallInst(primalTypeMap[loweredPairType], primalFieldMethod, baseInst);
+            builder->emitCallInst(primalType, primalFieldMethod, baseInst);
 
         return primalFieldVal;
     }
@@ -401,8 +407,14 @@ IRInst* DifferentialPairTypeBuilder::emitDiffFieldAccess(
             baseWitness,
             getDiffKey);
 
+        IRType* diffType;
+        if (!diffTypeMap.tryGetValue(loweredPairType, diffType))
+        {
+            SLANG_UNEXPECTED("Diff type not found in map");
+            return nullptr;
+        }
         auto diffFieldVal =
-            builder->emitCallInst(diffTypeMap[loweredPairType], diffFieldMethod, baseInst);
+            builder->emitCallInst(diffType, diffFieldMethod, baseInst);
 
         return diffFieldVal;
     }
@@ -539,9 +551,9 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
     IRStructKey* getDiffRequirementKey = builder.createStructKey();
     IRStructKey* makePairRequirementKey = builder.createStructKey();
 
-    makePairKeyMap[diffPairRequirementKey] = makePairRequirementKey;
-    getPrimalKeyMap[diffPairRequirementKey] = getPrimalRequirementKey;
-    getDiffKeyMap[diffPairRequirementKey] = getDiffRequirementKey;
+    makePairKeyMap.addIfNotExists(diffPairRequirementKey, makePairRequirementKey);
+    getPrimalKeyMap.addIfNotExists(diffPairRequirementKey, getPrimalRequirementKey);
+    getDiffKeyMap.addIfNotExists(diffPairRequirementKey, getDiffRequirementKey);
 
     List<IRInst*> entries;
 
@@ -577,7 +589,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         auto entry =
             builder.createInterfaceRequirementEntry(getPrimalRequirementKey, entryFuncType);
 
-        getPrimalFuncTypeMap[getPrimalRequirementKey] = entryFuncType;
+        getPrimalFuncTypeMap.addIfNotExists(getPrimalRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_getPrimal";
@@ -601,7 +613,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
         auto entryFuncType = builder.getFuncType(paramTypes, resultType);
         auto entry = builder.createInterfaceRequirementEntry(getDiffRequirementKey, entryFuncType);
 
-        getDiffFuncTypeMap[getDiffRequirementKey] = entryFuncType;
+        getDiffFuncTypeMap.addIfNotExists(getDiffRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_getDiff";
@@ -627,7 +639,7 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
             builder.getAssociatedType(resultConstraintTypes.getArrayView()));
         auto entry = builder.createInterfaceRequirementEntry(makePairRequirementKey, entryFuncType);
 
-        makePairFuncTypeMap[makePairRequirementKey] = entryFuncType;
+        makePairFuncTypeMap.addIfNotExists(makePairRequirementKey, entryFuncType);
 
         StringBuilder entryNameBuilder;
         entryNameBuilder << nameBuilderReqKey.getUnownedSlice() << "_makePair";
@@ -648,11 +660,17 @@ IRInst* DifferentialPairTypeBuilder::_createDiffPairInterfaceRequirement(
 
         // Replace the interface maps in the caches.
         if (this->pairTypeCache.containsKey(interfaceType))
-            this->pairTypeCache[newInterfaceType] = this->pairTypeCache[interfaceType];
+        {
+            if (!this->pairTypeCache.containsKey(newInterfaceType))
+                this->pairTypeCache[newInterfaceType] = this->pairTypeCache[interfaceType];
+        }
 
         if (this->existentialPairTypeCache.containsKey(interfaceType))
-            this->existentialPairTypeCache[newInterfaceType] =
-                this->existentialPairTypeCache[interfaceType];
+        {
+            if (!this->existentialPairTypeCache.containsKey(newInterfaceType))
+                this->existentialPairTypeCache[newInterfaceType] =
+                    this->existentialPairTypeCache[interfaceType];
+        }
 
         interfaceType->removeAndDeallocate();
         interfaceType = newInterfaceType;
@@ -877,7 +895,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
         if (!existentialPairTypeCache.tryGetValue(cacheKey, pairReqKey))
         {
             pairReqKey = _createDiffPairInterfaceRequirement(primalType, (IRType*)diffType);
-            existentialPairTypeCache.add(cacheKey, pairReqKey);
+            existentialPairTypeCache.addIfNotExists(cacheKey, pairReqKey);
         }
 
         auto baseWitnessTable = getExistentialBaseWitnessTable(builder, primalType);
@@ -886,8 +904,10 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             baseWitnessTable,
             pairReqKey);
 
-        primalTypeMap[result] = primalType;
-        diffTypeMap[result] = (IRType*)diffType;
+        if (!primalTypeMap.containsKey(result))
+            primalTypeMap[result] = primalType;
+        if (!diffTypeMap.containsKey(result))
+            diffTypeMap[result] = (IRType*)diffType;
 
         return result;
     }
@@ -940,13 +960,13 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
             // Lower the diff pair type.
             auto loweredPairType = (IRType*)_createDiffPairType(type, diffType);
 
-            pairTypeCache.add(type, loweredPairType);
+            pairTypeCache.addIfNotExists(type, loweredPairType);
             args.add(loweredPairType);
         }
 
         auto loweredTypePack = builder->getTypePack(args.getCount(), args.getBuffer());
         // TODO: Unify the cache between the three cases.
-        pairTypeCache.add(cacheKey, loweredTypePack);
+        pairTypeCache.addIfNotExists(cacheKey, loweredTypePack);
 
         return loweredTypePack;
     }
@@ -977,7 +997,7 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
 
         // Concrete case.
         result = _createDiffPairType(primalType, (IRType*)diffType);
-        pairTypeCache.add(cacheKey, result);
+        pairTypeCache.addIfNotExists(cacheKey, result);
 
         return result;
     }
@@ -2641,7 +2661,8 @@ bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst*
     {
         if (isTypeEqual(type.key, (IRType*)typeInst))
         {
-            context.differentiableTypeWitnessDictionary[(IRType*)typeInst] = type.value;
+            // Use addIfNotExists to avoid crashes when key already exists
+            context.differentiableTypeWitnessDictionary.addIfNotExists((IRType*)typeInst, type.value);
             return true;
         }
     }
@@ -2799,7 +2820,7 @@ struct AutoDiffPass : public InstPassBase
                                     auto bwdFuncDecor = func->findDecoration<
                                         IRBackwardDerivativePropagateDecoration>();
 
-                                    typeToBwdFuncMap.add(
+                                    typeToBwdFuncMap.addIfNotExists(
                                         type,
                                         cast<IRGlobalValueWithCode>(
                                             as<IRSpecialize>(
@@ -2811,7 +2832,7 @@ struct AutoDiffPass : public InstPassBase
                                     auto bwdFuncDecor = func->findDecoration<
                                         IRBackwardDerivativePropagateDecoration>();
 
-                                    typeToBwdFuncMap.add(
+                                    typeToBwdFuncMap.addIfNotExists(
                                         type,
                                         cast<IRGlobalValueWithCode>(
                                             bwdFuncDecor->getBackwardDerivativePropagateFunc()));
@@ -2952,7 +2973,12 @@ struct AutoDiffPass : public InstPassBase
         IRBuilder builder(module);
         for (auto t : sortedContextTypes)
         {
-            auto func = typeToBwdFuncMap[t];
+            IRGlobalValueWithCode* func;
+            if (!typeToBwdFuncMap.tryGetValue(t, func))
+            {
+                SLANG_UNEXPECTED("Function not found in typeToBwdFuncMap");
+                continue;
+            }
             DifferentiableTypeConformanceContext ctx(this->autodiffContext);
             ctx.setFunc(func);
 
@@ -2964,7 +2990,8 @@ struct AutoDiffPass : public InstPassBase
                 SLANG_RELEASE_ASSERT(t->getParent() && t->getParent()->getOp() == kIROp_ModuleInst);
                 builder.setInsertBefore(t);
                 auto diffInfo = fillDifferentialTypeImplementation(&ctx, diffTypes, t);
-                diffTypes[t] = diffInfo;
+                if (!diffTypes.containsKey(t))
+                    diffTypes.addIfNotExists(t, diffInfo);
             }
             else if (auto specialize = as<IRSpecialize>(t))
             {
@@ -2988,7 +3015,8 @@ struct AutoDiffPass : public InstPassBase
                     baseInfo.diffWitness,
                     (UInt)args.getCount(),
                     args.getBuffer());
-                diffTypes[t] = info;
+                if (!diffTypes.containsKey(t))
+                    diffTypes.addIfNotExists(t, info);
             }
             else
             {

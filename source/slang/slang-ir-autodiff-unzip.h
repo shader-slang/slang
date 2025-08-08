@@ -162,8 +162,11 @@ struct DiffUnzipPass
             for (auto block : workList)
             {
                 if (primalMap.containsKey(block))
-                    indexRegionMap->map[as<IRBlock>(primalMap[block])] =
-                        (IndexedRegion*)indexRegionMap->map[block];
+                {
+                    auto primalBlock = as<IRBlock>(primalMap[block]);
+                    if (!indexRegionMap->map.containsKey(primalBlock))
+                        indexRegionMap->map[primalBlock] = (IndexedRegion*)indexRegionMap->map[block];
+                }
 
                 if (diffMap.containsKey(block))
                     indexRegionMap->map.set(
