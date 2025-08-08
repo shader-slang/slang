@@ -446,6 +446,11 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
                             load,
                             [&](IRGetElement* getElement)
                             {
+                                // Only optimize if the load
+                                // is the base
+                                if (getElement->getBase() != load)
+                                    return;
+
                                 IRBuilder builder(getElement);
                                 builder.setInsertBefore(getElement);
                                 auto newGetElementPtr = builder.emitElementAddress(
