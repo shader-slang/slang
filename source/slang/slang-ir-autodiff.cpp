@@ -373,8 +373,14 @@ IRInst* DifferentialPairTypeBuilder::emitPrimalFieldAccess(
             baseWitness,
             getPrimalKey);
 
+        IRType* primalType;
+        if (!primalTypeMap.tryGetValue(loweredPairType, primalType))
+        {
+            SLANG_UNEXPECTED("Primal type not found in map");
+            return nullptr;
+        }
         auto primalFieldVal =
-            builder->emitCallInst(primalTypeMap[loweredPairType], primalFieldMethod, baseInst);
+            builder->emitCallInst(primalType, primalFieldMethod, baseInst);
 
         return primalFieldVal;
     }
@@ -401,8 +407,14 @@ IRInst* DifferentialPairTypeBuilder::emitDiffFieldAccess(
             baseWitness,
             getDiffKey);
 
+        IRType* diffType;
+        if (!diffTypeMap.tryGetValue(loweredPairType, diffType))
+        {
+            SLANG_UNEXPECTED("Diff type not found in map");
+            return nullptr;
+        }
         auto diffFieldVal =
-            builder->emitCallInst(diffTypeMap[loweredPairType], diffFieldMethod, baseInst);
+            builder->emitCallInst(diffType, diffFieldMethod, baseInst);
 
         return diffFieldVal;
     }
@@ -2961,7 +2973,12 @@ struct AutoDiffPass : public InstPassBase
         IRBuilder builder(module);
         for (auto t : sortedContextTypes)
         {
-            auto func = typeToBwdFuncMap[t];
+            IRGlobalValueWithCode* func;
+            if (!typeToBwdFuncMap.tryGetValue(t, func))
+            {
+                SLANG_UNEXPECTED("Function not found in typeToBwdFuncMap");
+                continue;
+            }
             DifferentiableTypeConformanceContext ctx(this->autodiffContext);
             ctx.setFunc(func);
 

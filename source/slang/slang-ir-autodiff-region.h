@@ -65,7 +65,7 @@ struct IndexedRegionMap : public RefObject
         return region;
     }
 
-    void mapBlock(IRBlock* block, IndexedRegion* region) { map.add(block, region); }
+    void mapBlock(IRBlock* block, IndexedRegion* region) { map.addIfNotExists(block, region); }
 
     bool hasMapping(IRBlock* block) { return map.containsKey(block); }
 

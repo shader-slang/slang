@@ -95,7 +95,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             {
                 if (auto diffDecor = diffLoop->findDecoration<IRDifferentialInstDecoration>())
                 {
-                    mapPrimalLoopToDiffLoop[as<IRLoop>(diffDecor->getPrimalInst())] = diffLoop;
+                    if (!mapPrimalLoopToDiffLoop.containsKey(as<IRLoop>(diffDecor->getPrimalInst())))
+                        mapPrimalLoopToDiffLoop[as<IRLoop>(diffDecor->getPrimalInst())] = diffLoop;
                 }
             }
         }
@@ -111,7 +112,7 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         auto recomputeBlock = builder.createBlock();
         recomputeBlock->insertAtEnd(func);
         builder.addDecoration(recomputeBlock, kIROp_RecomputeBlockDecoration);
-        recomputeBlockMap.add(primalBlock, recomputeBlock);
+        recomputeBlockMap.addIfNotExists(primalBlock, recomputeBlock);
         indexedBlockInfo.set(recomputeBlock, indexedBlockInfo.getValue(primalBlock));
         return recomputeBlock;
     };
@@ -141,7 +142,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
         {func->getFirstBlock(), firstRecomputeBlock, firstRecomputeBlock, firstDiffBlock};
     workList.add(firstWorkItem);
 
-    recomputeBlockMap[func->getFirstBlock()] = firstRecomputeBlock;
+    if (!recomputeBlockMap.containsKey(func->getFirstBlock()))
+        recomputeBlockMap[func->getFirstBlock()] = firstRecomputeBlock;
 
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -202,7 +204,8 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
             // Map the primal condition block directly to the diff
             // conditon block (we won't create a recompute block for this)
             //
-            recomputeBlockMap[getLoopConditionBlock(loop)] = getLoopConditionBlock(diffLoop);
+            if (!recomputeBlockMap.containsKey(getLoopConditionBlock(loop)))
+                recomputeBlockMap[getLoopConditionBlock(loop)] = getLoopConditionBlock(diffLoop);
 
             moveParams(bodyRecomputeBlock, diffBodyBlock);
             {
@@ -344,7 +347,8 @@ void splitLoopConditionBlockInsts(
             if (isDifferentialBlock(loopConditionBlock))
             {
                 auto diffDecor = loopConditionBlock->findDecoration<IRDifferentialInstDecoration>();
-                diffBlockMap[cast<IRBlock>(diffDecor->getPrimalInst())] = loopConditionBlock;
+                if (!diffBlockMap.containsKey(cast<IRBlock>(diffDecor->getPrimalInst())))
+                    diffBlockMap[cast<IRBlock>(diffDecor->getPrimalInst())] = loopConditionBlock;
             }
             else
                 loopConditionBlocks.add(loopConditionBlock);
