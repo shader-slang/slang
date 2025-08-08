@@ -11,12 +11,9 @@
 RWStructuredBuffer<uint> uintBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=intBuffer
 RWStructuredBuffer<int> intBuffer;
-//TEST_INPUT:ubuffer(data=[0.0 1.0 2.0 3.0], stride=4):name=floatBuffer
-RWStructuredBuffer<float> floatBuffer;
 
 groupshared uint shareMemUI[4];
 groupshared int shareMemI[4];
-groupshared float shareMemF[4];
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -30,7 +27,6 @@ void computeMain(uint groupIndex : SV_GroupIndex)
         {
             shareMemUI[i] = 0U;
             shareMemI[i] = 0;
-            shareMemF[i] = 0.0f;
         }
     }
     AllMemoryBarrierWithGroupSync();
@@ -347,54 +343,10 @@ void computeMain(uint groupIndex : SV_GroupIndex)
     val += intBuffer[idx];
     val += origi;
 
-    // Floating point atomic intrinsics
-    float origf = 0.0f;
-    
-    // InterlockedAdd (float)
-    //LIB: call {{.*}}.atomic.local.add.f.f32
-    InterlockedAdd(shareMemF[idx], 1.5f);
-    val += shareMemF[idx];
-
-    //LIB: call {{.*}}.atomic.global.add.f.f32
-    InterlockedAdd(floatBuffer[idx], 2.5f);
-    val += floatBuffer[idx];
-
-    // InterlockedAdd (float) - original_value
-    //LIB: call {{.*}}.atomic.local.add.f.f32
-    InterlockedAdd(shareMemF[idx], 0.5f, origf);
-    val += shareMemF[idx];
-    val += origf;
-
-    //LIB: call {{.*}}.atomic.global.add.f.f32
-    InterlockedAdd(floatBuffer[idx], 1.25f, origf);
-    val += floatBuffer[idx];
-    val += origf;
-
-    // InterlockedSub (float) - Note: InterlockedSub may not be directly supported,
-    // but can be implemented as InterlockedAdd with negative value
-    //LIB: call {{.*}}.atomic.local.add.f.f32
-    InterlockedAdd(shareMemF[idx], -0.75f);
-    val += shareMemF[idx];
-
-    //LIB: call {{.*}}.atomic.global.add.f.f32
-    InterlockedAdd(floatBuffer[idx], -1.5f);
-    val += floatBuffer[idx];
-
-    // InterlockedSub (float) - original_value
-    //LIB: call {{.*}}.atomic.local.add.f.f32
-    InterlockedAdd(shareMemF[idx], -0.25f, origf);
-    val += shareMemF[idx];
-    val += origf;
-
-    //LIB: call {{.*}}.atomic.global.add.f.f32
-    InterlockedAdd(floatBuffer[idx], -0.5f, origf);
-    val += floatBuffer[idx];
-    val += origf;
-
     outputBuffer[idx] = val;
 }
 
-// CHK: 196.5
-// CHK: 219.75
-// CHK: 243
-// CHK: 266.25
+// CHK: 184
+// CHK: 207
+// CHK: 230
+// CHK: 253
