@@ -5537,6 +5537,40 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLinkageTypeImport);
                 break;
             }
+        case kIROp_SpirVExportDecoration:
+            {
+                requireSPIRVCapability(SpvCapabilityLinkage);
+                auto exportDecoration =
+                    decoration->getParent()->findDecoration<IRExportDecoration>();
+                if (!exportDecoration)
+                    break;
+                emitInst(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    SpvOpDecorate,
+                    dstID,
+                    SpvDecorationLinkageAttributes,
+                    exportDecoration->getMangledName(),
+                    SpvLinkageTypeExport);
+                break;
+            }
+        case kIROp_SpirVExternDecoration:
+            {
+                requireSPIRVCapability(SpvCapabilityLinkage);
+                auto importDecoration =
+                    decoration->getParent()->findDecoration<IRImportDecoration>();
+                if (!importDecoration)
+                    break;
+                emitInst(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decoration,
+                    SpvOpDecorate,
+                    dstID,
+                    SpvDecorationLinkageAttributes,
+                    importDecoration->getMangledName(),
+                    SpvLinkageTypeImport);
+                break;
+            }
             // ...
         }
 
@@ -9360,7 +9394,8 @@ SlangResult emitSPIRVFromIR(
         {
             if (auto func = as<IRFunc>(inst))
             {
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+                if (func->findDecoration<IRDownstreamModuleExportDecoration>() ||
+                    func->findDecoration<IRSpirVExportDecoration>())
                 {
                     context.ensureInst(inst);
                     symbolsEmitted = true;
