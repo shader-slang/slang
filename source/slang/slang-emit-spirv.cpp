@@ -4280,7 +4280,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitOpSelectionMerge(parent, nullptr, afterBlockID, getSpvBranchSelectionControl(ifelseInst));
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    afterBlockID,
+                    getSpvBranchSelectionControl(ifelseInst));
                 auto falseLabel = ifelseInst->getFalseBlock();
                 result = emitOpBranchConditional(
                     parent,
@@ -4295,7 +4299,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitOpSelectionMerge(parent, nullptr, mergeBlockID, getSpvBranchSelectionControl(switchInst));
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    mergeBlockID,
+                    getSpvBranchSelectionControl(switchInst));
                 result = emitInstCustomOperandFunc(
                     parent,
                     inst,
