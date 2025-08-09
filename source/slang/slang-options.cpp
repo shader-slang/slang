@@ -663,6 +663,12 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
+        {OptionKind::ForceCPULayout,
+         "-fvk-use-cpu-layout",
+         nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
+         "ByteAddressBuffer and general pointers follow the C/C++ structure layout rules "
+         "when targeting SPIRV."},
         {OptionKind::VulkanBindShift,
          vkShiftNames.getBuffer(),
          "-fvk-<vulkan-shift>-shift <N> <space>",
@@ -2670,6 +2676,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
                 break;
             }
+        case OptionKind::ForceCPULayout:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCPULayout, true);
+                break;
+            }
         case OptionKind::EnableEffectAnnotations:
             {
                 m_compileRequest->setEnableEffectAnnotations(true);
@@ -3705,6 +3716,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (rawTarget.optionSet.shouldUseDXLayout())
             {
                 m_compileRequest->setTargetForceDXLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.shouldUseCPULayout())
+            {
+                m_compileRequest->setTargetForceCPULayout(targetID, true);
             }
 
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))

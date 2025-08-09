@@ -162,6 +162,12 @@ class ScalarDataLayoutType : public DataLayoutType
 };
 
 FIDDLE()
+class CPUDataLayoutType : public DataLayoutType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
 class FeedbackType : public BuiltinType
 {
     FIDDLE(...)

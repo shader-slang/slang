@@ -369,6 +369,7 @@ static Result _calcSizeAndAlignment(
         }
         break;
     case kIROp_ScalarBufferLayoutType:
+    case kIROp_CPUBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
     case kIROp_Std430BufferLayoutType:
     case kIROp_DefaultBufferLayoutType:
@@ -523,6 +524,33 @@ struct NaturalLayoutRules : IRTypeLayoutRules
         SLANG_UNUSED(lastFieldType);
         SLANG_UNUSED(lastFieldAlignment);
         return offset;
+    }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        return elementSize;
+    }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count)
+    {
+        return IRSizeAndAlignment(element.size * count, element.alignment);
+    }
+};
+
+struct CPULayoutRules : IRTypeLayoutRules
+{
+    CPULayoutRules() { ruleName = IRTypeLayoutRuleName::CPU; }
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
+    {
+        SLANG_UNUSED(elementSize);
+        SLANG_UNUSED(lastFieldType);
+        return align(offset, (int)lastFieldAlignment);
     }
 
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
@@ -713,6 +741,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getNatural()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getCPU()
+{
+    static CPULayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getConstantBuffer()
 {
     static ConstantBufferLayoutRules rules;
@@ -729,6 +763,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getStd140();
     case IRTypeLayoutRuleName::Natural:
         return getNatural();
+    case IRTypeLayoutRuleName::CPU:
+        return getCPU();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
     default:

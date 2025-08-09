@@ -182,6 +182,7 @@ static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName 
         CASE(VulkanEmitReflection);
         CASE(GLSLForceScalarLayout);
         CASE(ForceDXLayout);
+        CASE(ForceCPULayout);
         CASE(EnableEffectAnnotations);
         CASE(EmitSpirvViaGLSL);
         CASE(EmitSpirvDirectly);

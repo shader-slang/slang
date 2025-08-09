@@ -489,6 +489,11 @@ Type* ASTBuilder::getScalarLayoutType()
     return getSpecializedBuiltinType({}, "ScalarDataLayoutType");
 }
 
+Type* ASTBuilder::getCPULayoutType()
+{
+    return getSpecializedBuiltinType({}, "CPUDataLayoutType");
+}
+
 // Construct the type `Out<valueType>`
 OutType* ASTBuilder::getOutType(Type* valueType)
 {

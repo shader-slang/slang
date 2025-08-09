@@ -426,6 +426,8 @@ struct LoweredElementTypeContext
             return "std430";
         case IRTypeLayoutRuleName::Natural:
             return "natural";
+        case IRTypeLayoutRuleName::CPU:
+            return "cpu";
         default:
             return "default";
         }
@@ -1467,6 +1469,8 @@ IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRules
         return IRTypeLayoutRules::getStd430();
     case kIROp_ScalarBufferLayoutType:
         return IRTypeLayoutRules::getNatural();
+    case kIROp_CPUBufferLayoutType:
+        return IRTypeLayoutRules::getCPU();
     }
     return defaultLayout;
 }
@@ -1481,6 +1485,10 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
         // If we are just emitting GLSL, we can just use the general layout rule.
         if (!target->shouldEmitSPIRVDirectly())
             return IRTypeLayoutRules::getNatural();
+
+        // If the user specified a C-compatible buffer layout, then do that.
+        if (target->getOptionSet().shouldUseCPULayout())
+            return IRTypeLayoutRules::getCPU();
 
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())
