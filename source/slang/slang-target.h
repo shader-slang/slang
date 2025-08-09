@@ -70,6 +70,9 @@ bool isMetalTarget(TargetRequest* targetReq);
 bool isKhronosTarget(TargetRequest* targetReq);
 bool isKhronosTarget(CodeGenTarget target);
 
+/// Are we generating code where SPIRV is the target?
+bool isSPIRV(CodeGenTarget codeGenTarget);
+
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
 
