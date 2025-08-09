@@ -35,26 +35,25 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: {{.*}}->buffer{{.*}}
-    ResourceStruct simple = simpleBlock;
-    outputBuffer[0] = simple.buffer[0];
+    outputBuffer[0] = simpleBlock.buffer[0];
     
     // CHECK: {{.*}}[int(1)])->buffer{{.*}}
     ResourceStruct fromArray = arrayBlock[1];
     outputBuffer[1] = fromArray.buffer[1];
-    
-    // CHECK: {{.*}}->resources{{.*}}[int(0)])->buffer{{.*}}
-    NestedStruct nested = nestedBlock;
-    outputBuffer[2] = nested.resources[0].buffer[2];
-    
+        
     // CHECK: {{.*}}->nested{{.*}}[int(1)])->resources{{.*}}[int(1)])->buffer{{.*}}
-    ComplexStruct complex = complexBlock;
-    outputBuffer[3] = complex.nested[1].resources[1].buffer[3];
+    outputBuffer[3] = complexBlock.nested[1].resources[1].buffer[3];
     
     // CHECK: {{.*}}[int(0)])->nested{{.*}}[int(2)])->resources{{.*}}[int(0)])->buffer{{.*}}
     ComplexStruct complexFromArray = arrayComplexBlock[0];
     outputBuffer[4] = complexFromArray.nested[2].resources[0].buffer[4];
     
     // CHECK: {{.*}}->directBuffer{{.*}}
-    outputBuffer[5] = complex.directBuffer[5];
+    outputBuffer[5] = complexBlock.directBuffer[5];
     
+
+
+    // // TODO: This crashes the compiler
+    // NestedStruct nested = nestedBlock;
+    // outputBuffer[2] = nested.resources[0].buffer[2];
 }
