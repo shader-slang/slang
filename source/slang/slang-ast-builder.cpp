@@ -530,6 +530,12 @@ PtrTypeBase* ASTBuilder::getPtrType(
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
+ShortStringType* ASTBuilder::getShortStringType(IntVal* length)
+{
+    Val* args[] = {length};
+    return as<ShortStringType>(getSpecializedBuiltinType(makeArrayView(args), "ShortStringType"));
+}
+
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
     if (!elementCount)
