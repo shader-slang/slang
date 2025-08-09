@@ -22582,18 +22582,21 @@ extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite)
     [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [require(glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
         {
-        default:
-            originalValue = __atomic_add(this[coord], value);
-            return;
         case hlsl:
             __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         case glsl:
             __intrinsic_asm "$3 = imageAtomicAdd($0, $1, $2)";
+        case metal:
+            originalValue = __atomic_add(this[coord], value);
+            return;
+        default:
+            originalValue = __atomic_add(this[coord], value);
+            return;
         }
     }
 
