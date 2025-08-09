@@ -1,8 +1,10 @@
 // optix-ignore-hit.slang
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry anyHitShader
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 //CHECK: HitBuffer_insert_0(((HitBuffer_0 *)getOptiXRayPayloadPtr()), hit_0.t_0);
 //CHECK: optixIgnoreIntersection
 
+//CHECK-PTX: _optix_get_ray_tmax
 
 struct HitBuffer
 {
@@ -28,6 +30,7 @@ void anyHitShader(inout HitBuffer rayHitBuffer)
     // Modify the inout parameter
     rayHitBuffer.insert(hit.t);
     
+    // CHECK-PTX: _optix_ignore_intersection
     // Early exit - should not lose the modification to inout rayHitBuffer
     if (hit.t < rayHitBuffer.last)
         IgnoreHit();

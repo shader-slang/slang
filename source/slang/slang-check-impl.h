@@ -2264,6 +2264,7 @@ public:
     void maybeInferArraySizeForVariable(VarDeclBase* varDecl);
 
     void validateArraySizeForVariable(VarDeclBase* varDecl);
+    void validateArrayElementTypeForVariable(VarDeclBase* varDecl);
 
     IntVal* getIntVal(IntegerLiteralExpr* expr);
 
