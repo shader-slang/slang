@@ -18,6 +18,8 @@ struct C // Total size should be 40 bytes.
     uint32_t test1; // 4 bytes, alignment 4
     B b;            // 12 bytes, alignment 4
     uint32_t test2; // 4 bytes, alignment 4
+    bool c; // 1 bytes, alignment 1
+    bool d; // 1 bytes, alignment 1
 };
 
 //TEST_INPUT:set cpuBuffer = ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20], stride=4)
@@ -49,5 +51,7 @@ void computeMain()
 // SPIRV: OpMemberDecorate %C_cpu 1 Offset 16
 // SPIRV: OpMemberDecorate %C_cpu 2 Offset 20
 // SPIRV: OpMemberDecorate %C_cpu 3 Offset 32
+// SPIRV: OpMemberDecorate %C_cpu 4 Offset 36
+// SPIRV: OpMemberDecorate %C_cpu 5 Offset 37
 // SPIRV: OpDecorate %_runtimearr_C_cpu ArrayStride 40
 

@@ -799,7 +799,22 @@ struct LoweredElementTypeContext
                     if (as<IRBoolType>(scalarType))
                     {
                         // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-                        info.loweredType = builder.getIntType();
+
+                        // Find an integer type of the correct size for the current layout rule.
+                        IRSizeAndAlignment boolSizeAndAlignment;
+                        if (getSizeAndAlignment(target->getOptionSet(), config.layoutRule, scalarType, &boolSizeAndAlignment) == SLANG_OK)
+                        {
+                            IntInfo ii;
+                            ii.width = boolSizeAndAlignment.size * 8;
+                            ii.isSigned = false;
+                            info.loweredType = builder.getType(getIntTypeOpFromInfo(ii));
+                        }
+                        else
+                        {
+                            // Just in case that fails for some reason, just use an int.
+                            info.loweredType = builder.getIntType();
+                        }
+
                         if (vectorType)
                             info.loweredType = builder.getVectorType(
                                 info.loweredType,
