@@ -2581,10 +2581,6 @@ static SlangResult createArtifactFromIR(
                 artifact = _Move(linkedArtifact);
             }
         }
-        
-        FILE* f = fopen("C:/code/test-files/test.spv", "wb");
-        fwrite((void*)spirv.getBuffer(), 1, spirv.getCount(), f);
-        fclose(f);
 
         if (!codeGenContext->shouldSkipSPIRVValidation())
         {
