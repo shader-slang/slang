@@ -5507,43 +5507,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 break;
             }
-        case kIROp_DownstreamModuleExportDecoration:
-            {
-                requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decoration,
-                    SpvOpDecorate,
-                    dstID,
-                    SpvDecorationLinkageAttributes,
-                    name,
-                    SpvLinkageTypeExport);
-                break;
-            }
-        case kIROp_DownstreamModuleImportDecoration:
-            {
-                requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
-                emitInst(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decoration,
-                    SpvOpDecorate,
-                    dstID,
-                    SpvDecorationLinkageAttributes,
-                    name,
-                    SpvLinkageTypeImport);
-                break;
-            }
         case kIROp_SpirVExportDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto exportDecoration =
                     decoration->getParent()->findDecoration<IRExportDecoration>();
-                if (!exportDecoration)
-                    break;
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -5559,8 +5527,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityLinkage);
                 auto importDecoration =
                     decoration->getParent()->findDecoration<IRImportDecoration>();
-                if (!importDecoration)
-                    break;
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -9394,8 +9360,7 @@ SlangResult emitSPIRVFromIR(
         {
             if (auto func = as<IRFunc>(inst))
             {
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>() ||
-                    func->findDecoration<IRSpirVExportDecoration>())
+                if (func->findDecoration<IRSpirVExportDecoration>())
                 {
                     context.ensureInst(inst);
                     symbolsEmitted = true;

@@ -1591,27 +1591,35 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void legalizeSPIRVLinkageFunc(IRFunc* func)
     {
-        // Check the HLSL export decoration and Downstream export decoration. We assume that the
-        // target is spirv if and only if the decoration has `HLSLExport` and not
-        // `DownstreamModuleExport`. If the function has `HLSLExport` and target is spirv, will emit
-        // decoration `SPIRVExport` and then add linkage decoration for this in SPIR-V binary.
+        // Check the `HLSLExport` decoration or `DownstreamExport` decoration. If any performs, we
+        // assume this function is exported, add SpirV export decoration and add linkage attribute
+        // later.
         auto hlslExportDecor = func->findDecoration<IRHLSLExportDecoration>();
         auto downstreamExportDecor = func->findDecoration<IRDownstreamModuleExportDecoration>();
-        if (hlslExportDecor && !downstreamExportDecor)
+        if (hlslExportDecor || downstreamExportDecor)
         {
             IRBuilder builder(func);
             builder.addDecoration(func, kIROp_SpirVExportDecoration);
         }
-        // Check the User extern decoration and Downstream import decoration. We assume that the
-        // target is spirv if and only if the decoration has `UserExtern` and not
-        // `DownstreamModuleImport`. If the function has `UserExtern` and target is spirv, will emit
-        // decoration `SPIRVExtern` and then add linkage decoration for this in SPIR-V binary.
+        // Check the `UserExtern` decoration or `DownstreamImport` decoration. If any performs, we
+        // assume this function is imported, add SpirV extern decoration and add linkage attribute
+        // later.
         auto userExternDecor = func->findDecoration<IRUserExternDecoration>();
         auto downstreamImportDecor = func->findDecoration<IRDownstreamModuleImportDecoration>();
-        if (userExternDecor && !downstreamImportDecor)
+        // Also, we need to check `AvailableInDownstream` decoration for slang module link.
+        auto availableInDownstreamDecor =
+            func->findDecoration<IRAvailableInDownstreamIRDecoration>();
+        if (userExternDecor || downstreamImportDecor || availableInDownstreamDecor)
         {
             IRBuilder builder(func);
             builder.addDecoration(func, kIROp_SpirVExternDecoration);
+            // If function comes from downstream IR, mangled name is stored in `ExportDecoration`
+            // instead of `ImportDecoration`, also need to fix this.
+            auto exportDecor = func->findDecoration<IRExportDecoration>();
+            if (exportDecor)
+            {
+                builder.addImportDecoration(func, exportDecor->getMangledName());
+            }
         }
     }
 
