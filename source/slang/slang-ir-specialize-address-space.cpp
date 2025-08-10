@@ -308,7 +308,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                         auto store = as<IRStore>(inst);
                         auto ptr = store->getPtr();
-                        auto val = store->getVal();
                         // Store gets its addr-space from its ptr or val,
                         // which-ever has a address-space to share.
                         auto dstAddrSpace = getAddrSpace(ptr);

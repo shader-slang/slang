@@ -200,7 +200,7 @@ struct TransformParamsToConstRefContext
                 // This allows us to pass the address of variables directly into a function,
                 // giving us the choice to remove copies into a parameter.
                 auto paramType = param->getDataType();
-                auto constRefType = builder.getConstRefType(paramType, AddressSpace::ThreadLocal);
+                auto constRefType = builder.getConstRefType(paramType, AccessQualifier::ReadWrite, AddressSpace::ThreadLocal);
                 param->setFullType(constRefType);
 
                 hasTransformedParams = true;
