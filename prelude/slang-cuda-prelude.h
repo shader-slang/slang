@@ -348,22 +348,22 @@ SLANG_VECTOR_GET_ELEMENT(ulonglong)
 SLANG_VECTOR_GET_ELEMENT(float)
 SLANG_VECTOR_GET_ELEMENT(double)
 
-#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                      \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##2 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##3 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##4 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
+#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##1 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##2 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##3 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##4 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
     }
 SLANG_VECTOR_GET_ELEMENT_PTR(int)
 SLANG_VECTOR_GET_ELEMENT_PTR(bool)
@@ -686,6 +686,11 @@ struct Matrix
 {
     Vector<T, COLS> rows[ROWS];
     SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, COLS>& operator[](size_t index)
+    {
+        return rows[index];
+    }
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const Vector<T, COLS>& operator[](size_t index) const
     {
         return rows[index];
     }
@@ -2312,7 +2317,7 @@ struct StructuredBuffer
     }
 
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride)
+    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) const
     {
         *outNumStructs = uint32_t(count);
         *outStride = uint32_t(sizeof(T));
@@ -3639,22 +3644,23 @@ __forceinline__ __device__ void* optixTraverse(
         r1);
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsHit(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsHit(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsHit();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsMiss(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsMiss(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsMiss();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsNop(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsNop(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsNop();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectGetClusterId();
 }
@@ -3804,7 +3810,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
         0 /*numTransforms */);
 }
 
-static __forceinline__ __device__ void optixMakeNopHitObject(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversableHandle* Obj)
 {
     optixMakeNopHitObject();
 }
@@ -3829,22 +3835,25 @@ static __forceinline__ __device__ RayDesc optixHitObjectGetRayDesc(OptixTraversa
     return ray;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceId();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtGASIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetPrimitiveIndex();
 }
@@ -3883,22 +3892,17 @@ static __forceinline__ __device__ T optixHitObjectGetAttribute(OptixTraversableH
     return result;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtRecordIndex();
 }
 
 static __forceinline__ __device__ uint
-optixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
 {
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return 0;
-}
-static __forceinline__ __device__ uint
-optixHitObjectGetSbtDataPointer(OptixTraversableHandle* Obj, uint sbtRecordIndex)
-{
-    optixHitObjectGetSbtDataPointer(); // returns void
-    return 0;
+    return sbtRecordIndex;
 }
 #endif
 static const int kSlangTorchTensorMaxDim = 5;

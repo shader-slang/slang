@@ -85,6 +85,8 @@ Available APIs:
 
 Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`
 
+To ignore a test, use `//DISABLE_TEST` instead of `//TEST`.
+
 Available test types:
 - `SIMPLE`: Runs the slangc compiler with specified options after the command
 - `REFLECTION`: Runs slang-reflection-test with the options specified after the command
@@ -103,7 +105,21 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
 ## Unit Tests
-In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples.
+In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples; but note that the unit tests do get run as part of `slang-test` as well.
+
+To ignore a unit test, use the `SLANG_IGNORE_TEST` macro:
+
+```cpp
+SLANG_UNIT_TEST(foo)
+{
+    if (condition)
+    {
+        SLANG_IGNORE_TEST
+    }
+
+    // ...
+}
+```
 
 ### slang-unit-test-tool
 ```bash

@@ -1,5 +1,5 @@
 #
-# Our wrapper for glslang 
+# Our wrapper for glslang
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
     slang_add_target(
@@ -14,6 +14,10 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     )
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in.
+    set_target_properties(
+        slang-glslang
+        PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON
+    )
     add_supported_cxx_linker_flags(
         slang-glslang
         PRIVATE

@@ -75,6 +75,9 @@ SLANG_UNIT_TEST(functionLookupResolution)
     auto func1 = layout->findFunctionByNameInType(type, "method");
     SLANG_CHECK_ABORT(func1->isOverloaded());
     SLANG_CHECK(func1->getOverloadCount() == 3);
+    // Test that overloaded function containers return the correct name
+    SLANG_CHECK(func1->getName() != nullptr);
+    SLANG_CHECK(String(func1->getName()) == "method");
     if (func1->isOverloaded())
     {
         List<slang::FunctionReflection*> candidates;

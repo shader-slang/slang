@@ -499,7 +499,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 if (isMultisample || isRW)
                     spirv << "OpImageQuerySize " << imageVar << ";";
                 else
-                    spirv << "OpImageQuerySizeLod " << imageVar << " $0;";
+                    spirv << "OpImageQuerySizeLod " << imageVar
+                          << (includeMipInfo ? " $mipLevel;" : " $0;");
 
                 auto convertAndStore = [&](UnownedStringSlice uintSourceVal, const char* destParam)
                 {

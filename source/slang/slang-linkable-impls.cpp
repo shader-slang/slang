@@ -180,6 +180,7 @@ void CompositeComponentType::acceptVisitor(
 RefPtr<ComponentType::SpecializationInfo> CompositeComponentType::_validateSpecializationArgsImpl(
     SpecializationArg const* args,
     Index argCount,
+    Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(argCount);
@@ -189,15 +190,16 @@ RefPtr<ComponentType::SpecializationInfo> CompositeComponentType::_validateSpeci
     Index offset = 0;
     for (auto child : m_childComponents)
     {
-        auto childParamCount = child->getSpecializationParamCount();
-        SLANG_ASSERT(offset + childParamCount <= argCount);
-
-        auto childInfo = child->_validateSpecializationArgs(args + offset, childParamCount, sink);
-
+        Index consumedArgCount = 0;
+        auto childInfo = child->_validateSpecializationArgs(
+            args + offset,
+            argCount - offset,
+            consumedArgCount,
+            sink);
         specializationInfo->childInfos.add(childInfo);
-
-        offset += childParamCount;
+        offset += consumedArgCount;
     }
+    outConsumedArgCount = offset;
     return specializationInfo;
 }
 
@@ -717,11 +719,13 @@ void TypeConformance::acceptVisitor(
 RefPtr<ComponentType::SpecializationInfo> TypeConformance::_validateSpecializationArgsImpl(
     SpecializationArg const* args,
     Index argCount,
+    Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(args);
     SLANG_UNUSED(argCount);
     SLANG_UNUSED(sink);
+    outConsumedArgCount = 0;
     return nullptr;
 }
 

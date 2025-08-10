@@ -1191,10 +1191,10 @@ bool SemanticsVisitor::_coerce(
     // then we should start by trying to resolve the ambiguous reference
     // based on prioritization of the different candidates.
     //
-    // TODO: A more powerful model would be to try to coerce each
+    // If `fromExpr` is overloaded, we will try to coerce each
     // of the constituent overload candidates, filtering down to
     // those that are coercible, and then disambiguating the result.
-    // Such an approach would let us disambiguate between overloaded
+    // Such an approach lets us disambiguate between overloaded
     // symbols based on their type (e.g., by casting the name of
     // an overloaded function to the type of the overload we mean
     // to reference).
@@ -1202,10 +1202,48 @@ bool SemanticsVisitor::_coerce(
     if (auto fromOverloadedExpr = as<OverloadedExpr>(fromExpr))
     {
         auto resolvedExpr =
-            maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, nullptr);
+            maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, toType, nullptr);
 
         fromExpr = resolvedExpr;
         fromType = resolvedExpr->type;
+    }
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(fromExpr))
+    {
+        ShortList<Expr*> coercibleCandidates;
+        for (auto candidate : overloadedExpr2->candidateExprs)
+        {
+            if (canCoerce(toType, candidate->type, candidate))
+                coercibleCandidates.add(candidate);
+        }
+        if (coercibleCandidates.getCount() == 1)
+        {
+            return _coerce(
+                site,
+                toType,
+                outToExpr,
+                coercibleCandidates[0]->type,
+                coercibleCandidates[0],
+                sink,
+                outCost);
+        }
+        if (sink)
+        {
+            auto firstCandidate = overloadedExpr2->candidateExprs.getCount() > 0
+                                      ? overloadedExpr2->candidateExprs[0]
+                                      : nullptr;
+            if (auto declCandidate = as<DeclRefExpr>(firstCandidate))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::ambiguousReference,
+                    declCandidate->declRef);
+            }
+            else
+            {
+                sink->diagnose(fromExpr->loc, Diagnostics::ambiguousExpression);
+            }
+        }
+        return false;
     }
 
     // An important and easy case is when the "to" and "from" types are equal.

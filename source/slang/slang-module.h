@@ -451,6 +451,7 @@ protected:
     RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) SLANG_OVERRIDE;
 
 private:

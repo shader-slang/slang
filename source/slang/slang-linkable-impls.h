@@ -65,6 +65,7 @@ protected:
     RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) SLANG_OVERRIDE;
 
 public:
@@ -165,11 +166,13 @@ protected:
     RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) SLANG_OVERRIDE
     {
         SLANG_UNUSED(args);
         SLANG_UNUSED(argCount);
         SLANG_UNUSED(sink);
+        outConsumedArgCount = 0;
         return nullptr;
     }
 
@@ -315,9 +318,10 @@ protected:
     RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) SLANG_OVERRIDE
     {
-        return m_base->_validateSpecializationArgsImpl(args, argCount, sink);
+        return m_base->_validateSpecializationArgsImpl(args, argCount, outConsumedArgCount, sink);
     }
 };
 
@@ -513,6 +517,7 @@ protected:
     RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) SLANG_OVERRIDE;
 
 private:

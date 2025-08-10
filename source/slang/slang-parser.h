@@ -32,7 +32,6 @@ Stmt* parseUnparsedStmt(
     SemanticsVisitor* semantics,
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
-    bool isInVariadicGenerics,
     TokenSpan const& tokens,
     DiagnosticSink* sink,
     Scope* currentScope,

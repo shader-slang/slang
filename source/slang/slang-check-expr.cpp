@@ -1128,7 +1128,9 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     return result;
 }
 
-LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inResult)
+LookupResult SemanticsVisitor::resolveOverloadedLookup(
+    LookupResult const& inResult,
+    Type* targetType)
 {
     // If the result isn't actually overloaded, it is fine as-is
     if (!inResult.isValid())
@@ -1140,6 +1142,15 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     List<LookupResultItem> items;
     for (auto item : inResult.items)
     {
+        // First we check if the item is coercible to targetType.
+        // And skip if it doesn't.
+        if (targetType)
+        {
+            auto declType = GetTypeForDeclRef(item.declRef, SourceLoc());
+            if (!canCoerce(targetType, declType, nullptr, nullptr))
+                continue;
+        }
+
         // For each item we consider adding, we will compare it
         // to those items we've already added.
         //
@@ -1232,6 +1243,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
 Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     OverloadedExpr* overloadedExpr,
     LookupMask mask,
+    Type* targetType,
     DiagnosticSink* diagSink)
 {
     auto lookupResult = overloadedExpr->lookupResult2;
@@ -1246,7 +1258,7 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     lookupResult = refineLookup(lookupResult, mask);
 
     // Try to filter out overload candidates based on which ones are "better" than one another.
-    lookupResult = resolveOverloadedLookup(lookupResult);
+    lookupResult = resolveOverloadedLookup(lookupResult, targetType);
 
     if (!lookupResult.isValid())
     {
@@ -1296,6 +1308,7 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
 Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
     Expr* expr,
     LookupMask mask,
+    Type* targetType,
     DiagnosticSink* diagSink)
 {
     if (IsErrorExpr(expr))
@@ -1303,7 +1316,7 @@ Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
 
     if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
-        return _resolveOverloadedExprImpl(overloadedExpr, mask, diagSink);
+        return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, diagSink);
     }
     else
     {
@@ -1311,9 +1324,12 @@ Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
     }
 }
 
-Expr* SemanticsVisitor::resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask)
+Expr* SemanticsVisitor::resolveOverloadedExpr(
+    OverloadedExpr* overloadedExpr,
+    Type* targetType,
+    LookupMask mask)
 {
-    return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
+    return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, getSink());
 }
 
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
@@ -1364,7 +1380,7 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
                 Slang::LookupMask::type,
                 Slang::LookupOptions::None);
 
-            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult);
+            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
 
             if (!diffTypeLookupResult.isValid())
             {
@@ -3229,6 +3245,40 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
 
+    // Check for comma operator usage and emit warning if not in for-loop side effect context
+    // Skip warning in Slang 2026+ mode where parentheses create tuples
+    if (!isSlang2026OrLater(this))
+    {
+        bool exprIsInfixExpr = false;
+        InfixExpr* infixExpr = nullptr;
+        if (auto candidateInfixExpr = as<InfixExpr>(expr))
+        {
+            exprIsInfixExpr = true;
+            infixExpr = candidateInfixExpr;
+        }
+
+        bool functionExprIsVarExpr = false;
+        VarExpr* varExpr = nullptr;
+        if (exprIsInfixExpr)
+        {
+            if (auto candidateVarExpr = as<VarExpr>(infixExpr->functionExpr))
+            {
+                functionExprIsVarExpr = true;
+                varExpr = candidateVarExpr;
+            }
+        }
+
+        if (functionExprIsVarExpr && varExpr->name && varExpr->name->text == ",")
+        {
+            // Allow comma operators in for-loop side effects and expand expressions without
+            // warning
+            if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+            {
+                getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+            }
+        }
+    }
+
     expr->functionExpr = CheckTerm(expr->functionExpr);
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
@@ -4416,7 +4466,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         {
             goto error;
         }
-        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>() && !as<TupleType>(baseType))
         {
             goto error;
         }
