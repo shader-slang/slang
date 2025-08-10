@@ -802,7 +802,11 @@ struct LoweredElementTypeContext
 
                         // Find an integer type of the correct size for the current layout rule.
                         IRSizeAndAlignment boolSizeAndAlignment;
-                        if (getSizeAndAlignment(target->getOptionSet(), config.layoutRule, scalarType, &boolSizeAndAlignment) == SLANG_OK)
+                        if (getSizeAndAlignment(
+                                target->getOptionSet(),
+                                config.layoutRule,
+                                scalarType,
+                                &boolSizeAndAlignment) == SLANG_OK)
                         {
                             IntInfo ii;
                             ii.width = boolSizeAndAlignment.size * 8;

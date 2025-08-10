@@ -224,10 +224,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(
-                optionSet,
-                atomicType->getElementType(),
-                outSizeAndAlignment);
+            calcSizeAndAlignment(optionSet, atomicType->getElementType(), outSizeAndAlignment);
             return SLANG_OK;
         }
         break;
@@ -540,8 +537,8 @@ struct CPULayoutRules : IRTypeLayoutRules
     virtual Result calcSizeAndAlignment(
         CompilerOptionSet& optionSet,
         IRType* type,
-        IRSizeAndAlignment* outSizeAndAlignment
-    ){
+        IRSizeAndAlignment* outSizeAndAlignment)
+    {
         if (type->getOp() == kIROp_BoolType)
         {
             *outSizeAndAlignment = IRSizeAndAlignment(1, 1);

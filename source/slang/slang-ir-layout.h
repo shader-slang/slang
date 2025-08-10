@@ -60,8 +60,7 @@ public:
     virtual Result calcSizeAndAlignment(
         CompilerOptionSet& optionSet,
         IRType* type,
-        IRSizeAndAlignment* outSizeAndAlignment
-    );
+        IRSizeAndAlignment* outSizeAndAlignment);
 
     /// Align composite based on rule. Type is aligned assuming
     /// it is apart of a composite (array, struct, matrix, etc...)
