@@ -92,6 +92,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             {
                 AddressSpace addrSpace = getAddrSpace<options>(addrSpaceNode->indirectAddressSpace);
                 
+                // Solve the Indirect references into a direct reference to save
+                // the cost of re-resolving the indirect references.
                 if constexpr (options == GetAddrSpaceOptions::CompressChain)
                 {
                     mapInstToAddrSpace.set(inst, AddressSpaceNode(addrSpace));
