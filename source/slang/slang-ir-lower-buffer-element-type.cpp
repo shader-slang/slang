@@ -810,7 +810,7 @@ struct LoweredElementTypeContext
                         {
                             IntInfo ii;
                             ii.width = boolSizeAndAlignment.size * 8;
-                            ii.isSigned = false;
+                            ii.isSigned = true;
                             info.loweredType = builder.getType(getIntTypeOpFromInfo(ii));
                         }
                         else
