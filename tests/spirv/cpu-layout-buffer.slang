@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
 //TEST:SIMPLE(filecheck=SPIRV): -stage compute -entry computeMain -target spirv -fvk-use-cpu-layout
 struct A
 {
