@@ -11,6 +11,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 {
     IRModule* module;
 
+    // TODO: support nested pointers: Ptr<Ptr<int>> = &groupshared_mem[0]
     enum class AddressSpaceNodeType
     {
         // Points to the correct address-space
@@ -22,7 +23,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         //    at a later point in the program (globals)
         // 2. calculating address-spaces if we change an
         //    address-space other inst's relied on
-        // TODO: store all addr space sources; if mismatch, fail.
         Indirect
     };
     
@@ -46,11 +46,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     };
 
-    // map which stores the new mappings of inst<->addrspace
+    // Map which stores the new mappings of inst<->addrspace
     Dictionary<IRInst*, AddressSpaceNode> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
     HashSet<IRFunc*> functionsToConsiderRemoving;
-    HashSet<IRDebugValue*> debugValuesToLegalize;
+    HashSet<IRDebugValue*> debugValuesToFixup;
+
+    // TODO:
+    // Ensure List of address-space chains which must be equal.
+    // getAddrSpace(validateAddrSpaceIsTheSame[0][0])` must equal `getAddrSpace(validateAddrSpaceIsTheSame[0][1])`
+    // and must equal `getAddrSpace(validateAddrSpaceIsTheSame[0][2]).
+    // Primarily needed for:
+    // 1.`Phi` nodes
+    // 2. If globalParam/globalVar gets specialized, we likely need to store all instances where this happens to ensure 
+    // consistent addr-space inference of globalParam/globalVar across all sources
+    // 
+    // /
+    //List<List<IRInst*>> validateAddrSpaceIsTheSame;
 
     AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
         : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
@@ -67,7 +79,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return addrSpaceAssigner->getLeafInstAddressSpace(inst);
     }
 
-    AddressSpace getAddrSpace(IRInst* inst) override
+    template<GetAddrSpaceOptions options =
+        GetAddrSpaceOptions::None>
+    AddressSpace getAddrSpace(IRInst* inst)
     {
         auto addrSpaceNode = mapInstToAddrSpace.tryGetValue(inst);
         if (addrSpaceNode)
@@ -75,7 +89,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (addrSpaceNode->type == AddressSpaceNodeType::Direct)
                 return addrSpaceNode->addressSpace;
             else if (addrSpaceNode->type == AddressSpaceNodeType::Indirect)
-                return getAddrSpace(addrSpaceNode->indirectAddressSpace);
+            {
+                AddressSpace addrSpace = getAddrSpace<options>(addrSpaceNode->indirectAddressSpace);
+                
+                if constexpr (options == GetAddrSpaceOptions::CompressChain)
+                {
+                    mapInstToAddrSpace.set(inst, AddressSpaceNode(addrSpace));
+                }
+
+                return addrSpace;
+            }
         }
         return AddressSpace::Generic;
     }
@@ -173,23 +196,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // insts that derive their addr-space from another inst.
     bool indirectAddressSpaceInst(IRInst* inst)
     {
-        // Ex of cases being handled:
-        /*
-            cbuffer
-            {
-                // `data` is a `uniform`
-                // The `Load(data)` is a `PhysicalStorageBuffer`
-                uint* data;
-            }
-        */
-
         switch (inst->getOp())
         {
         case kIROp_DebugValue:
             {
-                // Ensure the debug var shares address-space with debug value.
-                debugValuesToLegalize.add(as<IRDebugValue>(inst));
-                break;
+                // In case address-spaces change we need to later-fixup the debugValues
+                debugValuesToFixup.add(as<IRDebugValue>(inst));
+                return true;
             }
         case kIROp_Add:
             if (!mapInstToAddrSpace.containsKey(inst))
@@ -204,9 +217,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 // To handle users using bit-cast and addition will require us to associate with integers
                 // address-space info lost when bit-casting (and to propegate across additions/math)
                 mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                return true;
             }
-            break;
+            return true;
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
         case kIROp_GetOffsetPtr:
@@ -218,212 +230,200 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 // address-space until this entire legalization
                 // pass is over.
                 mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                return true;
             }
-            break;
+            return true;
         default:
-            break;
+            return false;
         }
-        return false;
     }
 
     // Return true if the address space of the function return type is changed.
     bool processFunction(IRFunc* func)
     {
         bool retValAddrSpaceChanged = false;
-        bool changed = true;
-        while (changed)
+        for (auto block : func->getBlocks())
         {
-            changed = false;
-            for (auto block : func->getBlocks())
+            bool isFirstBlock = block == func->getFirstBlock();
+
+            for (auto inst : block->getChildren())
             {
-                bool isFirstBlock = block == func->getFirstBlock();
-
-                for (auto inst : block->getChildren())
+                // If we have already assigned an address space to this instruction, then skip
+                // it.
+                if (mapInstToAddrSpace.containsKey(inst))
                 {
-                    // If we have already assigned an address space to this instruction, then skip
-                    // it.
-                    if (mapInstToAddrSpace.containsKey(inst))
+                    // TODO: if the inst is a phi node, we need to check if the address space of
+                    // the phi arguments is consistent. If not, then we need to report an error.
+                    // For now, we just skip the checks.
+                    //
+                    // Do this by adding a `List<> validateInstAddrSpaceAreTheSame`
+                    // so that we can validate after legalization fully resolves addr-space
+                    continue;
+                }
+
+                if (indirectAddressSpaceInst(inst))
+                {
+                    continue;
+                }
+
+                // If the inst already has a pointer type with explicit address space, then use
+                // it.
+                if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+                {
+                    if (ptrType->hasAddressSpace())
                     {
-                        // TODO: if the inst is a phi node, we need to check if the address space of
-                        // the phi arguments is consistent. If not, then we need to report an error.
-                        // For now, we just skip the checks.
-                        //
-                        // Do this by adding a `List<> validateInstAddrSpaceAreTheSame`
-                        // so that we can validae after legalization fully resolves addr-space
+                        mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
                         continue;
                     }
+                }
 
-                    if (indirectAddressSpaceInst(inst))
+                // Otherwise, try to assign an address space based on the instruction type.
+                switch (inst->getOp())
+                {
+                case kIROp_Var:
+                case kIROp_RWStructuredBufferGetElementPtr:
                     {
-                        changed = true;
-                        continue;
-                    }
-
-                    // If the inst already has a pointer type with explicit address space, then use
-                    // it.
-                    if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
-                    {
-                        if (ptrType->hasAddressSpace())
+                        // The address space of these insts should be assigned by the initial
+                        // address space assigner.
+                        AddressSpace addrSpace = AddressSpace::Generic;
+                        if (addrSpaceAssigner->tryAssignAddressSpace(inst, addrSpace))
                         {
-                            mapInstToAddrSpace[inst] = AddressSpaceNode(ptrType->getAddressSpace());
-                            continue;
+                            mapInstToAddrSpace[inst] = AddressSpaceNode(addrSpace);
+                        }
+                        break;
+                    }
+                case kIROp_BitCast:
+                    // Derives addr-space from base-inst.
+                    // We do this to try and infer an address-space
+                    // if a user (or Slang legalization pass) did not
+                    // provide one.
+                    mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
+                    break;
+                case kIROp_Load:
+                    // The addr-space is the same as source.
+                    mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
+                    break;
+                case kIROp_Store:
+                    {
+                        auto store = as<IRStore>(inst);
+                        auto ptr = store->getPtr();
+                        auto val = store->getVal();
+                        // Store gets its addr-space from its ptr or val,
+                        // which-ever has a address-space to share.
+                        auto dstAddrSpace = getAddrSpace(ptr);
+                        if (dstAddrSpace != AddressSpace::Generic)
+                        {
+                            // dst has an addr-space.
+                            mapInstToAddrSpace[store] = AddressSpaceNode(ptr);
+                        }
+                        else
+                        {
+                            // dst did not have an addr-space. This means we infer from the val.
+                            mapInstToAddrSpace[store] = AddressSpaceNode(store->getVal());
+                            mapInstToAddrSpace[ptr] = AddressSpaceNode(store);
                         }
                     }
-
-                    // Otherwise, try to assign an address space based on the instruction type.
-                    switch (inst->getOp())
+                    break;
+                case kIROp_Param:
+                    if (!isFirstBlock)
                     {
-                    case kIROp_Var:
-                    case kIROp_RWStructuredBufferGetElementPtr:
+                        auto phiArgs = getPhiArgs(inst);
+                        AddressSpace addrSpace = AddressSpace::Generic;
+                        for (auto arg : phiArgs)
                         {
-                            // The address space of these insts should be assigned by the initial
-                            // address space assigner.
-                            AddressSpace addrSpace = AddressSpace::Generic;
-                            if (addrSpaceAssigner->tryAssignAddressSpace(inst, addrSpace))
+                            auto argAddrSpace = getAddrSpace(arg);
+                            if (argAddrSpace != AddressSpace::Generic)
                             {
-                                mapInstToAddrSpace[inst] = AddressSpaceNode(addrSpace);
+                                if (addrSpace != AddressSpace::Generic && addrSpace != argAddrSpace)
+                                {
+                                    // TODO: this is an error in user code, because the
+                                    // address spaces of the phi arguments don't match.
+                                }
+                                addrSpace = argAddrSpace;
                             }
-                            break;
                         }
-                    case kIROp_BitCast:
-                        // Derives addr-space from base-inst.
-                        // We do this to try and infer an address-space
-						// if a user (or Slang legalization pass) did not
-						// provide one.
-                        mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                        break;
-                    case kIROp_Load:
-                            // The addr-space is the same as source.
-                            mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
-                        break;
-                    case kIROp_Store:
+                        if (addrSpace != AddressSpace::Generic)
                         {
-                            auto store = as<IRStore>(inst);
-                            auto ptr = store->getPtr();
-
-                            // Store gets its addr-space from its ptr or val,
-                            // which-ever has a address-space to share.
-                            auto dstAddrSpace = getAddrSpace(ptr);
-                            if (dstAddrSpace != AddressSpace::Generic)
+                            mapInstToAddrSpace[inst] = AddressSpaceNode(addrSpace);
+                        }
+                        break;
+                    }
+                    break;
+                case kIROp_Call:
+                    {
+                        auto callInst = as<IRCall>(inst);
+                        auto callee = as<IRFunc>(inst->getOperand(0));
+                        if (callee)
+                        {
+                            List<AddressSpace> argAddrSpaces;
+                            bool fullySpecialized = true;
+                            for (UInt i = 0; i < callInst->getArgCount(); i++)
                             {
-                                // ptr has an addr-space.
-                                // This has priority since we can store a groupshared into a local.
-                                mapInstToAddrSpace[store] = AddressSpaceNode(dstAddrSpace);
+                                auto arg = callInst->getArg(i);
+                                auto argAddrSpace = getAddrSpace(arg);
+                                argAddrSpaces.add(argAddrSpace);
+                                if (argAddrSpace == AddressSpace::Generic &&
+                                    as<IRPtrTypeBase>(arg->getDataType()))
+                                {
+                                    fullySpecialized = false;
+                                    break;
+                                }
+                            }
+                            if (!fullySpecialized)
+                                break;
+
+                            FuncSpecializationKey key(callee, argAddrSpaces);
+                            IRFunc* specializedCallee = nullptr;
+                            if (IRFunc** specializedFunc = functionSpecializations.tryGetValue(key))
+                            {
+                                specializedCallee = *specializedFunc;
                             }
                             else
                             {
-                                // dst did not have an addr-space. This means we infer from the val.
-                                mapInstToAddrSpace[store] = AddressSpaceNode(store->getVal());
-                                mapInstToAddrSpace[ptr] = AddressSpaceNode(store);
+                                specializedCallee = specializeFunc(key);
+                                workList.add(specializedCallee);
+                            }
+                            IRBuilder builder(callInst);
+                            builder.setInsertBefore(callInst);
+                            if (specializedCallee != callInst->getCallee())
+                            {
+                                callInst = as<IRCall>(builder.replaceOperand(
+                                    callInst->getOperands(),
+                                    specializedCallee));
+                                // At this point, the original callee may be left without uses.
+                                functionsToConsiderRemoving.add(callee);
+                            }
+                            auto callResultAddrSpace = getFuncResultAddrSpace(specializedCallee);
+                            if (callResultAddrSpace != AddressSpace::Generic)
+                            {
+                                mapInstToAddrSpace[callInst] =
+                                    AddressSpaceNode(callResultAddrSpace);
                             }
                         }
-                        break;
-                    case kIROp_Param:
-                        if (!isFirstBlock)
-                        {
-                            auto phiArgs = getPhiArgs(inst);
-                            AddressSpace addrSpace = AddressSpace::Generic;
-                            for (auto arg : phiArgs)
-                            {
-                                auto argAddrSpace = getAddrSpace(arg);
-                                if (argAddrSpace != AddressSpace::Generic)
-                                {
-                                    if (addrSpace != AddressSpace::Generic &&
-                                        addrSpace != argAddrSpace)
-                                    {
-                                        // TODO: this is an error in user code, because the
-                                        // address spaces of the phi arguments don't match.
-                                    }
-                                    addrSpace = argAddrSpace;
-                                }
-                            }
-                            if (addrSpace != AddressSpace::Generic)
-                            {
-                                mapInstToAddrSpace[inst] = AddressSpaceNode(addrSpace);
-                            }
-                            break;
-                        }
-                        break;
-                    case kIROp_Call:
-                        {
-                            auto callInst = as<IRCall>(inst);
-                            auto callee = as<IRFunc>(inst->getOperand(0));
-                            if (callee)
-                            {
-                                List<AddressSpace> argAddrSpaces;
-                                bool fullySpecialized = true;
-                                for (UInt i = 0; i < callInst->getArgCount(); i++)
-                                {
-                                    auto arg = callInst->getArg(i);
-                                    auto argAddrSpace = getAddrSpace(arg);
-                                    argAddrSpaces.add(getAddrSpace(arg));
-                                    if (argAddrSpace == AddressSpace::Generic &&
-                                        as<IRPtrTypeBase>(arg->getDataType()))
-                                    {
-                                        fullySpecialized = false;
-                                        break;
-                                    }
-                                }
-                                if (!fullySpecialized)
-                                    break;
-
-                                FuncSpecializationKey key(callee, argAddrSpaces);
-                                IRFunc* specializedCallee = nullptr;
-                                if (IRFunc** specializedFunc =
-                                        functionSpecializations.tryGetValue(key))
-                                {
-                                    specializedCallee = *specializedFunc;
-                                }
-                                else
-                                {
-                                    specializedCallee = specializeFunc(key);
-                                    workList.add(specializedCallee);
-                                }
-                                IRBuilder builder(callInst);
-                                builder.setInsertBefore(callInst);
-                                if (specializedCallee != callInst->getCallee())
-                                {
-                                    callInst = as<IRCall>(builder.replaceOperand(
-                                        callInst->getOperands(),
-                                        specializedCallee));
-                                    // At this point, the original callee may be left without uses.
-                                    functionsToConsiderRemoving.add(callee);
-                                }
-                                auto callResultAddrSpace =
-                                    getFuncResultAddrSpace(specializedCallee);
-                                if (callResultAddrSpace != AddressSpace::Generic)
-                                {
-                                    mapInstToAddrSpace[callInst] = AddressSpaceNode(callResultAddrSpace);
-                                    changed = true;
-                                }
-                            }
-                        }
-                        break;
-                    case kIROp_Return:
-                        {
-                            auto retVal = inst->getOperand(0);
-                            auto addrSpace = getAddrSpace(retVal);
-                            if (addrSpace != AddressSpace::Generic)
-                            {
-                                auto funcType = as<IRFuncType>(func->getDataType());
-                                AddressSpace resultAddrSpace = getFuncResultAddrSpace(func);
-                                auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
-                                if (resultAddrSpace != addrSpace && ptrResultType)
-                                {
-                                    IRBuilder builder(func);
-                                    auto newResultType = builder.getPtrType(
-                                        ptrResultType->getOp(),
-                                        ptrResultType->getValueType(),
-                                        AccessQualifier::ReadWrite,
-                                        addrSpace);
-                                    fixUpFuncType(func, newResultType);
-                                    retValAddrSpaceChanged = true;
-                                }
-                            }
-                        }
-                        break;
                     }
+                    break;
+                case kIROp_Return:
+                    {
+                        auto retVal = inst->getOperand(0);
+                        auto addrSpace = getAddrSpace(retVal);
+                        if (addrSpace != AddressSpace::Generic)
+                        {
+                            auto funcType = as<IRFuncType>(func->getDataType());
+                            AddressSpace resultAddrSpace = getFuncResultAddrSpace(func);
+                            auto ptrResultType = as<IRPtrTypeBase>(funcType->getResultType());
+                            if (resultAddrSpace != addrSpace && ptrResultType)
+                            {
+                                IRBuilder builder(func);
+                                auto newResultType = builder.getPtrType(
+                                    ptrResultType->getOp(),
+                                    ptrResultType->getValueType(),
+                                    AccessQualifier::ReadWrite,
+                                    addrSpace);
+                                fixUpFuncType(func, newResultType);
+                                retValAddrSpaceChanged = true;
+                            }
+                        }
+                    }
+                    break;
                 }
             }
         }
@@ -445,18 +445,19 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         inst->setFullType(newType);
     }
 
-    void applyAddressSpaceToInstType()
+    // Iteratively compress the list of addr-space while we process each node.
+    void applyAddressSpaceToInsts()
     {
         for (auto [inst, addrSpaceNode] : mapInstToAddrSpace)
         {
             auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
             if (!ptrType)
                 continue;
-            
-            auto addrSpace = getAddrSpace(inst);
+
+            auto addrSpace = getAddrSpace<GetAddrSpaceOptions::CompressChain>(inst);
             if (ptrType->getAddressSpace() == addrSpace)
                 continue;
-            
+
             IRBuilder builder(inst);
             auto newType = builder.getPtrType(
                 ptrType->getOp(),
@@ -506,11 +507,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 workList.add(f);
         }
 
-        applyAddressSpaceToInstType();
+        // Apply addr-space according to our addr-space resolution chain
+        applyAddressSpaceToInsts();
 
 		// Correct DebugVar types
         IRBuilder builder(module);
-		for (auto inst : debugValuesToLegalize)
+		for (auto inst : debugValuesToFixup)
 		{
             auto debugValue = as<IRDebugValue>(inst);
             auto debugVar = debugValue->getDebugVar();

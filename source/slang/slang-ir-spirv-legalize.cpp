@@ -2325,6 +2325,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so we need to update the function types to match that.
         updateFunctionTypes();
 
+        // Specalize address space for all pointers.
+        SpirvAddressSpaceAssigner addressSpaceAssigner;
+        specializeAddressSpace(m_module, &addressSpaceAssigner);
+
         // Lower all loads/stores from buffer pointers to use correct storage types.
         // We didn't do the lowering for buffer pointers because we don't know which pointer
         // types are actual storage buffer pointers until we propagated the address space of
@@ -2352,10 +2356,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Propagate alignment hints on address instructions.
         propagateAddressAlignment();
-
-        // Specalize address space for all pointers.
-        SpirvAddressSpaceAssigner addressSpaceAssigner;
-        specializeAddressSpace(m_module, &addressSpaceAssigner);
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
