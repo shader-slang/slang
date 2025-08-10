@@ -60,6 +60,7 @@ struct ScalarDataLayout : IBufferDataLayout
 /// @category misc_types
 __intrinsic_type($(kIROp_CPUBufferLayoutType))
 __magic_type(CPUDataLayoutType)
+[require(spirv)]
 struct CPUDataLayout : IBufferDataLayout
 {};
 
