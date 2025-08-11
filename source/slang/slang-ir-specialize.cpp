@@ -3073,8 +3073,6 @@ void finalizeSpecialization(IRModule* module)
             break;
         }
     }
-
-    // lowerCollectionAndTagInsts(module, nullptr);
 }
 
 
