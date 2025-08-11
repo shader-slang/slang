@@ -1257,15 +1257,20 @@ struct DynamicInstLoweringContext
                 if (auto tag = as<IRCollectionTagType>(typeInfo))
                 {
                     SLANG_ASSERT(getCollectionCount(tag) == 1);
-                    auto specializeInst = as<IRSpecialize>(getCollectionElement(tag, 0));
-                    auto funcType = as<IRFuncType>(specializeGeneric(specializeInst));
-                    if (!funcType)
-                    {
-                        SLANG_UNEXPECTED(
-                            "Unexpected IRSpecialize in analyzeSpecialize for func type");
-                        return none();
-                    }
+                    auto specializeInst = cast<IRSpecialize>(getCollectionElement(tag, 0));
+                    auto funcType = cast<IRFuncType>(specializeGeneric(specializeInst));
                     typeOfSpecialization = funcType;
+                }
+                else if (auto collection = as<IRCollectionBase>(typeInfo))
+                {
+                    SLANG_ASSERT(getCollectionCount(collection) == 1);
+                    auto specializeInst = cast<IRSpecialize>(getCollectionElement(collection, 0));
+                    auto funcType = cast<IRFuncType>(specializeGeneric(specializeInst));
+                    typeOfSpecialization = funcType;
+                }
+                else
+                {
+                    return none();
                 }
             }
             else
@@ -2701,10 +2706,26 @@ struct DynamicInstLoweringContext
         return true;
     }
 
+    void maybeSpecializeCalleeType(IRInst* callee)
+    {
+        if (auto specializeInst = as<IRSpecialize>(callee->getDataType()))
+        {
+            if (isGlobalInst(specializeInst))
+                callee->setFullType((IRType*)specializeGeneric(specializeInst));
+        }
+    }
+
     bool lowerCall(IRInst* context, IRCall* inst)
     {
         auto callee = inst->getCallee();
         IRInst* calleeTagInst = nullptr;
+
+        // This is a bit of a workaround for specialized callee's
+        // whose function types haven't been specialized yet (can
+        // occur for concrete IRSpecialize insts that are created
+        // during the lowering process).
+        //
+        maybeSpecializeCalleeType(callee);
 
         // If we're calling using a tag, place a call to the collection,
         // with the tag as the first argument. So the callee is
