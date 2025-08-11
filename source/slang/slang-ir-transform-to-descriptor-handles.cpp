@@ -16,14 +16,13 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
     IRBuilder builder;
 
     // Dictionary mapping original types to lowered types
-    // Original resource types -> lowered resource types
+    // Lowered types are either DescriptorHandle<ResourceType> or a struct with DescriptorHandle<ResourceType> 
     Dictionary<IRType*, IRType*> typeLoweringMap;
 
     // Track which fields have been updated to descriptor handles
     // for updating the instructions that access these fields
     List<IRStructField*> updatedFields;
     List<IRParameterBlockType*> updatedParameterBlock;
-
 
     ResourceToDescriptorHandleContext(
         TargetProgram* inTargetProgram,
@@ -33,7 +32,9 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
     {
     }
 
-    // Recursive type lowering function
+    // Recursively convert types, lowering resource types to descriptor handles,
+    // and lowering any structs that contain resource types to a struct with
+    // DescriptorHandle<ResourceType> recursively.
     IRType* convertTypeToHandler(IRType* originalType)
     {
         // Check if we've already lowered this type
@@ -46,8 +47,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         {
             // Lower resource types to DescriptorHandle<ResourceType>
             builder.setInsertBefore(originalType);
-            loweredType =
-                (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, originalType);
+            loweredType = (IRDescriptorHandleType*)builder.getType(kIROp_DescriptorHandleType, originalType);
         }
         else if (auto structType = as<IRStructType>(originalType))
         {
@@ -79,9 +79,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                     auto loweredFieldType = convertTypeToHandler(fieldType);
                     auto fieldKey = originalField->getKey();
 
-                    auto newField =
-                        builder.createStructField(newStructType, fieldKey, loweredFieldType);
-
+                    auto newField = builder.createStructField(newStructType, fieldKey, loweredFieldType);
                     updatedFields.add(newField);
                 }
 
@@ -96,8 +94,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
             if (loweredElementType != elementType)
             {
                 builder.setInsertBefore(originalType);
-                loweredType =
-                    builder.getArrayType(loweredElementType, arrayType->getElementCount());
+                loweredType = builder.getArrayType(loweredElementType, arrayType->getElementCount());
             }
         }
         else if (auto ptrType = as<IRPtrTypeBase>(originalType))
@@ -120,8 +117,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         return loweredType;
     }
 
-
-    // Pass 1: Clone parameter block structs with lowered types
+    // Clone parameter block structs with lowered types
     void cloneParameterBlockStructs()
     {
         List<IRParameterBlockType*> paramBlockTypesToReplace;
@@ -147,14 +143,13 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
             auto elementType = paramBlockType->getElementType();
             auto loweredElementType = convertTypeToHandler(elementType);
 
-
             // Create a new parameter block type with the lowered element type
             auto newParamBlockType = builder.getType(kIROp_ParameterBlockType, loweredElementType);
 
             paramBlockType->replaceUsesWith(newParamBlockType);
             paramBlockType->removeAndDeallocate();
 
-            if (auto arrayType = as<IRArrayType>(loweredElementType))
+            if (as<IRArrayType>(loweredElementType))
             {
                 if (auto parameterBlockType = as<IRParameterBlockType>(newParamBlockType))
                 {
@@ -174,10 +169,10 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
         return nullptr;
     }
 
-    // Recursively follow through address instructions until we find a load or other use
+    // Recursively process address instructions and their users
     void processAccessChain(IRInst* accessInst)
     {
-        // Process certain users of this address instruction
+        // Process users of this address instruction
         for (auto use = accessInst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -189,7 +184,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                 {
                     processAccessChain(user);
 
-                    // If this is a field address, we need to the ptrType
+                    // Update pointer type to point to lowered type if needed
                     auto currentPtrType = as<IRPtrTypeBase>(user->getFullType());
                     auto originalType = currentPtrType->getValueType();
                     IRType* typeLowered = nullptr;
@@ -206,7 +201,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                 }
                 break;
             case kIROp_RWStructuredBufferGetElementPtr:
-                processAccessChain(user); // pass through to next user (e.g. Load)
+                processAccessChain(user); // Pass through to next user (e.g. Load)
                 break;
             case kIROp_GetElement:
                 {
@@ -225,7 +220,7 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                 {
                     processAccessChain(user);
 
-                    // Load now should load a descriptor handle ptr type
+                    // Update type to descriptor handle if needed
                     auto originalType = user->getFullType();
                     IRType* typeLowered = nullptr;
                     if (typeLoweringMap.tryGetValue(originalType, typeLowered))
@@ -235,22 +230,19 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
 
                     if (auto descriptorHandleType = as<IRDescriptorHandleType>(typeLowered))
                     {
-                        auto resourceType =
-                            getResourceTypeFromDescriptorHandle(descriptorHandleType);
+                        auto resourceType = getResourceTypeFromDescriptorHandle(descriptorHandleType);
                         if (resourceType)
                         {
                             // Insert CastDescriptorHandleToResource after the load
                             builder.setInsertAfter(user);
-                            // castInst: cast the descriptor handle back to resource type
                             auto castInst = builder.emitIntrinsicInst(
                                 descriptorHandleType->getResourceType(),
                                 kIROp_CastDescriptorHandleToResource,
                                 1,
                                 &user);
 
-
                             // Replace all uses of the load with the cast result
-                            // But we need to be careful not to replace the use in the cast itself
+                            // (except the use in the cast instruction itself)
                             List<IRUse*> usesToReplace;
                             for (auto loadUse = user->firstUse; loadUse; loadUse = loadUse->nextUse)
                             {
@@ -270,50 +262,49 @@ struct ResourceToDescriptorHandleContext : public InstPassBase
                 break;
 
             default:
-                // For other uses, we don't need to do anything special
+                // For other uses, no special handling needed
                 break;
             }
+        }
+    }
+
+    // Update types and insert cast logic for descriptor handle conversions
+    void updateTypeAndInsertCastLogic()
+    {
+        for (auto field : updatedFields)
+        {
+            // Process the address chain for each updated field
+            // This handles cases where the field is used in loads or other instructions
+            auto structKey = field->getKey();
+            if (!structKey)
+            {
+                // Skip fields without keys
+                continue;
             }
+
+            processAccessChain(structKey);
         }
 
-        // Pass 2: Process parameter block users and insert conversion logic
-        void updateTypeAndInsertCastLogic()
+        // Handle arrays inside ParameterBlock that are accessed with GetElementPtr directly
+        // e.g. ParameterBlock<Array<ResourceStruct, 4>> arrayBlock; arrayBlock[1];
+        for (auto arrayType : updatedParameterBlock)
         {
-
-            for (auto field : updatedFields)
+            for (auto use = arrayType->firstUse; use; use = use->nextUse)
             {
-                // For each updated field, we need to process its address chain
-                // This will handle cases where the field is used in loads or other instructions
-                auto structKey = field->getKey();
-                if (!structKey)
+                auto user = use->getUser();
+                if (auto globalParam = as<IRGlobalParam>(user))
                 {
-                    // If the field has no key, we can't process it
-                    continue;
-                }
-
-                processAccessChain(structKey);
-            }
-
-            // Handle array inside ParameterBlock and gets accessed with GetElementPtr directly
-            // e.g. ParameterBlock<Array<ResourceStruct, 4>> arrayBlock; arrayBlock[1];
-            for (auto arrayType : updatedParameterBlock)
-            {
-                for (auto use = arrayType->firstUse; use; use = use->nextUse)
-                {
-                    auto user = use->getUser();
-                    if (auto globalParam = as<IRGlobalParam>(user))
-                    {
-                        processAccessChain(globalParam);
-                    }
+                    processAccessChain(globalParam);
                 }
             }
         }
+    }
 
-        void processModule()
-        {
-            cloneParameterBlockStructs();
-            updateTypeAndInsertCastLogic();
-        }
+    void processModule()
+    {
+        cloneParameterBlockStructs();
+        updateTypeAndInsertCastLogic();
+    }
 };
 
 void transformResourceTypesToDescriptorHandles(
