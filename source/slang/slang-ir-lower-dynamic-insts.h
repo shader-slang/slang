@@ -15,4 +15,6 @@ void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink);
 void lowerTagTypes(IRModule* module);
+
+bool lowerTaggedUnionPtrCasts(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang
