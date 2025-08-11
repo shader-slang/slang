@@ -141,29 +141,10 @@ static UCount getCollectionCount(IRCollectionBase* collection)
     return collection->getOperandCount();
 }
 
-static UCount getCollectionCount(IRCollectionTaggedUnionType* taggedUnion)
-{
-    auto typeCollection = taggedUnion->getOperand(0);
-    return getCollectionCount(as<IRCollectionBase>(typeCollection));
-}
-
 static UCount getCollectionCount(IRCollectionTagType* tagType)
 {
     auto collection = tagType->getOperand(0);
     return getCollectionCount(as<IRCollectionBase>(collection));
-}
-
-static IRInst* getCollectionElement(IRCollectionBase* collection, UInt index)
-{
-    if (!collection || index >= collection->getOperandCount())
-        return nullptr;
-    return collection->getOperand(index);
-}
-
-static IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
-{
-    auto typeCollection = collectionTagType->getOperand(0);
-    return getCollectionElement(as<IRCollectionBase>(typeCollection), index);
 }
 
 static IRInst* upcastCollection(IRBuilder* builder, IRInst* arg, IRType* destInfo)
