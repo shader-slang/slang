@@ -1,10 +1,13 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry computeMain
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -O0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK: [branch]
-// CHECK: [flatten]
+// HLSL: [branch]
+// HLSL: [flatten]
+// SPIRV: OpSelectionMerge {{.*}} DontFlatten
+// SPIRV: OpSelectionMerge {{.*}} Flatten
 
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)

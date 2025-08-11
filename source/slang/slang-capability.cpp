@@ -269,6 +269,22 @@ CapabilityAtomSet CapabilityAtomSet::newSetWithoutImpliedAtoms() const
 
 //// CapabiltySet
 
+CapabilityAtomSet getTargetAtomsInSet(const CapabilitySet& set)
+{
+    CapabilityAtomSet out;
+    for (auto i : set.getCapabilityTargetSets())
+        out.add((UInt)i.first);
+    return out;
+}
+
+CapabilityAtomSet getStageAtomsInSet(const CapabilityTargetSet& set)
+{
+    CapabilityAtomSet out;
+    for (auto i : set.getShaderStageSets())
+        out.add((UInt)i.first);
+    return out;
+}
+
 CapabilityAtom getTargetAtomInSet(const CapabilityAtomSet& atomSet)
 {
     auto targetSet = getAtomSetOfTargets();
@@ -959,56 +975,117 @@ CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
     return CapabilitySet::AtomSets::Iterator(&this->getCapabilityTargetSets()).begin();
 }
 
-bool CapabilitySet::checkCapabilityRequirement(
+void CapabilitySet::checkCapabilityRequirement(
+    CheckCapabilityRequirementOptions options,
     CapabilitySet const& available,
     CapabilitySet const& required,
-    CapabilityAtomSet& outFailedAvailableSet)
+    CapabilityAtomSet& outFailedAvailableSet,
+    CheckCapabilityRequirementResult& result)
 {
-    // Requirements x are met by available disjoint capabilities (a | b) iff
+    // 'required' capabilities x are met by 'available' disjoint capabilities (a | b) iff
     // both 'a' satisfies x and 'b' satisfies x.
     // If we have a caller function F() decorated with:
     //     [require(hlsl, _sm_6_3)] [require(spirv, _spv_ray_tracing)] void F() { g(); }
     // We'd better make sure that `g()` can be compiled with both (hlsl+_sm_6_3) and
     // (spirv+_spv_ray_tracing) capability sets. In this method, F()'s capability declaration is
     // represented by `available`, and g()'s capability is represented by `required`. We will check
-    // that for every capability conjunction X of F(), there is one capability conjunction Y in g()
+    // that for every capability conjunction X of F(), there is a capability conjunction Y in g()
     // such that X implies Y.
     //
 
-    // if empty there is no body, all capabilities are supported.
-    if (required.isEmpty())
-        return true;
+    // If empty, all capabilities are supported.
+    // Either, we require no capabilities (return true)
+    // or we have no capability requirements (return true)
+    if (required.isEmpty() || available.isEmpty())
+    {
+        result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+        return;
+    }
 
+    // invalid isn't a fail because the capabilities already threw an error.
     if (required.isInvalid())
     {
         outFailedAvailableSet.add((UInt)CapabilityAtom::Invalid);
-        return false;
+        result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+        return;
     }
 
-    // If F's capability is empty, we can satisfy any non-empty requirements.
-    //
-    if (available.isEmpty() && !required.isEmpty())
-        return false;
-
-
-    // if all sets in `available` are not a super-set to at least 1 `required` set, then we have an
-    // err
-    for (auto& availableTarget : available.m_targetSets)
+    auto availableTargetSets = available.getCapabilityTargetSets();
+    auto requiredTargetSets = required.getCapabilityTargetSets();
+    if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
     {
-        auto reqTarget = required.m_targetSets.tryGetValue(availableTarget.first);
+        // If we have a mismatch in capability-target count we clearly have a
+        // mismatch and will fail
+        auto availableTargetSetsCount = availableTargetSets.getCount();
+        auto requiredTargetSetsCount = requiredTargetSets.getCount();
+        if (availableTargetSetsCount != requiredTargetSetsCount)
+        {
+            auto availableTargets = getTargetAtomsInSet(available);
+            auto requiredTargets = getTargetAtomsInSet(required);
+
+            if (requiredTargetSetsCount > availableTargetSetsCount)
+            {
+                result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
+                requiredTargets.subtractWith((UIntSet)availableTargets);
+                outFailedAvailableSet.add((UIntSet)requiredTargets);
+            }
+            else
+            {
+                result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+                availableTargets.subtractWith((UIntSet)requiredTargets);
+                outFailedAvailableSet.add((UIntSet)availableTargets);
+            }
+            return;
+        }
+    }
+
+    // if all sets in `available` are not a superset to `required` then we have an
+    // error.
+    for (auto& availableTarget : availableTargetSets)
+    {
+        auto reqTarget = requiredTargetSets.tryGetValue(availableTarget.first);
         if (!reqTarget)
         {
             outFailedAvailableSet.add((UInt)availableTarget.first);
-            return false;
+            result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+            return;
         }
 
-        for (auto& availableStage : availableTarget.second.shaderStageSets)
+        if (options == CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms)
         {
-            auto reqStage = reqTarget->shaderStageSets.tryGetValue(availableStage.first);
+            // If we have a mismatch in capability-stage count we clearly have a
+            // mismatch and will fail
+            auto availableStageSetsCount = availableTarget.second.getShaderStageSets().getCount();
+            auto requiredStageSetsCount = reqTarget->getShaderStageSets().getCount();
+            if (availableStageSetsCount != requiredStageSetsCount)
+            {
+                auto availableStages = getStageAtomsInSet(availableTarget.second);
+                auto requiredStages = getStageAtomsInSet(*reqTarget);
+
+                if (requiredStageSetsCount > availableStageSetsCount)
+                {
+                    result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
+                    requiredStages.subtractWith((UIntSet)availableStages);
+                    outFailedAvailableSet.add((UIntSet)requiredStages);
+                }
+                else
+                {
+                    result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+                    availableStages.subtractWith((UIntSet)requiredStages);
+                    outFailedAvailableSet.add((UIntSet)availableStages);
+                }
+                return;
+            }
+        }
+
+        for (auto& availableStage : availableTarget.second.getShaderStageSets())
+        {
+            auto reqStage = reqTarget->getShaderStageSets().tryGetValue(availableStage.first);
             if (!reqStage)
             {
                 outFailedAvailableSet.add((UInt)availableStage.first);
-                return false;
+                result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
+                return;
             }
 
             const CapabilityAtomSet* lastBadStage = nullptr;
@@ -1020,7 +1097,7 @@ bool CapabilitySet::checkCapabilityRequirement(
                 {
                     const auto& reqStageSet = reqStage->atomSet.value();
                     if (availableStageSet.contains(reqStageSet))
-                        break;
+                        continue;
                     else
                         lastBadStage = &reqStageSet;
                 }
@@ -1031,13 +1108,19 @@ bool CapabilitySet::checkCapabilityRequirement(
                         outFailedAvailableSet,
                         *lastBadStage,
                         availableStageSet);
-                    return false;
+
+                    // Not a failiure if nothing is missing
+                    if (outFailedAvailableSet.isEmpty())
+                        continue;
+                    result = CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired;
+                    return;
                 }
             }
         }
     }
 
-    return true;
+    result = CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired;
+    return;
 }
 
 /// Converts spirv version atom to the glsl_spirv equivlent. If not possible, Invalid is returned
@@ -1097,7 +1180,7 @@ UnownedStringSlice capabilityNameToStringWithoutPrefix(CapabilityName capability
     return name;
 }
 
-void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet atomSet)
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet)
 {
     bool isFirst = true;
     for (auto atom : atomSet.newSetWithoutImpliedAtoms())

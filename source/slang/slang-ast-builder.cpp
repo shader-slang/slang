@@ -535,12 +535,8 @@ PtrTypeBase* ASTBuilder::getPtrType(
 {
     Val* args[] = {
         valueType,
-        getIntVal(
-            getBuiltinType(BaseType::AccessQualifier),
-            (IntegerLiteralValue)accessQualifier),
-        getIntVal(
-            getBuiltinType(BaseType::AddressSpace),
-            (IntegerLiteralValue)addrSpace)};
+        getIntVal(getBuiltinType(BaseType::AccessQualifier), (IntegerLiteralValue)accessQualifier),
+        getIntVal(getBuiltinType(BaseType::AddressSpace), (IntegerLiteralValue)addrSpace)};
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
