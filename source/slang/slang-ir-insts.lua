@@ -2191,6 +2191,9 @@ local insts = {
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
 	} }, 
+	{ CastTaggedUnionToInterfacePtr = {
+		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
+	} }, 
 	{ GetTagForSuperCollection = {
 		-- Translate a tag from a set to its equivalent in a super-set
 	} }, 

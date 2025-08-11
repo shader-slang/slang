@@ -1140,6 +1140,9 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
+    if (lowerTaggedUnionPtrCasts(irModule, sink))
+        requiredLoweringPassSet.reinterpret = true; // TODO: Is this the right way to handle this?
+
     lowerTagInsts(irModule, sink);
     lowerTypeCollections(irModule, sink);
 

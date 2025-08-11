@@ -261,6 +261,51 @@ struct WorkQueue
     }
 };
 
+
+// TODO: Move to utilities
+
+IRCollectionTagType* makeTagType(IRCollectionBase* collection)
+{
+    IRInst* collectionInst = collection;
+    // Create the tag type from the collection
+    IRBuilder builder(collection->getModule());
+    return as<IRCollectionTagType>(
+        builder.emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collectionInst));
+}
+
+UCount getCollectionCount(IRCollectionBase* collection)
+{
+    if (!collection)
+        return 0;
+    return collection->getOperandCount();
+}
+
+UCount getCollectionCount(IRCollectionTaggedUnionType* taggedUnion)
+{
+    auto typeCollection = taggedUnion->getOperand(0);
+    return getCollectionCount(as<IRCollectionBase>(typeCollection));
+}
+
+UCount getCollectionCount(IRCollectionTagType* tagType)
+{
+    auto collection = tagType->getOperand(0);
+    return getCollectionCount(as<IRCollectionBase>(collection));
+}
+
+IRInst* getCollectionElement(IRCollectionBase* collection, UInt index)
+{
+    if (!collection || index >= collection->getOperandCount())
+        return nullptr;
+    return collection->getOperand(index);
+}
+
+IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
+{
+    auto typeCollection = collectionTagType->getOperand(0);
+    return getCollectionElement(as<IRCollectionBase>(typeCollection), index);
+}
+
+
 struct DynamicInstLoweringContext
 {
     // Helper methods for creating canonical collections
@@ -351,47 +396,6 @@ struct DynamicInstLoweringContext
             kIROp_CollectionTaggedUnionType,
             elements.getCount(),
             elements.getBuffer()));
-    }
-
-    IRCollectionTagType* makeTagType(IRCollectionBase* collection)
-    {
-        IRInst* collectionInst = collection;
-        // Create the tag type from the collection
-        IRBuilder builder(module);
-        return as<IRCollectionTagType>(
-            builder.emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collectionInst));
-    }
-
-    UCount getCollectionCount(IRCollectionBase* collection)
-    {
-        if (!collection)
-            return 0;
-        return collection->getOperandCount();
-    }
-
-    UCount getCollectionCount(IRCollectionTaggedUnionType* taggedUnion)
-    {
-        auto typeCollection = taggedUnion->getOperand(0);
-        return getCollectionCount(as<IRCollectionBase>(typeCollection));
-    }
-
-    UCount getCollectionCount(IRCollectionTagType* tagType)
-    {
-        auto collection = tagType->getOperand(0);
-        return getCollectionCount(as<IRCollectionBase>(collection));
-    }
-
-    IRInst* getCollectionElement(IRCollectionBase* collection, UInt index)
-    {
-        if (!collection || index >= collection->getOperandCount())
-            return nullptr;
-        return collection->getOperand(index);
-    }
-
-    IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
-    {
-        auto typeCollection = collectionTagType->getOperand(0);
-        return getCollectionElement(as<IRCollectionBase>(typeCollection), index);
     }
 
     IRUnboundedCollection* makeUnbounded()
@@ -616,32 +620,6 @@ struct DynamicInstLoweringContext
         }
     }
 
-    IRIntegerValue getInterfaceAnyValueSize(IRInst* type)
-    {
-        if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
-        {
-            return decor->getSize();
-        }
-
-        // We could conceivably make it an error to have an interface
-        // without an `[anyValueSize(...)]` attribute, but then we risk
-        // producing error messages even when doing 100% static specialization.
-        //
-        // It is simpler to use a reasonable default size and treat any
-        // type without an explicit attribute as using that size.
-        //
-        return kDefaultAnyValueSize;
-    }
-
-    IRType* lowerInterfaceType(IRInterfaceType* interfaceType)
-    {
-        IRBuilder builder(module);
-        auto anyValueType = builder.getAnyValueType(getInterfaceAnyValueSize(interfaceType));
-        auto witnessTableType = builder.getWitnessTableIDType((IRType*)interfaceType);
-        auto rttiType = builder.getRTTIHandleType();
-        return builder.getTupleType({rttiType, witnessTableType, anyValueType});
-    }
-
     IRInst* upcastCollection(IRInst* context, IRInst* arg, IRType* destInfo)
     {
         auto argInfo = arg->getDataType();
@@ -713,39 +691,6 @@ struct DynamicInstLoweringContext
             IRBuilder builder(module);
             builder.setInsertAfter(arg);
             return builder.emitPackAnyValue((IRType*)destInfo, arg);
-        }
-        else if (as<IRInterfaceType>(argInfo) && as<IRCollectionTaggedUnionType>(destInfo))
-        {
-            auto loweredInterfaceType = lowerInterfaceType(as<IRInterfaceType>(argInfo));
-            IRBuilder builder(module);
-            builder.setInsertAfter(arg);
-            auto witnessTable =
-                builder.emitGetTupleElement(builder.getWitnessTableIDType(argInfo), arg, 1);
-            auto tableID = builder.emitGetSequentialIDInst(witnessTable);
-            auto tableCollection = cast<IRTableCollection>(destInfo->getOperand(1));
-            auto typeCollection = cast<IRTypeCollection>(destInfo->getOperand(0));
-
-            List<IRInst*> getTagOperands;
-            getTagOperands.add(argInfo);
-            getTagOperands.add(tableID);
-            auto tableTag = builder.emitIntrinsicInst(
-                (IRType*)makeTagType(tableCollection),
-                kIROp_GetTagFromSequentialID,
-                getTagOperands.getCount(),
-                getTagOperands.getBuffer());
-
-            auto effectiveValType = getCollectionCount(typeCollection) > 1
-                                        ? typeCollection
-                                        : getCollectionElement(typeCollection, 0);
-
-            return builder.emitMakeTuple(
-                {tableTag,
-                 builder.emitReinterpret(
-                     (IRType*)effectiveValType,
-                     builder.emitGetTupleElement(
-                         (IRType*)loweredInterfaceType->getOperand(0),
-                         arg,
-                         2))});
         }
 
         return arg; // Can use as-is.
@@ -2925,26 +2870,39 @@ struct DynamicInstLoweringContext
         auto bufferType = (IRType*)inst->getOperand(0)->getDataType();
         auto bufferBaseType = (IRType*)bufferType->getOperand(0);
 
-        if (bufferBaseType != (IRType*)getLoweredType(valInfo))
+        auto loweredValType = (IRType*)getLoweredType(valInfo);
+        if (bufferBaseType != loweredValType)
         {
-            IRBuilder builder(inst);
-            builder.setInsertAfter(inst);
-
-            IRCloneEnv cloneEnv;
-            auto newLoad = cloneInst(&cloneEnv, &builder, inst);
-
-            auto loweredVal = upcastCollection(context, newLoad, (IRType*)valInfo);
-
-            // TODO: this is a hack. Encode this in the type-flow-data.
-            if (as<IRInterfaceType>(bufferBaseType) && !isComInterfaceType(inst->getDataType()) &&
-                !isBuiltin(inst->getDataType()))
+            if (as<IRInterfaceType>(bufferBaseType))
             {
-                newLoad->setFullType(lowerInterfaceType(as<IRInterfaceType>(bufferBaseType)));
-            }
+                // If we're dealing with a loading a known tagged union value from
+                // an interface-typed pointer, we'll cast the pointer itself and
+                // defer the lowering of the load until later.
+                //
+                // This avoids having to change the source pointer type
+                // and confusing any future runs of the type flow
+                // analysis pass.
+                //
+                IRBuilder builder(inst);
+                builder.setInsertAfter(inst);
+                auto bufferHandle = inst->getOperand(0);
+                auto newHandle = builder.emitIntrinsicInst(
+                    builder.getPtrType(loweredValType),
+                    kIROp_CastInterfaceToTaggedUnionPtr,
+                    1,
+                    &bufferHandle);
+                List<IRInst*> newLoadOperands = {newHandle, inst->getOperand(1)};
+                auto newLoad = builder.emitIntrinsicInst(
+                    loweredValType,
+                    inst->getOp(),
+                    newLoadOperands.getCount(),
+                    newLoadOperands.getBuffer());
 
-            inst->replaceUsesWith(loweredVal);
-            inst->removeAndDeallocate();
-            return true;
+                inst->replaceUsesWith(newLoad);
+                inst->removeAndDeallocate();
+
+                return true;
+            }
         }
         else if (inst->getDataType() != bufferBaseType)
         {
@@ -2952,11 +2910,8 @@ struct DynamicInstLoweringContext
             inst->setFullType((IRType*)getLoweredType(valInfo));
             return true;
         }
-        else
-        {
-            // No change needed.
-            return false;
-        }
+
+        return false;
     }
 
     bool lowerSpecialize(IRInst* context, IRSpecialize* inst)
@@ -3052,31 +3007,39 @@ struct DynamicInstLoweringContext
         if (!valInfo)
             return false;
 
-        IRType* ptrValType = nullptr;
-        ptrValType = as<IRPtrTypeBase>(as<IRLoad>(inst)->getPtr()->getDataType())->getValueType();
+        auto loadPtr = as<IRLoad>(inst)->getPtr();
+        auto loadPtrType = as<IRPtrTypeBase>(loadPtr->getDataType());
+        auto ptrValType = loadPtrType->getValueType();
 
-        if (ptrValType != (IRType*)getLoweredType(valInfo))
+        IRType* loweredType = (IRType*)getLoweredType(valInfo);
+        if (ptrValType != loweredType)
         {
             SLANG_ASSERT(!as<IRParam>(inst));
-            IRBuilder builder(inst);
-            builder.setInsertAfter(inst);
 
-            IRCloneEnv cloneEnv;
-            auto newLoad = cloneInst(&cloneEnv, &builder, inst);
-
-            auto loweredVal = upcastCollection(context, newLoad, (IRType*)valInfo);
-
-            // TODO: this is a hack. Encode this in the type-flow-data.
-            if (as<IRInterfaceType>(ptrValType) && !isComInterfaceType(inst->getDataType()) &&
-                !isBuiltin(inst->getDataType()))
+            if (as<IRInterfaceType>(ptrValType))
             {
-                newLoad->setFullType(lowerInterfaceType(as<IRInterfaceType>(ptrValType)));
+                // If we're dealing with a loading a known tagged union value from
+                // an interface-typed pointer, we'll cast the pointer itself and
+                // defer the lowering of the load until later.
+                //
+                // This avoids having to change the source pointer type
+                // and confusing any future runs of the type flow
+                // analysis pass.
+                //
+                IRBuilder builder(inst);
+                builder.setInsertAfter(inst);
+                auto newLoadPtr = builder.emitIntrinsicInst(
+                    builder.getPtrTypeWithAddressSpace(loweredType, loadPtrType),
+                    kIROp_CastInterfaceToTaggedUnionPtr,
+                    1,
+                    &loadPtr);
+                auto newLoad = builder.emitLoad(loweredType, newLoadPtr);
+
+                inst->replaceUsesWith(newLoad);
+                inst->removeAndDeallocate();
+
+                return true;
             }
-
-            inst->replaceUsesWith(loweredVal);
-            inst->removeAndDeallocate();
-
-            return true;
         }
         else if (inst->getDataType() != ptrValType)
         {
@@ -3813,6 +3776,161 @@ void lowerTagTypes(IRModule* module)
 {
     TagTypeLoweringContext context(module);
     context.processModule();
+}
+
+// This context lowers `CastInterfaceToTaggedUnionPtr` and
+// `CastTaggedUnionToInterfacePtr` by finding all `IRLoad` and
+// `IRStore` uses of these insts, and upcasting the tagged-union
+// tuple to the the interface-based tuple (of the loaded inst or before
+// storing the val, as necessary)
+//
+struct TaggedUnionCastLoweringContext : public InstPassBase
+{
+    TaggedUnionCastLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    IRInst* convertToTaggedUnion(
+        IRBuilder* builder,
+        IRInst* val,
+        IRInst* interfaceType,
+        IRInst* targetType)
+    {
+        auto baseInterfaceValue = val;
+        auto witnessTable = builder->emitExtractExistentialWitnessTable(baseInterfaceValue);
+        auto tableID = builder->emitGetSequentialIDInst(witnessTable);
+
+        auto taggedUnionTupleType = cast<IRTupleType>(targetType);
+
+        List<IRInst*> getTagOperands;
+        getTagOperands.add(interfaceType);
+        getTagOperands.add(tableID);
+        auto tableTag = builder->emitIntrinsicInst(
+            (IRType*)taggedUnionTupleType->getOperand(0),
+            kIROp_GetTagFromSequentialID,
+            getTagOperands.getCount(),
+            getTagOperands.getBuffer());
+
+        return builder->emitMakeTuple(
+            {tableTag,
+             builder->emitReinterpret(
+                 (IRType*)taggedUnionTupleType->getOperand(1),
+                 builder->emitExtractExistentialValue(
+                     (IRType*)builder->emitExtractExistentialType(baseInterfaceValue),
+                     baseInterfaceValue))});
+    }
+
+    void lowerCastInterfaceToTaggedUnionPtr(IRCastInterfaceToTaggedUnionPtr* inst)
+    {
+        // Find all uses of the inst
+        traverseUses(
+            inst,
+            [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                switch (user->getOp())
+                {
+                case kIROp_Load:
+                    {
+                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfaceType = as<IRInterfaceType>(
+                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+
+                        // Rewrite the load to use the original ptr and load
+                        // an interface-typed object.
+                        //
+                        IRBuilder builder(module);
+                        builder.setInsertAfter(user);
+                        builder.replaceOperand(user->getOperands() + 0, baseInterfacePtr);
+                        builder.replaceOperand(&user->typeUse, baseInterfaceType);
+
+                        // Then, we'll rewrite it.
+                        List<IRUse*> oldUses;
+                        traverseUses(user, [&](IRUse* oldUse) { oldUses.add(oldUse); });
+
+                        auto newVal = convertToTaggedUnion(
+                            &builder,
+                            user,
+                            baseInterfaceType,
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+                        for (auto oldUse : oldUses)
+                        {
+                            builder.replaceOperand(oldUse, newVal);
+                        }
+                        break;
+                    }
+                case kIROp_StructuredBufferLoad:
+                case kIROp_RWStructuredBufferLoad:
+                    {
+                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfaceType =
+                            as<IRInterfaceType>((baseInterfacePtr->getDataType())->getOperand(0));
+
+                        IRBuilder builder(module);
+                        builder.setInsertAfter(user);
+                        builder.replaceOperand(user->getOperands() + 0, baseInterfacePtr);
+                        builder.replaceOperand(&user->typeUse, baseInterfaceType);
+
+                        // Then, we'll rewrite it.
+                        List<IRUse*> oldUses;
+                        traverseUses(user, [&](IRUse* oldUse) { oldUses.add(oldUse); });
+
+                        auto newVal = convertToTaggedUnion(
+                            &builder,
+                            user,
+                            baseInterfaceType,
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+                        for (auto oldUse : oldUses)
+                        {
+                            builder.replaceOperand(oldUse, newVal);
+                        }
+                        break;
+                    }
+                default:
+                    SLANG_UNEXPECTED("Unexpected user of CastInterfaceToTaggedUnionPtr");
+                }
+            });
+
+        SLANG_ASSERT(!inst->hasUses());
+        inst->removeAndDeallocate();
+    }
+
+    void lowerCastTaggedUnionToInterfacePtr(IRCastTaggedUnionToInterfacePtr* inst)
+    {
+        SLANG_UNUSED(inst);
+        SLANG_UNEXPECTED("Unexpected inst of CastTaggedUnionToInterfacePtr");
+    }
+
+    bool processModule()
+    {
+        bool hasCastInsts = false;
+        processInstsOfType<IRCastInterfaceToTaggedUnionPtr>(
+            kIROp_CastInterfaceToTaggedUnionPtr,
+            [&](IRCastInterfaceToTaggedUnionPtr* inst)
+            {
+                hasCastInsts = true;
+                return lowerCastInterfaceToTaggedUnionPtr(inst);
+            });
+
+        processInstsOfType<IRCastTaggedUnionToInterfacePtr>(
+            kIROp_CastTaggedUnionToInterfacePtr,
+            [&](IRCastTaggedUnionToInterfacePtr* inst)
+            {
+                hasCastInsts = true;
+                return lowerCastTaggedUnionToInterfacePtr(inst);
+            });
+
+        return hasCastInsts;
+    }
+};
+
+bool lowerTaggedUnionPtrCasts(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    TaggedUnionCastLoweringContext context(module);
+    return context.processModule();
 }
 
 // Main entry point
