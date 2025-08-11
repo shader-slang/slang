@@ -474,8 +474,10 @@ struct DynamicInstLoweringContext
     }
 
     // Centralized method to update propagation info and manage work queue
-    // Use this when you want to propagate new information to an existing instruction
+    //
+    // Use this when you want to propagate new information to an existing instruction.
     // This will union the new info with existing info and add users to work queue if changed
+    //
     void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue& workQueue)
     {
         auto existingInfo = tryGetInfo(context, inst);
@@ -824,11 +826,6 @@ struct DynamicInstLoweringContext
 
     IRInst* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
-        //
-        // TODO: Actually use the integer<->type map present in the linkage to
-        // extract a set of possible witness tables (if the index is a compile-time constant).
-        //
-
         if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
         {
             if (isComInterfaceType(interfaceType) || isBuiltin(interfaceType))
@@ -1593,21 +1590,10 @@ struct DynamicInstLoweringContext
         UIndex idx = 0;
         for (auto param : func->getParams())
         {
-            /*if (auto newType = tryGetInfo(context, param))
-                effectiveTypes.add((IRType*)newType);
-            else
-            {
-                const auto [direction, type] = getParameterDirectionAndType(
-                    as<IRFuncType>(context->getDataType())->getParamType(idx));
-                SLANG_ASSERT(isGlobalInst(type));
-                effectiveTypes.add((IRType*)type);
-            }*/
             if (auto newType = tryGetInfo(context, param))
                 effectiveTypes.add((IRType*)newType);
             else
-                effectiveTypes.add(
-                    //(IRType*)as<IRFuncType>(context->getDataType())->getParamType(idx)
-                    param->getDataType());
+                effectiveTypes.add(param->getDataType());
             idx++;
         }
 
@@ -2145,20 +2131,6 @@ struct DynamicInstLoweringContext
 
         if (auto info = tryGetInfo(context, inst))
         {
-            /* // Special cast for type collections.
-            if (auto collectionTagType = as<IRCollectionTagType>(info))
-            {
-                if (as<IRTypeCollection>(collectionTagType->getOperand(0)))
-                {
-                    // Remove the tag and replace the inst itself with the type
-                    // in the collection.
-                    //
-                    inst->replaceUsesWith(getLoweredType(collectionTagType->getOperand(0)));
-                    inst->removeAndDeallocate();
-                    return true;
-                }
-            }*/
-
             if (auto loweredType = getLoweredType(info))
             {
                 if (loweredType == inst->getDataType())
@@ -2301,7 +2273,6 @@ struct DynamicInstLoweringContext
             auto operand = inst->getOperand(0);
             auto element = builder.emitGetTupleElement((IRType*)collectionTagType, operand, 0);
             inst->replaceUsesWith(element);
-            // propagationMap[Element(context, element)] = info;
             inst->removeAndDeallocate();
             return true;
         }
@@ -2324,26 +2295,6 @@ struct DynamicInstLoweringContext
         }
 
         return false;
-        /*
-        auto operandInfo = tryGetInfo(context, inst->getOperand(0));
-        auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo);
-        if (!taggedUnion)
-            return false;
-
-        auto info = tryGetInfo(context, inst);
-        auto typeCollection = as<IRTypeCollection>(info);
-        if (!typeCollection)
-            return false;
-
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-
-        // Replace with GetElement(loweredInst, 1) : TypeCollection
-        auto operand = inst->getOperand(0);
-        auto element = builder.emitGetTupleElement((IRType*)info, operand, 1);
-        inst->replaceUsesWith(element);
-        inst->removeAndDeallocate();
-        return true;*/
     }
 
     bool lowerExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
@@ -2534,19 +2485,9 @@ struct DynamicInstLoweringContext
         {
             auto paramEffectiveTypes = getParamEffectiveTypes(context);
             auto paramDirections = getParamDirections(context);
-            for (UInt i = 0; i < paramEffectiveTypes.getCount(); i++)
-            {
-                updateParamType(i, getLoweredType(paramEffectiveTypes[i]));
-                /*if (auto collectionType = as<IRTypeFlowData>(paramEffectiveTypes[i]))
 
-                else if (paramEffectiveTypes[i] != nullptr)
-                    updateParamType(
-                        i,
-                        fromDirectionAndType(
-                            &builder,
-                            paramDirections[i],
-                            (IRType*)paramEffectiveTypes[i]));*/
-            }
+            for (UInt i = 0; i < paramEffectiveTypes.getCount(); i++)
+                updateParamType(i, getLoweredType(paramEffectiveTypes[i]));
 
             auto returnType = getFuncReturnInfo(context);
             if (auto newResultType = getLoweredType(returnType))
@@ -2565,7 +2506,7 @@ struct DynamicInstLoweringContext
         }
 
         //
-        // Add in extra parameter types for a call to the callee.
+        // Add in extra parameter types for a call to a non-concrete callee.
         //
 
         List<IRType*> extraParamTypes;
@@ -2576,7 +2517,6 @@ struct DynamicInstLoweringContext
             // as the first parameter.
             if (getCollectionCount(funcCollection) > 1)
                 extraParamTypes.add((IRType*)makeTagType(funcCollection));
-            // extraParamTypes.add((IRType*)makeTagType(funcCollection));
         }
 
         // If the any of the elements in the callee (or the callee itself in case
@@ -2695,7 +2635,6 @@ struct DynamicInstLoweringContext
             callArgs.add(inst->getArg(ii));
 
         IRBuilder builder(inst->getModule());
-        // builder.replaceOperand(inst->getCalleeUse(), specializedCallee);
         builder.setInsertBefore(inst);
         auto newCallInst = builder.emitCallInst(
             as<IRFuncType>(targetContext->getDataType())->getResultType(),
@@ -3250,8 +3189,7 @@ struct DynamicInstLoweringContext
             return *existingId;
 
         // If we reach here, the instruction was not assigned an ID during initialization.
-        // This can happen for instructions that are generated during the dynamic analysis
-        // process.
+        // This can happen for instructions that are generated during the analysis.
         //
         // We will ensure that they are moved to the end of the module, and assign them a new ID.
         // This will ensure a stable ordering on subsequent passes.
@@ -3259,10 +3197,6 @@ struct DynamicInstLoweringContext
         inst->moveToEnd();
         uniqueIds[inst] = nextUniqueId;
         return nextUniqueId++;
-
-        // If we reach here, this instruction wasn't assigned an ID during initialization
-        // This should only happen for instructions that don't support collection types
-        // SLANG_UNEXPECTED("getUniqueID called on instruction without pre-assigned ID");
     }
 
     bool isExistentialType(IRType* type) { return as<IRInterfaceType>(type) != nullptr; }
@@ -3312,17 +3246,8 @@ struct DynamicInstLoweringContext
         // Phase 1: Information Propagation
         performInformationPropagation();
 
-        // Phase 1.5: Insert reinterprets for points where sets merge
-        // e.g. phi, return, call
-        //
-        // hasChanges |= insertReinterprets();
-
         // Phase 2: Dynamic Instruction Lowering
         hasChanges |= performDynamicInstLowering();
-
-        // Phase 3: Lower collection types.
-        // if (hasChanges)
-        //    lowerTypeCollections();
 
         return hasChanges;
     }
