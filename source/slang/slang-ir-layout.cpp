@@ -309,6 +309,13 @@ static Result _calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_CollectionTagType:
+        {
+            outSizeAndAlignment->size = 4;
+            outSizeAndAlignment->alignment = 4;
+            return SLANG_OK;
+        }
+        break;
     case kIROp_InterfaceType:
         {
             auto interfaceType = cast<IRInterfaceType>(type);
