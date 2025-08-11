@@ -84,11 +84,6 @@ struct Element
         context = func;
     }
 
-    Element(const Element& other)
-        : context(other.context), inst(other.inst)
-    {
-    }
-
     bool operator==(const Element& other) const
     {
         return context == other.context && inst == other.inst;
@@ -2561,7 +2556,7 @@ struct DynamicInstLoweringContext
     List<IRInst*> getArgsForDynamicSpecialization(IRSpecialize* specializedCallee)
     {
         List<IRInst*> callArgs;
-        for (auto ii = 0; ii < specializedCallee->getArgCount(); ii++)
+        for (UInt ii = 0; ii < specializedCallee->getArgCount(); ii++)
         {
             auto specArg = specializedCallee->getArg(ii);
             auto argInfo = specArg->getDataType();
@@ -2587,7 +2582,7 @@ struct DynamicInstLoweringContext
         auto targetContext = getCollectionElement(calleeCollection, 0);
 
         List<IRInst*> callArgs;
-        for (auto ii = 0; ii < specializedCallee->getArgCount(); ii++)
+        for (UInt ii = 0; ii < specializedCallee->getArgCount(); ii++)
         {
             auto specArg = specializedCallee->getArg(ii);
             auto argInfo = tryGetInfo(context, specArg);
@@ -2613,7 +2608,7 @@ struct DynamicInstLoweringContext
             }
         }
 
-        for (auto ii = 0; ii < inst->getArgCount(); ii++)
+        for (UInt ii = 0; ii < inst->getArgCount(); ii++)
             callArgs.add(inst->getArg(ii));
 
         IRBuilder builder(inst->getModule());
