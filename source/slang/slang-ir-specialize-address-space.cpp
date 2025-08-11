@@ -173,7 +173,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 auto newParamType = builder.getPtrType(
                     ptrType->getOp(),
                     ptrType->getValueType(),
-                    AccessQualifier::ReadWrite,
+                    ptrType->getAccessQualifier(),
                     paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = AddressSpaceNode(paramAddrSpace);

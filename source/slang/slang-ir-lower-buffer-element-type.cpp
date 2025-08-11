@@ -930,6 +930,7 @@ struct LoweredElementTypeContext
             bool shouldWrapArrayInStruct = false;
         };
         List<BufferTypeInfo> bufferTypeInsts;
+        HashSet<IRType*> typesThatWillOrHaveBeenProcessed;
         for (auto globalInst : module->getGlobalInsts())
         {
             IRType* elementType = nullptr;
@@ -974,6 +975,7 @@ struct LoweredElementTypeContext
                 !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
+            typesThatWillOrHaveBeenProcessed.add((IRType*)globalInst);
         }
 
         // Maintain a pending work list of all matrix addresses, and try to lower them out of
@@ -981,8 +983,10 @@ struct LoweredElementTypeContext
 
         List<MatrixAddrWorkItem> matrixAddrInsts;
 
-        for (auto bufferTypeInfo : bufferTypeInsts)
+        for (Index bufferTypeInstsIndex = 0; bufferTypeInstsIndex < bufferTypeInsts.getCount();
+             bufferTypeInstsIndex++)
         {
+            const auto& bufferTypeInfo = bufferTypeInsts[bufferTypeInstsIndex];
             auto bufferType = bufferTypeInfo.bufferType;
             auto elementType = bufferTypeInfo.elementType;
 
@@ -990,6 +994,11 @@ struct LoweredElementTypeContext
                 continue;
 
             auto config = getTypeLoweringConfigForBuffer(target, bufferType);
+            
+            // We need to cache to ensure we do not double-create. This would be very bad since
+            // then we would be causing mismatched parameters despite expectation being that
+            // the params are the same. TODO: check if multple diff layouts break this logic 
+            // and I need to check for this.
             auto loweredBufferElementTypeInfo = getLoweredTypeInfo(elementType, config);
 
             // If the lowered type is the same as original type, no change is required.
@@ -1000,8 +1009,9 @@ struct LoweredElementTypeContext
             builder.setInsertBefore(bufferType);
 
             ShortList<IRInst*> typeOperands;
-            for (UInt i = 0; i < bufferType->getOperandCount(); i++)
-                typeOperands.add(bufferType->getOperand(i));
+            for (UInt bufferTypeIndex = 0; bufferTypeIndex < bufferType->getOperandCount();
+                 bufferTypeIndex++)
+                typeOperands.add(bufferType->getOperand(bufferTypeIndex));
             typeOperands[0] = loweredBufferElementTypeInfo.loweredType;
             auto loweredBufferType = builder.getType(
                 bufferType->getOp(),
@@ -1023,9 +1033,9 @@ struct LoweredElementTypeContext
                 });
 
             // Translate the values to use new lowered buffer type instead.
-            for (Index i = 0; i < ptrValsWorkList.getCount(); i++)
+            for (Index ptrValsIndex = 0; ptrValsIndex < ptrValsWorkList.getCount(); ptrValsIndex++)
             {
-                auto ptrVal = ptrValsWorkList[i];
+                auto ptrVal = ptrValsWorkList[ptrValsIndex];
                 auto oldPtrType = ptrVal->getFullType();
                 auto originalElementType = oldPtrType->getOperand(0);
 
@@ -1112,6 +1122,87 @@ struct LoweredElementTypeContext
                     };
                     if (handleUnsizedArrayAccess())
                         continue;
+                }
+                else if (auto param = as<IRParam>(ptrVal))
+                {
+                    // If we have a pointer type, we have a few issues:
+                    //
+                    // 1. Without specializing the addr-space of the
+                    // calling function, we do not know if we have a
+                    // UserSpace pointer to legalize (buffer type is
+                    // userspace). This means we may have a IRParam
+                    // that is used for groupshared only and we accidently
+                    // legalized the param to `Ptr<Data_natural,groupshared>`:
+                    //
+                    /*
+                    // Slang assumes `ptr` is `Ptr<Data, UserPointer>` until we
+                    // run our address-space legalization pass.
+                    // `foo` should be `Ptr<Data, Groupshared>` but is not until
+                    // later in our compile.
+                    //
+                    void foo(Data* ptr)
+                    {
+                        ...
+                    }
+                    [numthreads(3, 1, 1)]
+                    void computeMain(uint3 group_thread_id: SV_GroupThreadID)
+                    {
+                        shared = Data(1, 2);
+                        foo(&shared);
+                    }
+                    */
+                    //
+                    // 2. If we legalize, we cannot treat a pointer input as
+                    // "copy out on function return" since pointers modify
+                    // the original data during the function:
+                    /*
+                    // kernel 1
+                    void deadLoop(Data* ptr)
+                    {
+                        while(globalDataRunning())
+                        {
+                            coherentStore(ptr, coherentLoad(ptr)+1);
+                            ...
+                        }
+                    }
+
+                    // kernel 2
+                    void deadLoop(Data* ptr)
+                    {
+                        while(ptr[0] < 10)
+                        {
+                            // waits for 'kernel 1'
+                        }
+                    }
+                    */
+                    //
+                    // Therefore our solution is to convert all pointer types
+                    // to the expanded form (so we just take the performance cost
+                    // of unpack/repack upfront) to get code to compile.
+                    auto ptrType = as<IRPtrType>(param->getFullType());
+                    if (ptrType)
+                    {
+                        IRBuilder ptrBuilder(param);
+                        ptrBuilder.setInsertBefore(ptrType);
+                        // Permutation of all user-accessable pointers we need aliasing into
+                        constexpr AddressSpace addressSpacesOfAccessiblePointers[5] = {
+                            AddressSpace::Function,
+                            AddressSpace::ThreadLocal,
+                            AddressSpace::GroupShared,
+                            AddressSpace::StorageBuffer,
+                            AddressSpace::UserPointer};
+                        for (auto newAddrSpace : addressSpacesOfAccessiblePointers)
+                        {
+                            auto newPtrTypePermutation = ptrBuilder.getPtrType(
+                                ptrType->getValueType(),
+                                ptrType->getAccessQualifier(),
+                                newAddrSpace);
+                            if (typesThatWillOrHaveBeenProcessed.contains(newPtrTypePermutation))
+                                continue;
+                            typesThatWillOrHaveBeenProcessed.add(newPtrTypePermutation);
+                            bufferTypeInsts.add(BufferTypeInfo{newPtrTypePermutation, elementType});
+                        }
+                    }
                 }
 
                 LoweredElementTypeInfo loweredElementTypeInfo = {};
@@ -1552,13 +1643,24 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
     AddressSpace addrSpace = AddressSpace::Generic;
     if (auto ptrType = as<IRPtrTypeBase>(bufferType))
     {
+        // We are trying to group up type-rewrites
+        // that should share the same type. Input/Output
+        // can share; UserPointer, ThreadLocal, Groupshared,
+        // etc... can share
         switch (ptrType->getAddressSpace())
         {
         case AddressSpace::Input:
         case AddressSpace::Output:
             addrSpace = AddressSpace::Input;
             break;
-        case AddressSpace::UserPointer:
+
+        default:
+            // Not an actual UserPointer, these are
+            // conflict groups.
+            // This is needed since otherwise we have
+            // the issue where we re-write `groupshared T val = T(otherVal)`
+            // into `groupshared T2 val = T1(otherVal)`; we need to generate
+            // the same types for both use-sites.
             addrSpace = AddressSpace::UserPointer;
             break;
         }
