@@ -216,7 +216,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instruction's word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
@@ -3159,7 +3159,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (opCode == SpvOpUndef)
         {
             String e = "Unhandled inst in spirv-emit:\n" +
-                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                       dumpIRToString(
+                           inst,
+                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
             SLANG_UNIMPLEMENTED_X(e.getBuffer());
         }
 
@@ -3751,7 +3753,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3779,7 +3781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3960,6 +3962,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    SpvSelectionControlMask getSpvBranchSelectionControl(IRInst* inst)
+    {
+        if (inst->findDecorationImpl(kIROp_BranchDecoration))
+            return SpvSelectionControlDontFlattenMask;
+
+        if (inst->findDecorationImpl(kIROp_FlattenDecoration))
+            return SpvSelectionControlFlattenMask;
+
+        return SpvSelectionControlMaskNone;
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -3979,7 +3992,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
                 String e = "Unhandled local inst in spirv-emit:\n" +
-                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                           dumpIRToString(
+                               inst,
+                               {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
         case kIROp_Specialize:
@@ -4265,7 +4280,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    afterBlockID,
+                    getSpvBranchSelectionControl(ifelseInst));
                 auto falseLabel = ifelseInst->getFalseBlock();
                 result = emitOpBranchConditional(
                     parent,
@@ -4280,7 +4299,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    mergeBlockID,
+                    getSpvBranchSelectionControl(switchInst));
                 result = emitInstCustomOperandFunc(
                     parent,
                     inst,
@@ -4738,7 +4761,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // Couldn't handle
             String e = "Unhandled local inst in spirv-emit:\n" +
-                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                       dumpIRToString(
+                           inst,
+                           {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
             SLANG_UNIMPLEMENTED_X(e.getBuffer());
         }
     }
@@ -5725,7 +5750,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
             if (!isPhysicalType)
+            {
+                id++;
                 continue;
+            }
 
             // Emit explicit struct field layout decorations if the struct is physical.
             IRIntegerValue offset = 0;
@@ -6193,23 +6221,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "nv_viewport_mask")
                 {
-                    requireSPIRVCapability(SpvCapabilityPerViewAttributesNV);
-                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_mesh_shader"));
-                    return getBuiltinGlobalVar(
-                        inst->getFullType(),
-                        SpvBuiltInViewportMaskPerViewNV,
-                        inst);
+                    requireSPIRVCapability(SpvCapabilityShaderViewportMaskNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_viewport_array2"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInViewportMaskNV, inst);
                 }
                 else if (semanticName == "sv_barycentrics")
                 {
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    auto interpolationModeDecor =
+                        inst->findDecoration<IRInterpolationModeDecoration>();
+                    if (interpolationModeDecor &&
+                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordNoPerspKHR,
+                            inst);
+                    }
+                    else
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordKHR,
+                            inst);
+                    }
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
@@ -6218,6 +6256,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return getBuiltinGlobalVar(
                         inst->getFullType(),
                         SpvBuiltInCullPrimitiveEXT,
+                        inst);
+                }
+                else if (semanticName == "sv_fragsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragSizeEXT, inst);
+                }
+                else if (semanticName == "sv_fraginvocationcount")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(
+                        inst->getFullType(),
+                        SpvBuiltInFragInvocationCountEXT,
                         inst);
                 }
                 else if (semanticName == "sv_shadingrate")
@@ -7374,6 +7429,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isIntegralType(fromType));
         SLANG_ASSERT(isIntegralType(toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         const auto fromInfo = getIntTypeInfo(fromType);
         const auto toInfo = getIntTypeInfo(toType);
@@ -7491,7 +7552,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isFloatingType(fromType));
         SLANG_ASSERT(isFloatingType(toType));
-        SLANG_ASSERT(!isTypeEqual(fromType, toType));
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(inst->getOperand(0));
+            registerInst(inst, inner);
+            return inner;
+        }
 
         if (isMatrixCast)
         {
@@ -7756,7 +7822,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, operands are raw elements, we need to construct row vectors first,
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
-        auto matrixType = as<IRMatrixType>(inst->getDataType());
+        auto matrixType = cast<IRMatrixType>(inst->getDataType());
         auto rowCount = getIntVal(matrixType->getRowCount());
         auto colCount = getIntVal(matrixType->getColumnCount());
         IRBuilder builder(inst);

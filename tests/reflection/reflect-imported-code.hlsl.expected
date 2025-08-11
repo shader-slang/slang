@@ -41,7 +41,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         }
                     ]
                 },
@@ -58,11 +58,11 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                 }
             }
         },
@@ -103,7 +103,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         }
                     ]
                 },
@@ -120,11 +120,11 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                 }
             }
         }

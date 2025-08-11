@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
@@ -34,6 +35,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-detect-uninitialized-resources.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -60,6 +62,7 @@
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -108,6 +111,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -1101,6 +1105,8 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    detectUninitializedResources(irModule, sink);
+
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
         removeAvailableInDownstreamModuleDecorations(target, irModule);
@@ -1110,6 +1116,7 @@ Result linkAndOptimizeIR(
     {
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
+        checkForOutOfBoundAccess(irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
             checkForMissingReturns(irModule, sink, target, false);
@@ -1336,7 +1343,11 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
+    legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
     legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1708,6 +1719,12 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
+        // Transform struct parameters to use ConstRef for better performance
+        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
+            isMetalTarget(targetRequest))
+        {
+            transformParamsToConstRef(irModule, codeGenContext->getSink());
+        }
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
 #endif
@@ -2214,6 +2231,10 @@ SlangResult emitSPIRVFromIR(
 class SpirvInstructionHelper
 {
 public:
+    // The result id of the OpExtInstImport instruction, eg.g %2 below
+    // %2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+    uint32_t m_nonSemanticDebugInfoExtSetId = 0;
+
     // The index of the SPIRV words in the blob.
     // The first 5 words are the header as defined by the SPIRV spec.
     enum SpvWordIndex
@@ -2356,6 +2377,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,
         NonSemanticShaderDebugInfo100DebugLocalVariable,
+        NonSemanticShaderDebugInfo100DebugGlobalVariable,
         NonSemanticShaderDebugInfo100DebugInlinedVariable,
         NonSemanticShaderDebugInfo100DebugDeclare,
         NonSemanticShaderDebugInfo100DebugValue,
@@ -2400,6 +2422,15 @@ static SlangResult stripDbgSpirvFromArtifact(
                     return;
                 }
             }
+            else if (inst.getOpCode() == SpvOpExtInstImport)
+            {
+                // looking for result id of "OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+                auto importName = inst.getStringFromInst();
+                if (importName == "NonSemantic.Shader.DebugInfo.100")
+                {
+                    spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId = inst.getOperand(0);
+                }
+            }
         });
 
     // Iterate over the instructions from the artifact and add them to the list
@@ -2420,14 +2451,19 @@ static SlangResult stripDbgSpirvFromArtifact(
                     foundDebugString = true;
                 }
                 if (!foundDebugString)
+                {
                     return;
+                }
             }
             // Also check if the instruction is an extended instruction containing DebugInfo.
             if (inst.getOpCode() == SpvOpExtInst)
             {
-                // Ignore this if the instruction contains DebugInfo.
-                if (debugExtInstNumbers.contains(inst.getOperand(3)))
+                // Ignore this if the instruction contains DebugInfo and is from the debug import
+                if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
+                    inst.getOperand(2) == spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId)
+                {
                     return;
+                }
             }
             // Otherwise this is a non-debug instruction and should be included.
             spirvWordsList.addRange(

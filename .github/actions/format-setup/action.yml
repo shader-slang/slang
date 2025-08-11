@@ -8,7 +8,7 @@ runs:
     - name: install gersemi
       shell: bash
       run: |
-        pip3 install gersemi colorama
+        pip3 install gersemi==0.21 colorama
 
     - name: install clang-format
       shell: bash

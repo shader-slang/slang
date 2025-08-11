@@ -1,11 +1,11 @@
-//TEST:SIMPLE:
+//TEST:INTERPRET(filecheck=CHECK):
 
 func foo(f : functype (float) -> int) -> int{
     return f(0);
 }
 
 int bit<T>(T) {
-    return 1;
+    return 10;
 }
 
 int bit<T, let N : int>(vector<T, N>) {
@@ -13,6 +13,13 @@ int bit<T, let N : int>(vector<T, N>) {
 }
 
 int zit() {
-    // In an ideal world in this case we could infer that we want bit<T>
+    // even though foo is overloaded, we should still be able to infer that we want bit<T>
+    // based on the parameter (expected) type.
     return foo(bit<float>);
+}
+
+void main()
+{
+    // CHECK: 10
+    printf("%d\n", zit());
 }

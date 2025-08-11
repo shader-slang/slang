@@ -9,9 +9,9 @@
 
 
 //CHECK: "dir"
-//CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 16}
+//CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
 //CHECK: "color"
-//CHECK: "binding": {"kind": "uniform", "offset": 16, "size": 16}
+//CHECK: "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
 
 struct Params
 {

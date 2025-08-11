@@ -1921,9 +1921,7 @@ TokenList Lexer::lexAllTokens()
 
     MemoryArena arena;
 
-    RootNamePool rootNamePool;
     NamePool namePool;
-    namePool.setRootNamePool(&rootNamePool);
 
     lexer.initialize(sourceView, &sink, &namePool, &arena);
 

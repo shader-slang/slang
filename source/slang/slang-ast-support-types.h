@@ -1627,6 +1627,7 @@ FIDDLE() namespace Slang
     struct SpecializationArg
     {
         Val* val = nullptr;
+        Expr* expr = nullptr;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 

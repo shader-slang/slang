@@ -434,7 +434,20 @@ static bool _isSubCommand(const char* arg)
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
             for (auto line : lines)
             {
-                optionsOut->expectedFailureList.add(line);
+                // Remove comments (everything after '#' character)
+                auto trimmedLine = line;
+                auto commentIndex = line.indexOf('#');
+                if (commentIndex != -1)
+                {
+                    trimmedLine = line.head(commentIndex);
+                }
+
+                // Trim whitespace and skip empty lines
+                trimmedLine = trimmedLine.trim();
+                if (trimmedLine.getLength() > 0)
+                {
+                    optionsOut->expectedFailureList.add(trimmedLine);
+                }
             }
         }
         else if (strcmp(arg, "-test-dir") == 0)

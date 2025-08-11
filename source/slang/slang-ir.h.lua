@@ -3,6 +3,27 @@
 --
 
 -- Helper function
+-- Find instruction data by struct name
+local function findInstData(insts, struct_name)
+	local function search(tbl)
+		for _, i in ipairs(tbl) do
+			local key, value = next(i)
+			local inst_struct_name = value.struct_name or key
+			if inst_struct_name == struct_name then
+				return value
+			end
+			-- Recursively search nested instructions
+			local result = search(value)
+			if result then
+				return result
+			end
+		end
+		return nil
+	end
+
+	return search(insts)
+end
+
 -- Walk the instruction tree and call a callback for each instruction
 local function walk_instructions(insts, callback, parent_struct)
 	local function walk_insts(tbl, parent)
@@ -28,7 +49,7 @@ end
 -- The definitions for leaf instructions
 local leafInst = function(name, args)
 	args = args or {}
-	return args.noIsaImpl and ""
+	local result = args.noIsaImpl and ""
 			or [[static bool isaImpl(IROp op)
     {
         return (kIROpMask_OpMask & op) == kIROp_]]
@@ -38,12 +59,30 @@ local leafInst = function(name, args)
     enum { kOp = kIROp_]]
 			.. name
 			.. [[ }; ]]
+
+	-- Add getter methods if operands are specified
+	if args.operands then
+		for i, operand in ipairs(args.operands) do
+                        local operandName = operand[1]
+                        local operandType = operand[2]
+                        local getterName = "get" .. operandName:sub(1,1):upper() .. operandName:sub(2)
+                        local returnType = "IRInst"
+                        if operandType then
+                                returnType = operandType
+                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return (" .. returnType .. "*)getOperand(" .. (i-1) .. "); }"
+                        else
+                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return getOperand(" .. (i-1) .. "); }"
+                        end
+		end
+	end
+
+	return result
 end
 
 -- The definitions for abstract instruction classes
 local baseInst = function(name, args)
 	args = args or {}
-	return args.noIsaImpl and ""
+	local result = args.noIsaImpl and ""
 			or [[static bool isaImpl(IROp opIn)
     {
         const int op = (kIROpMask_OpMask & opIn);
@@ -53,6 +92,24 @@ local baseInst = function(name, args)
 			.. name
 			.. [[;
     }]]
+
+	-- Add getter methods if operands are specified
+	if args.operands then
+		for i, operand in ipairs(args.operands) do
+                        local operandName = operand[1]
+                        local operandType = operand[2]
+                        local getterName = "get" .. operandName:sub(1,1):upper() .. operandName:sub(2)
+                        local returnType = "IRInst"
+                        if operandType then
+                                returnType = operandType
+                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return (" .. returnType .. "*)getOperand(" .. (i-1) .. "); }"
+                        else
+                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return getOperand(" .. (i-1) .. "); }"
+                        end
+		end
+	end
+
+	return result
 end
 
 -- Generate struct definitions for instructions not defined by the user
@@ -124,13 +181,21 @@ local function instInfoEntries()
 
 	walk_instructions(insts, function(key, value, struct_name, parent_struct)
 		if value.is_leaf then
+			-- Calculate operand count from operands array or use min_operands as fallback
+			local operand_count = 0
+			if value.operands then
+				operand_count = #value.operands
+			elseif value.min_operands then
+				operand_count = value.min_operands
+			end
+
 			RAW(
 				"{kIROp_"
 				.. struct_name
 				.. ', {"'
 				.. value.mnemonic
 				.. '", '
-				.. tostring(value.min_operands)
+				.. tostring(operand_count)
 				.. ", "
 				.. constructFlags(value)
 				.. "}},"
@@ -179,6 +244,7 @@ local function instEnums()
 					RAW("    kIROp_Last" .. value.struct_name .. " = " .. child_last .. ",")
 				end
 			end
+			RAW("\n")
 		end
 
 		return first_child, last_child
@@ -190,10 +256,32 @@ end
 
 return {
 	leafInst = function(args)
-		return leafInst(tostring(fiddle.current_decl):gsub("^IR", ""), args)
+		-- Get the current instruction definition from the Lua data
+		local insts = require("source/slang/slang-ir-insts.lua").insts
+		local current_name = tostring(fiddle.current_decl):gsub("^IR", "")
+		local inst_data = findInstData(insts, current_name)
+
+		-- Merge the args with the instruction data
+		local merged_args = args or {}
+		if inst_data and inst_data.operands then
+			merged_args.operands = inst_data.operands
+		end
+
+		return leafInst(current_name, merged_args)
 	end,
 	baseInst = function(args)
-		return baseInst(tostring(fiddle.current_decl):gsub("^IR", ""), args)
+		-- Get the current instruction definition from the Lua data
+		local insts = require("source/slang/slang-ir-insts.lua").insts
+		local current_name = tostring(fiddle.current_decl):gsub("^IR", "")
+		local inst_data = findInstData(insts, current_name)
+
+		-- Merge the args with the instruction data
+		local merged_args = args or {}
+		if inst_data and inst_data.operands then
+			merged_args.operands = inst_data.operands
+		end
+
+		return baseInst(current_name, merged_args)
 	end,
 	allOtherInstStructs = allOtherInstStructs,
 	instStructForwardDecls = instStructForwardDecls,

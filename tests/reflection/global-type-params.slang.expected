@@ -107,7 +107,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                         },
                         {
                             "name": "v",
@@ -119,7 +119,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
                         },
                         {
                             "name": "w",
@@ -131,7 +131,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 32, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
                         }
                     ]
                 },
@@ -152,7 +152,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                             },
                             {
                                 "name": "v",
@@ -164,7 +164,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
                             },
                             {
                                 "name": "w",
@@ -176,11 +176,11 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 32, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 48}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 48, "elementStride": 0}
                 }
             }
         }

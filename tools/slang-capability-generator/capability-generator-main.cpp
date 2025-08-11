@@ -1063,10 +1063,38 @@ SlangResult generateDocumentation(
     setupDocumentationHeader(sbDoc, outPath);
 
     List<StringBuilder> sbDocSections = setupDocCommentHeaderStringBuilders();
+
+    // Group capabilities by header group and sort alphabetically within each group
+    List<List<RefPtr<CapabilityDef>>> capabilitiesByHeaderGroup;
+    capabilitiesByHeaderGroup.setCount((UInt)AutoDocHeaderGroup::Count);
+
+    // Collect capabilities into their respective header groups
     for (auto def : defs)
     {
-        printDocForCapabilityDef(sbDoc, def, sbDocSections);
+        if (!isInternalDef(def) && def->flavor != CapabilityFlavor::Abstract &&
+            def->docComment.headerGroup != AutoDocHeaderGroup::Invalid)
+        {
+            capabilitiesByHeaderGroup[(UInt)def->docComment.headerGroup].add(def);
+        }
     }
+
+    // Sort capabilities within each header group alphabetically by name
+    for (auto& capabilitiesInGroup : capabilitiesByHeaderGroup)
+    {
+        capabilitiesInGroup.sort([](const RefPtr<CapabilityDef>& a, const RefPtr<CapabilityDef>& b)
+                                 { return a->name < b->name; });
+    }
+
+    // Add sorted capabilities to documentation sections
+    for (UInt headerGroupIndex = 0; headerGroupIndex < (UInt)AutoDocHeaderGroup::Count;
+         headerGroupIndex++)
+    {
+        for (auto def : capabilitiesByHeaderGroup[headerGroupIndex])
+        {
+            printDocForCapabilityDef(sbDoc, def, sbDocSections);
+        }
+    }
+
     for (auto stringBuilder : sbDocSections)
         sbDoc << stringBuilder.toString();
     return 1;
@@ -1326,8 +1354,6 @@ SlangResult parseDefFile(
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
     Lexer lexer;
     NamePool namePool;
-    RootNamePool rootPool;
-    namePool.setRootNamePool(&rootPool);
     lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
 
     CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);

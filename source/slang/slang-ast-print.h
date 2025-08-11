@@ -154,7 +154,9 @@ public:
     void addDeclSignature(const DeclRef<Decl>& declRef);
 
     /// Add generic parameters
-    void addGenericParams(const DeclRef<GenericDecl>& genericDeclRef);
+    void addGenericParams(
+        const DeclRef<GenericDecl>& genericDeclRef,
+        List<Slang::Range<Index>>* outParamRanges = nullptr);
 
     /// Get the specified part type. Returns empty slice if not found
     UnownedStringSlice getPartSlice(Part::Type partType) const;

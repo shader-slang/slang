@@ -136,6 +136,13 @@ int innerMain(int argc, char** argv)
     TApp app;
 
     app.parseOption(argc, argv);
+
+    if (app.shouldShowHelp())
+    {
+        app.printUsage(argc > 0 ? argv[0] : "example");
+        return 0;
+    }
+
     if (SLANG_FAILED(app.initialize()))
     {
         return -1;

@@ -218,8 +218,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     TypeEqualityWitness* selfIsSelf =
         selfType ? visitor.createTypeEqualityWitness(selfType) : nullptr;
-    Facet selfFacet = new (arena)
-        Facet::Impl(selfFacetKind, Facet::Directness::Self, declRef, selfType, selfIsSelf);
+    Facet selfFacet = new (arena) Facet::Impl(
+        astBuilder,
+        selfFacetKind,
+        Facet::Directness::Self,
+        declRef,
+        selfType,
+        selfIsSelf);
     allFacets.add(selfFacet);
 
     // After the self facet will come a list of facets formed
@@ -253,8 +258,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // the base in the linearized inheritance list
         // we are building.
         //
-        baseInfo->facetImpl =
-            FacetImpl(kind, Facet::Directness::Direct, baseDeclRef, baseType, selfIsBaseWitness);
+        baseInfo->facetImpl = FacetImpl(
+            astBuilder,
+            kind,
+            Facet::Directness::Direct,
+            baseDeclRef,
+            baseType,
+            selfIsBaseWitness);
         Facet baseFacet(&baseInfo->facetImpl);
         //
         // Second, we have a list of the facets in the
@@ -848,13 +858,37 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             SubtypeWitness* baseIsSubtypeOfFacet = foundFacet->subtypeWitness;
 
-            auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
-                selfIsSubtypeOfBase,
-                baseIsSubtypeOfFacet);
+            // Check if this would create an unwanted struct->struct->interface conformance
+            // We want to prevent transitive witnesses of the form: struct Child -> struct Parent ->
+            // interface IFoo
+            bool shouldSkipTransitiveWitness = false;
 
-            indirectFacet->subtypeWitness = selfIsSubtypeOfFacet;
+            auto selfType = selfIsSubtypeOfBase->getSub();
+            auto baseType = selfIsSubtypeOfBase->getSup();
+            auto facetType = baseIsSubtypeOfFacet->getSup();
 
-            ioMergedFacets.add(indirectFacet);
+            if (selfType && baseType && facetType)
+            {
+                auto selfDeclRef = isDeclRefTypeOf<StructDecl>(selfType);
+                auto baseDeclRef = isDeclRefTypeOf<StructDecl>(baseType);
+                auto facetDeclRef = isDeclRefTypeOf<InterfaceDecl>(facetType);
+
+                // Only skip if we have struct->struct->interface
+                // and the struct->struct witness is not the identity witness
+                shouldSkipTransitiveWitness = selfDeclRef && baseDeclRef && facetDeclRef &&
+                                              !isTypeEqualityWitness(selfIsSubtypeOfBase);
+            }
+
+            if (!shouldSkipTransitiveWitness)
+            {
+                auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
+                    selfIsSubtypeOfBase,
+                    baseIsSubtypeOfFacet);
+
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+
+                ioMergedFacets.add(indirectFacet);
+            }
         }
 
         // We picked one `foundFacet` above to be added to the merged
@@ -1105,6 +1139,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         DirectBaseInfo leftBaseInfo;
         leftBaseInfo.facetImpl = FacetImpl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Direct,
             DeclRef<Decl>(),
@@ -1114,6 +1149,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
         DirectBaseInfo rightBaseInfo;
         rightBaseInfo.facetImpl = FacetImpl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Direct,
             DeclRef<Decl>(),
@@ -1143,6 +1179,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             getInheritanceInfo(eachType->getElementType(), circularityInfo);
         SemanticsVisitor visitor(this);
         auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Self,
             DeclRef<Decl>(),
@@ -1154,6 +1191,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (facet->directness == Facet::Directness::Direct)
             {
                 auto eachFacet = new (arena) Facet::Impl(
+                    astBuilder,
                     Facet::Kind::Type,
                     Facet::Directness::Direct,
                     facet->origin.declRef,
@@ -1182,6 +1220,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         SemanticsVisitor visitor(this);
         auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
             Facet::Kind::Type,
             Facet::Directness::Self,
             DeclRef<Decl>(),

@@ -23,7 +23,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                         },
                         {
                             "name": "at1",
@@ -87,7 +87,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                             },
                             {
                                 "name": "at1",
@@ -133,7 +133,7 @@ standard output = {
                     "bindings": [
                         {"kind": "shaderResource", "index": 0, "count": 2},
                         {"kind": "samplerState", "index": 0},
-                        {"kind": "uniform", "offset": 0, "size": 16}
+                        {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
                     ]
                 }
             }
@@ -157,7 +157,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                         },
                         {
                             "name": "bt",
@@ -205,7 +205,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                             },
                             {
                                 "name": "bt",
@@ -235,7 +235,7 @@ standard output = {
                     "bindings": [
                         {"kind": "shaderResource", "index": 0},
                         {"kind": "samplerState", "index": 0},
-                        {"kind": "uniform", "offset": 0, "size": 16}
+                        {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
                     ]
                 }
             }

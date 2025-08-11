@@ -21,8 +21,69 @@ namespace Slang
 namespace Fossil
 {
 
+// Deserializing data is an important place where security issues
+// can arise, so it is usually important to perform validation
+// checks throughout the process, and fail fast rather than
+// risk reading mal-formed data.
+//
+// However, validation typically comes at a performance cost,
+// and one of the key cases for serialization in Slang is loading
+// the core module from the `slang.dll` binary itself. In order
+// to measure how much performance is being lost to validation
+// checks, we provide a define that is intended to enable or
+// disable validation during deserialization.
+//
+#define SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS 1
+
+#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
+            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
+    } while (0)
+#else
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
+#endif
+
+// A commonly-occuring kind of validation check when reading
+// data in fossil format is asserting that some expected
+// piece of data is both *present* and has the expected
+// type/layout.
+//
+template<typename T>
+SLANG_FORCE_INLINE ValPtr<T> expectNonNullValOfType(AnyValPtr valPtr)
+{
+#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+    if (auto resultPtr = as<T>(valPtr))
+        return resultPtr;
+    SLANG_UNEXPECTED("invalid format encountered in serialized data");
+#else
+    return cast<T>(valPtr);
+#endif
+}
+
+// Some types can be encoded via a null pointer when they
+// are in their "default" state. For example, an empty
+// dictionary or array may be encoded as a null pointer
+// to a `FossilizedContainerObj`. We still expect a match
+// on the *format* in such cases.
+//
+template<typename T>
+SLANG_FORCE_INLINE ValPtr<T> expectPossiblyNullValOfType(AnyValPtr valPtr)
+{
+#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+    auto layout = valPtr.getLayout();
+    if (!layout || !T::isMatchingKind(layout->kind))
+    {
+        SLANG_UNEXPECTED("invalid format encountered in serialized data");
+    }
+#endif
+    return cast<T>(valPtr);
+}
+
 /// Serializer implementation for writing objects to a fossil-format blob.
-struct SerialWriter : ISerializerImpl
+struct SerialWriter
 {
 public:
     SerialWriter(ChunkBuilder* chunk);
@@ -75,12 +136,9 @@ private:
         {
         }
 
-        virtual ~LayoutObj() {}
-
         FossilizedValKind getKind() const { return kind; }
 
         Size getSize() const { return size; }
-        Size getAlignment() const { return alignment; }
 
         FossilizedValKind kind;
         Size size = 0;
@@ -133,6 +191,18 @@ private:
     class SimpleLayoutObj : public LayoutObj
     {
     public:
+        SimpleLayoutObj(FossilizedValKind kind, Size size, Size alignment)
+            : LayoutObj(kind, size, alignment)
+        {
+        }
+
+        //
+        // Note that for `SimpleLayoutObj` the default
+        // alignment is the same as the `size`, while
+        // for the base `LayoutObj` the default is
+        // one-byte alignment.
+        //
+
         SimpleLayoutObj(FossilizedValKind kind, Size size)
             : LayoutObj(kind, size, size)
         {
@@ -259,7 +329,7 @@ private:
         LayoutObj* ptrLayout = nullptr;
 
         /// Callback information used by the ISerializer interface.
-        Callback callback = nullptr;
+        SerializerCallback callback = nullptr;
         void* context = nullptr;
     };
 
@@ -501,62 +571,73 @@ private:
     void _pushState(LayoutObj* layout);
     void _popState();
 
-private:
+public:
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:
     //
 
-    virtual SerializationMode getMode() override;
+    SerializationMode getMode();
 
-    virtual void handleBool(bool& value) override;
+    void handleBool(bool& value);
 
-    virtual void handleInt8(int8_t& value) override;
-    virtual void handleInt16(int16_t& value) override;
-    virtual void handleInt32(Int32& value) override;
-    virtual void handleInt64(Int64& value) override;
+    void handleInt8(int8_t& value);
+    void handleInt16(int16_t& value);
+    void handleInt32(Int32& value);
+    void handleInt64(Int64& value);
 
-    virtual void handleUInt8(uint8_t& value) override;
-    virtual void handleUInt16(uint16_t& value) override;
-    virtual void handleUInt32(UInt32& value) override;
-    virtual void handleUInt64(UInt64& value) override;
+    void handleUInt8(uint8_t& value);
+    void handleUInt16(uint16_t& value);
+    void handleUInt32(UInt32& value);
+    void handleUInt64(UInt64& value);
 
-    virtual void handleFloat32(float& value) override;
-    virtual void handleFloat64(double& value) override;
+    void handleFloat32(float& value);
+    void handleFloat64(double& value);
 
-    virtual void handleString(String& value) override;
+    void handleString(String& value);
 
-    virtual void beginArray() override;
-    virtual void endArray() override;
+    struct Scope
+    {
+        // The `SerialWriter` implementation for fossil
+        // does not currently take advantage of the `Scope`
+        // facility provided by the serialization framework.
+        //
+        // If we *do* want to modify it to use that facility,
+        // then we can look to the `SerialReader` implementation
+        // for an example of how it can be used.
+    };
 
-    virtual void beginOptional() override;
-    virtual void endOptional() override;
 
-    virtual void beginDictionary() override;
-    virtual void endDictionary() override;
+    void beginArray(Scope& scope);
+    void endArray(Scope& scope);
 
-    virtual bool hasElements() override;
+    void beginOptional(Scope& scope);
+    void endOptional(Scope& scope);
 
-    virtual void beginTuple() override;
-    virtual void endTuple() override;
+    void beginDictionary(Scope& scope);
+    void endDictionary(Scope& scope);
 
-    virtual void beginStruct() override;
-    virtual void endStruct() override;
+    bool hasElements();
 
-    virtual void beginVariant() override;
-    virtual void endVariant() override;
+    void beginTuple(Scope& scope);
+    void endTuple(Scope& scope);
 
-    virtual void handleFieldKey(char const* name, Int index) override;
+    void beginStruct(Scope& scope);
+    void endStruct(Scope& scope);
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
+    void beginVariant(Scope& scope);
+    void endVariant(Scope& scope);
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
-        override;
+    void handleFieldKey(char const* name, Int index);
+
+    void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
+    void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
+
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 /// Serializer implementation for reading objects from a fossil-format blob.
-struct SerialReader : ISerializerImpl
+struct SerialReader
 {
 public:
     struct ReadContext;
@@ -595,57 +676,91 @@ private:
     /// A state that the reader can be in.
     struct State
     {
+        // Note: the exact order of declaration for the fields
+        // here can end up impacting the overall performance of
+        // deserialization, so be mindful when making changes.
+
         /// Type of state; related to the kind of value being read from.
+        ///
+        /// Most of these values are determined by the `FossilizedValKind`
+        /// of the parent/container that was pushed to create this state,
+        /// but the correspondance is not one-to-one. For example,
+        /// both `FossilizedValKind::ArrayObj` and `::DictinaryObj` map
+        /// to `State::Type::Container`.
+        ///
+        /// Reducing the number of distinct cases tracked here minimizes
+        /// the complexity of branches on the type of state.
         ///
         enum class Type
         {
-            Root,
-            Array,
-            Dictionary,
-            Optional,
-            Tuple,
-            Struct,
             Object,
-
+            Container,
+            Record,
             PseudoPtr,
         };
 
+        /// The pointers to the data and layout of the fossilized
+        /// value that will be read next.
+        ///
+        void* dataCursor = nullptr;
+        FossilizedValLayout const* layoutCursor = nullptr;
+
+        /// The field layout information for the next value to be read.
+        ///
+        /// This value is only used when `type == State::Type::Record`.
+        /// In that case, the `fieldCursor` can be used to locate
+        /// the layout for the next field (if their is one).
+        ///
+        FossilizedRecordElementLayout const* fieldCursor = nullptr;
+
+        /// The number of values that can still be read in this state.
+        ///
+        /// If the `remainingValueCount` field is zero, then the contents
+        /// of the remaining fields are irrelevant (and may hold stale
+        /// values rather than being cleared correctly).
+        ///
+        uint32_t remainingValueCount = 0;
+
+        /// A stride (in bytes) between values.
+        ///
+        /// This value is only used when `type == State::Type::Container`.
+        /// It should be set to zero for any other type of state.
+        ///
+        uint32_t dataStride = 0;
+
         /// The type of state.
-        Type type = Type::Root;
-
-        /// The fossilized value (data and layout) that is being read from.
-        ///
-        /// Depending on the `type` of state, this might either be the next value
-        /// that will be read (e.g., for the `Root` case), or it might be
-        /// a container that is a parent of the next value to be read.
-        ///
-        Fossil::AnyValPtr baseValPtr;
-
-        /// Index of next element to read.
-        ///
-        /// This is used in the case where `baseValue` is some kind of
-        /// container or record.
-        ///
-        Index elementIndex = 0;
-
-        /// Total number of values that can be read.
-        ///
-        /// If `baseValue` is a container, this is the element count.
-        /// If `baseValue` is a tuple/struct, this is the field count.
-        /// If `baseValue` is an optional, this is either zero or one.
-        /// If this state is a singleton case like `Root`, will be one.
-        ///
-        Count elementCount = 0;
+        Type type = Type::Object;
     };
 
     /// The current state.
     State _state;
 
-    /// Stack of saved states.
-    List<State> _stack;
+    SLANG_FORCE_INLINE State& getState() { return _state; }
 
+public:
     //
-    // Like other `ISerializerImpl`s for reading, we track objects
+    // The serialization protocol allows the back-end
+    // implementation to define a `Scope` type that will
+    // be passed into the paired `begin` and `end` operations.
+    //
+    // We define a scope type that is able to store a saved
+    // copy of the state of the `SerialReader`, which allows
+    // us to maintain a stack of states that gets stored on
+    // the run-time call stack, instead of requiring a
+    // heap-allocated container here.
+    //
+
+    struct Scope
+    {
+    private:
+        friend struct SerialReader;
+
+        State savedState;
+    };
+
+private:
+    //
+    // Like other serializer implementations for reading, we track objects
     // that are in the process of being read in, to avoid possible
     // unbounded recursion (and detect circularities when they
     // occur).
@@ -682,12 +797,15 @@ private:
 
         State savedState;
 
-        Callback callback;
+        SerializerCallback callback;
         void* context;
     };
 
-    void _pushState();
-    void _popState();
+    void _pushState(Scope& scope);
+    void _popState(Scope& scope);
+
+    void _pushContainerState(Scope& scope, Fossil::ValPtr<FossilizedContainerObjBase> containerPtr);
+    void _pushRecordState(Scope& scope, Fossil::ValPtr<FossilizedRecordVal> recordPtr);
 
 
     /// Execute all deferred actions that are still pending.
@@ -698,6 +816,10 @@ private:
     /// This is the case for scalars, tuples, and structs.
     ///
     Fossil::AnyValPtr _readValPtr();
+
+    /// Advance the read cursor.
+    ///
+    void _advanceCursor();
 
     /// Read an indirect value.
     ///
@@ -717,10 +839,16 @@ private:
 
 
     template<typename T>
-    void handleSimpleVal(T& value)
+    SLANG_FORCE_INLINE T _readSimpleVal()
     {
         auto valPtr = _readValPtr();
-        value = as<Fossilized<T>>(valPtr)->getDataRef();
+        return expectNonNullValOfType<Fossilized<T>>(valPtr)->getDataRef();
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE void _handleSimpleVal(T& value)
+    {
+        value = _readSimpleVal<T>();
     }
 
 public:
@@ -739,61 +867,212 @@ public:
     };
 
 
-private:
+public:
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:
     //
 
-    virtual SerializationMode getMode() override;
+    SerializationMode getMode();
 
-    virtual void handleBool(bool& value) override;
+    void handleBool(bool& value);
 
-    virtual void handleInt8(int8_t& value) override;
-    virtual void handleInt16(int16_t& value) override;
-    virtual void handleInt32(Int32& value) override;
-    virtual void handleInt64(Int64& value) override;
+    void handleInt8(int8_t& value);
+    void handleInt16(int16_t& value);
+    void handleInt32(Int32& value);
+    void handleInt64(Int64& value);
 
-    virtual void handleUInt8(uint8_t& value) override;
-    virtual void handleUInt16(uint16_t& value) override;
-    virtual void handleUInt32(UInt32& value) override;
-    virtual void handleUInt64(UInt64& value) override;
+    void handleUInt8(uint8_t& value);
+    void handleUInt16(uint16_t& value);
+    void handleUInt32(UInt32& value);
+    void handleUInt64(UInt64& value);
 
-    virtual void handleFloat32(float& value) override;
-    virtual void handleFloat64(double& value) override;
+    void handleFloat32(float& value);
+    void handleFloat64(double& value);
 
-    virtual void handleString(String& value) override;
+    void handleString(String& value);
 
-    virtual void beginArray() override;
-    virtual void endArray() override;
+    void beginArray(Scope& scope);
+    void endArray(Scope& scope);
 
-    virtual void beginDictionary() override;
-    virtual void endDictionary() override;
+    void beginDictionary(Scope& scope);
+    void endDictionary(Scope& scope);
 
-    virtual bool hasElements() override;
+    bool hasElements();
 
-    virtual void beginStruct() override;
-    virtual void endStruct() override;
+    void beginStruct(Scope& scope);
+    void endStruct(Scope& scope);
 
-    virtual void beginVariant() override;
-    virtual void endVariant() override;
+    void beginVariant(Scope& scope);
+    void endVariant(Scope& scope);
 
-    virtual void handleFieldKey(char const* name, Int index) override;
+    void handleFieldKey(char const* name, Int index);
 
-    virtual void beginTuple() override;
-    virtual void endTuple() override;
+    void beginTuple(Scope& scope);
+    void endTuple(Scope& scope);
 
-    virtual void beginOptional() override;
-    virtual void endOptional() override;
+    void beginOptional(Scope& scope);
+    void endOptional(Scope& scope);
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* context) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* context) override;
+    void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
+    void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* context)
-        override;
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 using ReadContext = SerialReader::ReadContext;
+
+SLANG_FORCE_INLINE Fossil::AnyValPtr SerialReader::readValPtr()
+{
+    return _readValPtr();
+}
+
+SLANG_FORCE_INLINE SerializationMode SerialReader::getMode()
+{
+    return SerializationMode::Read;
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleBool(bool& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleInt8(int8_t& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleInt16(int16_t& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleInt32(Int32& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleInt64(Int64& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleUInt8(uint8_t& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleUInt16(uint16_t& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleUInt32(UInt32& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleUInt64(UInt64& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleFloat32(float& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleFloat64(double& value)
+{
+    _handleSimpleVal(value);
+}
+
+SLANG_FORCE_INLINE void SerialReader::endArray(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE void SerialReader::endDictionary(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE bool SerialReader::hasElements()
+{
+    return getState().remainingValueCount != 0;
+}
+
+SLANG_FORCE_INLINE void SerialReader::endStruct(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE void SerialReader::endVariant(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleFieldKey(char const* name, Int index)
+{
+    // For now we are ignoring field keys, and treating
+    // structs as basically equivalent to tuples.
+    SLANG_UNUSED(name);
+    SLANG_UNUSED(index);
+}
+
+SLANG_FORCE_INLINE void SerialReader::endTuple(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE void SerialReader::endOptional(Scope& scope)
+{
+    _popState(scope);
+}
+
+SLANG_FORCE_INLINE void SerialReader::handleUniquePtr(
+    void*& value,
+    SerializerCallback callback,
+    void* context)
+{
+    //  We treat all pointers as shared pointers, because there isn't really
+    //  an optimized representation we would want to use for the unique case.
+    //
+    handleSharedPtr(value, callback, context);
+}
+
+SLANG_FORCE_INLINE void SerialReader::_pushState(Scope& scope)
+{
+    scope.savedState = _state;
+    _state = State();
+}
+
+SLANG_FORCE_INLINE void SerialReader::_popState(Scope& scope)
+{
+    _state = scope.savedState;
+}
+
+SLANG_FORCE_INLINE Fossil::AnyValPtr SerialReader::_readValPtr()
+{
+    SLANG_ASSERT(_state.remainingValueCount > 0);
+
+    // The rest of the `SerialReader` implementation conspires
+    // to set things up so that the `dataCursor` and `layoutCursor`
+    // stored in `_state` will always represent the next value
+    // to be read, so the logic to determine the result of
+    // this function is trivial.
+    //
+    auto dataPtr = _state.dataCursor;
+    auto layoutPtr = _state.layoutCursor;
+
+    // Currently, the logic to advance the cursor(s) to the next
+    // value is more complicated, and thus it isn't included in
+    // the inlined part of the function.
+    //
+    _advanceCursor();
+
+    return AnyValPtr(dataPtr, layoutPtr);
+}
 
 } // namespace Fossil
 } // namespace Slang

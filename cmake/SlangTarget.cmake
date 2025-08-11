@@ -41,7 +41,7 @@ function(slang_add_target dir type)
         # building respectively
         EXPORT_MACRO_PREFIX
         # Ignore target type and use a particular style of export macro
-        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT
         # pass in STATIC or SHARED
         EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS

@@ -1,0 +1,2 @@
+Completion:
+  HeaderInsertion: Never # This repo does not follow include-what-you-use.

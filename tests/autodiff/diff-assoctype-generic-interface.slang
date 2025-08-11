@@ -1,6 +1,7 @@
 // Test calling differentiable function through dynamic dispatch.
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -compile-arg -skip-spirv-validation -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[2 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -15,6 +16,7 @@ struct GetterImpl : IGetter
 {
     float[8] data;
 
+    [Differentiable]
     __init(float[8] data)
     { this.data = data; }
 

@@ -943,7 +943,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifierWithBindingKinds(
     case LayoutResourceKind::SpecializationConstant:
         m_writer->emit("layout(constant_id = ");
         m_writer->emit(index);
-        m_writer->emit(")\n");
+        m_writer->emit(")\nconst ");
         break;
 
     case LayoutResourceKind::ConstantBuffer:
@@ -1245,6 +1245,14 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     else if (name == "gl_PrimitiveShadingRateEXT")
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
+    }
+    else if (name == "gl_FragSizeEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_invocation_density"));
+    }
+    else if (name == "gl_FragInvocationCountEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_invocation_density"));
     }
     else if (name == "gl_DrawID")
     {
@@ -2726,6 +2734,23 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 return true;
             }
             break;
+        }
+    case kIROp_CastPtrToInt:
+    case kIROp_CastIntToPtr:
+    case kIROp_PtrCast:
+        {
+            // For GLSL, emit constructor-style casts instead of C-style casts
+            auto prec = getInfo(EmitOp::Postfix);
+            EmitOpInfo outerPrec = inOuterPrec; // Make a mutable copy
+            bool needClose = maybeEmitParens(outerPrec, prec);
+
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+
+            maybeCloseParens(needClose);
+            return true;
         }
     default:
         break;
