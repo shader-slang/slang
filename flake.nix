@@ -17,6 +17,9 @@
           inherit system;
           config.allowUnfree = true; # Necessary for CUDA.
         };
+
+        # CUDA is not supported on all platforms, e.g. macOS.
+        cuda = if pkgs.stdenv.hostPlatform.isLinux then pkgs.cudatoolkit else pkgs.emptyDirectory;
       in
       {
         # We want to use Clang instead of GCC because it seems to behave better
@@ -49,7 +52,7 @@
             pkgs.python3
 
             # Needed for running some of the tests.
-            pkgs.cudatoolkit
+            cuda
             pkgs.xorg.libX11
 
             # Other useful tools.
@@ -62,7 +65,7 @@
 
           # Needed for running some of the tests.
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
-            pkgs.cudatoolkit
+            cuda
             pkgs.vulkan-loader
           ];
         };
