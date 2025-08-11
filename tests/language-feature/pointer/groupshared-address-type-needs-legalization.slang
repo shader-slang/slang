@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 
-// Tests if we handle passing groupshared address space pointers with fields correctly.
+// Tests if we handle passing groupshared address-space pointers correctly to a function
+// when that data-type needs legalization (Data -> Data_natural due to `lower-buffer-element-type`).
 // CHECK: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 0
