@@ -446,7 +446,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // there is a format conversion required between the type associated by the resource and
             // the backing ImageFormat. Currently this is only implemented on CUDA, where there are
             // specialized versions of the RWTexture writes that will do a format conversion.
-            if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
+            if (m_emitter->getTarget() == CodeGenTarget::CUDASource || m_emitter->getTarget() == CodeGenTarget::CUDAHeader)
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
 
