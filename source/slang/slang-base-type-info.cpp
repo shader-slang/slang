@@ -89,7 +89,7 @@ namespace Slang
     case BaseType::MemoryScope:
         return UnownedStringSlice::fromLiteral("MemoryScope");
     case BaseType::AccessQualifier:
-        return UnownedStringSlice::fromLiteral("AccessQualifier");
+        return UnownedStringSlice::fromLiteral("Access");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");

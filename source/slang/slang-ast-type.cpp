@@ -501,10 +501,10 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     switch (accessQualifier)
     {
     case AccessQualifier::ReadWrite:
-        out << toSlice(", readwrite");
+        out << toSlice(", Access::ReadWrite");
         break;
     case AccessQualifier::Read:
-        out << toSlice(", read");
+        out << toSlice(", Access::Read");
         break;
     default:
         break;
@@ -515,10 +515,7 @@ void PtrType::_toTextOverride(StringBuilder& out)
 {
     auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
-    if (addrSpace == AddressSpace::Generic)
-        out << toSlice("Addr<") << getValueType();
-    else
-        out << toSlice("Ptr<") << getValueType();
+    out << toSlice("Ptr<") << getValueType();
     maybePrintAccessQualifierOperand(out, accessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
