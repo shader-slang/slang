@@ -13,7 +13,10 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true; # Necessary for CUDA.
+        };
       in
       {
         # We want to use Clang instead of GCC because it seems to behave better
@@ -39,16 +42,28 @@
               }
             ])
 
+            # Needed for building.
             pkgs.clang
             pkgs.cmake
+            pkgs.ninja
+            pkgs.python3
+
+            # Needed for running some of the tests.
+            pkgs.cudatoolkit
+            pkgs.xorg.libX11
+
+            # Other useful tools.
             pkgs.gersemi
             pkgs.lldb
-            pkgs.ninja
             pkgs.nixfmt-rfc-style
             pkgs.prettier
-            pkgs.python3
             pkgs.shfmt
-            pkgs.xorg.libX11
+          ];
+
+          # Needed for running some of the tests.
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.cudatoolkit
+            pkgs.vulkan-loader
           ];
         };
       }
