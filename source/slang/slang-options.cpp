@@ -2010,7 +2010,14 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         auto catArg = m_reader.getArgAndAdvance();
 
         categoryIndex =
-            m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+            m_cmdOptions->findCategoryByName(catArg.value.getUnownedSlice());
+
+        if (categoryIndex < 0)
+        {
+            categoryIndex =
+                m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        }
+
         if (categoryIndex < 0)
         {
             m_sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
