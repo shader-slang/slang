@@ -3203,11 +3203,11 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             }
 
             builder.setInsertInto(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
-            for (auto inst = funcFirstBlock->getFirstOrdinaryInst(); inst;
-                 inst = inst->getNextInst())
+            for (auto _inst = funcFirstBlock->getFirstOrdinaryInst(); _inst;
+                 _inst = _inst->getNextInst())
             {
                 // Clone the instructions in the first block.
-                cloneInst(&cloneEnv, &builder, inst);
+                cloneInst(&cloneEnv, &builder, _inst);
             }
 
             for (auto block : returnedFunc->getBlocks())
