@@ -2189,11 +2189,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(
-            ArtifactDesc::make(
-                ArtifactKind::Json,
-                ArtifactPayload::SourceMap,
-                ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+            ArtifactKind::Json,
+            ArtifactPayload::SourceMap,
+            ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 

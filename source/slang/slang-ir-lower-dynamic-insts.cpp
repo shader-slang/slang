@@ -34,7 +34,7 @@ struct Element
         validateElement();
     }
 
-    bool validateElement() const
+    void validateElement() const
     {
         switch (context->getOp())
         {
@@ -243,7 +243,7 @@ struct WorkQueue
 {
     List<WorkItem> enqueueList;
     List<WorkItem> dequeueList;
-    UIndex dequeueIndex = 0;
+    Index dequeueIndex = 0;
 
     void enqueue(const WorkItem& item) { enqueueList.add(item); }
 
@@ -515,7 +515,7 @@ struct DynamicInstLoweringContext
             }
 
             // If user is a return instruction, handle function return propagation
-            if (auto returnInst = as<IRReturn>(user))
+            if (as<IRReturn>(user))
             {
                 updateFuncReturnInfo(context, info, workQueue);
             }
@@ -818,6 +818,7 @@ struct DynamicInstLoweringContext
 
     IRInst* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
     {
+        SLANG_UNUSED(context);
         if (auto interfaceType = as<IRInterfaceType>(inst->getDataType()))
         {
             if (isComInterfaceType(interfaceType) || isBuiltin(interfaceType))
@@ -840,8 +841,6 @@ struct DynamicInstLoweringContext
     IRInst* analyzeMakeExistential(IRInst* context, IRMakeExistential* inst)
     {
         auto witnessTable = inst->getWitnessTable();
-        auto value = inst->getWrappedValue();
-        auto valueType = value->getDataType();
 
         // If we're building an existential for a COM pointer,
         // we won't try to lower that.
@@ -877,11 +876,11 @@ struct DynamicInstLoweringContext
         for (auto field : structType->getFields())
         {
             auto operand = makeStruct->getOperand(operandIndex);
-            if (auto fieldInfo = tryGetInfo(context, operand))
+            if (auto operandInfo = tryGetInfo(context, operand))
             {
                 IRInst* existingInfo = nullptr;
                 this->fieldInfo.tryGetValue(field, existingInfo);
-                auto newInfo = unionPropagationInfo(existingInfo, fieldInfo);
+                auto newInfo = unionPropagationInfo(existingInfo, operandInfo);
                 if (newInfo && !areInfosEqual(existingInfo, newInfo))
                 {
                     // Update the field info map
@@ -930,9 +929,8 @@ struct DynamicInstLoweringContext
                     {
                         auto tables = collectExistentialTables(interfaceType);
                         if (tables.getCount() > 0)
-                            return makeExistential(
-                                as<IRTableCollection>(
-                                    createCollection(kIROp_TableCollection, tables)));
+                            return makeExistential(as<IRTableCollection>(
+                                createCollection(kIROp_TableCollection, tables)));
                         else
                             return none();
                     }
@@ -1030,7 +1028,6 @@ struct DynamicInstLoweringContext
 
                 if (this->fieldInfo.containsKey(structField))
                 {
-                    IRBuilder builder(module);
                     return builder.getPtrTypeWithAddressSpace(
                         (IRType*)this->fieldInfo[structField],
                         as<IRPtrTypeBase>(fieldAddress->getDataType()));
@@ -1055,7 +1052,6 @@ struct DynamicInstLoweringContext
 
             if (this->fieldInfo.containsKey(structField))
             {
-                IRBuilder builder(module);
                 return this->fieldInfo[structField];
             }
         }
@@ -1136,6 +1132,8 @@ struct DynamicInstLoweringContext
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
             return cast<IRTypeCollection>(taggedUnion->getOperand(0));
+
+        return none();
     }
 
     IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
@@ -1162,7 +1160,7 @@ struct DynamicInstLoweringContext
             bool needsTag = false;
 
             List<IRInst*> specializationArgs;
-            for (auto i = 0; i < inst->getArgCount(); ++i)
+            for (UInt i = 0; i < inst->getArgCount(); ++i)
             {
                 // For concrete args, add as-is.
                 if (isGlobalInst(inst->getArg(i)))
@@ -1247,15 +1245,15 @@ struct DynamicInstLoweringContext
                 {
                     SLANG_ASSERT(getCollectionCount(tag) == 1);
                     auto specializeInst = cast<IRSpecialize>(getCollectionElement(tag, 0));
-                    auto funcType = cast<IRFuncType>(specializeGeneric(specializeInst));
-                    typeOfSpecialization = funcType;
+                    auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
+                    typeOfSpecialization = specializedFuncType;
                 }
                 else if (auto collection = as<IRCollectionBase>(typeInfo))
                 {
                     SLANG_ASSERT(getCollectionCount(collection) == 1);
                     auto specializeInst = cast<IRSpecialize>(getCollectionElement(collection, 0));
-                    auto funcType = cast<IRFuncType>(specializeGeneric(specializeInst));
-                    typeOfSpecialization = funcType;
+                    auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
+                    typeOfSpecialization = specializedFuncType;
                 }
                 else
                 {
@@ -1332,7 +1330,7 @@ struct DynamicInstLoweringContext
                     // first generic block.
                     //
                     IRParam* param = generic->getFirstBlock()->getFirstParam();
-                    for (auto index = 0; index < specialize->getArgCount() && param;
+                    for (UInt index = 0; index < specialize->getArgCount() && param;
                          ++index, param = param->getNextParam())
                     {
                         // Map the specialization argument to the corresponding parameter
@@ -1377,8 +1375,6 @@ struct DynamicInstLoweringContext
     {
         auto callee = inst->getCallee();
         auto calleeInfo = tryGetInfo(context, callee);
-
-        auto funcType = as<IRFuncType>(callee->getDataType());
 
         //
         // Propagate the input judgments to the call & append a work item
@@ -1455,7 +1451,6 @@ struct DynamicInstLoweringContext
             // If this is a field address, update the fieldInfos map.
             if (auto thisPtrInfo = as<IRPtrTypeBase>(info))
             {
-                auto thisValueType = thisPtrInfo->getValueType();
                 IRBuilder builder(module);
                 auto baseStructPtrType = as<IRPtrTypeBase>(fieldAddress->getBase()->getDataType());
                 auto baseStructType = as<IRStructType>(baseStructPtrType->getValueType());
@@ -1524,7 +1519,7 @@ struct DynamicInstLoweringContext
             return;
 
         // Collect propagation info for each argument and update corresponding parameter
-        Index paramIndex = 0;
+        UInt paramIndex = 0;
         for (auto param : successorBlock->getParams())
         {
             if (paramIndex < unconditionalBranch->getArgCount())
@@ -1580,14 +1575,12 @@ struct DynamicInstLoweringContext
             SLANG_UNEXPECTED("Unexpected context type for parameter info retrieval");
         }
 
-        UIndex idx = 0;
         for (auto param : func->getParams())
         {
             if (auto newType = tryGetInfo(context, param))
                 effectiveTypes.add((IRType*)newType);
             else
                 effectiveTypes.add(param->getDataType());
-            idx++;
         }
 
         return effectiveTypes;
@@ -1662,7 +1655,7 @@ struct DynamicInstLoweringContext
                 if (!firstBlock)
                     return;
 
-                Index argIndex = 1; // Skip callee (operand 0)
+                UInt argIndex = 1; // Skip callee (operand 0)
                 for (auto param : firstBlock->getParams())
                 {
                     if (argIndex < callInst->getOperandCount())
@@ -1844,18 +1837,16 @@ struct DynamicInstLoweringContext
 
         if (as<IRCollectionTaggedUnionType>(info1) && as<IRCollectionTaggedUnionType>(info2))
         {
-            return makeExistential(
-                unionCollection<IRTableCollection>(
-                    cast<IRTableCollection>(info1->getOperand(1)),
-                    cast<IRTableCollection>(info2->getOperand(1))));
+            return makeExistential(unionCollection<IRTableCollection>(
+                cast<IRTableCollection>(info1->getOperand(1)),
+                cast<IRTableCollection>(info2->getOperand(1))));
         }
 
         if (as<IRCollectionTagType>(info1) && as<IRCollectionTagType>(info2))
         {
-            return makeTagType(
-                unionCollection<IRCollectionBase>(
-                    cast<IRCollectionBase>(info1->getOperand(0)),
-                    cast<IRCollectionBase>(info2->getOperand(0))));
+            return makeTagType(unionCollection<IRCollectionBase>(
+                cast<IRCollectionBase>(info1->getOperand(0)),
+                cast<IRCollectionBase>(info2->getOperand(0))));
         }
 
         if (as<IRCollectionBase>(info1) && as<IRCollectionBase>(info2))
@@ -1870,6 +1861,7 @@ struct DynamicInstLoweringContext
 
     IRTypeFlowData* analyzeDefault(IRInst* context, IRInst* inst)
     {
+        SLANG_UNUSED(context);
         // Check if this is a global concrete type, witness table, or function.
         // If so, it's a concrete element. We'll create a singleton set for it.
         if (isGlobalInst(inst) &&
@@ -1903,7 +1895,6 @@ struct DynamicInstLoweringContext
         for (auto inst : block->getChildren())
             instsToLower.add(inst);
 
-        UIndex paramIndex = 0;
         for (auto inst : instsToLower)
         {
             hasChanges |= lowerInst(context, inst);
@@ -2041,10 +2032,9 @@ struct DynamicInstLoweringContext
         auto tableCollection = cast<IRTableCollection>(taggedUnion->getOperand(1));
 
         if (getCollectionCount(typeCollection) == 1)
-            return builder.getTupleType(
-                List<IRType*>(
-                    {(IRType*)makeTagType(tableCollection),
-                     (IRType*)getCollectionElement(typeCollection, 0)}));
+            return builder.getTupleType(List<IRType*>(
+                {(IRType*)makeTagType(tableCollection),
+                 (IRType*)getCollectionElement(typeCollection, 0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)makeTagType(tableCollection), (IRType*)typeCollection}));
@@ -2172,7 +2162,7 @@ struct DynamicInstLoweringContext
             return lowerGetSequentialID(context, as<IRGetSequentialID>(inst));
         default:
             {
-                if (auto info = tryGetInfo(context, inst))
+                if (tryGetInfo(context, inst))
                     return replaceType(context, inst);
                 return false;
             }
@@ -2273,6 +2263,8 @@ struct DynamicInstLoweringContext
 
     bool lowerExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
     {
+        SLANG_UNUSED(context);
+
         auto existential = inst->getOperand(0);
         auto existentialInfo = existential->getDataType();
         if (isTaggedUnionType(existentialInfo))
@@ -2352,7 +2344,6 @@ struct DynamicInstLoweringContext
             return builder->getConstRefType(type);
         default:
             SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
-            return nullptr;
         }
     }
 
@@ -2404,15 +2395,13 @@ struct DynamicInstLoweringContext
         {
             IRBuilder builder(module);
             // Merge the elements of both tagged unions into a new tuple type
-            return builder.getTupleType(
-                List<IRType*>(
-                    {(IRType*)makeTagType(
-                         as<IRCollectionBase>(updateType(
-                             (IRType*)currentType->getOperand(0)->getOperand(0),
-                             (IRType*)newType->getOperand(0)->getOperand(0)))),
-                     (IRType*)updateType(
-                         (IRType*)currentType->getOperand(1),
-                         (IRType*)newType->getOperand(1))}));
+            return builder.getTupleType(List<IRType*>(
+                {(IRType*)makeTagType(as<IRCollectionBase>(updateType(
+                     (IRType*)currentType->getOperand(0)->getOperand(0),
+                     (IRType*)newType->getOperand(0)->getOperand(0)))),
+                 (IRType*)updateType(
+                     (IRType*)currentType->getOperand(1),
+                     (IRType*)newType->getOperand(1))}));
         }
         else // Need to create a new collection.
         {
@@ -2436,7 +2425,7 @@ struct DynamicInstLoweringContext
         List<IRType*> paramTypes;
         IRType* resultType = nullptr;
 
-        auto updateParamType = [&](UInt index, IRType* paramType) -> IRType*
+        auto updateParamType = [&](Index index, IRType* paramType) -> IRType*
         {
             if (paramTypes.getCount() <= index)
             {
@@ -2479,7 +2468,7 @@ struct DynamicInstLoweringContext
             auto paramEffectiveTypes = getParamEffectiveTypes(context);
             auto paramDirections = getParamDirections(context);
 
-            for (UInt i = 0; i < paramEffectiveTypes.getCount(); i++)
+            for (Index i = 0; i < paramEffectiveTypes.getCount(); i++)
                 updateParamType(i, getLoweredType(paramEffectiveTypes[i]));
 
             auto returnType = getFuncReturnInfo(context);
@@ -2748,7 +2737,6 @@ struct DynamicInstLoweringContext
             const auto [paramDirection, paramType] =
                 getParameterDirectionAndType(expectedFuncType->getParamType(i + extraArgCount));
 
-            IRInst* newArg = nullptr;
             switch (paramDirection)
             {
             case kParameterDirection_In:
@@ -2771,13 +2759,13 @@ struct DynamicInstLoweringContext
         builder.setInsertBefore(inst);
 
         bool changed = false;
-        if (newArgs.getCount() != inst->getArgCount())
+        if (((UInt)newArgs.getCount()) != inst->getArgCount())
             changed = true;
         else
         {
-            for (UInt i = 0; i < newArgs.getCount(); i++)
+            for (Index i = 0; i < newArgs.getCount(); i++)
             {
-                if (newArgs[i] != inst->getArg(i))
+                if (newArgs[i] != inst->getArg((UInt)i))
                 {
                     changed = true;
                     break;
@@ -3045,6 +3033,7 @@ struct DynamicInstLoweringContext
 
     bool lowerGetValueFromBoundInterface(IRInst* context, IRGetValueFromBoundInterface* inst)
     {
+        SLANG_UNUSED(context);
         auto destType = inst->getDataType();
         auto operandInfo = inst->getOperand(0)->getDataType();
         if (auto taggedUnionTupleType = as<IRTupleType>(operandInfo))
@@ -3105,6 +3094,7 @@ struct DynamicInstLoweringContext
 
     bool handleDefaultStore(IRInst* context, IRStore* inst)
     {
+        SLANG_UNUSED(context);
         SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
         auto ptr = inst->getPtr();
         auto destInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
@@ -3124,8 +3114,6 @@ struct DynamicInstLoweringContext
     {
         auto ptr = inst->getPtr();
         auto ptrInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
-
-        auto valInfo = inst->getVal()->getDataType();
 
         // Special case for default initialization:
         //
@@ -3151,6 +3139,7 @@ struct DynamicInstLoweringContext
 
     bool lowerGetSequentialID(IRInst* context, IRGetSequentialID* inst)
     {
+        SLANG_UNUSED(context);
         auto arg = inst->getOperand(0);
         if (auto tagType = as<IRCollectionTagType>(arg->getDataType()))
         {
@@ -3350,7 +3339,7 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
 
     // Create parameters for the original function arguments
     List<IRInst*> originalParams;
-    for (UInt i = 0; i < innerParamTypes.getCount(); i++)
+    for (Index i = 0; i < innerParamTypes.getCount(); i++)
     {
         originalParams.add(builder.emitParam(innerParamTypes[i]));
     }
@@ -3391,7 +3380,7 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
 
             List<IRInst*> callArgs;
             auto wrappedFuncType = as<IRFuncType>(wrapperFunc->getDataType());
-            for (UIndex ii = 0; ii < originalParams.getCount(); ii++)
+            for (Index ii = 0; ii < originalParams.getCount(); ii++)
             {
                 callArgs.add(originalParams[ii]);
             }
@@ -3691,6 +3680,7 @@ struct CollectionLoweringContext : public InstPassBase
 
 void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
     CollectionLoweringContext context(module);
     context.processModule();
 }
@@ -3704,7 +3694,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
-        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
+        SLANG_UNUSED(cast<IRInterfaceType>(inst->getOperand(0)));
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
@@ -3719,7 +3709,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
-                auto witnessTable = cast<IRWitnessTable>(table);
+                SLANG_UNUSED(cast<IRWitnessTable>(table));
                 auto outputId = dstSeqID++;
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
@@ -3743,7 +3733,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
     void lowerGetSequentialIDFromTag(IRGetSequentialIDFromTag* inst)
     {
-        auto srcInterfaceType = cast<IRInterfaceType>(inst->getOperand(0));
+        SLANG_UNUSED(cast<IRInterfaceType>(inst->getOperand(0)));
         auto srcTagInst = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
@@ -3758,7 +3748,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
-                auto witnessTable = cast<IRWitnessTable>(table);
+                SLANG_UNUSED(cast<IRWitnessTable>(table));
                 auto outputId = dstSeqID++;
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
@@ -3793,12 +3783,14 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
     SequentialIDTagLoweringContext context(module);
     context.processModule();
 }
 
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
 {
+    SLANG_UNUSED(sink);
     TagOpsLoweringContext tagContext(module);
     tagContext.processModule();
 }
