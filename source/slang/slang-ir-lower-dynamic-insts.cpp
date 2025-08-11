@@ -128,8 +128,8 @@ struct WorkItem
     enum class Type
     {
         None,      // Invalid
-        Inst,      // Propagate through a single instruction
-        Block,     // Propagate information within a block
+        Inst,      // Propagate through a single instruction.
+        Block,     // Propagate through each instruction in a block.
         IntraProc, // Propagate through within-function edge (IREdge)
         InterProc  // Propagate across function call/return (InterproceduralEdge)
     };
@@ -407,14 +407,6 @@ struct DynamicInstLoweringContext
     }
 
     IRTypeFlowData* none() { return nullptr; }
-
-    // Helper to convert collection to HashSet
-    HashSet<IRInst*> collectionToHashSet(IRCollectionBase* info)
-    {
-        HashSet<IRInst*> result;
-        forEachInCollection(info, [&](IRInst* element) { result.add(element); });
-        return result;
-    }
 
     IRInst* tryGetInfo(Element element)
     {
@@ -1501,11 +1493,12 @@ struct DynamicInstLoweringContext
         }
         else if (auto var = as<IRVar>(inst))
         {
+            // If we hit a local var, we'll update it's info.
             updateInfo(context, var, info, workQueue);
         }
         else
         {
-            // Do nothing..
+            // If we hit something unsupported, assume no information.
             return;
         }
     }
