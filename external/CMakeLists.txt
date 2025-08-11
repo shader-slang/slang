@@ -82,7 +82,7 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
 endif()
 
 # Vulkan headers
-if (NOT DEFINED VULKAN_HEADERS_SOURCE_DIR)
+if (NOT TARGET Vulkan::Headers)
     if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
         if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
             add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
@@ -105,7 +105,7 @@ target_include_directories(
 )
 
 # SPIRV-Headers
-if (NOT DEFINED SPIRV-Headers_SOURCE_DIR)
+if (NOT TARGET SPIRV-Headers)
     if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
         if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
             message(
