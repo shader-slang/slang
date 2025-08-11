@@ -3753,7 +3753,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3781,7 +3781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3960,6 +3960,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         default:
             return false;
         }
+    }
+
+    SpvSelectionControlMask getSpvBranchSelectionControl(IRInst* inst)
+    {
+        if (inst->findDecorationImpl(kIROp_BranchDecoration))
+            return SpvSelectionControlDontFlattenMask;
+
+        if (inst->findDecorationImpl(kIROp_FlattenDecoration))
+            return SpvSelectionControlFlattenMask;
+
+        return SpvSelectionControlMaskNone;
     }
 
     // The instructions that appear inside the basic blocks of
@@ -4269,7 +4280,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    afterBlockID,
+                    getSpvBranchSelectionControl(ifelseInst));
                 auto falseLabel = ifelseInst->getFalseBlock();
                 result = emitOpBranchConditional(
                     parent,
@@ -4284,7 +4299,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    mergeBlockID,
+                    getSpvBranchSelectionControl(switchInst));
                 result = emitInstCustomOperandFunc(
                     parent,
                     inst,
@@ -6211,11 +6230,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    auto interpolationModeDecor =
+                        inst->findDecoration<IRInterpolationModeDecoration>();
+                    if (interpolationModeDecor &&
+                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordNoPerspKHR,
+                            inst);
+                    }
+                    else
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordKHR,
+                            inst);
+                    }
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
@@ -6224,6 +6256,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return getBuiltinGlobalVar(
                         inst->getFullType(),
                         SpvBuiltInCullPrimitiveEXT,
+                        inst);
+                }
+                else if (semanticName == "sv_fragsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragSizeEXT, inst);
+                }
+                else if (semanticName == "sv_fraginvocationcount")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(
+                        inst->getFullType(),
+                        SpvBuiltInFragInvocationCountEXT,
                         inst);
                 }
                 else if (semanticName == "sv_shadingrate")

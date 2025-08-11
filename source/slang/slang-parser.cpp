@@ -118,10 +118,6 @@ public:
 
     bool hasSeenCompletionToken = false;
 
-    // Track whether or not we are inside a generics that has variadic parameters.
-    // If so we will enable the new `expand` and `each` keyword.
-    bool isInVariadicGenerics = false;
-
     TokenReader tokenReader;
     DiagnosticSink* sink;
     SourceLoc lastErrorLoc;
@@ -1619,9 +1615,6 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
 {
     parser->ReadToken(TokenType::OpLess);
     parser->genericDepth++;
-    bool oldIsInVariadicGenerics = parser->isInVariadicGenerics;
-    SLANG_DEFER(parser->isInVariadicGenerics = oldIsInVariadicGenerics);
-
     for (;;)
     {
         const TokenType tokenType = parser->tokenReader.peekTokenType();
@@ -1634,11 +1627,6 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
 
         auto genericParam = ParseGenericParamDecl(parser, decl);
         AddMember(decl, genericParam);
-
-        if (as<GenericTypePackParamDecl>(genericParam))
-        {
-            parser->isInVariadicGenerics = true;
-        }
 
         // Make sure we make forward progress.
         if (parser->tokenReader.getCursor() == currentCursor)
@@ -1869,7 +1857,6 @@ static Stmt* parseOptBody(Parser* parser)
     unparsedStmt->currentScope = parser->currentScope;
     unparsedStmt->outerScope = parser->outerScope;
     unparsedStmt->sourceLanguage = parser->getSourceLanguage();
-    unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
     parser->FillPosition(unparsedStmt);
     List<Token>& tokens = unparsedStmt->tokens;
     int braceDepth = 0;
@@ -5767,7 +5754,7 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
                         Diagnostics::unknownTargetName,
                         caseName.getContent());
                 }
-                targetCase->capability = int32_t(cap);
+                targetCase->capability = (int32_t)cap;
                 targetCase->capabilityToken = caseName;
                 targetCase->loc = caseName.loc;
                 targetCase->body = bodyStmt;
@@ -8623,6 +8610,32 @@ static Expr* parseEachExpr(Parser* parser, SourceLoc loc)
     return eachExpr;
 }
 
+// Check if a specific contextual keyword is available and not shadowed by user-defined decls.
+static bool isKeywordAvailable(Parser* parser, const char* keyword)
+{
+    if (!parser->semanticsVisitor || !parser->currentLookupScope)
+        return true;
+    if (lookUp(
+            parser->astBuilder,
+            parser->semanticsVisitor,
+            parser->semanticsVisitor->getName(keyword),
+            parser->currentLookupScope)
+            .isValid())
+        return false;
+    return true;
+}
+
+// Advance the token reader if the next token is a keyword and the keyword is not shadowed.
+static bool advanceIfAvailableKeyword(Parser* parser, const char* keyword)
+{
+    if (parser->LookAheadToken(keyword) && isKeywordAvailable(parser, keyword))
+    {
+        parser->ReadToken();
+        return true;
+    }
+    return false;
+}
+
 static Expr* parsePrefixExpr(Parser* parser)
 {
     auto tokenType = peekTokenType(parser);
@@ -8657,18 +8670,13 @@ static Expr* parsePrefixExpr(Parser* parser)
             {
                 return parseSPIRVAsmExpr(parser, tokenLoc);
             }
-            else if (parser->isInVariadicGenerics)
+            else if (advanceIfAvailableKeyword(parser, "expand"))
             {
-                // If we are inside a variadic generic, we also need to recognize
-                // the new `expand` and `each` keyword for dealing with variadic packs.
-                if (AdvanceIf(parser, "expand"))
-                {
-                    return parseExpandExpr(parser, tokenLoc);
-                }
-                else if (AdvanceIf(parser, "each"))
-                {
-                    return parseEachExpr(parser, tokenLoc);
-                }
+                return parseExpandExpr(parser, tokenLoc);
+            }
+            else if (advanceIfAvailableKeyword(parser, "each"))
+            {
+                return parseEachExpr(parser, tokenLoc);
             }
             return parsePostfixExpr(parser);
         }
@@ -8742,7 +8750,7 @@ Expr* Parser::ParseLeafExpression()
 /// Parse an argument to an application of a generic
 static Expr* _parseGenericArg(Parser* parser)
 {
-    // The grammar for generic arguments needs to be a super-set of the
+    // The grammar for generic arguments needs to be a superset of the
     // grammar for types and for expressions, because we do not know
     // which to expect at each argument position during parsing.
     //
@@ -8802,7 +8810,6 @@ Stmt* parseUnparsedStmt(
     SemanticsVisitor* semanticsVisitor,
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
-    bool isInVariadicGenerics,
     TokenSpan const& tokens,
     DiagnosticSink* sink,
     Scope* currentScope,
@@ -8826,7 +8833,6 @@ Stmt* parseUnparsedStmt(
     parser.semanticsVisitor = semanticsVisitor;
     parser.currentScope = parser.currentLookupScope = currentScope;
     parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
-    parser.isInVariadicGenerics = isInVariadicGenerics;
     return parser.parseBlockStatement();
 }
 
@@ -9395,7 +9401,8 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     {
         modifier->magicNodeType = syntaxClass;
     }
-    // TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
+    // TODO: print diagnostic if the magic type name doesn't correspond to an actual
+    // ASTNodeType.
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
