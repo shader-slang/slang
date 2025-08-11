@@ -1341,6 +1341,12 @@ LayoutRulesImpl kCPUAnyValueLayoutRulesImpl_ = {
     &kCPUObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kCPUPushConstantRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
+};
+
 // CUDA
 
 static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
@@ -1739,7 +1745,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules(CompilerOption
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
-    return &kCPULayoutRulesImpl_;
+    return &kCPUPushConstantRulesImpl_;
 }
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
@@ -1770,15 +1776,15 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOption
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getRayPayloadParameterRules()
 {
-    return nullptr;
+    return &kGLSLRayPayloadParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 {
-    return nullptr;
+    return &kGLSLCallablePayloadParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
-    return nullptr;
+    return &kGLSLHitAttributesParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
