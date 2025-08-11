@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -shaderobj -output-using-type
 // Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 

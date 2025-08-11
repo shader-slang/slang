@@ -10,6 +10,7 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
+                "combined": true,
                 "resultType": {
                     "kind": "scalar",
                     "scalarType": "float32"
@@ -22,6 +23,7 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
+                "combined": true,
                 "resultType": {
                     "kind": "vector",
                     "elementCount": 4,

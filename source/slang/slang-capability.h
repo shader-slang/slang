@@ -36,7 +36,7 @@ namespace Slang
 // The situation is slightly more complicated for a function. A function
 // might require a specific set of atomic feature, and that is the simple
 // case. In this simple case, we know that a target can run a function
-// if the features of the target are a super-set of those required by
+// if the features of the target are a superset of those required by
 // the function.
 //
 // In the more general case, we might have a function that can be used
@@ -98,6 +98,27 @@ struct CapabilityTargetSet
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
+
+    const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
+};
+
+enum class CheckCapabilityRequirementOptions
+{
+    // `available` can have a subset of the abstract atoms `required` has
+    AvailableCanHaveSubsetOfAbstractAtoms,
+    // `available` and `required` both must have equal abstract stage & target atoms
+    MustHaveEqualAbstractAtoms,
+};
+
+enum class CheckCapabilityRequirementResult
+{
+    // `available` is a superset to `required`
+    AvailableIsASuperSetToRequired,
+    // `available` is not a superset to `required`
+    AvailableIsNotASuperSetToRequired,
+    // `available` has abstract atoms that `required` is missing.
+    // Only possible with CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms
+    RequiredIsMissingAbstractAtoms,
 };
 
 struct CapabilitySet
@@ -186,12 +207,14 @@ public:
         CapabilitySet const& targetCaps,
         bool& isEqual) const;
 
-    /// Find any capability sets which are in 'available' but not in 'required'. Return false if
+    /// Identify capability sets which are in 'available' but not in 'required'. Return false if
     /// this situation occurs.
-    static bool checkCapabilityRequirement(
+    static void checkCapabilityRequirement(
+        CheckCapabilityRequirementOptions options,
         CapabilitySet const& available,
         CapabilitySet const& required,
-        CapabilityAtomSet& outFailedAvailableSet);
+        CapabilityAtomSet& outFailedAvailableSet,
+        CheckCapabilityRequirementResult& result);
 
     // For each element in `elementsToPermutateWith`, create and add a different conjunction
     // permutation by adding to `setToPermutate`.
@@ -370,6 +393,7 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);
 
 const CapabilityAtomSet& getAtomSetOfTargets();
 const CapabilityAtomSet& getAtomSetOfStages();

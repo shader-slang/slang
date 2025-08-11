@@ -11,7 +11,7 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
     auto processVarLayout = [&](IRVarLayout* varLayout)
     {
         UInt spaceOffset = 0;
-        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
         {
             spaceOffset = spaceAttr->getOffset();
         }

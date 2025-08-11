@@ -5,7 +5,9 @@
 
 #include <assert.h>
 #include <cstddef>
+#include <cstring>
 #include <stdint.h>
+#include <type_traits>
 
 #define VARIADIC_TEMPLATE
 
@@ -199,6 +201,19 @@ inline bool isBitSet(T value, T bitToTest)
     static_assert(sizeof(T) <= sizeof(uint32_t), "Only support up to 32 bit enums");
     return (T)((uint32_t)value & (uint32_t)bitToTest) == bitToTest;
 }
+
+template<typename To, typename From>
+typename std::enable_if_t<
+    sizeof(To) == sizeof(From) && std::is_trivially_copyable_v<From> &&
+        std::is_trivially_copyable_v<To> && std::is_trivially_constructible_v<To>,
+    To>
+bitCast(const From& src)
+{
+    To dst;
+    std::memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
+
 } // namespace Slang
 
 // SLANG_DEFER
@@ -349,7 +364,7 @@ public:
 #define SLANG_ASSERT(VALUE)               \
     do                                    \
     {                                     \
-        if (!(VALUE))                     \
+        if (!(VALUE)) [[unlikely]]        \
             SLANG_ASSERT_FAILURE(#VALUE); \
     } while (0)
 #else
@@ -357,7 +372,7 @@ public:
 #endif
 
 #define SLANG_RELEASE_ASSERT(VALUE) \
-    if (VALUE)                      \
+    if (VALUE) [[likely]]           \
     {                               \
     }                               \
     else                            \

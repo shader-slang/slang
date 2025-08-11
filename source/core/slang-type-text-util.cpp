@@ -77,10 +77,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_HOST_HOST_CALLABLE, "", "host-host-callable", "Host callable for host execution"},
     {SLANG_METAL, "metal", "metal", "Metal shader source"},
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
-    {SLANG_METAL_LIB_ASM,
-     "metallib-asm"
-     "metallib-asm",
-     "Metal Library Bytecode assembly"},
+    {SLANG_METAL_LIB_ASM, "metallib-asm", "metallib-asm", "Metal Library Bytecode assembly"},
     {SLANG_WGSL, "wgsl", "wgsl", "WebGPU shading language source"},
     {SLANG_WGSL_SPIRV_ASM,
      "wgsl-spirv-asm",

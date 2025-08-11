@@ -26,7 +26,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                         },
                         {
                             "name": "myTexture",
@@ -50,7 +50,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "mySampler",
@@ -78,7 +78,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 12}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                             },
                             {
                                 "name": "myTexture",
@@ -102,7 +102,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "mySampler",
@@ -116,7 +116,7 @@ standard output = {
                     "bindings": [
                         {"kind": "shaderResource", "index": 0},
                         {"kind": "samplerState", "index": 0},
-                        {"kind": "uniform", "offset": 0, "size": 16}
+                        {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
                     ]
                 }
             }

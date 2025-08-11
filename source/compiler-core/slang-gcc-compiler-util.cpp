@@ -796,7 +796,7 @@ static SlangResult _parseGCCFamilyLine(
     SLANG_UNUSED(loader);
 
     ComPtr<IDownstreamCompiler> compiler;
-    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "clang"), compiler)))
+    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "clang++"), compiler)))
     {
         set->addCompiler(compiler);
     }

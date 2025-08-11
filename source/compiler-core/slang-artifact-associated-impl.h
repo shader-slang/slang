@@ -166,6 +166,7 @@ struct ShaderBindingRange
         case slang::VaryingInput:
         case slang::VaryingOutput:
         case slang::SpecializationConstant:
+        case slang::SubElementRegisterSpace:
             return true;
         default:
             return false;

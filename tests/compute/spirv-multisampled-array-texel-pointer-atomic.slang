@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -Wno-41024
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk -xslang -Wno-41024
+//DISABLE_TEST(cuda):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT: RWTexture2D(format=R32Uint, size=4, content = zero, arrayLength=2, sampleCount=two, mipMaps = 1):name rwTexture2DMSArray
 [[vk::binding(2)]]

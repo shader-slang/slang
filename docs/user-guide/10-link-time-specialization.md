@@ -22,7 +22,7 @@ While functioning systems can be built around preprocessor macros, overusing the
 Slang approaches the problem of shader specialization by supporting generics as a first class feature that allow most specializable code to be
 written in strongly typed code, and by allowing specialization to be triggered through link-time constants or types.
 
-As discussed in the [Compiling code with Slang](compiling) chapter, Slang provides a three-step compilation model: precompiling, linking and target code generation.
+As discussed in the [Compiling code with Slang](08-compiling.md) chapter, Slang provides a three-step compilation model: precompiling, linking and target code generation.
 Assuming the user shader is implemented as three Slang modules: `a.slang`, `b.slang`, and `c.slang`, the user can precompile all three modules to binary IR and store
 them as `a.slang-module`, `b.slang-module`, and `c.slang-module` in a complete offline process that is independent to any specialization arguments.
 Next, these three IR modules are linked together to form a self-contained program that will then go through a set of compiler optimizations for target code generation.

@@ -160,6 +160,7 @@ SlangResult LanguageServer::parseNextMessage()
                     caps.semanticTokensProvider.full = true;
                     caps.semanticTokensProvider.range = false;
                     caps.signatureHelpProvider.triggerCharacters.add("(");
+                    caps.signatureHelpProvider.triggerCharacters.add("<");
                     caps.signatureHelpProvider.triggerCharacters.add(",");
                     caps.signatureHelpProvider.retriggerCharacters.add(",");
                     for (auto tokenType : kSemanticTokenTypes)
@@ -247,14 +248,6 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
-
-    auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = version->getOrLoadModule(canonicalPath);
-    if (!parsedModule)
-    {
-        return SLANG_FAIL;
-    }
-
     return SLANG_OK;
 }
 
@@ -271,6 +264,7 @@ SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams&
     {
         publishDiagnostics();
     }
+    m_pendingModulesToUpdateDiagnostics.add(uriToCanonicalPath(args.textDocument.uri));
     return result;
 }
 
@@ -565,6 +559,12 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
     return location;
 }
 
+void LanguageServer::removePendingModuleToUpdateDiagnostics(const String& uri)
+{
+    String canonicalPath = uriToCanonicalPath(uri);
+    m_pendingModulesToUpdateDiagnostics.remove(canonicalPath);
+}
+
 // When user code has `Foo(123)` where `Foo` is a `struct`, goto-definition on
 // `Foo` should redirect to the constructor of `Foo` instead of the type declaration of `Foo`.
 // This function will check if the `declRefExpr` is a reference to a type declaration,
@@ -601,6 +601,8 @@ SlangResult LanguageServer::hover(
     const JSONValue& responseId)
 {
     auto result = m_core.hover(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -614,6 +616,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     const LanguageServerProtocol::HoverParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
@@ -660,7 +663,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             }
             else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
             {
-                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+                numOverloads = overloadedExpr2->candidateExprs.getCount();
             }
         }
         if (numOverloads > 1)
@@ -869,9 +872,9 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
-        if (overloadedExpr2->candidiateExprs.getCount() > 0)
+        if (overloadedExpr2->candidateExprs.getCount() > 0)
         {
-            auto candidateExpr = overloadedExpr2->candidiateExprs[0];
+            auto candidateExpr = overloadedExpr2->candidateExprs[0];
             fillExprHoverInfo(candidateExpr);
         }
     }
@@ -982,6 +985,8 @@ SlangResult LanguageServer::gotoDefinition(
     const JSONValue& responseId)
 {
     auto result = m_core.gotoDefinition(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1363,6 +1368,8 @@ SlangResult LanguageServer::semanticTokens(
     const JSONValue& responseId)
 {
     auto result = m_core.semanticTokens(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1536,6 +1543,8 @@ SlangResult LanguageServer::signatureHelp(
     const JSONValue& responseId)
 {
     auto result = m_core.signatureHelp(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1690,13 +1699,32 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
         bool useOriginalExpr = true;
         if (auto originalDeclRefExpr = as<DeclRefExpr>(appExpr->originalFunctionExpr))
         {
+            // If the original expr doesn't map to a valid declref, we will use the checked
+            // func expr instead.
             if (!originalDeclRefExpr->declRef)
             {
                 useOriginalExpr = false;
             }
         }
+        if (as<GenericAppExpr>(appExpr->originalFunctionExpr))
+        {
+            if (as<DeclRefExpr>(funcExpr))
+            {
+                // If the original function is a fully specialized generic app, use the checked func
+                // expr for signature help.
+                useOriginalExpr = false;
+            }
+        }
         if (useOriginalExpr)
             funcExpr = appExpr->originalFunctionExpr;
+    }
+    if (auto partialGenAppExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
+    {
+        funcExpr = partialGenAppExpr->originalExpr;
+    }
+    if (auto genAppExpr = as<GenericAppExpr>(funcExpr))
+    {
+        funcExpr = genAppExpr->functionExpr;
     }
     if (!funcExpr)
     {
@@ -1726,6 +1754,22 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
         if (!declRef.getDecl())
             return;
 
+        // If funcExpr is a direct reference to a generic, we should either
+        // show the generic signature if we are inside `<>`, or show the function
+        // parameter signature if we are inside `()`. If we are inside `()`, we will
+        // need to form a decl ref to the inner decl and show its signature.
+        if (!as<GenericAppExpr>(appExpr))
+        {
+            if (auto genDeclRef = as<GenericDecl>(declRef))
+            {
+                declRef = createDefaultSubstitutionsIfNeeded(
+                    version->linkage->getASTBuilder(),
+                    &semanticsVisitor,
+                    version->linkage->getASTBuilder()->getMemberDeclRef(
+                        declRef,
+                        genDeclRef.getDecl()->inner));
+            }
+        }
         // If we have a better match than the current best, we will update response.activeSignature
         // to this signature.
         if (auto callableDeclRef = declRef.as<CallableDecl>())
@@ -1817,12 +1861,20 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     {
         if (auto typeType = as<TypeType>(declRefExpr->type.type))
         {
-            // Look for initializers
-            auto ctors =
-                semanticsVisitor.lookupConstructorsInType(typeType->getType(), declRefExpr->scope);
-            for (auto ctor : ctors)
+            if (as<GenericDeclRefType>(typeType->getType()))
             {
-                addDeclRef(ctor.declRef);
+                addDeclRef(declRefExpr->declRef);
+            }
+            else
+            {
+                // Look for initializers
+                auto ctors = semanticsVisitor.lookupConstructorsInType(
+                    typeType->getType(),
+                    declRefExpr->scope);
+                for (auto ctor : ctors)
+                {
+                    addDeclRef(ctor.declRef);
+                }
             }
         }
         else
@@ -1832,14 +1884,19 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {
+        bool isGenApp = as<GenericAppExpr>(appExpr) != nullptr;
         for (auto item : overloadedExpr->lookupResult2)
         {
+            // Skip non-generic candidates if we are inside a generic app expr (e.g.
+            // `f<WE_ARE_HERE>`).
+            if (isGenApp && !as<GenericDecl>(item.declRef))
+                continue;
             addDeclRef(item.declRef);
         }
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             addExpr(item);
         }
@@ -1914,6 +1971,8 @@ SlangResult LanguageServer::inlayHint(
     const JSONValue& responseId)
 {
     auto result = m_core.inlayHint(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -2120,6 +2179,13 @@ void LanguageServer::publishDiagnostics()
 
     auto version = m_core.m_workspace->getCurrentVersion();
     SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
+    // Make sure modules in pendingSet are being compiled.
+    for (auto canonicalPath : m_pendingModulesToUpdateDiagnostics)
+    {
+        version->getOrLoadModule(canonicalPath);
+    }
+    m_pendingModulesToUpdateDiagnostics.clear();
 
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;
@@ -2752,6 +2818,18 @@ SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentPar
 {
     resetDiagnosticUpdateTime();
     auto result = m_core.didChangeTextDocument(args);
+
+    // Register the module path for a diagnostics update.
+    // Note: we don't want to trigger a compile and generate the diagnostics immediately on
+    // every text change. Instead, we want to defer it to when it is the right time for an
+    // update. This is needed to reduce the latency of other requests, such as completion.
+    // For example, when user types `.`, there will be a text change event followed by a
+    // completion request. We don't want to run compile once to get the diagnostics, and then
+    // process the completion request, as this will double the latency to popup the completion
+    // list.
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    m_pendingModulesToUpdateDiagnostics.add(canonicalPath);
+
     if (!m_core.m_options.periodicDiagnosticUpdate)
     {
         publishDiagnostics();
@@ -2764,13 +2842,6 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
-
-    auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = version->getOrLoadModule(canonicalPath);
-    if (!parsedModule)
-    {
-        return SLANG_FAIL;
-    }
 
     return SLANG_OK;
 }

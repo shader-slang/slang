@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
+// CHECK-PTX: add.f32
 // CHECK: optixCoopVecLoad
 // CHECK: OptixCoopVec
 // CHECK: optixCoopVecTanh

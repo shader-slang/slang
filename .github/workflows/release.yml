@@ -6,7 +6,7 @@ on:
     # We are not caching the builds so we don't want to run the release workflow for every push to master;
     # The release workflow is only triggered by tags or manual dispatch
     tags:
-      - "v*"
+      - "v20[2-9][0-9].[0-9]*"
 jobs:
   release:
     strategy:

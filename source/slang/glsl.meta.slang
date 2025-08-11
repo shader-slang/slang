@@ -216,6 +216,9 @@ public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
 public in int gl_BaseInstance : SV_StartInstanceLocation;
 
+public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
+public in int2 gl_FragSizeEXT : SV_FragSize;
+
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
@@ -4775,9 +4778,9 @@ public property uint3 gl_LaunchSizeEXT
 // casting conflict due to the spirv implementation of PrimitiveIndex().
 internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 
-public property int gl_PrimitiveID 
+public property int gl_PrimitiveID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch
@@ -4793,9 +4796,9 @@ public property int gl_PrimitiveID
     }
 }
 
-public property int gl_InstanceID 
+public property int gl_InstanceID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch
@@ -8470,7 +8473,7 @@ public vector<T, N> subgroupPartitionedInclusiveMulNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedInclusiveMinNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMin(value, ballot);
@@ -8478,7 +8481,7 @@ public T subgroupPartitionedInclusiveMinNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedInclusiveMinNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMin(value, ballot);
@@ -8486,7 +8489,7 @@ public vector<T, N> subgroupPartitionedInclusiveMinNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedInclusiveMaxNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMax(value, ballot);
@@ -8494,7 +8497,7 @@ public T subgroupPartitionedInclusiveMaxNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedInclusiveMaxNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMax(value, ballot);
@@ -8582,7 +8585,7 @@ public vector<T, N> subgroupPartitionedExclusiveMulNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedExclusiveMinNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMin(value, ballot);
@@ -8590,7 +8593,7 @@ public T subgroupPartitionedExclusiveMinNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedExclusiveMinNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMin(value, ballot);
@@ -8598,7 +8601,7 @@ public vector<T, N> subgroupPartitionedExclusiveMinNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedExclusiveMaxNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMax(value, ballot);
@@ -8606,7 +8609,7 @@ public T subgroupPartitionedExclusiveMaxNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedExclusiveMaxNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMax(value, ballot);

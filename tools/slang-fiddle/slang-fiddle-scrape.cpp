@@ -1602,20 +1602,18 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
-    RootNamePool* rootNamePool,
+    NamePool* namePool,
     DiagnosticSink* sink,
     SourceManager* sourceManager,
     String outputFileName)
 {
     Lexer lexer;
-    NamePool namePool;
-    namePool.setRootNamePool(rootNamePool);
 
     // We suppress any diagnostics that might get emitted during lexing,
     // so that we can ignore any files we don't understand.
     //
     DiagnosticSink lexerSink;
-    lexer.initialize(inputSourceView, &lexerSink, &namePool, sourceManager->getMemoryArena());
+    lexer.initialize(inputSourceView, &lexerSink, namePool, sourceManager->getMemoryArena());
 
     auto inputTokens = lexer.lexAllTokens();
     auto tokensWithTrivia = collectTokensWithTrivia(inputTokens);
