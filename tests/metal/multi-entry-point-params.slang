@@ -27,7 +27,7 @@ RWStructuredBuffer<uint> outBuffer;
 //  - Binding offset for global params in global scope are the same for each generated entry point.
 //
 
-// CHECK: main1({{.*}}FirstStruct{{.*}}buffer(2)]], SecondStruct{{.*}}buffer(3)]],{{.*}}globalScopeBuffer{{.*}}buffer(0)]], float{{.*}}buffer(4)]]
+// CHECK: main1({{.*}}FirstStruct{{.*}}buffer(2)]], SecondStruct{{.*}}buffer(3)]], float{{.*}}buffer(4)]], uint device* outBuffer{{.*}}buffer(1)]], uint device* globalScopeBuffer{{.*}}buffer(0)]])
 
 [shader("compute")]
 [numthreads(5, 1, 1)]
@@ -44,7 +44,7 @@ void main1(
 
 // CHECK-NOT: FirstStruct
 // CHECK-NOT: SecondStruct
-// CHECK: main2({{.*}}ThirdStruct{{.*}}buffer(5)]], FourthStruct{{.*}}buffer(6)]],{{.*}}globalScopeBuffer{{.*}}buffer(0)]]
+// CHECK: main2({{.*}}ThirdStruct{{.*}}buffer(5)]], FourthStruct{{.*}}buffer(6)]], uint device* outBuffer{{.*}}buffer(1)]], uint device* globalScopeBuffer{{.*}}buffer(0)]])
 
 [shader("compute")]
 [numthreads(5, 1, 1)]

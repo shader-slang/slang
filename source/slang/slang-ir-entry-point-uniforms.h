@@ -21,6 +21,6 @@ void collectEntryPointUniformParams(
     CollectEntryPointUniformParamsOptions const& options);
 
 /// Move any uniform parameters of entry points to the global scope instead.
-void moveEntryPointUniformParamsToGlobalScope(IRModule* module);
+void moveEntryPointUniformParamsToGlobalScope(IRModule* module, TargetRequest* targetReq = nullptr);
 
 } // namespace Slang
