@@ -23,7 +23,11 @@ struct ComplexStruct {
 struct ParentStruct {
     struct ChildStruct {
         Texture2D<float> texture;
+        int i;
+        float f;
     } c;
+
+    Array<Texture2D<float>, 2> tex_array;
 }
 
 struct OtherParent {
@@ -44,6 +48,19 @@ RWStructuredBuffer<float> outputBuffer;
 
 void func(ParentStruct::ChildStruct c) {
     outputBuffer[0] = c.texture.Load(int3(0));
+    Texture2D<float> tex = c.texture;
+    outputBuffer[0] = tex.Load(int3(0));
+
+}
+
+void func2(ParentStruct p) {
+    Array<Texture2D<float>, 2> tex_array_local = p.tex_array;
+    outputBuffer[1] = tex_array_local[0].Load(int3(0));
+    outputBuffer[2] = p.c.texture.Load(int3(3));
+}
+
+void func3(Array<Texture2D<float>, 2> arr) {
+    outputBuffer[3] = arr[0].Load(int3(0));
 }
 
 [numthreads(1, 1, 1)]
@@ -77,7 +94,17 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
     // Test function with a copy of the parameter block
     // CHECK: {{.*}}func{{.*}}->texture{{.*}}
-    OtherParent p;
-    p.c2 = parentBlock.c;
-    func(p.c2);
+    OtherParent other_p;
+    other_p.c2 = parentBlock.c;
+    func(other_p.c2);
+
+    // CHECK: {{.*}}func2{{.*}}->texture{{.*}}
+    ParentStruct p;
+    p = parentBlock;
+    func2(p);
+
+    // Test function with a field from the parameter block
+    // CHECK: {{.*}}func3{{.*}}
+    func3(p.tex_array);
+
 }

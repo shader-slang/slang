@@ -244,6 +244,83 @@ namespace Slang
             return value;
         }
 
+        enum class AccessOrigin
+        {
+            FunctionParameter,  // Access originates from a function parameter (kIROp_Param)
+            ParameterBlock,     // Access originates from a global parameter block (IRGlobalParam)
+            Other              // Access originates from something else (local var, etc.)
+        };
+
+        struct AccessChainInfo
+        {
+            IRInst* rootInst;
+            AccessOrigin origin;
+        };
+
+
+        AccessChainInfo traceFieldAccessChain(IRInst* inst)
+        {
+            // Recursively trace back through field extracts, element accesses, etc.
+            // to find the ultimate source of the access
+            IRInst* current = inst;
+
+            while (current)
+            {
+                switch (current->getOp())
+                {
+                case kIROp_FieldExtract:
+                {
+                    auto fieldExtract = as<IRFieldExtract>(current);
+                    current = fieldExtract->getBase();
+                    break;
+                }
+                case kIROp_GetElement:
+                {
+                    auto getElement = as<IRGetElement>(current);
+                    current = getElement->getBase();
+                    break;
+                }
+                case kIROp_FieldAddress:
+                {
+                    auto fieldAddr = as<IRFieldAddress>(current);
+                    current = fieldAddr->getBase();
+                    break;
+                }
+                case kIROp_GetElementPtr:
+                {
+                    auto getElementPtr = as<IRGetElementPtr>(current);
+                    current = getElementPtr->getBase();
+                    break;
+                }
+                case kIROp_Load:
+                {
+                    auto load = as<IRLoad>(current);
+                    current = load->getPtr();
+                    break;
+                }
+                case kIROp_Param:
+                {
+                    // Function parameter
+                    return { current, AccessOrigin::FunctionParameter };
+                }
+                default:
+                {
+                    // Check if it's a global parameter (parameter block)
+                    if (auto globalParam = as<IRGlobalParam>(current))
+                    {
+                        return { current, AccessOrigin::ParameterBlock };
+                    }
+
+                    // Some other kind of instruction (local var, etc.)
+                    return { current, AccessOrigin::Other };
+                }
+                }
+            }
+
+            return { nullptr, AccessOrigin::Other };
+        }
+
+
         // Recursively process address instructions and their users
         void processAccessChain(IRInst* accessInst)
         {
@@ -292,6 +369,10 @@ namespace Slang
                 case kIROp_FieldExtract:
                 case kIROp_Load:
                 {
+                    AccessChainInfo chainInfo = traceFieldAccessChain(user);
+                    if (chainInfo.origin != AccessOrigin::ParameterBlock) {
+                        break;
+                    }
 
                     // Update type to descriptor handle if needed
                     auto originalType = user->getFullType();
@@ -398,10 +479,10 @@ namespace Slang
                     if (auto funcType = as<IRFuncType>(funcOperand->getFullType()))
                     {
                         auto paramTypes = funcType->getParamTypes();
-                        auto argCount = callInst->getOperandCount() - 1; // Subtract 1 for function operand
-
+                        UInt paramCount = (UInt)paramTypes.getCount();
+                        UInt argCount = callInst->getOperandCount() - 1; // Subtract 1 for function operand
                         // Check each argument against its corresponding parameter type
-                        for (auto i = 0; i < argCount && i < paramTypes.getCount(); i++)
+                        for (UInt i = 0; i < argCount && i < paramCount; i++)
                         {
                             auto argOperand = callInst->getOperand(i + 1); // +1 to skip function operand
                             auto argType = argOperand->getFullType();
@@ -437,12 +518,6 @@ namespace Slang
                 // Process the address chain for each updated field
                 // This handles cases where the field is used in loads or other instructions
                 auto structKey = field->getKey();
-                if (!structKey)
-                {
-                    // Skip fields without keys
-                    continue;
-                }
-
                 processAccessChain(structKey);
             }
 
