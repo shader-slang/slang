@@ -565,6 +565,7 @@ local insts = {
 	},
 	{ makeArray = {} },
 	{ makeArrayFromElement = { min_operands = 1 } },
+	{ makeArrayFromBlob = { min_operands = 1 } },
 	{ makeCoopVector = {} },
 	{ makeCoopVectorFromValuePack = { min_operands = 1 } },
 	{ makeStruct = {} },

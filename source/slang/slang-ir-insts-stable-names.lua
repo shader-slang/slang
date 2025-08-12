@@ -669,5 +669,6 @@ return {
 	["SPIRVAsmOperand.__sampledType"] = 665,
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
-	["IRBytes"] = 668,
+	["makeArrayFromBlob"] = 668,
+	["IRBytes"] = 669,
 }

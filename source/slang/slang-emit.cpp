@@ -1069,9 +1069,12 @@ Result linkAndOptimizeIR(
             {
                 auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
                 auto& blob = moduleBlobs.getValue(moduleName);
-                // TODO: replace with an array value instead of an integer value
-                auto value = builder.getIntValue(builder.getUIntType(), blob->getBufferSize());
-                inst->replaceUsesWith(value);
+                auto type = builder.getArrayType(
+                    builder.getUInt8Type(),
+                    builder.getIntValue(blob->getBufferSize()));
+                IRInst* args[] = {builder.getBlobValue(blob)};
+                inst->replaceUsesWith(
+                    builder.emitIntrinsicInst(type, kIROp_MakeArrayFromBlob, 1, args));
                 removeList.add(inst);
             }
         }
