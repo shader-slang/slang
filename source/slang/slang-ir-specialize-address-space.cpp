@@ -49,6 +49,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // Map which stores the new mappings of inst<->addrspace
     Dictionary<IRInst*, AddressSpaceNode> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
+    DiagnosticSink* sink;
     HashSet<IRFunc*> functionsToConsiderRemoving;
     HashSet<IRDebugValue*> debugValuesToFixup;
 
@@ -64,8 +65,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     // /
     //List<List<IRInst*>> validateAddrSpaceIsTheSame;
 
-    AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
-        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
+    AddressSpaceContext(
+        IRModule* inModule,
+        InitialAddressSpaceAssigner* inAddrSpaceAssigner,
+        DiagnosticSink* sink)
+        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner), sink(sink)
     {
     }
 
@@ -308,6 +312,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                         auto store = as<IRStore>(inst);
                         auto ptr = store->getPtr();
+                        auto val = store->getVal();
                         // Store gets its addr-space from its ptr or val,
                         // which-ever has a address-space to share.
                         auto dstAddrSpace = getAddrSpace(ptr);
@@ -319,8 +324,25 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         else
                         {
                             // dst did not have an addr-space. This means we infer from the val.
-                            mapInstToAddrSpace[store] = AddressSpaceNode(store->getVal());
+                            mapInstToAddrSpace[store] = AddressSpaceNode(val);
                             mapInstToAddrSpace[ptr] = AddressSpaceNode(store);
+                        }
+
+
+                        // If storing into a `Ptr<Ptr<...>>` a Non-UserPointer, warn since Slang
+                        // is experiemental with this feature. We do not track nested pointers
+                        // currently.
+                        auto valPtrType = as<IRPtrType>(val->getFullType());
+                        auto ptrPtrType = as<IRPtrType>(ptr->getFullType());
+                        if (valPtrType && ptrPtrType && as<IRPtrType>(ptrPtrType->getValueType()))
+                        {
+                            auto srcAddrSpace = valPtrType->getAddressSpace();
+                            if (srcAddrSpace != AddressSpace::Generic &&
+                                srcAddrSpace != AddressSpace::UserPointer)
+                            {
+                                sink->diagnose(
+                                    store, Diagnostics::assignmentOfNonUserPointerToNestedPointer);
+                            }
                         }
                     }
                     break;
@@ -538,9 +560,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     }
 };
 
-void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner)
+void specializeAddressSpace(
+    IRModule* module,
+    InitialAddressSpaceAssigner* addrSpaceAssigner,
+    DiagnosticSink* sink)
 {
-    AddressSpaceContext context(module, addrSpaceAssigner);
+    AddressSpaceContext context(module, addrSpaceAssigner, sink);
     context.processModule();
 }
 

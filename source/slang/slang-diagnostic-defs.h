@@ -2697,6 +2697,7 @@ DIAGNOSTIC(
     "buffer.")
 
 DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
+DIAGNOSTIC(41405, Warning, assignmentOfNonUserPointerToNestedPointer, "assignment of a non-device 'Ptr<>' to a 'Ptr<Ptr<...>>' or global-variable is experimental")
 
 //
 // 5xxxx - Target code generation.

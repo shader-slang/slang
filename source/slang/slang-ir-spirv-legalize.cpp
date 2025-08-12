@@ -2355,7 +2355,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
-        specializeAddressSpace(m_module, &addressSpaceAssigner);
+        specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.

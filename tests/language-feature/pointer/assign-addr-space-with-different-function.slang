@@ -2,6 +2,9 @@
 // Currently, Slang assumes all nested pointers are of the `UserPointer` address space.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -capability vk_mem_model+sm_6_0+spvGroupNonUniformBallot
 
+// Check for a warning that this test uses experimental behavior.
+//TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv -capability vk_mem_model+sm_6_0+spvGroupNonUniformBallot
+
 struct Data
 {
     int value1;
@@ -16,6 +19,7 @@ static int* ptr;
 
 void setPtrAddrSpace()
 {
+    //SPIRV: ([[# @LINE+1]]): warning 41405
     ptr = &shared;
     *ptr = 2;
 }

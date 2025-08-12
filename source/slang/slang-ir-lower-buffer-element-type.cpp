@@ -930,7 +930,9 @@ struct LoweredElementTypeContext
             bool shouldWrapArrayInStruct = false;
         };
         List<BufferTypeInfo> bufferTypeInsts;
-        HashSet<IRType*> typesThatWillOrHaveBeenProcessed;
+        HashSet<IRType*> elementTypeThatHasBeenFullyTraversed;
+        HashSet<IRInst*> plannedToBeLegalized;
+
         for (auto globalInst : module->getGlobalInsts())
         {
             IRType* elementType = nullptr;
@@ -975,7 +977,7 @@ struct LoweredElementTypeContext
                 !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
-            typesThatWillOrHaveBeenProcessed.add((IRType*)globalInst);
+            plannedToBeLegalized.add(globalInst);
         }
 
         // Maintain a pending work list of all matrix addresses, and try to lower them out of
@@ -1179,29 +1181,25 @@ struct LoweredElementTypeContext
                     // Therefore our solution is to convert all pointer types
                     // to the expanded form (so we just take the performance cost
                     // of unpack/repack upfront) to get code to compile.
+                    //
+                    // When doing this we cannot:
+                    // 1. Process the same type twice since that would mean processing a deleted type.
+                    // 2. Traverse users for a single element-type twice.
                     auto ptrType = as<IRPtrType>(param->getFullType());
-                    if (ptrType)
+                    if (ptrType && !plannedToBeLegalized.contains(ptrType) &&
+                        !elementTypeThatHasBeenFullyTraversed.contains(elementType))
                     {
-                        IRBuilder ptrBuilder(param);
-                        ptrBuilder.setInsertBefore(ptrType);
-                        // Permutation of all user-accessable pointers we need aliasing into
-                        constexpr AddressSpace addressSpacesOfAccessiblePointers[5] = {
-                            AddressSpace::Function,
-                            AddressSpace::ThreadLocal,
-                            AddressSpace::GroupShared,
-                            AddressSpace::StorageBuffer,
-                            AddressSpace::UserPointer};
-                        for (auto newAddrSpace : addressSpacesOfAccessiblePointers)
-                        {
-                            auto newPtrTypePermutation = ptrBuilder.getPtrType(
-                                ptrType->getValueType(),
-                                ptrType->getAccessQualifier(),
-                                newAddrSpace);
-                            if (typesThatWillOrHaveBeenProcessed.contains(newPtrTypePermutation))
-                                continue;
-                            typesThatWillOrHaveBeenProcessed.add(newPtrTypePermutation);
-                            bufferTypeInsts.add(BufferTypeInfo{newPtrTypePermutation, elementType});
-                        }
+                        elementTypeThatHasBeenFullyTraversed.add(elementType);
+                        traverseUsers<IRPtrTypeBase>(
+                            elementType,
+                            [&](IRPtrTypeBase* user)
+                            {
+                                IRBuilder ptrBuilder(param);
+                                ptrBuilder.setInsertBefore(ptrType);
+                                bufferTypeInsts.add(
+                                    BufferTypeInfo{user, elementType});
+                                plannedToBeLegalized.add(ptrType);
+                            });
                     }
                 }
 
