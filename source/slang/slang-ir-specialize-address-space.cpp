@@ -328,21 +328,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             mapInstToAddrSpace[ptr] = AddressSpaceNode(store);
                         }
 
-
                         // If storing into a `Ptr<Ptr<...>>` a Non-UserPointer, warn since Slang
                         // is experiemental with this feature. We do not track nested pointers
                         // currently.
-                        auto valPtrType = as<IRPtrType>(val->getFullType());
-                        auto ptrPtrType = as<IRPtrType>(ptr->getFullType());
-                        if (valPtrType && ptrPtrType && as<IRPtrType>(ptrPtrType->getValueType()))
+                        auto valPtrType = as<IRPtrTypeBase>(val->getFullType());
+                        auto ptrPtrType = as<IRPtrTypeBase>(ptr->getFullType());
+                        if (!valPtrType || !ptrPtrType)
+                            break;
+                        auto ptrPtrValueType = as<IRPtrTypeBase>(ptrPtrType->getValueType());
+                        if (!ptrPtrValueType)
+                            break;
+
+                        auto valAddrSpace = getAddrSpace(val);
+                        if (valAddrSpace != AddressSpace::Generic &&
+                            valAddrSpace != AddressSpace::UserPointer)
                         {
-                            auto srcAddrSpace = valPtrType->getAddressSpace();
-                            if (srcAddrSpace != AddressSpace::Generic &&
-                                srcAddrSpace != AddressSpace::UserPointer)
-                            {
-                                sink->diagnose(
-                                    store, Diagnostics::assignmentOfNonUserPointerToNestedPointer);
-                            }
+                            sink->diagnose(
+                                store, Diagnostics::assignmentOfNonUserPointerToNestedPointer);
                         }
                     }
                     break;
