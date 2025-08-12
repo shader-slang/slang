@@ -3325,6 +3325,14 @@ protected:
                 result.permittedTypes.add(builder.getUIntType());
                 break;
             }
+        case SystemValueSemanticName::Barycentrics:
+            {
+                result.systemValueName = toSlice("barycentric_coord");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
