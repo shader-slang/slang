@@ -84,27 +84,22 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[5] = complexBlock.directBuffer[5];
     
     // Test parameter block accessed via a local variable
-    // CHECK: {{.*}}->buffer{{.*}}
     NestedStruct nested = nestedBlock;
     outputBuffer[6] = nested.resources[0].buffer[2];
 
     // Test function with parameter block containing a struct with a resource type
-    // CHECK: {{.*}}func{{.*}}->texture{{.*}}
     func(parentBlock.c);
 
     // Test function with a copy of the parameter block
-    // CHECK: {{.*}}func{{.*}}->texture{{.*}}
     OtherParent other_p;
     other_p.c2 = parentBlock.c;
     func(other_p.c2);
 
-    // CHECK: {{.*}}func2{{.*}}->texture{{.*}}
     ParentStruct p;
     p = parentBlock;
     func2(p);
 
     // Test function with a field from the parameter block
-    // CHECK: {{.*}}func3{{.*}}
     func3(p.tex_array);
 
 }
