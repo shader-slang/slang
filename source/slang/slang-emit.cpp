@@ -1073,8 +1073,7 @@ Result linkAndOptimizeIR(
                     builder.getUInt8Type(),
                     builder.getIntValue(blob->getBufferSize()));
                 IRInst* args[] = {builder.getBlobValue(blob)};
-                inst->replaceUsesWith(
-                    builder.emitIntrinsicInst(type, kIROp_MakeArrayFromBlob, 1, args));
+                inst->replaceUsesWith(builder.emitIntrinsicInst(type, kIROp_BlobAsArray, 1, args));
                 removeList.add(inst);
             }
         }
