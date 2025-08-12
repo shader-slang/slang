@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -profile cs_6_6 -dx12 -use-dxil -shaderobj -render-feature hardware-device -allow-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -allow-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -allow-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -allow-glsl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-webgpu -compute -shaderobj -allow-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -g0 -allow-glsl
 
 //TEST_INPUT:ubuffer(data=[0x12345678], stride=4):name inputBuffer

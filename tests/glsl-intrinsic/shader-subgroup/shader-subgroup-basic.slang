@@ -9,7 +9,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl
 
 #version 430
@@ -27,7 +27,7 @@ shared uint shareMem;
 [[ForceInline]]
 void _barrier()
 {
-#if !defined(WGPU)
+#if !defined(WebGPU)
     subgroupBarrier();
 #else
     GroupMemoryBarrier();
@@ -37,7 +37,7 @@ void _barrier()
 [[ForceInline]]
 void _memoryBarrier()
 {
-#if !defined(WGPU)
+#if !defined(WebGPU)
     subgroupMemoryBarrier();
 #else
     GroupMemoryBarrier();
@@ -47,7 +47,7 @@ void _memoryBarrier()
 [[ForceInline]]
 void _memoryBarrierShared()
 {
-#if !defined(WGPU)
+#if !defined(WebGPU)
     subgroupMemoryBarrierShared();
 #else
     GroupMemoryBarrier();
@@ -57,7 +57,7 @@ void _memoryBarrierShared()
 [[ForceInline]]
 void _memoryBarrierBuffer()
 {
-#if !defined(WGPU)
+#if !defined(WebGPU)
     subgroupMemoryBarrierBuffer();
 #else
     GroupMemoryBarrier();

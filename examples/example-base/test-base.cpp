@@ -29,7 +29,7 @@ static rhi::DeviceType parseApiString(const char* apiStr)
 #endif
         {"cpu", rhi::DeviceType::CPU},
         {"cuda", rhi::DeviceType::CUDA},
-        {"webgpu", rhi::DeviceType::WGPU}};
+        {"webgpu", rhi::DeviceType::WebGPU}};
 
     for (auto& api : apiTable)
     {

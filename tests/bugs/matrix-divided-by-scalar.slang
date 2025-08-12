@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -entry computeMain -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute -entry computeMain -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-webgpu -compute -entry computeMain -output-using-type
 
 //TEST_INPUT:ubuffer(data=[3.5], stride=4):name inputBuffer
 StructuredBuffer<float> inputBuffer;
@@ -18,4 +18,3 @@ void computeMain()
     // CHECK: 4.0
     outputBuffer[1] = (float4x4(14.0) / inputBuffer[0])[0][0];
 }
-

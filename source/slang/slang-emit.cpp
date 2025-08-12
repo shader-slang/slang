@@ -1377,7 +1377,7 @@ Result linkAndOptimizeIR(
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
     if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
-        isWGPUTarget(targetRequest))
+        isWebGPUTarget(targetRequest))
         deferBufferLoad(irModule);
 
     // We also want to specialize calls to functions that
@@ -1646,7 +1646,7 @@ Result linkAndOptimizeIR(
     }
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
-        isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
+        isWebGPUTarget(targetRequest) || isMetalTarget(targetRequest))
         legalizeLogicalAndOr(irModule->getModuleInst());
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
@@ -1804,7 +1804,7 @@ Result linkAndOptimizeIR(
 
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
     bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
-        isWGPUTarget(targetRequest);
+        isWebGPUTarget(targetRequest);
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
     performForceInlining(irModule);
 

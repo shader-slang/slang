@@ -3,7 +3,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -metal
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cuda
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -wgpu
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -webgpu
 
 // Note: there is a bug in fxc compiler errorneously reporting infinite loop for this shader.
 // Skipping d3d11 test to avoid the bug.

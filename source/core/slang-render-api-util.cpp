@@ -17,7 +17,7 @@ namespace Slang
     {RenderApiType::Metal, "mtl,metal", ""},
     {RenderApiType::CPU, "cpu", ""},
     {RenderApiType::CUDA, "cuda", "cuda,ptx"},
-    {RenderApiType::WebGPU, "wgpu,webgpu", "wgsl"},
+    {RenderApiType::WebGPU, "webgpu", "wgsl"},
 };
 
 static int _calcAvailableApis()

@@ -4,7 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -wgpu -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -webgpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 
 //CHK:1

@@ -1,5 +1,5 @@
 // TODO: Investigate failures on non-WebGPU backends
-//TEST(smoke,render):COMPARE_HLSL_RENDER: -wgpu
+//TEST(smoke,render):COMPARE_HLSL_RENDER: -webgpu
 
 cbuffer Uniforms
 {

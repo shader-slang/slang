@@ -67,7 +67,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
             else
                 return isIllegalGLSLParameterType(type);
         }
-        else if (isWGPUTarget(targetRequest))
+        else if (isWebGPUTarget(targetRequest))
         {
             return isIllegalWGSLParameterType(type);
         }
@@ -1243,7 +1243,8 @@ bool specializeResourceOutputs(
     HashSet<IRFunc*>& unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+        isWebGPUTarget(targetRequest))
     {
     }
     else
