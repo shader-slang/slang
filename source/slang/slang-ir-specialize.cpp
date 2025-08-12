@@ -3189,13 +3189,22 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                 cloneEnv.mapOldValToNew[block] = cloneInstAndOperands(&cloneEnv, &builder, block);
             }
 
+            builder.setInsertInto(builder.getModule());
+            auto loweredFuncType =
+                as<IRFuncType>(cloneInst(&staticCloningEnv, &builder, returnedFunc->getFullType()));
+            loweredFunc->setFullType((IRType*)loweredFuncType);
+
             builder.setInsertInto(loweredFunc->getFirstBlock());
             builder.emitBranch(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
 
             for (auto param : funcFirstBlock->getParams())
             {
                 // Clone the parameters of the first block.
-                builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
+                if (loweredFunc->getFirstBlock()->getFirstParam() == nullptr)
+                    builder.setInsertBefore(loweredFunc->getFirstBlock()->getFirstChild());
+                else
+                    builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
+
                 auto newParam = cloneInst(&staticCloningEnv, &builder, param);
                 cloneEnv.mapOldValToNew[param] = newParam; // Transfer the param to the dynamic env
             }
@@ -3219,10 +3228,6 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                     block,
                     cloneEnv.mapOldValToNew[block]);
             }
-
-            builder.setInsertInto(builder.getModule());
-            auto loweredFuncType = as<IRFuncType>(
-                cloneInst(&cloneEnv, &builder, as<IRFuncType>(returnedFunc->getFullType())));
 
             // Add extra indices to the func-type parameters
             List<IRType*> funcTypeParams;

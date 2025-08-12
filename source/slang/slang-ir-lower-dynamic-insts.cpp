@@ -1249,6 +1249,14 @@ struct DynamicInstLoweringContext
                 return none(); // No info for the type
             }
 
+            if (!isGlobalInst(typeOfSpecialization))
+            {
+                // Our func-type operand is not yet been lifted.
+                // For now, we can't say anything.
+                //
+                return none();
+            }
+
             IRCollectionBase* collection = nullptr;
             if (auto _collection = as<IRCollectionBase>(operandInfo))
             {
@@ -1432,7 +1440,7 @@ struct DynamicInstLoweringContext
         else if (auto fieldAddress = as<IRFieldAddress>(inst))
         {
             // If this is a field address, update the fieldInfos map.
-            if (auto thisPtrInfo = as<IRPtrTypeBase>(info))
+            if (as<IRPtrTypeBase>(info))
             {
                 IRBuilder builder(module);
                 auto baseStructPtrType = as<IRPtrTypeBase>(fieldAddress->getBase()->getDataType());
@@ -1572,10 +1580,12 @@ struct DynamicInstLoweringContext
 
         for (auto param : func->getParams())
         {
-            if (auto newType = tryGetInfo(context, param))
-                effectiveTypes.add((IRType*)newType);
-            else
-                effectiveTypes.add(param->getDataType());
+            if (auto newInfo = tryGetInfo(context, param))
+                if (getLoweredType(newInfo) != nullptr) // Check that info isn't unbounded
+                    effectiveTypes.add((IRType*)newInfo);
+
+            // Fallback.. no new info, just use the param type.
+            effectiveTypes.add(param->getDataType());
         }
 
         return effectiveTypes;
@@ -2065,17 +2075,25 @@ struct DynamicInstLoweringContext
         if (auto ptrType = as<IRPtrTypeBase>(info))
         {
             IRBuilder builder(module);
-            return builder.getPtrTypeWithAddressSpace(
-                (IRType*)getLoweredType(ptrType->getValueType()),
-                ptrType);
+            if (auto loweredValueType = getLoweredType(ptrType->getValueType()))
+            {
+                return builder.getPtrTypeWithAddressSpace((IRType*)loweredValueType, ptrType);
+            }
+            else
+                return nullptr;
         }
 
         if (auto arrayType = as<IRArrayType>(info))
         {
             IRBuilder builder(module);
-            return builder.getArrayType(
-                (IRType*)getLoweredType(arrayType->getElementType()),
-                arrayType->getElementCount());
+            if (auto loweredElementType = getLoweredType(arrayType->getElementType()))
+            {
+                return builder.getArrayType(
+                    (IRType*)loweredElementType,
+                    arrayType->getElementCount());
+            }
+            else
+                return nullptr;
         }
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(info))
@@ -2883,8 +2901,7 @@ struct DynamicInstLoweringContext
                 1,
                 &zeroValueOfTagType);
         }
-        else if (
-            auto witnessTableTag = as<IRCollectionTagType>(inst->getWitnessTable()->getDataType()))
+        else if (as<IRCollectionTagType>(inst->getWitnessTable()->getDataType()))
         {
             // Dynamic. Use the witness table inst as a tag
             witnessTableID = inst->getWitnessTable();
@@ -2965,7 +2982,8 @@ struct DynamicInstLoweringContext
         auto loweredValType = (IRType*)getLoweredType(valInfo);
         if (bufferBaseType != loweredValType)
         {
-            if (as<IRInterfaceType>(bufferBaseType))
+            if (as<IRInterfaceType>(bufferBaseType) && !isComInterfaceType(bufferBaseType) &&
+                !isBuiltin(bufferBaseType))
             {
                 // If we're dealing with a loading a known tagged union value from
                 // an interface-typed pointer, we'll cast the pointer itself and
@@ -3028,7 +3046,7 @@ struct DynamicInstLoweringContext
             // TODO: Maybe make this the 'default' behavior if a lowering call
             // returns false.
             //
-            if (auto info = tryGetInfo(context, inst))
+            if (tryGetInfo(context, inst))
                 return replaceType(context, inst);
             else
                 return false;
@@ -3078,9 +3096,9 @@ struct DynamicInstLoweringContext
         SLANG_UNUSED(context);
         auto destType = inst->getDataType();
         auto operandInfo = inst->getOperand(0)->getDataType();
-        if (auto taggedUnionTupleType = as<IRTupleType>(operandInfo))
+        if (auto taggedUnionTupleType = as<IRCollectionTaggedUnionType>(operandInfo))
         {
-            SLANG_ASSERT(taggedUnionTupleType->getOperand(1) == destType);
+            // SLANG_ASSERT(taggedUnionTupleType->getOperand(1) == destType);
 
             IRBuilder builder(inst);
             setInsertAfterOrdinaryInst(&builder, inst);
@@ -3108,7 +3126,8 @@ struct DynamicInstLoweringContext
         {
             SLANG_ASSERT(!as<IRParam>(inst));
 
-            if (as<IRInterfaceType>(ptrValType))
+            if (as<IRInterfaceType>(ptrValType) && !isComInterfaceType(ptrValType) &&
+                !isBuiltin(ptrValType))
             {
                 // If we're dealing with a loading a known tagged union value from
                 // an interface-typed pointer, we'll cast the pointer itself and
@@ -3171,7 +3190,7 @@ struct DynamicInstLoweringContext
         // removed from Slang, but the auto-diff process can sometimes
         // produce a store of default-constructed value.
         //
-        if (auto defaultConstruct = as<IRDefaultConstruct>(inst->getVal()))
+        if (as<IRDefaultConstruct>(inst->getVal()))
             return handleDefaultStore(context, inst);
 
         auto loweredVal = upcastCollection(context, inst->getVal(), ptrInfo);
