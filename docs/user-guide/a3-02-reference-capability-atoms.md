@@ -810,6 +810,9 @@ Extensions
 `spvVulkanMemoryModelKHR`
 > Represents the SPIR-V capability for vulkan memory model.
 
+`GL_NV_cooperative_vector`
+> Represents the GL_NV_cooperative_vector extension.
+
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*

@@ -4621,6 +4621,7 @@ struct SpecializationArg
     {
         Unknown, /**< An invalid specialization argument. */
         Type,    /**< Specialize to a type. */
+        Expr,    /**< An expression representing a type or value */
     };
 
     /** The kind of specialization argument. */
@@ -4629,6 +4630,8 @@ struct SpecializationArg
     {
         /** A type specialization argument, used for `Kind::Type`. */
         TypeReflection* type;
+        /** An expression in Slang syntax, used for `Kind::Expr`. */
+        const char* expr;
     };
 
     static SpecializationArg fromType(TypeReflection* inType)
@@ -4636,6 +4639,14 @@ struct SpecializationArg
         SpecializationArg rs;
         rs.kind = Kind::Type;
         rs.type = inType;
+        return rs;
+    }
+
+    static SpecializationArg fromExpr(const char* inExpr)
+    {
+        SpecializationArg rs;
+        rs.kind = Kind::Expr;
+        rs.expr = inExpr;
         return rs;
     }
 };
