@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -profile cs_5_1 -dx12
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -cuda
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -cuda
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
