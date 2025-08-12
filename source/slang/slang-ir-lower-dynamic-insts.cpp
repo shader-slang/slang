@@ -1676,34 +1676,46 @@ struct DynamicInstLoweringContext
                         }
 
                         IRInst* argInfo = tryGetInfo(edge.callerContext, arg);
-                        if (!argInfo && isGlobalInst(arg->getDataType()))
-                            argInfo = arg->getDataType();
 
-                        if (argInfo)
+                        switch (paramDirection)
                         {
-                            switch (paramDirection)
+                        case kParameterDirection_Out:
+                        case kParameterDirection_InOut:
                             {
-                            case kParameterDirection_Out:
-                            case kParameterDirection_InOut:
+                                IRBuilder builder(module);
+                                if (!argInfo)
                                 {
-                                    IRBuilder builder(module);
-                                    auto newInfo = fromDirectionAndType(
-                                        &builder,
-                                        paramDirection,
-                                        as<IRPtrTypeBase>(argInfo)->getValueType());
-                                    updateInfo(edge.targetContext, param, newInfo, workQueue);
-                                    break;
+                                    if (isGlobalInst(arg->getDataType()) &&
+                                        !as<IRInterfaceType>(
+                                            as<IRPtrTypeBase>(arg->getDataType())->getValueType()))
+                                        argInfo = arg->getDataType();
                                 }
-                            case kParameterDirection_In:
-                                {
-                                    // Use centralized update method
-                                    updateInfo(edge.targetContext, param, argInfo, workQueue);
+
+                                if (!argInfo)
                                     break;
-                                }
-                            default:
-                                SLANG_UNEXPECTED(
-                                    "Unhandled parameter direction in interprocedural edge");
+
+                                auto newInfo = fromDirectionAndType(
+                                    &builder,
+                                    paramDirection,
+                                    as<IRPtrTypeBase>(argInfo)->getValueType());
+                                updateInfo(edge.targetContext, param, newInfo, workQueue);
+                                break;
                             }
+                        case kParameterDirection_In:
+                            {
+                                // Use centralized update method
+                                if (!argInfo)
+                                {
+                                    if (isGlobalInst(arg->getDataType()) &&
+                                        !as<IRInterfaceType>(arg->getDataType()))
+                                        argInfo = arg->getDataType();
+                                }
+                                updateInfo(edge.targetContext, param, argInfo, workQueue);
+                                break;
+                            }
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in interprocedural edge");
                         }
                     }
                     argIndex++;
@@ -1930,7 +1942,7 @@ struct DynamicInstLoweringContext
                 continue;
 
             auto loweredFieldType = getLoweredType(info);
-            if (loweredFieldType != field->getDataType())
+            if (loweredFieldType != field->getFieldType())
             {
                 hasChanges = true;
                 field->setFieldType(loweredFieldType);
@@ -2401,9 +2413,8 @@ struct DynamicInstLoweringContext
             as<IRCollectionTaggedUnionType>(newType))
         {
             // Merge the elements of both tagged unions into a new tuple type
-            return (IRType*)makeExistential((as<IRTableCollection>(updateType(
-                (IRType*)currentType->getOperand(0)->getOperand(0),
-                (IRType*)newType->getOperand(0)->getOperand(0)))));
+            return (IRType*)makeExistential((as<IRTableCollection>(
+                updateType((IRType*)currentType->getOperand(1), (IRType*)newType->getOperand(1)))));
         }
         else if (isTaggedUnionType(currentType) && isTaggedUnionType(newType))
         {
@@ -2922,7 +2933,8 @@ struct DynamicInstLoweringContext
             args.getBuffer());
 
         IRInst* packedValue = nullptr;
-        if (auto collection = as<IRTypeCollection>(taggedUnionType->getOperand(0)))
+        auto collection = as<IRTypeCollection>(taggedUnionType->getOperand(0));
+        if (getCollectionCount(collection) > 1)
         {
             packedValue = builder.emitPackAnyValue((IRType*)collection, inst->getValue());
         }
