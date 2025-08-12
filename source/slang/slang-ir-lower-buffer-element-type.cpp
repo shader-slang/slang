@@ -931,7 +931,7 @@ struct LoweredElementTypeContext
         };
         List<BufferTypeInfo> bufferTypeInsts;
         HashSet<IRType*> elementTypeThatHasBeenFullyTraversed;
-        HashSet<IRInst*> plannedToBeLegalized;
+        HashSet<IRInst*> alreadyVisited;
 
         for (auto globalInst : module->getGlobalInsts())
         {
@@ -977,7 +977,6 @@ struct LoweredElementTypeContext
                 !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
-            plannedToBeLegalized.add(globalInst);
         }
 
         // Maintain a pending work list of all matrix addresses, and try to lower them out of
@@ -990,8 +989,11 @@ struct LoweredElementTypeContext
         {
             const auto& bufferTypeInfo = bufferTypeInsts[bufferTypeInstsIndex];
             auto bufferType = bufferTypeInfo.bufferType;
-            auto elementType = bufferTypeInfo.elementType;
+            if (alreadyVisited.contains(bufferType))
+                continue;
+            alreadyVisited.add(bufferType);
 
+            auto elementType = bufferTypeInfo.elementType;
             if (elementType->findDecoration<IRPhysicalTypeDecoration>())
                 continue;
 
@@ -1182,12 +1184,8 @@ struct LoweredElementTypeContext
                     // to the expanded form (so we just take the performance cost
                     // of unpack/repack upfront) to get code to compile.
                     //
-                    // When doing this we cannot:
-                    // 1. Process the same type twice since that would mean processing a deleted type.
-                    // 2. Traverse users for a single element-type twice.
                     auto ptrType = as<IRPtrType>(param->getFullType());
-                    if (ptrType && !plannedToBeLegalized.contains(ptrType) &&
-                        !elementTypeThatHasBeenFullyTraversed.contains(elementType))
+                    if (ptrType && !elementTypeThatHasBeenFullyTraversed.contains(elementType))
                     {
                         elementTypeThatHasBeenFullyTraversed.add(elementType);
                         traverseUsers<IRPtrTypeBase>(
@@ -1198,7 +1196,6 @@ struct LoweredElementTypeContext
                                 ptrBuilder.setInsertBefore(ptrType);
                                 bufferTypeInsts.add(
                                     BufferTypeInfo{user, elementType});
-                                plannedToBeLegalized.add(ptrType);
                             });
                     }
                 }
