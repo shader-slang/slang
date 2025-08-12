@@ -11,7 +11,7 @@ struct AssembledVertex
 
 struct VertexStageInput
 {
-        AssembledVertex assembledVertex : A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
