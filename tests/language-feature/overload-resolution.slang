@@ -47,12 +47,14 @@ void main()
     //           myF(inout uint, uint)          this needs int->uint   cost: 250 (kConversionCost_SignedToUnsignedConversion)
 
     result[2] = myGenF(a, ic);
-    // call-site myF(      uint,   int)
-    // overload: myF(inout int, int)            this needs uint->int   cost: 300 (kConversionCost_SameSizeUnsignedToSignedConversion)
-    //           myF(inout uint, uint)          this needs int->uint   cost: 250 (kConversionCost_SignedToUnsignedConversion)
+    // call-site        myF(      uint,   int)
+    // specialize to    myF(inout uint, uint)
+    // The process will be as follows:
+    // We would try to resolve the type constraints by finding the best T that is int or uint.
+    // Then we would try to resolve between those two T's, we we will prefer T == uint, because int->uint is cheaper.
+    // Note that our type constraints resolve won't take argument type into account, it only compares all the candidates
+    // of T to decide which one is the best. (see: trySolveConstraintSystem for details)
 
     result[3] = myGenF(b, uc);
-    // call-site myF(      int, uint)
-    // overload: myF(inout int, int)            this needs uint->int   cost: 300 (kConversionCost_SameSizeUnsignedToSignedConversion)
-    //           myF(inout uint, uint)          this needs int->uint   cost: 250 (kConversionCost_SignedToUnsignedConversion)
+    // Same as above
 }
