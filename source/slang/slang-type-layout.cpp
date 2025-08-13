@@ -1090,6 +1090,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1170,6 +1193,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
 MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
@@ -1341,11 +1365,68 @@ LayoutRulesImpl kCPUAnyValueLayoutRulesImpl_ = {
     &kCPUObjectLayoutRulesImpl,
 };
 
-LayoutRulesImpl kCPUPushConstantRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl,
+// C layout
+
+LayoutRulesImpl kCLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCAnyValueLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPushConstantRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
     &kCPULayoutRulesImpl,
     &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
 };
+
+LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl
+};
+
+LayoutRulesImpl kCVaryingOutputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl
+};
+
+LayoutRulesImpl kCSpecializationConstantLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLSpecializationConstantLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl
+};
+
+LayoutRulesImpl kCShaderRecordLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kCRayPayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLRayPayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCCallablePayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLCallablePayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCHitAttributesParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLHitAttributesParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 
 // CUDA
 
@@ -1541,7 +1622,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     else if (compilerOptions.shouldUseCPULayout())
-        return &kCPULayoutRulesImpl_;
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
     if (auto cbufferType = as<ConstantBufferType>(containerType))
@@ -1557,7 +1638,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
         case ASTNodeType::CPUDataLayoutType:
-            return &kCPULayoutRulesImpl_;
+            return &kCLayoutRulesImpl_;
         default:
             break;
         }
@@ -1571,7 +1652,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     else if (compilerOptions.shouldUseCPULayout())
-        return &kCPULayoutRulesImpl_;
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1594,7 +1675,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     else if (compilerOptions.shouldUseCPULayout())
-        return &kCPULayoutRulesImpl_;
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1622,7 +1703,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     else if (compilerOptions.shouldUseCPULayout())
-        return &kCPULayoutRulesImpl_;
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1650,7 +1731,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
     else if (compilerOptions.shouldUseCPULayout())
-        return &kCPULayoutRulesImpl_;
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1745,7 +1826,7 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules(CompilerOption
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
-    return &kCPUPushConstantRulesImpl_;
+    return &kCPULayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
@@ -1776,15 +1857,15 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOption
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getRayPayloadParameterRules()
 {
-    return &kGLSLRayPayloadParameterLayoutRulesImpl_;
+    return nullptr;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 {
-    return &kGLSLCallablePayloadParameterLayoutRulesImpl_;
+    return nullptr;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
-    return &kGLSLHitAttributesParameterLayoutRulesImpl_;
+    return nullptr;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
@@ -1795,6 +1876,70 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
+}
+
+// C compatible layout family
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kCAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPushConstantRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kCVaryingInputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kCVaryingOutputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kCSpecializationConstantLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kCRayPayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kCCallablePayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kCHitAttributesParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kCShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
 }
 
 // CUDA Family
