@@ -48,7 +48,14 @@
             pkgs.prettier
             pkgs.python3
             pkgs.shfmt
+            pkgs.vulkan-loader # Ensure this gets built to use in library path.
             pkgs.xorg.libX11
+          ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            # In addition to this, running the Vulkan tests on Linux distros
+            # other than NixOS may require the use of nixGL:
+            # https://github.com/nix-community/nixGL
+            pkgs.vulkan-loader
           ];
         };
       }
