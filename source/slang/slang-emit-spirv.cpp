@@ -1700,7 +1700,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!type)
             return false;
-        
+
         switch (type->getOp())
         {
         case kIROp_HalfType:
@@ -1859,7 +1859,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 // For SPIR-V 1.3 and later, require uniformAndStorageBuffer16BitAccess capability
                 // when uniform or storage buffers contain 16-bit types
-                if ((storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer) &&
+                if ((storageClass == SpvStorageClassUniform ||
+                     storageClass == SpvStorageClassStorageBuffer) &&
                     typeContains16BitTypes(ptrType->getValueType()))
                 {
                     requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
