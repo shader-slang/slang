@@ -1609,8 +1609,7 @@ struct ICompileRequest : public ISlangUnknown
     virtual SLANG_NO_THROW void SLANG_MCALL
     setTargetEmbedDownstreamIR(int targetIndex, bool value) = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-    setTargetForceCLayout(int targetIndex, bool value) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceCLayout(int targetIndex, bool value) = 0;
 };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

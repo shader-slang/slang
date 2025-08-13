@@ -1388,19 +1388,19 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
     &kGLSLVaryingOutputLayoutRulesImpl,
-    &kGLSLObjectLayoutRulesImpl
+    &kGLSLObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kCVaryingOutputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
     &kGLSLVaryingOutputLayoutRulesImpl,
-    &kGLSLObjectLayoutRulesImpl
+    &kGLSLObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kCSpecializationConstantLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
     &kGLSLSpecializationConstantLayoutRulesImpl,
-    &kGLSLObjectLayoutRulesImpl
+    &kGLSLObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kCShaderRecordLayoutRulesImpl_ = {
