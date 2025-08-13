@@ -3,8 +3,9 @@
 //TEST:SIMPLE(filecheck=CHECK_3):-stage compute -entry computeMain -target spirv -DT3
 //TEST:SIMPLE(filecheck=CHECK_4):-stage compute -entry computeMain -target spirv -DT4
 
-// Tests for invalid use of `globallycoherent` with Ptr/T*
-// Due to bad syntax breaking the parser, it is more robust to use disjoint tests
+// Tests for invalid use of `const` with Ptr/T*
+// Due to bad syntax breaking the parser, it is more robust to use disjoint tests with
+// #define's.
 cbuffer Globals
 {
     int* ptr;

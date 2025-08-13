@@ -10,11 +10,6 @@ int* output;
 
 typealias ReadPtr = Ptr<int, Access::Read, AddressSpace::Device>;
 
-void writeToReadOnlyPointer(ReadPtr ptr)
-{
-    ptr[0] = 1;
-}
-
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
