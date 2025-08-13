@@ -1695,48 +1695,62 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::VulkanEmitReflection);
     }
 
-    // Helper function to check if a type contains 16-bit types
-    bool typeContains16BitTypes(IRType* type)
+    // Helper function to check if a type contains 16-bit types (with cycle detection)
+    bool typeContains16BitTypesImpl(IRType* type, HashSet<IRType*>& visited)
     {
         if (!type)
             return false;
-        
+
+        // Check for cycles - if we've already visited this type, assume no 16-bit types
+        // to avoid infinite recursion
+        if (!visited.add(type))
+            return false;
+
+        bool result = false;
         switch (type->getOp())
         {
         case kIROp_HalfType:
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
-            return true;
+            result = true;
+            break;
         case kIROp_VectorType:
             {
                 auto vectorType = as<IRVectorType>(type);
-                return typeContains16BitTypes(vectorType->getElementType());
+                result = typeContains16BitTypesImpl(vectorType->getElementType(), visited);
             }
+            break;
         case kIROp_MatrixType:
             {
                 auto matrixType = as<IRMatrixType>(type);
-                return typeContains16BitTypes(matrixType->getElementType());
+                result = typeContains16BitTypesImpl(matrixType->getElementType(), visited);
             }
+            break;
         case kIROp_ArrayType:
             {
                 auto arrayType = as<IRArrayType>(type);
-                return typeContains16BitTypes(arrayType->getElementType());
+                result = typeContains16BitTypesImpl(arrayType->getElementType(), visited);
             }
+            break;
         case kIROp_UnsizedArrayType:
             {
                 auto arrayType = as<IRUnsizedArrayType>(type);
-                return typeContains16BitTypes(arrayType->getElementType());
+                result = typeContains16BitTypesImpl(arrayType->getElementType(), visited);
             }
+            break;
         case kIROp_StructType:
             {
                 auto structType = as<IRStructType>(type);
                 for (auto field : structType->getFields())
                 {
-                    if (typeContains16BitTypes(field->getFieldType()))
-                        return true;
+                    if (typeContains16BitTypesImpl(field->getFieldType(), visited))
+                    {
+                        result = true;
+                        break;
+                    }
                 }
-                return false;
             }
+            break;
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
@@ -1744,11 +1758,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_InOutType:
             {
                 auto ptrType = as<IRPtrTypeBase>(type);
-                return typeContains16BitTypes(ptrType->getValueType());
+                result = typeContains16BitTypesImpl(ptrType->getValueType(), visited);
             }
+            break;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+            {
+                auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+                result = typeContains16BitTypesImpl(bufferType->getElementType(), visited);
+            }
+            break;
         default:
-            return false;
+            result = false;
+            break;
         }
+
+        visited.remove(type);
+        return result;
+    }
+
+    // Helper function to check if a type contains 16-bit types
+    bool typeContains16BitTypes(IRType* type)
+    {
+        HashSet<IRType*> visited;
+        return typeContains16BitTypesImpl(type, visited);
     }
 
     void requirePhysicalStorageAddressing()
@@ -1859,7 +1893,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 // For SPIR-V 1.3 and later, require uniformAndStorageBuffer16BitAccess capability
                 // when uniform or storage buffers contain 16-bit types
-                if ((storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer) &&
+                if ((storageClass == SpvStorageClassUniform ||
+                     storageClass == SpvStorageClassStorageBuffer) &&
                     typeContains16BitTypes(ptrType->getValueType()))
                 {
                     requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
