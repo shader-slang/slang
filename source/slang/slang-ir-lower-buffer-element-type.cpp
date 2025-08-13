@@ -930,8 +930,6 @@ struct LoweredElementTypeContext
             bool shouldWrapArrayInStruct = false;
         };
         List<BufferTypeInfo> bufferTypeInsts;
-        HashSet<IRType*> elementTypeThatHasBeenFullyTraversed;
-        HashSet<IRInst*> alreadyVisited;
 
         for (auto globalInst : module->getGlobalInsts())
         {
@@ -989,9 +987,6 @@ struct LoweredElementTypeContext
         {
             const auto& bufferTypeInfo = bufferTypeInsts[bufferTypeInstsIndex];
             auto bufferType = bufferTypeInfo.bufferType;
-            if (alreadyVisited.contains(bufferType))
-                continue;
-            alreadyVisited.add(bufferType);
 
             auto elementType = bufferTypeInfo.elementType;
             if (elementType->findDecoration<IRPhysicalTypeDecoration>())
@@ -999,10 +994,6 @@ struct LoweredElementTypeContext
 
             auto config = getTypeLoweringConfigForBuffer(target, bufferType);
             
-            // We need to cache to ensure we do not double-create. This would be very bad since
-            // then we would be causing mismatched parameters despite expectation being that
-            // the params are the same. TODO: check if multple diff layouts break this logic 
-            // and I need to check for this.
             auto loweredBufferElementTypeInfo = getLoweredTypeInfo(elementType, config);
 
             // If the lowered type is the same as original type, no change is required.
@@ -1126,78 +1117,6 @@ struct LoweredElementTypeContext
                     };
                     if (handleUnsizedArrayAccess())
                         continue;
-                }
-                else if (auto param = as<IRParam>(ptrVal))
-                {
-                    // If we have a pointer type, we have a few issues:
-                    //
-                    // 1. Without specializing the addr-space of the
-                    // calling function, we do not know if we have a
-                    // UserSpace pointer to legalize (buffer type is
-                    // userspace). This means we may have a IRParam
-                    // that is used for groupshared only and we accidently
-                    // legalized the param to `Ptr<Data_natural,groupshared>`:
-                    //
-                    /*
-                    // Slang assumes `ptr` is `Ptr<Data, UserPointer>` until we
-                    // run our address-space legalization pass.
-                    // `foo` should be `Ptr<Data, Groupshared>` but is not until
-                    // later in our compile.
-                    //
-                    void foo(Data* ptr)
-                    {
-                        ...
-                    }
-                    [numthreads(3, 1, 1)]
-                    void computeMain(uint3 group_thread_id: SV_GroupThreadID)
-                    {
-                        shared = Data(1, 2);
-                        foo(&shared);
-                    }
-                    */
-                    //
-                    // 2. If we legalize, we cannot treat a pointer input as
-                    // "copy out on function return" since pointers modify
-                    // the original data during the function:
-                    /*
-                    // kernel 1
-                    void deadLoop(Data* ptr)
-                    {
-                        while(globalDataRunning())
-                        {
-                            coherentStore(ptr, coherentLoad(ptr)+1);
-                            ...
-                        }
-                    }
-
-                    // kernel 2
-                    void deadLoop(Data* ptr)
-                    {
-                        while(ptr[0] < 10)
-                        {
-                            // waits for 'kernel 1'
-                        }
-                    }
-                    */
-                    //
-                    // Therefore our solution is to convert all pointer types
-                    // to the expanded form (so we just take the performance cost
-                    // of unpack/repack upfront) to get code to compile.
-                    //
-                    auto ptrType = as<IRPtrType>(param->getFullType());
-                    if (ptrType && !elementTypeThatHasBeenFullyTraversed.contains(elementType))
-                    {
-                        elementTypeThatHasBeenFullyTraversed.add(elementType);
-                        traverseUsers<IRPtrTypeBase>(
-                            elementType,
-                            [&](IRPtrTypeBase* user)
-                            {
-                                IRBuilder ptrBuilder(param);
-                                ptrBuilder.setInsertBefore(ptrType);
-                                bufferTypeInsts.add(
-                                    BufferTypeInfo{user, elementType});
-                            });
-                    }
                 }
 
                 LoweredElementTypeInfo loweredElementTypeInfo = {};

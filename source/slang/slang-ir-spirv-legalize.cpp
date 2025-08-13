@@ -2325,6 +2325,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so we need to update the function types to match that.
         updateFunctionTypes();
 
+        // Specalize address space for all pointers BEFORE `lowerBufferElementTypeToStorageType` since
+        // this legalization pass takes Ptr<T,UserPointer> and legalizes them into Ptr<T_layout,UserPointer>.
+        // This is an issue since we are only aware of a pointer being `groupshared` after we specialize functions
+        // (legalize addr-space for the first time).
+        {
+            SpirvAddressSpaceAssigner addressSpaceAssigner;
+            specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
+        }
+
         // Lower all loads/stores from buffer pointers to use correct storage types.
         // We didn't do the lowering for buffer pointers because we don't know which pointer
         // types are actual storage buffer pointers until we propagated the address space of
@@ -2353,9 +2362,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Propagate alignment hints on address instructions.
         propagateAddressAlignment();
 
-        // Specalize address space for all pointers.
-        SpirvAddressSpaceAssigner addressSpaceAssigner;
-        specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
+        {
+            // Specalize address space for all pointers.
+            SpirvAddressSpaceAssigner addressSpaceAssigner;
+            specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
+        }
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
