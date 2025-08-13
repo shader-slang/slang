@@ -76,11 +76,11 @@ struct BasicTypeKey
     uint32_t knownConstantBitCount : 8;
     uint32_t knownNegative : 1;
     uint32_t isLValue : 1;
-    uint32_t reserved : 6;
-    uint32_t getRaw() const
+    uint32_t reserved : 30;
+    uint64_t getRaw() const
     {
-        uint32_t val;
-        memcpy(&val, this, sizeof(uint32_t));
+        uint64_t val;
+        memcpy(&val, this, sizeof(uint64_t));
         return val;
     }
     bool operator==(BasicTypeKey other) const { return getRaw() == other.getRaw(); }
