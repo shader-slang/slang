@@ -1582,7 +1582,10 @@ struct DynamicInstLoweringContext
         {
             if (auto newInfo = tryGetInfo(context, param))
                 if (getLoweredType(newInfo) != nullptr) // Check that info isn't unbounded
+                {
                     effectiveTypes.add((IRType*)newInfo);
+                    continue;
+                }
 
             // Fallback.. no new info, just use the param type.
             effectiveTypes.add(param->getDataType());
