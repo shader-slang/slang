@@ -8,20 +8,30 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DTARGET_WGSL
 
 // Not testing because CI runners may not support Metal's intrinsics.
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DTARGET_METAL
 
 #version 430
 
 #if 1                        \
     && !defined(TARGET_HLSL) \
-    && !defined(TARGET_CUDA)
+    && !defined(TARGET_CUDA) \
+    && !defined(TARGET_WGSL) \
+    && !defined(TARGET_METAL)
 // hlsl does not treat boolean types with subgroup.* as a logical operator
-// cuda is missing an implementation
+// cuda, wgsl, and metal is missing an implementation
 #define TEST_when_logical_operators_are_implemented
 #endif
+
+#if 1                        \
+    && !defined(TARGET_WGSL) \
+    && !defined(TARGET_METAL)
+// metal, and wgsl do not support these ops
+#define TEST_when_min_max_operators_are_implemented
+#endif
+
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
@@ -102,9 +112,8 @@ bool test1Arithmetic() {
     return true
         & subgroupInclusiveAdd(T(1)) == T(4)
         & subgroupInclusiveMul(T(1)) == T(1)
-    
         // WGSL and Metal does not support inclusive min/max
-#if !defined(WGPU) && !defined(METAL)
+#if defined(TEST_when_min_max_operators_are_implemented)
         & subgroupInclusiveMin(T(1)) == T(1)
         & subgroupInclusiveMax(T(1)) == T(1)
 #endif
@@ -119,7 +128,7 @@ bool testVArithmetic() {
         // & subgroupInclusiveMul(gvec(T(1))) == gvec(T(1))
 
         // WGSL and Metal does not support inclusive min/max
-#if !defined(WGPU) && !defined(METAL)
+#if defined(TEST_when_min_max_operators_are_implemented)
         & subgroupInclusiveMin(gvec(T(1))) == gvec(T(1))
         & subgroupInclusiveMax(gvec(T(1))) == gvec(T(1))
 #endif
@@ -145,8 +154,8 @@ bool testArithmetic() {
         // & testVArithmetic<uint, 3>()
         // & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+        // Disabled on WGSL and Metal as these built-in types are not supported as of time of writing.
+#if !defined(TARGET_WGSL) && !defined(TARGET_METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
@@ -169,8 +178,8 @@ bool testArithmetic() {
         & testVArithmetic<int64_t, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WGSL as these built-in types are not supported as of time of writing.
+#if !defined (TARGET_WGSL)
         & test1Arithmetic<uint16_t>() 
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
@@ -189,7 +198,7 @@ void computeMain()
 
     bool res0 = true
     // WGSL and Metal does not support bitwise inclusive intrinsics.
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(TARGET_WGSL) && !defined(TARGET_METAL)
             & testLogical()
 #endif
             ;
