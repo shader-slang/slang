@@ -14269,7 +14269,7 @@ static void _propagateRequirement(
     }
 
     // If we do not have the same target+stage, we need to `join` to remove excess target+stage.
-    // 
+    //
     // If we have the same target+stage but current capabilities do not imply incoming capabilities,
     // we need to `join`.
     if (resultCaps.allTargetAndStageSetsImpliedInOther(nodeCaps))
