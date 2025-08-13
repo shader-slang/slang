@@ -3201,6 +3201,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
+
+        // Check if we need UniformAndStorageBuffer16BitAccess capability
+        if (storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer)
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
+            {
+                if (typeContains16BitTypes(ptrType->getValueType()))
+                {
+                    requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
+                }
+            }
+        }
+
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
             emitSystemVarDecoration(param, systemValInst);
@@ -3231,6 +3244,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
+
+        // Check if we need UniformAndStorageBuffer16BitAccess capability
+        if (storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer)
+        {
+            if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
+            {
+                if (typeContains16BitTypes(ptrType->getValueType()))
+                {
+                    requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
+                }
+            }
+        }
+
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             globalVar,
@@ -6403,11 +6429,80 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return paramSpvInst;
     }
 
+    // Helper function to recursively check if a type contains 16-bit types
+    bool typeContains16BitTypesImpl(IRType* type, HashSet<IRType*>& visited)
+    {
+        if (visited.contains(type))
+            return false; // Cycle detected, break recursion
+
+        visited.add(type);
+
+        switch (type->getOp())
+        {
+        case kIROp_HalfType:
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+            return true;
+
+        case kIROp_VectorType:
+            if (auto vectorType = as<IRVectorType>(type))
+                return typeContains16BitTypesImpl(vectorType->getElementType(), visited);
+            break;
+
+        case kIROp_MatrixType:
+            if (auto matrixType = as<IRMatrixType>(type))
+                return typeContains16BitTypesImpl(matrixType->getElementType(), visited);
+            break;
+
+        case kIROp_ArrayType:
+            if (auto arrayType = as<IRArrayType>(type))
+                return typeContains16BitTypesImpl(arrayType->getElementType(), visited);
+            break;
+
+        case kIROp_StructType:
+            if (auto structType = as<IRStructType>(type))
+            {
+                for (auto field : structType->getFields())
+                {
+                    if (typeContains16BitTypesImpl(field->getFieldType(), visited))
+                        return true;
+                }
+            }
+            break;
+
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
+            if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+                return typeContains16BitTypesImpl(bufferType->getElementType(), visited);
+            break;
+
+        default:
+            break;
+        }
+
+        return false;
+    }
+
+    bool typeContains16BitTypes(IRType* type)
+    {
+        HashSet<IRType*> visited;
+        return typeContains16BitTypesImpl(type, visited);
+    }
+
     SpvInst* emitVar(SpvInstParent* parent, IRInst* inst)
     {
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(ptrType);
         SpvStorageClass storageClass = getSpvStorageClass(ptrType);
+
+        // Check if we need UniformAndStorageBuffer16BitAccess capability
+        if ((storageClass == SpvStorageClassUniform || storageClass == SpvStorageClassStorageBuffer) &&
+            typeContains16BitTypes(ptrType->getValueType()))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
+        }
 
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
