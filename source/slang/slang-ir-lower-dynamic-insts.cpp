@@ -16,7 +16,6 @@ namespace Slang
 // Forward-declare.. (TODO: Just include this from the header instead)
 IRInst* specializeGeneric(IRSpecialize* specializeInst);
 
-constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 // Elements for which we keep track of propagation information.
 struct Element
 {

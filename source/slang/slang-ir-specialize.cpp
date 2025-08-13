@@ -964,18 +964,33 @@ struct SpecializationContext
     void readSpecializationDictionaries()
     {
         auto moduleInst = module->getModuleInst();
+        ShortList<IRInst*, 4> dictInsts;
         for (auto child : moduleInst->getChildren())
         {
             switch (child->getOp())
             {
             case kIROp_GenericSpecializationDictionary:
-                _readSpecializationDictionaryImpl(genericSpecializations, child);
+            case kIROp_ExistentialFuncSpecializationDictionary:
+            case kIROp_ExistentialTypeSpecializationDictionary:
+                dictInsts.add(child);
+                break;
+            default:
+                continue;
+            }
+        }
+
+        for (auto dict : dictInsts)
+        {
+            switch (dict->getOp())
+            {
+            case kIROp_GenericSpecializationDictionary:
+                _readSpecializationDictionaryImpl(genericSpecializations, dict);
                 break;
             case kIROp_ExistentialFuncSpecializationDictionary:
-                _readSpecializationDictionaryImpl(existentialSpecializedFuncs, child);
+                _readSpecializationDictionaryImpl(existentialSpecializedFuncs, dict);
                 break;
             case kIROp_ExistentialTypeSpecializationDictionary:
-                _readSpecializationDictionaryImpl(existentialSpecializedStructs, child);
+                _readSpecializationDictionaryImpl(existentialSpecializedStructs, dict);
                 break;
             default:
                 continue;
