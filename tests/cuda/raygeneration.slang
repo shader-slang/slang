@@ -1,6 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx
 
+// Test that we emit a valid raygeneration kernel.
+// This test will fail if either: (1) `OptixTraversableHandle` is not emitted
+// as a local var for `RaytracingAccelerationStructure` or (2)`RaytracingAccelerationStructure`
+// is not hoisted into use-site.
+
 // CHECK: void{{.*}}raygenMain
 // CHECK-PTX: .visible .entry{{.*}}raygenMain
 
