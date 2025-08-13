@@ -1910,6 +1910,7 @@ local insts = {
 	{ IsVector = { min_operands = 1 } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ IRBytes = { min_operands = 1, hoistable = true } },
+	{ IRBytesCount = { min_operands = 1, hoistable = true } },
 	{ ForwardDifferentiate = { min_operands = 1 } },
 	-- Produces the primal computation of backward derivatives, will return an intermediate context for
 	-- backward derivative func.

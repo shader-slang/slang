@@ -671,4 +671,5 @@ return {
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["BlobAsArray"] = 668,
 	["IRBytes"] = 669,
+	["IRBytesCount"] = 670,
 }

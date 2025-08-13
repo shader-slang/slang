@@ -1065,16 +1065,26 @@ Result linkAndOptimizeIR(
         IRBuilder builder(irModule);
         for (auto inst : irModule->getGlobalInsts())
         {
-            if (inst->getOp() == kIROp_IRBytes)
+            switch (inst->getOp())
             {
-                auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
-                auto& blob = moduleBlobs.getValue(moduleName);
-                auto type = builder.getArrayType(
-                    builder.getUInt8Type(),
-                    builder.getIntValue(blob->getBufferSize()));
-                IRInst* args[] = {builder.getBlobValue(blob)};
-                inst->replaceUsesWith(builder.emitIntrinsicInst(type, kIROp_BlobAsArray, 1, args));
-                removeList.add(inst);
+            case kIROp_IRBytes:
+                {
+                    auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+                    auto& blob = moduleBlobs.getValue(moduleName);
+                    IRInst* args[] = {builder.getBlobValue(blob)};
+                    inst->replaceUsesWith(
+                        builder.emitIntrinsicInst(inst->getFullType(), kIROp_BlobAsArray, 1, args));
+                    removeList.add(inst);
+                    break;
+                }
+            case kIROp_IRBytesCount:
+                {
+                    auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+                    auto& blob = moduleBlobs.getValue(moduleName);
+                    inst->replaceUsesWith(builder.getIntValue(blob->getBufferSize()));
+                    removeList.add(inst);
+                    break;
+                }
             }
         }
         for (auto inst : removeList)
