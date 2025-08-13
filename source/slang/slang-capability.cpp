@@ -538,7 +538,7 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
     bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
     bool thisMustHaveAtMostEqualTargetAndStageAsOther =
         ((int)flags & (int)ImpliesFlags::ThisMustHaveAtMostEqualTargetAndStageAsOther);
-        
+
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
     if (otherSet.isEmpty())
