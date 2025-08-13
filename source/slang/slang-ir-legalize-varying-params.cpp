@@ -1908,6 +1908,9 @@ private:
                     field->getKey(),
                     fieldParam);
 
+                // Remove the sementic info from the original struct
+                semanticInfoToRemove.add(field);
+
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
                 if (varLayout)
