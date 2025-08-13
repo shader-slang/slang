@@ -14272,7 +14272,7 @@ static void _propagateRequirement(
     // 
     // If we have the same target+stage but current capabilities do not imply incoming capabilities,
     // we need to `join`.
-    if (resultCaps.allTargetAndStageSetsImpliedInOther(nodeCaps))
+    if (!resultCaps.joinWithOtherWillChangeThis(nodeCaps))
         return;
 
     auto oldCaps = resultCaps;

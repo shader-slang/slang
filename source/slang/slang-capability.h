@@ -172,9 +172,8 @@ public:
     bool implies(CapabilitySet const& other) const;
     /// Does this capability set imply at least 1 set in other.
     ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
-    /// Does this capability set imply all the capabilities in `other`?
-    /// `this` cannot have excess target+stage sets.
-    bool allTargetAndStageSetsImpliedInOther(CapabilitySet const& other) const;
+    /// Will a `join` with `other` change `this`?
+    bool joinWithOtherWillChangeThis(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -192,7 +191,7 @@ public:
     void unionWith(const CapabilitySet& other);
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
-    CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const;
+    CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);
 
     /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
     CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other);
@@ -357,9 +356,28 @@ private:
 
     enum class ImpliesFlags
     {
+        // All permutations of target+stage from `other` must be implied by a target+stage
+        // in `this`.
         None = 0,
+        // Given a single target+stage permutation, if 1 permutation is implied in `other`,
+        // return true.
         OnlyRequireASingleValidImply = 1 << 0,
-        ThisMustHaveAtMostEqualTargetAndStageAsOther = 1 << 1,
+        // The target+stage permuations in `this` cannot have extra permutations
+        // relative to `other`.
+        // Ex: `{metal+glsl}.implies({glsl})` is false
+        //     `{glsl}.implies({glsl,metal})` is false
+        //     `{glsl}.implies({glsl,glsl})` is true
+        CannotHaveMoreTargetAndStageSets = 1 << 1,
+        // The target+stage permuations in `this` can have less permutations
+        // than `other`. This means, only for the shared permutations of `this`
+        // and `other` does `thisSet[target][stage].imply(otherSet)` have to be
+        // true.
+        // If `this` is empty, `this` is not able to imply `other` unless `other`
+        // is empty.
+        // Ex: `{glsl}.implies({glsl,metal})` is true since we only compare shared-permutations.
+        CanHaveSubsetOfTargetAndStageSets = 1 << 2,
+
+        WillAJoinWithOtherModifyThis = CannotHaveMoreTargetAndStageSets | CanHaveSubsetOfTargetAndStageSets
     };
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
