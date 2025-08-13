@@ -212,12 +212,18 @@ bool isVaryingParameter(IRVarLayout* varLayout)
 // to generate proper binding attributes like [[buffer(N)]], [[texture(N)]], [[sampler(N)]]
 bool shouldCollectEntryPointParamInConstantBuffer(
     IRParam* param,
-    CollectEntryPointUniformParamsOptions const& options)
+    TargetRequest* targetReq,
+    IRVarLayout* paramLayout = nullptr)
 {
+
+    // Check if this is a varying parameter - if so, don't collect
+    if (isVaryingParameter(paramLayout))
+        return false;
+
     auto paramType = param->getDataType();
 
     // For Metal targets, skip all resource types to preserve direct binding
-    if (isMetalTarget(options.targetReq))
+    if (targetReq && isMetalTarget(targetReq))
     {
         // Skip all resource types that need explicit Metal binding attributes
         if (isResourceType(paramType))
@@ -324,22 +330,19 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
-            //
-            if (isVaryingParameter(paramLayout))
-                continue;
-
-            for (auto offsetAttr : paramLayout->getOffsetAttrs())
-                resourceKinds.add(offsetAttr->getResourceKind());
 
             // For Metal targets, skip collection of resource parameters
             // so they remain as direct entry point parameters and can generate
             // proper binding attributes like [[buffer(N)]], [[texture(N)]], [[sampler(N)]]
             //
-            if (!shouldCollectEntryPointParamInConstantBuffer(param, m_options))
+            if (!shouldCollectEntryPointParamInConstantBuffer(
+                    param,
+                    m_options.targetReq,
+                    paramLayout))
                 continue;
+
+            for (auto offsetAttr : paramLayout->getOffsetAttrs())
+                resourceKinds.add(offsetAttr->getResourceKind());
 
             // At this point we know that `param` is not a varying shader parameter,
             // so that we want to turn it into an equivalent global shader parameter.
@@ -648,25 +651,9 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
-            if (isVaryingParameter(paramLayout))
+            // Use unified logic to determine if parameter should be collected
+            if (!shouldCollectEntryPointParamInConstantBuffer(param, m_targetReq, paramLayout))
                 continue;
-
-            // For Metal targets, skip resource parameters that should remain
-            // as direct parameters (consistent with collection pass)
-            //
-            auto paramDataType = param->getDataType();
-
-            // Resource types that need direct parameter binding for Metal
-            // Skip these to preserve binding attributes like [[buffer(N)]], [[texture(N)]],
-            // [[sampler(N)]]
-            if (m_targetReq && isMetalTarget(m_targetReq))
-            {
-                if (isResourceType(paramDataType))
-                    continue;
-            }
 
             auto paramType = param->getFullType();
 
