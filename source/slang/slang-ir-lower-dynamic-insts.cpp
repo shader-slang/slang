@@ -3099,10 +3099,8 @@ struct DynamicInstLoweringContext
         SLANG_UNUSED(context);
         auto destType = inst->getDataType();
         auto operandInfo = inst->getOperand(0)->getDataType();
-        if (auto taggedUnionTupleType = as<IRCollectionTaggedUnionType>(operandInfo))
+        if (as<IRCollectionTaggedUnionType>(operandInfo))
         {
-            // SLANG_ASSERT(taggedUnionTupleType->getOperand(1) == destType);
-
             IRBuilder builder(inst);
             setInsertAfterOrdinaryInst(&builder, inst);
             auto newInst = builder.emitGetTupleElement((IRType*)destType, inst->getOperand(0), 1);
