@@ -27,10 +27,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
     /// Key: Original type (e.g., struct with Texture2D field)
     /// Value: Lowered type (e.g., struct with DescriptorHandle<Texture2D> field)
     Dictionary<IRType*, IRType*> originalToLoweredTypeMap;
-
-    /// Tracks struct fields that have been converted to descriptor handles
-    /// These fields need special handling in access chains and function calls
-    List<IRStructField*> fieldsConvertedToDescriptorHandles;
+    Dictionary<IRType*, IRType*> loweredToOriginalTypeMap;
 
     /// Tracks parameter block types that have been updated with lowered element types
     List<IRParameterBlockType*> updatedParameterBlockTypes;
@@ -100,12 +97,10 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                     auto originalFieldType = originalField->getFieldType();
                     auto transformedFieldType = convertTypeToDescriptorHandle(originalFieldType);
                     auto fieldKey = originalField->getKey();
-
-                    auto transformedField = irBuilder.createStructField(
+                    irBuilder.createStructField(
                         transformedStructType,
                         fieldKey,
                         transformedFieldType);
-                    fieldsConvertedToDescriptorHandles.add(transformedField);
                 }
 
                 transformedType = transformedStructType;
@@ -142,6 +137,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         if (transformedType != originalType)
         {
             originalToLoweredTypeMap[originalType] = transformedType;
+            loweredToOriginalTypeMap[transformedType] = originalType;
         }
 
         return transformedType;
@@ -247,6 +243,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 transformedField->getFieldType(),
                 transformedStructValue,
                 transformedField->getKey());
+
 
             // Convert descriptor handle fields back to resource types if needed
             auto convertedFieldValue =
@@ -408,357 +405,127 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         return transformedValue;
     }
 
-    /// Categories of access chain origins for determining transformation behavior
-    enum class AccessChainOrigin
-    {
-        FunctionParameter, /// Access originates from a function parameter (kIROp_Param)
-        ParameterBlock,    /// Access originates from a global parameter block (IRGlobalParam)
-        LocalVariable      /// Access originates from a local variable or other instruction
-    };
 
-    /// Information about an access chain's root and origin type
-    struct AccessChainAnalysis
-    {
-        IRInst* rootInstruction;      /// The root instruction of the access chain
-        AccessChainOrigin originType; /// Where the access chain originates from
-    };
+        void updateTypesAndInsertCast(IRInst* startInst) {
+            
+            List<IRInst*> worklist;
+            HashSet<IRInst*> processed; // Track processed instructions to avoid infinite loops
+            
+            worklist.add(startInst);
 
-    /// Traces an instruction back through field accesses to find its ultimate origin
-    ///
-    /// This method follows a chain of field extracts, element accesses, loads, etc.
-    /// back to the root instruction to understand where the access is coming from.
-    /// This information is crucial for determining how to handle descriptor handle
-    /// transformations properly.
-    ///
-    /// @param accessInstruction The instruction to trace back from
-    /// @return Information about the access chain's origin
-    AccessChainAnalysis traceAccessChainToOrigin(IRInst* accessInstruction)
-    {
-        // Follow the access chain backwards to find the root
-        IRInst* currentInstruction = accessInstruction;
+            while (worklist.getCount() > 0) {
+                auto currentInst = worklist.getLast();
+                worklist.removeLast();
+                // Skip if already processed
+                if (processed.contains(currentInst)) {
+                    continue;
+                }
+                processed.add(currentInst);
 
-        while (currentInstruction)
-        {
-            switch (currentInstruction->getOp())
-            {
-            case kIROp_FieldExtract:
+                // Process all users of the current instruction
+                for (auto use = currentInst->firstUse; use; use = use->nextUse)
                 {
-                    // Follow field extraction: struct.field -> struct
-                    auto fieldExtract = as<IRFieldExtract>(currentInstruction);
-                    currentInstruction = fieldExtract->getBase();
-                    break;
-                }
-                case kIROp_GetElement:
-                {
-                    // Follow array access: array[index] -> array
-                    auto getElement = as<IRGetElement>(currentInstruction);
-                    currentInstruction = getElement->getBase();
-                    break;
-                }
-                case kIROp_FieldAddress:
-                {
-                    // Follow field address: &struct.field -> struct
-                    auto fieldAddr = as<IRFieldAddress>(currentInstruction);
-                    currentInstruction = fieldAddr->getBase();
-                    break;
-                }
-                case kIROp_GetElementPtr:
-                {
-                    // Follow element pointer: &array[index] -> array
-                    auto getElementPtr = as<IRGetElementPtr>(currentInstruction);
-                    currentInstruction = getElementPtr->getBase();
-                    break;
-                }
-                case kIROp_Load:
-                {
-                    // Follow load operation: load(ptr) -> ptr
-                    auto load = as<IRLoad>(currentInstruction);
-                    currentInstruction = load->getPtr();
-                    break;
-                }
-                case kIROp_Param:
-                {
-                    // Reached a function parameter - this is a function parameter access
-                    return {currentInstruction, AccessChainOrigin::FunctionParameter};
-                }
-                default:
-                {
-                    // Check if it's a global parameter (parameter block variable)
-                    if (as<IRGlobalParam>(currentInstruction))
+                    auto userInstruction = use->getUser();
+                    
+                    switch (userInstruction->getOp())
                     {
-                        return {currentInstruction, AccessChainOrigin::ParameterBlock};
-                    }
-
-                    // Some other kind of instruction (local variable, etc.)
-                    return {currentInstruction, AccessChainOrigin::LocalVariable};
-                }
-                }
-            }
-
-            // Couldn't trace to a recognizable origin
-            return {nullptr, AccessChainOrigin::LocalVariable};
-        }
-
-
-        /// Processes an access chain to apply descriptor handle transformations
-        ///
-        /// This method recursively processes all users of an instruction to apply
-        /// the necessary type transformations and insert cast instructions where needed.
-        /// It handles field accesses, loads, stores, and function calls that need
-        /// to work with the transformed types.
-        ///
-        /// @param accessInstruction The instruction whose users should be processed
-        void processDescriptorHandleAccessChain(IRInst* accessInstruction)
-        {
-            // Process all users of this instruction
-            for (auto use = accessInstruction->firstUse; use; use = use->nextUse)
-            {
-                auto userInstruction = use->getUser();
-
-                switch (userInstruction->getOp())
-                {
-                case kIROp_FieldAddress:
-                case kIROp_GetElementPtr:
-                {
-                    // Update pointer types for field/element addresses to point to transformed
-                    // types
-                    auto currentPtrType = as<IRPtrTypeBase>(userInstruction->getFullType());
-                    auto originalValueType = currentPtrType->getValueType();
-                    IRType* transformedValueType = nullptr;
-
-                    if (originalToLoweredTypeMap.tryGetValue(
-                            originalValueType,
-                            transformedValueType))
+                    case kIROp_FieldAddress:
+                    case kIROp_GetElementPtr:
                     {
-                        // Create new pointer type pointing to the transformed type
-                        auto transformedPtrType = irBuilder.getPtrTypeWithAddressSpace(
-                            transformedValueType, // new value type (with descriptor handles)
-                            currentPtrType);      // preserves pointer op and address space
-
-                        // Update the instruction's type
-                        userInstruction->setFullType(transformedPtrType);
-                    }
-
-                    // Continue processing the chain
-                    processDescriptorHandleAccessChain(userInstruction);
-                }
-                break;
-
-                case kIROp_RWStructuredBufferGetElementPtr:
-                    // Pass through to next user (typically a Load operation)
-                    processDescriptorHandleAccessChain(userInstruction);
-                    break;
-
-                case kIROp_GetElement:
-                {
-                    // Update the result type of array element access if needed
-                    auto originalResultType = userInstruction->getFullType();
-                    IRType* transformedResultType = nullptr;
-
-                    if (originalToLoweredTypeMap.tryGetValue(
-                            originalResultType,
-                            transformedResultType))
-                    {
-                        userInstruction->setFullType(transformedResultType);
-                        break;
-                    }
-
-                    processDescriptorHandleAccessChain(userInstruction);
-                }
-                break;
-                case kIROp_FieldExtract:
-                case kIROp_Load:
-                {
-                    // Analyze where this access originates from
-                    AccessChainAnalysis chainAnalysis = traceAccessChainToOrigin(userInstruction);
-
-                    // Only transform accesses from parameter blocks (not function params or locals)
-                    if (chainAnalysis.originType != AccessChainOrigin::ParameterBlock)
-                    {
-                        break;
-                    }
-
-                    // Update the instruction's type to use descriptor handles if needed
-                    auto originalResultType = userInstruction->getFullType();
-                    IRType* transformedResultType = nullptr;
-
-                    if (originalToLoweredTypeMap.tryGetValue(
-                            originalResultType,
-                            transformedResultType))
-                    {
-                        userInstruction->setFullType(transformedResultType);
-                    }
-
-                    // If the result is now a descriptor handle, insert a cast back to resource type
-                    if (auto descriptorHandleType =
-                            as<IRDescriptorHandleType>(transformedResultType))
-                    {
-                        auto resourceType =
-                            extractResourceTypeFromDescriptorHandle(descriptorHandleType);
-                        if (resourceType)
+                        // Update pointer types for field/element addresses to point to transformed types
+                        auto currentPtrType = as<IRPtrTypeBase>(userInstruction->getFullType());
+                        if (!currentPtrType) break;
+                        
+                        auto originalValueType = currentPtrType->getValueType();
+                        IRType* transformedValueType = nullptr;
+                        
+                        if (originalToLoweredTypeMap.tryGetValue(originalValueType, transformedValueType))
                         {
-                            // Insert cast instruction after the load/extract:
-                            // DescriptorHandle<Texture2D> -> Texture2D
-                            irBuilder.setInsertAfter(userInstruction);
-                            auto castInstruction = irBuilder.emitIntrinsicInst(
-                                descriptorHandleType->getResourceType(),
-                                kIROp_CastDescriptorHandleToResource,
-                                1,
-                                &userInstruction);
-
-                            // Replace all uses of the original instruction with the cast result
-                            // (except the use in the cast instruction itself)
-                            List<IRUse*> usesToReplace;
-                            for (auto originalUse = userInstruction->firstUse; originalUse;
-                                 originalUse = originalUse->nextUse)
+                            // Create new pointer type pointing to the transformed type
+                            auto transformedPtrType = irBuilder.getPtrTypeWithAddressSpace(
+                                transformedValueType, // new value type (with descriptor handles)
+                                currentPtrType);      // preserves pointer op and address space
+                            
+                            // Update the instruction's type
+                            userInstruction->setFullType(transformedPtrType);
+                        }
+                        
+                        // Add to worklist for further processing
+                        worklist.add(userInstruction);
+                    }
+                    break;
+                    
+                    case kIROp_Load:
+                    case kIROp_Call:
+                    {
+                        // Insert conversion before the load or call
+                        // so that the Load/Call operates on the original type data
+                        auto currentInstType = currentInst->getFullType();
+                        
+                        IRType* transformedType = nullptr;
+                        IRType* originalType = nullptr;
+                        IRInst* sourceToLoad = nullptr;
+                        
+                        // Check if current instruction has PtrType<TransformedType>
+                        if (auto ptrType = as<IRPtrTypeBase>(currentInstType))
+                        {
+                            auto pointeeType = ptrType->getValueType();
+                            if (loweredToOriginalTypeMap.tryGetValue(pointeeType, originalType))
                             {
-                                if (originalUse->getUser() != castInstruction)
-                                {
-                                    usesToReplace.add(originalUse);
-                                }
-                            }
-
-                            for (auto useToReplace : usesToReplace)
-                            {
-                                useToReplace->set(castInstruction);
+                                transformedType = pointeeType;
+                                sourceToLoad = currentInst;  // Load from the pointer
                             }
                         }
-                    }
-
-                    processDescriptorHandleAccessChain(userInstruction);
-                }
-                break;
-                case kIROp_Store:
-                {
-                    // Handle storing transformed values into locations expecting original types
-                    auto storeInstruction = userInstruction;
-                    auto valueBeingStored = storeInstruction->getOperand(1); // The value to store
-                    auto destinationPtr =
-                        storeInstruction->getOperand(0); // The destination pointer
-
-                    // Analyze the types involved
-                    auto valueType = valueBeingStored->getFullType();
-                    auto ptrType = as<IRPtrTypeBase>(destinationPtr->getFullType());
-                    if (!ptrType) break;
-
-                    auto expectedTargetType = ptrType->getValueType();
-
-                    // Case 1: Storing a descriptor handle where a resource is expected
-                    if (auto descriptorHandleType = as<IRDescriptorHandleType>(valueType))
-                    {
-                        auto resourceType =
-                            extractResourceTypeFromDescriptorHandle(descriptorHandleType);
-                        if (resourceType && resourceType == expectedTargetType)
+                        // Check if current instruction is a ParameterBlock<TransformedType>
+                        else if (auto paramBlockType = as<IRParameterBlockType>(currentInstType))
                         {
-                            // Cast descriptor handle back to resource type before storing
-                            irBuilder.setInsertBefore(storeInstruction);
-                            auto castInstruction = irBuilder.emitIntrinsicInst(
-                                resourceType,
-                                kIROp_CastDescriptorHandleToResource,
-                                1,
-                                &valueBeingStored);
-
-                            // Update the store to use the cast result
-                            storeInstruction->setOperand(1, castInstruction);
-                        }
-                    }
-                    // Case 2: Storing a transformed struct where an original struct is expected
-                    else if (as<IRStructType>(valueType))
-                    {
-                        auto expectedOriginalStructType = as<IRStructType>(expectedTargetType);
-                        if (expectedOriginalStructType)
-                        {
-                            // Check if we're storing a transformed struct to an original struct
-                            // location
-                            IRType* expectedTransformedType = nullptr;
-                            if (originalToLoweredTypeMap.tryGetValue(
-                                    expectedTargetType,
-                                    expectedTransformedType) &&
-                                expectedTransformedType == valueType)
+                            auto elementType = paramBlockType->getElementType();
+                            if (loweredToOriginalTypeMap.tryGetValue(elementType, originalType))
                             {
-                                // Convert the transformed struct back to the original struct
-                                irBuilder.setInsertBefore(storeInstruction);
-                                auto convertedValue = convertTransformedStructToOriginal(
-                                    valueBeingStored,
-                                    expectedTargetType);
-                                storeInstruction->setOperand(1, convertedValue);
+                                transformedType = elementType;
+                                sourceToLoad = currentInst;  // Load from the parameter block
                             }
                         }
-                    }
-                }
-                break;
-                case kIROp_Call:
-                {
-                    // Handle function calls where transformed arguments need conversion to original
-                    // types
-                    auto callInstruction = userInstruction;
-                    auto calledFunction = callInstruction->getOperand(0);
-
-                    // Analyze the function signature to check parameter types
-                    if (auto functionType = as<IRFuncType>(calledFunction->getFullType()))
-                    {
-                        auto expectedParameterTypes = functionType->getParamTypes();
-                        UInt parameterCount = (UInt)expectedParameterTypes.getCount();
-                        UInt argumentCount =
-                            callInstruction->getOperandCount() - 1; // Exclude function operand
-
-                        // Process each argument against its corresponding parameter
-                        for (UInt argIndex = 0;
-                             argIndex < argumentCount && argIndex < parameterCount;
-                             argIndex++)
+                        
+                        // If we found a transformed type that needs conversion
+                        if (transformedType && originalType && sourceToLoad)
                         {
-                            auto argumentOperand =
-                                callInstruction->getOperand(argIndex + 1); // +1 to skip function
-                            auto actualArgumentType = argumentOperand->getFullType();
-                            auto expectedParameterType = expectedParameterTypes[argIndex];
-
-                            // Check if we're passing a transformed type where original type is
-                            // expected
-                            IRType* expectedTransformedType = nullptr;
-                            if (originalToLoweredTypeMap.tryGetValue(
-                                    expectedParameterType,
-                                    expectedTransformedType) &&
-                                expectedTransformedType == actualArgumentType)
-                            {
-                                // Convert the transformed argument back to the original type
-                                irBuilder.setInsertBefore(callInstruction);
-                                auto convertedArgument = convertDescriptorHandleToOriginalType(
-                                    argumentOperand,
-                                    expectedParameterType);
-                                callInstruction->setOperand(argIndex + 1, convertedArgument);
-                            }
+                            // Insert conversion instructions before the load so it can operate normally
+                            irBuilder.setInsertBefore(userInstruction);
+                            
+                            // Load the transformed value from the source
+                            auto transformedValue = irBuilder.emitLoad(sourceToLoad);
+                            
+                            // Convert the transformed value back to original type
+                            auto convertedValue = convertDescriptorHandleToOriginalType(
+                                transformedValue, 
+                                originalType);
+                            
+                            // Create storage for the converted value with original type
+                            auto convertedPtr = irBuilder.emitVar(originalType);
+                            irBuilder.emitStore(convertedPtr, convertedValue);
+                            
+                            // Replace the use of currentInst in the load with convertedPtr
+                            // This makes the load operate on the original type pointer/source
+                            use->set(convertedPtr);
                         }
+                        // Add the user instruction to worklist for further processing
+                        worklist.add(userInstruction);
                     }
-                }
-                break;
-
-                default:
-                    // Other instruction types don't require special handling
                     break;
+                    
+                    default:
+                    {
+                        // For other instruction types, just add to worklist
+                        worklist.add(userInstruction);
+                    }
+                    break;
+                    }
                 }
             }
         }
 
-        /// Applies descriptor handle transformations to the entire module
-        ///
-        /// This method coordinates the transformation process by:
-        /// 1. Processing converted struct fields to handle their access chains
-        /// 2. Processing parameter block accesses that use the transformed types
-        void applyDescriptorHandleTransformations()
-        {
-            // Process all struct fields that were converted to descriptor handles
-            for (auto convertedField : fieldsConvertedToDescriptorHandles)
-            {
-                // Process the access chain for each converted field
-                // This handles loads, stores, and other operations on these fields
-                auto fieldKey = convertedField->getKey();
-                processDescriptorHandleAccessChain(fieldKey);
-            }
-
-            // Process parameter block accesses that use the transformed types
-            // Examples:
-            // - ParameterBlock<Array<ResourceStruct, 4>> arrayBlock; arrayBlock[1];
-            // - ParameterBlock<NestedStruct> nestedBlock; NestedStruct nested = nestedBlock;
+        void updateTypesAndInsertCast() {
             for (auto transformedParameterBlockType : updatedParameterBlockTypes)
             {
                 for (auto use = transformedParameterBlockType->firstUse; use; use = use->nextUse)
@@ -766,7 +533,8 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                     auto userInstruction = use->getUser();
                     if (auto globalParameterVariable = as<IRGlobalParam>(userInstruction))
                     {
-                        processDescriptorHandleAccessChain(globalParameterVariable);
+                        // Begin top-down processing from this global parameter
+                        updateTypesAndInsertCast(globalParameterVariable);
                     }
                 }
             }
@@ -776,11 +544,11 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         ///
         /// Orchestrates the complete descriptor handle transformation:
         /// 1. Transforms parameter block types to use descriptor handles
-        /// 2. Applies transformations to all access chains and instructions
+        /// 2. Applies transformations using top-down approach
         void processModule()
         {
             transformParameterBlockTypes();
-            applyDescriptorHandleTransformations();
+            updateTypesAndInsertCast();
         }
     };
 
