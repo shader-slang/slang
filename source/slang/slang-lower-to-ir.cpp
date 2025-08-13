@@ -1657,6 +1657,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return resVal;
     }
 
+    LoweredValInfo visitIRBytesCountIntVal(IRBytesCountIntVal*)
+    {
+        auto builder = context->irBuilder;
+        auto moduleName = builder->getModule()->getName()->text.getUnownedSlice();
+        IRInst* args[] = {builder->getStringValue(moduleName)};
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(builder->getIntType(), kIROp_IRBytesCount, 1, args));
+    }
+
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());

@@ -31,7 +31,7 @@ export __extern_cpp int main()
     device.value.createCommandQueue(&queueDesc, queue);
 
     gfx.ShaderProgramDesc2 programDesc = {};
-    uint8_t s[] = __ir_bytes;
+    let s = __ir_bytes;
     programDesc.sourceData = (void*) &s[0];
     programDesc.sourceType = gfx.ShaderModuleSourceType.SlangModuleBinary;
     programDesc.sourceDataSize = s.getCount();
