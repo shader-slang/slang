@@ -262,7 +262,7 @@ public:
     /// it only really makes sense on `Module`.
     ///
     Type* getTypeFromString(String const& typeStr, DiagnosticSink* sink);
-
+    Expr* parseExprFromString(String expr, DiagnosticSink* sink);
     Expr* findDeclFromString(String const& name, DiagnosticSink* sink);
     Expr* tryResolveOverloadedExpr(Expr* exprIn);
 
@@ -348,6 +348,7 @@ public:
     virtual RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink) = 0;
 
     /// Validate the given specialization `args` and compute any side-band specialization info.
@@ -363,11 +364,12 @@ public:
     RefPtr<SpecializationInfo> _validateSpecializationArgs(
         SpecializationArg const* args,
         Index argCount,
+        Index& outConsumedArgCount,
         DiagnosticSink* sink)
     {
         if (argCount == 0)
             return nullptr;
-        return _validateSpecializationArgsImpl(args, argCount, sink);
+        return _validateSpecializationArgsImpl(args, argCount, outConsumedArgCount, sink);
     }
 
     /// Specialize this component type given `specializationArgs`
