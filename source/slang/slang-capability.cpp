@@ -536,10 +536,19 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
     // x implies (c | d) only if (x implies c) and (x implies d).
 
     bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
+    bool thisMustHaveAtMostEqualTargetAndStageAsOther =
+        ((int)flags & (int)ImpliesFlags::ThisMustHaveAtMostEqualTargetAndStageAsOther);
+        
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
     if (otherSet.isEmpty())
         return CapabilitySet::ImpliesReturnFlags::Implied;
+
+    if (thisMustHaveAtMostEqualTargetAndStageAsOther &&
+        this->getCapabilityTargetSets().getCount() > otherSet.getCapabilityTargetSets().getCount())
+    {
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+    }
 
     for (const auto& otherTarget : otherSet.m_targetSets)
     {
@@ -552,7 +561,14 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
-        for (const auto& otherStage : otherTarget.second.shaderStageSets)
+        if (thisMustHaveAtMostEqualTargetAndStageAsOther &&
+            thisTarget->getShaderStageSets().getCount() >
+                otherTarget.second.getShaderStageSets().getCount())
+        {
+            return CapabilitySet::ImpliesReturnFlags::NotImplied;
+        }
+
+        for (const auto& otherStage : otherTarget.second.getShaderStageSets())
         {
             auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
             if (!thisStage)
@@ -593,10 +609,17 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
     return (int)_implies(other, ImpliesFlags::None) &
            (int)CapabilitySet::ImpliesReturnFlags::Implied;
 }
+
 CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(
     CapabilitySet const& other) const
 {
     return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
+}
+
+bool CapabilitySet::allTargetAndStageSetsImpliedInOther(CapabilitySet const& other) const
+{
+    return (int)_implies(other, ImpliesFlags::ThisMustHaveAtMostEqualTargetAndStageAsOther) &
+           (int)CapabilitySet::ImpliesReturnFlags::Implied;
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
@@ -667,7 +690,7 @@ bool CapabilitySet::operator==(CapabilitySet const& that) const
     return true;
 }
 
-CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
+CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const
 {
     CapabilitySet newSet{};
     for (auto& i : this->m_targetSets)

@@ -168,9 +168,13 @@ public:
         Implied = 1 << 0,
     };
     /// Does this capability set imply all the capabilities in `other`?
+    /// `this` can have excess target+stage sets.
     bool implies(CapabilitySet const& other) const;
     /// Does this capability set imply at least 1 set in other.
     ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
+    /// Does this capability set imply all the capabilities in `other`?
+    /// `this` cannot have excess target+stage sets.
+    bool allTargetAndStageSetsImpliedInOther(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -188,7 +192,7 @@ public:
     void unionWith(const CapabilitySet& other);
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
-    CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);
+    CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const;
 
     /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
     CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other);
@@ -355,6 +359,7 @@ private:
     {
         None = 0,
         OnlyRequireASingleValidImply = 1 << 0,
+        ThisMustHaveAtMostEqualTargetAndStageAsOther = 1 << 1,
     };
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };

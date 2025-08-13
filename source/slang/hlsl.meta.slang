@@ -5975,12 +5975,14 @@ ${{{{
     }
 
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, 0, value);
     }
 
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void Store<T>(uint address, T value, uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
@@ -5992,6 +5994,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of size of `T`.
     ///@param value The input value.
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv)]
     void StoreAligned<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);

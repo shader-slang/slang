@@ -296,10 +296,11 @@
     <Type Name="Slang::Decl" Inheritable="false">
         <DisplayString Condition="nameAndLoc.name!=0">{astNodeType,en} {nameAndLoc.name->text}</DisplayString>
         <DisplayString Condition="nameAndLoc.name==0">{astNodeType,en}</DisplayString>
-        <Expand>
+		<Expand>
             <Item Name="[Name]" Condition="nameAndLoc.name!=0">nameAndLoc.name->text</Item>
             <Item Name="[Parent]">parentDecl</Item>
             <Item Name="[CheckState]">Slang::DeclCheckState(checkState.m_raw &amp; ~Slang::DeclCheckStateExt::kBeingCheckedBit)</Item>
+			<Item Name="[Capabilities]">inferredCapabilityRequirements</Item>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
