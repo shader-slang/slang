@@ -894,7 +894,7 @@ void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
     getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceDXLayout, value);
 }
 
-void EndToEndCompileRequest::setTargetForceCPULayout(int targetIndex, bool value)
+void EndToEndCompileRequest::setTargetForceCLayout(int targetIndex, bool value)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceCPULayout, value);
 }

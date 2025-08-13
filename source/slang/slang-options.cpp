@@ -3720,7 +3720,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
             if (rawTarget.optionSet.shouldUseCPULayout())
             {
-                m_compileRequest->setTargetForceCPULayout(targetID, true);
+                m_compileRequest->setTargetForceCLayout(targetID, true);
             }
 
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
