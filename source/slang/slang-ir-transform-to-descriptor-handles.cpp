@@ -307,6 +307,102 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 }
             }
         }
+        // Case 3: Convert PtrType<transformed struct> back to PtrType<original struct>
+        else if (auto transformedPtrType = as<IRPtrType>(transformedValueType))
+        {
+            auto targetPtrType = as<IRPtrType>(targetOriginalType);
+            if (targetPtrType)
+            {
+                auto transformedPointeeType = transformedPtrType->getValueType();
+                auto targetPointeeType = targetPtrType->getValueType();
+                
+                // Check if the pointer's value type corresponds to a transformed type
+                IRType* expectedTransformedPointeeType = nullptr;
+                if (originalToLoweredTypeMap.tryGetValue(
+                        targetPointeeType,
+                        expectedTransformedPointeeType) &&
+                    expectedTransformedPointeeType == transformedPointeeType)
+                {
+                    // We need to convert the value that the pointer points to, not just the pointer type
+                    // 1. Load the transformed struct from the pointer
+                    auto transformedStructValue = irBuilder.emitLoad(transformedValue);
+                    
+                    // 2. Convert the loaded transformed struct to the original struct
+                    auto convertedStructValue = convertTransformedStructToOriginal(
+                        transformedStructValue, 
+                        targetPointeeType);
+                    
+                    // 3. Allocate storage for the converted struct and store it
+                    auto convertedStructPtr = irBuilder.emitVar(targetPointeeType);
+                    irBuilder.emitStore(convertedStructPtr, convertedStructValue);
+                    
+                    return convertedStructPtr;
+                }
+            }
+        }
+        // Case 4: Convert Array<transformed_type> back to Array<original_type>
+        else if (auto transformedArrayType = as<IRArrayTypeBase>(transformedValueType))
+        {
+            auto targetArrayType = as<IRArrayTypeBase>(targetOriginalType);
+            if (targetArrayType)
+            {
+                auto transformedElementType = transformedArrayType->getElementType();
+                auto targetElementType = targetArrayType->getElementType();
+                
+                // Check if the array's element type corresponds to a transformed type
+                IRType* expectedTransformedElementType = nullptr;
+                if (originalToLoweredTypeMap.tryGetValue(
+                        targetElementType,
+                        expectedTransformedElementType) &&
+                    expectedTransformedElementType == transformedElementType)
+                {
+                    // We need to convert each element of the array from transformed type to original type
+                    
+                    // Get the array count - handle both sized and unsized arrays
+                    auto arrayCount = transformedArrayType->getElementCount();
+                    if (!arrayCount)
+                    {
+                        // For unsized arrays, we can't convert element by element at this level
+                        // The conversion should happen at the access level instead
+                        return transformedValue;
+                    }
+                    
+                    // Extract array count as integer literal
+                    auto arrayCountLit = as<IRIntLit>(arrayCount);
+                    if (!arrayCountLit)
+                    {
+                        // For non-constant array sizes, we can't convert element by element
+                        // The conversion should happen at the access level instead
+                        return transformedValue;
+                    }
+                    
+                    // Convert each array element
+                    List<IRInst*> convertedElements;
+                    IntegerLiteralValue count = arrayCountLit->getValue();
+                    
+                    for (IntegerLiteralValue i = 0; i < count; ++i)
+                    {
+                        // Create index constant
+                        auto indexInst = irBuilder.getIntValue(irBuilder.getIntType(), i);
+                        
+                        // Extract the element at index i from the transformed array
+                        auto transformedElement = irBuilder.emitElementExtract(
+                            transformedValue, 
+                            indexInst);
+                        
+                        // Convert the extracted element from transformed type to original type
+                        auto convertedElement = convertDescriptorHandleToOriginalType(
+                            transformedElement, 
+                            targetElementType);
+                        
+                        convertedElements.add(convertedElement);
+                    }
+                    
+                    // Create a new array with the converted elements
+                    return irBuilder.emitMakeArray(targetOriginalType, convertedElements.getCount(), convertedElements.getBuffer());
+                }
+            }
+        }
 
         // No conversion needed - return value as-is
         return transformedValue;
