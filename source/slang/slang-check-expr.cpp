@@ -5714,7 +5714,9 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
 
 Expr* SemanticsExprVisitor::visitIRBytesExpr(IRBytesExpr* expr)
 {
-    expr->type = m_astBuilder->getArrayType(m_astBuilder->getUInt8Type(), nullptr);
+    auto count =
+        m_astBuilder->getOrCreate<IRBytesCountIntVal>(m_astBuilder->getIntType(), expr->scope);
+    expr->type = m_astBuilder->getArrayType(m_astBuilder->getUInt8Type(), count);
     return expr;
 }
 
