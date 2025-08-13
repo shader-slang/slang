@@ -115,6 +115,11 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             isRefParam = true;
             paramType = outType->getValueType();
         }
+        else if (auto ptrType = as<IRConstRefType>(param->getDataType()))
+        {
+            isRefParam = true;
+            paramType = ptrType->getValueType();
+        }
         if (!isDebuggableType(paramType))
             continue;
         auto debugVar = builder.emitDebugVar(
@@ -130,9 +135,18 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         // Store the initial value of the parameter into the debug var.
         IRInst* paramVal = nullptr;
         if (!isRefParam)
+        {
             paramVal = param;
+        }
         else if (as<IRInOutType>(param->getDataType()))
+        {
             paramVal = builder.emitLoad(param);
+        }
+        else if (as<IRConstRefType>(param->getDataType()))
+        {
+            paramVal = builder.emitLoad(param);
+        }
+
         if (paramVal)
         {
             builder.emitDebugValue(debugVar, paramVal);
