@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
-//TEST:SIMPLE(filecheck=SPIRV): -stage compute -entry computeMain -target spirv -fvk-use-cpu-layout
+//TEST:SIMPLE(filecheck=SPIRV): -stage compute -entry computeMain -target spirv -fvk-use-c-layout
 struct A
 {
     uint64_t f0;
@@ -23,7 +23,7 @@ struct C // Total size should be 40 bytes.
 };
 
 //TEST_INPUT:set cpuBuffer = ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20], stride=4)
-StructuredBuffer<C, CPUDataLayout> cpuBuffer;
+StructuredBuffer<C, CDataLayout> cpuBuffer;
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
@@ -44,14 +44,14 @@ void computeMain()
     outputBuffer[3] = cpuBuffer[1].test2;
 }
 
-// SPIRV: OpMemberDecorate %A_cpu 0 Offset 0
-// SPIRV: OpMemberDecorate %A_cpu 1 Offset 8
-// SPIRV: OpMemberDecorate %B_cpu 0 Offset 0
-// SPIRV: OpMemberDecorate %C_cpu 0 Offset 0
-// SPIRV: OpMemberDecorate %C_cpu 1 Offset 16
-// SPIRV: OpMemberDecorate %C_cpu 2 Offset 20
-// SPIRV: OpMemberDecorate %C_cpu 3 Offset 32
-// SPIRV: OpMemberDecorate %C_cpu 4 Offset 36
-// SPIRV: OpMemberDecorate %C_cpu 5 Offset 37
-// SPIRV: OpDecorate %_runtimearr_C_cpu ArrayStride 40
+// SPIRV: OpMemberDecorate %A_c 0 Offset 0
+// SPIRV: OpMemberDecorate %A_c 1 Offset 8
+// SPIRV: OpMemberDecorate %B_c 0 Offset 0
+// SPIRV: OpMemberDecorate %C_c 0 Offset 0
+// SPIRV: OpMemberDecorate %C_c 1 Offset 16
+// SPIRV: OpMemberDecorate %C_c 2 Offset 20
+// SPIRV: OpMemberDecorate %C_c 3 Offset 32
+// SPIRV: OpMemberDecorate %C_c 4 Offset 36
+// SPIRV: OpMemberDecorate %C_c 5 Offset 37
+// SPIRV: OpDecorate %_runtimearr_C_c ArrayStride 40
 

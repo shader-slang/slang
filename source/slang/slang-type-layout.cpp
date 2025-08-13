@@ -1621,7 +1621,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCPULayout())
+    else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
@@ -1637,7 +1637,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
-        case ASTNodeType::CPUDataLayoutType:
+        case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
         default:
             break;
@@ -1651,7 +1651,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCPULayout())
+    else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
@@ -1674,7 +1674,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCPULayout())
+    else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
@@ -1702,7 +1702,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCPULayout())
+    else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
@@ -1730,7 +1730,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCPULayout())
+    else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;

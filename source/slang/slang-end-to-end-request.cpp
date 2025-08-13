@@ -896,7 +896,7 @@ void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
 
 void EndToEndCompileRequest::setTargetForceCLayout(int targetIndex, bool value)
 {
-    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceCPULayout, value);
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceCLayout, value);
 }
 
 void EndToEndCompileRequest::setTargetFloatingPointMode(

@@ -58,10 +58,10 @@ struct ScalarDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
-__intrinsic_type($(kIROp_CPUBufferLayoutType))
-__magic_type(CPUDataLayoutType)
+__intrinsic_type($(kIROp_CBufferLayoutType))
+__magic_type(CDataLayoutType)
 [require(spirv)]
-struct CPUDataLayout : IBufferDataLayout
+struct CDataLayout : IBufferDataLayout
 {};
 
 //@hidden:

@@ -524,7 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
-    CPU,
+    C,
     _Count,
 };
 

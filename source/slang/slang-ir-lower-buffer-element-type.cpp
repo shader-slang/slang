@@ -426,8 +426,8 @@ struct LoweredElementTypeContext
             return "std430";
         case IRTypeLayoutRuleName::Natural:
             return "natural";
-        case IRTypeLayoutRuleName::CPU:
-            return "cpu";
+        case IRTypeLayoutRuleName::C:
+            return "c";
         default:
             return "default";
         }
@@ -1488,8 +1488,8 @@ IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRules
         return IRTypeLayoutRules::getStd430();
     case kIROp_ScalarBufferLayoutType:
         return IRTypeLayoutRules::getNatural();
-    case kIROp_CPUBufferLayoutType:
-        return IRTypeLayoutRules::getCPU();
+    case kIROp_CBufferLayoutType:
+        return IRTypeLayoutRules::getC();
     }
     return defaultLayout;
 }
@@ -1506,8 +1506,8 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             return IRTypeLayoutRules::getNatural();
 
         // If the user specified a C-compatible buffer layout, then do that.
-        if (target->getOptionSet().shouldUseCPULayout())
-            return IRTypeLayoutRules::getCPU();
+        if (target->getOptionSet().shouldUseCLayout())
+            return IRTypeLayoutRules::getC();
 
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())

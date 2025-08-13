@@ -474,8 +474,8 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
-<a id="fvk-use-cpu-layout"></a>
-### -fvk-use-cpu-layout
+<a id="fvk-use-c-layout"></a>
+### -fvk-use-c-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV. 
 
 

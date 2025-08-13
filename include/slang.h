@@ -1053,7 +1053,7 @@ typedef uint32_t SlangSizeT;
         // Bitfield options
         UseMSVCStyleBitfieldPacking, // bool
 
-        ForceCPULayout, // bool
+        ForceCLayout, // bool
 
         CountOf,
     };

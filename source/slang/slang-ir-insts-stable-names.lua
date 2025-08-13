@@ -669,5 +669,5 @@ return {
 	["SPIRVAsmOperand.__sampledType"] = 665,
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
-	["Type.CPULayout"] = 668,
+	["Type.CLayout"] = 668,
 }

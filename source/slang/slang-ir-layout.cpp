@@ -360,7 +360,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
         break;
     case kIROp_ScalarBufferLayoutType:
-    case kIROp_CPUBufferLayoutType:
+    case kIROp_CBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
     case kIROp_Std430BufferLayoutType:
     case kIROp_DefaultBufferLayoutType:
@@ -530,9 +530,9 @@ struct NaturalLayoutRules : IRTypeLayoutRules
     }
 };
 
-struct CPULayoutRules : IRTypeLayoutRules
+struct CLayoutRules : IRTypeLayoutRules
 {
-    CPULayoutRules() { ruleName = IRTypeLayoutRuleName::CPU; }
+    CLayoutRules() { ruleName = IRTypeLayoutRuleName::C; }
 
     virtual Result calcSizeAndAlignment(
         CompilerOptionSet& optionSet,
@@ -748,9 +748,9 @@ IRTypeLayoutRules* IRTypeLayoutRules::getNatural()
     return &rules;
 }
 
-IRTypeLayoutRules* IRTypeLayoutRules::getCPU()
+IRTypeLayoutRules* IRTypeLayoutRules::getC()
 {
-    static CPULayoutRules rules;
+    static CLayoutRules rules;
     return &rules;
 }
 
@@ -770,8 +770,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getStd140();
     case IRTypeLayoutRuleName::Natural:
         return getNatural();
-    case IRTypeLayoutRuleName::CPU:
-        return getCPU();
+    case IRTypeLayoutRuleName::C:
+        return getC();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
     default:

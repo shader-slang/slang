@@ -663,8 +663,8 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
-        {OptionKind::ForceCPULayout,
-         "-fvk-use-cpu-layout",
+        {OptionKind::ForceCLayout,
+         "-fvk-use-c-layout",
          nullptr,
          "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
          "ByteAddressBuffer and general pointers follow the C/C++ structure layout rules "
@@ -2676,9 +2676,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
                 break;
             }
-        case OptionKind::ForceCPULayout:
+        case OptionKind::ForceCLayout:
             {
-                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCPULayout, true);
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
                 break;
             }
         case OptionKind::EnableEffectAnnotations:
@@ -3718,7 +3718,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->setTargetForceDXLayout(targetID, true);
             }
 
-            if (rawTarget.optionSet.shouldUseCPULayout())
+            if (rawTarget.optionSet.shouldUseCLayout())
             {
                 m_compileRequest->setTargetForceCLayout(targetID, true);
             }
