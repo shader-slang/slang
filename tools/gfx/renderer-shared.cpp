@@ -605,6 +605,7 @@ Result RendererBase::createProgram2(
     ComPtr<slang::IBlob> diagnosticsBlob;
     switch (desc.sourceType)
     {
+    case ShaderModuleSourceType::SlangModuleBinaryFile:
     case ShaderModuleSourceType::SlangSourceFile:
         {
             auto fileName = (char*)desc.sourceData;
@@ -619,6 +620,20 @@ Result RendererBase::createProgram2(
             auto hashStr = String(hash);
             auto srcBlob = UnownedRawBlob::create(desc.sourceData, desc.sourceDataSize);
             module = slangSession->loadModuleFromSource(
+                hashStr.getBuffer(),
+                hashStr.getBuffer(),
+                srcBlob,
+                diagnosticsBlob.writeRef());
+            if (!module)
+                return SLANG_FAIL;
+            break;
+        }
+    case ShaderModuleSourceType::SlangModuleBinary:
+        {
+            auto hash = getStableHashCode32((char*)desc.sourceData, desc.sourceDataSize);
+            auto hashStr = String(hash);
+            auto srcBlob = UnownedRawBlob::create(desc.sourceData, desc.sourceDataSize);
+            slangSession->loadModuleFromIRBlob(
                 hashStr.getBuffer(),
                 hashStr.getBuffer(),
                 srcBlob,
