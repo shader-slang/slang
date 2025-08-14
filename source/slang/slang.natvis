@@ -8,24 +8,15 @@
             <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
         </Expand>
     </Type>
-	<!--
-	    TODO: Eventually, we should potentially expand on how we generate debug info 
-		(like, the type of `NodeBase`, Decl, Expr, Modifier, Stmt, or Val) so that we
-		can clean up our debug logic without workarounds like this one.
-		
-		We could potentially use `fiddle` to generate node types and access this info via
-		`kSyntaxClassInfo[astNoteType]`
-	-->
     <Type Name="Slang::NodeBase" Inheritable="false">
         <DisplayString>{astNodeType}</DisplayString>
         <Expand>
-			<CustomListItems>
-				<Item Name="Decl">(Slang::Decl*)this</Item>
-			    <Item Name="Expr">(Slang::Expr*)this</Item>
-			    <Item Name="Modifier">(Slang::Modifier*)this</Item>
-			    <Item Name="Stmt">(Slang::Stmt*)this</Item>
-			    <Item Name="Val">(Slang::Val*)this</Item>
-			</CustomListItems>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Decl" Name="Decl">(Slang::Decl*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Expr" Name="Expr">(Slang::Expr*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Modifier" Name="Modifier">(Slang::Modifier*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Stmt" Name="Stmt">(Slang::Stmt*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Val" Name="Val">(Slang::Val*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Scope" Name="Scope">(Slang::Scope*)this</Item>
         </Expand>
     </Type>
     <Type Name="Slang::ValNodeOperand">

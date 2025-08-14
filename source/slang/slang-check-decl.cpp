@@ -14627,7 +14627,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         funcDecl->findModifier<RequireCapabilityAttribute>(),
         [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
         {
-            _propagateRequirement(
+             _propagateRequirement(
                 this,
                 funcDecl->inferredCapabilityRequirements,
                 funcDecl,
