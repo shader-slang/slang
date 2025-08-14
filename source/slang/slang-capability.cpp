@@ -581,9 +581,10 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
-        for (const auto& otherStage : otherTarget.getShaderStageSets())
+        for (const auto& otherStagePair : otherTarget.getShaderStageSets())
         {
-            auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
+            auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStagePair.first);
+            const auto& otherStage = otherStagePair.second;
             if (!thisStage)
             {
                 if (onlyRequireSingleImply)
@@ -599,9 +600,9 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             if (thisStage->atomSet)
             {
                 auto& thisStageSet = thisStage->atomSet.value();
-                if (otherStage.second.atomSet)
+                if (otherStage.atomSet)
                 {
-                    auto contained = thisStageSet.contains(otherStage.second.atomSet.value());
+                    auto contained = thisStageSet.contains(otherStage.atomSet.value());
                     if (!onlyRequireSingleImply && !contained)
                     {
                         return CapabilitySet::ImpliesReturnFlags::NotImplied;
