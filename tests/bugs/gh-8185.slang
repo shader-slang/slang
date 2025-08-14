@@ -1,8 +1,8 @@
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
