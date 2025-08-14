@@ -541,7 +541,7 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
         ((int)flags & (int)ImpliesFlags::CannotHaveMoreTargetAndStageSets);
     bool canHaveSubsetOfTargetAndStageSets =
         ((int)flags & (int)ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
-        
+
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
     if (otherSet.isEmpty())
@@ -550,7 +550,7 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
     // If empty, and the other is not empty, it does not matter what flags are used,
     // `this` is considered to "not imply" another set. This is important since
     // `T.join(U)` causes `T == U`.
-    if(this->isEmpty())
+    if (this->isEmpty())
         return CapabilitySet::ImpliesReturnFlags::NotImplied;
 
     if (cannotHaveMoreTargetAndStageSets &&
@@ -568,15 +568,14 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             if (onlyRequireSingleImply)
                 continue;
 
-            if(canHaveSubsetOfTargetAndStageSets)
+            if (canHaveSubsetOfTargetAndStageSets)
                 continue;
             // 'this' lacks a target 'other' has.
             return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
-        if (cannotHaveMoreTargetAndStageSets &&
-            thisTarget->getShaderStageSets().getCount() >
-                otherTarget.getShaderStageSets().getCount())
+        if (cannotHaveMoreTargetAndStageSets && thisTarget->getShaderStageSets().getCount() >
+                                                    otherTarget.getShaderStageSets().getCount())
         {
             return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
@@ -589,8 +588,8 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             {
                 if (onlyRequireSingleImply)
                     continue;
-                
-                if(canHaveSubsetOfTargetAndStageSets)
+
+                if (canHaveSubsetOfTargetAndStageSets)
                     continue;
                 // 'this' lacks a stage 'other' has.
                 return CapabilitySet::ImpliesReturnFlags::NotImplied;
@@ -635,8 +634,9 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(
 
 bool CapabilitySet::joinWithOtherWillChangeThis(CapabilitySet const& other) const
 {
-    return !((int)_implies(other, ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
-           (int)CapabilitySet::ImpliesReturnFlags::Implied);
+    return !(
+        (int)_implies(other, ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
+        (int)CapabilitySet::ImpliesReturnFlags::Implied);
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
