@@ -10765,7 +10765,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // need to create an IR function here
 
         LoweredValInfo cachedVal;
-        bool isAlreadyLowered = context->shared->globalEnv.mapDeclToValue.tryGetValue(decl, cachedVal);
+        bool isAlreadyLowered =
+            context->shared->globalEnv.mapDeclToValue.tryGetValue(decl, cachedVal);
 
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(subContext, irFunc, decl);
