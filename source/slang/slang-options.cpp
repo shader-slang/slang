@@ -2009,8 +2009,14 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
     {
         auto catArg = m_reader.getArgAndAdvance();
 
-        categoryIndex =
-            m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        categoryIndex = m_cmdOptions->findCategoryByName(catArg.value.getUnownedSlice());
+
+        if (categoryIndex < 0)
+        {
+            categoryIndex =
+                m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        }
+
         if (categoryIndex < 0)
         {
             m_sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
@@ -2294,11 +2300,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(
                     m_session->loadCoreModule(contents.getData(), contents.getSizeInBytes()));
-
-                // Ensure that the linkage's AST builder is up-to-date.
-                linkage->getASTBuilder()->m_cachedNodes =
-                    asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
-
                 break;
             }
         case OptionKind::CompileCoreModule:

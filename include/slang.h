@@ -502,6 +502,12 @@ convention for interface methods.
     #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+#ifdef SLANG_NO_DEPRECATION
+    #define SLANG_DEPRECATED
+#else
+    #define SLANG_DEPRECATED [[deprecated]]
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -3345,6 +3351,16 @@ struct ShaderReflection
             name);
     }
 
+    SLANG_DEPRECATED FunctionReflection* tryResolveOverloadedFunction(
+        uint32_t candidateCount,
+        FunctionReflection** candidates)
+    {
+        return (FunctionReflection*)spReflection_TryResolveOverloadedFunction(
+            (SlangReflection*)this,
+            candidateCount,
+            (SlangReflectionFunction**)candidates);
+    }
+
     VariableReflection* findVarByNameInType(TypeReflection* type, const char* name)
     {
         return (VariableReflection*)spReflection_FindVarByNameInType(
@@ -4605,6 +4621,7 @@ struct SpecializationArg
     {
         Unknown, /**< An invalid specialization argument. */
         Type,    /**< Specialize to a type. */
+        Expr,    /**< An expression representing a type or value */
     };
 
     /** The kind of specialization argument. */
@@ -4613,6 +4630,8 @@ struct SpecializationArg
     {
         /** A type specialization argument, used for `Kind::Type`. */
         TypeReflection* type;
+        /** An expression in Slang syntax, used for `Kind::Expr`. */
+        const char* expr;
     };
 
     static SpecializationArg fromType(TypeReflection* inType)
@@ -4620,6 +4639,14 @@ struct SpecializationArg
         SpecializationArg rs;
         rs.kind = Kind::Type;
         rs.type = inType;
+        return rs;
+    }
+
+    static SpecializationArg fromExpr(const char* inExpr)
+    {
+        SpecializationArg rs;
+        rs.kind = Kind::Expr;
+        rs.expr = inExpr;
         return rs;
     }
 };
