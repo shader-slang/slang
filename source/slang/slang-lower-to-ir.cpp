@@ -10764,6 +10764,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // need to create an IR function here
 
+        LoweredValInfo cachedVal;
+        bool isAlreadyLowered = context->shared->globalEnv.mapDeclToValue.tryGetValue(decl, cachedVal);
+
         IRFunc* irFunc = subBuilder->createFunc();
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
@@ -10771,7 +10774,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Register the value now, to avoid any possible infinite recursion when lowering the body
         // or attributes.
-        context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+        if (!isAlreadyLowered)
+            context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
@@ -10796,7 +10800,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irFunc);
 
-        if (emitBody && decl->body && !isFromDifferentModule)
+        if (emitBody && decl->body && !isFromDifferentModule && !isAlreadyLowered)
         {
             // This is a function definition, so we need to actually
             // construct IR for the body...
