@@ -1805,6 +1805,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 
                 // Check for 16-bit storage capabilities when emitting pointer types
                 require16BitStorageCapabilitiesForType(valueType, storageClass);
+
                 // If we haven't emitted the inner type yet, we need to emit a forward declaration.
                 bool useForwardDeclaration =
                     (!m_mapIRInstToSpvInst.containsKey(valueType) && as<IRStructType>(valueType) &&
@@ -8039,14 +8040,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (storageClass)
         {
         case SpvStorageClassUniform:
-            // For SPIR-V < 1.4, uniform buffers use SpvStorageClassUniform
-            // For SPIR-V >= 1.4, they use SpvStorageClassStorageBuffer, but we can still encounter SpvStorageClassUniform
-            requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
-            break;
-            
         case SpvStorageClassStorageBuffer:
-            // Storage buffers (including structured buffers)
-            requireSPIRVCapability(SpvCapabilityStorageBuffer16BitAccess);
             requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
             break;
             
