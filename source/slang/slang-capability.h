@@ -377,7 +377,8 @@ private:
         // Ex: `{glsl}.implies({glsl|metal})` is true since we only compare shared-permutations.
         CanHaveSubsetOfTargetAndStageSets = 1 << 2,
 
-        WillAJoinWithOtherModifyThis = CannotHaveMoreTargetAndStageSets | CanHaveSubsetOfTargetAndStageSets
+        WillAJoinWithOtherModifyThis =
+            CannotHaveMoreTargetAndStageSets | CanHaveSubsetOfTargetAndStageSets
     };
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
