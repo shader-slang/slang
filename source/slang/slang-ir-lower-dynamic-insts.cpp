@@ -468,10 +468,15 @@ struct DynamicInstLoweringContext
     // Use this when you want to propagate new information to an existing instruction.
     // This will union the new info with existing info and add users to work queue if changed
     //
-    void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue& workQueue)
+    void updateInfo(
+        IRInst* context,
+        IRInst* inst,
+        IRInst* newInfo,
+        bool takeUnion,
+        WorkQueue& workQueue)
     {
         auto existingInfo = tryGetInfo(context, inst);
-        auto unionedInfo = unionPropagationInfo(existingInfo, newInfo);
+        auto unionedInfo = (takeUnion) ? unionPropagationInfo(existingInfo, newInfo) : newInfo;
 
         // Only proceed if info actually changed
         if (areInfosEqual(existingInfo, unionedInfo))
@@ -792,7 +797,10 @@ struct DynamicInstLoweringContext
             break;
         }
 
-        updateInfo(context, inst, info, workQueue);
+        // TODO: Remove this workaround.. there are a few insts
+        // where we shouldn't
+        bool takeUnion = !as<IRSpecialize>(inst);
+        updateInfo(context, inst, info, takeUnion, workQueue);
     }
 
     IRInst* analyzeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)
@@ -1330,7 +1338,7 @@ struct DynamicInstLoweringContext
 
                         if (auto collection = as<IRCollectionBase>(arg))
                         {
-                            updateInfo(context, param, makeTagType(collection), workQueue);
+                            updateInfo(context, param, makeTagType(collection), true, workQueue);
                         }
                         else if (as<IRType>(arg) || as<IRWitnessTable>(arg))
                         {
@@ -1338,6 +1346,7 @@ struct DynamicInstLoweringContext
                                 context,
                                 param,
                                 makeTagType(makeSingletonSet(arg)),
+                                true,
                                 workQueue);
                         }
                         else
@@ -1479,7 +1488,7 @@ struct DynamicInstLoweringContext
         else if (auto var = as<IRVar>(inst))
         {
             // If we hit a local var, we'll update it's info.
-            updateInfo(context, var, info, workQueue);
+            updateInfo(context, var, info, true, workQueue);
         }
         else if (auto param = as<IRParam>(inst))
         {
@@ -1491,7 +1500,7 @@ struct DynamicInstLoweringContext
             auto newInfo = builder.getPtrTypeWithAddressSpace(
                 (IRType*)as<IRPtrTypeBase>(info)->getValueType(),
                 as<IRPtrTypeBase>(param->getDataType()));
-            updateInfo(context, param, newInfo, workQueue);
+            updateInfo(context, param, newInfo, true, workQueue);
         }
         else
         {
@@ -1530,7 +1539,7 @@ struct DynamicInstLoweringContext
                 if (auto argInfo = tryGetInfo(context, arg))
                 {
                     // Use centralized update method
-                    updateInfo(context, param, argInfo, workQueue);
+                    updateInfo(context, param, argInfo, true, workQueue);
                 }
             }
             paramIndex++;
@@ -1693,6 +1702,7 @@ struct DynamicInstLoweringContext
                         {
                         case kParameterDirection_Out:
                         case kParameterDirection_InOut:
+                        case kParameterDirection_ConstRef:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -1710,7 +1720,7 @@ struct DynamicInstLoweringContext
                                     &builder,
                                     paramDirection,
                                     as<IRPtrTypeBase>(argInfo)->getValueType());
-                                updateInfo(edge.targetContext, param, newInfo, workQueue);
+                                updateInfo(edge.targetContext, param, newInfo, true, workQueue);
                                 break;
                             }
                         case kParameterDirection_In:
@@ -1722,7 +1732,7 @@ struct DynamicInstLoweringContext
                                         !as<IRInterfaceType>(arg->getDataType()))
                                         argInfo = arg->getDataType();
                                 }
-                                updateInfo(edge.targetContext, param, argInfo, workQueue);
+                                updateInfo(edge.targetContext, param, argInfo, true, workQueue);
                                 break;
                             }
                         default:
@@ -1741,7 +1751,7 @@ struct DynamicInstLoweringContext
                 if (returnInfo)
                 {
                     // Use centralized update method
-                    updateInfo(edge.callerContext, callInst, *returnInfo, workQueue);
+                    updateInfo(edge.callerContext, callInst, *returnInfo, true, workQueue);
                 }
 
                 // Also update infos of any out parameters
@@ -1765,6 +1775,7 @@ struct DynamicInstLoweringContext
                                 builder.getPtrTypeWithAddressSpace(
                                     (IRType*)as<IRPtrTypeBase>(paramInfo)->getValueType(),
                                     argPtrType),
+                                true,
                                 workQueue);
                         }
                     }
