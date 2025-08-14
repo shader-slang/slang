@@ -714,12 +714,10 @@ Result linkAndOptimizeIR(
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
 
-    // For now, only emit the debug build identifier if separate debug info is enabled
-    // and only if there are targets.
-    // TODO: We will ultimately need to change this to always emit the instruction.
-    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+    // Build identifier is a hash of the source code and compile options.
+    // Only emit the identifier if there is an entry point.
+    if (irEntryPoints.getCount() > 0)
     {
-        // Build identifier is a hash of the source code and compile options.
         String buildIdentifier = getBuildIdentifierString(codeGenContext->getProgram());
         int buildIdentifierFlags = 0;
         IRBuilder builder(irModule);
