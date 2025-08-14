@@ -1792,6 +1792,18 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tanh(float f)
 {
     return ::tanhf(f);
 }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_asinh(float f)
+{
+    return ::asinhf(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_acosh(float f)
+{
+    return ::acoshf(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_atanh(float f)
+{
+    return ::atanhf(f);
+}
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 {
     return ::log2f(f);
