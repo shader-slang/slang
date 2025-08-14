@@ -1819,25 +1819,25 @@ int _indexVal(lua_State* L)
         if (strcmp(name, "getDebugVisType") == 0)
         {
             auto aggTypeDecl = as<AggTypeDecl>(decl);
-            if(aggTypeDecl)
+            if (aggTypeDecl)
             {
-                if(aggTypeDecl->isSubTypeOf("Decl"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Decl");
-                else if(aggTypeDecl->isSubTypeOf("Expr"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Expr");
-                else if(aggTypeDecl->isSubTypeOf("Modifier"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Modifier");
-                else if(aggTypeDecl->isSubTypeOf("Stmt"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Stmt");
-                else if(aggTypeDecl->isSubTypeOf("Val"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Val");
-                else if(aggTypeDecl->isSubTypeOf("Scope"))
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Scope");
+                if (aggTypeDecl->isSubTypeOf("Decl"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Decl");
+                else if (aggTypeDecl->isSubTypeOf("Expr"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Expr");
+                else if (aggTypeDecl->isSubTypeOf("Modifier"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Modifier");
+                else if (aggTypeDecl->isSubTypeOf("Stmt"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Stmt");
+                else if (aggTypeDecl->isSubTypeOf("Val"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Val");
+                else if (aggTypeDecl->isSubTypeOf("Scope"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Scope");
                 else
-                    lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Unknown");
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Unknown");
             }
             else
-                lua_pushstring(L,  "SyntaxClassInfoDebugVisType::Unknown");
+                lua_pushstring(L, "SyntaxClassInfoDebugVisType::Unknown");
             return 1;
         }
     }
