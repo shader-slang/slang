@@ -9,50 +9,6 @@
       <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
     </Expand>
   </Type>
-  <Type Name="Slang::NodeBase" Inheritable="false">
-    <Expand>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ClassDecl">(Slang::ClassDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumDecl">(Slang::EnumDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InterfaceDecl">(Slang::InterfaceDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AssocTypeDecl">(Slang::AssocTypeDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GlobalGenericParamDecl">(Slang::GlobalGenericParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ScopeDecl">(Slang::ScopeDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ConstructorDecl">(Slang::ConstructorDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GetterDecl">(Slang::GetterDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SetterDecl">(Slang::SetterDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::RefAccessorDecl">(Slang::RefAccessorDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::FuncDecl">(Slang::FuncDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SubscriptDecl">(Slang::SubscriptDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PropertyDecl">(Slang::PropertyDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::NamespaceDecl">(Slang::NamespaceDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModuleDecl">(Slang::ModuleDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericDecl">(Slang::GenericDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AttributeDecl">(Slang::AttributeDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VarDeclBase">(Slang::VarDeclBase*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VarDecl">(Slang::VarDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::LetDecl">(Slang::LetDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GlobalGenericValueParamDecl">(Slang::GlobalGenericValueParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParamDecl">(Slang::ParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModernParamDecl">(Slang::ModernParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericValueParamDecl">(Slang::GenericValueParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EnumCaseDecl">(Slang::EnumCaseDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeConstraintDecl">(Slang::TypeConstraintDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::InheritanceDecl">(Slang::InheritanceDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericTypeConstraintDecl">(Slang::GenericTypeConstraintDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SimpleTypeDecl">(Slang::SimpleTypeDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeDefDecl">(Slang::TypeDefDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TypeAliasDecl">(Slang::TypeAliasDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GenericTypeParamDecl">(Slang::GenericTypeParamDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::UsingDecl">(Slang::UsingDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ImportDecl">(Slang::ImportDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
-        <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
-	</Expand>
-  </Type>
   <Type Name="Slang::ValNodeOperand">
     <DisplayString Condition="kind == Slang::ValNodeOperandKind::ConstantValue">Constant {intOperand}</DisplayString>
     <DisplayString Condition="kind == Slang::ValNodeOperandKind::ValNode">{(Slang::Val*)nodeOperand}</DisplayString>
@@ -340,11 +296,10 @@
     <Type Name="Slang::Decl" Inheritable="false">
         <DisplayString Condition="nameAndLoc.name!=0">{astNodeType,en} {nameAndLoc.name->text}</DisplayString>
         <DisplayString Condition="nameAndLoc.name==0">{astNodeType,en}</DisplayString>
-		<Expand>
+        <Expand>
             <Item Name="[Name]" Condition="nameAndLoc.name!=0">nameAndLoc.name->text</Item>
             <Item Name="[Parent]">parentDecl</Item>
             <Item Name="[CheckState]">Slang::DeclCheckState(checkState.m_raw &amp; ~Slang::DeclCheckStateExt::kBeingCheckedBit)</Item>
-			<Item Name="[Capabilities]">inferredCapabilityRequirements</Item>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
