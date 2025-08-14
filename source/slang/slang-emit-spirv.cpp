@@ -1802,7 +1802,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto valueType = ptrType->getValueType();
-                
+
                 // Check for 16-bit storage capabilities when emitting pointer types
                 require16BitStorageCapabilitiesForType(valueType, storageClass);
 
@@ -3211,13 +3211,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             registerInst(param, systemValInst);
             return systemValInst;
         }
-        
+
         // Check for 16-bit storage capabilities
         if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
         {
             require16BitStorageCapabilitiesForType(ptrType->getValueType(), storageClass);
         }
-        
+
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             param,
@@ -3242,13 +3242,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
-        
+
         // Check for 16-bit storage capabilities
         if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
         {
             require16BitStorageCapabilitiesForType(ptrType->getValueType(), storageClass);
         }
-        
+
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             globalVar,
@@ -7969,7 +7969,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (visited.contains(type))
             return false; // Cycle detected, break recursion
-        
+
         visited.add(type);
 
         switch (type->getOp())
@@ -7978,22 +7978,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
             return true;
-        
+
         case kIROp_VectorType:
             if (auto vectorType = as<IRVectorType>(type))
                 return typeContains16BitTypesImpl(vectorType->getElementType(), visited);
             break;
-            
+
         case kIROp_MatrixType:
             if (auto matrixType = as<IRMatrixType>(type))
                 return typeContains16BitTypesImpl(matrixType->getElementType(), visited);
             break;
-            
+
         case kIROp_ArrayType:
             if (auto arrayType = as<IRArrayType>(type))
                 return typeContains16BitTypesImpl(arrayType->getElementType(), visited);
             break;
-            
+
         case kIROp_StructType:
             if (auto structType = as<IRStructType>(type))
             {
@@ -8002,7 +8002,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         return true;
             }
             break;
-            
+
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
         case kIROp_HLSLAppendStructuredBufferType:
@@ -8010,7 +8010,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
                 return typeContains16BitTypesImpl(bufferType->getElementType(), visited);
             break;
-            
+
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
@@ -8020,7 +8020,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return typeContains16BitTypesImpl(ptrType->getValueType(), visited);
             break;
         }
-        
+
         return false;
     }
 
@@ -8036,18 +8036,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!typeContains16BitTypes(type))
             return;
-            
+
         switch (storageClass)
         {
         case SpvStorageClassUniform:
         case SpvStorageClassStorageBuffer:
             requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
             break;
-            
+
         case SpvStorageClassPushConstant:
             requireSPIRVCapability(SpvCapabilityStoragePushConstant16);
             break;
-            
+
         case SpvStorageClassInput:
         case SpvStorageClassOutput:
             requireSPIRVCapability(SpvCapabilityStorageInputOutput16);
