@@ -633,7 +633,7 @@ Result RendererBase::createProgram2(
             auto hash = getStableHashCode32((char*)desc.sourceData, desc.sourceDataSize);
             auto hashStr = String(hash);
             auto srcBlob = UnownedRawBlob::create(desc.sourceData, desc.sourceDataSize);
-            slangSession->loadModuleFromIRBlob(
+            module = slangSession->loadModuleFromIRBlob(
                 hashStr.getBuffer(),
                 hashStr.getBuffer(),
                 srcBlob,
