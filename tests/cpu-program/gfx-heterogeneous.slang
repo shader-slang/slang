@@ -6,8 +6,7 @@ import slang;
 [numthreads(4, 1, 1)]
 void computeMain(
     uint3 sv_dispatchThreadID: SV_DispatchThreadID,
-    uniform RWStructuredBuffer<float> buffer
-            )
+    uniform RWStructuredBuffer<float> buffer)
 {
     var input = buffer[sv_dispatchThreadID.x];
     buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
