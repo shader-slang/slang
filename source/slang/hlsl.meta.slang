@@ -12381,18 +12381,36 @@ T nextafter(T x, T y)
         if (isnan(x)) return x;
         if (isnan(y)) return y;
         if (x == y) return y;
+
+        int delta = x < y ? 1 : -1;
+
         if (T is half)
         {
-            T delta = __realCast<T>(bit_cast<half>(uint16_t(1)));
-            return x + ((x < y) ? delta : -delta);
+            uint16_t val = bit_cast<uint16_t>(x);
+            if((val >> 15) != 0) // If we're negative, -1 acts like +1 on the float.
+                delta = -delta;
+            uint16_t nextval = val + uint16_t(delta);
+            if(((val^nextval) >> 15) != 0) // If sign bit changed
+                nextval += 0x8002; // Correct the overflow
+            return bit_cast<T>(nextval);
         }
         if (T is float)
         {
-            T delta = __realCast<T>(bit_cast<float>(uint32_t(1)));
-            return x + ((x < y) ? delta : -delta);
+            uint32_t val = bit_cast<uint32_t>(x);
+            if((val >> 31) != 0)
+                delta = -delta;
+            uint32_t nextval = val + uint32_t(delta);
+            if(((val^nextval) >> 31) != 0)
+                nextval += 0x80000002u;
+            return bit_cast<T>(nextval);
         }
-        T delta = __realCast<T>(bit_cast<double>(uint64_t(1)));
-        return x + ((x < y) ? delta : -delta);
+        uint64_t val = bit_cast<uint64_t>(x);
+        if((val >> 63) != 0)
+            delta = -delta;
+        uint64_t nextval = val + uint64_t(delta);
+        if(((val^nextval) >> 63) != 0)
+            nextval += 0x8000000000000002ull;
+        return bit_cast<T>(nextval);
     }
 }
 
