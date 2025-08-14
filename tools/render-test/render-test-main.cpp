@@ -1401,7 +1401,7 @@ static SlangResult _innerMain(
         nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
         slangPassThrough = SLANG_PASS_THROUGH_NVRTC;
         break;
-    case DeviceType::WGPU:
+    case DeviceType::WebGPU:
         input.target = SLANG_WGSL;
         input.profile = "";
         nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;

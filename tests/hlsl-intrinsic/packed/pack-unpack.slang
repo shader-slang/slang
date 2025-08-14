@@ -4,7 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
 // 16 bit variants are not supported by WGSL.
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL
+//TEST(compute):COMPARE_COMPUTE_EX:-webgpu -compute -shaderobj -xslang -DWGSL
 // Debug info for inlining errors can be given out, so disable them for this test.
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0
 
@@ -14,7 +14,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -xslang -DUSE_SLANG_SYNTAX
 
 // 16 bit variants are not supported by WGSL.
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -xslang -DWGSL -xslang -DUSE_SLANG_SYNTAX
+//TEST(compute):COMPARE_COMPUTE_EX:-webgpu -compute -shaderobj -xslang -DWGSL -xslang -DUSE_SLANG_SYNTAX
 // Debug info for inlining errors can be given out, so disable them for this test.
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -g0 -xslang -DUSE_SLANG_SYNTAX
 
@@ -264,4 +264,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = 0x81807FFF;
 #endif
 }
-

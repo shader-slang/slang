@@ -140,7 +140,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
     {
         legalizeScalarOperandsToMatchComposite(inst);
     }
-    else if (isWGPUTarget(target))
+    else if (isWebGPUTarget(target))
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
         replaceMatrixDividedByScalarWithMul(inst);

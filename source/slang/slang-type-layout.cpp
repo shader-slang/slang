@@ -2525,7 +2525,7 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
-bool isWGPUTarget(CodeGenTarget target)
+bool isWebGPUTarget(CodeGenTarget target)
 {
     switch (target)
     {
@@ -2539,9 +2539,9 @@ bool isWGPUTarget(CodeGenTarget target)
     }
 }
 
-bool isWGPUTarget(TargetRequest* targetReq)
+bool isWebGPUTarget(TargetRequest* targetReq)
 {
-    return isWGPUTarget(targetReq->getTarget());
+    return isWebGPUTarget(targetReq->getTarget());
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
@@ -2679,7 +2679,7 @@ static bool shouldAllocateRegisterSpaceForParameterBlock(TypeLayoutContext const
     // If we know that we are targetting Vulkan, then
     // the only way to effectively use parameter blocks
     // is by using descriptor sets.
-    if (isVulkanTarget(targetReq) || isWGPUTarget(targetReq))
+    if (isVulkanTarget(targetReq) || isWebGPUTarget(targetReq))
         return true;
 
     // If none of the above passed, then it seems like we

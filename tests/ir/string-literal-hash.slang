@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-wgpu
+//TEST(compute):COMPARE_COMPUTE:-webgpu
 
 // Note: disabled on CPU target until we can fill
 // in a more correct/complete `String` and `getStringHash`
@@ -21,4 +21,3 @@ void computeMain(
     int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");   
     outputBuffer[tid.x] = value;
 }
-

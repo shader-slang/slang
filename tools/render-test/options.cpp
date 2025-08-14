@@ -38,7 +38,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::CUDA:
         return rhi::DeviceType::CUDA;
     case RenderApiType::WebGPU:
-        return rhi::DeviceType::WGPU;
+        return rhi::DeviceType::WebGPU;
     default:
         return rhi::DeviceType::Default;
     }

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -webgpu -output-using-type
 
 struct Params{
     int2 data[2];
@@ -20,4 +20,3 @@ void computeMain()
     // CHECK: 17
     outputBuffer[0] = helper(params.data[1]) + params.scalarData[1];
 }
-

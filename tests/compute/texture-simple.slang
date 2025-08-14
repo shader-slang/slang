@@ -10,7 +10,7 @@
 //Texture1D<float> tLoad1D;
 
 // Not supported in WGSL: 1D array texture not supported in WGSL
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -webgpu
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;

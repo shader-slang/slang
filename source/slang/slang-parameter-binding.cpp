@@ -1151,7 +1151,7 @@ static void addExplicitParameterBindings_GLSL(
 
     // First, we want to apply offsets of specialization constants for platforms that supports them.
     if (!isKhronosTarget(context->getTargetRequest()) &&
-        !isWGPUTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
+        !isWebGPUTarget(context->getTargetRequest()) && !isMetalTarget(context->getTargetRequest()))
         return;
 
     if (auto foundSpecializationConstant =
@@ -1191,7 +1191,7 @@ static void addExplicitParameterBindings_GLSL(
     // so that we are able to distinguish between
     // Vulkan and OpenGL as targets.
     //
-    if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+    if (isKhronosTarget(context->getTargetRequest()) || isWebGPUTarget(context->getTargetRequest()))
     {
         // The catch in GLSL is that the expected resource type
         // is implied by the parameter declaration itself, and
@@ -1988,7 +1988,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // the `SV_Target` order.
     //
     if (isKhronosTarget(context->getTargetRequest()) ||
-        isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+        isMetalTarget(context->getTargetRequest()) || isWebGPUTarget(context->getTargetRequest()))
     {
         if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {

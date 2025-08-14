@@ -1777,7 +1777,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     if (as<IRSwizzledStore>(user))
     {
         if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
-            isWGPUTarget(getTargetReq()))
+            isWebGPUTarget(getTargetReq()))
             return false;
     }
 
@@ -3328,7 +3328,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             // cpp, cuda and wgsl targets don't support swizzle on the left handside, so we
             // have to assign the element one by one.
             if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
-                isWGPUTarget(getTargetReq()))
+                isWebGPUTarget(getTargetReq()))
             {
                 _emitSwizzleStorePerElement(inst);
             }

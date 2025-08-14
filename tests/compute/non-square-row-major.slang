@@ -3,7 +3,7 @@
 // Note! This test doesn't work on CUDA or CPU targets, because both these targets 
 // assume matrices are tightly packed, whereas GPU targets align rows to 16 bytes.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -wgpu -output-using-type -xslang -matrix-layout-row-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -webgpu -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj

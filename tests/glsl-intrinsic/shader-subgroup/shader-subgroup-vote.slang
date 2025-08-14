@@ -9,7 +9,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU
 
 // Not testing because CI runners may not support Metal's intrinsics.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
@@ -119,7 +119,7 @@ bool testAllEqual() {
 [[ForceInline]]
 void _barrier()
 {
-#if !defined(WGPU)
+#if !defined(WebGPU)
     subgroupBarrier();
 #else
     GroupMemoryBarrier();
@@ -134,7 +134,7 @@ void computeMain()
     // one is true, rest false, positive
     outputBuffer.data[0] = 1;
     
-#if !defined(WGPU)
+#if !defined(WebGPU)
     bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
 #else
     // There is no subgroup barrier for WGSL and workgroup barrier requries non uniform control flow.
@@ -172,7 +172,7 @@ void computeMain()
     outputBuffer.data[4] = 1;
 
     // All equal intrinsic is not supported on WGSL as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
     if (testAllEqual()) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;

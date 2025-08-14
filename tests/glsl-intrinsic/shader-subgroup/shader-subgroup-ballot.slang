@@ -9,7 +9,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU -render-feature half
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU -render-feature half
 
 // Not testing because CI runners may not support Metal's intrinsics.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
@@ -79,8 +79,8 @@ bool testBroadcastX() {
         & testVBroadcastX<uint, 3>()
         & testVBroadcastX<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+        // Disabled on WebGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WebGPU) && !defined(METAL)
         & test1BroadcastX<double>() // WARNING: intel GPU's lack FP64 support
         & testVBroadcastX<double, 2>()
         & testVBroadcastX<double, 3>()
@@ -107,8 +107,8 @@ bool testBroadcastX() {
         & testVBroadcastX<bool, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined(WGPU)
+        // Disabled on WebGPU as these built-in types are not supported as of time of writing.
+#if !defined(WebGPU)
         & test1BroadcastX<int16_t>() 
         & testVBroadcastX<int16_t, 2>()
         & testVBroadcastX<int16_t, 3>()
@@ -125,7 +125,7 @@ bool testBallot() {
     return true 
         & (subgroupBallot(true).x == 0xFFFFFFFF)
 
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
         & (subgroupInverseBallot(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == true)
         & (subgroupBallotBitExtract(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), 0) == true)
         & (subgroupBallotBitCount(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == 32)

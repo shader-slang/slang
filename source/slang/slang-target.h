@@ -77,8 +77,8 @@ bool isCUDATarget(TargetRequest* targetReq);
 bool isCPUTarget(TargetRequest* targetReq);
 
 /// Are we generating code for the WebGPU API?
-bool isWGPUTarget(TargetRequest* targetReq);
-bool isWGPUTarget(CodeGenTarget target);
+bool isWebGPUTarget(TargetRequest* targetReq);
+bool isWebGPUTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
