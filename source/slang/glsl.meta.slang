@@ -301,7 +301,7 @@ public extension vector<T, 3>
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -309,7 +309,7 @@ public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -317,7 +317,7 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -325,7 +325,7 @@ public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -333,7 +333,7 @@ public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -341,7 +341,7 @@ public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -354,7 +354,7 @@ for (auto type : kBaseTypes) {
 }}}}
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return all(equal(left, right));
@@ -362,7 +362,7 @@ public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return any(notEqual(left, right));
@@ -6264,7 +6264,7 @@ public void traceRayMotionNV(
 
 // GL_KHR_shader_subgroup_basic Built-in Variables
 
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 void requireGLSLExtForSubgroupBasicBuiltin() {
     __target_switch
     {
@@ -6288,7 +6288,7 @@ void setupExtForSubgroupBasicBuiltIn() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 void requireGLSLExtForSubgroupBallotBuiltin() {
     __target_switch
     {
@@ -6301,7 +6301,7 @@ void requireGLSLExtForSubgroupBallotBuiltin() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 void setupExtForSubgroupBallotBuiltIn() {
     __target_switch
     {
@@ -8204,7 +8204,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_metal_spirv, subgroup_quad)]
 public T subgroupQuadBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
@@ -8247,9 +8247,9 @@ public T subgroupQuadSwapDiagonal(T value)
 
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_quad)
+    __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+    [require(glsl_hlsl_metal_spirv, subgroup_quad)]
 public vector<T,N> subgroupQuadBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
