@@ -364,9 +364,9 @@ private:
         OnlyRequireASingleValidImply = 1 << 0,
         // The target+stage permuations in `this` cannot have extra permutations
         // relative to `other`.
-        // Ex: `{metal+glsl}.implies({glsl})` is false
-        //     `{glsl}.implies({glsl,metal})` is false
-        //     `{glsl}.implies({glsl,glsl})` is true
+        // Ex: `{metal|glsl}.implies({glsl})` is false
+        //     `{glsl}.implies({glsl|metal})` is false
+        //     `{glsl}.implies({glsl|glsl})` is true
         CannotHaveMoreTargetAndStageSets = 1 << 1,
         // The target+stage permuations in `this` can have less permutations
         // than `other`. This means, only for the shared permutations of `this`
@@ -374,7 +374,7 @@ private:
         // true.
         // If `this` is empty, `this` is not able to imply `other` unless `other`
         // is empty.
-        // Ex: `{glsl}.implies({glsl,metal})` is true since we only compare shared-permutations.
+        // Ex: `{glsl}.implies({glsl|metal})` is true since we only compare shared-permutations.
         CanHaveSubsetOfTargetAndStageSets = 1 << 2,
 
         WillAJoinWithOtherModifyThis = CannotHaveMoreTargetAndStageSets | CanHaveSubsetOfTargetAndStageSets
