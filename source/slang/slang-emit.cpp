@@ -1807,6 +1807,23 @@ Result linkAndOptimizeIR(
     // Validate vectors and matrices according to what the target allows
     validateVectorsAndMatrices(irModule, sink, targetRequest);
 
+    if (target == CodeGenTarget::HostCPPSource)
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_Func)
+            {
+                if (auto dec = inst->findDecoration<IRKeepAliveDecoration>())
+                {
+                    if (!inst->findDecoration<IRExternCppDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+
     // The resource-based specialization pass above
     // may create specialized versions of functions, but
     // it does not try to completely eliminate the original
