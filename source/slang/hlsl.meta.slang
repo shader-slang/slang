@@ -8186,7 +8186,7 @@ uint countbits(T value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        __intrinsic_asm "popcount";
+        __intrinsic_asm "($TR)popcount($0)";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_countbits($0)";
@@ -8246,7 +8246,7 @@ vector<uint, N> countbits(vector<T, N> value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        __intrinsic_asm "popcount";
+        __intrinsic_asm "($TR)popcount($0)";
     case spirv:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
