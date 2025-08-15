@@ -8002,14 +8002,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return typeNeedsStorageCapabilityImpl(atomicType->getElementType(), found, visited);
             break;
 
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-        case kIROp_HLSLAppendStructuredBufferType:
-        case kIROp_HLSLConsumeStructuredBufferType:
-            if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
-                return typeNeedsStorageCapabilityImpl(bufferType->getElementType(), found, visited);
-            break;
-
         case kIROp_PtrType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
