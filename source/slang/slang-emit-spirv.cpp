@@ -1802,9 +1802,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto valueType = ptrType->getValueType();
-
-                // Check for 16-bit storage capabilities when emitting pointer types
-                require16BitStorageCapabilitiesForType(valueType, storageClass);
+                
+                // Check for 8/16-bit storage capabilities when emitting pointer types
+                requireCapabilitiesForType(valueType, storageClass);
 
                 // If we haven't emitted the inner type yet, we need to emit a forward declaration.
                 bool useForwardDeclaration =
@@ -3212,12 +3212,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return systemValInst;
         }
 
-        // Check for 16-bit storage capabilities
-        if (auto ptrType = as<IRPtrTypeBase>(param->getDataType()))
-        {
-            require16BitStorageCapabilitiesForType(ptrType->getValueType(), storageClass);
-        }
-
         auto varInst = emitOpVariable(
             getSection(SpvLogicalSectionID::GlobalVariables),
             param,
@@ -3241,12 +3235,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
-        }
-
-        // Check for 16-bit storage capabilities
-        if (auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType()))
-        {
-            require16BitStorageCapabilitiesForType(ptrType->getValueType(), storageClass);
         }
 
         auto varInst = emitOpVariable(
@@ -6427,8 +6415,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType);
         SpvStorageClass storageClass = getSpvStorageClass(ptrType);
 
-        // Check for 16-bit storage capabilities
-        require16BitStorageCapabilitiesForType(ptrType->getValueType(), storageClass);
+        // Check for 8/16-bit storage capabilities
+        requireCapabilitiesForType(ptrType->getValueType(), storageClass);
 
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
@@ -7964,8 +7952,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    // Helper function to recursively check if a type contains 16-bit types
-    bool typeContains16BitTypesImpl(IRType* type, HashSet<IRType*>& visited)
+    // Helper function to recursively check if a type contains 8/16-bit types
+    bool typeNeedsStorageCapabilityImpl(IRType* type, HashSet<int>& found, HashSet<IRType*>& visited)
     {
         if (visited.contains(type))
             return false; // Cycle detected, break recursion
@@ -7977,28 +7965,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HalfType:
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
+            found.add(16);
+            return true;
+
+        case kIROp_UInt8Type:
+        case kIROp_Int8Type:
+            found.add(8);
             return true;
 
         case kIROp_VectorType:
             if (auto vectorType = as<IRVectorType>(type))
-                return typeContains16BitTypesImpl(vectorType->getElementType(), visited);
+                return typeNeedsStorageCapabilityImpl(vectorType->getElementType(), found, visited);
             break;
 
         case kIROp_MatrixType:
             if (auto matrixType = as<IRMatrixType>(type))
-                return typeContains16BitTypesImpl(matrixType->getElementType(), visited);
+                return typeNeedsStorageCapabilityImpl(matrixType->getElementType(), found, visited);
             break;
 
         case kIROp_ArrayType:
             if (auto arrayType = as<IRArrayType>(type))
-                return typeContains16BitTypesImpl(arrayType->getElementType(), visited);
+                return typeNeedsStorageCapabilityImpl(arrayType->getElementType(), found, visited);
             break;
 
         case kIROp_StructType:
             if (auto structType = as<IRStructType>(type))
             {
                 for (auto field : structType->getFields())
-                    if (typeContains16BitTypesImpl(field->getFieldType(), visited))
+                    if (typeNeedsStorageCapabilityImpl(field->getFieldType(), found, visited))
                         return true;
             }
             break;
@@ -8008,7 +8002,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
             if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
-                return typeContains16BitTypesImpl(bufferType->getElementType(), visited);
+                return typeNeedsStorageCapabilityImpl(bufferType->getElementType(), found, visited);
             break;
 
         case kIROp_PtrType:
@@ -8017,40 +8011,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_OutType:
         case kIROp_InOutType:
             if (auto ptrType = as<IRPtrTypeBase>(type))
-                return typeContains16BitTypesImpl(ptrType->getValueType(), visited);
+                return typeNeedsStorageCapabilityImpl(ptrType->getValueType(), found, visited);
             break;
         }
 
         return false;
     }
 
-    // Public wrapper for 16-bit type detection
-    bool typeContains16BitTypes(IRType* type)
+    // Public wrapper for 8/16-bit type detection
+    bool typeNeedsStorageCapability(IRType* type, HashSet<int>& found)
     {
         HashSet<IRType*> visited;
-        return typeContains16BitTypesImpl(type, visited);
+        return typeNeedsStorageCapabilityImpl(type, found, visited);
     }
 
-    // Check and require 16-bit storage capabilities based on storage class and type
-    void require16BitStorageCapabilitiesForType(IRType* type, SpvStorageClass storageClass)
+    // Check and require 8/16-bit storage capabilities based on storage class and type
+    void requireCapabilitiesForType(IRType* type, SpvStorageClass storageClass)
     {
-        if (!typeContains16BitTypes(type))
+        HashSet<int> found;
+        if (!typeNeedsStorageCapability(type, found))
             return;
 
         switch (storageClass)
         {
         case SpvStorageClassUniform:
         case SpvStorageClassStorageBuffer:
-            requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
+            if (found.contains(8)) {
+                ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
+                requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer8BitAccess);
+            }
+            if (found.contains(16))
+                requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
             break;
 
         case SpvStorageClassPushConstant:
-            requireSPIRVCapability(SpvCapabilityStoragePushConstant16);
+            if (found.contains(8)) {
+                ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
+                requireSPIRVCapability(SpvCapabilityStoragePushConstant8);
+            }
+            if (found.contains(16))
+                requireSPIRVCapability(SpvCapabilityStoragePushConstant16);
             break;
 
         case SpvStorageClassInput:
         case SpvStorageClassOutput:
-            requireSPIRVCapability(SpvCapabilityStorageInputOutput16);
+            if (found.contains(16))
+                requireSPIRVCapability(SpvCapabilityStorageInputOutput16);
             break;
         }
     }
@@ -8479,7 +8485,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return ensureInst(m_voidType);
 
         IRBuilder builder(type);
-        if (const auto funcType = as<IRFuncType>(type))
+        if (as<IRFuncType>(type))
         {
             List<SpvInst*> argTypes;
             return emitOpDebugTypeFunction(
