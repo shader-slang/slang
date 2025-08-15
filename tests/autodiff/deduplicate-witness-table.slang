@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK):-stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE(filecheck=CHK):-target cuda -line-directive-mode none
 
 //CHK: struct DiffPair_1
 //CHK-NOT: struct DiffPair_2

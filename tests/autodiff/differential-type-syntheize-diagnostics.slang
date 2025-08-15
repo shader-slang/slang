@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 
 struct PartlyDiffable : IDifferentiable
 {

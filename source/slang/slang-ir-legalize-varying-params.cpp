@@ -1908,6 +1908,9 @@ private:
                     field->getKey(),
                     fieldParam);
 
+                // Remove the sementic info from the original struct
+                semanticInfoToRemove.add(field);
+
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
                 if (varLayout)
@@ -3323,6 +3326,14 @@ protected:
                 result.systemValueName = toSlice("thread_index_in_quadgroup");
                 result.permittedTypes.add(builder.getUInt16Type());
                 result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+        case SystemValueSemanticName::Barycentrics:
+            {
+                result.systemValueName = toSlice("barycentric_coord");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 3)));
                 break;
             }
         default:
