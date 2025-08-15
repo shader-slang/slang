@@ -1319,6 +1319,7 @@ Result linkAndOptimizeIR(
         // For Metal targets, transform resource types to descriptor handles first
         if (isMetalTarget(targetRequest))
         {
+            legalizeEmptyTypes(targetProgram, irModule, sink);
             transformResourceTypesToDescriptorHandles(targetProgram, irModule, sink);
         }
         
@@ -1326,10 +1327,6 @@ Result linkAndOptimizeIR(
 
         // We also need to legalize empty types for Metal targets.
 
-        if (isMetalTarget(targetRequest))
-        {
-            legalizeEmptyTypes(targetProgram, irModule, sink);
-        }
         //  Debugging output of legalization
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");

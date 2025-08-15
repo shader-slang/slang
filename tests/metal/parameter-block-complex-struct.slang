@@ -53,8 +53,6 @@ ParameterBlock<RWStructuredBuffer<Val>> valBlock;
 
 RWStructuredBuffer<float> outputBuffer;
 
-// CHECK-ASM: define void @computeMain
-
 void func(ParentStruct::ChildStruct c) {
     outputBuffer[0] = c.texture.Load(int3(0));
     Texture2D<float> tex = c.texture;
@@ -72,6 +70,12 @@ void func3(Array<Texture2D<float>, 2> arr) {
     outputBuffer[3] = arr[0].Load(int3(0));
 }
 
+void func4(ParameterBlock<ParentStruct> block) {
+    ParentStruct p = block;
+    outputBuffer[8] = p.c.texture.Load(int3(0));
+}
+
+// CHECK-ASM: {{.*}} @computeMain
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
@@ -117,9 +121,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     // Test function with a field from the parameter block
     func3(p.tex_array);
 
-    // TODO: parameter block in function signature doesn't work
-    // Should we modify the func and convert the the param `block` ? 
-    // void func(ParameterBlock<NestedStruct> block) {
-    // func(nestedBlock);
-
+    // Test function with a parameter block in the function signature
+    func4(parentBlock);
 }

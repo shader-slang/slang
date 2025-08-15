@@ -405,6 +405,70 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         return transformedValue;
     }
 
+    /// Helper function to convert a transformed instruction to original type and replace its use
+    ///
+    /// This function performs the common pattern of loading a transformed value, converting it
+    /// back to the original type, storing it in new storage, and replacing the use with the
+    /// new storage pointer. It also tracks processed instructions to avoid infinite loops.
+    ///
+    /// @param currentInst The instruction with transformed type to convert
+    /// @param userInstruction The instruction that will use the converted value
+    /// @param use The specific use to replace
+    /// @param processed HashSet to track processed instructions for loop prevention
+    /// @return true if conversion was performed, false otherwise
+    bool performTransformedToOriginalConversionForUse(
+        IRInst* currentInst, 
+        IRInst* userInstruction, 
+        IRUse* use, 
+        HashSet<IRInst*>& processed)
+    {
+        auto currentInstType = currentInst->getFullType();
+        
+        IRType* transformedType = nullptr;
+        IRType* originalType = nullptr;
+
+        // Check if current instruction has PtrType<TransformedType>
+        if (auto ptrType = as<IRPtrTypeBase>(currentInstType))
+        {
+            transformedType = ptrType->getValueType();
+        }
+        // Check if current instruction is a ParameterBlock<TransformedType>
+        else if (auto paramBlockType = as<IRParameterBlockType>(currentInstType))
+        {
+            transformedType = paramBlockType->getElementType();
+        }
+
+        // Check if we have a mapping from transformed type to original type
+        if (!transformedType || !loweredToOriginalTypeMap.tryGetValue(transformedType, originalType))
+        {
+            return false; // No conversion needed
+        }
+
+        // Insert conversion instructions before the user instruction
+        irBuilder.setInsertBefore(userInstruction);
+        
+        // Load the transformed value from the source
+        auto transformedValue = irBuilder.emitLoad(currentInst);
+        
+        // Convert the transformed value back to original type
+        auto convertedValue = convertDescriptorHandleToOriginalType(
+            transformedValue, 
+            originalType);
+        
+        // Create storage for the converted value with original type
+        auto convertedPtr = irBuilder.emitVar(originalType);
+        auto store = irBuilder.emitStore(convertedPtr, convertedValue);
+
+        // Track the newly created instructions to avoid processing them again
+        processed.add(transformedValue);
+        processed.add(convertedPtr);
+        processed.add(store);
+
+        // Replace the use of currentInst with convertedPtr
+        use->set(convertedPtr);
+
+        return true; // Conversion was performed
+    }
 
         void updateTypesAndInsertCast(IRInst* startInst) {
             
@@ -426,7 +490,9 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 for (auto use = currentInst->firstUse; use; use = use->nextUse)
                 {
                     auto userInstruction = use->getUser();
-                    
+                    if (processed.contains(userInstruction)) {
+                        continue;
+                    }
                     switch (userInstruction->getOp())
                     {
                     case kIROp_FieldAddress:
@@ -454,68 +520,74 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                         worklist.add(userInstruction);
                     }
                     break;
-                    
-                    case kIROp_Load:
                     case kIROp_Call:
                     {
-                        // Insert conversion before the load or call
-                        // so that the Load/Call operates on the original type data
+                        // Handle function calls - check if the function expects transformed types
+                        auto callInst = as<IRCall>(userInstruction);
+                        auto calleeFunc = as<IRFunc>(callInst->getCallee());
+                        if (!calleeFunc)
+                        {
+                            worklist.add(userInstruction);
+                            break;
+                        }
+
                         auto currentInstType = currentInst->getFullType();
-                        
                         IRType* transformedType = nullptr;
-                        IRType* originalType = nullptr;
-                        IRInst* sourceToLoad = nullptr;
-                        
+
                         // Check if current instruction has PtrType<TransformedType>
                         if (auto ptrType = as<IRPtrTypeBase>(currentInstType))
                         {
-                            auto pointeeType = ptrType->getValueType();
-                            if (loweredToOriginalTypeMap.tryGetValue(pointeeType, originalType))
-                            {
-                                transformedType = pointeeType;
-                                sourceToLoad = currentInst;  // Load from the pointer
-                            }
+                            transformedType = ptrType->getValueType();
                         }
                         // Check if current instruction is a ParameterBlock<TransformedType>
                         else if (auto paramBlockType = as<IRParameterBlockType>(currentInstType))
                         {
-                            auto elementType = paramBlockType->getElementType();
-                            if (loweredToOriginalTypeMap.tryGetValue(elementType, originalType))
+                            transformedType = paramBlockType->getElementType();
+                        }
+
+                        // Check if the function has parameters that expect transformed types
+                        // Only ParameterBlockType is likely to be transformed in function params
+                        bool functionExpectsTransformedTypes = false;
+                        for (auto param = calleeFunc->getFirstParam(); param; param = param->getNextParam())
+                        {
+                            auto paramType = param->getDataType();
+
+                            // Check if this parameter type is a transformed ParameterBlock type
+                            if (auto paramBlockType = as<IRParameterBlockType>(paramType))
                             {
-                                transformedType = elementType;
-                                sourceToLoad = currentInst;  // Load from the parameter block
+                                auto elementType = paramBlockType->getElementType();
+                                if (elementType == transformedType)
+                                {
+                                    functionExpectsTransformedTypes = true;
+                                    break;
+                                }
                             }
                         }
-                        
-                        // If we found a transformed type that needs conversion
-                        if (transformedType && originalType && sourceToLoad)
+
+                        // If function expects transformed types, keep the transformed type
+                        if (functionExpectsTransformedTypes)
                         {
-                            // Insert conversion instructions before the load so it can operate normally
-                            irBuilder.setInsertBefore(userInstruction);
-                            
-                            // Load the transformed value from the source
-                            auto transformedValue = irBuilder.emitLoad(sourceToLoad);
-                            
-                            // Convert the transformed value back to original type
-                            auto convertedValue = convertDescriptorHandleToOriginalType(
-                                transformedValue, 
-                                originalType);
-                            
-                            // Create storage for the converted value with original type
-                            auto convertedPtr = irBuilder.emitVar(originalType);
-                            irBuilder.emitStore(convertedPtr, convertedValue);
-                            
-                            // Replace the use of currentInst in the load with convertedPtr
-                            // This makes the load operate on the original type pointer/source
-                            use->set(convertedPtr);
+                            // No conversion needed - the function expects the transformed type
+                            // Just add to worklist for further processing
+                            worklist.add(userInstruction);
                         }
-                        // Add the user instruction to worklist for further processing
-                        worklist.add(userInstruction);
-                    }
-                    break;
+                        else
+                        {
+                            // Function expects original types, so convert back
+                            // Use helper function to convert transformed types to original types
+                            performTransformedToOriginalConversionForUse(currentInst, userInstruction, use, processed);
+
+                            // Add to worklist for further processing
+                            worklist.add(userInstruction);
+                        }
                     
+                        break;
+                    }
+
                     default:
                     {
+                        // Use helper function to convert transformed types to original types
+                        performTransformedToOriginalConversionForUse(currentInst, userInstruction, use, processed);
                         // For other instruction types, just add to worklist
                         worklist.add(userInstruction);
                     }
@@ -531,10 +603,11 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 for (auto use = transformedParameterBlockType->firstUse; use; use = use->nextUse)
                 {
                     auto userInstruction = use->getUser();
-                    if (auto globalParameterVariable = as<IRGlobalParam>(userInstruction))
+                    if (userInstruction->getOp() == kIROp_GlobalParam || 
+                        userInstruction->getOp() == kIROp_Param)
                     {
-                        // Begin top-down processing from this global parameter
-                        updateTypesAndInsertCast(globalParameterVariable);
+                        // Begin top-down processing from this global parameter or function parameter
+                        updateTypesAndInsertCast(userInstruction);
                     }
                 }
             }
