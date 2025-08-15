@@ -6,6 +6,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -205,6 +206,33 @@ bool isVaryingParameter(IRVarLayout* varLayout)
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 
+
+// Helper function to determine if a parameter should be collected into a constant buffer
+// For Metal targets, resource types need to remain as direct entry point parameters
+// to generate proper binding attributes like [[buffer(N)]], [[texture(N)]], [[sampler(N)]]
+bool shouldCollectEntryPointParamInConstantBuffer(
+    IRParam* param,
+    TargetRequest* targetReq,
+    IRVarLayout* paramLayout = nullptr)
+{
+
+    // Check if this is a varying parameter - if so, don't collect
+    if (isVaryingParameter(paramLayout))
+        return false;
+
+    auto paramType = param->getDataType();
+
+    // For Metal targets, skip all resource types to preserve direct binding
+    if (targetReq && isMetalTarget(targetReq))
+    {
+        // Skip all resource types that need explicit Metal binding attributes
+        if (isResourceType(paramType))
+            return false;
+    }
+
+    return true; // Collect into constant buffer by default
+}
+
 struct CollectEntryPointUniformParams : PerEntryPointPass
 {
     CollectEntryPointUniformParamsOptions m_options;
@@ -302,11 +330,15 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
+
+            // For Metal targets, skip collection of resource parameters
+            // so they remain as direct entry point parameters and can generate
+            // proper binding attributes like [[buffer(N)]], [[texture(N)]], [[sampler(N)]]
             //
-            if (isVaryingParameter(paramLayout))
+            if (!shouldCollectEntryPointParamInConstantBuffer(
+                    param,
+                    m_options.targetReq,
+                    paramLayout))
                 continue;
 
             for (auto offsetAttr : paramLayout->getOffsetAttrs())
@@ -584,6 +616,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
 struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 {
+    TargetRequest* m_targetReq = nullptr;
+
     void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
         auto entryPointFunc = info.func;
@@ -617,11 +651,8 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
-            //
-            if (isVaryingParameter(paramLayout))
+            // Use unified logic to determine if parameter should be collected
+            if (!shouldCollectEntryPointParamInConstantBuffer(param, m_targetReq, paramLayout))
                 continue;
 
             auto paramType = param->getFullType();
@@ -675,9 +706,10 @@ void collectEntryPointUniformParams(
     context.processModule(module);
 }
 
-void moveEntryPointUniformParamsToGlobalScope(IRModule* module)
+void moveEntryPointUniformParamsToGlobalScope(IRModule* module, TargetRequest* targetReq)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
+    context.m_targetReq = targetReq;
     context.processModule(module);
 }
 
