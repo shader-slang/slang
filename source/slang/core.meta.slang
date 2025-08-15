@@ -1377,9 +1377,9 @@ void storeAligned<int alignment, T>(T* ptr, T value)
 }
 
 ${{{
-    StringBuilder ptrTypeParameterList;
-    ptrTypeParameterList << "T, Access access, AddressSpace addrSpace";
-    String ptrArgListDef = ptrTypeParameterList.toString();
+    StringBuilder ptrTypeParameterListBuilder;
+    ptrTypeParameterListBuilder << "T, Access access, AddressSpace addrSpace";
+    String ptrTypeParameterList = ptrTypeParameterListBuilder.toString();
 
     StringBuilder ptrArgListBuilder;
     ptrArgListBuilder << "T, access, addrSpace";
@@ -1392,45 +1392,45 @@ ${{{
 }}}
 //@hidden:
 __intrinsic_op($(kIROp_Load))
-T __load<$(ptrArgListDef)>($(fullPtrType) ptr);
+T __load<$(ptrTypeParameterList)>($(fullPtrType) ptr);
 
 __intrinsic_op($(kIROp_Store))
-void __store<$(ptrArgListDef)>($(fullPtrType) ptr, T val);
+void __store<$(ptrTypeParameterList)>($(fullPtrType) ptr, T val);
 
 __intrinsic_op($(kIROp_GetElementPtr))
-$(fullPtrType) __getElementPtr<$(ptrArgListDef), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
+$(fullPtrType) __getElementPtr<$(ptrTypeParameterList), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
 
 __intrinsic_op($(kIROp_GetOffsetPtr))
-$(fullPtrType) __getOffsetPtr<$(ptrArgListDef), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
+$(fullPtrType) __getOffsetPtr<$(ptrTypeParameterList), TIndex : __BuiltinIntegerType>($(fullPtrType) ptr, TIndex index);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Less))
 bool operator <($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Leq))
 bool operator <=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Greater))
 bool operator>($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Geq))
 bool operator >=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Neq))
 bool operator !=($(fullPtrType) p1, $(fullPtrType) p2);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_Eql))
 bool operator ==($(fullPtrType) p1, $(fullPtrType) p2);
 
 //@public:
 extension bool : IRangedValue
 {
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __implicit_conversion($(kConversionCost_PtrToBool))
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init($(fullPtrType) ptr);
@@ -1449,7 +1449,7 @@ extension bool : IRangedValue
 
 extension uint64_t : IRangedValue
 {
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
 
@@ -1459,7 +1459,7 @@ extension uint64_t : IRangedValue
 
 extension int64_t : IRangedValue
 {
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
 
@@ -1469,7 +1469,7 @@ extension int64_t : IRangedValue
 
 extension intptr_t : IRangedValue
 {
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
     static const intptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0x7FFFFFFFFFFFFFFFz":"0x7FFFFFFFz");
@@ -1479,7 +1479,7 @@ extension intptr_t : IRangedValue
 
 extension uintptr_t : IRangedValue
 {
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
     static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
@@ -1878,7 +1878,7 @@ extension<Access _access> Ptr<void, _access>
     [__unsafeForceInlineEarly]
     __init(NativeString nativeStr) { this = Ptr<void, _access>(nativeStr.getBuffer()); }
 
-    __generic<$(ptrArgListDef)>
+    __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_BitCast))
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     __init($(fullPtrType) ptr);
@@ -2646,7 +2646,7 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*($(fullPtrType) value);
@@ -2656,6 +2656,7 @@ __prefix Ref<T> operator*($(fullPtrType) value);
 __generic<T>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::OperatorAddressOf))]
 __prefix Ptr<T> operator&(__ref T value);
 
 __generic<T>
@@ -2664,11 +2665,11 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __Addr<T> __get_addr(__ref T value);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 __intrinsic_op($(kIROp_GetOffsetPtr))
 $(fullPtrType) operator+($(fullPtrType) value, int64_t offset);
 
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 [__unsafeForceInlineEarly]
 $(fullPtrType) operator-($(fullPtrType) value, int64_t offset)
 {
@@ -2735,7 +2736,7 @@ matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<$(ptrArgListDef)>
+__generic<$(ptrTypeParameterList)>
 [__unsafeForceInlineEarly]
 $(fullPtrType) operator$(op.name)(in out $(fullPtrType) value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) 1; return $(fixity.returnVal); }
