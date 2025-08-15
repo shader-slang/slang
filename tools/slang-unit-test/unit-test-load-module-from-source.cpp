@@ -43,7 +43,11 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         ComPtr<ISlangBlob> diagnostics;
 
         // Use loadModuleFromSourceString which takes a string directly
-        module = session->loadModuleFromSourceString("testModule", "test.slang", testSource, diagnostics.writeRef());
+        module = session->loadModuleFromSourceString(
+            "testModule",
+            "test.slang",
+            testSource,
+            diagnostics.writeRef());
 
         SLANG_CHECK(module != nullptr);
         if (diagnostics)
@@ -60,10 +64,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
 
         module = slang_loadModuleFromSource(
             session,
-            "testModule2", 
-            "test2.slang", 
-            testSource, 
-            sourceSize, 
+            "testModule2",
+            "test2.slang",
+            testSource,
+            sourceSize,
             diagnostics.writeRef());
 
         SLANG_CHECK(module != nullptr);
@@ -82,10 +86,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         // Test with null session
         module = slang_loadModuleFromSource(
             nullptr,
-            "testModule", 
-            "test.slang", 
-            testSource, 
-            sourceSize, 
+            "testModule",
+            "test.slang",
+            testSource,
+            sourceSize,
             diagnostics.writeRef());
 
         SLANG_CHECK(module == nullptr);
@@ -93,10 +97,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         // Test with null moduleName
         module = slang_loadModuleFromSource(
             session,
-            nullptr, 
-            "test.slang", 
-            testSource, 
-            sourceSize, 
+            nullptr,
+            "test.slang",
+            testSource,
+            sourceSize,
             diagnostics.writeRef());
 
         SLANG_CHECK(module == nullptr);
@@ -104,10 +108,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
         // Test with null path
         module = slang_loadModuleFromSource(
             session,
-            "testModule", 
-            nullptr, 
-            testSource, 
-            sourceSize, 
+            "testModule",
+            nullptr,
+            testSource,
+            sourceSize,
             diagnostics.writeRef());
 
         SLANG_CHECK(module == nullptr);
@@ -120,10 +124,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
 
         module = slang_loadModuleFromSource(
             session,
-            "testModule", 
-            "test.slang", 
-            nullptr, 
-            10, 
+            "testModule",
+            "test.slang",
+            nullptr,
+            10,
             diagnostics.writeRef());
 
         SLANG_CHECK(module == nullptr);
@@ -153,10 +157,10 @@ SLANG_UNIT_TEST(loadModuleFromSource)
 
         module = slang_loadModuleFromSource(
             session,
-            "complexModule", 
-            "complex.slang", 
-            complexSource, 
-            complexSourceSize, 
+            "complexModule",
+            "complex.slang",
+            complexSource,
+            complexSourceSize,
             diagnostics.writeRef());
 
         SLANG_CHECK(module != nullptr);

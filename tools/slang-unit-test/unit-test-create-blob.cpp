@@ -32,7 +32,7 @@ SLANG_UNIT_TEST(createBlob)
 
     // Test 2: Test with binary data (non-string)
     {
-        const uint8_t binaryData[] = { 0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0xFC };
+        const uint8_t binaryData[] = {0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0xFC};
         size_t dataSize = sizeof(binaryData);
 
         ComPtr<ISlangBlob> blob;
@@ -74,7 +74,7 @@ SLANG_UNIT_TEST(createBlob)
 
     // Test 4: Test with null pointer and non-zero size (should fail)
     {
-        char *testData = nullptr;
+        char* testData = nullptr;
         ComPtr<ISlangBlob> blob;
         blob = slang_createBlob((const void*)testData, 10);
 
@@ -83,7 +83,7 @@ SLANG_UNIT_TEST(createBlob)
 
     // Test 5: Test with null pointer and zero size (should fail)
     {
-        char *testData = nullptr;
+        char* testData = nullptr;
         ComPtr<ISlangBlob> blob;
         blob = slang_createBlob((const void*)testData, 0);
 
@@ -157,8 +157,12 @@ SLANG_UNIT_TEST(createBlob)
         mutableData[0] = 'X'; // Change first character
 
         SLANG_CHECK(blob->getBufferSize() == dataSize);
-        SLANG_CHECK(memcmp(blob->getBufferPointer(), testData, dataSize) == 0); // Should still match original
-        SLANG_CHECK(memcmp(blob->getBufferPointer(), mutableData, dataSize) != 0); // Should not match modified
+        SLANG_CHECK(
+            memcmp(blob->getBufferPointer(), testData, dataSize) ==
+            0); // Should still match original
+        SLANG_CHECK(
+            memcmp(blob->getBufferPointer(), mutableData, dataSize) !=
+            0); // Should not match modified
 
         delete[] mutableData;
     }

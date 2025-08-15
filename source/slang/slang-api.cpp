@@ -1060,5 +1060,9 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_loadModuleInfoFromIRBlob(
         return SLANG_E_INVALID_ARG;
 
     // Load module info using the existing IR blob-based API.
-    return session->loadModuleInfoFromIRBlob(sourceBlob, outModuleVersion, outModuleCompilerVersion, outModuleName);
+    return session->loadModuleInfoFromIRBlob(
+        sourceBlob,
+        outModuleVersion,
+        outModuleCompilerVersion,
+        outModuleName);
 }

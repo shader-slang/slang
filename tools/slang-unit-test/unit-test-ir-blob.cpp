@@ -57,9 +57,10 @@ SLANG_UNIT_TEST(irBlob)
         if (diagnostics && diagnostics->getBufferSize() > 0)
         {
             // Log diagnostics if any
-            printf("Module compilation diagnostics: %.*s\n", 
-                   (int)diagnostics->getBufferSize(), 
-                   (const char*)diagnostics->getBufferPointer());
+            printf(
+                "Module compilation diagnostics: %.*s\n",
+                (int)diagnostics->getBufferSize(),
+                (const char*)diagnostics->getBufferPointer());
         }
 
         // Serialize the module to create IR data
@@ -85,9 +86,10 @@ SLANG_UNIT_TEST(irBlob)
         if (diagnostics && diagnostics->getBufferSize() > 0)
         {
             // Log diagnostics if any
-            printf("IR blob loading diagnostics: %.*s\n", 
-                   (int)diagnostics->getBufferSize(), 
-                   (const char*)diagnostics->getBufferPointer());
+            printf(
+                "IR blob loading diagnostics: %.*s\n",
+                (int)diagnostics->getBufferSize(),
+                (const char*)diagnostics->getBufferPointer());
         }
 
         // Verify the loaded module is valid
