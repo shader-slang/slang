@@ -15,7 +15,7 @@ void computeMain(
 export __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
-    deviceDesc.deviceType = gfx.DeviceType.CPU;
+    deviceDesc.deviceType = gfx.DeviceType.Vulkan;
     Optional<gfx.IDevice> device;
     gfx.gfxCreateDevice(&deviceDesc, device);
     if (device == none)
@@ -23,7 +23,7 @@ export __extern_cpp int main()
         printf("fail\n");
         return -1;
     }
-    
+
     gfx.CommandQueueDesc queueDesc = {gfx::QueueType::Graphics};
     queueDesc.type = gfx.QueueType.Graphics;
     Optional<gfx.ICommandQueue> queue;
@@ -84,7 +84,7 @@ export __extern_cpp int main()
     encoder.value.dispatchCompute(1, 1, 1);
     encoder.value.endEncoding();
     commandBuffer.value.close();
-    
+
     NativeRef<gfx.ICommandBuffer> commandBufferRef = NativeRef<gfx.ICommandBuffer>(commandBuffer.value);
     queue.value.executeCommandBuffers(1, &commandBufferRef, none, 0);
     queue.value.waitOnHost();
