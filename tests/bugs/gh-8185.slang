@@ -1,6 +1,6 @@
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute
 
