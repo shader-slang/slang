@@ -1185,7 +1185,7 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
     }
     if (!isInLanguageServer())
     {
-        sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+        sink->diagnose(SourceLoc(), Diagnostics::compilationCeased);
     }
 }
 

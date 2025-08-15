@@ -14268,7 +14268,11 @@ static void _propagateRequirement(
         ensureDecl(visitor, referencedDecl, DeclCheckState::CapabilityChecked);
     }
 
-    if (resultCaps.implies(nodeCaps))
+    // If we do not have the same target+stage, we need to `join` to remove excess target+stage.
+    //
+    // If we have the same target+stage but current capabilities do not imply incoming capabilities,
+    // we need to `join`.
+    if (!resultCaps.joinWithOtherWillChangeThis(nodeCaps))
         return;
 
     auto oldCaps = resultCaps;
