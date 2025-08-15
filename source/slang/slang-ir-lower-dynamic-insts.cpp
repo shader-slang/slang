@@ -714,7 +714,7 @@ struct DynamicInstLoweringContext
                 getCollectionCount(as<IRCollectionTagType>(destInfo)))
             {
                 IRBuilder builder(module);
-                builder.setInsertAfter(arg);
+                setInsertAfterOrdinaryInst(&builder, arg);
                 return builder
                     .emitIntrinsicInst((IRType*)destInfo, kIROp_GetTagForSuperCollection, 1, &arg);
             }
@@ -726,14 +726,14 @@ struct DynamicInstLoweringContext
             {
                 // If the sets of witness tables are not equal, reinterpret to the parameter type
                 IRBuilder builder(module);
-                builder.setInsertAfter(arg);
+                setInsertAfterOrdinaryInst(&builder, arg);
                 return builder.emitReinterpret((IRType*)destInfo, arg);
             }
         }
         else if (!as<IRCollectionBase>(argInfo) && as<IRCollectionBase>(destInfo))
         {
             IRBuilder builder(module);
-            builder.setInsertAfter(arg);
+            setInsertAfterOrdinaryInst(&builder, arg);
             return builder.emitPackAnyValue((IRType*)destInfo, arg);
         }
 
