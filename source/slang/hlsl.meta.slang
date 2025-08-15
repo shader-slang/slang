@@ -8190,19 +8190,7 @@ uint countbits(T value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        if (T is int64_t || T  is uint64_t)
-        {
-            return __emulatedCountbits64(__intCast<uint64_t>(value));
-        }
-        else if (T is int16_t || T  is uint16_t)
-        {
-            // emulate 16-bit
-            return countbits(__intCast<uint32_t>(value));
-        }
-        else
-        {
-            __intrinsic_asm "popcount";
-        }
+        __intrinsic_asm "($TR)popcount($0)";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_countbits($0)";
@@ -8262,15 +8250,7 @@ vector<uint, N> countbits(vector<T, N> value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
-        {
-            // Emulate 64-bit and 16-bit
-            VECTOR_MAP_UNARY(uint, N, countbits, value);
-        }
-        else
-        {
-            __intrinsic_asm "popcount";
-        }
+        __intrinsic_asm "($TR)popcount($0)";
     case spirv:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
