@@ -7997,6 +7997,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
 
+        case kIROp_AtomicType:
+            if (auto atomicType = as<IRAtomicType>(type))
+                return typeNeedsStorageCapabilityImpl(atomicType->getElementType(), found, visited);
+            break;
+
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
         case kIROp_HLSLAppendStructuredBufferType:
@@ -8010,6 +8015,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ConstRefType:
         case kIROp_OutType:
         case kIROp_InOutType:
+        case kIROp_RateQualifiedType:
             if (auto ptrType = as<IRPtrTypeBase>(type))
                 return typeNeedsStorageCapabilityImpl(ptrType->getValueType(), found, visited);
             break;

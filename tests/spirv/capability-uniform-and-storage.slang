@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DOUT_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_HALF
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_HALF -DATOMIC
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
 //CHECK8: OpCapability UniformAndStorageBuffer8BitAccess
@@ -27,9 +28,9 @@ uniform struct {
 } inputBuffer;
 
 #if defined(OUT_HALF)
-#define OUT_FLOAT_TYPE half4
+#define OUT_FLOAT_TYPE half
 #else
-#define OUT_FLOAT_TYPE float4
+#define OUT_FLOAT_TYPE float
 #endif
 #if defined(OUT_UINT8)
 #define OUT_UINT_TYPE uint8_t
@@ -40,7 +41,11 @@ uniform struct {
 #endif
 
 struct st {
+#if defined(ATOMIC)
+    Atomic<OUT_FLOAT_TYPE> data;
+#else
     OUT_FLOAT_TYPE data;
+#endif
     OUT_UINT_TYPE index;
 };
 RWStructuredBuffer<st> outputBuffer;
@@ -49,6 +54,6 @@ RWStructuredBuffer<st> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0].data = OUT_FLOAT_TYPE(inputBuffer.data);
+    outputBuffer[0].data = OUT_FLOAT_TYPE(inputBuffer.data.x);
     outputBuffer[1].index = OUT_UINT_TYPE(inputBuffer.index);
 }
