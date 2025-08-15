@@ -9,6 +9,7 @@
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-dynamic-insts.h"
 #include "slang-ir-lower-existential.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-function.h"
@@ -136,6 +137,9 @@ void specializeRTTIObjects(SharedGenericsLoweringContext* sharedContext, Diagnos
     specializeDispatchFunctions(sharedContext);
     if (sink->getErrorCount() != 0)
         return;
+
+    lowerSequentialIDTagCasts(sharedContext->module, sharedContext->sink);
+    lowerTagTypes(sharedContext->module);
 
     lowerIsTypeInsts(sharedContext);
 

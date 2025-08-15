@@ -76,6 +76,7 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-dynamic-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-generics.h"
@@ -1138,6 +1139,12 @@ Result linkAndOptimizeIR(
         // 1) It's not inlinable for some reason (for example if it's recursive)
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
+
+    if (lowerTaggedUnionTypes(irModule, sink))
+        requiredLoweringPassSet.reinterpret = true; // TODO: Is this the right way to handle this?
+
+    lowerTagInsts(irModule, sink);
+    lowerTypeCollections(irModule, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         lowerReinterpret(targetProgram, irModule, sink);
