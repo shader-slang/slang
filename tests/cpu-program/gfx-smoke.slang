@@ -20,23 +20,13 @@ export __extern_cpp int main()
     device.value.createCommandQueue(&queueDesc, queue);
 
     gfx.ShaderProgramDesc2 programDesc = {};
-    NativeString s = R"(
-        [shader("compute")]
-        [numthreads(4, 1, 1)]
-        void computeMain(
-            uint3 sv_dispatchThreadID: SV_DispatchThreadID,
-            uniform RWStructuredBuffer<float> buffer
-            )
-        {
-            var input = buffer[sv_dispatchThreadID.x];
-            buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
-        })";
+    NativeString s = "tests/cpu-program/saxpy.slang";
     programDesc.sourceData = s;
-    programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSource;
+    programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSourceFile;
     programDesc.sourceDataSize = s.length;
-    programDesc.entryPointCount = 1;
-    NativeString entryPointName = "computeMain";
-    programDesc.entryPointNames = &entryPointName;
+    programDesc.entryPointCount = 2;
+    NativeString entryPointNames[] = { "times", "plus" };
+    programDesc.entryPointNames = &entryPointNames[0];
     Optional<gfx.IShaderProgram> program;
     Optional<slang.ISlangBlob> diagBlob;
     device.value.createProgram2(&programDesc, program, diagBlob);
