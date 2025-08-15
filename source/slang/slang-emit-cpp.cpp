@@ -100,12 +100,8 @@ static const char s_xyzwNames[] = "xyzw";
         return UnownedStringSlice("uint64_t");
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
-
-        // Not clear just yet how we should handle half... we want all processing as float
-        // probly, but when reading/writing to memory converting
     case kIROp_HalfType:
         return UnownedStringSlice("half");
-
     case kIROp_FloatType:
         return UnownedStringSlice("float");
     case kIROp_DoubleType:
@@ -240,12 +236,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->getOp())
     {
-    case kIROp_HalfType:
-        {
-            // Special case half
-            out << getBuiltinTypeName(kIROp_FloatType);
-            return SLANG_OK;
-        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);

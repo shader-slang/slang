@@ -271,6 +271,51 @@ SLANG_FORCE_INLINE Vector<T, n> _slang_vector_reshape(const Vector<OtherT, m> ot
 
 typedef uint32_t uint;
 
+#if __cplusplus >= 202302L
+#include <stdfloat> // C++23
+#else
+#define __STDC_WANT_IEC_60559_TYPES_EXT__
+#include <cfloat>
+#endif
+
+#ifdef FLT16_MIN
+typedef _Float16 half;
+#elif __STDCPP_FLOAT16_T__ == 1
+typedef std::float16_t half;
+#else
+uint32_t f32tof16(const float value);
+float f16tof32(const uint32_t value);
+struct half
+{
+    uint16_t data;
+
+    half() {}
+    explicit half(float f) { store(f); }
+
+    SLANG_FORCE_INLINE void store(float f) { data = f32tof16(f); }
+    SLANG_FORCE_INLINE float load() const { return f16tof32(data); }
+
+    half operator+(half other) const { return load() + other.load(); }
+    half operator-(half other) const { return load() - other.load(); }
+    half operator*(half other) const { return load() * other.load(); }
+    half operator/(half other) const { return load() / other.load(); }
+    half& operator+=(half other) { store(load() + other.load()); return *this; }
+    half& operator-=(half other) { store(load() - other.load()); return *this; }
+    half& operator*=(half other) { store(load() * other.load()); return *this; }
+    half& operator/=(half other) { store(load() / other.load()); return *this; }
+
+    bool operator<(half other) const { return load() < other.load(); }
+    bool operator>(half other) const { return load() > other.load(); }
+    bool operator<=(half other) const { return load() <= other.load(); }
+    bool operator>=(half other) const { return load() >= other.load(); }
+    bool operator==(half other) const { return load() == other.load(); }
+    bool operator!=(half other) const { return load() != other.load(); }
+
+    explicit operator float() const { return load(); }
+};
+#endif
+
+
 #define SLANG_VECTOR_BINARY_OP(T, op)            \
     template<int n>                              \
     SLANG_FORCE_INLINE Vector<T, n> operator op( \
