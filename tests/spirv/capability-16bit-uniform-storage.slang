@@ -1,32 +1,39 @@
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DIN_HALF
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DIN_UINT16
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DOUT_HALF
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DOUT_UINT16
-//TEST:SIMPLE(filecheck=CHECKB): -target spirv -profile spirv_1_3
+//TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DIN_UINT8
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_UINT16
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_HALF
+//TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DOUT_UINT8
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_UINT16
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_HALF
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
-//CHECKA: OpCapability UniformAndStorageBuffer16BitAccess
-//CHECKB-NOT: OpCapability UniformAndStorageBuffer16BitAccess
+//CHECK8: OpCapability UniformAndStorageBuffer8BitAccess
+//CHECK16: OpCapability UniformAndStorageBuffer16BitAccess
+//CHECK-NOT: OpCapability UniformAndStorageBuffer16BitAccess
 
 
 uniform struct {
-#ifdef IN_HALF
+#if defined(IN_HALF)
     half4 data;
 #else
     float4 data;
 #endif
-#ifdef IN_UINT16
+#if defined(IN_UINT8)
+    uint8_t index;
+#elif defined(IN_UINT16)
     uint16_t index;
 #else
     uint32_t index;
 #endif
 } inputBuffer;
 
-#ifdef OUT_HALF
+#if defined(OUT_HALF)
 #define OUT_FLOAT_TYPE half4
 #else
 #define OUT_FLOAT_TYPE float4
 #endif
-#ifdef OUT_UINT16
+#if defined(OUT_UINT8)
+#define OUT_UINT_TYPE uint8_t
+#elif defined(OUT_UINT16)
 #define OUT_UINT_TYPE uint16_t
 #else
 #define OUT_UINT_TYPE uint32_t

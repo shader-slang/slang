@@ -1,17 +1,21 @@
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DCONST_HALF
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DCONST_UINT16
-//TEST:SIMPLE(filecheck=CHECKB): -target spirv -profile spirv_1_3
+//TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DCONST_UINT8
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_UINT16
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_HALF
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
-//CHECKA: OpCapability StoragePushConstant16
-//CHECKB-NOT: OpCapability StoragePushConstant16
+//CHECK8: OpCapability StoragePushConstant8
+//CHECK16: OpCapability StoragePushConstant16
+//CHECK-NOT: OpCapability StoragePushConstant16
 
 struct PushConstants {
-#ifdef CONST_HALF
+#if defined(CONST_HALF)
     half4 color;
 #else
     float4 color;
 #endif
-#ifdef CONST_UINT16
+#if defined(CONST_UINT8)
+    int8_t index;
+#elif defined(CONST_UINT16)
     int16_t index;
 #else
     int32_t index;
