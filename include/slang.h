@@ -4693,9 +4693,7 @@ struct SlangGlobalSessionDesc
  * @param size Size of the data in bytes. Must be greater than 0.
  * @return The created blob on success, or nullptr on failure.
  */
-SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(
-    const void* data,
-    size_t size);
+SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
 /* Load a module from source code with size specification.
  *
