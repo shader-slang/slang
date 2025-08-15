@@ -345,7 +345,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         Index selectedDeviceIndex = 0;
 
         // Search for requested adapter.
-        if (false)
+        if (m_desc.adapterLUID)
         {
             selectedDeviceIndex = -1;
             for (Index i = 0; i < physicalDevices.getCount(); ++i)
