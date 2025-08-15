@@ -1181,7 +1181,7 @@ alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cu
 alias atomicfloat2 = GL_EXT_shader_atomic_float2 | _sm_6_6 + hlsl_nvapi | cpp | cuda;
 /// Capabilities needed to use fragment-shader-barycentric's
 /// [Compound]
-alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
+alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1 | metal;
 ///  (gfx targets) Capabilities needed to use memory barriers
 /// [Compound]
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
