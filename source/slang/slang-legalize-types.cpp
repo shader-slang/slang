@@ -1223,8 +1223,7 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             //
             // If the element type has been legalized, find it in the map,
             // otherwise, return the simple LegalType of it to avoid generating duplicates
-            if (!context->mapTypeToLegalType.tryGetValue(
-                originalElementType, legalElementType))
+            if (!context->mapTypeToLegalType.tryGetValue(originalElementType, legalElementType))
             {
                 legalElementType = LegalType::simple(originalElementType);
             }
