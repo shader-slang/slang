@@ -75,7 +75,7 @@ void test()
 	InterlockedXor(intBuffer[0], valInt, originalValueInt);
 	InterlockedExchange(intBuffer[0], valInt, originalValueInt);
 	InterlockedCompareExchange(intBuffer[0], valInt, compareValueInt, originalValueInt);
-	InterlockedCompareStore(intBuffer[0], valUInt, compareValueUInt);
+	InterlockedCompareStore(intBuffer[0], valInt, compareValueUInt);
 
 	InterlockedAdd(uintBuffer[0], valUInt);
 	InterlockedAnd(uintBuffer[0], valUInt);
