@@ -49,9 +49,7 @@ ParameterBlock<ComplexStruct> complexBlock;
 ParameterBlock<Array<ComplexStruct, 2>> arrayComplexBlock;
 ParameterBlock<ParentStruct> parentBlock;
 
-// TODO: This is emitted as "Val_0 device* constant* valBlock_0;"
-// From Metal: "type 'device Val_0 *' cannot be used in buffer pointee type"
-// ParameterBlock<RWStructuredBuffer<Val>> valBlock;
+ParameterBlock<RWStructuredBuffer<Val>> valBlock;
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -105,8 +103,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[6] = resStruct.buffer[2];
 
     // Test parameter block with resource type directly
-    // TODO
-    // outputBuffer[7] = valBlock[0].f;
+    outputBuffer[7] = valBlock[0].f;
 
     // Test function with parameter block containing a struct with a resource type
     func(parentBlock.c);

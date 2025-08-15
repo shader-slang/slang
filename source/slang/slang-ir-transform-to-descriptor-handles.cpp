@@ -32,6 +32,9 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
     /// Tracks parameter block types that have been updated with lowered element types
     List<IRParameterBlockType*> updatedParameterBlockTypes;
 
+    /// Maps original buffer types to their wrapper struct types
+    Dictionary<IRType*, IRStructType*> bufferToWrapperMap;
+
     ResourceToDescriptorHandleTransformContext(
         TargetProgram* inTargetProgram,
         IRModule* module,
@@ -143,6 +146,36 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         return transformedType;
     }
 
+    /// Checks if a type is a buffer type that results in a pointer in Metal
+    ///
+    /// These buffer types cannot be used directly in ParameterBlocks in Metal
+    /// because they result in pointer types that create invalid syntax like
+    /// "float device* constant*". These need to be wrapped in structs.
+    ///
+    /// @param type The type to check
+    /// @return true if the type needs to be wrapped in a struct
+    bool isBufferTypeThatNeedsWrapping(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        // Structured buffer types - these emit as "ElementType device*" in Metal
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        
+        // Byte address buffer types - these emit as "uint32_t device*" in Metal
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
+            return true;
+            
+        default:
+            return false;
+        }
+    }
+
     /// Transforms parameter block types to use descriptor handles
     ///
     /// This method finds all ParameterBlock<T> types where T contains resources,
@@ -153,6 +186,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
     void transformParameterBlockTypes()
     {
         List<IRParameterBlockType*> parameterBlockTypesToTransform;
+        List<IRParameterBlockType*> bufferParameterBlocks;
 
         // First pass: identify all parameter block types that need transformation
         for (auto globalInst : module->getGlobalInsts())
@@ -160,6 +194,15 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
             if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
             {
                 auto elementType = paramBlockType->getElementType();
+                
+                // Check if this is ParameterBlock<BufferType> that needs wrapping
+                if (isBufferTypeThatNeedsWrapping(elementType))
+                {
+                    // We will handle buffer types separately to wrap them in structs
+                    bufferParameterBlocks.add(paramBlockType);
+                    continue;
+                }
+
                 auto transformedElementType = convertTypeToDescriptorHandle(elementType);
 
                 if (transformedElementType != elementType)
@@ -168,6 +211,9 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 }
             }
         }
+
+        // Handle ParameterBlock<BufferType> wrapping
+        handleBufferParameterBlockWrapping(bufferParameterBlocks);
 
         // Second pass: replace each parameter block type with its transformed version
         for (auto originalParamBlockType : parameterBlockTypesToTransform)
@@ -202,6 +248,102 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
             return descHandleType->getResourceType();
         }
         return nullptr;
+    }
+
+    /// Handles wrapping of ParameterBlock<BufferType> into ParameterBlock<WrapperStruct>
+    ///
+    /// This method processes buffer parameter blocks that need wrapping in Metal.
+    /// For each ParameterBlock<BufferType>, it:
+    /// 1. Creates a wrapper struct with a single field containing the buffer
+    /// 2. Transforms the type to ParameterBlock<WrapperStruct>
+    /// 3. Updates all parameter uses to extract the buffer from the wrapper
+    ///
+    /// @param bufferParameterBlocks List of parameter block types that contain buffers
+    void handleBufferParameterBlockWrapping(const List<IRParameterBlockType*>& bufferParameterBlocks)
+    {
+        for (auto originalParamBlockType : bufferParameterBlocks)
+        {
+            auto bufferType = originalParamBlockType->getElementType();
+
+            // Check if we already created a wrapper for this buffer type
+            IRStructType* wrapperStructType = nullptr;
+            if (!bufferToWrapperMap.tryGetValue(bufferType, wrapperStructType))
+            {
+                // Create a new wrapper struct with a single field
+                irBuilder.setInsertBefore(originalParamBlockType);
+                wrapperStructType = irBuilder.createStructType();
+
+                // Generate a descriptive name for the wrapper struct
+                String wrapperName = "BufferWrapper";
+                irBuilder.addNameHintDecoration(wrapperStructType, wrapperName.getUnownedSlice());
+
+                // Create the single field containing the buffer
+                auto fieldKey = irBuilder.createStructKey();
+                
+                String fieldName = "buffer"; // Default name
+                irBuilder.addNameHintDecoration(fieldKey, fieldName.getUnownedSlice());
+                irBuilder.createStructField(
+                    wrapperStructType,
+                    fieldKey,
+                    bufferType);
+
+                // Cache the wrapper struct for this buffer type
+                bufferToWrapperMap[bufferType] = wrapperStructType;
+            }
+
+            // Create new parameter block type: ParameterBlock<WrapperStruct>
+            auto transformedParamBlockType =
+                irBuilder.getType(kIROp_ParameterBlockType, wrapperStructType);
+
+            // Collect all uses before replacement to process them
+            List<IRUse*> usesToUpdate;
+            for (auto use = originalParamBlockType->firstUse; use; use = use->nextUse)
+            {
+                usesToUpdate.add(use);
+            }
+
+            // Replace the parameter block type
+            originalParamBlockType->replaceUsesWith(transformedParamBlockType);
+
+            // Now process all the uses to insert field extraction where needed
+            for (auto use : usesToUpdate)
+            {
+                auto userInst = use->getUser();
+
+                // Skip if this is just a type reference (not an actual parameter/variable)
+                if (userInst->getOp() != kIROp_GlobalParam && userInst->getOp() != kIROp_Param)
+                    continue;
+
+                // Process all uses of this parameter/variable to insert field extraction
+                List<IRUse*> parameterUses;
+                for (auto paramUse = userInst->firstUse; paramUse; paramUse = paramUse->nextUse)
+                {
+                    parameterUses.add(paramUse);
+                }
+
+                for (auto paramUse : parameterUses)
+                {
+                    auto paramUserInst = paramUse->getUser();
+                    // Insert before the user instruction
+                    irBuilder.setInsertBefore(paramUserInst);
+                    // Load the wrapper struct
+                    auto wrapperValue = irBuilder.emitLoad(userInst);
+                    // Extract the buffer field
+                    auto firstField = wrapperStructType->getFields().getFirst();
+                    auto bufferValue = irBuilder.emitFieldExtract(
+                        firstField->getFieldType(),
+                        wrapperValue,
+                        firstField->getKey());
+                    // Create storage for the buffer
+                    auto bufferPtr = irBuilder.emitVar(firstField->getFieldType());
+                    irBuilder.emitStore(bufferPtr, bufferValue);
+                    // Replace the use of the wrapper parameter with the extracted buffer
+                    paramUse->set(bufferPtr);
+                }
+            }
+
+            originalParamBlockType->removeAndDeallocate();
+        }
     }
 
     /// Converts a transformed struct back to its original form for compatibility
@@ -616,7 +758,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         /// Main entry point for processing the entire module
         ///
         /// Orchestrates the complete descriptor handle transformation:
-        /// 1. Transforms parameter block types to use descriptor handles
+        /// 1. Transforms parameter block types (including RWStructuredBuffer wrapping)
         /// 2. Applies transformations using top-down approach
         void processModule()
         {
