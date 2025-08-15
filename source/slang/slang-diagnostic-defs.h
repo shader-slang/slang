@@ -2234,7 +2234,7 @@ DIAGNOSTIC(
     glslModuleNotAvailable,
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
-DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
+DIAGNOSTIC(39999, Fatal, compilationCeased, "compilation ceased")
 
 DIAGNOSTIC(
     38203,
