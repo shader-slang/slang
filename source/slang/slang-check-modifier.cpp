@@ -1684,7 +1684,7 @@ Modifier* SemanticsVisitor::checkModifier(
             if (as<PointerTypeExpr>(varDeclBase->type.exp))
             {
                 // Disallow `const T*` syntax.
-                getSink()->diagnose(m, Diagnostics::disallowConstAsModifierOfCppPtr);
+                getSink()->diagnose(m, Diagnostics::constNotAllowedOnCStylePtrDecl);
                 return nullptr;
             }
         }

@@ -662,13 +662,16 @@ struct FunctionParameterSpecializationContext
         case kIROp_OutType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
-            resultType = getBuilder()->getPtrType(
-                paramType->getOp(),
-                argType,
-                AccessQualifier::ReadWrite,
-                as<IRPtrTypeBase>(paramType)->getAddressSpace());
-            break;
+            {
+                auto ptrParamType = as<IRPtrTypeBase>(paramType);
+                argType = as<IRPtrTypeBase>(argType)->getValueType();
+                resultType = getBuilder()->getPtrType(
+                    paramType->getOp(),
+                    argType,
+                    ptrParamType->getAccessQualifier(),
+                    ptrParamType->getAddressSpace());
+                break;
+            }
         }
         if (auto rate = paramType->getRate())
         {

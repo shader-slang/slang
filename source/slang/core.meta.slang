@@ -1321,7 +1321,6 @@ struct Ptr<
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
 
-    [OverloadRank(1)]
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 

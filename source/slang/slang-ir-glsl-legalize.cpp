@@ -1458,8 +1458,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
+            auto accessQualifier = AccessQualifier::ReadWrite;
+            if(kind == LayoutResourceKind::VaryingInput)
+                accessQualifier = AccessQualifier::Read;
             IRType* paramType =
-                builder->getPtrType(ptrOpCode, arrayType, AccessQualifier::ReadWrite, addrSpace);
+                builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -3086,7 +3089,7 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
     arrayInst = builder.createGlobalParam(
-        builder.getPtrType(arrayType, AccessQualifier::ReadWrite, AddressSpace::Input));
+        builder.getPtrType(arrayType, AccessQualifier::Read, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 

@@ -106,7 +106,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 auto newParamType = builder.getPtrType(
                     ptrType->getOp(),
                     ptrType->getValueType(),
-                    AccessQualifier::ReadWrite,
+                    ptrType->getAccessQualifier(),
                     paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
@@ -313,7 +313,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     auto newResultType = builder.getPtrType(
                                         ptrResultType->getOp(),
                                         ptrResultType->getValueType(),
-                                        AccessQualifier::ReadWrite,
+                                        ptrResultType->getAccessQualifier(),
                                         addrSpace);
                                     fixUpFuncType(func, newResultType);
                                     retValAddrSpaceChanged = true;
@@ -356,7 +356,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     auto newType = builder.getPtrType(
                         ptrType->getOp(),
                         ptrType->getValueType(),
-                        AccessQualifier::ReadWrite,
+                        ptrType->getAccessQualifier(),
                         addrSpace);
                     setDataType(inst, newType);
                 }

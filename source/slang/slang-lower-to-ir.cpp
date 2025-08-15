@@ -3479,7 +3479,6 @@ void _lowerFuncDeclBaseTypeInfo(
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(
                 irParamType,
-                AccessQualifier::ReadWrite,
                 AddressSpace::Generic);
             break;
         default:

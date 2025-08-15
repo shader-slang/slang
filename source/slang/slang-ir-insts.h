@@ -3733,7 +3733,6 @@ public:
         AddressSpace addrSpace);
     IRConstRefType* getConstRefType(
         IRType* valueType,
-        AccessQualifier accessQualifier,
         AddressSpace addrSpace);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(

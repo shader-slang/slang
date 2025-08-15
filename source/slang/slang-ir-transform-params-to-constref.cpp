@@ -202,7 +202,6 @@ struct TransformParamsToConstRefContext
                 auto paramType = param->getDataType();
                 auto constRefType = builder.getConstRefType(
                     paramType,
-                    AccessQualifier::ReadWrite,
                     AddressSpace::ThreadLocal);
                 param->setFullType(constRefType);
 

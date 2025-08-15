@@ -826,14 +826,14 @@ bool SemanticsVisitor::TryUnifyVals(
 
     if (fstInt && sndInt)
     {
-        const auto paramUnderCastToConstant = [](IntVal* i)
+        const auto paramUnderCastToConstant = [](IntVal* intVal)
         {
-            if (const auto c = as<TypeCastIntVal>(i))
-                i = as<IntVal>(c->getBase());
-            return i;
+            while (auto typeCastIntVal = as<TypeCastIntVal>(intVal))
+                intVal = as<IntVal>(typeCastIntVal->getBase());
+            return intVal;
         };
 
-        // if both values are constant integers, then compare them
+        // If both values are constant integers, then compare them
         if (auto fstIntVal = as<ConstantIntVal>(paramUnderCastToConstant(fstInt)))
         {
             if (auto sndIntVal = as<ConstantIntVal>(paramUnderCastToConstant(sndInt)))

@@ -3598,10 +3598,8 @@ protected:
 
                 IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
 
-                const auto annotatedPayloadType = builder.getPtrType(
-                    kIROp_ConstRefType,
+                const auto annotatedPayloadType = builder.getConstRefType(
                     type->getValueType(),
-                    AccessQualifier::ReadWrite,
                     AddressSpace::MetalObjectData);
 
                 param->setFullType(annotatedPayloadType);

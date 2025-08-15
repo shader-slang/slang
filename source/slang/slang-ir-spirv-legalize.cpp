@@ -252,7 +252,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     builder.getPtrType(
                         kIROp_PtrType,
                         innerType,
-                        AccessQualifier::ReadWrite,
+                        AccessQualifier::Read,
                         AddressSpace::Uniform),
                     cbParamInst,
                     key);
@@ -448,6 +448,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
             }
 
+            AccessQualifier access = AccessQualifier::ReadWrite;
             // Opaque resource handles can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
             if (isSpirvUniformConstantType(inst->getDataType()))
@@ -523,7 +524,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+                {
+                    access = AccessQualifier::Read;
                     memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                }
                 if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
                     memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
 
@@ -563,7 +567,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             ptrType = builder.getPtrType(
                 kIROp_PtrType,
                 innerType,
-                AccessQualifier::ReadWrite,
+                access,
                 addressSpace);
             inst->setFullType(ptrType);
             if (needLoad)
@@ -590,7 +594,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 builder.getPtrType(
                                     kIROp_PtrType,
                                     innerElementType,
-                                    AccessQualifier::ReadWrite,
+                                    ptrType->getAccessQualifier(),
                                     addressSpace),
                                 inst,
                                 getElement->getIndex());
@@ -727,7 +731,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newPtrType = builder.getPtrType(
                 oldPtrType->getOp(),
                 oldPtrType->getValueType(),
-                AccessQualifier::ReadWrite,
+                oldPtrType->getAccessQualifier(),
                 AddressSpace::Function);
             inst->setFullType(newPtrType);
             addUsersToWorkList(inst);
@@ -779,7 +783,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldPtrType->getOp(),
                     oldPtrType->getValueType(),
-                    AccessQualifier::ReadWrite,
+                    oldPtrType->getAccessQualifier(),
                     AddressSpace::UserPointer);
                 inst->setFullType(newPtrType);
                 addUsersToWorkList(inst);
@@ -858,7 +862,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto newPtrType = builder.getPtrType(
             oldPtrType->getOp(),
             oldPtrType->getValueType(),
-            AccessQualifier::ReadWrite,
+            oldPtrType->getAccessQualifier(),
             addressSpace);
         inst->setFullType(newPtrType);
         addUsersToWorkList(inst);
@@ -2207,7 +2211,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newPtrType = builder.getPtrType(
                 ptrType->getOp(),
                 wrapperStruct,
-                AccessQualifier::ReadWrite,
+                ptrType->getAccessQualifier(),
                 ptrType->getAddressSpace());
             globalParam->setFullType(newPtrType);
 
@@ -2222,7 +2226,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         builder.getPtrType(
                             kIROp_PtrType,
                             structType,
-                            AccessQualifier::ReadWrite,
+                            ptrType->getAccessQualifier(),
                             ptrType->getAddressSpace()),
                         globalParam,
                         key);
@@ -2285,12 +2289,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto t : instsToProcess)
         {
             auto lowered = lowerStructuredBufferType(t);
-            IRBuilder builder(t);
+            
+            AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+            if (as<IRHLSLStructuredBufferType>(t))
+                accessQualifier = AccessQualifier::Read;
+            
+                IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
                 kIROp_PtrType,
                 lowered.structType,
-                AccessQualifier::ReadWrite,
+                accessQualifier,
                 getStorageBufferAddressSpace()));
         }
         for (auto t : textureFootprintTypes)

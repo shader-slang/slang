@@ -527,9 +527,11 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     20017,
     Error,
-    disallowConstAsModifierOfCppPtr,
-    "cannot use 'const' on 'T*', prefer to use the syntax 'const Ptr<T>' instead")
-DIAGNOSTIC(20018, Error, disallowConstAsTypeModifier, "cannot use 'const' as a type modifier")
+    constNotAllowedOnCStylePtrDecl,
+    "'const' not allowed on pointer typed declarations using the C style '*' operator. "
+    "If the intent is to restrict the pointed-to value to read-only, use 'Ptr<T, Access.Read>' "
+    "instead; if the intent is to make the pointer itself immutable, use 'const Ptr<...>'.")
+DIAGNOSTIC(20018, Error, constNotAllowedOnType, "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -834,7 +836,7 @@ DIAGNOSTIC(
     30079,
     Error,
     cannotTakeConstantPointers,
-    "Not allowed to take pointer of an immutable object")
+    "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
     30100,
     Error,

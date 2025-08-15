@@ -5835,7 +5835,7 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     }
     else if (as<ConstModifier>(modifier))
     {
-        getSink()->diagnose(modifier, Diagnostics::disallowConstAsTypeModifier);
+        getSink()->diagnose(modifier, Diagnostics::constNotAllowedOnType);
         return nullptr;
     }
     else

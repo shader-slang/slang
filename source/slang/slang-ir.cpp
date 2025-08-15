@@ -2943,10 +2943,9 @@ IRRefType* IRBuilder::getRefType(
 
 IRConstRefType* IRBuilder::getConstRefType(
     IRType* valueType,
-    AccessQualifier accessQualifier,
     AddressSpace addrSpace)
 {
-    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, accessQualifier, addrSpace);
+    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, AccessQualifier::Read, addrSpace);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
