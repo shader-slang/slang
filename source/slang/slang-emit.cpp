@@ -699,6 +699,16 @@ Result linkAndOptimizeIR(
     auto targetProgram = codeGenContext->getTargetProgram();
     auto targetCompilerOptions = targetRequest->getOptionSet();
 
+    Dictionary<String, ComPtr<ISlangBlob>> moduleBlobs;
+    codeGenContext->getProgram()->enumerateModules(
+        [&](Module* module)
+        {
+            auto name = module->getIRModule()->getName()->text;
+            ComPtr<ISlangBlob> blob;
+            module->serialize(blob.writeRef());
+            moduleBlobs.add(name, blob);
+        });
+
     // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
@@ -1049,6 +1059,39 @@ Result linkAndOptimizeIR(
     }
 
     finalizeSpecialization(irModule);
+
+    {
+        List<IRInst*> removeList;
+        IRBuilder builder(irModule);
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_IRBytes:
+                {
+                    auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+                    auto& blob = moduleBlobs.getValue(moduleName);
+                    IRInst* args[] = {builder.getBlobValue(blob)};
+                    inst->replaceUsesWith(
+                        builder.emitIntrinsicInst(inst->getFullType(), kIROp_BlobAsArray, 1, args));
+                    removeList.add(inst);
+                    break;
+                }
+            case kIROp_IRBytesCount:
+                {
+                    auto moduleName = as<IRStringLit>(inst->getOperand(0))->getStringSlice();
+                    auto& blob = moduleBlobs.getValue(moduleName);
+                    inst->replaceUsesWith(builder.getIntValue(blob->getBufferSize()));
+                    removeList.add(inst);
+                    break;
+                }
+            }
+        }
+        for (auto inst : removeList)
+        {
+            inst->removeAndDeallocate();
+        }
+    }
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
@@ -1763,6 +1806,39 @@ Result linkAndOptimizeIR(
 
     // Validate vectors and matrices according to what the target allows
     validateVectorsAndMatrices(irModule, sink, targetRequest);
+
+    if (target == CodeGenTarget::HostCPPSource)
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_Func)
+            {
+                if (auto dec = inst->findDecoration<IRKeepAliveDecoration>())
+                {
+                    if (!inst->findDecoration<IRExternCppDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_Func)
+            {
+                if (auto dec = inst->findDecoration<IRKeepAliveDecoration>())
+                {
+                    if (inst->findDecoration<IRExternCppDecoration>())
+                    {
+                        dec->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but

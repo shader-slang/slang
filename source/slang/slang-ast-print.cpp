@@ -674,6 +674,10 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "__return_val";
     }
+    else if (as<IRBytesExpr>(expr))
+    {
+        sb << "__ir_bytes";
+    }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
         sb << "let ";

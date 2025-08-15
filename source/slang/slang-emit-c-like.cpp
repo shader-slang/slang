@@ -2886,6 +2886,31 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(getName(inst));
         break;
 
+    case kIROp_BlobAsArray:
+        {
+            auto stringSlice = cast<IRBlobLit>(inst->getOperand(0))->getStringSlice();
+            m_writer->emit("{");
+            for (Index i = 0; i < stringSlice.getLength(); ++i)
+            {
+                // Wrap lines at 80 characters.
+                if (i % 16 == 0)
+                    m_writer->emit("\n");
+                m_writer->emit("0x");
+                char c = stringSlice[i];
+                int hex[2] = {(c >> 4) & 0x0f, c & 0x0f};
+                for (Index j = 0; j < 2; ++j)
+                {
+                    int digit = hex[j];
+                    if (digit < 10)
+                        m_writer->emitChar(digit + '0');
+                    else
+                        m_writer->emitChar(digit - 10 + 'A');
+                }
+                m_writer->emit(",");
+            }
+            m_writer->emit("\n}");
+            break;
+        }
     case kIROp_MakeArray:
     case kIROp_MakeStruct:
         {

@@ -1753,6 +1753,13 @@ Val* FuncCallIntVal::_substituteImplOverride(
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRBytesCountIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void IRBytesCountIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "__ir_bytes.getCount()";
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SizeOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void SizeOfIntVal::_toTextOverride(StringBuilder& out)

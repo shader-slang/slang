@@ -1657,6 +1657,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return resVal;
     }
 
+    LoweredValInfo visitIRBytesCountIntVal(IRBytesCountIntVal*)
+    {
+        auto builder = context->irBuilder;
+        auto moduleName = builder->getModule()->getName()->text.getUnownedSlice();
+        IRInst* args[] = {builder->getStringValue(moduleName)};
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(builder->getIntType(), kIROp_IRBytesCount, 1, args));
+    }
+
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
@@ -4609,6 +4618,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
 
     LoweredValInfo visitReturnValExpr(ReturnValExpr*) { return context->returnDestination; }
+
+    LoweredValInfo visitIRBytesExpr(IRBytesExpr*)
+    {
+        auto builder = context->irBuilder;
+        auto moduleName = builder->getModule()->getName()->text.getUnownedSlice();
+        IRInst* args[] = {builder->getStringValue(moduleName)};
+        auto type = builder->getArrayType(
+            builder->getUInt8Type(),
+            builder->emitIntrinsicInst(builder->getIntType(), kIROp_IRBytesCount, 1, args));
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(type, kIROp_IRBytes, 1, args));
+    }
 
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {

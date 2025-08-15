@@ -1744,7 +1744,7 @@ public struct DeviceDesc
     // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
     public DeviceInteropHandles existingDeviceHandles = {};
     // Name to identify the adapter to use
-    public NativeString adapter = "";
+    public NativeString *adapter = nullptr;
     // Number of required features.
     public GfxCount requiredFeatureCount = 0;
     // Array of required feature names, whose size is `requiredFeatureCount`.

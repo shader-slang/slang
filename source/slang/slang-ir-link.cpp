@@ -1715,7 +1715,7 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     case CodeGenTarget::SPIRV:
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;
-        return false;
+        return true;
     default:
         return false;
     }
