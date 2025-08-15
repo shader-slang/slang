@@ -2682,7 +2682,12 @@ DIAGNOSTIC(
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
 
-DIAGNOSTIC(41405, Warning, assignmentOfNonUserPointerToNestedPointer, "assignment of a non-device 'Ptr<>' to a 'Ptr<Ptr<...>>', global-variable, or 'out' parameter, is experimental")
+DIAGNOSTIC(
+    41405,
+    Warning,
+    assignmentOfNonUserPointerToNestedPointer,
+    "assignment of a non-device 'Ptr<>' to a 'Ptr<Ptr<...>>', global-variable, or 'out' parameter, "
+    "is experimental")
 
 //
 // 5xxxx - Target code generation.

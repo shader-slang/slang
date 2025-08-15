@@ -1840,7 +1840,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             (IRPtrTypeBase*)inst))
                         emitOpTypeForwardPointer(resultSpvType, storageClass);
                 }
-                if (storageClass == SpvStorageClassPhysicalStorageBuffer || storageClass == SpvStorageClassStorageBuffer)
+                if (storageClass == SpvStorageClassPhysicalStorageBuffer ||
+                    storageClass == SpvStorageClassStorageBuffer)
                 {
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
@@ -3864,7 +3865,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return true;
         case kIROp_PtrType:
             return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer ||
-                as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
+                   as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
         default:
             if (as<IRBasicType>(type))
                 return true;
@@ -6950,15 +6951,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (typeOfPtr->getAddressSpace())
         {
         case AddressSpace::StorageBuffer:
-        {
-            requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
-            break;
-        }
+            {
+                requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+                break;
+            }
         case AddressSpace::GroupShared:
             requireSPIRVCapability(SpvCapabilityVariablePointers);
             break;
         }
-        
+
         return emitOpPtrAccessChain(
             parent,
             inst,

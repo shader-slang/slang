@@ -18,8 +18,9 @@ public:
     enum GetAddrSpaceOptions
     {
         None,
-        
-        // No longer allowed to modify the addr-space chain since address-spaces will now be changed.
+
+        // No longer allowed to modify the addr-space chain since address-spaces will now be
+        // changed.
         CompressChain
     };
     template<GetAddrSpaceOptions options>

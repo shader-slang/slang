@@ -19,23 +19,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         // Stores an `Inst` the current `Inst` derives its mappings of inst<->addrspace from.
         // This is important for 2 reasons:
-        // 1. Sometimes we have to figure out the address-space of an inst 
+        // 1. Sometimes we have to figure out the address-space of an inst
         //    at a later point in the program (globals)
         // 2. calculating address-spaces if we change an
         //    address-space other inst's relied on
         Indirect
     };
-    
+
     struct AddressSpaceNode
     {
-        AddressSpaceNodeType type = AddressSpaceNodeType::Direct; 
+        AddressSpaceNodeType type = AddressSpaceNodeType::Direct;
         AddressSpace addressSpace = AddressSpace::Generic;
         IRInst* indirectAddressSpace = nullptr;
-        
+
         AddressSpaceNode() {}
 
         AddressSpaceNode(AddressSpace addressSpace)
-        { 
+        {
             type = AddressSpaceNodeType::Direct;
             this->addressSpace = addressSpace;
         }
@@ -55,15 +55,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     // TODO:
     // Ensure List of address-space chains which must be equal.
-    // getAddrSpace(validateAddrSpaceIsTheSame[0][0])` must equal `getAddrSpace(validateAddrSpaceIsTheSame[0][1])`
-    // and must equal `getAddrSpace(validateAddrSpaceIsTheSame[0][2]).
-    // Primarily needed for:
-    // 1.`Phi` nodes
-    // 2. If globalParam/globalVar gets specialized, we likely need to store all instances where this happens to ensure 
-    // consistent addr-space inference of globalParam/globalVar across all sources
-    // 
+    // getAddrSpace(validateAddrSpaceIsTheSame[0][0])` must equal
+    // `getAddrSpace(validateAddrSpaceIsTheSame[0][1])` and must equal
+    // `getAddrSpace(validateAddrSpaceIsTheSame[0][2]). Primarily needed for: 1.`Phi` nodes
+    // 2. If globalParam/globalVar gets specialized, we likely need to store all instances where
+    // this happens to ensure consistent addr-space inference of globalParam/globalVar across all
+    // sources
+    //
     // /
-    //List<List<IRInst*>> validateAddrSpaceIsTheSame;
+    // List<List<IRInst*>> validateAddrSpaceIsTheSame;
 
     AddressSpaceContext(
         IRModule* inModule,
@@ -83,8 +83,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return addrSpaceAssigner->getLeafInstAddressSpace(inst);
     }
 
-    template<GetAddrSpaceOptions options =
-        GetAddrSpaceOptions::None>
+    template<GetAddrSpaceOptions options = GetAddrSpaceOptions::None>
     AddressSpace getAddrSpace(IRInst* inst)
     {
         auto addrSpaceNode = mapInstToAddrSpace.tryGetValue(inst);
@@ -95,7 +94,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             else if (addrSpaceNode->type == AddressSpaceNodeType::Indirect)
             {
                 AddressSpace addrSpace = getAddrSpace<options>(addrSpaceNode->indirectAddressSpace);
-                
+
                 // Solve the Indirect references into a direct reference to save
                 // the cost of re-resolving the indirect references.
                 if constexpr (options == GetAddrSpaceOptions::CompressChain)
@@ -174,10 +173,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (ptrType)
             {
                 auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
-                auto newParamType = builder.getPtrType(
-                    ptrType->getOp(),
-                    ptrType->getValueType(),
-                    paramAddrSpace);
+                auto newParamType =
+                    builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = AddressSpaceNode(paramAddrSpace);
             }
@@ -219,8 +216,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 // Note: this case is only to handle Slang's internal handling of byte-offsets
                 // to a physical buffer. We derives addr-space from operand(0).
                 //
-                // To handle users using bit-cast and addition will require us to associate with integers
-                // address-space info lost when bit-casting (and to propegate across additions/math)
+                // To handle users using bit-cast and addition will require us to associate with
+                // integers address-space info lost when bit-casting (and to propegate across
+                // additions/math)
                 mapInstToAddrSpace[inst] = AddressSpaceNode(inst->getOperand(0));
             }
             return true;
@@ -343,7 +341,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             valAddrSpace != AddressSpace::UserPointer)
                         {
                             sink->diagnose(
-                                store, Diagnostics::assignmentOfNonUserPointerToNestedPointer);
+                                store,
+                                Diagnostics::assignmentOfNonUserPointerToNestedPointer);
                         }
                     }
                     break;
@@ -482,10 +481,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 continue;
 
             IRBuilder builder(inst);
-            auto newType = builder.getPtrType(
-                ptrType->getOp(),
-                ptrType->getValueType(),
-                addrSpace);
+            auto newType = builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
             setDataType(inst, newType);
         }
     }
@@ -532,10 +528,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Apply addr-space according to our addr-space resolution chain
         applyAddressSpaceToInsts();
 
-		// Correct DebugVar types
+        // Correct DebugVar types
         IRBuilder builder(module);
-		for (auto inst : debugValuesToFixup)
-		{
+        for (auto inst : debugValuesToFixup)
+        {
             auto debugValue = as<IRDebugValue>(inst);
             auto debugVar = debugValue->getDebugVar();
             auto value = debugValue->getValue();
@@ -544,11 +540,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 continue;
 
             // Ensure the address-space of debug-ptr is correct.
-			// Should be Ptr<Ptr<...>>
+            // Should be Ptr<Ptr<...>>
             builder.setInsertBefore(valuePtrType);
             auto newDebugPtrType = builder.getPtrType(valuePtrType);
             debugVar->setFullType(newDebugPtrType);
-		}
+        }
 
         for (IRFunc* func : functionsToConsiderRemoving)
         {
