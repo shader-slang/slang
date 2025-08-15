@@ -1220,7 +1220,13 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             //
             // But we do need empty type legalized for Metal, because Metal doesn't
             // allow empty struct in argument buffer.
-            legalElementType = LegalType::simple(originalElementType);
+            // If the element type has been legalized, find it in the map,
+            // otherwise, return the simple LegalType of it.
+            if (!context->mapTypeToLegalType.tryGetValue(
+                originalElementType, legalElementType))
+            {
+                legalElementType = LegalType::simple(originalElementType);
+            }
         }
         else
         {
