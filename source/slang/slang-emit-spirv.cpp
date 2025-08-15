@@ -6415,9 +6415,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType);
         SpvStorageClass storageClass = getSpvStorageClass(ptrType);
 
-        // Check for 8/16-bit storage capabilities
-        requireCapabilitiesForType(ptrType->getValueType(), storageClass);
-
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
         maybeEmitPointerDecoration(varSpvInst, inst);
@@ -7984,6 +7981,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
 
         case kIROp_ArrayType:
+        case kIROp_UnsizedArrayType:
             if (auto arrayType = as<IRArrayType>(type))
                 return typeNeedsStorageCapabilityImpl(arrayType->getElementType(), found, visited);
             break;
