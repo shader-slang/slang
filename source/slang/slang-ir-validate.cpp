@@ -482,43 +482,6 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     return false;
 }
 
-void validatePointerAccess(DiagnosticSink* sink, IRInst* inst)
-{
-    auto errorIfReadOnlyPtrInst = [&](IRInst* maybePtrInst)
-    {
-        auto ptrType = as<IRPtrType>(maybePtrInst->getDataType());
-        if (!ptrType)
-            return;
-        if (ptrType->getAccessQualifier() == AccessQualifier::Read)
-            sink->diagnose(inst->sourceLoc, Diagnostics::cannotWriteToReadOnlyPointer);
-    };
-
-    switch (inst->getOp())
-    {
-    case kIROp_Store:
-        {
-            auto storeInst = as<IRStore>(inst);
-            errorIfReadOnlyPtrInst(storeInst->getPtr());
-            break;
-        }
-    case kIROp_SwizzledStore:
-        {
-            auto swizzledStoreInst = as<IRSwizzledStore>(inst);
-            errorIfReadOnlyPtrInst(swizzledStoreInst->getDest());
-            break;
-        }
-    case kIROp_AtomicStore:
-        {
-            auto atomicStoreInst = as<IRAtomicStore>(inst);
-            errorIfReadOnlyPtrInst(atomicStoreInst->getPtr());
-            break;
-        }
-    }
-
-    for (auto child : inst->getModifiableChildren())
-        validatePointerAccess(sink, child);
-}
-
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
 {
     switch (inst->getOp())

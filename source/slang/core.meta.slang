@@ -1324,15 +1324,29 @@ struct Ptr<
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
+    // By default, getter is not an L value
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
+    {
+        __intrinsic_op($(kIROp_GetOffsetPtr))
+        [nonmutating]
+        ref;
+    }
+};
+
+extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
+{
+    // We have a `ref` accessor if we are ReadWrite. This means only `ReadWrite`
+    // can be used as an L-value.
+    __generic<TInt : __BuiltinIntegerType>
+    __subscript(TInt index) -> Ref<T>
     {
         // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
         [nonmutating]
         ref;
     }
-};
+}
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -2645,10 +2659,18 @@ for (auto op : intrinsicUnaryOps)
 
 }}}}
 
+// Only ReadWrite is an L-value.
+__generic<T, AddressSpace addrSpace>
+__intrinsic_op(0)
+[require(cpp_cuda_spirv)]
+__prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
+
+// Unknown access qualifier or Access::Read access qualifier is a promise
+// that the pointer is not going to be used as an L-value.
 __generic<$(ptrTypeParameterList)>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
-__prefix Ref<T> operator*($(fullPtrType) value);
+__prefix ConstRef<T> operator*($(fullPtrType) value);
 
 // Cannot infer generic from use-site, therefore only T can be 
 // used in the generic parameter list.
@@ -2664,13 +2686,13 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __Addr<T> __get_addr(__ref T value);
 
-__generic<$(ptrTypeParameterList)>
+__generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
 __intrinsic_op($(kIROp_GetOffsetPtr))
-$(fullPtrType) operator+($(fullPtrType) value, int64_t offset);
+$(fullPtrType) operator+($(fullPtrType) value, TInt offset);
 
-__generic<$(ptrTypeParameterList)>
+__generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
 [__unsafeForceInlineEarly]
-$(fullPtrType) operator-($(fullPtrType) value, int64_t offset)
+$(fullPtrType) operator-($(fullPtrType) value, TInt offset)
 {
     return __getOffsetPtr(value, -offset);
 }

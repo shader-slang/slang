@@ -230,6 +230,7 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         openRef->type.isLeftValue = (as<RefType>(exprType) != nullptr);
         openRef->type.type = refType->getValueType();
         openRef->checked = true;
+        openRef->loc = expr->loc;
         return openRef;
     }
     return expr;
