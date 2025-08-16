@@ -7,6 +7,11 @@
 
 struct Val
 {
+    RWStructuredBuffer<float> buffer;
+}
+
+struct Val_f
+{
     float f;
 }
 
@@ -41,6 +46,14 @@ struct OtherParent {
       ParentStruct::ChildStruct c2;
 }
 
+struct StructWithParameterBlock {
+    RWStructuredBuffer<float> buffer;
+    ParameterBlock<Array<Val, 2>> arr;
+}
+
+uniform StructWithParameterBlock struct_with_parameter_block;
+
+
 // Test various parameter block configurations
 ParameterBlock<ResourceStruct> simpleBlock;
 ParameterBlock<Array<ResourceStruct, 4>> arrayBlock; 
@@ -49,7 +62,9 @@ ParameterBlock<ComplexStruct> complexBlock;
 ParameterBlock<Array<ComplexStruct, 2>> arrayComplexBlock;
 ParameterBlock<ParentStruct> parentBlock;
 
-ParameterBlock<RWStructuredBuffer<Val>> valBlock;
+ParameterBlock<RWStructuredBuffer<Val>> valBufferBlock;
+ParameterBlock<RWStructuredBuffer<Val_f>> valBlock;
+
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -103,7 +118,18 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[6] = resStruct.buffer[2];
 
     // Test parameter block with resource type directly
+    // TODO: Below fails in all targets
+    // (0): error 99999: Slang compilation aborted due to an exception of class
+    // Slang::InternalError: unexpected: non-simple operand(s)!
+    // outputBuffer[7] = valBufferBlock[0].buffer[0];
+
+    // CHECK: {{.*}}valBlock{{.*}}
     outputBuffer[7] = valBlock[0].f;
+
+    // Test parameter block inside a struct
+    // CHECK: {{.*}}struct_with_parameter_block_arr{{.*}}
+    StructWithParameterBlock local = struct_with_parameter_block;
+    outputBuffer[8] = local.arr[0].buffer[0];
 
     // Test function with parameter block containing a struct with a resource type
     func(parentBlock.c);

@@ -200,9 +200,17 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 {
                     // We will handle buffer types separately to wrap them in structs
                     bufferParameterBlocks.add(paramBlockType);
-                    continue;
                 }
+            }
+        }
+        // Handle ParameterBlock<BufferType> wrapping
+        handleBufferParameterBlockWrapping(bufferParameterBlocks);
 
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
+            {
+                auto elementType = paramBlockType->getElementType();
                 auto transformedElementType = convertTypeToDescriptorHandle(elementType);
 
                 if (transformedElementType != elementType)
@@ -211,9 +219,6 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 }
             }
         }
-
-        // Handle ParameterBlock<BufferType> wrapping
-        handleBufferParameterBlockWrapping(bufferParameterBlocks);
 
         // Second pass: replace each parameter block type with its transformed version
         for (auto originalParamBlockType : parameterBlockTypesToTransform)
@@ -746,7 +751,8 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 {
                     auto userInstruction = use->getUser();
                     if (userInstruction->getOp() == kIROp_GlobalParam || 
-                        userInstruction->getOp() == kIROp_Param)
+                        userInstruction->getOp() == kIROp_Param ||
+                        userInstruction->getOp() == kIROp_FieldExtract)
                     {
                         // Begin top-down processing from this global parameter or function parameter
                         updateTypesAndInsertCast(userInstruction);
