@@ -221,7 +221,7 @@ struct GlobalVarTranslationContext
 
                 // Emit a new param here to represent the global input var.
                 auto inputParam = builder.emitParam(
-                    builder.getPtrType(kIROp_ConstRefType, inputType, AddressSpace::Input));
+                    builder.getConstRefType(inputType, AddressSpace::Input));
 
                 // Copy the global input vars original decorations onto the new param.
                 // We need to do this to ensure that we can do things like get system

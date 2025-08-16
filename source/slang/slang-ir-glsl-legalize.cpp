@@ -1458,7 +1458,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
-            IRType* paramType = builder->getPtrType(ptrOpCode, arrayType, addrSpace);
+            auto accessQualifier = AccessQualifier::ReadWrite;
+            if(kind == LayoutResourceKind::VaryingInput)
+                accessQualifier = AccessQualifier::Read;
+            IRType* paramType =
+                builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1588,7 +1592,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     //
 
     // Non system value varying inputs shall be passed as pointers.
-    IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
+    IRType* paramType = builder->getPtrType(ptrOpCode, type, AccessQualifier::ReadWrite, addrSpace);
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
@@ -2550,7 +2554,11 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
     // Create a global variable to hold the consolidated struct
     consolidatedVar = builder->createGlobalVar(structType);
-    auto ptrType = builder->getPtrType(kIROp_PtrType, structType, AddressSpace::IncomingRayPayload);
+    auto ptrType = builder->getPtrType(
+        kIROp_PtrType,
+        structType,
+        AccessQualifier::ReadWrite,
+        AddressSpace::IncomingRayPayload);
     consolidatedVar->setFullType(ptrType);
     consolidatedVar->moveToEnd();
 
@@ -3080,7 +3088,8 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     auto arrayType = builder.getArrayType(
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(builder.getPtrType(arrayType, AddressSpace::Input));
+    arrayInst = builder.createGlobalParam(
+        builder.getPtrType(arrayType, AccessQualifier::Read, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -4296,6 +4305,7 @@ void legalizeEntryPointForGLSL(
                 sizedArrayType = builder.getPtrType(
                     ptrType->getOp(),
                     sizedArrayType,
+                    ptrType->getAccessQualifier(),
                     ptrType->getAddressSpace());
             }
 
@@ -4478,6 +4488,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                         builder.getPtrType(
                             payloadPtrType->getOp(),
                             payloadPtrType->getValueType(),
+                            AccessQualifier::ReadWrite,
                             AddressSpace::TaskPayloadWorkgroup));
                     payload->setFullType(payloadSharedPtrType);
                 }

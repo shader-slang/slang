@@ -15,6 +15,10 @@ QualType::QualType(Type* type)
     {
         isLeftValue = true;
     }
+    else if (as<ConstRefType>(type))
+    {
+        isLeftValue = false;
+    }
 }
 
 void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
