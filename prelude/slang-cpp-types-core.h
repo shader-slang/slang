@@ -289,7 +289,7 @@ struct half
 {
     uint16_t data;
 
-    half() {}
+    half() = default;
     explicit half(float f) { store(f); }
 
     SLANG_FORCE_INLINE void store(float f) { data = f32tof16(f); }
