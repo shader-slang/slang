@@ -1802,10 +1802,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto valueType = ptrType->getValueType();
-                // If we haven't emitted the inner type yet, we need to emit a forward declaration.
-                bool useForwardDeclaration =
-                    (!m_mapIRInstToSpvInst.containsKey(valueType) && as<IRStructType>(valueType) &&
-                     storageClass == SpvStorageClassPhysicalStorageBuffer);
+                bool useForwardDeclaration = false;
                 SpvId valueTypeId;
                 if (as<IRVoidType>(valueType))
                 {
@@ -1814,9 +1811,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     builder.setInsertBefore(valueType);
                     valueTypeId = getID(ensureInst(builder.getUIntType()));
                 }
-                else if (useForwardDeclaration)
+                else if (
+                    as<IRStructType>(valueType) &&
+                    storageClass == SpvStorageClassPhysicalStorageBuffer)
                 {
-                    valueTypeId = getIRInstSpvID(valueType);
+                    // We need to emit a forward declaration if the struct type contains a pointer
+                    // to itself.
+                    if (m_emittingTypes.add(ptrType))
+                    {
+                        auto spvValueType = ensureInst(valueType);
+                        valueTypeId = getID(spvValueType);
+
+                        m_emittingTypes.remove(ptrType);
+                        useForwardDeclaration = false;
+                    }
+                    else
+                    {
+                        valueTypeId = getIRInstSpvID(valueType);
+                        useForwardDeclaration = true;
+                    }
                 }
                 else if (storageClass == SpvStorageClassNodePayloadAMDX)
                 {
