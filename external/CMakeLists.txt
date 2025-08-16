@@ -82,16 +82,18 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
 endif()
 
 # Vulkan headers
-if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
-        add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
-            vulkan
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
+if(NOT TARGET Vulkan::Headers)
+    if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
+        if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+            add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
+                vulkan
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
     endif()
 endif()
 
@@ -103,22 +105,24 @@ target_include_directories(
 )
 
 # SPIRV-Headers
-if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        message(
-            WARNING
-            "SLANG_OVERRIDE_SPIRV_HEADERS_PATH does nothing when SLANG_USE_SPIRV_HEADERS is set"
+if(NOT TARGET SPIRV-Headers)
+    if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+        if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+            message(
+                WARNING
+                "SLANG_OVERRIDE_SPIRV_HEADERS_PATH does nothing when SLANG_USE_SPIRV_HEADERS is set"
+            )
+        endif()
+    elseif(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
+            spirv-headers
+            EXCLUDE_FROM_ALL
+            ${system}
         )
+    else()
+        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
     endif()
-elseif(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-    add_subdirectory(
-        ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
-        spirv-headers
-        EXCLUDE_FROM_ALL
-        ${system}
-    )
-else()
-    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
