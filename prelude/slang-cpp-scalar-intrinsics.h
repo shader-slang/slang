@@ -20,6 +20,12 @@ namespace SLANG_PRELUDE_NAMESPACE
 #define SLANG_PRELUDE_PI 3.14159265358979323846
 #endif
 
+union Union16
+{
+    uint16_t u;
+    int16_t i;
+    half h;
+};
 
 union Union32
 {
@@ -61,8 +67,9 @@ SLANG_FORCE_INLINE float _bitCastUIntToFloat(uint32_t ui)
     return u.f;
 }
 
-// ----------------------------- F16 -----------------------------------------
+half U16_ashalf(uint16_t x);
 
+// ----------------------------- F16 -----------------------------------------
 
 // This impl is based on FloatToHalf that is in Slang codebase
 SLANG_FORCE_INLINE uint32_t f32tof16(const float value)
@@ -147,6 +154,233 @@ SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
     }
 
     return _bitCastUIntToFloat(sign | (exponent << 23) | (mantissa << 13));
+}
+
+SLANG_FORCE_INLINE uint16_t F16_asuint(half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.u;
+}
+
+SLANG_FORCE_INLINE int16_t F16_asint(half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.i;
+}
+
+SLANG_FORCE_INLINE half F16_ceil(half f)
+{
+    return half(::ceilf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_floor(half f)
+{
+    return half(::floorf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_round(half f)
+{
+    return half(::roundf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sin(half f)
+{
+    return half(::sinf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_cos(half f)
+{
+    return half(::cosf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_tan(half f)
+{
+    return half(::tanf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_asin(half f)
+{
+    return half(::asinf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_acos(half f)
+{
+    return half(::acosf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_atan(half f)
+{
+    return half(::atanf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sinh(half f)
+{
+    return half(::sinhf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_cosh(half f)
+{
+    return half(::coshf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_tanh(half f)
+{
+    return half(::tanhf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_asinh(half f)
+{
+    return half(::asinhf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_acosh(half f)
+{
+    return half(::acosh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_atanh(half f)
+{
+    return half(::atanh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log2(half f)
+{
+    return half(::log2f(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log(half f)
+{
+    return half(::logf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log10(half f)
+{
+    return half(::log10f(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_exp2(half f)
+{
+    return half(::exp2f(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_exp(half f)
+{
+    return half(::expf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_abs(half f)
+{
+    return U16_ashalf(F16_asuint(f)&0x7FFF);
+}
+
+SLANG_FORCE_INLINE half F16_trunc(half f)
+{
+    return half(::truncf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sqrt(half f)
+{
+    return half(::sqrtf(float(f)));
+}
+
+SLANG_FORCE_INLINE bool F16_isnan(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u&0x7C00) == 0x7C00 && (u&0x3FF) != 0;
+}
+
+SLANG_FORCE_INLINE bool F16_isfinite(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u&0x7C00) != 0x7C00;
+}
+
+SLANG_FORCE_INLINE bool F16_isinf(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u&0x7C00) == 0x7C00 && (u&0x3FF) == 0;
+}
+
+SLANG_FORCE_INLINE half F16_min(half a, half b)
+{
+    if(F16_isnan(a)) return b;
+    if(F16_isnan(b)) return a;
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE half F16_max(half a, half b)
+{
+    if(F16_isnan(a)) return b;
+    if(F16_isnan(b)) return a;
+    return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE half F16_pow(half a, half b)
+{
+    return half(::powf(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_fmod(half a, half b)
+{
+    return half(::fmodf(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_remainder(half a, half b)
+{
+    return half(::remainderf(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_atan2(half a, half b)
+{
+    return half(::atan2f(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_frexp(half x, int* e)
+{
+    return half(::frexpf(float(x), e));
+}
+
+SLANG_FORCE_INLINE half F16_modf(half x, half* ip)
+{
+    float ipf;
+    float res = ::modff(float(x), &ipf);
+    *ip = half(ipf);
+    return half(res);
+}
+
+SLANG_FORCE_INLINE half F16_fma(half a, half b, half c)
+{
+    return half(::fmaf(float(a), float(b), float(c)));
+}
+
+SLANG_FORCE_INLINE half F16_calcSafeRadians(half radians)
+{
+    // Put 0 to 2pi cycles to cycle around 0 to 1
+    float a = float(radians) * (1.0f / float(SLANG_PRELUDE_PI * 2));
+    // Get truncated fraction, as value in  0 - 1 range
+    a = a - ::floorf(a);
+    // Convert back to 0 - 2pi range
+    return half(a * float(SLANG_PRELUDE_PI * 2));
+}
+
+SLANG_FORCE_INLINE half F16_rsqrt(half f)
+{
+    return half(1.0f / ::sqrtf(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sign(half f)
+{
+    uint16_t u = F16_asuint(f);
+    if((u&0x7FFF) == 0) return f;
+    return (u&0x8000) != 0 ? U16_ashalf(0xBC00) : U16_ashalf(0x3C00);
+}
+
+SLANG_FORCE_INLINE half F16_frac(half h)
+{
+    float f = float(h);
+    return half(f - ::floorf(f));
 }
 
 // ----------------------------- F32 -----------------------------------------
@@ -656,6 +890,13 @@ SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
     }
     return c;
 #endif
+}
+
+SLANG_FORCE_INLINE half U16_ashalf(uint16_t x)
+{
+    Union16 u;
+    u.u = x;
+    return u.h;
 }
 
 // ----------------------------- I16 -----------------------------------------
