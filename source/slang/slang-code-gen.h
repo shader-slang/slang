@@ -75,6 +75,7 @@ struct RequiredLoweringPassSet
     bool specializeStageSwitch;
     bool missingReturn;
     bool nonVectorCompositeSelect;
+    bool validateReadOnlyPtr;
 };
 
 /// A context for code generation in the compiler back-end

@@ -1531,6 +1531,9 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
     case ASTNodeType::OverrideModifier:
         return as<FunctionDeclBase>(decl) && as<AggTypeDecl>(getParentDecl(decl));
+    case ASTNodeType::BuiltinEnumModifier:
+        return as<EnumDecl>(decl);
+
     default:
         return true;
     }
@@ -1677,6 +1680,18 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstModifier>(m))
+    {
+        if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+        {
+            if (as<PointerTypeExpr>(varDeclBase->type.exp))
+            {
+                // Disallow `const T*` syntax.
+                getSink()->diagnose(m, Diagnostics::disallowConstAsModifierOfCppPtr);
+                return nullptr;
+            }
+        }
+    }
     if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
     {
         return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
