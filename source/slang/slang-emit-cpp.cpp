@@ -1062,6 +1062,13 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     if (inst->getOp() == kIROp_FloatLit)
     {
         IRConstant* constantInst = static_cast<IRConstant*>(inst);
+
+        IRType* type = constantInst->getDataType();
+        if (type && type->getOp() == kIROp_HalfType)
+        {
+            m_writer->emit("half(");
+        }
+
         switch (constantInst->getFloatKind())
         {
         case IRConstant::FloatKind::Nan:
@@ -1088,13 +1095,17 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 // If the literal is a float, then we need to add 'f' at end, as
                 // without literal suffix the value defaults to double.
-                IRType* type = constantInst->getDataType();
                 if (type && type->getOp() == kIROp_FloatType)
                 {
                     m_writer->emitChar('f');
                 }
                 break;
             }
+        }
+
+        if (type && type->getOp() == kIROp_HalfType)
+        {
+            m_writer->emit(")");
         }
     }
     else

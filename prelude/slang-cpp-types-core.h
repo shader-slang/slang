@@ -295,10 +295,10 @@ struct half
     SLANG_FORCE_INLINE void store(float f) { data = f32tof16(f); }
     SLANG_FORCE_INLINE float load() const { return f16tof32(data); }
 
-    half operator+(half other) const { return load() + other.load(); }
-    half operator-(half other) const { return load() - other.load(); }
-    half operator*(half other) const { return load() * other.load(); }
-    half operator/(half other) const { return load() / other.load(); }
+    half operator+(half other) const { return half(load() + other.load()); }
+    half operator-(half other) const { return half(load() - other.load()); }
+    half operator*(half other) const { return half(load() * other.load()); }
+    half operator/(half other) const { return half(load() / other.load()); }
     half& operator+=(half other) { store(load() + other.load()); return *this; }
     half& operator-=(half other) { store(load() - other.load()); return *this; }
     half& operator*=(half other) { store(load() * other.load()); return *this; }
