@@ -56,6 +56,12 @@ struct IRTypeLayoutRules
 public:
     IRTypeLayoutRuleName ruleName;
 
+    /// This function calculates the size and alignment of the given type.
+    virtual Result calcSizeAndAlignment(
+        CompilerOptionSet& optionSet,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment);
+
     /// Align composite based on rule. Type is aligned assuming
     /// it is apart of a composite (array, struct, matrix, etc...)
     virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize) = 0;
@@ -79,6 +85,7 @@ public:
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* getC();
     static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);
 };
