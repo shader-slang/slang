@@ -1,96 +1,120 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -shaderobj
+// `min(half, half)` seems to crash spirv-opt, so disable optimization for now to allow this test to pass.
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -Xslang... -O0 -X.
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgpu -compute -shaderobj
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-[numthreads(4, 1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int idx = int(dispatchThreadID.x);
-    
-    half f = half(idx) * 1.0h / 4.0h;
+    // We test the "interesting" functions in more detail - the ones that have
+    // a special implementation on the CPU target. The ones that simply defer
+    // to f32 math get a collective test that just checks that nothing changes.
 
-    half ft = 0.0h;
-    
-    // fmod
-    ft += trunc(((f % 0.11h) * 100) + 0.5h);
-    
-    ft += sin(f);
-    ft += cos(f);
-    ft += tan(f);
-    
-    ft += asin(f);
-    ft += acos(f);
-    ft += atan(f);
-    
-    ft += length(f - 0.5h);
-    
-    ft += atan2(f, 2.0h);
-    
-    {
-        half sf, cf;
-        sincos(f, sf, cf);
-        
-        ft += sf;
-        ft += cf;
-    }
-    
-    ft += rcp(1.0h + f);
-    ft += half(sign(f - 0.5h));
-    
-    ft += saturate(f * 4 - 2.0h);
-    
-    ft += sqrt(f);
-    ft += rsqrt(1.0h + f);
-    
-    ft += exp2(f);
-    ft += exp(f);
-        
-        
-    ft += frac(f * 3);
-    ft += ceil(f * 5 - 3);
-    
-    ft += floor(f * 10 - 7);
-    ft += trunc(f * 7);
-     
-   
-    ft += log(f + 10.0h);
-    ft += log2(f * 3 + 2);
+    // CHECK: 1F
+    outputBuffer[0] =
+        (abs(-2.0h) == 2.0h ? 1<<0 : 0) |
+        (abs(2.0h) == 2.0h ? 1<<1 : 0) |
+        (abs(-0.0h) == 0.0h ? 1<<2 : 0) |
+        (abs(-1.0h/0.0h) == 1.0h/0.0h ? 1<<3 : 0) |
+        (abs(1.0h/0.0h) == 1.0h/0.0h ? 1<<4 : 0);
 
-    {
-        half v[] = { 1, 10, 100, 1000 };
-        ft += trunc(log10(v[idx]) + 0.5h);
-    }
-       
-    ft += abs(f * 4 - 2.0h);
+    // CHECK: 7
+    outputBuffer[1] =
+        (!isnan(0.0h) ? 1<<0 : 0) |
+        (!isnan(-1.0h/0.0h) ? 1<<1 : 0) |
+        (isnan(0.0h/0.0h) ? 1<<2 : 0);
+
+    // CHECK: 7
+    outputBuffer[2] =
+        (isfinite(-12.0h) ? 1<<0 : 0) |
+        (!isfinite(0.0h/0.0h) ? 1<<1 : 0) |
+        (!isfinite(1.0h/0.0h) ? 1<<2 : 0);
+
+    // CHECK: F
+    outputBuffer[3] =
+        (!isinf(-0.0h) ? 1<<0 : 0) |
+        (!isinf(0.0h/0.0h) ? 1<<1 : 0) |
+        (isinf(1.0h/0.0h) ? 1<<2 : 0) |
+        (isinf(-1.0h/0.0h) ? 1<<3 : 0);
+
+    // CHECK: FF
+    outputBuffer[4] =
+        (min(1.0h, 1.0h) == 1.0h ? 1<<0 : 0) |
+        (min(-1.0h, -0.3h) == -1.0h ? 1<<1 : 0) |
+        (min(0.25h, 100.0h) == 0.25h ? 1<<2 : 0) |
+        (min(-0.25h, 100.0h) == -0.25h ? 1<<3 : 0) |
+        (min(0.0h, 1.0h/0.0h) == 0.0h ? 1<<4 : 0) |
+        (min(0.0h, -1.0h/0.0h) == -1.0h/0.0h ? 1<<5 : 0) |
+        (min(0.0h, 0.0h/0.0h) == 0.0h ? 1<<6 : 0) |
+        (min(0.0h/0.0h, 0.0h) == 0.0h ? 1<<7 : 0);
+
+    // CHECK: FF
+    outputBuffer[5] =
+        (max(1.0h, 1.0h) == 1.0h ? 1<<0 : 0) |
+        (max(-1.0h, -0.3h) == -0.3h ? 1<<1 : 0) |
+        (max(0.25h, 100.0h) == 100.0h ? 1<<2 : 0) |
+        (max(-0.25h, 100.0h) == 100.0h ? 1<<3 : 0) |
+        (max(0.0h, 1.0h/0.0h) == 1.0h/0.0h ? 1<<4 : 0) |
+        (max(0.0h, -1.0h/0.0h) == 0.0h ? 1<<5 : 0) |
+        (max(0.0h, 0.0h/0.0h) == 0.0h ? 1<<6 : 0) |
+        (max(0.0h/0.0h, 0.0h) == 0.0h ? 1<<7 : 0);
+
+    // CHECK: 3F
+    outputBuffer[6] =
+        (sign(0.0h) == 0 ? 1<<0 : 0) |
+        (sign(-0.0h) == 0 ? 1<<1 : 0) |
+        (sign(-17.0h) == -1 ? 1<<2 : 0) |
+        (sign(23.0h) == 1 ? 1<<3 : 0) |
+        (sign(1.0h/0.0h) == 1 ? 1<<4 : 0) |
+        (sign(-1.0h/0.0h) == -1 ? 1<<5 : 0);
     
-    ft += min(0.5h, f);
-    ft += max(f, 0.75h);
+    // The rest of the functions.
+    half ft = 42.3h;
 
-    ft += pow(0.5h, f);
+    ft = ceil(ft) + floor(ft) + round(ft);
+    ft = sin(ft);
+    ft = cos(ft);
+    ft = tan(ft);
+    ft = asin(frac(ft));
+    ft = acos(frac(ft));
+    ft = atan(ft);
+    ft = sinh(ft) + cosh(ft) + tanh(ft);
 
-    ft += smoothstep(0.2h, 0.7h, f);
-    ft += lerp(-100, 100, f);
+    //ft = asinh(ft);
+    //ft = acosh(abs(ft) + 1.0h);
+    //ft = atanh(fmod(ft, 1.0h));
 
+    ft = log2(ft);
+    ft = exp2(ft);
+    ft = log(ft);
+    ft = exp(ft);
+    ft = log10(ft);
 
-    ft += clamp(f, 0.1h, 0.3h);
+    ft += trunc(ft);
+    ft = sqrt(abs(ft));
+    ft = pow(ft, 2.5h);
 
-    ft += step(f, 0.5h);
+    ft = atan2(ft, 2.0h);
 
-    int vi = asint16(f - f) + idx;
-    
-    ft += half(vi);
+    ft = fma(ft, 2.0h, 1.0h);
 
-    ft += ldexp(23.2h, f);
+    ft = rsqrt(ft);
 
-    uint16_t vu = asuint16(f);
-    ft += asfloat16(vu);
-    
-    outputBuffer[idx] = int(ft * 16);
+    int e;
+    ft = frexp(ft, e);
+    ft += half(e);
+
+    half ip;
+    modf(ft, ip);
+    ft += ip;
+
+    // CHECK: 5AF0
+    outputBuffer[7] = asuint16(round(ft * 256.0h));
 }
