@@ -2294,7 +2294,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (as<IRHLSLStructuredBufferType>(t))
                 accessQualifier = AccessQualifier::Read;
             
-                IRBuilder builder(t);
+            IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
                 kIROp_PtrType,
