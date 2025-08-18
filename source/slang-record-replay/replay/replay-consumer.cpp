@@ -320,6 +320,58 @@ SlangResult CommonInterfaceReplayer::linkWithOptions(
     return res;
 }
 
+SlangResult CommonInterfaceReplayer::getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    InputObjectSanityCheck(objectId);
+
+    slang::IComponentType2* pObj = getObjectPointer2(objectId);
+    slang::ICompileResult* outCompileResultType{};
+    slang::IBlob* outDiagnostics{};
+
+    SlangResult res =
+        pObj->getTargetCompileResult(targetIndex, &outCompileResultType, &outDiagnostics);
+
+    if (outCompileResultType && SLANG_SUCCEEDED(res))
+    {
+        m_objectMap.addIfNotExists(outCompileResultId, outCompileResultType);
+    }
+
+    ReplayConsumer::printDiagnosticMessage(outDiagnostics);
+    return res;
+}
+
+SlangResult CommonInterfaceReplayer::getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    InputObjectSanityCheck(objectId);
+
+    slang::IComponentType2* pObj = getObjectPointer2(objectId);
+    slang::ICompileResult* outCompileResultType{};
+    slang::IBlob* outDiagnostics{};
+
+    SlangResult res = pObj->getEntryPointCompileResult(
+        entryPointIndex,
+        targetIndex,
+        &outCompileResultType,
+        &outDiagnostics);
+
+    if (outCompileResultType && SLANG_SUCCEEDED(res))
+    {
+        m_objectMap.addIfNotExists(outCompileResultId, outCompileResultType);
+    }
+
+    ReplayConsumer::printDiagnosticMessage(outDiagnostics);
+    return res;
+}
+
 
 void ReplayConsumer::printDiagnosticMessage(slang::IBlob* diagnosticsBlob)
 {
@@ -1784,5 +1836,34 @@ void ReplayConsumer::ITypeConformance_linkWithOptions(
     FAIL_WITH_LOG(ITypeConformance::linkWithOptions);
 }
 
+void ReplayConsumer::IComponentType2_getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SlangResult res = m_commonReplayer.getTargetCompileResult(
+        objectId,
+        targetIndex,
+        outCompileResultId,
+        outDiagnosticsId);
+    FAIL_WITH_LOG(IComponentType2::getTargetCompileResult);
+}
+
+void ReplayConsumer::IComponentType2_getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SlangResult res = m_commonReplayer.getEntryPointCompileResult(
+        objectId,
+        entryPointIndex,
+        targetIndex,
+        outCompileResultId,
+        outDiagnosticsId);
+    FAIL_WITH_LOG(IComponentType2::getEntryPointCompileResult);
+}
 
 }; // namespace SlangRecord

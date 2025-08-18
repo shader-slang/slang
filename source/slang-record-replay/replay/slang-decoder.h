@@ -247,6 +247,14 @@ public:
     void ITypeConformance_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock);
     void ITypeConformance_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock);
 
+    // IComponentType2 methods.
+    void IComponentType2_getTargetCompileResult(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
+    void IComponentType2_getEntryPointCompileResult(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
+
 private:
     Slang::List<IDecoderConsumer*> m_consumers;
 };

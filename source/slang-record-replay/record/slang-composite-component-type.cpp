@@ -19,6 +19,7 @@ ISlangUnknown* CompositeComponentTypeRecorder::getInterface(const Guid& guid)
     {
         return static_cast<ISlangUnknown*>(this);
     }
-    return nullptr;
+    // Delegate to the base class for IComponentType2 support.
+    return IComponentTypeRecorder::getInterface(guid);
 }
 } // namespace SlangRecord

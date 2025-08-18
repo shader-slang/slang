@@ -459,6 +459,19 @@ public:
         uint32_t compilerOptionEntryCount,
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
+
+    // IComponentType2 methods.
+    virtual void IComponentType2_getTargetCompileResult(
+        ObjectID objectId,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
+        ObjectID outDiagnosticsId) = 0;
+    virtual void IComponentType2_getEntryPointCompileResult(
+        ObjectID objectId,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
+        ObjectID outDiagnosticsIdId) = 0;
 };
 } // namespace SlangRecord
 

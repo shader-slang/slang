@@ -423,6 +423,12 @@ bool SlangDecoder::processITypeConformanceMethods(
     case ApiCallId::ITypeConformance_linkWithOptions:
         ITypeConformance_linkWithOptions(objectId, parameterBlock);
         break;
+    case ApiCallId::IComponentType2_getTargetCompileResult:
+        IComponentType2_getTargetCompileResult(objectId, parameterBlock);
+        break;
+    case ApiCallId::IComponentType2_getEntryPointCompileResult:
+        IComponentType2_getEntryPointCompileResult(objectId, parameterBlock);
+        break;
     }
     return true;
 }
@@ -3153,6 +3159,76 @@ void SlangDecoder::ITypeConformance_linkWithOptions(
             outLinkedComponentTypeId,
             compilerOptionEntryCount,
             compilerOptionEntries.data(),
+            outDiagnosticsId);
+    }
+}
+
+void SlangDecoder::IComponentType2_getTargetCompileResult(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+    int64_t targetIndex = 0;
+    readByte = ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        targetIndex);
+
+    ObjectID outCompileResultId = 0;
+    ObjectID outDiagnosticsId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outCompileResultId);
+    readByte += ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer + readByte,
+        parameterBlock.outputBufferSize - readByte,
+        outDiagnosticsId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->IComponentType2_getTargetCompileResult(
+            objectId,
+            targetIndex,
+            outCompileResultId,
+            outDiagnosticsId);
+    }
+}
+
+void SlangDecoder::IComponentType2_getEntryPointCompileResult(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+    int64_t targetIndex = 0;
+    int64_t entryPointIndex = 0;
+    readByte = ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        targetIndex);
+    readByte += ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        entryPointIndex);
+
+    ObjectID outCompileResultId = 0;
+    ObjectID outDiagnosticsId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outCompileResultId);
+    readByte += ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer + readByte,
+        parameterBlock.outputBufferSize - readByte,
+        outDiagnosticsId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->IComponentType2_getEntryPointCompileResult(
+            objectId,
+            entryPointIndex,
+            targetIndex,
+            outCompileResultId,
             outDiagnosticsId);
     }
 }
