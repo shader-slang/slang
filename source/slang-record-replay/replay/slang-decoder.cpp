@@ -373,6 +373,9 @@ bool SlangDecoder::processICompositeComponentTypeMethods(
     case ApiCallId::ICompositeComponentType_linkWithOptions:
         ICompositeComponentType_linkWithOptions(objectId, parameterBlock);
         break;
+    case ApiCallId::ICompositeComponentType_queryInterface:
+        ICompositeComponentType_queryInterface(objectId, parameterBlock);
+        break;
     }
     return true;
 }
@@ -2793,6 +2796,49 @@ void SlangDecoder::ICompositeComponentType_linkWithOptions(
     }
 }
 
+void SlangDecoder::ICompositeComponentType_queryInterface(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+    
+    // Decode the GUID
+    SlangUUID guid;
+    readByte = ParameterDecoder::decodeUint32(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        guid.data1);
+    readByte += ParameterDecoder::decodeUint16(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        guid.data2);
+    readByte += ParameterDecoder::decodeUint16(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        guid.data3);
+    for (int i = 0; i < 8; i++)
+    {
+        readByte += ParameterDecoder::decodeUint8(
+            parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte,
+            guid.data4[i]);
+    }
+
+    // Decode the output interface pointer
+    ObjectID outInterfaceId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outInterfaceId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->ICompositeComponentType_queryInterface(
+            objectId,
+            guid,
+            outInterfaceId);
+    }
+}
 
 void SlangDecoder::ITypeConformance_getSession(
     ObjectID objectId,

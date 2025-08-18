@@ -74,6 +74,28 @@ SlangResult CommonInterfaceReplayer::getLayout(
     return res;
 }
 
+SlangResult CommonInterfaceReplayer::queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    slang::IComponentType* pObj = getObjectPointer(objectId);
+    if (pObj == nullptr)
+    {
+        return SLANG_FAIL;
+    }
+
+    void* outInterface = nullptr;
+    SlangResult res = pObj->queryInterface(guid, &outInterface);
+
+    if (res == SLANG_OK && outInterface != nullptr)
+    {
+        m_objectMap.add(outInterfaceId, outInterface);
+    }
+
+    return res;
+}
+
 SlangResult CommonInterfaceReplayer::getEntryPointCode(
     ObjectID objectId,
     SlangInt entryPointIndex,
@@ -1694,6 +1716,15 @@ void ReplayConsumer::ICompositeComponentType_linkWithOptions(
         compilerOptionEntries,
         outDiagnosticsId);
     FAIL_WITH_LOG(ICompositeComponentType::linkWithOptions);
+}
+
+void ReplayConsumer::ICompositeComponentType_queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    SlangResult res = m_commonReplayer.queryInterface(objectId, guid, outInterfaceId);
+    FAIL_WITH_LOG(ICompositeComponentType::queryInterface);
 }
 
 

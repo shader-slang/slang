@@ -60,6 +60,7 @@ enum IComponentTypeMethodId : uint16_t
     linkWithOptions = 0x0015,
     getTargetCompileResult = 0x0016,
     getEntryPointCompileResult = 0x0017,
+    queryInterface = 0x0018,
 };
 
 enum ApiCallId : uint32_t
@@ -192,6 +193,8 @@ enum ApiCallId : uint32_t
         makeApiCallId(Class_ICompositeComponentType, IComponentTypeMethodId::renameEntryPoint),
     ICompositeComponentType_linkWithOptions =
         makeApiCallId(Class_ICompositeComponentType, IComponentTypeMethodId::linkWithOptions),
+    ICompositeComponentType_queryInterface =
+        makeApiCallId(Class_ICompositeComponentType, IComponentTypeMethodId::queryInterface),
 
     ITypeConformance_getSession =
         makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::getSession),

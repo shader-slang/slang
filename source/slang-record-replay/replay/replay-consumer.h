@@ -73,6 +73,11 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId);
 
+    SlangResult queryInterface(
+        ObjectID objectId,
+        const SlangUUID& guid,
+        ObjectID outInterfaceId);
+
     // IComponentType2 methods.
     SlangResult getTargetCompileResult(
         ObjectID objectId,
@@ -519,6 +524,11 @@ public:
         uint32_t compilerOptionEntryCount,
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
+
+    virtual void ICompositeComponentType_queryInterface(
+        ObjectID objectId,
+        const SlangUUID& guid,
+        ObjectID outInterfaceId) override;
 
     // ITypeConformance
     virtual void ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId) override;

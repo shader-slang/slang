@@ -399,6 +399,11 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
 
+    virtual void ICompositeComponentType_queryInterface(
+        ObjectID objectId,
+        const SlangUUID& guid,
+        ObjectID outInterfaceId) = 0;
+
     // ITypeConformance
     virtual void ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId) = 0;
     virtual void ITypeConformance_getLayout(

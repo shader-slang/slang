@@ -223,6 +223,9 @@ public:
     void ICompositeComponentType_linkWithOptions(
         ObjectID objectId,
         ParameterBlock const& parameterBlock);
+    void ICompositeComponentType_queryInterface(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
 
     void ITypeConformance_getSession(ObjectID objectId, ParameterBlock const& parameterBlock);
     void ITypeConformance_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock);
