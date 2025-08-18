@@ -2345,7 +2345,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // Global field address operations can occur for cbuffer field access.
                 // Emit this as a field address operation.
                 auto fieldAddrInst = as<IRFieldAddress>(inst);
-                return emitFieldAddress(getSection(SpvLogicalSectionID::ConstantsAndTypes), fieldAddrInst);
+                return emitFieldAddress(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    fieldAddrInst);
             }
         default:
             {
