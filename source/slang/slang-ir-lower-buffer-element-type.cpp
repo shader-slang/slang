@@ -161,7 +161,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -214,7 +215,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         IRType* paramTypes[] = {outStructType, matrixType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -300,7 +302,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -364,7 +367,8 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outLoweredType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outLoweredType =
+            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
         IRType* paramTypes[] = {outLoweredType, structType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -713,7 +717,10 @@ struct LoweredElementTypeContext
                     info.convertLoweredToOriginal.func,
                     UnownedStringSlice("unpackStorage"));
                 builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
-                auto refLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto refLoweredType = builder.getRefType(
+                    loweredType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
                 builder.emitBlock();
@@ -750,7 +757,10 @@ struct LoweredElementTypeContext
                     UnownedStringSlice("packStorage"));
                 builder.addForceInlineDecoration(info.convertOriginalToLowered.func);
 
-                auto outLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto outLoweredType = builder.getRefType(
+                    loweredType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(
                     builder.getFuncType(2, paramTypes, builder.getVoidType()));
@@ -920,6 +930,7 @@ struct LoweredElementTypeContext
             bool shouldWrapArrayInStruct = false;
         };
         List<BufferTypeInfo> bufferTypeInsts;
+
         for (auto globalInst : module->getGlobalInsts())
         {
             IRType* elementType = nullptr;
@@ -971,15 +982,18 @@ struct LoweredElementTypeContext
 
         List<MatrixAddrWorkItem> matrixAddrInsts;
 
-        for (auto bufferTypeInfo : bufferTypeInsts)
+        for (Index bufferTypeInstsIndex = 0; bufferTypeInstsIndex < bufferTypeInsts.getCount();
+             bufferTypeInstsIndex++)
         {
+            const auto& bufferTypeInfo = bufferTypeInsts[bufferTypeInstsIndex];
             auto bufferType = bufferTypeInfo.bufferType;
-            auto elementType = bufferTypeInfo.elementType;
 
+            auto elementType = bufferTypeInfo.elementType;
             if (elementType->findDecoration<IRPhysicalTypeDecoration>())
                 continue;
 
             auto config = getTypeLoweringConfigForBuffer(target, bufferType);
+            
             auto loweredBufferElementTypeInfo = getLoweredTypeInfo(elementType, config);
 
             // If the lowered type is the same as original type, no change is required.
@@ -990,8 +1004,9 @@ struct LoweredElementTypeContext
             builder.setInsertBefore(bufferType);
 
             ShortList<IRInst*> typeOperands;
-            for (UInt i = 0; i < bufferType->getOperandCount(); i++)
-                typeOperands.add(bufferType->getOperand(i));
+            for (UInt bufferTypeIndex = 0; bufferTypeIndex < bufferType->getOperandCount();
+                 bufferTypeIndex++)
+                typeOperands.add(bufferType->getOperand(bufferTypeIndex));
             typeOperands[0] = loweredBufferElementTypeInfo.loweredType;
             auto loweredBufferType = builder.getType(
                 bufferType->getOp(),
@@ -1013,9 +1028,9 @@ struct LoweredElementTypeContext
                 });
 
             // Translate the values to use new lowered buffer type instead.
-            for (Index i = 0; i < ptrValsWorkList.getCount(); i++)
+            for (Index ptrValsIndex = 0; ptrValsIndex < ptrValsWorkList.getCount(); ptrValsIndex++)
             {
-                auto ptrVal = ptrValsWorkList[i];
+                auto ptrVal = ptrValsWorkList[ptrValsIndex];
                 auto oldPtrType = ptrVal->getFullType();
                 auto originalElementType = oldPtrType->getOperand(0);
 
@@ -1067,6 +1082,7 @@ struct LoweredElementTypeContext
                             newArrayPtrVal = builder.emitBitCast(
                                 builder.getPtrType(
                                     loweredInnerType.loweredType,
+                                    AccessQualifier::ReadWrite,
                                     ptrType->getAddressSpace()),
                                 newArrayPtrVal);
                             traverseUses(
@@ -1541,13 +1557,24 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
     AddressSpace addrSpace = AddressSpace::Generic;
     if (auto ptrType = as<IRPtrTypeBase>(bufferType))
     {
+        // We are trying to group up type-rewrites
+        // that should share the same type. Input/Output
+        // can share; UserPointer, ThreadLocal, Groupshared,
+        // etc... can share
         switch (ptrType->getAddressSpace())
         {
         case AddressSpace::Input:
         case AddressSpace::Output:
             addrSpace = AddressSpace::Input;
             break;
-        case AddressSpace::UserPointer:
+
+        default:
+            // Not an actual UserPointer, these are
+            // conflict groups.
+            // This is needed since otherwise we have
+            // the issue where we re-write `groupshared T val = T(otherVal)`
+            // into `groupshared T2 val = T1(otherVal)`; we need to generate
+            // the same types for both use-sites.
             addrSpace = AddressSpace::UserPointer;
             break;
         }

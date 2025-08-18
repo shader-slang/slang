@@ -5744,7 +5744,10 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
     expr->base = CheckProperType(expr->base);
     if (as<ErrorType>(expr->base.type))
         expr->type = expr->base.type;
-    auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
+    auto ptrType = m_astBuilder->getPtrType(
+        expr->base.type,
+        AccessQualifier::ReadWrite,
+        AddressSpace::UserPointer);
     expr->type = m_astBuilder->getTypeType(ptrType);
     return expr;
 }
@@ -5829,6 +5832,13 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
     {
         return m_astBuilder->getNoDiffModifierVal();
+    }
+    else if (as<ConstModifier>(modifier))
+    {
+        getSink()->diagnose(
+            modifier,
+            Diagnostics::disallowConstAsTypeModifier);
+        return nullptr;
     }
     else
     {

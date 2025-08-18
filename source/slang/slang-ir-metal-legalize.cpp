@@ -254,7 +254,7 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
-    specializeAddressSpace(module, &metalAddressSpaceAssigner);
+    specializeAddressSpace(module, &metalAddressSpaceAssigner, sink);
 
     processInst(module->getModuleInst(), sink);
 }

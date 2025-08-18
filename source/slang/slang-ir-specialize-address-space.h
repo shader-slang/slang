@@ -9,12 +9,21 @@ namespace Slang
 {
 struct IRModule;
 struct IRInst;
+class DiagnosticSink;
 enum class AddressSpace : uint64_t;
 
 struct AddressSpaceSpecializationContext
 {
 public:
-    virtual AddressSpace getAddrSpace(IRInst* inst) = 0;
+    enum GetAddrSpaceOptions
+    {
+        None,
+        
+        // No longer allowed to modify the addr-space chain since address-spaces will now be changed.
+        CompressChain
+    };
+    template<GetAddrSpaceOptions options>
+    AddressSpace getAddrSpace(IRInst* inst);
 };
 
 struct InitialAddressSpaceAssigner
@@ -28,7 +37,10 @@ struct InitialAddressSpaceAssigner
 /// Specialize functions with reference/pointer parameters to use the correct address space
 /// based on the address space of the arguments.
 ///
-void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner);
+void specializeAddressSpace(
+    IRModule* module,
+    InitialAddressSpaceAssigner* addrSpaceAssigner,
+    DiagnosticSink* sink);
 
 /// Traverse the user graph of the initial insts and fix up address spaces to make sure they are
 /// consistent. This is needed after inlining a callee, the address space of the callee's
