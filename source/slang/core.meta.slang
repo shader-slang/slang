@@ -1885,11 +1885,11 @@ struct NativeString
     __init() { this = NativeString(""); }
 };
 
-extension<Access _access> Ptr<void, _access>
+extension<Access access> Ptr<void, access>
 {
     __implicit_conversion($(kConversionCost_PtrToVoidPtr))
     [__unsafeForceInlineEarly]
-    __init(NativeString nativeStr) { this = Ptr<void, _access>(nativeStr.getBuffer()); }
+    __init(NativeString nativeStr) { this = Ptr<void, access>(nativeStr.getBuffer()); }
 
     __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_BitCast))

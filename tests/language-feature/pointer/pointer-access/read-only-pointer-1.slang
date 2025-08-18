@@ -21,7 +21,7 @@ void writeToReadOnlyPointerOut(out int ptrVal)
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    // CHECK: ([[# @LINE+1]])-NOT: error
+    // CHECK-NOT: ([[# @LINE+1]]): error
     ReadPtr ptr1 = ReadPtr(&processMemory[id.x]);
 
     // CHECK: ([[# @LINE+1]]): error 30011
