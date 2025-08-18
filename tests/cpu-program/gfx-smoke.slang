@@ -2,6 +2,26 @@
 import gfx;
 import slang;
 
+gfx.IPipelineState createPipeline(gfx.IDevice device, NativeString entryPointName)
+{
+    gfx.ShaderProgramDesc2 programDesc = {};
+    NativeString filename = "tests/cpu-program/saxpy.slang";
+    programDesc.sourceData = filename;
+    programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSourceFile;
+    programDesc.sourceDataSize = filename.length;
+    programDesc.entryPointCount = 1;
+    programDesc.entryPointNames = &entryPointName;
+    Optional<gfx.IShaderProgram> program;
+    Optional<slang.ISlangBlob> diagBlob;
+    device.createProgram2(&programDesc, program, diagBlob);
+
+    Optional<gfx.IPipelineState> pipeline;
+    gfx.ComputePipelineStateDesc pipelineDesc;
+    pipelineDesc.program = NativeRef<gfx.IShaderProgram>(program.value);
+    device.createComputePipelineState(&pipelineDesc, pipeline);
+    return pipeline.value;
+}
+
 export __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
@@ -19,22 +39,8 @@ export __extern_cpp int main()
     Optional<gfx.ICommandQueue> queue;
     device.value.createCommandQueue(&queueDesc, queue);
 
-    gfx.ShaderProgramDesc2 programDesc = {};
-    NativeString s = "tests/cpu-program/saxpy.slang";
-    programDesc.sourceData = s;
-    programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSourceFile;
-    programDesc.sourceDataSize = s.length;
-    programDesc.entryPointCount = 2;
-    NativeString entryPointNames[] = { "times", "plus" };
-    programDesc.entryPointNames = &entryPointNames[0];
-    Optional<gfx.IShaderProgram> program;
-    Optional<slang.ISlangBlob> diagBlob;
-    device.value.createProgram2(&programDesc, program, diagBlob);
-
-    Optional<gfx.IPipelineState> pipeline;
-    gfx.ComputePipelineStateDesc pipelineDesc;
-    pipelineDesc.program = NativeRef<gfx.IShaderProgram>(program.value);
-    device.value.createComputePipelineState(&pipelineDesc, pipeline);
+    gfx.IPipelineState pipelineTimes = createPipeline(device.value, "times");
+    gfx.IPipelineState pipelinePlus = createPipeline(device.value, "plus");
 
     Optional<gfx.ITransientResourceHeap> transientHeap;
     gfx.TransientResourceHeapDesc transientHeapDesc;
@@ -66,7 +72,7 @@ export __extern_cpp int main()
     Optional<gfx.IComputeCommandEncoder> encoder;
     commandBuffer.value.encodeComputeCommands(encoder);
     Optional<gfx.IShaderObject> rootObject;
-    encoder.value.bindPipeline(pipeline.value, rootObject);
+    encoder.value.bindPipeline(pipelineTimes, rootObject);
     Optional<gfx.IShaderObject> entryPointObject;
     rootObject.value.getEntryPoint(0, entryPointObject);
     gfx.ShaderOffset offset = {};
