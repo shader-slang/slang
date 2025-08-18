@@ -2332,6 +2332,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugInlinedAt>(inst));
+        case kIROp_Load:
+            {
+                // Global loads are not typical in SPIRV, but we can handle the case where
+                // we're loading from a field address (e.g., cbuffer member) by emitting
+                // the load operation directly into the constants section.
+                auto loadInst = as<IRLoad>(inst);
+                return emitLoad(getSection(SpvLogicalSectionID::ConstantsAndTypes), loadInst);
+            }
+        case kIROp_FieldAddress:
+            {
+                // Global field address operations can occur for cbuffer field access.
+                // Emit this as a field address operation.
+                auto fieldAddrInst = as<IRFieldAddress>(inst);
+                return emitFieldAddress(getSection(SpvLogicalSectionID::ConstantsAndTypes), fieldAddrInst);
+            }
         default:
             {
                 if (isSpecConstRateType(inst->getFullType()))
