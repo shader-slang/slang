@@ -3598,9 +3598,8 @@ protected:
 
                 IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
 
-                const auto annotatedPayloadType = builder.getConstRefType(
-                    type->getValueType(),
-                    AddressSpace::MetalObjectData);
+                const auto annotatedPayloadType =
+                    builder.getConstRefType(type->getValueType(), AddressSpace::MetalObjectData);
 
                 param->setFullType(annotatedPayloadType);
             }
