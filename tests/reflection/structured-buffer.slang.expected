@@ -52,7 +52,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                         },
                         {
                             "name": "b",
@@ -60,7 +60,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "c",
@@ -68,7 +68,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "uint32"
                             },
-                            "binding": {"kind": "uniform", "offset": 12, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         }
                     ]
                 }

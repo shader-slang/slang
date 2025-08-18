@@ -6,7 +6,7 @@ standard output = {
     "parameters": [
         {
             "name": "cb",
-            "binding": {"kind": "uniform", "offset": 0, "size": 8},
+            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
             "type": {
                 "kind": "constantBuffer",
                 "elementType": {
@@ -28,7 +28,7 @@ standard output = {
                                                 "kind": "scalar",
                                                 "scalarType": "float64"
                                             },
-                                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                                         },
                                         {
                                             "name": "b",
@@ -36,13 +36,13 @@ standard output = {
                                                 "kind": "scalar",
                                                 "scalarType": "uint8"
                                             },
-                                            "binding": {"kind": "uniform", "offset": 8, "size": 1}
+                                            "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
                                         }
                                     ]
                                 },
                                 "uniformStride": 16
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
                         },
                         {
                             "name": "c",
@@ -50,7 +50,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "uint8"
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 1}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
                         },
                         {
                             "name": "d",
@@ -63,7 +63,7 @@ standard output = {
                                     "scalarType": "float16"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 20, "size": 24}
+                            "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
                         },
                         {
                             "name": "e",
@@ -71,12 +71,12 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "uint8"
                             },
-                            "binding": {"kind": "uniform", "offset": 44, "size": 1}
+                            "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
                         }
                     ]
                 },
                 "containerVarLayout": {
-                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                 },
                 "elementVarLayout": {
                     "type": {
@@ -98,7 +98,7 @@ standard output = {
                                                     "kind": "scalar",
                                                     "scalarType": "float64"
                                                 },
-                                                "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                                                "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                                             },
                                             {
                                                 "name": "b",
@@ -106,13 +106,13 @@ standard output = {
                                                     "kind": "scalar",
                                                     "scalarType": "uint8"
                                                 },
-                                                "binding": {"kind": "uniform", "offset": 8, "size": 1}
+                                                "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
                                             }
                                         ]
                                     },
                                     "uniformStride": 16
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
                             },
                             {
                                 "name": "c",
@@ -120,7 +120,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "uint8"
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 1}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
                             },
                             {
                                 "name": "d",
@@ -133,7 +133,7 @@ standard output = {
                                         "scalarType": "float16"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 20, "size": 24}
+                                "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
                             },
                             {
                                 "name": "e",
@@ -141,17 +141,17 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "uint8"
                                 },
-                                "binding": {"kind": "uniform", "offset": 44, "size": 1}
+                                "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 48}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 48, "elementStride": 0}
                 }
             }
         },
         {
             "name": "sb",
-            "binding": {"kind": "uniform", "offset": 8, "size": 16},
+            "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -175,7 +175,7 @@ standard output = {
                                                 "kind": "scalar",
                                                 "scalarType": "float64"
                                             },
-                                            "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                                         },
                                         {
                                             "name": "b",
@@ -183,13 +183,13 @@ standard output = {
                                                 "kind": "scalar",
                                                 "scalarType": "uint8"
                                             },
-                                            "binding": {"kind": "uniform", "offset": 8, "size": 1}
+                                            "binding": {"kind": "uniform", "offset": 8, "size": 1, "elementStride": 0}
                                         }
                                     ]
                                 },
                                 "uniformStride": 16
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 16}
                         },
                         {
                             "name": "c",
@@ -197,7 +197,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "uint8"
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 1}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 1, "elementStride": 0}
                         },
                         {
                             "name": "d",
@@ -210,7 +210,7 @@ standard output = {
                                     "scalarType": "float16"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 20, "size": 24}
+                            "binding": {"kind": "uniform", "offset": 20, "size": 24, "elementStride": 0}
                         },
                         {
                             "name": "e",
@@ -218,7 +218,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "uint8"
                             },
-                            "binding": {"kind": "uniform", "offset": 44, "size": 1}
+                            "binding": {"kind": "uniform", "offset": 44, "size": 1, "elementStride": 0}
                         }
                     ]
                 }

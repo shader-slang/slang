@@ -81,7 +81,7 @@ class OverloadedExpr2 : public Expr
     Expr* base = nullptr;
 
     // The lookup result that was ambiguous
-    List<Expr*> candidiateExprs;
+    List<Expr*> candidateExprs;
 };
 
 FIDDLE(abstract)
@@ -802,6 +802,7 @@ class PartiallyAppliedGenericExpr : public Expr
     FIDDLE(...)
 public:
     Expr* originalExpr = nullptr;
+    Expr* baseExpr = nullptr;
 
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;

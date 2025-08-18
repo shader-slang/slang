@@ -18,6 +18,7 @@ struct Helper
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
 const SyntaxClassInfo $T::kSyntaxClassInfo = {
     "$T",
+    $(T.getDebugVisType),
     ASTNodeType::$T,
     $(#T.subclasses),
 %  if T.isAbstract then

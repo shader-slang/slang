@@ -58,7 +58,6 @@ class UnparsedStmt : public Stmt
     Scope* currentScope = nullptr;
     Scope* outerScope = nullptr;
     SourceLanguage sourceLanguage;
-    bool isInVariadicGenerics = false;
 };
 
 FIDDLE()
