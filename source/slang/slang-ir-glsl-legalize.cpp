@@ -1459,7 +1459,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             auto arrayType = builder->getArrayType(type, 0);
 
             auto accessQualifier = AccessQualifier::ReadWrite;
-            if(kind == LayoutResourceKind::VaryingInput)
+            if (kind == LayoutResourceKind::VaryingInput)
                 accessQualifier = AccessQualifier::Read;
             IRType* paramType =
                 builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);

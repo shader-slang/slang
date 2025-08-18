@@ -564,11 +564,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(
-                kIROp_PtrType,
-                innerType,
-                access,
-                addressSpace);
+            ptrType = builder.getPtrType(kIROp_PtrType, innerType, access, addressSpace);
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -2289,11 +2285,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto t : instsToProcess)
         {
             auto lowered = lowerStructuredBufferType(t);
-            
+
             AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
             if (as<IRHLSLStructuredBufferType>(t))
                 accessQualifier = AccessQualifier::Read;
-            
+
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
