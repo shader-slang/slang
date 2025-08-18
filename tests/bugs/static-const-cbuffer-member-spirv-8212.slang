@@ -3,7 +3,7 @@
 // Test for issue #8212: slangc crashes when initializing "static const" variable to cbuffer member for SPIRV target
 // This test verifies that the compilation doesn't crash, which was the main issue.
 
-extern static const float VALUE = Value;
+static const float VALUE = Value;
 
 cbuffer Options
 {
@@ -18,5 +18,6 @@ void computeMain(uint3 thread_id : SV_DispatchThreadID)
 {
     outputBuffer[thread_id.x] = float4(thread_id.y + VALUE);
 }
+
 
 // SPIRV: OpTypeFloat
