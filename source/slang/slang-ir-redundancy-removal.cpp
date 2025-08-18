@@ -361,43 +361,146 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     return false;
 }
 
+// Checks if we can change or have a modified rootVar
+// at some point.
+bool isExternallyModifiableAddr(IRInst* rootVar)
+{
+    if (!rootVar)
+        return false;
+
+    auto ptr = as<IRConstRefType>(rootVar->getDataType());
+    if (!ptr)
+        return true;
+
+    // Only a UserPointer can potentially be modified and changed to point to a different address
+    // if constRef. This may happen from a different thread even if constref to the current thread.
+    auto addrSpace = ptr->getAddressSpace();
+    if (addrSpace == AddressSpace::UserPointer)
+        return true;
+
+    return false;
+}
+
+bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
+{
+    bool changed = false;
+
+    // If the load is preceeded by a store without any side-effect insts
+    // in-between, remove the load.
+    for (auto prev = load->getPrevInst(); prev; prev = prev->getPrevInst())
+    {
+        if (auto store = as<IRStore>(prev))
+        {
+            if (store->getPtr() == load->getPtr())
+            {
+                auto value = store->getVal();
+                load->replaceUsesWith(value);
+                load->removeAndDeallocate();
+                changed = true;
+                break;
+            }
+        }
+
+        if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
+        {
+            break;
+        }
+    }
+
+    return changed;
+}
+
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
 {
     bool changed = false;
     for (auto block : func->getBlocks())
     {
-        for (auto inst = block->getFirstInst(); inst;)
+        IRInst* nextInst = nullptr;
+        for (auto inst = block->getFirstInst(); inst; inst = nextInst)
         {
-            auto nextInst = inst->getNextInst();
+            nextInst = inst->getNextInst();
             if (auto load = as<IRLoad>(inst))
             {
-                for (auto prev = inst->getPrevInst(); prev; prev = prev->getPrevInst())
-                {
-                    if (auto store = as<IRStore>(prev))
-                    {
-                        if (store->getPtr() == load->getPtr())
-                        {
-                            // If the load is preceeded by a store without any side-effect insts
-                            // in-between, remove the load.
-                            auto value = store->getVal();
-                            load->replaceUsesWith(value);
-                            load->removeAndDeallocate();
-                            changed = true;
-                            break;
-                        }
-                    }
-
-                    if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
-                    {
-                        break;
-                    }
-                }
+                changed |= tryRemoveRedundantLoad(func, load);
             }
             else if (auto store = as<IRStore>(inst))
             {
                 changed |= tryRemoveRedundantStore(func, store);
             }
-            inst = nextInst;
+            else if (auto getElementPtr = as<IRGetElementPtr>(inst))
+            {
+                auto rootAddr = getRootAddr(getElementPtr);
+                if (isExternallyModifiableAddr(rootAddr))
+                    continue;
+
+                // GetElement(Load(GetElementPtr(x)))) ==> Load(GetElementPtr(GetElementPtr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
+                // This can only be done if we have no side-effects. `constref` never has
+                // single-invocation side-effects.
+                traverseUsers<IRLoad>(
+                    getElementPtr,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRGetElement>(
+                            load,
+                            [&](IRGetElement* getElement)
+                            {
+                                // Only optimize if the load
+                                // is the base
+                                if (getElement->getBase() != load)
+                                    return;
+
+                                IRBuilder builder(getElement);
+                                builder.setInsertBefore(getElement);
+                                auto newGetElementPtr = builder.emitElementAddress(
+                                    getElementPtr,
+                                    getElement->getIndex());
+                                auto newLoad = builder.emitLoad(newGetElementPtr);
+                                getElement->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
+            }
+            else if (auto fieldAddress = as<IRFieldAddress>(inst))
+            {
+                auto rootAddr = getRootAddr(fieldAddress);
+                if (isExternallyModifiableAddr(rootAddr))
+                    continue;
+
+                // ExtractField(Load(GetFieldAddr(x)))) ==> Load(GetFieldAddr(GetFieldAddr(x)))
+                // The benefit is that any GetAddr(Load(...)) can then transitively be optimized
+                // out.
+                // This can only be done if we have no side-effects. `constref` never has
+                // single-invocation side-effects.
+                traverseUsers<IRLoad>(
+                    fieldAddress,
+                    [&](IRLoad* load)
+                    {
+                        traverseUsers<IRFieldExtract>(
+                            load,
+                            [&](IRFieldExtract* fieldExtract)
+                            {
+                                // Only optimize if the load
+                                // is the base; not strictly
+                                // needed for field extract,
+                                // but it will prevent future
+                                // regressions if a field ever
+                                // becomes a non-struct-key
+                                if (fieldExtract->getBase() != load)
+                                    return;
+
+                                IRBuilder builder(fieldExtract);
+                                builder.setInsertBefore(fieldExtract);
+                                auto newGetFieldAddress = builder.emitFieldAddress(
+                                    fieldAddress,
+                                    fieldExtract->getField());
+                                auto newLoad = builder.emitLoad(newGetFieldAddress);
+                                fieldExtract->replaceUsesWith(newLoad);
+                                changed = true;
+                            });
+                    });
+            }
         }
     }
     return changed;

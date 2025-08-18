@@ -248,14 +248,6 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
-
-    auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = version->getOrLoadModule(canonicalPath);
-    if (!parsedModule)
-    {
-        return SLANG_FAIL;
-    }
-
     return SLANG_OK;
 }
 
@@ -272,6 +264,7 @@ SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams&
     {
         publishDiagnostics();
     }
+    m_pendingModulesToUpdateDiagnostics.add(uriToCanonicalPath(args.textDocument.uri));
     return result;
 }
 
@@ -670,7 +663,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             }
             else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
             {
-                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+                numOverloads = overloadedExpr2->candidateExprs.getCount();
             }
         }
         if (numOverloads > 1)
@@ -879,9 +872,9 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
-        if (overloadedExpr2->candidiateExprs.getCount() > 0)
+        if (overloadedExpr2->candidateExprs.getCount() > 0)
         {
-            auto candidateExpr = overloadedExpr2->candidiateExprs[0];
+            auto candidateExpr = overloadedExpr2->candidateExprs[0];
             fillExprHoverInfo(candidateExpr);
         }
     }
@@ -1903,7 +1896,7 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             addExpr(item);
         }

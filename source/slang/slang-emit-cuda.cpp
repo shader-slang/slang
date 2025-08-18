@@ -214,6 +214,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << "TensorView";
             return SLANG_OK;
         }
+    case kIROp_RaytracingAccelerationStructureType:
     case kIROp_HitObjectType:
         {
             out << "OptixTraversableHandle";
@@ -250,22 +251,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 break;
             }
 
-            break;
-        }
-    }
-
-    if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
-    {
-        switch (untypedBufferType->getOp())
-        {
-        case kIROp_RaytracingAccelerationStructureType:
-            {
-                m_writer->emit("OptixTraversableHandle");
-                return SLANG_OK;
-                break;
-            }
-
-        default:
             break;
         }
     }
