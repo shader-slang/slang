@@ -354,7 +354,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
     // This is the bottleneck for using declarations which might be
     // deprecated, diagnose here.
-    diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
+    if (getSink())
+        diagnoseDeprecatedDeclRefUsage(declRef, loc, originalExpr);
 
     // Construct an appropriate expression based on the structured of
     // the declaration reference.
@@ -386,18 +387,19 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // and given a type of `(Test) -> float` to indicate
             // that it is an "unbound" instance method.
             //
-            if (!isDeclUsableAsStaticMember(declRef.getDecl()))
+            auto expr = m_astBuilder->create<StaticMemberExpr>();
+            expr->loc = loc;
+            expr->type = type;
+            if (getSink() && !isDeclUsableAsStaticMember(declRef.getDecl()))
             {
                 getSink()->diagnose(
                     loc,
                     Diagnostics::staticRefToNonStaticMember,
                     typeType->getType(),
                     declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
             }
 
-            auto expr = m_astBuilder->create<StaticMemberExpr>();
-            expr->loc = loc;
-            expr->type = type;
             expr->baseExpression = baseExpr;
             expr->name = name;
             expr->declRef = declRef;
@@ -1126,7 +1128,9 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     return result;
 }
 
-LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inResult)
+LookupResult SemanticsVisitor::resolveOverloadedLookup(
+    LookupResult const& inResult,
+    Type* targetType)
 {
     // If the result isn't actually overloaded, it is fine as-is
     if (!inResult.isValid())
@@ -1138,6 +1142,15 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     List<LookupResultItem> items;
     for (auto item : inResult.items)
     {
+        // First we check if the item is coercible to targetType.
+        // And skip if it doesn't.
+        if (targetType)
+        {
+            auto declType = GetTypeForDeclRef(item.declRef, SourceLoc());
+            if (!canCoerce(targetType, declType, nullptr, nullptr))
+                continue;
+        }
+
         // For each item we consider adding, we will compare it
         // to those items we've already added.
         //
@@ -1184,6 +1197,20 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(LookupResult const& inRes
     return result;
 }
 
+bool SemanticsVisitor::maybeDiagnoseAmbiguousReference(Expr* expr)
+{
+    if (auto overloadExpr = as<OverloadedExpr>(expr))
+    {
+        if (overloadExpr->lookupResult2.isValid() &&
+            !as<NamespaceDecl>(overloadExpr->lookupResult2.item.declRef.getDecl()))
+        {
+            diagnoseAmbiguousReference(overloadExpr);
+            return true;
+        }
+    }
+    return false;
+}
+
 void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
@@ -1210,15 +1237,18 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
     {
         getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
     }
+    expr->type = m_astBuilder->getErrorType();
 }
 
 Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     OverloadedExpr* overloadedExpr,
     LookupMask mask,
+    Type* targetType,
     DiagnosticSink* diagSink)
 {
     auto lookupResult = overloadedExpr->lookupResult2;
-    SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
+    if (!lookupResult.isValid() || !lookupResult.isOverloaded())
+        return overloadedExpr;
 
     // Take the lookup result we had, and refine it based on what is expected in context.
     //
@@ -1228,7 +1258,7 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
     lookupResult = refineLookup(lookupResult, mask);
 
     // Try to filter out overload candidates based on which ones are "better" than one another.
-    lookupResult = resolveOverloadedLookup(lookupResult);
+    lookupResult = resolveOverloadedLookup(lookupResult, targetType);
 
     if (!lookupResult.isValid())
     {
@@ -1278,6 +1308,7 @@ Expr* SemanticsVisitor::_resolveOverloadedExprImpl(
 Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
     Expr* expr,
     LookupMask mask,
+    Type* targetType,
     DiagnosticSink* diagSink)
 {
     if (IsErrorExpr(expr))
@@ -1285,7 +1316,7 @@ Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
 
     if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
-        return _resolveOverloadedExprImpl(overloadedExpr, mask, diagSink);
+        return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, diagSink);
     }
     else
     {
@@ -1293,9 +1324,12 @@ Expr* SemanticsVisitor::maybeResolveOverloadedExpr(
     }
 }
 
-Expr* SemanticsVisitor::resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask)
+Expr* SemanticsVisitor::resolveOverloadedExpr(
+    OverloadedExpr* overloadedExpr,
+    Type* targetType,
+    LookupMask mask)
 {
-    return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
+    return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, getSink());
 }
 
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
@@ -1346,7 +1380,7 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
                 Slang::LookupMask::type,
                 Slang::LookupOptions::None);
 
-            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult);
+            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
 
             if (!diffTypeLookupResult.isValid())
             {
@@ -1762,6 +1796,10 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     {
         return memberExpr->baseExpression;
     }
+    else if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+    {
+        return staticMemberExpr->baseExpression;
+    }
     else if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
         return overloadedExpr->base;
@@ -1776,7 +1814,7 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     }
     else if (auto partiallyApplied = as<PartiallyAppliedGenericExpr>(expr))
     {
-        return GetBaseExpr(partiallyApplied->originalExpr);
+        return GetBaseExpr(partiallyApplied->baseExpr);
     }
     return nullptr;
 }
@@ -2607,7 +2645,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     if (!lookupResult.isValid())
     {
         if (!diagnosed)
-            getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        {
+            if (!maybeDiagnoseAmbiguousReference(baseExpr))
+                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+        }
         return CreateErrorExpr(subscriptExpr);
     }
     auto subscriptFuncExpr = createLookupResultExpr(
@@ -2680,9 +2721,13 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
         {
             e = subscriptExpr->baseExpression;
         }
-        else
+        else if (as<ThisExpr>(e))
         {
             break;
+        }
+        else
+        {
+            return;
         }
     }
 
@@ -2956,7 +3001,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             else if (!as<ErrorType>(argExpr->type))
                             {
                                 // Emit additional diagnostic for invalid pointer taking operations
-                                auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+                                auto funcDeclRef = funcDeclRefExpr
+                                                       ? getDeclRef(m_astBuilder, funcDeclRefExpr)
+                                                       : DeclRef<Decl>();
                                 if (funcDeclRef)
                                 {
                                     auto knownBuiltinAttr =
@@ -3197,6 +3244,40 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
+
+    // Check for comma operator usage and emit warning if not in for-loop side effect context
+    // Skip warning in Slang 2026+ mode where parentheses create tuples
+    if (!isSlang2026OrLater(this))
+    {
+        bool exprIsInfixExpr = false;
+        InfixExpr* infixExpr = nullptr;
+        if (auto candidateInfixExpr = as<InfixExpr>(expr))
+        {
+            exprIsInfixExpr = true;
+            infixExpr = candidateInfixExpr;
+        }
+
+        bool functionExprIsVarExpr = false;
+        VarExpr* varExpr = nullptr;
+        if (exprIsInfixExpr)
+        {
+            if (auto candidateVarExpr = as<VarExpr>(infixExpr->functionExpr))
+            {
+                functionExprIsVarExpr = true;
+                varExpr = candidateVarExpr;
+            }
+        }
+
+        if (functionExprIsVarExpr && varExpr->name && varExpr->name->text == ",")
+        {
+            // Allow comma operators in for-loop side effects and expand expressions without
+            // warning
+            if (!getInForLoopSideEffect() && !m_parentExpandExpr)
+            {
+                getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+            }
+        }
+    }
 
     expr->functionExpr = CheckTerm(expr->functionExpr);
 
@@ -3798,7 +3879,7 @@ static Expr* _checkHigherOrderInvokeExpr(
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -3807,12 +3888,12 @@ static Expr* _checkHigherOrderInvokeExpr(
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
     {
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, item);
             candidateExpr->loc = expr->loc;
-            result->candidiateExprs.add(candidateExpr);
+            result->candidateExprs.add(candidateExpr);
         }
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
@@ -4385,7 +4466,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         {
             goto error;
         }
-        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>() && !as<TupleType>(baseType))
         {
             goto error;
         }
@@ -4601,17 +4682,6 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     bool anyDuplicates = false;
     int zeroIndexOffset = -1;
 
-    if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = baseElementRowCount;
-        suggestions.elementCount[1] = baseElementColCount;
-    }
-
     String swizzleText = getText(memberRefExpr->name);
     auto cursor = swizzleText.begin();
 
@@ -4759,18 +4829,6 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     UInt tupleElementCount = (UInt)baseTupleType->getMemberCount();
     if (tupleElementCount == 0)
         return checkGeneralMemberLookupExpr(memberExpr, baseTupleType);
-
-    if (memberExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberExpr->baseExpression ? memberExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = (Index)tupleElementCount;
-        suggestions.elementCount[1] = 0;
-        return memberExpr;
-    }
 
     String swizzleText = getText(memberExpr->name);
     auto span = swizzleText.getUnownedSlice();
@@ -5175,7 +5233,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
     }
     else if (auto overloaded2 = as<OverloadedExpr2>(baseExpression))
     {
-        for (auto candidate : overloaded2->candidiateExprs)
+        for (auto candidate : overloaded2->candidateExprs)
         {
             handleLeafExpr(candidate);
         }
@@ -5228,9 +5286,12 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     // Check it's a member expression
     SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-    if (!supressDiagnostic)
-        getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
     expr->type = QualType(m_astBuilder->getErrorType());
+    if (!supressDiagnostic)
+    {
+        if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+    }
     return expr;
 }
 
@@ -5279,11 +5340,9 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
                 shouldRemove = true;
             if (!shouldRemove)
             {
-                filteredLookupResult.items.add(lookupResult);
+                AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
-        if (filteredLookupResult.items.getCount() == 1)
-            filteredLookupResult.item = filteredLookupResult.items.getFirst();
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
             filteredLookupResult,
@@ -5349,6 +5408,27 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
                 suggestions.elementCount[1] = 0;
                 suggestions.elementCount[0] = 1;
                 suggestions.swizzleBaseType = scalarType;
+            }
+            else if (auto matrixType = as<MatrixExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.clear();
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.swizzleBaseType = matrixType;
+                suggestions.elementCount[0] = 0;
+                suggestions.elementCount[1] = 0;
+                if (auto rowCount = as<ConstantIntVal>(matrixType->getRowCount()))
+                    suggestions.elementCount[0] = rowCount->getValue();
+                if (auto colCount = as<ConstantIntVal>(matrixType->getColumnCount()))
+                    suggestions.elementCount[1] = colCount->getValue();
+            }
+            else if (auto tupleType = as<TupleType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[0] = tupleType->getMemberCount();
+                suggestions.elementCount[1] = 0;
+                suggestions.swizzleBaseType = tupleType;
             }
         }
     }

@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -profile cs_5_0 -entry computeMain -line-directive-mode none
 //DISABLE_TEST:SIMPLE(filecheck=CTX):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

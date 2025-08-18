@@ -99,6 +99,19 @@ void _optixLogCallback(unsigned int level, const char* tag, const char* message,
 
 AdapterLUID getAdapterLUID(int deviceIndex);
 
+// Version-aware cuCtxCreate wrapper that works with both CUDA 12 and CUDA 13
+inline CUresult createCudaContext(CUcontext* pctx, unsigned int flags, CUdevice dev)
+{
+#if CUDA_VERSION >= 13000
+    // CUDA 13+ requires CUctxCreateParams
+    CUctxCreateParams ctxCreateParams = {};
+    return cuCtxCreate(pctx, &ctxCreateParams, flags, dev);
+#else
+    // CUDA 12 and earlier use the old signature
+    return cuCtxCreate(pctx, flags, dev);
+#endif
+}
+
 } // namespace cuda
 #endif
 

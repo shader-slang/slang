@@ -35,6 +35,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-detect-uninitialized-resources.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -109,6 +110,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -1102,6 +1104,8 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    detectUninitializedResources(irModule, sink);
+
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
         removeAvailableInDownstreamModuleDecorations(target, irModule);
@@ -1336,7 +1340,10 @@ Result linkAndOptimizeIR(
     }
 
     legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
     legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1708,6 +1715,12 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
+        // Transform struct parameters to use ConstRef for better performance
+        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
+            isMetalTarget(targetRequest))
+        {
+            transformParamsToConstRef(irModule, codeGenContext->getSink());
+        }
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
 #endif

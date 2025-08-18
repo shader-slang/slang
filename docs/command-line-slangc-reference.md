@@ -361,6 +361,11 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
+<a id="msvc-style-bitfield-packing"></a>
+### -msvc-style-bitfield-packing
+Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+
+
 
 <a id="Target"></a>
 ## Target
@@ -1132,7 +1137,6 @@ Vulkan Shift
 A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 
 * `spirv_1_{ 0`, `1`, `2`, `3`, `4`, `5 }` : minimum supported SPIR - V version 
-* `Invalid` 
 * `textualTarget` 
 * `hlsl` 
 * `glsl` 
@@ -1356,6 +1360,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
+* `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
 * `ser` 
