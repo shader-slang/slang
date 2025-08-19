@@ -2698,6 +2698,8 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     }
 }
 
+void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
+
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
@@ -2892,6 +2894,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
+
+    validateStructuredBufferElementType(this, varDecl);
+
     bool isGlobalOrLocalVar = !isGlobalShaderParameter(varDecl) && !as<ParamDecl>(varDecl) &&
                               (!parentDecl || isEffectivelyStatic(varDecl));
     if (isGlobalOrLocalVar)
@@ -15016,6 +15021,92 @@ bool isOpaqueHandleType(Type* type)
     if (as<MeshOutputType>(type))
         return true;
     return false;
+}
+
+bool containsOpaqueHandleTypeImpl(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Type*>& visitedTypes)
+{
+    // Prevent infinite recursion
+    if (!visitedTypes.add(type))
+        return false;
+
+    // Check cache first
+    auto shared = visitor->getShared();
+    bool* cachedResult = shared->m_typeContainsOpaqueHandleCache.tryGetValue(type);
+    if (cachedResult)
+        return *cachedResult;
+
+    // Check if the type itself is an opaque handle
+    bool result = false;
+    if (isOpaqueHandleType(type))
+    {
+        result = true;
+    }
+    else if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
+        {
+            for (auto member : aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>())
+            {
+                if (isEffectivelyStatic(member))
+                    continue;
+
+                if (containsOpaqueHandleTypeImpl(visitor, member->getType(), visitedTypes))
+                {
+                    result = true;
+                    break;
+                }
+            }
+        }
+    }
+    else if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        result = containsOpaqueHandleTypeImpl(visitor, arrayType->getElementType(), visitedTypes);
+    }
+
+    // Cache the result
+    shared->m_typeContainsOpaqueHandleCache[type] = result;
+
+    return result;
+}
+
+bool containsOpaqueHandleType(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Type*> visitedTypes;
+    return containsOpaqueHandleTypeImpl(visitor, type, visitedTypes);
+}
+
+void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+{
+    auto type = varDecl->getType();
+
+    // Check if this is a StructuredBuffer type
+    auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
+    if (!structuredBufferType)
+    {
+        // Also check if it's wrapped in an array
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            structuredBufferType = as<HLSLStructuredBufferTypeBase>(arrayType->getElementType());
+        }
+    }
+
+    if (!structuredBufferType)
+        return;
+
+    // Get the element type
+    auto elementType = structuredBufferType->getElementType();
+
+    // Check if the element type contains any resource/opaque handle types
+    if (containsOpaqueHandleType(visitor, elementType))
+    {
+        visitor->getSink()->diagnose(
+            varDecl->loc,
+            Diagnostics::cannotUseResourceTypeInStructuredBuffer,
+            elementType);
+    }
 }
 
 void diagnoseMissingCapabilityProvenance(

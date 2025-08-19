@@ -2254,6 +2254,12 @@ DIAGNOSTIC(
     vectorWithInvalidElementCountEncountered,
     "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
 
+DIAGNOSTIC(
+    38204,
+    Error,
+    cannotUseResourceTypeInStructuredBuffer,
+    "StructuredBuffer element type '$0' cannot contain resource or opaque handle types")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(
