@@ -819,7 +819,6 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->innerExpr);
     }
 
-
     // Stmt Visitor
 
     void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
