@@ -143,7 +143,7 @@ Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst,
 void Val::_toTextOverride(StringBuilder& out)
 {
     SLANG_UNUSED(out);
-    SLANG_UNEXPECTED("Val::_toStringOverride not overridden");
+    SLANG_UNEXPECTED("Val::_toTextOverride not overridden");
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

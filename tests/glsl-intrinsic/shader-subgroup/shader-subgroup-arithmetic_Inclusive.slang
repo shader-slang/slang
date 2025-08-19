@@ -17,9 +17,11 @@
 
 #if 1                        \
     && !defined(TARGET_HLSL) \
-    && !defined(TARGET_CUDA)
+    && !defined(TARGET_CUDA) \
+    && !defined(WGPU)        \
+    && !defined(METAL)
 // hlsl does not treat boolean types with subgroup.* as a logical operator
-// cuda is missing an implementation
+// cuda, wgsl, and metal is missing an implementation
 #define TEST_when_logical_operators_are_implemented
 #endif
 
