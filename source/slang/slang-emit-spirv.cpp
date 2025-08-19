@@ -7949,8 +7949,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Type and constants used by typeNeedsStorageCapability
+    typedef uint32_t TypeNeedsStorageFlags;
+    struct TypeNeedsStorageFlag {
+        enum Enum : TypeNeedsStorageFlags
+        {
+            kNone = 0b0,
+            kElementSize8 = 0b1,
+            kElementSize16 = 0b10,
+            kAll = kElementSize8 | kElementSize16,
+            kStopFollowingPtr = 0b1000,
+        };
+    };
+
     // Helper function to recursively check if a type contains 8/16-bit types
-    bool typeNeedsStorageCapabilityImpl(IRType* type, HashSet<int>& found, HashSet<IRType*>& visited)
+    bool typeNeedsStorageCapabilityImpl(IRType* type, const TypeNeedsStorageFlags targets, TypeNeedsStorageFlags& found, HashSet<IRType*>& visited)
     {
         if (visited.contains(type))
             return false; // Cycle detected, break recursion
@@ -7962,42 +7975,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HalfType:
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
-            found.add(16);
-            return true;
+            found |= TypeNeedsStorageFlag::kElementSize16;
+            return ((targets & TypeNeedsStorageFlag::kAll) == found);
 
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
-            found.add(8);
-            return true;
+            found |= TypeNeedsStorageFlag::kElementSize8;
+            return ((targets & TypeNeedsStorageFlag::kAll) == found);
 
         case kIROp_VectorType:
             if (auto vectorType = as<IRVectorType>(type))
-                return typeNeedsStorageCapabilityImpl(vectorType->getElementType(), found, visited);
+                return typeNeedsStorageCapabilityImpl(vectorType->getElementType(), targets, found, visited);
             break;
 
         case kIROp_MatrixType:
             if (auto matrixType = as<IRMatrixType>(type))
-                return typeNeedsStorageCapabilityImpl(matrixType->getElementType(), found, visited);
+                return typeNeedsStorageCapabilityImpl(matrixType->getElementType(), targets, found, visited);
             break;
 
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             if (auto arrayType = as<IRArrayType>(type))
-                return typeNeedsStorageCapabilityImpl(arrayType->getElementType(), found, visited);
+                return typeNeedsStorageCapabilityImpl(arrayType->getElementType(), targets, found, visited);
             break;
 
         case kIROp_StructType:
             if (auto structType = as<IRStructType>(type))
             {
                 for (auto field : structType->getFields())
-                    if (typeNeedsStorageCapabilityImpl(field->getFieldType(), found, visited))
+                    if (typeNeedsStorageCapabilityImpl(field->getFieldType(), targets, found, visited))
                         return true;
             }
             break;
 
         case kIROp_AtomicType:
             if (auto atomicType = as<IRAtomicType>(type))
-                return typeNeedsStorageCapabilityImpl(atomicType->getElementType(), found, visited);
+                return typeNeedsStorageCapabilityImpl(atomicType->getElementType(), targets, found, visited);
             break;
 
         case kIROp_PtrType:
@@ -8006,8 +8019,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_OutType:
         case kIROp_InOutType:
         case kIROp_RateQualifiedType:
+            if (targets & TypeNeedsStorageFlag::kStopFollowingPtr)
+                return false;
             if (auto ptrType = as<IRPtrTypeBase>(type))
-                return typeNeedsStorageCapabilityImpl(ptrType->getValueType(), found, visited);
+                return typeNeedsStorageCapabilityImpl(ptrType->getValueType(), targets | TypeNeedsStorageFlag::kStopFollowingPtr, found, visited);
             break;
         }
 
@@ -8015,43 +8030,74 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     // Public wrapper for 8/16-bit type detection
-    bool typeNeedsStorageCapability(IRType* type, HashSet<int>& found)
+    bool typeNeedsStorageCapability(IRType* type, const TypeNeedsStorageFlags targets, TypeNeedsStorageFlags& found)
     {
         HashSet<IRType*> visited;
-        return typeNeedsStorageCapabilityImpl(type, found, visited);
+        return typeNeedsStorageCapabilityImpl(type, targets, found, visited);
     }
 
     // Check and require 8/16-bit storage capabilities based on storage class and type
     void requireCapabilitiesForType(IRType* type, SpvStorageClass storageClass)
     {
-        HashSet<int> found;
-        if (!typeNeedsStorageCapability(type, found))
+        // Search for specific aspects of the type, depending on the class.
+        TypeNeedsStorageFlags targets = TypeNeedsStorageFlag::kNone;
+        switch (storageClass)
+        {
+        case SpvStorageClassUniform:
+        case SpvStorageClassStorageBuffer:
+            if (!m_capabilities.contains(SpvCapabilityUniformAndStorageBuffer8BitAccess))
+                targets |= TypeNeedsStorageFlag::kElementSize8;
+            if (!m_capabilities.contains(SpvCapabilityUniformAndStorageBuffer16BitAccess))
+                targets |= TypeNeedsStorageFlag::kElementSize16;
+            break;
+        case SpvStorageClassPushConstant:
+            if (!m_capabilities.contains(SpvCapabilityStoragePushConstant8))
+                targets |= TypeNeedsStorageFlag::kElementSize8;
+            if (!m_capabilities.contains(SpvCapabilityStoragePushConstant16))
+                targets |= TypeNeedsStorageFlag::kElementSize16;
+            break;
+        case SpvStorageClassInput:
+        case SpvStorageClassOutput:
+            if (!m_capabilities.contains(SpvCapabilityStorageInputOutput16))
+                targets |= TypeNeedsStorageFlag::kElementSize16;
+            break;
+        }
+
+        // If we've already found all possible capabilities, there's no reason to search
+        // again.
+        if (targets == TypeNeedsStorageFlag::kNone)
+            return;
+
+        TypeNeedsStorageFlags found = TypeNeedsStorageFlag::kNone;
+        typeNeedsStorageCapability(type, targets, found);
+
+        if (found == TypeNeedsStorageFlag::kNone)
             return;
 
         switch (storageClass)
         {
         case SpvStorageClassUniform:
         case SpvStorageClassStorageBuffer:
-            if (found.contains(8)) {
+            if (found & TypeNeedsStorageFlag::kElementSize8) {
                 ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
                 requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer8BitAccess);
             }
-            if (found.contains(16))
+            if (found & TypeNeedsStorageFlag::kElementSize16)
                 requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
             break;
 
         case SpvStorageClassPushConstant:
-            if (found.contains(8)) {
+            if (found & TypeNeedsStorageFlag::kElementSize8) {
                 ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
                 requireSPIRVCapability(SpvCapabilityStoragePushConstant8);
             }
-            if (found.contains(16))
+            if (found & TypeNeedsStorageFlag::kElementSize16)
                 requireSPIRVCapability(SpvCapabilityStoragePushConstant16);
             break;
 
         case SpvStorageClassInput:
         case SpvStorageClassOutput:
-            if (found.contains(16))
+            if (found & TypeNeedsStorageFlag::kElementSize16)
                 requireSPIRVCapability(SpvCapabilityStorageInputOutput16);
             break;
         }
