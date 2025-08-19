@@ -819,57 +819,6 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->innerExpr);
     }
 
-    void visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
-    {
-        // Continue visiting from DifferentiateExpr
-        visitHigherOrderInvokeExpr(expr);
-
-        // Check if the base function has a user-defined backward derivative
-        if (auto baseFunc = expr->baseFunction)
-        {
-            if (auto baseDeclRefExpr = as<DeclRefExpr>(baseFunc))
-            {
-                if (auto funcDecl = as<CallableDecl>(baseDeclRefExpr->declRef.getDecl()))
-                {
-                    if (auto backwardDerivAttr =
-                            funcDecl->findModifier<BackwardDerivativeAttribute>())
-                    {
-                        // Visit the derivative function declaration
-                        if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
-                        {
-                            dispatchIfNotNull(derivFuncExpr);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    void visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
-    {
-        // Continue visiting from DifferentiateExpr
-        visitHigherOrderInvokeExpr(expr);
-
-        // Check if the base function has a user-defined forward derivative
-        if (auto baseFunc = expr->baseFunction)
-        {
-            if (auto baseDeclRefExpr = as<DeclRefExpr>(baseFunc))
-            {
-                if (auto funcDecl = as<CallableDecl>(baseDeclRefExpr->declRef.getDecl()))
-                {
-                    if (auto forwardDerivAttr =
-                            funcDecl->findModifier<ForwardDerivativeAttribute>())
-                    {
-                        // Visit the derivative function declaration
-                        if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
-                        {
-                            dispatchIfNotNull(derivFuncExpr);
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // Stmt Visitor
 
@@ -14402,6 +14351,10 @@ struct CapabilityDeclReferenceVisitor
     const ParentDiagnosticFunc handleParentDiagnosticFunc;
     RequireCapabilityAttribute* maybeRequireCapability;
     SemanticsContext& outerContext;
+
+    // Context for derivative expressions
+    bool isBwdDerivative = false;
+    bool isFwdDerivative = false;
     CapabilityDeclReferenceVisitor(
         const ProcessFunc& processFunc,
         const ParentDiagnosticFunc& parentDiagnosticFunc,
@@ -14420,6 +14373,63 @@ struct CapabilityDeclReferenceVisitor
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
+
+        // Check if we're visiting a function in derivative context
+        if (auto funcDecl = as<CallableDecl>(decl))
+        {
+            if (isBwdDerivative || isFwdDerivative)
+            {
+                // Check for derivative attributes and visit derivative functions
+                if (isBwdDerivative)
+                {
+                    if (auto backwardDerivAttr =
+                            funcDecl->findModifier<BackwardDerivativeAttribute>())
+                    {
+                        if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
+                        {
+                            // Create a sub-visitor with the same propagator (context)
+                            CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>
+                                subVisitor(
+                                    handleProcessFunc,
+                                    handleParentDiagnosticFunc,
+                                    maybeRequireCapability,
+                                    outerContext);
+
+                            // Visit the derivative function with sub-visitor
+                            subVisitor.dispatchIfNotNull(derivFuncExpr);
+
+                            // Return early - don't process capabilities for the original function
+                            return;
+                        }
+                    }
+                }
+                else if (isFwdDerivative)
+                {
+                    if (auto forwardDerivAttr =
+                            funcDecl->findModifier<ForwardDerivativeAttribute>())
+                    {
+                        if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
+                        {
+                            // Create a sub-visitor with the same propagator (context)
+                            CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc>
+                                subVisitor(
+                                    handleProcessFunc,
+                                    handleParentDiagnosticFunc,
+                                    maybeRequireCapability,
+                                    outerContext);
+
+                            // Visit the derivative function with sub-visitor
+                            subVisitor.dispatchIfNotNull(derivFuncExpr);
+
+                            // Return early - don't process capabilities for the original function
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Normal processing for non-derivative contexts
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
@@ -14537,6 +14547,32 @@ struct CapabilityDeclReferenceVisitor
     void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
     {
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+    }
+
+    void visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
+    {
+        // Set derivative context before visiting
+        bool oldIsBwdDerivative = isBwdDerivative;
+        isBwdDerivative = true;
+
+        // Visit as normal HigherOrderInvokeExpr
+        Base::visitHigherOrderInvokeExpr(expr);
+
+        // Restore context
+        isBwdDerivative = oldIsBwdDerivative;
+    }
+
+    void visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
+    {
+        // Set derivative context before visiting
+        bool oldIsFwdDerivative = isFwdDerivative;
+        isFwdDerivative = true;
+
+        // Visit as normal HigherOrderInvokeExpr
+        Base::visitHigherOrderInvokeExpr(expr);
+
+        // Restore context
+        isFwdDerivative = oldIsFwdDerivative;
     }
 };
 
