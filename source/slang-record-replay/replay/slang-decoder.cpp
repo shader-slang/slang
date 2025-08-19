@@ -2801,7 +2801,7 @@ void SlangDecoder::ICompositeComponentType_queryInterface(
     ParameterBlock const& parameterBlock)
 {
     size_t readByte = 0;
-    
+
     // Decode the GUID
     SlangUUID guid;
     readByte = ParameterDecoder::decodeUint32(
@@ -2833,10 +2833,7 @@ void SlangDecoder::ICompositeComponentType_queryInterface(
 
     for (auto consumer : m_consumers)
     {
-        consumer->ICompositeComponentType_queryInterface(
-            objectId,
-            guid,
-            outInterfaceId);
+        consumer->ICompositeComponentType_queryInterface(objectId, guid, outInterfaceId);
     }
 }
 

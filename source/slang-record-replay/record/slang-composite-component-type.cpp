@@ -16,8 +16,8 @@ CompositeComponentTypeRecorder::CompositeComponentTypeRecorder(
 ISlangUnknown* CompositeComponentTypeRecorder::getInterface(const Guid& guid)
 {
     // Record the queryInterface call
-    ApiCallId callId = static_cast<ApiCallId>(
-        makeApiCallId(getClassId(), IComponentTypeMethodId::queryInterface));
+    ApiCallId callId =
+        static_cast<ApiCallId>(makeApiCallId(getClassId(), IComponentTypeMethodId::queryInterface));
     ParameterRecorder* recorder{};
     {
         recorder = m_recordManager->beginMethodRecord(callId, m_componentHandle);

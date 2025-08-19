@@ -85,10 +85,7 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId);
 
-    void queryInterface(
-        ObjectID objectId,
-        const SlangUUID& guid,
-        ObjectID outInterfaceId);
+    void queryInterface(ObjectID objectId, const SlangUUID& guid, ObjectID outInterfaceId);
 
     // IComponentType2 methods.
     void getTargetCompileResult(
@@ -151,13 +148,16 @@ public:
         ObjectID objectId,
         SlangSourceLanguage inSourceLanguage,
         ObjectID outPreludeId) override;
-    virtual void IGlobalSession_createCompileRequest(ObjectID objectId, ObjectID outCompileRequest) override;
+    virtual void IGlobalSession_createCompileRequest(ObjectID objectId, ObjectID outCompileRequest)
+        override;
     virtual void IGlobalSession_addBuiltins(
         ObjectID objectId,
         char const* sourcePath,
         char const* sourceString) override;
-    virtual void IGlobalSession_setSharedLibraryLoader(ObjectID objectId, ObjectID loaderId) override;
-    virtual void IGlobalSession_getSharedLibraryLoader(ObjectID objectId, ObjectID outLoaderId) override;
+    virtual void IGlobalSession_setSharedLibraryLoader(ObjectID objectId, ObjectID loaderId)
+        override;
+    virtual void IGlobalSession_getSharedLibraryLoader(ObjectID objectId, ObjectID outLoaderId)
+        override;
     virtual void IGlobalSession_checkCompileTargetSupport(
         ObjectID objectId,
         SlangCompileTarget target) override;
@@ -186,9 +186,13 @@ public:
         SlangCompileTarget source,
         SlangCompileTarget target) override;
 
-    virtual void IGlobalSession_getCompilerElapsedTime(ObjectID objectId) override { (void)objectId; }
+    virtual void IGlobalSession_getCompilerElapsedTime(ObjectID objectId) override
+    {
+        (void)objectId;
+    }
 
-    virtual void IGlobalSession_setSPIRVCoreGrammar(ObjectID objectId, char const* jsonPath) override;
+    virtual void IGlobalSession_setSPIRVCoreGrammar(ObjectID objectId, char const* jsonPath)
+        override;
     virtual void IGlobalSession_parseCommandLineArguments(
         ObjectID objectId,
         int argc,
@@ -286,11 +290,13 @@ public:
         SlangInt conformanceIdOverride,
         ObjectID outDiagnosticsId) override;
 
-    virtual void ISession_createCompileRequest(ObjectID objectId, ObjectID outCompileRequestId) override;
+    virtual void ISession_createCompileRequest(ObjectID objectId, ObjectID outCompileRequestId)
+        override;
 
     virtual void ISession_getLoadedModuleCount(ObjectID objectId) override { (void)objectId; }
 
-    virtual void ISession_getLoadedModule(ObjectID objectId, SlangInt index, ObjectID outModuleId) override;
+    virtual void ISession_getLoadedModule(ObjectID objectId, SlangInt index, ObjectID outModuleId)
+        override;
 
     virtual void ISession_isBinaryModuleUpToDate(ObjectID objectId) override { (void)objectId; }
 
@@ -385,7 +391,10 @@ public:
         ObjectID outDiagnosticsId,
         ObjectID retProgramLayoutId) override;
 
-    virtual void IEntryPoint_getSpecializationParamCount(ObjectID objectId) override { (void)objectId; };
+    virtual void IEntryPoint_getSpecializationParamCount(ObjectID objectId) override
+    {
+        (void)objectId;
+    }
 
     virtual void IEntryPoint_getEntryPointCode(
         ObjectID objectId,
@@ -436,7 +445,8 @@ public:
         ObjectID outDiagnosticsId) override;
 
     // ICompositeComponentType
-    virtual void ICompositeComponentType_getSession(ObjectID objectId, ObjectID outSessionId) override;
+    virtual void ICompositeComponentType_getSession(ObjectID objectId, ObjectID outSessionId)
+        override;
     virtual void ICompositeComponentType_getLayout(
         ObjectID objectId,
         SlangInt targetIndex,

@@ -73,10 +73,7 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId);
 
-    SlangResult queryInterface(
-        ObjectID objectId,
-        const SlangUUID& guid,
-        ObjectID outInterfaceId);
+    SlangResult queryInterface(ObjectID objectId, const SlangUUID& guid, ObjectID outInterfaceId);
 
     // IComponentType2 methods.
     SlangResult getTargetCompileResult(
