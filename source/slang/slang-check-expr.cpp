@@ -3761,7 +3761,26 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
                     // are also checked by the system
                     if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
                     {
-                        semantics->CheckTerm(derivFuncExpr);
+                        auto checkedDerivExpr = semantics->CheckTerm(derivFuncExpr);
+                        
+                        // Extract the derivative function declaration and propagate its capability requirements
+                        if (auto derivDeclRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(checkedDerivExpr)))
+                        {
+                            auto derivFuncDecl = derivDeclRefExpr->declRef.as<CallableDecl>().getDecl();
+                            if (auto derivGenDecl = as<GenericDecl>(derivDeclRefExpr->declRef.getDecl()))
+                            {
+                                derivFuncDecl = as<CallableDecl>(derivGenDecl->inner);
+                            }
+                            if (derivFuncDecl)
+                            {
+                                // Propagate the derivative function's capability requirements
+                                // to the containing function
+                                if (auto currentFunc = semantics->getParentFuncOfVisitor())
+                                {
+                                    currentFunc->inferredCapabilityRequirements.unionWith(derivFuncDecl->inferredCapabilityRequirements);
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -3814,7 +3833,26 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
                     // are also checked by the system
                     if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
                     {
-                        semantics->CheckTerm(derivFuncExpr);
+                        auto checkedDerivExpr = semantics->CheckTerm(derivFuncExpr);
+                        
+                        // Extract the derivative function declaration and propagate its capability requirements
+                        if (auto derivDeclRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(checkedDerivExpr)))
+                        {
+                            auto derivFuncDecl = derivDeclRefExpr->declRef.as<CallableDecl>().getDecl();
+                            if (auto derivGenDecl = as<GenericDecl>(derivDeclRefExpr->declRef.getDecl()))
+                            {
+                                derivFuncDecl = as<CallableDecl>(derivGenDecl->inner);
+                            }
+                            if (derivFuncDecl)
+                            {
+                                // Propagate the derivative function's capability requirements
+                                // to the containing function
+                                if (auto currentFunc = semantics->getParentFuncOfVisitor())
+                                {
+                                    currentFunc->inferredCapabilityRequirements.unionWith(derivFuncDecl->inferredCapabilityRequirements);
+                                }
+                            }
+                        }
                     }
                 }
                 
