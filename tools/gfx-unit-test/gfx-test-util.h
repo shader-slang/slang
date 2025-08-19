@@ -179,7 +179,7 @@ inline bool deviceTypeInEnabledApis(rhi::DeviceType deviceType, Slang::RenderApi
         return enabledApis & Slang::RenderApiFlag::CUDA;
     case rhi::DeviceType::Metal:
         return enabledApis & Slang::RenderApiFlag::Metal;
-    case rhi::DeviceType::WGPU:
+    case rhi::DeviceType::WebGPU:
         return enabledApis & Slang::RenderApiFlag::WebGPU;
     case rhi::DeviceType::Vulkan:
         return enabledApis & Slang::RenderApiFlag::Vulkan;

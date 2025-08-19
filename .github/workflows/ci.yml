@@ -242,7 +242,7 @@ jobs:
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
-            for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
+            for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'webgpu'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done

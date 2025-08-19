@@ -607,7 +607,7 @@ void validateVectorsAndMatrices(
             // Verify that the element type is a floating point type, or an allowed integral type
             auto elementType = vectorType->getElementType();
             uint32_t allowedWidths = 0U;
-            if (isWGPUTarget(targetRequest))
+            if (isWebGPUTarget(targetRequest))
                 allowedWidths = 32U;
             else
                 allowedWidths = 8U | 16U | 32U | 64U;

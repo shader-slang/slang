@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-webgpu
 
 // CHECK: 8765432F
 // CHECK-NEXT: 876543F1

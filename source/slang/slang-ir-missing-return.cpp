@@ -16,7 +16,7 @@ struct IRModule;
 // compilation) on missing returns.
 static bool doesTargetAllowMissingReturns(CodeGenTarget target)
 {
-    if (isKhronosTarget(target) || isWGPUTarget(target))
+    if (isKhronosTarget(target) || isWebGPUTarget(target))
     {
         return false;
     }

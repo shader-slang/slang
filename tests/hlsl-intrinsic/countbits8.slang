@@ -5,7 +5,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
 // Not testing the following:
 // -dx12/hlsl, No support for uint8_t with hlsl
-// -wgpu, only has 32-bit support
+// -webgpu, only has 32-bit support
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 
 //CHK:1

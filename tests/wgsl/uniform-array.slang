@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -webgpu -output-using-type
 
 struct MyPoint { int x; int y; int type; }
 
@@ -18,4 +18,3 @@ void computeMain()
     // CHECK: 5
     outputBuffer[0] = params.data[1].y;
 }
-

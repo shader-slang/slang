@@ -8,7 +8,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU -render-feature half
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU -render-feature half
 
 // Not testing because CI runners may not support Metal's intrinsics.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
@@ -67,8 +67,8 @@ bool testLogical() {
         & testVLogical<uint, 3>()
         & testVLogical<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+        // Disabled on WebGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WebGPU) && !defined(METAL)
         & test1Logical<int8_t>()
         & testVLogical<int8_t, 2>()
         & testVLogical<int8_t, 3>()
@@ -91,8 +91,8 @@ bool testLogical() {
         & testVLogical<bool, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WebGPU as these built-in types are not supported as of time of writing.
+#if !defined (WebGPU)
         & test1Logical<int16_t>()
         & testVLogical<int16_t, 2>()
         & testVLogical<int16_t, 3>()
@@ -145,8 +145,8 @@ bool testArithmetic() {
         & testVArithmetic<uint, 3>()
         & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+        // Disabled on WebGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WebGPU) && !defined(METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
@@ -168,8 +168,8 @@ bool testArithmetic() {
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()
 #endif
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WebGPU as these built-in types are not supported as of time of writing.
+#if !defined (WebGPU)
         & test1Arithmetic<int16_t>() 
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()

@@ -1,5 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -output-using-type
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -webgpu
 //DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12
 //DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d11
 //DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal

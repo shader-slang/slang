@@ -6,7 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Not supported in WGSL: Use of traditional atomics intrinsics (InterlockedXXX functions)
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -webgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 

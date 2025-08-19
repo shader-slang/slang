@@ -8,7 +8,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU
 
 // Not testing because CI runners may not support Metal's intrinsics.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
@@ -106,7 +106,7 @@ bool test1Arithmetic() {
         & subgroupInclusiveMul(T(1)) == T(1)
     
         // WGSL and Metal does not support inclusive min/max
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
         & subgroupInclusiveMin(T(1)) == T(1)
         & subgroupInclusiveMax(T(1)) == T(1)
 #endif
@@ -121,7 +121,7 @@ bool testVArithmetic() {
         // & subgroupInclusiveMul(gvec(T(1))) == gvec(T(1))
 
         // WGSL and Metal does not support inclusive min/max
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
         & subgroupInclusiveMin(gvec(T(1))) == gvec(T(1))
         & subgroupInclusiveMax(gvec(T(1))) == gvec(T(1))
 #endif
@@ -147,8 +147,8 @@ bool testArithmetic() {
         // & testVArithmetic<uint, 3>()
         // & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
-#if !defined(WGPU) && !defined(METAL)
+        // Disabled on WebGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WebGPU) && !defined(METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
@@ -171,8 +171,8 @@ bool testArithmetic() {
         & testVArithmetic<int64_t, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WebGPU as these built-in types are not supported as of time of writing.
+#if !defined (WebGPU)
         & test1Arithmetic<uint16_t>() 
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
@@ -191,7 +191,7 @@ void computeMain()
 
     bool res0 = true
     // WGSL and Metal does not support bitwise inclusive intrinsics.
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
             & testLogical()
 #endif
             ;

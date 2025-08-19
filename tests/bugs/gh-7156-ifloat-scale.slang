@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-hlsl -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-webgpu -compute -output-using-type
 
 // CHECK: 1210.0
 
@@ -23,4 +23,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     let dm_sum = dot(dm[0], vi) + dot(dm[1], vi) + dot(dm[2], vi) + dot(dm[3], vi);
     outputBuffer[dispatchThreadID.x] = double_it(float2(1.0, 2.0)).x + double_it(4.0) + dm_sum;
 }
-

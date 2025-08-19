@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-wgpu
+//TEST(compute):COMPARE_COMPUTE:-webgpu
 
 int test(int t, int r)
 {

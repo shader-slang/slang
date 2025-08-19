@@ -9,7 +9,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU -render-feature half
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-webgpu -compute -entry computeMain -allow-glsl -xslang -DWebGPU -render-feature half
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
@@ -29,7 +29,7 @@ bool test1QuadX() {
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
         // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
-#if !defined(WGPU)
+#if !defined(WebGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
 #endif
         ;
@@ -43,7 +43,7 @@ bool testVQuadX() {
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
         // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
-#if !defined(WGPU)
+#if !defined(WebGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
 #endif
         ;
@@ -56,7 +56,7 @@ bool test1QuadX() {
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
         // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
-#if !defined(WGPU)
+#if !defined(WebGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
 #endif
         ;
@@ -70,7 +70,7 @@ bool testVQuadX() {
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
         // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
-#if !defined(WGPU)
+#if !defined(WebGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
 #endif
         ;
@@ -95,7 +95,7 @@ bool testQuadSwapX() {
         & testVQuadX<uint, 4>()
 
         // Disabled on WGSL and Metal as these built-in types are not supported.
-#if !defined(WGPU) && !defined(METAL)
+#if !defined(WebGPU) && !defined(METAL)
         & test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
         & testVQuadX<double, 2>()
         & testVQuadX<double, 3>()
@@ -125,7 +125,7 @@ bool testQuadSwapX() {
 #endif
 
 
-#if !defined(WGPU)
+#if !defined(WebGPU)
         & test1QuadX<int16_t>() 
         & testVQuadX<int16_t, 2>()
         & testVQuadX<int16_t, 3>()
