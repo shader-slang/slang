@@ -1361,30 +1361,6 @@ Ptr<T, addrSpace> __getElementPtr<T, let addrSpace : uint64_t, TIndex : __Builti
 __intrinsic_op($(kIROp_GetOffsetPtr))
 Ptr<T, addrSpace> __getOffsetPtr<T, let addrSpace : uint64_t, TIndex : __BuiltinIntegerType>(Ptr<T, addrSpace> ptr, TIndex index);
 
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Less))
-bool operator <(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Leq))
-bool operator <=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Greater))
-bool operator>(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Geq))
-bool operator >=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Neq))
-bool operator !=(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
-__generic<T, let addrSpace : uint64_t>
-__intrinsic_op($(kIROp_Eql))
-bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
-
 //@public:
 __generic<T, let addrSpace : uint64_t>
 extension Ptr<T, addrSpace> : IComparable
