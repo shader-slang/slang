@@ -3543,7 +3543,7 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
 }
 
 
-IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mapping)
+IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mapping, UInt defaultVal)
 {
     // Create a function that maps input IDs to output IDs
     IRBuilder builder(module);
@@ -3562,7 +3562,7 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
     // Create default block that returns 0
     auto defaultBlock = builder.emitBlock();
     builder.setInsertInto(defaultBlock);
-    builder.emitReturn(builder.getIntValue(builder.getUIntType(), 0));
+    builder.emitReturn(builder.getIntValue(builder.getUIntType(), defaultVal));
 
     // Go back to entry block and create switch
     builder.setInsertInto(entryBlock);
@@ -3836,9 +3836,10 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
         IRBuilder builder(inst);
         builder.setInsertAfter(inst);
+        UInt defaultID = dstSeqID - 1; // Default to last available conformance.
         auto translatedID = builder.emitCallInst(
             inst->getDataType(),
-            createIntegerMappingFunc(builder.getModule(), mapping),
+            createIntegerMappingFunc(builder.getModule(), mapping, defaultID),
             List<IRInst*>({srcSeqID}));
 
         inst->replaceUsesWith(translatedID);
@@ -3877,7 +3878,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
         auto translatedID = builder.emitCallInst(
             inst->getDataType(),
-            createIntegerMappingFunc(builder.getModule(), mapping),
+            createIntegerMappingFunc(builder.getModule(), mapping, 0),
             List<IRInst*>({srcTagInst}));
 
         inst->replaceUsesWith(translatedID);
