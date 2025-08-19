@@ -7949,22 +7949,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    // Type and constants used by typeNeedsStorageCapability
+    // Type and constants used by checkTypeNeedsStorageCapability
     typedef uint32_t TypeNeedsStorageFlags;
     struct TypeNeedsStorageFlag
     {
         enum Enum : TypeNeedsStorageFlags
         {
-            kNone = 0b0,
-            kElementSize8 = 0b1,
-            kElementSize16 = 0b10,
-            kAll = kElementSize8 | kElementSize16,
-            kStopFollowingPtr = 0b1000,
+            kNone = 0,
+            kElementSize8 = 1 << 0,
+            kElementSize16 = 1 << 1,
         };
     };
 
-    // Helper function to recursively check if a type contains 8/16-bit types
-    bool typeNeedsStorageCapabilityImpl(
+    // Helper function to recursively check if a storage type contains 8/16-bit types.
+    // Returns true if all requested targets have been found and therefore it can stop
+    // recursing.
+    bool checkTypeNeedsStorageCapability(
         IRType* type,
         const TypeNeedsStorageFlags targets,
         TypeNeedsStorageFlags& found,
@@ -7981,16 +7981,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
             found |= TypeNeedsStorageFlag::kElementSize16;
-            return ((targets & TypeNeedsStorageFlag::kAll) == found);
+            return (targets == (found & targets));
 
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
             found |= TypeNeedsStorageFlag::kElementSize8;
-            return ((targets & TypeNeedsStorageFlag::kAll) == found);
+            return (targets == (found & targets));
 
         case kIROp_VectorType:
             if (auto vectorType = as<IRVectorType>(type))
-                return typeNeedsStorageCapabilityImpl(
+                return checkTypeNeedsStorageCapability(
                     vectorType->getElementType(),
                     targets,
                     found,
@@ -7999,7 +7999,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_MatrixType:
             if (auto matrixType = as<IRMatrixType>(type))
-                return typeNeedsStorageCapabilityImpl(
+                return checkTypeNeedsStorageCapability(
                     matrixType->getElementType(),
                     targets,
                     found,
@@ -8008,8 +8008,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
-            if (auto arrayType = as<IRArrayType>(type))
-                return typeNeedsStorageCapabilityImpl(
+            if (auto arrayType = as<IRArrayTypeBase>(type))
+                return checkTypeNeedsStorageCapability(
                     arrayType->getElementType(),
                     targets,
                     found,
@@ -8020,7 +8020,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (auto structType = as<IRStructType>(type))
             {
                 for (auto field : structType->getFields())
-                    if (typeNeedsStorageCapabilityImpl(
+                    if (checkTypeNeedsStorageCapability(
                             field->getFieldType(),
                             targets,
                             found,
@@ -8031,7 +8031,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_AtomicType:
             if (auto atomicType = as<IRAtomicType>(type))
-                return typeNeedsStorageCapabilityImpl(
+                return checkTypeNeedsStorageCapability(
                     atomicType->getElementType(),
                     targets,
                     found,
@@ -8043,29 +8043,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ConstRefType:
         case kIROp_OutType:
         case kIROp_InOutType:
-        case kIROp_RateQualifiedType:
-            if (targets & TypeNeedsStorageFlag::kStopFollowingPtr)
-                return false;
             if (auto ptrType = as<IRPtrTypeBase>(type))
-                return typeNeedsStorageCapabilityImpl(
+                return checkTypeNeedsStorageCapability(
                     ptrType->getValueType(),
-                    targets | TypeNeedsStorageFlag::kStopFollowingPtr,
+                    targets,
+                    found,
+                    visited);
+            break;
+
+        case kIROp_RateQualifiedType:
+            if (auto ptrType = as<IRRateQualifiedType>(type))
+                return checkTypeNeedsStorageCapability(
+                    ptrType->getValueType(),
+                    targets,
                     found,
                     visited);
             break;
         }
 
         return false;
-    }
-
-    // Public wrapper for 8/16-bit type detection
-    bool typeNeedsStorageCapability(
-        IRType* type,
-        const TypeNeedsStorageFlags targets,
-        TypeNeedsStorageFlags& found)
-    {
-        HashSet<IRType*> visited;
-        return typeNeedsStorageCapabilityImpl(type, targets, found, visited);
     }
 
     // Check and require 8/16-bit storage capabilities based on storage class and type
@@ -8095,13 +8091,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         }
 
-        // If we've already found all possible capabilities, there's no reason to search
-        // again.
+        // If we've already enabled all possible capabilities for this storage class, there's no
+        // reason to search again.
         if (targets == TypeNeedsStorageFlag::kNone)
             return;
 
+        HashSet<IRType*> visited;
         TypeNeedsStorageFlags found = TypeNeedsStorageFlag::kNone;
-        typeNeedsStorageCapability(type, targets, found);
+        checkTypeNeedsStorageCapability(type, targets, found, visited);
 
         if (found == TypeNeedsStorageFlag::kNone)
             return;
