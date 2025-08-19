@@ -1450,7 +1450,7 @@ bool SemanticsVisitor::_coerce(
         {
             Type* fromValueType = fromOptionalType->getValueType();
             Type* toValueType = toOptionalType->getValueType();
-            
+
             // Check if the value types can be converted via subtype witness
             if (auto valueWitness = tryGetSubtypeWitness(fromValueType, toValueType))
             {

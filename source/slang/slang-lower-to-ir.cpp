@@ -5214,7 +5214,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // but with Optional wrapping/unwrapping logic
         auto sourceVal = lowerRValueExpr(context, expr->operand);
         auto targetType = lowerType(context, expr->type);
-        
+
         // Generate a cast instruction that handles Optional conversion
         // This will be expanded by later IR passes
         auto irVal = context->irBuilder->emitCast(targetType, sourceVal.val);
