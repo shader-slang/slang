@@ -1102,6 +1102,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
+    case kIROp_DescriptorHandleType:
+        emitType(type);
+        return;
 
     case kIROp_DoubleType:
         SLANG_UNEXPECTED("'double' type emitted");
