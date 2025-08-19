@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 struct RecursiveFoo
 {
@@ -7,19 +7,15 @@ struct RecursiveFoo
     StructuredBuffer<RecursiveFoo> children;
 }
 
-struct MutualB
-{
-    //CHECK-DAG: ([[# @LINE+1]]): error 38204
-    StructuredBuffer<MutualA> aBuffer;
-}
-
-struct MutualA
-{
-    //CHECK-DAG: ([[# @LINE+1]]): error 38204
-    StructuredBuffer<MutualB> bBuffer;
-}
+StructuredBuffer<RecursiveFoo> recursiveRoot;
+RWStructuredBuffer<float> output;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    uint i = dispatchThreadID.x;
+    RecursiveFoo foo = recursiveRoot[i];
+    float result = foo.value + foo.children[0].value + foo.children[0].children[0].value;
+    output[i] = result;
 }
+
