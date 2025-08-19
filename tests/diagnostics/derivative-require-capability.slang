@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0], stride=16):out
 RWStructuredBuffer<float> outputBuffer;
