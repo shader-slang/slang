@@ -22,6 +22,29 @@ gfx.IPipelineState createPipeline(gfx.IDevice device, NativeString entryPointNam
     return pipeline.value;
 }
 
+gfx.IBufferResource createBuffer(gfx.IDevice device, Ptr<void> data)
+{
+    Optional<gfx.IBufferResource> buffer;
+    gfx.BufferResourceDesc bufferDesc = {};
+    bufferDesc.memoryType = gfx.MemoryType.DeviceLocal;
+    bufferDesc.allowedStates.add(gfx.ResourceState.UnorderedAccess);
+    bufferDesc.defaultState = gfx.ResourceState.UnorderedAccess;
+    bufferDesc.elementSize = 4;
+    bufferDesc.sizeInBytes = 256;
+    bufferDesc.type = gfx.ResourceType.Buffer;
+    device.createBufferResource(&bufferDesc, data, buffer);
+    return buffer.value;
+}
+
+gfx.IResourceView createView(gfx.IDevice device, gfx.IBufferResource buffer)
+{
+    Optional<gfx.IResourceView> bufferView;
+    gfx.ResourceViewDesc viewDesc;
+    viewDesc.type = gfx.ResourceViewType.UnorderedAccess;
+    device.createBufferView(buffer, none, &viewDesc, bufferView);
+    return bufferView.value;
+}
+
 export __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
@@ -52,32 +75,51 @@ export __extern_cpp int main()
     transientHeapDesc.accelerationStructureDescriptorCount = 32;
     device.value.createTransientResourceHeap(&transientHeapDesc, transientHeap);
 
-    Optional<gfx.IBufferResource> buffer;
-    gfx.BufferResourceDesc bufferDesc = {};
-    bufferDesc.memoryType = gfx.MemoryType.DeviceLocal;
-    bufferDesc.allowedStates.add(gfx.ResourceState.UnorderedAccess);
-    bufferDesc.defaultState = gfx.ResourceState.UnorderedAccess;
-    bufferDesc.elementSize = 4;
-    bufferDesc.sizeInBytes = 256;
-    bufferDesc.type = gfx.ResourceType.Buffer;
-    device.value.createBufferResource(&bufferDesc, nullptr, buffer);
+    float4 dataX = { 2, 3, 5, 7 };
+    gfx.IBufferResource bufferX = createBuffer(device.value, (void*) &dataX);
+    gfx.IResourceView bufferViewX = createView(device.value, bufferX);
 
-    Optional<gfx.IResourceView> bufferView;
-    gfx.ResourceViewDesc viewDesc;
-    viewDesc.type = gfx.ResourceViewType.UnorderedAccess;
-    device.value.createBufferView(buffer.value, none, &viewDesc, bufferView);
+    float4 dataY = { 11, 13, 17, 19 };
+    gfx.IBufferResource bufferY = createBuffer(device.value, (void*) &dataY);
+    gfx.IResourceView bufferViewY = createView(device.value, bufferY);
+
+    gfx.IBufferResource bufferAX = createBuffer(device.value, nullptr);
+    gfx.IResourceView bufferViewAX = createView(device.value, bufferAX);
+
+    gfx.IBufferResource bufferAXPY = createBuffer(device.value, nullptr);
+    gfx.IResourceView bufferViewAXPY = createView(device.value, bufferAXPY);
 
     Optional<gfx.ICommandBuffer> commandBuffer;
     transientHeap.value.createCommandBuffer(commandBuffer);
     Optional<gfx.IComputeCommandEncoder> encoder;
     commandBuffer.value.encodeComputeCommands(encoder);
-    Optional<gfx.IShaderObject> rootObject;
-    encoder.value.bindPipeline(pipelineTimes, rootObject);
-    Optional<gfx.IShaderObject> entryPointObject;
-    rootObject.value.getEntryPoint(0, entryPointObject);
-    gfx.ShaderOffset offset = {};
-    entryPointObject.value.setResource(&offset, bufferView.value);
+
+    Optional<gfx.IShaderObject> rootTimes;
+    encoder.value.bindPipeline(pipelineTimes, rootTimes);
+    Optional<gfx.IShaderObject> entryPointTimes;
+    rootTimes.value.getEntryPoint(0, entryPointTimes);
+    gfx.ShaderOffset offsetTimesX = {};
+    offsetTimesX.uniformOffset = 1;
+    gfx.ShaderOffset offsetTimesAX = {};
+    offsetTimesAX.uniformOffset = 2;
+    entryPointTimes.value.setResource(&offsetTimesX, bufferViewX);
+    entryPointTimes.value.setResource(&offsetTimesAX, bufferViewAX);
     encoder.value.dispatchCompute(1, 1, 1);
+
+    Optional<gfx.IShaderObject> rootPlus;
+    encoder.value.bindPipeline(pipelinePlus, rootPlus);
+    Optional<gfx.IShaderObject> entryPointPlus;
+    rootPlus.value.getEntryPoint(0, entryPointPlus);
+    gfx.ShaderOffset offsetPlusAX = {};
+    gfx.ShaderOffset offsetPlusY = {};
+    offsetPlusY.uniformOffset = 1;
+    gfx.ShaderOffset offsetPlusAXPY = {};
+    offsetPlusAXPY.uniformOffset = 2;
+    entryPointPlus.value.setResource(&offsetPlusAX, bufferViewAX);
+    entryPointPlus.value.setResource(&offsetPlusY, bufferViewY);
+    entryPointPlus.value.setResource(&offsetPlusAXPY, bufferViewAXPY);
+    encoder.value.dispatchCompute(1, 1, 1);
+
     encoder.value.endEncoding();
     commandBuffer.value.close();
     
@@ -86,7 +128,7 @@ export __extern_cpp int main()
     queue.value.waitOnHost();
 
     Optional<slang.ISlangBlob> blob;
-    device.value.readBufferResource(buffer.value, 0, 16, blob);
+    device.value.readBufferResource(bufferAXPY, 0, 16, blob);
 
     for (int i = 0; i < 4; i++)
     {

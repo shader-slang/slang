@@ -2,18 +2,22 @@
 [numthreads(4, 1, 1)]
 void times(
     uint3 sv_dispatchThreadID: SV_DispatchThreadID,
-    uniform RWStructuredBuffer<float> buffer)
+    uniform float a,
+    uniform StructuredBuffer<float> x,
+    uniform RWStructuredBuffer<float> ax)
 {
-    var input = buffer[sv_dispatchThreadID.x];
-    buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
+    uint i = sv_dispatchThreadID.x;
+    ax[i] = a * x[i];
 }
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void plus(
     uint3 sv_dispatchThreadID: SV_DispatchThreadID,
-    uniform RWStructuredBuffer<float> buffer)
+    uniform StructuredBuffer<float> ax,
+    uniform StructuredBuffer<float> y,
+    uniform RWStructuredBuffer<float> axpy)
 {
-    var input = buffer[sv_dispatchThreadID.x];
-    buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
+    uint i = sv_dispatchThreadID.x;
+    axpy[i] = ax[i] + y[i];
 }
