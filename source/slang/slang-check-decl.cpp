@@ -819,6 +819,58 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->innerExpr);
     }
 
+    void visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
+    {
+        // Continue visiting from DifferentiateExpr
+        visitHigherOrderInvokeExpr(expr);
+
+        // Check if the base function has a user-defined backward derivative
+        if (auto baseFunc = expr->baseFunction)
+        {
+            if (auto baseDeclRefExpr = as<DeclRefExpr>(baseFunc))
+            {
+                if (auto funcDecl = as<CallableDecl>(baseDeclRefExpr->declRef.getDecl()))
+                {
+                    if (auto backwardDerivAttr =
+                            funcDecl->findModifier<BackwardDerivativeAttribute>())
+                    {
+                        // Visit the derivative function declaration
+                        if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
+                        {
+                            dispatchIfNotNull(derivFuncExpr);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
+    {
+        // Continue visiting from DifferentiateExpr
+        visitHigherOrderInvokeExpr(expr);
+
+        // Check if the base function has a user-defined forward derivative
+        if (auto baseFunc = expr->baseFunction)
+        {
+            if (auto baseDeclRefExpr = as<DeclRefExpr>(baseFunc))
+            {
+                if (auto funcDecl = as<CallableDecl>(baseDeclRefExpr->declRef.getDecl()))
+                {
+                    if (auto forwardDerivAttr =
+                            funcDecl->findModifier<ForwardDerivativeAttribute>())
+                    {
+                        // Visit the derivative function declaration
+                        if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
+                        {
+                            dispatchIfNotNull(derivFuncExpr);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Stmt Visitor
 
     void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }

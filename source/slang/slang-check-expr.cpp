@@ -3753,37 +3753,6 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
-                // Check if the base function has a user-defined forward derivative
-                if (auto forwardDerivAttr = funcDecl->findModifier<ForwardDerivativeAttribute>())
-                {
-                    // Get the derivative function expression and check it
-                    // This ensures that the capability requirements of the derivative function
-                    // are also checked by the system
-                    if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
-                    {
-                        auto checkedDerivExpr = semantics->CheckTerm(derivFuncExpr);
-                        
-                        // Extract the derivative function declaration and propagate its capability requirements
-                        if (auto derivDeclRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(checkedDerivExpr)))
-                        {
-                            auto derivFuncDecl = derivDeclRefExpr->declRef.as<CallableDecl>().getDecl();
-                            if (auto derivGenDecl = as<GenericDecl>(derivDeclRefExpr->declRef.getDecl()))
-                            {
-                                derivFuncDecl = as<CallableDecl>(derivGenDecl->inner);
-                            }
-                            if (derivFuncDecl)
-                            {
-                                // Propagate the derivative function's capability requirements
-                                // to the containing function
-                                if (auto currentFunc = semantics->getParentFuncOfVisitor())
-                                {
-                                    currentFunc->inferredCapabilityRequirements.unionWith(derivFuncDecl->inferredCapabilityRequirements);
-                                }
-                            }
-                        }
-                    }
-                }
-                
                 for (auto param : funcDecl->getParameters())
                 {
                     resultDiffExpr->newParameterNames.add(param->getName());
@@ -3825,37 +3794,6 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
-                // Check if the base function has a user-defined backward derivative
-                if (auto backwardDerivAttr = funcDecl->findModifier<BackwardDerivativeAttribute>())
-                {
-                    // Get the derivative function expression and check it
-                    // This ensures that the capability requirements of the derivative function
-                    // are also checked by the system
-                    if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
-                    {
-                        auto checkedDerivExpr = semantics->CheckTerm(derivFuncExpr);
-                        
-                        // Extract the derivative function declaration and propagate its capability requirements
-                        if (auto derivDeclRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(checkedDerivExpr)))
-                        {
-                            auto derivFuncDecl = derivDeclRefExpr->declRef.as<CallableDecl>().getDecl();
-                            if (auto derivGenDecl = as<GenericDecl>(derivDeclRefExpr->declRef.getDecl()))
-                            {
-                                derivFuncDecl = as<CallableDecl>(derivGenDecl->inner);
-                            }
-                            if (derivFuncDecl)
-                            {
-                                // Propagate the derivative function's capability requirements
-                                // to the containing function
-                                if (auto currentFunc = semantics->getParentFuncOfVisitor())
-                                {
-                                    currentFunc->inferredCapabilityRequirements.unionWith(derivFuncDecl->inferredCapabilityRequirements);
-                                }
-                            }
-                        }
-                    }
-                }
-                
                 for (auto param : funcDecl->getParameters())
                 {
                     if (param->findModifier<NoDiffModifier>())
