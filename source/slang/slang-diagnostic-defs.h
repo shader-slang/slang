@@ -2260,6 +2260,12 @@ DIAGNOSTIC(
     cannotUseResourceTypeInStructuredBuffer,
     "StructuredBuffer element type '$0' cannot contain resource or opaque handle types")
 
+DIAGNOSTIC(
+    38205,
+    Error,
+    recursiveTypesFoundInStructuredBuffer,
+    "structured buffer element type '$0' contains recursive type references")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(

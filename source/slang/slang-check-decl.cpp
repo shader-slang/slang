@@ -15023,29 +15023,50 @@ bool isOpaqueHandleType(Type* type)
     return false;
 }
 
-bool containsOpaqueHandleTypeImpl(
-    SemanticsVisitor* visitor,
-    Type* type,
-    HashSet<Type*>& visitedTypes)
+bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)
 {
-    // Prevent infinite recursion
-    if (!visitedTypes.add(type))
-        return false;
+    // Skip modified types (const, etc.)
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
 
-    // Check cache first
-    auto shared = visitor->getShared();
-    bool* cachedResult = shared->m_typeContainsOpaqueHandleCache.tryGetValue(type);
-    if (cachedResult)
-        return *cachedResult;
-
-    // Check if the type itself is an opaque handle
-    bool result = false;
-    if (isOpaqueHandleType(type))
+    // Check if this is a StructuredBuffer type and look inside it
+    if (auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
     {
-        result = true;
+        return containsRecursiveTypeImpl(
+            visitor,
+            structuredBufferType->getElementType(),
+            currentPath);
     }
-    else if (auto declRefType = as<DeclRefType>(type))
+
+    // Check if this is an array type and look inside it
+    if (auto arrayType = as<ArrayExpressionType>(type))
     {
+        return containsRecursiveTypeImpl(visitor, arrayType->getElementType(), currentPath);
+    }
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto typeDecl = declRefType->getDeclRef().getDecl();
+
+        // Check global cache first - if we've already fully analyzed this type, use that result
+        auto shared = visitor->getShared();
+        if (auto cachedResult = shared->m_typeContainsRecursionCache.tryGetValue(typeDecl))
+        {
+            return *cachedResult;
+        }
+
+        // If we're currently exploring this type, we found a cycle!
+        if (currentPath.contains(typeDecl))
+        {
+            return true;
+        }
+
+        // Add to current exploration path
+        currentPath.add(typeDecl);
+
+        bool hasRecursion = false;
+
+        // Check members if it's an aggregate type
         if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
         {
             for (auto member : aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>())
@@ -15053,45 +15074,38 @@ bool containsOpaqueHandleTypeImpl(
                 if (isEffectivelyStatic(member))
                     continue;
 
-                if (containsOpaqueHandleTypeImpl(visitor, member->getType(), visitedTypes))
+                if (containsRecursiveTypeImpl(visitor, member->getType(), currentPath))
                 {
-                    result = true;
+                    hasRecursion = true;
                     break;
                 }
             }
         }
-    }
-    else if (auto arrayType = as<ArrayExpressionType>(type))
-    {
-        result = containsOpaqueHandleTypeImpl(visitor, arrayType->getElementType(), visitedTypes);
+
+        // Remove from current exploration path
+        currentPath.remove(typeDecl);
+
+        // Cache the result globally
+        shared->m_typeContainsRecursionCache[typeDecl] = hasRecursion;
+
+        return hasRecursion;
     }
 
-    // Cache the result
-    shared->m_typeContainsOpaqueHandleCache[type] = result;
-
-    return result;
+    return false;
 }
 
-bool containsOpaqueHandleType(SemanticsVisitor* visitor, Type* type)
+bool containsRecursiveType(SemanticsVisitor* visitor, Type* type)
 {
-    HashSet<Type*> visitedTypes;
-    return containsOpaqueHandleTypeImpl(visitor, type, visitedTypes);
+    HashSet<Decl*> currentPath;
+    return containsRecursiveTypeImpl(visitor, type, currentPath);
 }
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl)
 {
-    auto type = varDecl->getType();
+    auto type = unwrapArrayType(varDecl->getType());
 
     // Check if this is a StructuredBuffer type
     auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
-    if (!structuredBufferType)
-    {
-        // Also check if it's wrapped in an array
-        if (auto arrayType = as<ArrayExpressionType>(type))
-        {
-            structuredBufferType = as<HLSLStructuredBufferTypeBase>(arrayType->getElementType());
-        }
-    }
 
     if (!structuredBufferType)
         return;
@@ -15099,12 +15113,12 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     // Get the element type
     auto elementType = structuredBufferType->getElementType();
 
-    // Check if the element type contains any resource/opaque handle types
-    if (containsOpaqueHandleType(visitor, elementType))
+    // Check if the element type contains recursive references
+    if (containsRecursiveType(visitor, elementType))
     {
         visitor->getSink()->diagnose(
             varDecl->loc,
-            Diagnostics::cannotUseResourceTypeInStructuredBuffer,
+            Diagnostics::recursiveTypesFoundInStructuredBuffer,
             elementType);
     }
 }

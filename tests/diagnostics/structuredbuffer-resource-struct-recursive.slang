@@ -3,7 +3,7 @@
 struct RecursiveFoo
 {
     float value;
-    //CHECK-DAG: ([[# @LINE+1]]): error 38204
+    //CHECK-DAG: ([[# @LINE+1]]): error 38205
     StructuredBuffer<RecursiveFoo> children;
 }
 

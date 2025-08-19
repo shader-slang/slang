@@ -699,7 +699,7 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
-    Dictionary<Type*, bool> m_typeContainsOpaqueHandleCache;
+    Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
 public:
     SharedSemanticsContext(
@@ -921,19 +921,6 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
-    struct TypePair
-    {
-        Type* type0;
-        Type* type1;
-        HashCode getHashCode() const
-        {
-            return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));
-        }
-        bool operator==(const TypePair& other) const
-        {
-            return type0 == other.type0 && type1 == other.type1;
-        }
-    };
     Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
