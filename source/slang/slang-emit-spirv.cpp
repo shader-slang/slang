@@ -1802,7 +1802,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto valueType = ptrType->getValueType();
-                
+
                 // Check for 8/16-bit storage capabilities when emitting pointer types
                 requireCapabilitiesForType(valueType, storageClass);
 
@@ -7951,7 +7951,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Type and constants used by typeNeedsStorageCapability
     typedef uint32_t TypeNeedsStorageFlags;
-    struct TypeNeedsStorageFlag {
+    struct TypeNeedsStorageFlag
+    {
         enum Enum : TypeNeedsStorageFlags
         {
             kNone = 0b0,
@@ -7963,7 +7964,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     };
 
     // Helper function to recursively check if a type contains 8/16-bit types
-    bool typeNeedsStorageCapabilityImpl(IRType* type, const TypeNeedsStorageFlags targets, TypeNeedsStorageFlags& found, HashSet<IRType*>& visited)
+    bool typeNeedsStorageCapabilityImpl(
+        IRType* type,
+        const TypeNeedsStorageFlags targets,
+        TypeNeedsStorageFlags& found,
+        HashSet<IRType*>& visited)
     {
         if (visited.contains(type))
             return false; // Cycle detected, break recursion
@@ -7985,32 +7990,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_VectorType:
             if (auto vectorType = as<IRVectorType>(type))
-                return typeNeedsStorageCapabilityImpl(vectorType->getElementType(), targets, found, visited);
+                return typeNeedsStorageCapabilityImpl(
+                    vectorType->getElementType(),
+                    targets,
+                    found,
+                    visited);
             break;
 
         case kIROp_MatrixType:
             if (auto matrixType = as<IRMatrixType>(type))
-                return typeNeedsStorageCapabilityImpl(matrixType->getElementType(), targets, found, visited);
+                return typeNeedsStorageCapabilityImpl(
+                    matrixType->getElementType(),
+                    targets,
+                    found,
+                    visited);
             break;
 
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             if (auto arrayType = as<IRArrayType>(type))
-                return typeNeedsStorageCapabilityImpl(arrayType->getElementType(), targets, found, visited);
+                return typeNeedsStorageCapabilityImpl(
+                    arrayType->getElementType(),
+                    targets,
+                    found,
+                    visited);
             break;
 
         case kIROp_StructType:
             if (auto structType = as<IRStructType>(type))
             {
                 for (auto field : structType->getFields())
-                    if (typeNeedsStorageCapabilityImpl(field->getFieldType(), targets, found, visited))
+                    if (typeNeedsStorageCapabilityImpl(
+                            field->getFieldType(),
+                            targets,
+                            found,
+                            visited))
                         return true;
             }
             break;
 
         case kIROp_AtomicType:
             if (auto atomicType = as<IRAtomicType>(type))
-                return typeNeedsStorageCapabilityImpl(atomicType->getElementType(), targets, found, visited);
+                return typeNeedsStorageCapabilityImpl(
+                    atomicType->getElementType(),
+                    targets,
+                    found,
+                    visited);
             break;
 
         case kIROp_PtrType:
@@ -8022,7 +8047,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (targets & TypeNeedsStorageFlag::kStopFollowingPtr)
                 return false;
             if (auto ptrType = as<IRPtrTypeBase>(type))
-                return typeNeedsStorageCapabilityImpl(ptrType->getValueType(), targets | TypeNeedsStorageFlag::kStopFollowingPtr, found, visited);
+                return typeNeedsStorageCapabilityImpl(
+                    ptrType->getValueType(),
+                    targets | TypeNeedsStorageFlag::kStopFollowingPtr,
+                    found,
+                    visited);
             break;
         }
 
@@ -8030,7 +8059,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     // Public wrapper for 8/16-bit type detection
-    bool typeNeedsStorageCapability(IRType* type, const TypeNeedsStorageFlags targets, TypeNeedsStorageFlags& found)
+    bool typeNeedsStorageCapability(
+        IRType* type,
+        const TypeNeedsStorageFlags targets,
+        TypeNeedsStorageFlags& found)
     {
         HashSet<IRType*> visited;
         return typeNeedsStorageCapabilityImpl(type, targets, found, visited);
@@ -8078,7 +8110,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case SpvStorageClassUniform:
         case SpvStorageClassStorageBuffer:
-            if (found & TypeNeedsStorageFlag::kElementSize8) {
+            if (found & TypeNeedsStorageFlag::kElementSize8)
+            {
                 ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
                 requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer8BitAccess);
             }
@@ -8087,7 +8120,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
 
         case SpvStorageClassPushConstant:
-            if (found & TypeNeedsStorageFlag::kElementSize8) {
+            if (found & TypeNeedsStorageFlag::kElementSize8)
+            {
                 ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
                 requireSPIRVCapability(SpvCapabilityStoragePushConstant8);
             }
