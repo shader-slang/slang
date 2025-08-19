@@ -3753,6 +3753,18 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
+                // Check if the base function has a user-defined forward derivative
+                if (auto forwardDerivAttr = funcDecl->findModifier<ForwardDerivativeAttribute>())
+                {
+                    // Get the derivative function expression and check it
+                    // This ensures that the capability requirements of the derivative function
+                    // are also checked by the system
+                    if (auto derivFuncExpr = forwardDerivAttr->funcExpr)
+                    {
+                        semantics->CheckTerm(derivFuncExpr);
+                    }
+                }
+                
                 for (auto param : funcDecl->getParameters())
                 {
                     resultDiffExpr->newParameterNames.add(param->getName());
@@ -3794,6 +3806,18 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
+                // Check if the base function has a user-defined backward derivative
+                if (auto backwardDerivAttr = funcDecl->findModifier<BackwardDerivativeAttribute>())
+                {
+                    // Get the derivative function expression and check it
+                    // This ensures that the capability requirements of the derivative function
+                    // are also checked by the system
+                    if (auto derivFuncExpr = backwardDerivAttr->funcExpr)
+                    {
+                        semantics->CheckTerm(derivFuncExpr);
+                    }
+                }
+                
                 for (auto param : funcDecl->getParameters())
                 {
                     if (param->findModifier<NoDiffModifier>())
