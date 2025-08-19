@@ -1,10 +1,13 @@
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DCONST_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_HALF
+//TEST:SIMPLE(filecheck=CHECKBOTH): -target spirv -profile spirv_1_3 -DCONST_UINT8 -DCONST_HALF
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
 //CHECK8: OpCapability StoragePushConstant8
 //CHECK16: OpCapability StoragePushConstant16
+//CHECKBOTH-DAG: OpCapability StoragePushConstant8
+//CHECKBOTH-DAG: OpCapability StoragePushConstant16
 //CHECK-NOT: OpCapability StoragePushConstant16
 
 struct PushConstants {

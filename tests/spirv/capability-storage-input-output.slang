@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DIN_HALF
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DIN_UINT16
-//TEST:SIMPLE(filecheck=CHECKA): -target spirv -profile spirv_1_3 -DOUT_HALF
-//TEST:SIMPLE(filecheck=CHECKB): -target spirv -profile spirv_1_3
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_HALF
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_UINT16
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_HALF
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
-//CHECKA: OpCapability StorageInputOutput16
-//CHECKB-NOT: OpCapability StorageInputOutput16
+//CHECK16: OpCapability StorageInputOutput16
+//CHECK-NOT: OpCapability StorageInputOutput16
 
 struct VertexInput {
 #ifdef IN_HALF

@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DIN_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_HALF
+//TEST:SIMPLE(filecheck=CHECKBOTH): -target spirv -profile spirv_1_3 -DIN_UINT8 -DIN_HALF
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DOUT_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_HALF
@@ -8,7 +9,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
 //CHECK8: OpCapability UniformAndStorageBuffer8BitAccess
+//CHECK8-NOT: OpCapability UniformAndStorageBuffer16BitAccess
 //CHECK16: OpCapability UniformAndStorageBuffer16BitAccess
+//CHECK16-NOT: OpCapability UniformAndStorageBuffer8BitAccess
+//CHECKBOTH-DAG: OpCapability UniformAndStorageBuffer8BitAccess
+//CHECKBOTH-DAG: OpCapability UniformAndStorageBuffer16BitAccess
+//CHECK-NOT: OpCapability UniformAndStorageBuffer8BitAccess
 //CHECK-NOT: OpCapability UniformAndStorageBuffer16BitAccess
 
 
