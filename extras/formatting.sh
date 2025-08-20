@@ -13,6 +13,7 @@ run_yaml=0
 run_markdown=0
 run_sh=0
 run_cmake=0
+run_slang=0
 run_all=1
 
 show_help() {
@@ -20,7 +21,7 @@ show_help() {
   cat <<EOF
 $me: Format or check formatting of files in this repo
 
-Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake]
+Usage: $me [--check-only] [--no-version-check] [--source <path>] [--cpp] [--yaml] [--md] [--sh] [--cmake] [--slang]
 
 Options:
     --check-only       Check formatting without modifying files
@@ -31,6 +32,7 @@ Options:
     --md              Format only markdown files
     --sh              Format only shell script files
     --cmake           Format only CMake files
+    --slang           Format only Slang files
     --since <rev>     Only format files since Git revision <rev>
 EOF
 }
@@ -61,6 +63,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --cmake)
     run_cmake=1
+    run_all=0
+    ;;
+  --slang)
+    run_slang=1
     run_all=0
     ;;
   --source)
@@ -136,9 +142,9 @@ exit_code=0
 
 function list_files() {
   if [ "$since_rev" ]; then
-    git diff --name-only "$since_rev" HEAD $@
+    git diff --name-only "$since_rev" HEAD $@ | grep -v '\.meta\.slang\|tests/language-server/\|tests/preprocessor/\|tests/diagnostics/'
   else
-    git ls-files $@
+    git ls-files $@ | grep -v '\.meta\.slang\|tests/language-server/\|tests/preprocessor/\|tests/diagnostics/'
   fi
 }
 
@@ -262,10 +268,81 @@ sh_formatting() {
   fi
 }
 
+slang_formatting() {
+  echo "Formatting Slang files..." >&2
+
+  readarray -t files < <(list_files '*.slang')
+
+  # Path to Slang-specific clang-format config
+  local slang_config="$script_dir/slang.clang-format"
+
+  # Function to protect TEST comments and __generic lines from formatting
+  # Also any lines starting with `&&` will be protected
+  protect_test_comments() {
+    sed -e '/\/\/[[:space:]]*[A-Z][A-Z0-9_\-]*[(:]/i\// clang-format off' \
+        -e '/\/\/[[:space:]]*[A-Z][A-Z0-9_\-]*[(:]/a\// clang-format on' \
+	-e '/^[[:space:]]*\(&&\|&\|+\|-\) /i\// clang-format off' \
+	-e '/^[[:space:]]*\(&&\|&\|+\|-\) /a\// clang-format on' \
+	-e '/#INF/i\// clang-format off' \
+	-e '/#INF/a\// clang-format on' \
+        -e 's|__generic|SLANG_FORMATTING_GENERIC template|g' \
+        -e 's|\(__attributeTarget(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__builtin(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__builtin_requirement(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__builtin_type(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__cuda_sm_version(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__glsl_extension(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__glsl_version(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__implicit_conversion(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__intrinsic_op(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__intrinsic_type(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__magic_type(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__postfix(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__prefix(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__specialized_for_target(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__spirv_version(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__target_intrinsic(.*)\)|[SLANG_FORMATTING\1]|g' \
+        -e 's|\(__wgsl_extension(.*)\)|[SLANG_FORMATTING\1]|g'
+  }
+  export -f protect_test_comments
+
+  # Function to restore protected lines - removes only our 4-space marked lines
+  unprotect_test_comments() {
+    sed -e '/\/\/ clang-format o/d' \
+        -e 's|SLANG_FORMATTING_GENERIC template|__generic|g' \
+        -e 's|\[SLANG_FORMATTING\(.*\)\]|\1|g'
+  }
+  export -f unprotect_test_comments
+
+  if [ "$check_only" -eq 1 ]; then
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    printf '%s\n' "${files[@]}" | xargs --verbose -P "$(nproc)" -I{} bash -c "
+      mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
+      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(cat \"{}\" | protect_test_comments | clang-format --style=file:\"$slang_config\" --assume-filename=\"{}.cs\" | unprotect_test_comments) > \"$tmpdir/{}\"
+      :
+    " |& track_progress ${#files[@]}
+
+    for file in "${files[@]}"; do
+      # Fail if any of the diffs have contents
+      if [ -s "$tmpdir/$file" ]; then
+        cat "$tmpdir/$file"
+        exit_code=1
+      fi
+    done
+  else
+    printf '%s\n' "${files[@]}" | xargs --verbose -n1 -P "$(nproc)" -I{} bash -c "cat \"{}\" | protect_test_comments | clang-format --style=file:\"$slang_config\" --assume-filename=\"{}.cs\" | unprotect_test_comments > \"{}.tmp\" && mv \"{}.tmp\" \"{}\"" |&
+      track_progress ${#files[@]}
+  fi
+}
+
 ((run_all || run_sh)) && sh_formatting
 ((run_all || run_cmake)) && cmake_formatting
 ((run_all || run_yaml)) && yaml_json_formatting
 ((run_markdown)) && markdown_formatting
 ((run_all || run_cpp)) && cpp_formatting
+((run_all || run_slang)) && slang_formatting
 
 exit $exit_code
