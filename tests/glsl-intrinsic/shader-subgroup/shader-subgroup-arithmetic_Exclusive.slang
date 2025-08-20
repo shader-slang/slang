@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
@@ -15,9 +15,7 @@
 
 #version 430
 
-#if 1                        \
-    && !defined(TARGET_HLSL) \
-    && !defined(TARGET_CUDA)
+#if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
 // hlsl does not treat boolean types with subgroup.* as a logical operator
 // cuda is missing an implementation
 #define TEST_when_logical_operators_are_implemented
@@ -151,19 +149,19 @@ bool testArithmetic() {
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
         & testVArithmetic<double, 4>()
-        & test1Arithmetic<int8_t>() 
+        & test1Arithmetic<int8_t>()
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int64_t>() 
+        & test1Arithmetic<int64_t>()
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
-        & test1Arithmetic<uint8_t>() 
+        & test1Arithmetic<uint8_t>()
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
-        & test1Arithmetic<uint64_t>() 
+        & test1Arithmetic<uint64_t>()
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()
@@ -171,11 +169,11 @@ bool testArithmetic() {
 
         // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined (WGPU)
-        & test1Arithmetic<int16_t>() 
+        & test1Arithmetic<int16_t>()
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()
         & testVArithmetic<int16_t, 4>()
-        & test1Arithmetic<uint16_t>() 
+        & test1Arithmetic<uint16_t>()
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
         & testVArithmetic<uint16_t, 4>()
@@ -193,7 +191,8 @@ void computeMain()
             & testLogical()
 #endif
             ;
-    
+
+
     bool res1 = true
             & testArithmetic()
             ;

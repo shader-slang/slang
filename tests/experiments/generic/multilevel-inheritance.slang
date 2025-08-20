@@ -6,12 +6,12 @@
 //TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std legacy
 
 // CHECK: error 30811
-// CHECK: struct Child : Parent {};
+// CHECK: struct Child : Parent
 // CHECK: error 38029
 // CHECK: getObject<Child>();
 
 // CHECK_LEGACY: warning 30816
-// CHECK_LEGACY: struct Child : Parent {};
+// CHECK_LEGACY: struct Child : Parent
 // CHECK_LEGACY: error 38029
 // CHECK_LEGACY: getObject<Child>();
 

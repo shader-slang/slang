@@ -7,15 +7,13 @@
 // CHECK-NOT: sm_5_0
 // CHECK-NOT: sm_5_1
 // CHECK: error 36104: 'processDataBad' uses undeclared capability 'sm_6_0'
-// CHECK: capability7.slang(28): note: see using of 'processDataBadNested'
-// CHECK: capability7.slang(20): note: see definition of 'processDataBadNested'
-
 
 [require(glsl_hlsl_metal_spirv)]
 void processDataGood()
 {
 }
 
+// CHECK-DAG: capability7.slang([[@LINE+2]]): note: see definition of 'processDataBadNested'
 [require(hlsl, sm_6_0)]
 void processDataBadNested()
 {
@@ -25,6 +23,7 @@ void processDataBadNested()
 [require(hlsl)]
 void processDataBad()
 {
+    // CHECK-DAG: capability7.slang([[@LINE+1]]): note: see using of 'processDataBadNested'
     processDataBadNested();
 }
 

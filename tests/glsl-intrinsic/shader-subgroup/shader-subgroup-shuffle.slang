@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL):  -allow-glsl -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // not testing hlsl due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
@@ -15,16 +15,14 @@
 
 #version 430
 
-#if 1                       \
-    && !defined(TARGET_HLSL) \
-    && !defined(TARGET_CUDA)
+#if !defined(TARGET_HLSL) && !defined(TARGET_CUDA)
 // hlsl is missing an implementation
 // cuda is missing an implementation
 #define TEST_when_subgroupShuffleXor_is_implemented
 #endif
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -78,7 +76,7 @@ bool testShuffleX() {
         & testVShuffleX<float, 2>()
         & testVShuffleX<float, 3>()
         & testVShuffleX<float, 4>()
-        & test1ShuffleX<half>() 
+        & test1ShuffleX<half>()
         & testVShuffleX<half, 2>()
         & testVShuffleX<half, 3>()
         & testVShuffleX<half, 4>()
@@ -97,7 +95,7 @@ bool testShuffleX() {
         & testVShuffleX<double, 2>()
         & testVShuffleX<double, 3>()
         & testVShuffleX<double, 4>()
-        & test1ShuffleX<int8_t>() 
+        & test1ShuffleX<int8_t>()
         & testVShuffleX<int8_t, 2>()
         & testVShuffleX<int8_t, 3>()
         & testVShuffleX<int8_t, 4>()
