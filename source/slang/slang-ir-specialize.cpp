@@ -5,11 +5,12 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-lower-dynamic-insts.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -849,7 +850,45 @@ struct SpecializationContext
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         if (!witnessTable)
         {
-            return false;
+            if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
+            {
+                auto requirementKey = lookupInst->getRequirementKey();
+
+                HashSet<IRInst*> satisfyingValSet;
+                bool skipSpecialization = false;
+                forEachInCollection(
+                    collection,
+                    [&](IRInst* instElement)
+                    {
+                        if (auto table = as<IRWitnessTable>(instElement))
+                        {
+                            if (auto satisfyingVal = findWitnessVal(table, requirementKey))
+                            {
+                                satisfyingValSet.add(satisfyingVal);
+                                return;
+                            }
+                        }
+
+                        // If we reach here, we didn't find a satisfying value.
+                        skipSpecialization = true;
+                    });
+
+                if (!skipSpecialization)
+                {
+                    CollectionBuilder cBuilder(lookupInst->getModule());
+                    auto newCollection = cBuilder.makeSet(satisfyingValSet);
+                    addUsersToWorkList(lookupInst);
+                    lookupInst->replaceUsesWith(newCollection);
+                    lookupInst->removeAndDeallocate();
+                    return true;
+                }
+                else
+                    return false;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         // Because we have a concrete witness table, we can
@@ -1179,7 +1218,7 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = lowerDynamicInsts(module, sink);
+                iterChanged = specializeDynamicInsts(module, sink);
                 if (iterChanged)
                 {
                     // We'll write out the specialization info to an inst,
@@ -3090,7 +3129,6 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-
 // DUPLICATE: merge.
 static bool isDynamicGeneric(IRInst* callee)
 {
@@ -3115,15 +3153,6 @@ static bool isDynamicGeneric(IRInst* callee)
     }
 
     return false;
-}
-
-static IRCollectionTagType* makeTagType(IRCollectionBase* collection)
-{
-    IRInst* collectionInst = collection;
-    // Create the tag type from the collection
-    IRBuilder builder(collection->getModule());
-    return as<IRCollectionTagType>(
-        builder.emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collectionInst));
 }
 
 static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
