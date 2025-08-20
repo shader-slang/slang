@@ -674,10 +674,26 @@ struct half
     half operator-(half other) const { return half(load() - other.load()); }
     half operator*(half other) const { return half(load() * other.load()); }
     half operator/(half other) const { return half(load() / other.load()); }
-    half& operator+=(half other) { store(load() + other.load()); return *this; }
-    half& operator-=(half other) { store(load() - other.load()); return *this; }
-    half& operator*=(half other) { store(load() * other.load()); return *this; }
-    half& operator/=(half other) { store(load() / other.load()); return *this; }
+    half& operator+=(half other)
+    {
+        store(load() + other.load());
+        return *this;
+    }
+    half& operator-=(half other)
+    {
+        store(load() - other.load());
+        return *this;
+    }
+    half& operator*=(half other)
+    {
+        store(load() * other.load());
+        return *this;
+    }
+    half& operator/=(half other)
+    {
+        store(load() / other.load());
+        return *this;
+    }
 
     bool operator<(half other) const { return load() < other.load(); }
     bool operator>(half other) const { return load() > other.load(); }
@@ -831,32 +847,36 @@ SLANG_FORCE_INLINE half F16_sqrt(half f)
 SLANG_FORCE_INLINE bool F16_isnan(half f)
 {
     uint16_t u = F16_asuint(f);
-    return (u&0x7C00) == 0x7C00 && (u&0x3FF) != 0;
+    return (u & 0x7C00) == 0x7C00 && (u & 0x3FF) != 0;
 }
 
 SLANG_FORCE_INLINE bool F16_isfinite(half f)
 {
     uint16_t u = F16_asuint(f);
-    return (u&0x7C00) != 0x7C00;
+    return (u & 0x7C00) != 0x7C00;
 }
 
 SLANG_FORCE_INLINE bool F16_isinf(half f)
 {
     uint16_t u = F16_asuint(f);
-    return (u&0x7C00) == 0x7C00 && (u&0x3FF) == 0;
+    return (u & 0x7C00) == 0x7C00 && (u & 0x3FF) == 0;
 }
 
 SLANG_FORCE_INLINE half F16_min(half a, half b)
 {
-    if(F16_isnan(a)) return b;
-    if(F16_isnan(b)) return a;
+    if(F16_isnan(a))
+        return b;
+    if(F16_isnan(b))
+        return a;
     return a < b ? a : b;
 }
 
 SLANG_FORCE_INLINE half F16_max(half a, half b)
 {
-    if(F16_isnan(a)) return b;
-    if(F16_isnan(b)) return a;
+    if(F16_isnan(a))
+        return b;
+    if(F16_isnan(b))
+        return a;
     return a > b ? a : b;
 }
 
@@ -916,8 +936,9 @@ SLANG_FORCE_INLINE half F16_rsqrt(half f)
 SLANG_FORCE_INLINE int F16_sign(half f)
 {
     uint16_t u = F16_asuint(f);
-    if((u&0x7FFF) == 0) return 0;
-    return (u&0x8000) != 0 ? -1 : 1;
+    if((u & 0x7FFF) == 0)
+        return 0;
+    return (u & 0x8000) != 0 ? -1 : 1;
 }
 
 SLANG_FORCE_INLINE half F16_frac(half h)
