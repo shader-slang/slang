@@ -273,6 +273,15 @@ typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
 
+#if SLANG_CUDA_ENABLE_HALF
+union Union16
+{
+    uint16_t u;
+    int16_t i;
+    __half h;
+};
+#endif
+
 union Union32
 {
     uint32_t u;
@@ -1736,6 +1745,199 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int4>(
         "r"(vz),
         "r"(vw));
 }
+
+// ----------------------------- F16 -----------------------------------------
+#if SLANG_CUDA_ENABLE_HALF
+// Unary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_ceil(__half f)
+{
+    return hceil(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_floor(__half f)
+{
+    return hfloor(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_round(__half f)
+{
+    return hrint(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sin(__half f)
+{
+    return hsin(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_cos(__half f)
+{
+    return hcos(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void F16_sincos(__half f, __half* s, __half* c)
+{
+    *s = hsin(f);
+    *c = hcos(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tan(__half f)
+{
+    return __float2half(::tanf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
+{
+    return __float2half(::asinf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_acos(__half f)
+{
+    return __float2half(::ascosf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atan(__half f)
+{
+    return __float2half(::atanf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sinh(__half f)
+{
+    return __float2half(::sinhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_cosh(__half f)
+{
+    return __float2half(::coshf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tanh(__half f)
+{
+    return __float2half(::tanhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asinh(__half f)
+{
+    return __float2half(::asinhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_acosh(__half f)
+{
+    return __float2half(::acoshf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atanh(__half f)
+{
+    return __float2half(::atanhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log2(__half f)
+{
+    return hlog2(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log(__half f)
+{
+    return hlog(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log10(__half f)
+{
+    return hlog10(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_exp2(__half f)
+{
+    return hexp2(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_exp(__half f)
+{
+    return hexp(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_abs(__half f)
+{
+    return __habs(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_trunc(__half f)
+{
+    return htrunc(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sqrt(__half f)
+{
+    return hsqrt(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_rsqrt(__half f)
+{
+    return hrsqrtf(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sign(__half f)
+{
+    return (f == __half(0.0f)) ? f : ((f < __half(0.0f)) ? __half(-1.0f) : __half(1.0f));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_frac(__half f)
+{
+    return f - F16_floor(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isnan(__half f)
+{
+    return __hisnan(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isfinite(__half f)
+{
+    return !__hisinf(f) && !__hisnan(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isinf(__half f)
+{
+    return __hisinf(f);
+}
+
+// Binary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_min(__half a, __half b)
+{
+    return __hmin(a, b);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_max(__half a, __half b)
+{
+    return __hmax(a, b);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_pow(__half a, __half b)
+{
+    return __float2half(::powf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fmod(__half a, __half b)
+{
+    return __float2half(::fmodf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_remainder(__half a, __half b)
+{
+    return __float2half(::remainderf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atan2(__half a, __half b)
+{
+    return __float2half(::atan2(__half2float(a), __half2float(b)));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_frexp(__half x, int* e)
+{
+    return __float2half(frexpf(__half2float(x), e));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_modf(__half x, __half* ip)
+{
+    float ipf;
+    float res = ::modff(__half2float(x), &ipf);
+    *ip = __float2half(ipf);
+    return __float2half(res);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t F16_asuint(__half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.u;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t F16_asint(__half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.i;
+}
+
+// Ternary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fma(__half a, __half b, __half c)
+{
+    return __hfma(a, b, c);
+}
+
+#endif
 
 // ----------------------------- F32 -----------------------------------------
 
