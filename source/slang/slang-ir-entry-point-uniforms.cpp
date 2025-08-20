@@ -213,19 +213,19 @@ bool isVaryingParameter(IRVarLayout* varLayout)
 bool shouldCollectEntryPointParamInConstantBuffer(
     IRParam* param,
     TargetRequest* targetReq,
-    IRVarLayout* paramLayout = nullptr)
+    IRVarLayout* paramLayout)
 {
 
     // Check if this is a varying parameter - if so, don't collect
     if (isVaryingParameter(paramLayout))
         return false;
 
-    auto paramType = param->getDataType();
-
     // For Metal targets, skip all resource types to preserve direct binding
     if (targetReq && isMetalTarget(targetReq))
     {
         // Skip all resource types that need explicit Metal binding attributes
+        auto paramType = param->getDataType();
+
         if (isResourceType(paramType))
             return false;
     }
