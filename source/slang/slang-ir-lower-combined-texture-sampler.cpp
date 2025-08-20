@@ -22,11 +22,12 @@ struct LowerCombinedSamplerContext
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
-    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRType* type)
+    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRType* type, IRUse*& firstUse)
     {
         if (auto arrayType = as<IRArrayType>(type))
         {
-            return findCombinedTextureSamplerTypeInArray(arrayType->getElementType());
+            firstUse = arrayType->firstUse;
+            return findCombinedTextureSamplerTypeInArray(arrayType->getElementType(), firstUse);
         }
         return as<IRTextureTypeBase>(type);
     }
@@ -124,14 +125,8 @@ void lowerCombinedTextureSamplers(
     // Lower combined texture sampler type into a struct type.
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto textureType = as<IRTextureTypeBase>(globalInst);
         IRUse* firstUse = nullptr;
-
-        if (auto arrayType = as<IRArrayType>(globalInst))
-        {
-            textureType = context.findCombinedTextureSamplerTypeInArray(arrayType);
-            firstUse = arrayType->firstUse;
-        }
+        auto textureType = context.findCombinedTextureSamplerTypeInArray(arrayType, &firstUse);
 
         if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
             continue;
@@ -163,8 +158,7 @@ void lowerCombinedTextureSamplers(
             // If the user of the type is an array, then we update the element layout
             // to use the new StructTypeVarLayout. Otherwise, we replace the VarLayout
             // with the new StructTypeVarLayout.
-            auto arrayTypeLayout = as<IRArrayTypeLayout>(oldTypeLayout);
-            if (arrayTypeLayout)
+            if (as<IRArrayTypeLayout>(oldTypeLayout))
             {
                 newTypeLayout =
                     IRArrayTypeLayout::Builder(&subBuilder, typeInfo.typeLayout).build();
