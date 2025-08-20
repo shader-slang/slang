@@ -8578,7 +8578,7 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [PreferCheckpoint]
-[require(glsl_hlsl_metal_spirv_wgsl)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -8590,6 +8590,7 @@ T determinant(matrix<T,N,N> m)
         OpExtInst $$T result glsl450 Determinant $m
     };
     case wgsl: __intrinsic_asm "determinant";
+    case cuda:
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -8629,13 +8630,14 @@ T determinant(matrix<T,N,N> m)
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(glsl_hlsl_metal_spirv_wgsl)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "determinant";
-    // GLSL, WGSL, and SPIR-V don't support integer determinants for lowered matrices, so we need to implement it manually
+    // GLSL, WGSL, SPIR-V, and CUDA don't support integer determinants for lowered matrices, so we need to implement it manually
+    case cuda:
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -16680,7 +16682,7 @@ for (auto opName : kWaveMultiPrefixMinMaxNames) {
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_spirv, subgroup_partitioned)]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
@@ -16688,6 +16690,8 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     {
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.name)(($1).x, $0)";
     case spirv:
         {
             if (__isFloat<T>())
@@ -16703,7 +16707,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_spirv, subgroup_partitioned)]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
@@ -16711,6 +16715,8 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     {
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.name)Multiple(($1).x, $0)";
     case spirv:
         {
             if (__isFloat<T>())
