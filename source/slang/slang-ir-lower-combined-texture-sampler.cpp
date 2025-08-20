@@ -22,7 +22,7 @@ struct LowerCombinedSamplerContext
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
-    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRType* type, IRUse*& firstUse)
+    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRInst* type, IRUse*& firstUse)
     {
         if (auto arrayType = as<IRArrayType>(type))
         {
