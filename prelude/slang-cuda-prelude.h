@@ -1856,9 +1856,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_rsqrt(__half f)
 {
     return hrsqrt(f);
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sign(__half f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F16_sign(__half f)
 {
-    return (f == __half(0.0f)) ? f : ((f < __half(0.0f)) ? __half(-1.0f) : __half(1.0f));
+    return (f == __half(0.0f)) ? 0 : ((f < __half(0.0f)) ? -1 : 1);
 }
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_frac(__half f)
@@ -2042,9 +2042,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_rsqrt(float f)
 {
     return ::rsqrtf(f);
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sign(float f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F32_sign(float f)
 {
-    return (f == 0.0f) ? f : ((f < 0.0f) ? -1.0f : 1.0f);
+    return (f == 0.0f) ? 0 : ((f < 0.0f) ? -1 : 1);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_frac(float f)
 {
@@ -2211,9 +2211,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_rsqrt(double f)
 {
     return ::rsqrt(f);
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_sign(double f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F64_sign(double f)
 {
-    return (f == 0.0) ? f : ((f < 0.0) ? -1.0 : 1.0);
+    return (f == 0.0) ? 0 : ((f < 0.0) ? -1 : 1);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_frac(double f)
 {
