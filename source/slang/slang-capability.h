@@ -36,7 +36,7 @@ namespace Slang
 // The situation is slightly more complicated for a function. A function
 // might require a specific set of atomic feature, and that is the simple
 // case. In this simple case, we know that a target can run a function
-// if the features of the target are a super-set of those required by
+// if the features of the target are a superset of those required by
 // the function.
 //
 // In the more general case, we might have a function that can be used
@@ -98,6 +98,27 @@ struct CapabilityTargetSet
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
+
+    const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
+};
+
+enum class CheckCapabilityRequirementOptions
+{
+    // `available` can have a subset of the abstract atoms `required` has
+    AvailableCanHaveSubsetOfAbstractAtoms,
+    // `available` and `required` both must have equal abstract stage & target atoms
+    MustHaveEqualAbstractAtoms,
+};
+
+enum class CheckCapabilityRequirementResult
+{
+    // `available` is a superset to `required`
+    AvailableIsASuperSetToRequired,
+    // `available` is not a superset to `required`
+    AvailableIsNotASuperSetToRequired,
+    // `available` has abstract atoms that `required` is missing.
+    // Only possible with CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms
+    RequiredIsMissingAbstractAtoms,
 };
 
 struct CapabilitySet
@@ -147,9 +168,12 @@ public:
         Implied = 1 << 0,
     };
     /// Does this capability set imply all the capabilities in `other`?
+    /// `this` can have excess target+stage sets.
     bool implies(CapabilitySet const& other) const;
     /// Does this capability set imply at least 1 set in other.
     ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
+    /// Will a `join` with `other` change `this`?
+    bool joinWithOtherWillChangeThis(CapabilitySet const& other) const;
 
     /// Does this capability set imply the atomic capability `other`?
     bool implies(CapabilityAtom other) const;
@@ -186,12 +210,14 @@ public:
         CapabilitySet const& targetCaps,
         bool& isEqual) const;
 
-    /// Find any capability sets which are in 'available' but not in 'required'. Return false if
+    /// Identify capability sets which are in 'available' but not in 'required'. Return false if
     /// this situation occurs.
-    static bool checkCapabilityRequirement(
+    static void checkCapabilityRequirement(
+        CheckCapabilityRequirementOptions options,
         CapabilitySet const& available,
         CapabilitySet const& required,
-        CapabilityAtomSet& outFailedAvailableSet);
+        CapabilityAtomSet& outFailedAvailableSet,
+        CheckCapabilityRequirementResult& result);
 
     // For each element in `elementsToPermutateWith`, create and add a different conjunction
     // permutation by adding to `setToPermutate`.
@@ -330,8 +356,29 @@ private:
 
     enum class ImpliesFlags
     {
+        // All permutations of target+stage from `other` must be implied by a target+stage
+        // in `this`.
         None = 0,
+        // Given a single target+stage permutation, if 1 permutation is implied in `other`,
+        // return true.
         OnlyRequireASingleValidImply = 1 << 0,
+        // The target+stage permuations in `this` cannot have extra permutations
+        // relative to `other`.
+        // Ex: `{metal|glsl}.implies({glsl})` is false
+        //     `{glsl}.implies({glsl|metal})` is false
+        //     `{glsl}.implies({glsl|glsl})` is true
+        CannotHaveMoreTargetAndStageSets = 1 << 1,
+        // The target+stage permuations in `this` can have less permutations
+        // than `other`. This means, only for the shared permutations of `this`
+        // and `other` does `thisSet[target][stage].imply(otherSet)` have to be
+        // true.
+        // If `this` is empty, `this` is not able to imply `other` unless `other`
+        // is empty.
+        // Ex: `{glsl}.implies({glsl|metal})` is true since we only compare shared-permutations.
+        CanHaveSubsetOfTargetAndStageSets = 1 << 2,
+
+        WillAJoinWithOtherModifyThis =
+            CannotHaveMoreTargetAndStageSets | CanHaveSubsetOfTargetAndStageSets
     };
     ImpliesReturnFlags _implies(CapabilitySet const& other, ImpliesFlags flags) const;
 };
@@ -370,6 +417,7 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
+void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);
 
 const CapabilityAtomSet& getAtomSetOfTargets();
 const CapabilityAtomSet& getAtomSetOfStages();

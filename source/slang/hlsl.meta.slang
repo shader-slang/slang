@@ -65,24 +65,24 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
@@ -150,7 +150,7 @@ struct ByteAddressBuffer
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -4804,11 +4804,11 @@ __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
@@ -4852,6 +4852,7 @@ struct StructuredBuffer
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -4947,6 +4948,7 @@ T __getElement<T, U, I>(U collection, I index);
 
 /// @category stage_io Stage IO types
 __generic<T, let N : int>
+[require(glsl_hlsl_spirv, geometry)]
 [require(glsl_hlsl_spirv, hull)]
 __magic_type(HLSLInputPatchType)
 __intrinsic_type($(kIROp_HLSLInputPatchType))
@@ -5017,6 +5019,7 @@ This type is supported natively when targeting HLSL.
 */
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
+[require(byteaddressbuffer_rw)]
 struct $(item.name)
 {
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
@@ -5025,7 +5028,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -5054,7 +5057,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint Load(int location)
     {
         __target_switch
@@ -5067,7 +5070,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint Load(int location, out uint status)
     {
         __target_switch
@@ -5093,7 +5096,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -5106,7 +5109,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5123,7 +5126,7 @@ struct $(item.name)
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -5136,7 +5139,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint2 Load2(uint location, out uint status)
     {
         __target_switch
@@ -5161,7 +5164,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -5174,7 +5177,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5191,7 +5194,7 @@ struct $(item.name)
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -5204,7 +5207,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint3 Load3(uint location, out uint status)
     {
         __target_switch
@@ -5228,7 +5231,7 @@ struct $(item.name)
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -5241,7 +5244,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5258,7 +5261,7 @@ struct $(item.name)
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -5271,7 +5274,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl)]
     uint4 Load4(uint location, out uint status)
     {
         __target_switch
@@ -5282,7 +5285,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
@@ -5290,7 +5293,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
@@ -5303,7 +5306,7 @@ struct $(item.name)
     ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -5420,6 +5423,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
+    [require(sm_5_0)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5459,6 +5463,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
+    [require(sm_5_0)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5735,7 +5740,7 @@ ${{{{
     /// @param value The operand of the atomic operation.
     /// @param original_value The original value at `dest` before the $(op.internalName) operation.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void Interlocked$(op.name)(
         UINT dest,
         UINT value,
@@ -5751,7 +5756,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void Interlocked$(op.name)(
         UINT dest,
         UINT value)
@@ -5778,7 +5783,7 @@ ${{{{
     /// translates to `InterlockedCompareExchange`.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void InterlockedCompareExchange(
         UINT dest,
         UINT compare_value,
@@ -5803,7 +5808,7 @@ ${{{{
     /// translates to `InterlockedCompareStore`.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal, byteaddressbuffer_rw)]
+    [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
     void InterlockedCompareStore(
         UINT dest,
         UINT compare_value,
@@ -5824,7 +5829,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store(uint address, uint value)
     {
         __target_switch
@@ -5841,7 +5846,7 @@ ${{{{
     ///@param value Two input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store2(uint address, uint2 value)
     {
         __target_switch
@@ -5854,7 +5859,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store2(uint address, uint2 value, uint alignment)
     {
         __target_switch
@@ -5870,7 +5875,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 8.
     ///@param value Two input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store2Aligned(uint address, uint2 value)
     {
         __target_switch
@@ -5886,7 +5891,7 @@ ${{{{
     ///@param value Three input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store3(uint address, uint3 value)
     {
         __target_switch
@@ -5898,7 +5903,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store3(uint address, uint3 value, uint alignment)
     {
         __target_switch
@@ -5914,7 +5919,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 12.
     ///@param value Three input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store3Aligned(uint address, uint3 value)
     {
         __target_switch
@@ -5930,7 +5935,7 @@ ${{{{
     ///@param value Four input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store4(uint address, uint4 value)
     {
         __target_switch
@@ -5943,7 +5948,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store4(uint address, uint4 value, uint alignment)
     {
         __target_switch
@@ -5959,7 +5964,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 16.
     ///@param value Four input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
@@ -5971,12 +5976,14 @@ ${{{{
     }
 
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, 0, value);
     }
 
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store<T>(uint address, T value, uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
@@ -5988,6 +5995,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of size of `T`.
     ///@param value The input value.
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void StoreAligned<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
@@ -6041,7 +6049,7 @@ struct $(item.name)
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -7392,7 +7400,6 @@ float16_t asfloat16(uint16_t value)
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
 {
     __target_switch
@@ -7414,7 +7421,6 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 int16_t asint16(float16_t value) 
 {
     __target_switch
@@ -7430,8 +7436,7 @@ int16_t asint16(float16_t value)
 }
 
 [__unsafeForceInlineEarly]
-[__readNone] 
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
+[__readNone]
 vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) 
 {
     __target_switch
@@ -7444,7 +7449,6 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
 matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) 
 {
     __target_switch
@@ -7455,8 +7459,7 @@ matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> valu
 }
 
 [__readNone]
-[__unsafeForceInlineEarly] 
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
+[__unsafeForceInlineEarly]
 float16_t asfloat16(int16_t value) 
 {
     __target_switch
@@ -7473,7 +7476,6 @@ float16_t asfloat16(int16_t value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_metal_spirv, shader5_sm_5_0)]
 vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) 
 {
     __target_switch
@@ -7489,7 +7491,6 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
 
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cuda_hlsl_spirv, shader5_sm_5_0)]
 matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) 
 {
     __target_switch
@@ -8189,19 +8190,7 @@ uint countbits(T value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        if (T is int64_t || T  is uint64_t)
-        {
-            return __emulatedCountbits64(__intCast<uint64_t>(value));
-        }
-        else if (T is int16_t || T  is uint16_t)
-        {
-            // emulate 16-bit
-            return countbits(__intCast<uint32_t>(value));
-        }
-        else
-        {
-            __intrinsic_asm "popcount";
-        }
+        __intrinsic_asm "($TR)popcount($0)";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_countbits($0)";
@@ -8261,15 +8250,7 @@ vector<uint, N> countbits(vector<T, N> value)
             __intrinsic_asm "bitCount";
         }
     case metal:
-        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
-        {
-            // Emulate 64-bit and 16-bit
-            VECTOR_MAP_UNARY(uint, N, countbits, value);
-        }
-        else
-        {
-            __intrinsic_asm "popcount";
-        }
+        __intrinsic_asm "($TR)popcount($0)";
     case spirv:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
@@ -8809,7 +8790,7 @@ vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 T divide(T x, T y)
 {
     __target_switch
@@ -8822,7 +8803,7 @@ T divide(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -10270,7 +10251,7 @@ vector<T, N> fwidth_coarse(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
 {
     __target_switch
@@ -10332,7 +10313,7 @@ vector<T, N> fwidth_fine(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
 {
     __target_switch
@@ -20472,7 +20453,7 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
-        case cuda: __intrinsic_asm "optixMakeNopHitObject";
+        case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spirv:
             spirv_asm 
             {
@@ -20561,7 +20542,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20582,7 +20563,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsHit";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20603,7 +20584,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectIsNop";
+        case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20655,7 +20636,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20675,7 +20656,7 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".SetShaderTableIndex";
-        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
@@ -20689,7 +20670,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20711,7 +20692,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20733,7 +20714,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20755,7 +20736,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20799,7 +20780,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetClusterId";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
         case spirv:
             return spirv_asm
             {
@@ -22585,18 +22566,21 @@ extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite)
     [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
-    [require(glsl_hlsl_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
+    [require(glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
     void InterlockedAddF32(vector<uint, Shape.dimensions> coord, float value, out float originalValue)
     {
         __target_switch
         {
-        default:
-            originalValue = __atomic_add(this[coord], value);
-            return;
         case hlsl:
             __intrinsic_asm "$3 = NvInterlockedAddFp32($0, $1, $2)";
         case glsl:
             __intrinsic_asm "$3 = imageAtomicAdd($0, $1, $2)";
+        case metal:
+            originalValue = __atomic_add(this[coord], value);
+            return;
+        default:
+            originalValue = __atomic_add(this[coord], value);
+            return;
         }
     }
 
@@ -26175,8 +26159,10 @@ CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yO
 
 // [ForceInline]
 [require(cooperative_vector)]
+[require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
+[require(GL_ARB_gpu_shader5)]
 CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, CoopVec<T, N> b, CoopVec<T, N> c)
 {
     // TODO: Investigate, why does this fail if it's not inlined

@@ -3753,7 +3753,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3781,7 +3781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3960,6 +3960,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         default:
             return false;
         }
+    }
+
+    SpvSelectionControlMask getSpvBranchSelectionControl(IRInst* inst)
+    {
+        if (inst->findDecorationImpl(kIROp_BranchDecoration))
+            return SpvSelectionControlDontFlattenMask;
+
+        if (inst->findDecorationImpl(kIROp_FlattenDecoration))
+            return SpvSelectionControlFlattenMask;
+
+        return SpvSelectionControlMaskNone;
     }
 
     // The instructions that appear inside the basic blocks of
@@ -4269,7 +4280,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    afterBlockID,
+                    getSpvBranchSelectionControl(ifelseInst));
                 auto falseLabel = ifelseInst->getFalseBlock();
                 result = emitOpBranchConditional(
                     parent,
@@ -4284,7 +4299,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    mergeBlockID,
+                    getSpvBranchSelectionControl(switchInst));
                 result = emitInstCustomOperandFunc(
                     parent,
                     inst,
