@@ -831,7 +831,7 @@ SLANG_FORCE_INLINE half F16_exp(half f)
 
 SLANG_FORCE_INLINE half F16_abs(half f)
 {
-    return U16_ashalf(F16_asuint(f)&0x7FFF);
+    return U16_ashalf(F16_asuint(f) & 0x7FFF);
 }
 
 SLANG_FORCE_INLINE half F16_trunc(half f)
@@ -864,18 +864,18 @@ SLANG_FORCE_INLINE bool F16_isinf(half f)
 
 SLANG_FORCE_INLINE half F16_min(half a, half b)
 {
-    if(F16_isnan(a))
+    if (F16_isnan(a))
         return b;
-    if(F16_isnan(b))
+    if (F16_isnan(b))
         return a;
     return a < b ? a : b;
 }
 
 SLANG_FORCE_INLINE half F16_max(half a, half b)
 {
-    if(F16_isnan(a))
+    if (F16_isnan(a))
         return b;
-    if(F16_isnan(b))
+    if (F16_isnan(b))
         return a;
     return a > b ? a : b;
 }
@@ -936,7 +936,7 @@ SLANG_FORCE_INLINE half F16_rsqrt(half f)
 SLANG_FORCE_INLINE int F16_sign(half f)
 {
     uint16_t u = F16_asuint(f);
-    if((u & 0x7FFF) == 0)
+    if ((u & 0x7FFF) == 0)
         return 0;
     return (u & 0x8000) != 0 ? -1 : 1;
 }
