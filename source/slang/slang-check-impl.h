@@ -1138,6 +1138,23 @@ public:
         return result;
     }
 
+    SemanticsContext withBwdDerivative()
+    {
+        SemanticsContext result(*this);
+        result.m_isBwdDerivative = true;
+        return result;
+    }
+
+    SemanticsContext withFwdDerivative()
+    {
+        SemanticsContext result(*this);
+        result.m_isFwdDerivative = true;
+        return result;
+    }
+
+    bool getIsBwdDerivative() { return m_isBwdDerivative; }
+    bool getIsFwdDerivative() { return m_isFwdDerivative; }
+
     SemanticsContext allowStaticReferenceToNonStaticMember()
     {
         SemanticsContext result(*this);
@@ -1217,6 +1234,10 @@ protected:
     // Flag to track when we're in a for-loop side effect expression where comma operators are
     // allowed
     bool m_inForLoopSideEffect = false;
+
+    // Context flags for derivative expressions
+    bool m_isBwdDerivative = false;
+    bool m_isFwdDerivative = false;
 
 
     ExpandExpr* m_parentExpandExpr = nullptr;

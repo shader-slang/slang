@@ -14350,10 +14350,6 @@ struct CapabilityDeclReferenceVisitor
     const ParentDiagnosticFunc handleParentDiagnosticFunc;
     RequireCapabilityAttribute* maybeRequireCapability;
     SemanticsContext& outerContext;
-
-    // Context for derivative expressions
-    bool isBwdDerivative = false;
-    bool isFwdDerivative = false;
     CapabilityDeclReferenceVisitor(
         const ProcessFunc& processFunc,
         const ParentDiagnosticFunc& parentDiagnosticFunc,
@@ -14376,10 +14372,10 @@ struct CapabilityDeclReferenceVisitor
         // Check if we're visiting a function in derivative context
         if (auto funcDecl = as<CallableDecl>(decl))
         {
-            if (isBwdDerivative || isFwdDerivative)
+            if (outerContext.getIsBwdDerivative() || outerContext.getIsFwdDerivative())
             {
                 // Check for derivative attributes and visit derivative functions
-                if (isBwdDerivative)
+                if (outerContext.getIsBwdDerivative())
                 {
                     if (auto backwardDerivAttr =
                             funcDecl->findModifier<BackwardDerivativeAttribute>())
@@ -14402,7 +14398,7 @@ struct CapabilityDeclReferenceVisitor
                         }
                     }
                 }
-                else if (isFwdDerivative)
+                else if (outerContext.getIsFwdDerivative())
                 {
                     if (auto forwardDerivAttr =
                             funcDecl->findModifier<ForwardDerivativeAttribute>())
@@ -14550,28 +14546,26 @@ struct CapabilityDeclReferenceVisitor
 
     void visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
-        // Set derivative context before visiting
-        bool oldIsBwdDerivative = isBwdDerivative;
-        isBwdDerivative = true;
-
-        // Visit as normal HigherOrderInvokeExpr
-        Base::visitHigherOrderInvokeExpr(expr);
-
-        // Restore context
-        isBwdDerivative = oldIsBwdDerivative;
+        // Visit as normal HigherOrderInvokeExpr with backward derivative context
+        auto subContext = outerContext.withBwdDerivative();
+        CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc> subVisitor(
+            handleProcessFunc,
+            handleParentDiagnosticFunc,
+            maybeRequireCapability,
+            subContext);
+        subVisitor.visitHigherOrderInvokeExpr(expr);
     }
 
     void visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
-        // Set derivative context before visiting
-        bool oldIsFwdDerivative = isFwdDerivative;
-        isFwdDerivative = true;
-
-        // Visit as normal HigherOrderInvokeExpr
-        Base::visitHigherOrderInvokeExpr(expr);
-
-        // Restore context
-        isFwdDerivative = oldIsFwdDerivative;
+        // Visit as normal HigherOrderInvokeExpr with forward derivative context
+        auto subContext = outerContext.withFwdDerivative();
+        CapabilityDeclReferenceVisitor<ProcessFunc, ParentDiagnosticFunc> subVisitor(
+            handleProcessFunc,
+            handleParentDiagnosticFunc,
+            maybeRequireCapability,
+            subContext);
+        subVisitor.visitHigherOrderInvokeExpr(expr);
     }
 };
 
