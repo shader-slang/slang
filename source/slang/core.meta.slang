@@ -2325,7 +2325,7 @@ struct OutputIndices
         }
 
         // If a 'OutputIndices[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
-        [require(glsl_hlsl_spirv, meshshading)]
+        [require(glsl_hlsl_metal_spirv, meshshading)]
         __intrinsic_op($(kIROp_MeshOutputRef))
         ref;
     }
