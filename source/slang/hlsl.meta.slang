@@ -8578,7 +8578,7 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [PreferCheckpoint]
-[require(glsl_hlsl_metal_spirv_wgsl)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -8590,6 +8590,7 @@ T determinant(matrix<T,N,N> m)
         OpExtInst $$T result glsl450 Determinant $m
     };
     case wgsl: __intrinsic_asm "determinant";
+    case cuda:
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -8629,13 +8630,14 @@ T determinant(matrix<T,N,N> m)
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(glsl_hlsl_metal_spirv_wgsl)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "determinant";
-    // GLSL, WGSL, and SPIR-V don't support integer determinants for lowered matrices, so we need to implement it manually
+    // GLSL, WGSL, SPIR-V, and CUDA don't support integer determinants for lowered matrices, so we need to implement it manually
+    case cuda:
     default:
         static_assert(N >= 1 && N <= 4, "determinant is only implemented up to 4x4 matrices");
         if (N == 1)
@@ -13934,7 +13936,7 @@ WaveMask __WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot_activemask)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_ballot_activemask)]
 WaveMask WaveGetActiveMask()
 {
     __target_switch
@@ -13943,6 +13945,8 @@ WaveMask WaveGetActiveMask()
         __intrinsic_asm "subgroupBallot(true).x";
     case hlsl:
         __intrinsic_asm "WaveActiveBallot(true).x";
+    case metal:
+        __intrinsic_asm "((uint32_t)((simd_vote::vote_t)simd_ballot(true)))";
     case spirv:
         let _true = true;
         return (spirv_asm
@@ -15501,7 +15505,7 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
-[require(cuda_glsl_hlsl_spirv, subgroup_basic_ballot)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
     __target_switch
@@ -15509,6 +15513,7 @@ uint WaveActiveCountBits(bool value)
     case hlsl: __intrinsic_asm "WaveActiveCountBits";
     case glsl:
     case spirv:
+    case metal:
         return _WaveCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
@@ -15598,7 +15603,7 @@ bool WaveIsFirstLane()
 // This implementation tries to limit the amount of work required by the actual lane count.
 /// @category wave
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint _WaveCountBits(uint4 value)
 {
     __target_switch
@@ -16081,7 +16086,7 @@ uint WavePrefixCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 uint4 WaveGetConvergedMulti()
 {
     __target_switch
@@ -16091,6 +16096,7 @@ uint4 WaveGetConvergedMulti()
         __intrinsic_asm "subgroupBallot(true)";
     case hlsl: __intrinsic_asm "WaveActiveBallot(true)";
     case cuda: __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)";
+    case metal: __intrinsic_asm "((uint4)((simd_vote::vote_t)simd_ballot(true)))";
     case spirv:
         let _true = true;
         return spirv_asm
@@ -16680,7 +16686,7 @@ for (auto opName : kWaveMultiPrefixMinMaxNames) {
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_spirv, subgroup_partitioned)]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
@@ -16688,6 +16694,8 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     {
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.name)(($1).x, $0)";
     case spirv:
         {
             if (__isFloat<T>())
@@ -16703,7 +16711,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_spirv, subgroup_partitioned)]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
 vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
 {
     __shaderSubgroupPartitionedPreamble<T>();
@@ -16711,6 +16719,8 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     {
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.name)Multiple(($1).x, $0)";
     case spirv:
         {
             if (__isFloat<T>())
