@@ -3466,7 +3466,8 @@ Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
     if (!srcDecl)
         return exprIn;
 
-    if (as<VarDeclBase>(srcDecl) && (isGlobalDecl(srcDecl) || srcDecl->hasModifier<HLSLStaticModifier>()))
+    if (as<VarDeclBase>(srcDecl) &&
+        (isGlobalDecl(srcDecl) || srcDecl->hasModifier<HLSLStaticModifier>()))
         return exprIn;
 
     auto lambdaScope = m_parentLambdaExpr->paramScopeDecl;
