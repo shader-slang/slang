@@ -129,6 +129,8 @@ if(SLANG_ENABLE_GFX)
     #
     # GFX
     #
+    # `gfx` is kept here for legacy reasons. It's not used by any slang tests but some external
+    # projects use it. We should remove it in the future.
     slang_add_target(
         gfx
         ${SLANG_LIB_TYPE}
@@ -187,8 +189,9 @@ if(SLANG_ENABLE_GFX)
         FOLDER gfx
     )
 
-
-    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+    # since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
+    # directory. So even if slang-test is not built, the gfx modules are still available.
+    set(modules_dest_dir $<TARGET_FILE_DIR:slangc>)
     add_custom_target(
         copy-gfx-slang-modules
         COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
@@ -207,7 +210,7 @@ if(SLANG_ENABLE_GFX)
         DESTINATION ${runtime_subdir}
     )
 endif()
-if(SLANG_ENABLE_TESTS)
+if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -216,7 +219,7 @@ if(SLANG_ENABLE_TESTS)
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_FROM_PRIVATE
             unit-test
-            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+            slang-rhi
         FOLDER test
     )
     slang_add_target(
@@ -239,7 +242,7 @@ if(SLANG_ENABLE_TESTS)
             stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
-        INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+        INCLUDE_FROM_PRIVATE slang-rhi
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
@@ -292,7 +295,6 @@ if(SLANG_ENABLE_TESTS)
     )
 
     # These are libraries loaded at runtime from the test executable:
-    if(SLANG_ENABLE_GFX AND SLANG_ENABLE_SLANG_RHI)
         #
         # `platform` contains all the platform abstractions for a GUI application.
         #
@@ -366,6 +368,7 @@ if(SLANG_ENABLE_TESTS)
                 platform
                 stb
                 $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            INCLUDE_FROM_PRIVATE slang-rhi
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
                 $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
@@ -374,7 +377,7 @@ if(SLANG_ENABLE_TESTS)
             REQUIRED_BY slang-test
             FOLDER test/tools
         )
-    endif()
+
     slang_add_target(
         slang-unit-test
         MODULE
