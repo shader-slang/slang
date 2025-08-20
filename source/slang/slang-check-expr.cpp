@@ -5712,6 +5712,14 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitIRBytesExpr(IRBytesExpr* expr)
+{
+    auto count =
+        m_astBuilder->getOrCreate<IRBytesCountIntVal>(m_astBuilder->getIntType(), expr->scope);
+    expr->type = m_astBuilder->getArrayType(m_astBuilder->getUInt8Type(), count);
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
 {
     // The left and right sides of an `&` for types must both be types.

@@ -257,6 +257,17 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
+FIDDLE()
+class IRBytesCountIntVal : public IntVal
+{
+    FIDDLE(...)
+    IRBytesCountIntVal(Type* inType, Scope* inScope) { setOperands(inType, inScope); }
+
+    void _toTextOverride(StringBuilder& out);
+
+    bool _isLinkTimeValOverride() { return true; }
+};
+
 FIDDLE(abstract)
 class SizeOfLikeIntVal : public IntVal
 {
