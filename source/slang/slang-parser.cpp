@@ -3073,9 +3073,32 @@ static DeclBase* ParseDeclaratorDecl(
                 // The token after the `}` is at the start of its
                 // own line, which means it can't be on the same line.
                 //
-                // This means the programmer probably wants to
-                // just treat this as a declaration.
-                return declGroupBuilder.getResult();
+                // However, we need to check if this could be a variable
+                // declarator that just happens to be on a new line.
+                // If the next token is an identifier followed by `=`, `,`, or `;`,
+                // it's likely a variable declaration.
+                if (peekToken(parser).type == TokenType::Identifier)
+                {
+                    // Look ahead to see if this looks like a variable declarator
+                    if (parser->LookAheadToken(TokenType::OpAssign, 1) ||
+                        parser->LookAheadToken(TokenType::Comma, 1) ||
+                        parser->LookAheadToken(TokenType::Semicolon, 1) ||
+                        parser->LookAheadToken(TokenType::LBracket, 1))
+                    {
+                        // This looks like a variable declarator, continue parsing
+                    }
+                    else
+                    {
+                        // This doesn't look like a variable declarator,
+                        // treat the struct declaration as complete
+                        return declGroupBuilder.getResult();
+                    }
+                }
+                else
+                {
+                    // Not an identifier, so definitely not a variable declarator
+                    return declGroupBuilder.getResult();
+                }
             }
         }
     }
