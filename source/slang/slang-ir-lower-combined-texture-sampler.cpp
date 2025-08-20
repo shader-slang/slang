@@ -126,7 +126,7 @@ void lowerCombinedTextureSamplers(
     for (auto globalInst : module->getGlobalInsts())
     {
         IRUse* firstUse = nullptr;
-        auto textureType = context.findCombinedTextureSamplerTypeInArray(arrayType, &firstUse);
+        auto textureType = context.findCombinedTextureSamplerTypeInArray(globalInst, &firstUse);
 
         if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
             continue;
