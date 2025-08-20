@@ -187,7 +187,6 @@ if(SLANG_ENABLE_GFX)
         FOLDER gfx
     )
 
-
     set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
     add_custom_target(
         copy-gfx-slang-modules
@@ -313,9 +312,7 @@ if(SLANG_ENABLE_TESTS)
             LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-            INCLUDE_FROM_PRIVATE
-                imgui
-                slang-rhi
+            INCLUDE_FROM_PRIVATE imgui slang-rhi
             INCLUDE_DIRECTORIES_PUBLIC
                 .
                 platform
@@ -332,13 +329,7 @@ if(SLANG_ENABLE_TESTS)
             EXCLUDE_FROM_ALL
             EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
             USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                slang
-                unit-test
-                stb
-                platform
-                slang-rhi
+            LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
             INCLUDE_FROM_PRIVATE slang-rhi
             INCLUDE_DIRECTORIES_PUBLIC
                 .
