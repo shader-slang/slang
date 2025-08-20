@@ -1790,7 +1790,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_acos(__half f)
 {
-    return __float2half(::ascosf(__half2float(f)));
+    return __float2half(::acosf(__half2float(f)));
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atan(__half f)
 {
@@ -1854,7 +1854,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sqrt(__half f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_rsqrt(__half f)
 {
-    return hrsqrtf(f);
+    return hrsqrt(f);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sign(__half f)
 {
