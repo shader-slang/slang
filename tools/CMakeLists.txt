@@ -189,7 +189,7 @@ if(SLANG_ENABLE_GFX)
         FOLDER gfx
     )
 
-    # since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
+    # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
     # directory. So even if slang-test is not built, the gfx modules are still available.
     set(modules_dest_dir $<TARGET_FILE_DIR:slangc>)
     add_custom_target(
@@ -315,9 +315,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
             EXTRA_COMPILE_DEFINITIONS_PRIVATE
                 $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-            INCLUDE_FROM_PRIVATE
-                imgui
-                slang-rhi
+            INCLUDE_FROM_PRIVATE imgui slang-rhi
             INCLUDE_DIRECTORIES_PUBLIC
                 .
                 platform
@@ -334,13 +332,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             EXCLUDE_FROM_ALL
             EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
             USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                slang
-                unit-test
-                stb
-                platform
-                slang-rhi
+            LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
             INCLUDE_FROM_PRIVATE slang-rhi
             INCLUDE_DIRECTORIES_PUBLIC
                 .
