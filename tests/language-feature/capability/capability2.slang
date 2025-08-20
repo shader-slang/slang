@@ -12,6 +12,11 @@ interface IFoo
     void method2();
 }
 
+interface IFoo2
+{
+    void method3();
+}
+
 [require(spvGroupNonUniformArithmetic)]
 void useNonUniformArithmetic()
 {}
@@ -39,20 +44,32 @@ struct Impl1 : IFoo
     }
 }
 
-struct Impl2 : IFoo
+struct Impl2 : IFoo, IFoo2
 {
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // error here because explicit requirement is on `method1`
+    // CHECK: error 36104:{{.*}}spvGroupNonUniformArithmetic
     void method1()
     {
-        useRayQueryKHR(); // OK.
-        useNonUniformArithmetic(); // error.
+        useRayQueryKHR();
+        useNonUniformArithmetic();
     }
 
+    // error here because capabilities are explicitly tagged on
+    // the requirement parent `IFoo`
     // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
     void method2()
     {
         useAtomicFloat16();
-        useNonUniformArithmetic(); // error.
+        useNonUniformArithmetic();
+    }
+
+    // do not error here because capabilities are not explicitly tagged 
+    // on the requirement parent `IFoo2` or requirment method
+    // CHECK-NOT: error
+    void method3()
+    {
+        useAtomicFloat16();
+        useNonUniformArithmetic();
     }
 }
 

@@ -16,11 +16,13 @@ struct ExecuteResult
         resultCode = 0;
         standardOutput = String();
         standardError = String();
+        debugLayer = String();
     }
 
     ResultCode resultCode;
     String standardOutput;
     String standardError;
+    String debugLayer;
 };
 
 struct ProcessUtil

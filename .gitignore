@@ -105,4 +105,5 @@ vkd3d-proton.cache.write
 
 # Other temporary files
 /generators
+/lock
 /tests/library/linked.spirv

@@ -526,6 +526,9 @@ Extensions
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
 
+`GL_NV_cooperative_vector`
+> Represents the GL_NV_cooperative_vector extension.
+
 `GL_NV_fragment_shader_barycentric`
 > Represents the GL_NV_fragment_shader_barycentric extension.
 

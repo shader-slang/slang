@@ -18,7 +18,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "a",
@@ -31,7 +31,7 @@ standard output = {
                                 },
                                 "uniformStride": 16
                             },
-                            "binding": {"kind": "uniform", "offset": 16, "size": 160}
+                            "binding": {"kind": "uniform", "offset": 16, "size": 160, "elementStride": 16}
                         },
                         {
                             "name": "y",
@@ -39,7 +39,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 176, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 176, "size": 4, "elementStride": 0}
                         }
                     ]
                 },
@@ -56,7 +56,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "a",
@@ -69,7 +69,7 @@ standard output = {
                                     },
                                     "uniformStride": 16
                                 },
-                                "binding": {"kind": "uniform", "offset": 16, "size": 160}
+                                "binding": {"kind": "uniform", "offset": 16, "size": 160, "elementStride": 16}
                             },
                             {
                                 "name": "y",
@@ -77,11 +77,11 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 176, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 176, "size": 4, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 192}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 192, "elementStride": 0}
                 }
             }
         },

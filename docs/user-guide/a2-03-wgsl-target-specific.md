@@ -26,6 +26,8 @@ The system-value semantics are translated to the following WGSL code.
 | SV_DepthLessEqual | *Not supported* |
 | SV_DispatchThreadID | `@builtin(global_invocation_id)` |
 | SV_DomainLocation | *Not supported* |
+| SV_FragInvocationCount | *Not supported* |
+| SV_FragSize | *Not supported* |
 | SV_GSInstanceID | *Not supported* |
 | SV_GroupID | `@builtin(workgroup_id)` |
 | SV_GroupIndex | `@builtin(local_invocation_index)` |

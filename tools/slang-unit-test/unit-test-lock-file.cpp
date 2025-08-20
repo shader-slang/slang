@@ -37,10 +37,16 @@ SLANG_UNIT_TEST(lockFileSync)
     SLANG_IGNORE_TEST
 #endif
 
+    // Clean up any leftover lock file from previous runs
+    File::remove(fileName);
+
     // Test using multiple threads.
     {
         static std::atomic<uint32_t> lockCounter;
         static std::atomic<uint32_t> unlockCounter;
+
+        lockCounter = 0;
+        unlockCounter = 0;
 
         struct LockTask
         {

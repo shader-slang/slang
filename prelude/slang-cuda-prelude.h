@@ -190,10 +190,65 @@ typedef size_t NonUniformResourceIndex;
 template<typename T, int ROWS, int COLS>
 struct Matrix;
 
-typedef int1 bool1;
-typedef int2 bool2;
-typedef int3 bool3;
-typedef int4 bool4;
+// Boolean vector types should follow CUDA's builtin vector alignment rules
+// Align boolX the same as charX according to CUDA spec:
+// char1/uchar1: 1-byte aligned, char2/uchar2: 2-byte aligned
+// char3/uchar3: 1-byte aligned, char4/uchar4: 4-byte aligned
+struct __align__(1) bool1
+{
+    bool x;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(2) bool2
+{
+    bool x, y;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(1) bool3
+{
+    bool x, y, z;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
+
+struct __align__(4) bool4
+{
+    bool x, y, z, w;
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
+    {
+        return (&x)[idx];
+    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
+    {
+        return (&x)[idx];
+    }
+};
 
 #if SLANG_CUDA_RTC
 
@@ -282,6 +337,7 @@ struct __align__(4) __half4
         return ((T*)(&x))[index];                                                     \
     }
 SLANG_VECTOR_GET_ELEMENT(int)
+SLANG_VECTOR_GET_ELEMENT(bool)
 SLANG_VECTOR_GET_ELEMENT(uint)
 SLANG_VECTOR_GET_ELEMENT(short)
 SLANG_VECTOR_GET_ELEMENT(ushort)
@@ -292,24 +348,25 @@ SLANG_VECTOR_GET_ELEMENT(ulonglong)
 SLANG_VECTOR_GET_ELEMENT(float)
 SLANG_VECTOR_GET_ELEMENT(double)
 
-#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                      \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##1 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##2 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##3 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
-    }                                                                                        \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(T##4 * x, int index) \
-    {                                                                                        \
-        return ((T*)(x)) + index;                                                            \
+#define SLANG_VECTOR_GET_ELEMENT_PTR(T)                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##1 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##2 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##3 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
+    }                                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T* _slang_vector_get_element_ptr(const T##4 * x, int index) \
+    {                                                                                              \
+        return ((T*)(x)) + index;                                                                  \
     }
 SLANG_VECTOR_GET_ELEMENT_PTR(int)
+SLANG_VECTOR_GET_ELEMENT_PTR(bool)
 SLANG_VECTOR_GET_ELEMENT_PTR(uint)
 SLANG_VECTOR_GET_ELEMENT_PTR(short)
 SLANG_VECTOR_GET_ELEMENT_PTR(ushort)
@@ -334,15 +391,14 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
                 _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
         return result;                                                                        \
     }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
-    {                                                                                \
-        bool##n result;                                                              \
-        for (int i = 0; i < n; i++)                                                  \
-            *_slang_vector_get_element_ptr(&result, i) =                             \
-                (int)(_slang_vector_get_element(thisVal, i)                          \
-                          op _slang_vector_get_element(other, i));                   \
-        return result;                                                               \
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
+    {                                                                                           \
+        bool##n result;                                                                         \
+        for (int i = 0; i < n; i++)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
+        return result;                                                                          \
     }
 #define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
@@ -382,6 +438,7 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
     SLANG_CUDA_VECTOR_INT_OP(T, 4)
 
 SLANG_CUDA_VECTOR_INT_OPS(int)
+SLANG_CUDA_VECTOR_INT_OPS(bool)
 SLANG_CUDA_VECTOR_INT_OPS(uint)
 SLANG_CUDA_VECTOR_INT_OPS(ushort)
 SLANG_CUDA_VECTOR_INT_OPS(short)
@@ -594,6 +651,7 @@ struct GetVectorTypeImpl
     GET_VECTOR_TYPE_IMPL(T, 4)
 
 GET_VECTOR_TYPE_IMPL_N(int)
+GET_VECTOR_TYPE_IMPL_N(bool)
 GET_VECTOR_TYPE_IMPL_N(uint)
 GET_VECTOR_TYPE_IMPL_N(short)
 GET_VECTOR_TYPE_IMPL_N(ushort)
@@ -628,6 +686,11 @@ struct Matrix
 {
     Vector<T, COLS> rows[ROWS];
     SLANG_FORCE_INLINE SLANG_CUDA_CALL Vector<T, COLS>& operator[](size_t index)
+    {
+        return rows[index];
+    }
+
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const Vector<T, COLS>& operator[](size_t index) const
     {
         return rows[index];
     }
@@ -1039,6 +1102,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
     SLANG_SELECT_IMPL(T, 4)
 
 SLANG_SELECT_T(int)
+SLANG_SELECT_T(bool)
 SLANG_SELECT_T(uint)
 SLANG_SELECT_T(short)
 SLANG_SELECT_T(ushort)
@@ -1728,6 +1792,18 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tanh(float f)
 {
     return ::tanhf(f);
 }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_asinh(float f)
+{
+    return ::asinhf(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_acosh(float f)
+{
+    return ::acoshf(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_atanh(float f)
+{
+    return ::atanhf(f);
+}
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 {
     return ::log2f(f);
@@ -2253,7 +2329,7 @@ struct StructuredBuffer
     }
 
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride)
+    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) const
     {
         *outNumStructs = uint32_t(count);
         *outStride = uint32_t(sizeof(T));
@@ -2585,16 +2661,66 @@ struct WaveOpMul
 template<typename T>
 struct WaveOpMax
 {
-    __inline__ __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T getInitial(T a, bool exclusive = false);
     __inline__ __device__ static T doOp(T a, T b) { return a > b ? a : b; }
 };
 
 template<typename T>
 struct WaveOpMin
 {
-    __inline__ __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T getInitial(T a, bool exclusive = false);
     __inline__ __device__ static T doOp(T a, T b) { return a < b ? a : b; }
 };
+
+// Compact specializations using macro for getInitial
+#define SLANG_WAVE_MIN_SPEC(T, EXCL_VAL)                                  \
+    template<>                                                            \
+    __inline__ __device__ T WaveOpMin<T>::getInitial(T a, bool exclusive) \
+    {                                                                     \
+        return exclusive ? (EXCL_VAL) : a;                                \
+    }
+
+#define SLANG_WAVE_MAX_SPEC(T, EXCL_VAL)                                  \
+    template<>                                                            \
+    __inline__ __device__ T WaveOpMax<T>::getInitial(T a, bool exclusive) \
+    {                                                                     \
+        return exclusive ? (EXCL_VAL) : a;                                \
+    }
+
+// Min specializations (exclusive identity = max value)
+SLANG_WAVE_MIN_SPEC(float, SLANG_INFINITY)
+SLANG_WAVE_MIN_SPEC(double, SLANG_INFINITY)
+SLANG_WAVE_MIN_SPEC(int, 0x7FFFFFFF)
+SLANG_WAVE_MIN_SPEC(uint, 0xFFFFFFFF)
+SLANG_WAVE_MIN_SPEC(char, (char)0x7F)
+SLANG_WAVE_MIN_SPEC(int8_t, (int8_t)0x7F)
+SLANG_WAVE_MIN_SPEC(uint8_t, (uint8_t)0xFF)
+SLANG_WAVE_MIN_SPEC(int16_t, (int16_t)0x7FFF)
+SLANG_WAVE_MIN_SPEC(uint16_t, (uint16_t)0xFFFF)
+SLANG_WAVE_MIN_SPEC(int64_t, 0x7FFFFFFFFFFFFFFFLL)
+SLANG_WAVE_MIN_SPEC(uint64_t, 0xFFFFFFFFFFFFFFFFULL)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_MIN_SPEC(__half, __ushort_as_half(0x7BFF))
+#endif
+
+// Max specializations (exclusive identity = min value)
+SLANG_WAVE_MAX_SPEC(float, -SLANG_INFINITY)
+SLANG_WAVE_MAX_SPEC(double, -SLANG_INFINITY)
+SLANG_WAVE_MAX_SPEC(int, (int)0x80000000)
+SLANG_WAVE_MAX_SPEC(uint, 0)
+SLANG_WAVE_MAX_SPEC(char, (char)0x80)
+SLANG_WAVE_MAX_SPEC(int8_t, (int8_t)0x80)
+SLANG_WAVE_MAX_SPEC(uint8_t, 0)
+SLANG_WAVE_MAX_SPEC(int16_t, (int16_t)0x8000)
+SLANG_WAVE_MAX_SPEC(uint16_t, 0)
+SLANG_WAVE_MAX_SPEC(int64_t, (int64_t)0x8000000000000000LL)
+SLANG_WAVE_MAX_SPEC(uint64_t, 0)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_MAX_SPEC(__half, __ushort_as_half(0xFBFF))
+#endif
+
+#undef SLANG_WAVE_MIN_SPEC
+#undef SLANG_WAVE_MAX_SPEC
 
 template<typename T>
 struct ElementTypeTrait;
@@ -2630,6 +2756,33 @@ struct ElementTypeTrait<int64_t>
 {
     typedef int64_t Type;
 };
+template<>
+struct ElementTypeTrait<char>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<uchar>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<short>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<ushort>
+{
+    typedef ushort Type;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct ElementTypeTrait<__half>
+{
+    typedef __half Type;
+};
+#endif
 
 // Vector
 template<>
@@ -2715,6 +2868,115 @@ struct ElementTypeTrait<double4>
 {
     typedef double Type;
 };
+
+// Additional vector types
+template<>
+struct ElementTypeTrait<char2>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<char3>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<char4>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<uchar2>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<uchar3>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<uchar4>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<short2>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<short3>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<short4>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<ushort2>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<ushort3>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<ushort4>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<longlong2>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<longlong3>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<longlong4>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong2>
+{
+    typedef uint64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong3>
+{
+    typedef uint64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong4>
+{
+    typedef uint64_t Type;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct ElementTypeTrait<__half2>
+{
+    typedef __half Type;
+};
+template<>
+struct ElementTypeTrait<__half3>
+{
+    typedef __half Type;
+};
+template<>
+struct ElementTypeTrait<__half4>
+{
+    typedef __half Type;
+};
+#endif
 
 // Matrix
 template<typename T, int ROWS, int COLS>
@@ -3355,6 +3617,111 @@ __inline__ __device__ T _wavePrefixAndMultiple(WarpMask mask, T val)
 }
 
 template<typename T>
+__inline__ __device__ T _wavePrefixMin(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpMin<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMax(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpMax<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMinMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpMin<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMaxMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpMax<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+// Wrapper structures for exclusive operations that use the overloaded getInitial method
+template<typename T>
+struct WaveOpExclusiveMin
+{
+    __inline__ __device__ static T getInitial(T a) { return WaveOpMin<T>::getInitial(a, true); }
+    __inline__ __device__ static T doOp(T a, T b) { return WaveOpMin<T>::doOp(a, b); }
+};
+
+template<typename T>
+struct WaveOpExclusiveMax
+{
+    __inline__ __device__ static T getInitial(T a) { return WaveOpMax<T>::getInitial(a, true); }
+    __inline__ __device__ static T doOp(T a, T b) { return WaveOpMax<T>::doOp(a, b); }
+};
+
+// Inclusive prefix min/max functions (for WaveMultiPrefixInclusive*)
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMin(WarpMask mask, T val)
+{
+    return _wavePrefixMin(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMax(WarpMask mask, T val)
+{
+    return _wavePrefixMax(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMinMultiple(WarpMask mask, T val)
+{
+    return _wavePrefixMinMultiple(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMaxMultiple(WarpMask mask, T val)
+{
+    return _wavePrefixMaxMultiple(mask, val);
+}
+
+// Explicit exclusive prefix min/max functions (for WaveMultiPrefixExclusive*)
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMin(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpExclusiveMin<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMax(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpExclusiveMax<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMinMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpExclusiveMin<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMaxMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpExclusiveMax<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
 __inline__ __device__ uint4 _waveMatchScalar(WarpMask mask, T val)
 {
     int pred;
@@ -3580,22 +3947,23 @@ __forceinline__ __device__ void* optixTraverse(
         r1);
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsHit(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsHit(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsHit();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsMiss(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsMiss(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsMiss();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsNop(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ bool slangOptixHitObjectIsNop(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsNop();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectGetClusterId();
 }
@@ -3745,7 +4113,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
         0 /*numTransforms */);
 }
 
-static __forceinline__ __device__ void optixMakeNopHitObject(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversableHandle* Obj)
 {
     optixMakeNopHitObject();
 }
@@ -3770,22 +4138,25 @@ static __forceinline__ __device__ RayDesc optixHitObjectGetRayDesc(OptixTraversa
     return ray;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceId();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtGASIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetPrimitiveIndex();
 }
@@ -3824,22 +4195,17 @@ static __forceinline__ __device__ T optixHitObjectGetAttribute(OptixTraversableH
     return result;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
+static __forceinline__ __device__ uint
+slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtRecordIndex();
 }
 
 static __forceinline__ __device__ uint
-optixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
 {
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return 0;
-}
-static __forceinline__ __device__ uint
-optixHitObjectGetSbtDataPointer(OptixTraversableHandle* Obj, uint sbtRecordIndex)
-{
-    optixHitObjectGetSbtDataPointer(); // returns void
-    return 0;
+    return sbtRecordIndex;
 }
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
