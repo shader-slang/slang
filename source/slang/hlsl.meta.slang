@@ -15511,6 +15511,7 @@ uint WaveActiveCountBits(bool value)
     case hlsl: __intrinsic_asm "WaveActiveCountBits";
     case glsl:
     case spirv:
+    case metal:
         return _WaveCountBits(WaveActiveBallot(value));
     default:
         return WaveMaskCountBits(WaveGetActiveMask(), value);
@@ -16083,7 +16084,7 @@ uint WavePrefixCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 uint4 WaveGetConvergedMulti()
 {
     __target_switch
@@ -16093,6 +16094,7 @@ uint4 WaveGetConvergedMulti()
         __intrinsic_asm "subgroupBallot(true)";
     case hlsl: __intrinsic_asm "WaveActiveBallot(true)";
     case cuda: __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)";
+    case metal: __intrinsic_asm "((uint4)((simd_vote::vote_t)simd_ballot(true)))";
     case spirv:
         let _true = true;
         return spirv_asm
