@@ -217,9 +217,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXECUTABLE
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_FROM_PRIVATE
-            unit-test
-            slang-rhi
+        INCLUDE_FROM_PRIVATE unit-test slang-rhi
         FOLDER test
     )
     slang_add_target(
@@ -295,80 +293,80 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     )
 
     # These are libraries loaded at runtime from the test executable:
-        #
-        # `platform` contains all the platform abstractions for a GUI application.
-        #
-        slang_add_target(
+    #
+    # `platform` contains all the platform abstractions for a GUI application.
+    #
+    slang_add_target(
+        platform
+        ${SLANG_LIB_TYPE}
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            imgui
+            stb
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            slang-rhi
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
+            ${CMAKE_DL_LIBS}
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
+        INCLUDE_FROM_PRIVATE imgui slang-rhi
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
             platform
-            ${SLANG_LIB_TYPE}
-            EXCLUDE_FROM_ALL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                imgui
-                stb
-                $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-                slang-rhi
-                "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
-                "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
-                ${CMAKE_DL_LIBS}
-            LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-            INCLUDE_FROM_PRIVATE imgui slang-rhi
-            INCLUDE_DIRECTORIES_PUBLIC
-                .
-                platform
-                if
-                (not ${SLANG_OVERRIDE_GLM_PATH})
-            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
-            EXPORT_MACRO_PREFIX SLANG_PLATFORM
-        )
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        EXPORT_MACRO_PREFIX SLANG_PLATFORM
+    )
 
-        slang_add_target(
-            gfx-unit-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
-            INCLUDE_FROM_PRIVATE slang-rhi
-            INCLUDE_DIRECTORIES_PUBLIC
-                .
-                platform
-                if
-                (not ${SLANG_OVERRIDE_GLM_PATH})
-            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
-            OUTPUT_NAME gfx-unit-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
+    slang_add_target(
+        gfx-unit-test
+        MODULE
+        EXCLUDE_FROM_ALL
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
+            platform
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        OUTPUT_NAME gfx-unit-test-tool
+        REQUIRED_BY slang-test
+        FOLDER test/tools
+    )
 
-        slang_add_target(
-            render-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                compiler-core
-                slang
-                slang-rhi
-                platform
-                stb
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-            INCLUDE_FROM_PRIVATE slang-rhi
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-                $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-            EXTRA_COMPILE_OPTIONS_PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHa>
-            OUTPUT_NAME render-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
+    slang_add_target(
+        render-test
+        MODULE
+        EXCLUDE_FROM_ALL
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            slang
+            slang-rhi
+            platform
+            stb
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+        INCLUDE_FROM_PRIVATE slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+        EXTRA_COMPILE_OPTIONS_PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHa>
+        OUTPUT_NAME render-test-tool
+        REQUIRED_BY slang-test
+        FOLDER test/tools
+    )
 
     slang_add_target(
         slang-unit-test
