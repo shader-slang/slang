@@ -75,6 +75,8 @@ void depointerizeInputParams(IRFunc* entryPoint);
     M(QuadLaneIndex, SV_QuadLaneIndex)                   \
     M(VulkanVertexID, SV_VulkanVertexID)                 \
     M(VulkanInstanceID, SV_VulkanInstanceID)             \
+    M(VulkanSamplePosition, SV_VulkanSamplePosition)     \
+    M(Barycentrics, SV_Barycentrics)                     \
 /* end */
 
 /// A known system-value semantic name that can be applied to a parameter

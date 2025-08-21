@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHK): -output-using-type -cuda
 
 interface ITest
 {
