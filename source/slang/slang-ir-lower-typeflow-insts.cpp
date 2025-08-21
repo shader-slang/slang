@@ -163,7 +163,7 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
 
     auto param = builder.emitParam(builder.getUIntType());
 
-    // Create default block that returns 0
+    // Create default block that returns defaultVal
     auto defaultBlock = builder.emitBlock();
     builder.setInsertInto(defaultBlock);
     builder.emitReturn(builder.getIntValue(builder.getUIntType(), defaultVal));
@@ -441,10 +441,18 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
         IRBuilder builder(inst);
         builder.setInsertAfter(inst);
-        UInt defaultID = dstSeqID - 1; // Default to last available conformance.
+
+        // Default to largest available sequential ID.
+        UInt defaultSeqID = 0;
+        for (auto [inputId, outputId] : mapping)
+        {
+            if (inputId > defaultSeqID)
+                defaultSeqID = inputId;
+        }
+
         auto translatedID = builder.emitCallInst(
             inst->getDataType(),
-            createIntegerMappingFunc(builder.getModule(), mapping, defaultID),
+            createIntegerMappingFunc(builder.getModule(), mapping, mapping[defaultSeqID]),
             List<IRInst*>({srcSeqID}));
 
         inst->replaceUsesWith(translatedID);
