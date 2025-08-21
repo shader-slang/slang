@@ -1152,6 +1152,33 @@ public:
         return result;
     }
 
+    SemanticsContext withBackwardDifferentiation()
+    {
+        SemanticsContext result(*this);
+        result.m_currentDifferentiationLevel = FunctionDifferentiableLevel::Backward;
+        return result;
+    }
+
+    SemanticsContext withForwardDifferentiation()
+    {
+        SemanticsContext result(*this);
+        result.m_currentDifferentiationLevel = FunctionDifferentiableLevel::Forward;
+        return result;
+    }
+
+    SemanticsContext withoutDifferentiation()
+    {
+        SemanticsContext result(*this);
+        result.m_currentDifferentiationLevel = FunctionDifferentiableLevel::None;
+        return result;
+    }
+
+    // DifferentiationLevel of current context (based on AST traversal)
+    FunctionDifferentiableLevel getCurrentDifferentiationLevel()
+    {
+        return m_currentDifferentiationLevel;
+    }
+
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     SemanticsContext excludeTransparentMembersFromLookup()
@@ -1180,6 +1207,8 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
+
+    FunctionDifferentiableLevel m_currentDifferentiationLevel = FunctionDifferentiableLevel::None;
 
 protected:
     // TODO: consider making more of this state `private`...
