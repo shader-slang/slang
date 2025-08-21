@@ -57,6 +57,13 @@ __magic_type(ScalarDataLayoutType)
 struct ScalarDataLayout : IBufferDataLayout
 {};
 
+/// @category misc_types
+__intrinsic_type($(kIROp_CBufferLayoutType))
+__magic_type(CDataLayoutType)
+[require(spirv)]
+struct CDataLayout : IBufferDataLayout
+{};
+
 //@hidden:
 __generic<T, L : IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_GLSLShaderStorageBufferType))

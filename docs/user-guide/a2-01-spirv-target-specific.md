@@ -192,9 +192,9 @@ StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` access.
 RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
 
-If you need to apply a different buffer layout for individual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>` or `StructuredBuffer<T, ScalarDataLayout>`.
+If you need to apply a different buffer layout for individual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, ScalarDataLayout>` or `StructuredBuffer<T, CDataLayout>`.
 
-Note that there are compiler options, "-fvk-use-scalar-layout" / "-force-glsl-scalar-layout" and "-fvk-use-dx-layout".
+Note that there are compiler options, "-fvk-use-scalar-layout" / "-force-glsl-scalar-layout", "-fvk-use-dx-layout" and "-fvk-use-c-layout".
 These options do the same but they are applied globally.
 
 
@@ -453,6 +453,9 @@ Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
 
 ### -fvk-use-dx-layout
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
+
+### -fvk-use-c-layout
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV.
 
 ### -fvk-use-entrypoint-name
 Uses the entrypoint name from the source instead of 'main' in the spirv output.
