@@ -420,8 +420,6 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
     emitReflectionModifierInfoJSON(writer, var->getVariable());
 
     emitReflectionVarBindingInfoJSON(writer, var);
-
-    emitUserAttributes(writer, var->getVariable());
     writer.dedent();
     writer << "\n}";
 }
