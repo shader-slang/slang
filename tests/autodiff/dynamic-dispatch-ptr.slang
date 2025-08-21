@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 //CHECK: 1.0 
 

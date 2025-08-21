@@ -1847,10 +1847,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRSizeAndAlignment sizeAndAlignment;
                         uint32_t stride;
 
-                        getNaturalSizeAndAlignment(
-                            m_targetProgram->getOptionSet(),
-                            valueType,
-                            &sizeAndAlignment);
+                        if (auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>())
+                        {
+                            auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
+                            getSizeAndAlignment(
+                                m_targetProgram->getOptionSet(),
+                                rule,
+                                valueType,
+                                &sizeAndAlignment);
+                        }
+                        else
+                        {
+                            getNaturalSizeAndAlignment(
+                                m_targetProgram->getOptionSet(),
+                                valueType,
+                                &sizeAndAlignment);
+                        }
                         uint64_t valueSize = sizeAndAlignment.size;
 
                         // Any unsized data type (e.g. struct or array) will have size of
@@ -6181,6 +6193,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     requireSPIRVCapability(SpvCapabilitySampleRateShading);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleId, inst);
+                }
+                else if (semanticName == "sv_vulkansampleposition")
+                {
+                    requireSPIRVCapability(SpvCapabilitySampleRateShading);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSamplePosition, inst);
                 }
                 else if (semanticName == "sv_stencilref")
                 {
