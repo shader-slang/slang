@@ -37,6 +37,9 @@ class UnresolvedDecl : public Decl
 struct ContainerDeclDirectMemberDecls
 {
 public:
+    /// Destructor to safely handle circular references
+    ~ContainerDeclDirectMemberDecls();
+
     List<Decl*> const& getDecls() const;
 
     Count getDeclCount() const;

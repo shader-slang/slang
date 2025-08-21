@@ -54,6 +54,23 @@ bool isInterfaceRequirement(Decl* decl)
 // ContainerDeclDirectMemberDecls
 //
 
+ContainerDeclDirectMemberDecls::~ContainerDeclDirectMemberDecls()
+{
+    // Safely handle potential circular references during destruction
+    if (onDemandDeserialization.context)
+    {
+        // Check if this context might be part of a circular reference
+        // by seeing if its reference count is 1 (meaning we might be the last holder)
+        auto contextPtr = onDemandDeserialization.context.get();
+        if (contextPtr && contextPtr->debugGetReferenceCount() == 1)
+        {
+            // This might be a circular reference - use detach() to avoid calling releaseReference()
+            onDemandDeserialization.context.detach();
+        }
+        // If ref count > 1, let the normal RefPtr destructor handle it
+    }
+}
+
 void ContainerDeclDirectMemberDecls::_initForOnDemandDeserialization(
     RefObject* deserializationContext,
     void const* deserializationData,
