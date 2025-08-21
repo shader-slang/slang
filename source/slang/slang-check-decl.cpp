@@ -14368,11 +14368,8 @@ struct CapabilityDeclReferenceVisitor
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
-
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
-
-
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)
@@ -14688,7 +14685,6 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
     // Get require of decl + add parents
     auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
-
     auto vis = getDeclVisibility(funcDecl);
 
     // If 0 capabilities were annotated on this function,
