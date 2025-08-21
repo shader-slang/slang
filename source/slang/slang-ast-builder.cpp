@@ -233,10 +233,20 @@ RootASTBuilder::RootASTBuilder(Session* globalSession)
 
 ASTBuilder::~ASTBuilder()
 {
-    for (NodeBase* node : m_dtorNodes)
+    // Create a copy of the list to avoid issues if destruction modifies the original list
+    auto nodesToDestroy = m_dtorNodes;
+    m_dtorNodes.clear();
+    
+    for (NodeBase* node : nodesToDestroy)
     {
-        auto nodeClass = node->getClass();
-        nodeClass.destructInstance(node);
+        if (node != nullptr)
+        {
+            auto nodeClass = node->getClass();
+            if (nodeClass.isValid())
+            {
+                nodeClass.destructInstance(node);
+            }
+        }
     }
     incrementEpoch();
 }

@@ -11,7 +11,13 @@ struct Helper
 {
     static void* create(ASTBuilder* builder) { return builder->createImpl<T>(); }
 
-    static void destruct(void* obj) { ((T*)obj)->~T(); }
+    static void destruct(void* obj) 
+    { 
+        if (obj != nullptr)
+        {
+            ((T*)obj)->~T(); 
+        }
+    }
 };
 
 #if 0 // FIDDLE TEMPLATE:

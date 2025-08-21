@@ -682,6 +682,18 @@ public:
     {
     }
 
+    /// Explicit virtual destructor to ensure proper destruction with multiple inheritance
+    virtual ~ASTSerialReadContext()
+    {
+        // Clear all references to prevent access to potentially destroyed objects
+        _linkage = nullptr;
+        _astBuilder = nullptr;
+        _sink = nullptr;
+        _sourceLocReader = nullptr;
+        _fossilizedModuleInfo = nullptr;
+        _blobHoldingSerializedData = nullptr;
+    }
+
     /// Translate a fossilized declaration into a live `Decl*`.
     ///
     /// If the same `fossilizedDecl` address has been passed to this
@@ -1696,9 +1708,13 @@ void ASTSerialReadContext::_cleanUpASTNode(NodeBase* node)
         }
         else if (auto namespaceLikeDecl = as<NamespaceDeclBase>(node))
         {
-            auto declScope = _astBuilder->create<Scope>();
-            declScope->containerDecl = namespaceLikeDecl;
-            namespaceLikeDecl->ownedScope = declScope;
+            // Add safety check to prevent accessing destroyed ASTBuilder
+            if (_astBuilder != nullptr)
+            {
+                auto declScope = _astBuilder->create<Scope>();
+                declScope->containerDecl = namespaceLikeDecl;
+                namespaceLikeDecl->ownedScope = declScope;
+            }
         }
 
 #if SLANG_ENABLE_AST_DESERIALIZATION_STATS
