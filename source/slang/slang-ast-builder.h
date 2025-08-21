@@ -517,7 +517,6 @@ public:
     Type* getStd140LayoutType();
     Type* getStd430LayoutType();
     Type* getScalarLayoutType();
-    Type* getCLayoutType();
 
     Type* getInitializerListType() { return m_sharedASTBuilder->getInitializerListType(); }
     Type* getOverloadedType() { return m_sharedASTBuilder->getOverloadedType(); }

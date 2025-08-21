@@ -557,9 +557,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             if (m_options.targetReq->getOptionSet().getBoolOption(
                     CompilerOptionName::GLSLForceScalarLayout))
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
-            else if (m_options.targetReq->getOptionSet().getBoolOption(
-                         CompilerOptionName::ForceCLayout))
-                layoutType = builder.getType(kIROp_CBufferLayoutType);
             else if (isKhronosTarget(m_options.targetReq))
                 layoutType = builder.getType(kIROp_Std430BufferLayoutType);
             else

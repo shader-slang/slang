@@ -348,8 +348,6 @@ struct CompilerOptionSet
 
     bool shouldUseDXLayout() { return getBoolOption(CompilerOptionName::ForceDXLayout); }
 
-    bool shouldUseCLayout() { return getBoolOption(CompilerOptionName::ForceCLayout); }
-
     bool shouldDumpIntermediates() { return getBoolOption(CompilerOptionName::DumpIntermediates); }
 
     bool shouldDumpIR() { return getBoolOption(CompilerOptionName::DumpIr); }

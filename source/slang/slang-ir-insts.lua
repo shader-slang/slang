@@ -206,7 +206,6 @@ local insts = {
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
-			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
 			{ SubpassInputType = { operands = { { "elementType", "IRType" }, { "isMultisampleInst" } }, hoistable = true } },
 			{ TextureFootprintType = { min_operands = 1, hoistable = true } },
 			{ TextureShape1DType = { hoistable = true } },

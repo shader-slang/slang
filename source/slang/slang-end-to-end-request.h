@@ -100,8 +100,6 @@ public:
     setTargetGenerateWholeProgram(int targetIndex, bool value) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setTargetEmbedDownstreamIR(int targetIndex, bool value)
         SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceCLayout(int targetIndex, bool value)
-        SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode)
         SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level)
