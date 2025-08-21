@@ -2992,6 +2992,63 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             };
         }
     }
+
+    // SM 6.7+ Integer texture sampling support
+    // These functions specifically allow integer texture sampling for SM 6.7 and later
+    
+    __generic<T : IInteger>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleInteger(SamplerState s, vector<float, Shape.dimensions+isArray> location)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : IInteger>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleInteger(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : IInteger>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleLevelInteger(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
+
+    __generic<T : IInteger>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleLevelInteger(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
 }
 
 // Texture.GetDimensions and Sampler.GetDimensions
