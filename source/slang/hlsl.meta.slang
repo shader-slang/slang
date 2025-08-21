@@ -3049,6 +3049,118 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleLevel";
         }
     }
+
+    // SM 6.7+ overloads for existing Sample/SampleLevel methods that support integer types
+    // These overloads have more specific constraints and should be preferred when SM 6.7 is available
+    
+    __generic<T : __BuiltinIntegerType>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
+
+    // Vector integer types for SM 6.7+
+    __generic<T : __BuiltinIntegerType, let N : int>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    vector<T,N> Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType, let N : int>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    vector<T,N> Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Sample";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType, let N : int>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    vector<T,N> SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
+
+    __generic<T : __BuiltinIntegerType, let N : int>
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_6_7)]
+    vector<T,N> SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".SampleLevel";
+        }
+    }
 }
 
 // Texture.GetDimensions and Sampler.GetDimensions
