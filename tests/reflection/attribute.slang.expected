@@ -35,15 +35,7 @@ standard output = {
                                     ]
                                 }
                             ],
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
-                            "userAttribs": [
-                                {
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        1
-                                    ]
-                                }
-                            ]
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
                     ],
                     "userAttribs": [
@@ -87,15 +79,7 @@ standard output = {
                                         ]
                                     }
                                 ],
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
-                                "userAttribs": [
-                                    {
-                                        "name": "DefaultValue",
-                                        "arguments": [
-                                            1
-                                        ]
-                                    }
-                                ]
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
                         ],
                         "userAttribs": [
@@ -144,15 +128,7 @@ standard output = {
                                     ]
                                 }
                             ],
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
-                            "userAttribs": [
-                                {
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        2
-                                    ]
-                                }
-                            ]
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
                     ],
                     "userAttribs": [
@@ -196,15 +172,7 @@ standard output = {
                                         ]
                                     }
                                 ],
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
-                                "userAttribs": [
-                                    {
-                                        "name": "DefaultValue",
-                                        "arguments": [
-                                            2
-                                        ]
-                                    }
-                                ]
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
                         ],
                         "userAttribs": [
