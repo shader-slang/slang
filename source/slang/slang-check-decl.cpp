@@ -14369,58 +14369,9 @@ struct CapabilityDeclReferenceVisitor
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
 
-        // Recurse down the derivative expression if we are in a derivative-context.
-        // We should require both, the capabilities of the `derivative->funcExpr` and `decl`.
-        auto currentDifferentiationLevel = outerContext.getCurrentDifferentiationLevel();
-        if (currentDifferentiationLevel != FunctionDifferentiableLevel::None)
-        {
-            auto newContext = outerContext.withoutDifferentiation();
-            CapabilityDeclReferenceVisitor withoutDifferentiationContextVisitor(
-                    handleProcessFunc,
-                    handleParentDiagnosticFunc,
-                    maybeRequireCapability,
-                    newContext);
-
-            UserDefinedDerivativeAttribute* diffModifier = nullptr;
-            if (currentDifferentiationLevel == FunctionDifferentiableLevel::Forward)
-                diffModifier = as<UserDefinedDerivativeAttribute>(
-                    decl->findModifier<ForwardDerivativeAttribute>());
-            else if (currentDifferentiationLevel == FunctionDifferentiableLevel::Backward)
-                diffModifier = as<UserDefinedDerivativeAttribute>(
-                    decl->findModifier<BackwardDerivativeAttribute>());
-
-            if (diffModifier)
-                withoutDifferentiationContextVisitor.dispatchIfNotNull(diffModifier->funcExpr);
-            withoutDifferentiationContextVisitor.handleProcessFunc(
-                decl,
-                decl->inferredCapabilityRequirements,
-                loc);
-        }
-        else
-            handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
+        handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
 
-    void visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
-    {
-        auto newContext = outerContext.withBackwardDifferentiation();
-        CapabilityDeclReferenceVisitor withDifferentiationContextVisitor(
-                handleProcessFunc,
-                handleParentDiagnosticFunc,
-                maybeRequireCapability,
-                newContext);
-        withDifferentiationContextVisitor.dispatchIfNotNull(expr->baseFunction);
-    }
-    
-    void visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
-    {
-        auto newContext = outerContext.withForwardDifferentiation();
-        CapabilityDeclReferenceVisitor withDifferentiationContextVisitor(
-                handleProcessFunc,
-                handleParentDiagnosticFunc,
-                maybeRequireCapability,
-                newContext);
-        withDifferentiationContextVisitor.dispatchIfNotNull(expr->baseFunction);
-    }
 
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
@@ -14662,6 +14613,29 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 {
     setParentFuncOfVisitor(funcDecl);
 
+    for (UserDefinedDerivativeAttribute* modifier :
+         funcDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
+    {
+        // Propegate capabilities of user defined derivatives to funcDecl.
+        visitReferencedDecls(
+            *this,
+            modifier->funcExpr,
+            funcDecl->loc,
+            nullptr,
+            [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+            {
+                _propagateRequirement(
+                    this,
+                    funcDecl->inferredCapabilityRequirements,
+                    funcDecl,
+                    node,
+                    nodeCaps,
+                    refLoc);
+            },
+            [this, funcDecl](DiagnosticCategory category)
+            { _propagateSeeDefinitionOf(this, funcDecl, category); });
+    }
+
     // visit the members of our funcDecl
     for (auto member : funcDecl->getDirectMemberDecls())
     {
@@ -14714,6 +14688,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
     // Get require of decl + add parents
     auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
+
     auto vis = getDeclVisibility(funcDecl);
 
     // If 0 capabilities were annotated on this function,
