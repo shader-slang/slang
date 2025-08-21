@@ -27,7 +27,7 @@ float paramRay()
 
 [Shader("compute")]
 [NumThreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     DifferentialPair<float> dpColor = fwd_diff(paramRay)();
     gOutputColor[0] = dpColor.p;

@@ -5,7 +5,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -compile-arg -O3 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
 
-// Test doing vector comparisons 
+// Test doing vector comparisons
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -17,7 +17,7 @@ bool assignFunc(int index)
 }
 
 [numthreads(16, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 

@@ -27,13 +27,14 @@ RWStructuredBuffer<UserDefinedPackedType> gObj;
 //TEST_INPUT: type_conformance Float4Val:IInterface = 4
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float result = 0.0;
     for (int i = 0; i < 2; i++)
     {
         var rawObj = gObj.Load(i);
-        IInterface dynamicObj = createDynamicObject<IInterface, UserDefinedPackedType>(rawObj.flags, rawObj);
+        IInterface dynamicObj =
+            createDynamicObject<IInterface, UserDefinedPackedType>(rawObj.flags, rawObj);
         result += dynamicObj.run();
     }
     gOutputBuffer[0] = result;
@@ -42,18 +43,19 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 struct FloatVal : IInterface
 {
     float val;
-    float run()
-    {
-        return val;
-    }
+    float run() { return val; }
 };
-interface ISomething{void g();}
-struct Float4Struct : ISomething { float4 val; void g() {} }
+interface ISomething
+{
+    void g();
+}
+struct Float4Struct : ISomething
+{
+    float4 val;
+    void g() {}
+}
 struct Float4Val : IInterface
 {
     Float4Struct val;
-    float run()
-    {
-        return val.val.x + val.val.y;
-    }
+    float run() { return val.val.x + val.val.y; }
 };

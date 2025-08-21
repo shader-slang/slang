@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 RWStructuredBuffer<int> outputBuffer;
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 //CHECK: error 30851
 
@@ -14,7 +14,7 @@ extension DefaultStructNoInit_base
 {
     __init(int indata)
     {
-        //unused
+        // unused
     }
 }
 struct DefaultStructNoInit : DefaultStructNoInit_base
@@ -31,7 +31,7 @@ extension DefaultStructWithInit_base
 {
     __init(int indata)
     {
-        //unused
+        // unused
     }
     __init()
     {

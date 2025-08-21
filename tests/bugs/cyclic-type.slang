@@ -13,7 +13,7 @@ struct TB
     TA ta[2];
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     TA ta;

@@ -41,42 +41,42 @@ void subf(inout FloatVector ft, FloatVector f, int idx, Float vf)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
     Float vf = idx * (1.0f / (4.0f));
-     
+
     FloatVector f = FloatVector(0.1f, vf, vf + 0.2f);
-    
+
     // Operate over all values
     FloatVector ft = {};
 
     // fmod
     ft += FloatVector(IntVector(((f % 0.11f) * 100) + 0.5));
-    
+
     ft += sin(f);
     ft += cos(f);
     ft += tan(f);
-    
+
     {
         // Vector specific
         FloatVector nv = normalize(f);
         ft += nv;
-        
-        FloatVector perp = cross(nv, f.zxy); 
+
+        FloatVector perp = cross(nv, f.zxy);
         ft += perp;
-  
+
         ft += dot(perp, f.zyx);
         ft += length(perp);
-  
+
         ft += reflect(f, perp.yzx);
     }
-    
+
     ft += asin(f);
     ft += acos(f);
     ft += atan(f);
-    
+
     ft += atan2(f, 2.0);
 
 #if 0
@@ -84,30 +84,30 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // Disabled because not supported on VK (glsl) in vector form
         FloatVector sf, cf;
         sincos(f, sf, cf);
-        
+
         ft += sf;
         ft += cf;
     }
-#endif     
-     
-#if 0     
+#endif
+
+#if 0
     // Disabled because not supported on VK (glsl) in vector form
     ft += rcp(1.0 + f);
 #endif
 
     ft += sign(f - 0.5);
-    
+
     ft += saturate(f * 4 - 2.0);
-    
+
     ft += sqrt(f);
     ft += rsqrt(1.0f + f);
-    
+
     ft += exp2(f);
     ft += exp(f);
-     
+
     ft += frac(f * 3);
     ft += ceil(f * 5 - 3);
-    
+
     ft += floor(f * 10 - 7.01);
 
     ft += trunc(f * 7);
@@ -116,8 +116,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         IntVector vi = asint(f - f) + idx;
-        ft += FloatVector(vi);   
+        ft += FloatVector(vi);
     }
-    
+
     outputBuffer[idx] = vector<Float, 4>(ft, 0);
 }

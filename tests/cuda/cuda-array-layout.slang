@@ -9,22 +9,23 @@ struct PadLadenStruct
     uint8_t b;
 };
 
-// This is to check if the last half can be inserted 'inside' the spare padding of a. It should not be
+// This is to check if the last half can be inserted 'inside' the spare padding of a. It should not
+// be
 struct StructWithArray : IDefaultInitializable
 {
     PadLadenStruct a[1];
     uint8_t b;
-    
+
     matrix<half, 3, 3> c;
     uint8_t d;
 };
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     StructWithArray s;
     outputBuffer[0] = __sizeOf(s);
-    
+
     outputBuffer[1] = __offsetOf(s, s.a);
     outputBuffer[2] = __offsetOf(s, s.b);
     outputBuffer[3] = __offsetOf(s, s.c);

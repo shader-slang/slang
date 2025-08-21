@@ -35,7 +35,10 @@ Texture2DArray<float4> t2DArray_f32v4;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_f32v4
 TextureCubeArray<float4> tCubeArray_f32v4;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -45,10 +48,12 @@ typealias depth2d = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -58,10 +63,12 @@ typealias depth2d_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -71,10 +78,12 @@ typealias depthcube = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
@@ -84,8 +93,7 @@ typealias depthcube_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
 //TEST_INPUT: Texture2D(size=4, content = zero):name d2D
 depth2d<float> d2D;
@@ -108,12 +116,12 @@ bool TEST_texture<T>(
     TextureCube<T> tCube,
     Texture1DArray<T> t1DArray,
     Texture2DArray<T> t2DArray,
-    TextureCubeArray<T> tCubeArray
-) where T:ITexelElement, IArithmetic
+    TextureCubeArray<T> tCubeArray)
+    where T : ITexelElement, IArithmetic
 {
     // WGSL-LABEL: TEST_texture
     typealias Tvn = T;
-    typealias Tv4 = vector<T.Element,4>;
+    typealias Tv4 = vector<T.Element, 4>;
 
     float u = 0;
     float u2 = 0.5;
@@ -166,7 +174,8 @@ bool TEST_texture<T>(
     voidResult = voidResult && (uint(4) == height);
     voidResult = voidResult && (uint(2) == elements);
 
-    bool result = voidResult
+    bool result =
+        voidResult
         // ===============================
         // float CalculateLevelOfDetail()
         // ===============================
@@ -380,22 +389,21 @@ void fragMain()
 {
     bool result = true
         && TEST_texture<float3>(
-            t1D_f32v3,
-            t2D_f32v3,
-            t3D_f32v3,
-            tCube_f32v3,
-            t1DArray_f32v3,
-            t2DArray_f32v3,
-            tCubeArray_f32v3)
+                        t1D_f32v3,
+                        t2D_f32v3,
+                        t3D_f32v3,
+                        tCube_f32v3,
+                        t1DArray_f32v3,
+                        t2DArray_f32v3,
+                        tCubeArray_f32v3)
         && TEST_texture<float4>(
-            t1D_f32v4,
-            t2D_f32v4,
-            t3D_f32v4,
-            tCube_f32v4,
-            t1DArray_f32v4,
-            t2DArray_f32v4,
-            tCubeArray_f32v4)
-        ;
+                        t1D_f32v4,
+                        t2D_f32v4,
+                        t3D_f32v4,
+                        tCube_f32v4,
+                        t1DArray_f32v4,
+                        t2DArray_f32v4,
+                        tCubeArray_f32v4);
 
     outputBuffer[0] = int(result);
 }

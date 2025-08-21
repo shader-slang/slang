@@ -7,7 +7,7 @@ RWTexture2D<float4> gOutput;
 
 float4 test(uint2 coord, float4 value)
 {
-	// read
+    // read
     value = value + gOutput[coord];
 
     // write
@@ -15,6 +15,6 @@ float4 test(uint2 coord, float4 value)
 
     // read-modify-write
     gOutput[coord] += value;
-	
-	return value;
+
+    return value;
 }

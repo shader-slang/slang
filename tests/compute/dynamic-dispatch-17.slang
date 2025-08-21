@@ -13,7 +13,7 @@ interface IReturnsZero
 [anyValueSize(16)]
 interface IInterface
 {
-    float run<Z:IReturnsZero>();
+    float run<Z : IReturnsZero>();
 }
 
 struct UserDefinedPackedType
@@ -32,13 +32,14 @@ RWStructuredBuffer<UserDefinedPackedType> gObj;
 //TEST_INPUT: type_conformance Float4Val:IInterface = 4
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float result = 0.0;
     for (int i = 0; i < 2; i++)
     {
         var rawObj = gObj.Load(i);
-        IInterface dynamicObj = createDynamicObject<IInterface, UserDefinedPackedType>(rawObj.flags, rawObj);
+        IInterface dynamicObj =
+            createDynamicObject<IInterface, UserDefinedPackedType>(rawObj.flags, rawObj);
         result += dynamicObj.run<ReturnsZero>();
     }
     gOutputBuffer[0] = result;
@@ -51,17 +52,20 @@ struct ReturnsZero : IReturnsZero
 struct FloatVal : IInterface
 {
     float val;
-    float run<Z:IReturnsZero>()
+    float run<Z : IReturnsZero>()
     {
         Z z = Z();
         return val + z.get();
     }
 };
-struct Float4Struct { float4 val; }
+struct Float4Struct
+{
+    float4 val;
+}
 struct Float4Val : IInterface
 {
     Float4Struct val;
-    float run<Z:IReturnsZero>()
+    float run<Z : IReturnsZero>()
     {
         Z z = Z();
         return val.val.x + val.val.y + z.get();

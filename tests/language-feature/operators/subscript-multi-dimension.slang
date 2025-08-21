@@ -4,10 +4,18 @@
 struct S
 {
     int4 data;
-    __subscript(int x, int y) -> int
+    __subscript(int x, int y)->int
     {
-        [__unsafeForceInlineEarly] get { return data[y * 2 + x]; }
-        [__unsafeForceInlineEarly] set { data[y * 2 + x] = newValue;}
+        [__unsafeForceInlineEarly]
+        get
+        {
+            return data[y * 2 + x];
+        }
+        [__unsafeForceInlineEarly]
+        set
+        {
+            data[y * 2 + x] = newValue;
+        }
     }
 }
 

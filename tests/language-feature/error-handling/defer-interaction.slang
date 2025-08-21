@@ -8,8 +8,9 @@ RWStructuredBuffer<int> outputBuffer;
 enum MyError
 {
     Fail
-};
-    
+}
+;
+
 int maybeThrowingFunc(int n) throws MyError
 {
     if (n == 3)
@@ -29,10 +30,12 @@ void testFunc(int n, inout int i)
     {
         do
         {
-            let m = try maybeThrowingFunc(n);
+            let m =
+            try
+                maybeThrowingFunc(n);
             value += m;
         }
-        catch(err: MyError)
+        catch (err: MyError)
         {
             defer
             {

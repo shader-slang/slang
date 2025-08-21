@@ -13,8 +13,14 @@ interface IFoo
     void doSomething();
 }
 
-A createA() { return {}; }
-B createB() { return {}; }
+A createA()
+{
+    return {};
+}
+B createB()
+{
+    return {};
+}
 ParameterBlock<B> gB;
 void user()
 {
@@ -23,35 +29,29 @@ void user()
     test(a.getT(), b);
     test(a, gB.getT());
 }
-B test<T:IFoo>(T a, IFoo b)
+B test<T : IFoo>(T a, IFoo b)
 {
     a.doSomething();
     b.doSomething();
     return {};
 }
-struct B :IFoo
+struct B : IFoo
 {
     A a;
     typealias T = A;
-    T getT() { return {};}
-    void doSomething()
-    {
-        outputBuffer[0] = 1;
-    }
+    T getT() { return {}; }
+    void doSomething() { outputBuffer[0] = 1; }
 }
 struct A : IFoo
 {
     typealias T = B;
-    T getT() { return {};}
-    void doSomething()
-    {
-        outputBuffer[0] = 1;
-    }
+    T getT() { return {}; }
+    void doSomething() { outputBuffer[0] = 1; }
 }
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     user();
 }

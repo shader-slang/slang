@@ -12,14 +12,14 @@ RWStructuredBuffer<int> outputBuffer;
 // This test tests a basic application of the spirv_asm block's assignment syntax
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
     int r = spirv_asm
     {
-        %two   = OpConstant $$int 2;
-        result = OpIMul $$int $n %two;
+        % two = OpConstant $$int 2;
+        result = OpIMul $$int $n % two;
     };
     outputBuffer[i] = r;
 }

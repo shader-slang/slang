@@ -18,7 +18,7 @@ groupshared int shareMemI[4];
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
+void computeMain(uint groupIndex: SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
     shareMemUI = { 0, 0, 0, 0 };
     shareMemI = { 0, 0, 0, 0 };
@@ -30,7 +30,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
     InterlockedAdd(shareMemUI[idx], 1);
     val += shareMemUI[idx];
 
-    InterlockedAdd(shareMemI[idx],  2);
+    InterlockedAdd(shareMemI[idx], 2);
     val += shareMemI[idx];
 
     InterlockedAdd(uintBuffer[idx], 1);

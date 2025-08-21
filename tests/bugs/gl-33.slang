@@ -17,7 +17,7 @@ int test(int val)
 RWStructuredBuffer<int> gBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 

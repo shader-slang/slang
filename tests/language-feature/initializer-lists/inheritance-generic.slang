@@ -1,15 +1,15 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 
-struct Base<let ND:int>
+struct Base<let ND : int>
 {
     int a = 1;
 }
 
-struct Derived<let ND:int>: Base<ND>
+struct Derived<let ND : int> : Base<ND>
 {
     bool x;
     bool y;
@@ -25,7 +25,7 @@ void computeMain()
     // Previously, this test is just test we can handle the base constructor invoke correctly,
     // so we don't construct the Derived object, since #6058, there will not be implicit constructor
     // to construct the struct, we will have to invoke the constructor explicitly.
-    Derived<3> d = {1,1,1};
+    Derived<3> d = { 1, 1, 1 };
 
     // BUFFER: 1
     result[0] = d.a;

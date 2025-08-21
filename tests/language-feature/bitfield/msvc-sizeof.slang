@@ -9,27 +9,31 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct S {
+struct S
+{
     int foo : 8;
     int bar : 24;
 };
 
 // MSVC will use separate backing fields for different sized types
-struct T {
-    int64_t foo : 33;  // Uses int64_t backing
-    int bar : 24;      // Uses separate int backing due to type size change
+struct T
+{
+    int64_t foo : 33; // Uses int64_t backing
+    int bar : 24;     // Uses separate int backing due to type size change
 };
 
 // This still takes two ints to store all the bits
-struct P {
+struct P
+{
     int foo : 24;
     int bar : 24;
 };
 
 // MSVC will use separate backing fields due to type size difference
-struct Q {
-    int8_t foo : 1;    // Uses int8_t backing
-    int64_t bar : 63;  // Uses separate int64_t backing
+struct Q
+{
+    int8_t foo : 1;   // Uses int8_t backing
+    int64_t bar : 63; // Uses separate int64_t backing
 };
 
 [numthreads(1, 1, 1)]
@@ -40,4 +44,3 @@ void computeMain()
     outputBuffer[2] = sizeof(P);
     outputBuffer[3] = sizeof(Q);
 }
-

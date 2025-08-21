@@ -16,15 +16,10 @@ struct BufferWithGrad
     void add(float value) { primal[0] = primal[0] + detach(value); }
 
     [PrimalSubstituteOf(add), Differentiable]
-    void add_subst(float value)
-    {
-    }
+    void add_subst(float value) {}
 
     [BackwardDerivativeOf(add)]
-    void add_bwd(inout DifferentialPair<float> d)
-    {
-        d = diffPair(d.p, grad[0]);
-    }
+    void add_bwd(inout DifferentialPair<float> d) { d = diffPair(d.p, grad[0]); }
 }
 
 [Differentiable]
@@ -37,8 +32,8 @@ void diffCall(BufferWithGrad result)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    BufferWithGrad bg = {outputBufferPrimal, gradBuffer};
-    diffCall(bg); 
+    BufferWithGrad bg = { outputBufferPrimal, gradBuffer };
+    diffCall(bg);
     bwd_diff(diffCall)(bg);
 
     // CHECK: type: float

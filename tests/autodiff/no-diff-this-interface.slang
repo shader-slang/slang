@@ -25,11 +25,11 @@ struct A : IDifferentiable, IFoo
     // requirement, we need to synthesize a method with `[NoDiffThis]` attribute
     // that calls this.
     [ForwardDifferentiable]
-    float getVal(float y){ return x * x + y * y; }
+    float getVal(float y) { return x * x + y * y; }
 }
 
 [ForwardDifferentiable]
-static float f<T:IFoo>(T obj, float y)
+static float f<T : IFoo>(T obj, float y)
 {
     return obj.getVal(y);
 }
@@ -47,7 +47,7 @@ float f3(A obj, float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     A a;
     a.x = 2.0;

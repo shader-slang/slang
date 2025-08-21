@@ -9,8 +9,8 @@ RWStructuredBuffer<float> output;
 
 // CHECK: OpVectorTimesScalar
 
-[numthreads(1,1,1)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
     float3 v = tid + 2.0;
     float3 v1 = v * 0.5;

@@ -7,26 +7,27 @@
 
 struct RasterVertex
 {
-  // location 0
-	float4 c : COLOR;
+    // location 0
+    float4 c : COLOR;
 
-  // Make sure that the input value in location 1 is decorated as Flat
+    // Make sure that the input value in location 1 is decorated as Flat
   // SPV-DAG: OpDecorate [[VAL:%[_A-Za-z0-9]+]] Location 1
   // SPV-DAG: [[VAL]] = OpVariable {{.*}} Input
   // SPV-DAG: OpDecorate [[VAL]] Flat
-  //
-  // Likewise for GLSL
+    //
+    // Likewise for GLSL
   // GLSL:      flat layout(location = 1)
   // GLSL-NEXT: in uint {{[[:alnum:]_]+}};
-  //
-  // location 1
-	uint u : FLAGS;
+    //
+    // location 1
+    uint u : FLAGS;
 };
 
-float4 main(RasterVertex v) : SV_Target
+float4 main(RasterVertex v)
+    : SV_Target
 {
-	float4 result = v.c;
-	if((v.u & 1) != 0)
-	    result += 1.0;
-   return result;
+    float4 result = v.c;
+    if ((v.u & 1) != 0)
+        result += 1.0;
+    return result;
 }

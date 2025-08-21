@@ -2,10 +2,11 @@
 
 struct VS_OUT
 {
-	uint drawID : DRAW_ID;	
+    uint drawID : DRAW_ID;
 };
 
-float4 main(VS_OUT vsOut) : SV_Target
+float4 main(VS_OUT vsOut)
+    : SV_Target
 {
-	return float4(float(vsOut.drawID));
+    return float4(float(vsOut.drawID));
 }

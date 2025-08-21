@@ -7,9 +7,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-static const float3 kArray[8] =
-{
-    float3(-0.4706069, -0.4427112, - - + 0.6461146),
+static const float3 kArray[8] = {
+    float3(-0.4706069, -0.4427112, - -+0.6461146),
     float3(-0.9057375, +0.3003471, +0.9542373),
     float3(-0.3487388, +0.4037880, +0.5335386),
     float3(+0.1023042, +0.6439373, +0.6520134),
@@ -21,13 +20,13 @@ static const float3 kArray[8] =
 
 float test(int val)
 {
-	return kArray[val].x + kArray[val].y + kArray[val].z;
+    return kArray[val].x + kArray[val].y + kArray[val].z;
 }
 
 [numthreads(8, 1, 1)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
-	int inVal = tid.x;
-	float outVal = test(inVal);
-	outputBuffer[inVal] = outVal;
+    int inVal = tid.x;
+    float outVal = test(inVal);
+    outputBuffer[inVal] = outVal;
 }

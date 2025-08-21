@@ -18,8 +18,9 @@ RWStructuredBuffer<int> outputBuffer;
 //BUF: 2
 
 [shader("compute")]
-[numthreads(1,1,1)]
-void computeMain() : SV_Position
+[numthreads(1, 1, 1)]
+void computeMain()
+    : SV_Position
 {
     // This should generate BufferPointer(address) instead of (BufferPointer)address in GLSL
     let buffer1 = ConstBufferPointer<int>(address);

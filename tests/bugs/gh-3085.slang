@@ -5,7 +5,8 @@ RWTexture2D<float4> g_Test;
 
 Texture2D<float4> g_inoutColorReadonly;
 
-[ForceInline] float3 LoadSourceColor(uint2 pixelPos, constexpr int2 offset, int sampleIndex)
+[ForceInline]
+float3 LoadSourceColor(uint2 pixelPos, constexpr int2 offset, int sampleIndex)
 {
     float3 color = g_inoutColorReadonly.Load(int3(pixelPos, 0), offset).rgb;
 

@@ -21,7 +21,7 @@ RWStructuredBuffer<int> outputBuffer;
 // It is unclear why "nextafter" is not working for Metal.
 #define TEST_WHEN_nextafter_WORKS 0
 
-__generic<T:__BuiltinFloatingPointType>
+__generic<T : __BuiltinFloatingPointType>
 bool Test_Scalar()
 {
     // METAL-LABEL: Test_Scalar
@@ -249,17 +249,17 @@ bool Test_Scalar()
     // METALLIB: ret
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 bool Test_Vector()
 {
     // METAL-LABEL: Test_Vector_0
-    const vector<T,N> zero = T(inputBuffer[0]);
-    const vector<T,N> one = T(inputBuffer[1]);
+    const vector<T, N> zero = T(inputBuffer[0]);
+    const vector<T, N> one = T(inputBuffer[1]);
 
-    const vector<int,N> zeroInt = int(inputBuffer[0]);
+    const vector<int, N> zeroInt = int(inputBuffer[0]);
 
-    vector<T,N> outFloat1, outFloat2;
-    vector<int,N> outInt;
+    vector<T, N> outFloat1, outFloat2;
+    vector<int, N> outInt;
 
     bool voidResult = true;
 
@@ -487,7 +487,7 @@ bool Test_Vector()
     // METAL-LABEL: Test_Vector_1
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // GLSL: void main(

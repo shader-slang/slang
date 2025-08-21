@@ -207,7 +207,7 @@ bool Test_Add_LShift()
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
+void computeMain(uint groupIndex: SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
     //BUF: 1
     bool result = true

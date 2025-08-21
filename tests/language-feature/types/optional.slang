@@ -49,5 +49,4 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     if (!(v2 == none))
         result += v2.value.data;
     outputBuffer[1] = result;
-
 }

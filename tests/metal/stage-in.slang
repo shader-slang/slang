@@ -69,7 +69,8 @@ VOut main_vertex(VIn vertexIn)
 }
 
 [shader("fragment")]
-float4 main_fragment(VOut fragmentIn) : SV_Target
+float4 main_fragment(VOut fragmentIn)
+    : SV_Target
 {
     return fragmentIn.vertexColor;
 }

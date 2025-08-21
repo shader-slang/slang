@@ -3,7 +3,7 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
-void computeMain(uint tig : SV_GroupIndex)
+void computeMain(uint tig: SV_GroupIndex)
 {
     // Test that we infer the type parameters to X from the type of f
     x(f);
@@ -14,7 +14,7 @@ void computeMain(uint tig : SV_GroupIndex)
 
 static int p = 0;
 
-func x<A, B>(f : functype (A) -> B)
+func x<A, B>(f: functype(A)->B)
 {
     ++p;
 }
@@ -24,11 +24,9 @@ float f(int)
     return 1;
 }
 
-func y<A, B, C>(g : functype (A, B) -> C)
+func y<A, B, C>(g: functype(A, B)->C)
 {
     p += 2;
 }
 
-void g<A>(A, bool)
-{ }
-
+void g<A>(A, bool) {}

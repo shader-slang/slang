@@ -7,8 +7,8 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float v = asfloat((int(dispatchThreadID.x) & -2147483648) | 1065353216);
-	outputBuffer[dispatchThreadID.x] = v;
+    outputBuffer[dispatchThreadID.x] = v;
 }

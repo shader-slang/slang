@@ -11,24 +11,24 @@ RWStructuredBuffer<float> outputBuffer;
 __generic<T>
 T test(T val)
 {
-	return val;
+    return val;
 }
 
 __generic<T>
 T test(T val, int a)
 {
-	return val;
+    return val;
 }
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	float inVal = float(tid);
+    float inVal = float(tid);
 
-	float outVal = test<float>(inVal, 0);
+    float outVal = test<float>(inVal, 0);
 
-	outputBuffer[tid] = outVal;
+    outputBuffer[tid] = outVal;
 }

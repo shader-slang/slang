@@ -9,8 +9,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
-// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
-// Only strictly necessary on the D3D12 path
+// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI
+// is going to be used Only strictly necessary on the D3D12 path
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
 RWStructuredBuffer<int> nvapiBuffer;
 
@@ -18,28 +18,29 @@ RWStructuredBuffer<int> nvapiBuffer;
 RWByteAddressBuffer outputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+{
     int tid = dispatchThreadID.x;
-    int idx = (tid & 3) ^ (tid >> 2); 
+    int idx = (tid & 3) ^ (tid >> 2);
 
     // Try directly reading
     uint2 currentValue2 = outputBuffer.Load2(idx << 3);
-    uint64_t currentValue = uint64_t(currentValue2.y) | currentValue2.x;    
-    
+    uint64_t currentValue = uint64_t(currentValue2.y) | currentValue2.x;
+
     while (true)
     {
         // This is probably not a great way to do this - InterlockedAddI64 would be better
         // but we are doing this to test CAS.
-        
+
         uint64_t readValue;
-        outputBuffer.InterlockedCompareExchangeU64(idx << 3, currentValue, currentValue + 1, readValue);
-        
+        outputBuffer
+            .InterlockedCompareExchangeU64(idx << 3, currentValue, currentValue + 1, readValue);
+
         if (readValue == currentValue)
         {
             break;
         }
-        
+
         currentValue = readValue;
     }
 }

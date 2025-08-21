@@ -16,7 +16,10 @@ struct StackImpl<let D : int> : IStack<D>
     // We should be able to specialize the callsites of this function to use
     // the concrete type instead of resorting to dynamic dispatch.
     __generic<let N : int>
-    IStack<D - N> popN() { return StackImpl<D-N>(); }
+    IStack<D - N> popN()
+    {
+        return StackImpl<D - N>();
+    }
 
     int get() { return D; }
 }
@@ -30,7 +33,7 @@ int test<int D, S : IStack<D>>(S stack)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     StackImpl<5> stack;
 

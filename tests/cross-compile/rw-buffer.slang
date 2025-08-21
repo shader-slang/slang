@@ -8,7 +8,8 @@
 RWBuffer<float> buffer;
 Buffer<float> inBuffer;
 
-float4 main(float u : U, int idx : IDX) : SV_Target
+float4 main(float u: U, int idx: IDX)
+    : SV_Target
 {
     // CHECK-DAG: OpImageQuerySize
 
@@ -22,6 +23,6 @@ float4 main(float u : U, int idx : IDX) : SV_Target
     buffer.GetDimensions(s1);
     buffer.GetDimensions(s2);
 
-	buffer[idx] = buffer[idx] + inBuffer[idx] + s1 + s2;
-	return u;
+    buffer[idx] = buffer[idx] + inBuffer[idx] + s1 + s2;
+    return u;
 }

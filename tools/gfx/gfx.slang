@@ -17,7 +17,8 @@ public static const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 public enum class StructType
 {
     D3D12ExtendedDesc,
-};
+}
+;
 
 public enum class StageType
 {
@@ -37,7 +38,8 @@ public enum class StageType
     Amplification,
     Mesh,
     CountOf,
-};
+}
+;
 
 public enum class DeviceType
 {
@@ -51,7 +53,8 @@ public enum class DeviceType
     CPU,
     CUDA,
     CountOf,
-};
+}
+;
 
 public enum class ProjectionStyle
 {
@@ -61,7 +64,8 @@ public enum class ProjectionStyle
     Vulkan,
     Metal,
     CountOf,
-};
+}
+;
 
 public enum class BindingStyle
 {
@@ -73,27 +77,30 @@ public enum class BindingStyle
     CPU,
     CUDA,
     CountOf,
-};
+}
+;
 
 public enum class AccessFlag
 {
     None,
     Read,
     Write,
-};
+}
+;
 
 public static const GfxCount kMaxRenderTargetCount = 8;
 
 // Defines how linking should be performed for a shader program.
 public enum class LinkingStyle
 {
-    // Compose all entry-points in a single program, then compile all entry-points together with the same
-    // set of root shader arguments.
+    // Compose all entry-points in a single program, then compile all entry-points together with the
+    // same set of root shader arguments.
     SingleProgram,
 
     // Link and compile each entry-point individually, potentially with different specializations.
     SeparateEntryPointCompilation
-};
+}
+;
 
 public enum class ShaderModuleSourceType
 {
@@ -101,12 +108,13 @@ public enum class ShaderModuleSourceType
     SlangModuleBinary,     // a slang module binary code in memory.
     SlangSourceFile,       // a slang source from file.
     SlangModuleBinaryFile, // a slang module binary code from file.
-};
+}
+;
 
 public struct ShaderProgramDesc2
 {
     public ShaderModuleSourceType sourceType = ShaderModuleSourceType::SlangSource;
-    public void *sourceData = nullptr;
+    public void* sourceData = nullptr;
     public Size sourceDataSize = 0;
 
     // Number of entry points to include in the shader program. 0 means include all entry points
@@ -126,8 +134,9 @@ public interface IShaderProgram
 public enum class Format
 {
     // D3D formats omitted: 19-22, 44-47, 65-66, 68-70, 73, 76, 79, 82, 88-89, 92-94, 97, 100-114
-    // These formats are omitted due to lack of a corresponding Vulkan format. D24_UNORM_S8_UINT (DXGI_FORMAT 45)
-    // has a matching Vulkan format but is also omitted as it is only supported by Nvidia.
+    // These formats are omitted due to lack of a corresponding Vulkan format. D24_UNORM_S8_UINT
+    // (DXGI_FORMAT 45) has a matching Vulkan format but is also omitted as it is only supported by
+    // Nvidia.
     Unknown,
 
     R32G32B32A32_TYPELESS,
@@ -233,12 +242,15 @@ public enum class Format
     BC7_UNORM_SRGB,
 
     _Count,
-};
+}
+;
 
 public struct FormatInfo
 {
-    public GfxCount channelCount; ///< The amount of channels in the format. Only set if the channelType is set
-    public uint8_t channelType;   ///< One of SlangScalarType None if type isn't made up of elements of type. TODO: Change to uint32_t?
+    public GfxCount
+        channelCount; ///< The amount of channels in the format. Only set if the channelType is set
+    public uint8_t channelType; ///< One of SlangScalarType None if type isn't made up of elements
+                                ///< of type. TODO: Change to uint32_t?
 
     public Size blockSizeInBytes;   ///< The size of a block in bytes.
     public GfxCount pixelsPerBlock; ///< The number of pixels contained in a block.
@@ -248,34 +260,49 @@ public struct FormatInfo
 
 public enum class InputSlotClass
 {
-    PerVertex, PerInstance
-};
+    PerVertex,
+    PerInstance
+}
+;
 
 public struct InputElementDesc
 {
     public NativeString semanticName; ///< The name of the corresponding parameter in shader code.
-    public GfxIndex semanticIndex;   ///< The index of the corresponding parameter in shader code. Only needed if multiple parameters share a semantic name.
-    public Format format;            ///< The format of the data being fetched for this element.
-    public Offset offset;            ///< The offset in bytes of this element from the start of the corresponding chunk of vertex stream data.
-    public GfxIndex bufferSlotIndex; ///< The index of the vertex stream to fetch this element's data from.
+    public GfxIndex semanticIndex;    ///< The index of the corresponding parameter in shader code.
+                                      ///< Only needed if multiple parameters share a semantic name.
+    public Format format;             ///< The format of the data being fetched for this element.
+    public Offset offset;             ///< The offset in bytes of this element from the start of the
+                                      ///< corresponding chunk of vertex stream data.
+    public GfxIndex
+        bufferSlotIndex; ///< The index of the vertex stream to fetch this element's data from.
 };
 
 public struct VertexStreamDesc
 {
-    public Size stride;                   ///< The stride in bytes for this vertex stream.
-    public InputSlotClass slotClass;      ///< Whether the stream contains per-vertex or per-instance data.
+    public Size stride; ///< The stride in bytes for this vertex stream.
+    public InputSlotClass
+        slotClass; ///< Whether the stream contains per-vertex or per-instance data.
     public GfxCount instanceDataStepRate; ///< How many instances to draw per chunk of data.
 };
 
 public enum class PrimitiveType
 {
-    Point, Line, Triangle, Patch
-};
+    Point,
+    Line,
+    Triangle,
+    Patch
+}
+;
 
 public enum class PrimitiveTopology
 {
-    TriangleList, TriangleStrip, PointList, LineList, LineStrip
-};
+    TriangleList,
+    TriangleStrip,
+    PointList,
+    LineList,
+    LineStrip
+}
+;
 
 public enum class ResourceState
 {
@@ -300,7 +327,8 @@ public enum class ResourceState
     AccelerationStructure,
     AccelerationStructureBuildInput,
     _Count
-};
+}
+;
 
 public struct ResourceStateSet
 {
@@ -309,12 +337,15 @@ public struct ResourceStateSet
     [mutating]
     public void add(ResourceState state) { m_bitFields |= (1LL << (uint32_t)state); }
 
-    public bool contains(ResourceState state) { return (m_bitFields & (1LL << (uint32_t)state)) != 0; }
+    public bool contains(ResourceState state)
+    {
+        return (m_bitFields & (1LL << (uint32_t)state)) != 0;
+    }
     public __init() { m_bitFields = 0; }
     public __init(ResourceState state) { add(state); }
 };
 
-public ResourceStateSet operator &(ResourceStateSet val, ResourceStateSet that)
+public ResourceStateSet operator&(ResourceStateSet val, ResourceStateSet that)
 {
     ResourceStateSet result;
     result.m_bitFields = val.m_bitFields & that.m_bitFields;
@@ -327,7 +358,8 @@ public enum class MemoryType
     DeviceLocal,
     Upload,
     ReadBack,
-};
+}
+;
 
 public enum class InteropHandleAPI
 {
@@ -340,7 +372,8 @@ public enum class InteropHandleAPI
     DeviceAddress,            // A device address.
     D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
     Metal,                    // A general Metal object handle.
-};
+}
+;
 
 public struct InteropHandle
 {
@@ -351,19 +384,20 @@ public struct InteropHandle
 // Declare opaque type
 public struct InputLayoutDesc
 {
-    public InputElementDesc *inputElements;
+    public InputElementDesc* inputElements;
     public GfxCount inputElementCount;
-    public VertexStreamDesc *vertexStreams;
+    public VertexStreamDesc* vertexStreams;
     public GfxCount vertexStreamCount;
 };
 
 [COM("45223711-a84b-455c-befa-4937421e8e2e")]
 public interface IInputLayout
-{   
+{
 };
 
 /// The type of resource.
-/// NOTE! The order needs to be such that all texture types are at or after Texture1D (otherwise isTexture won't work correctly)
+/// NOTE! The order needs to be such that all texture types are at or after Texture1D (otherwise
+/// isTexture won't work correctly)
 public enum class ResourceType
 {
     Unknown,     ///< Unknown
@@ -373,7 +407,8 @@ public enum class ResourceType
     Texture3D,   ///< A 3d texture
     TextureCube, ///< A cubemap consists of 6 Texture2D like faces
     _Count,
-};
+}
+;
 
 /// Base class for Descs
 public struct ResourceDescBase
@@ -413,9 +448,9 @@ public struct BufferResourceDesc : ResourceDescBase
 [COM("1b274efe-5e37-492b-826e-7ee7e8f5a49b")]
 public interface IBufferResource : IResource
 {
-    public BufferResourceDesc *getDesc();
+    public BufferResourceDesc* getDesc();
     public DeviceAddress getDeviceAddress();
-    public Result map(MemoryRange *rangeToRead, void **outPointer);
+    public Result map(MemoryRange* rangeToRead, void** outPointer);
     public Result unmap(MemoryRange* writtenRange);
 };
 
@@ -430,16 +465,10 @@ public struct ColorClearValue
     public float4 values;
 
     [mutating]
-    public void setValue(uint4 uintVal)
-    {
-        values = reinterpret<float4, uint4>(uintVal);
-    }
+    public void setValue(uint4 uintVal) { values = reinterpret<float4, uint4>(uintVal); }
 
     [mutating]
-    public void setValue(float4 floatVal)
-    {
-        values = floatVal;
-    }
+    public void setValue(float4 floatVal) { values = floatVal; }
 };
 
 public struct ClearValue
@@ -450,8 +479,8 @@ public struct ClearValue
 
 public struct BufferRange
 {
-    public Offset offset;   ///< Offset in bytes.
-    public Size size;       ///< Size in bytes.
+    public Offset offset; ///< Offset in bytes.
+    public Size size;     ///< Size in bytes.
 };
 
 public enum class TextureAspect : uint32_t
@@ -466,7 +495,8 @@ public enum class TextureAspect : uint32_t
     Plane2 = 0x00000040,
 
     DepthStencil = 0x6,
-};
+}
+;
 
 public struct SubresourceRange
 {
@@ -490,7 +520,7 @@ public struct TextureResourceDesc : ResourceDescBase
 
     public GfxCount arraySize = 0; ///< Array size
 
-    public GfxCount numMipLevels = 0;         ///< Number of mip levels - if 0 will create all mip levels
+    public GfxCount numMipLevels = 0; ///< Number of mip levels - if 0 will create all mip levels
     public Format format;             ///< The resources format
     public TextureResourceSampleDesc sampleDesc; ///< How the resource is sampled
     public ClearValue* optimalClearValue;
@@ -518,7 +548,7 @@ public struct TextureResourceDesc : ResourceDescBase
 public struct SubresourceData
 {
     /// Pointer to texel data for the subresource tensor.
-    public void *data;
+    public void* data;
 
     /// Stride in bytes between rows of the subresource tensor.
     ///
@@ -557,13 +587,15 @@ public enum class ComparisonFunc : uint8_t
     NotEqual = 0x5,
     GreaterEqual = 0x6,
     Always = 0x7,
-};
+}
+;
 
 public enum class TextureFilteringMode
 {
     Point,
     Linear,
-};
+}
+;
 
 public enum class TextureAddressingMode
 {
@@ -572,7 +604,8 @@ public enum class TextureAddressingMode
     ClampToBorder,
     MirrorRepeat,
     MirrorOnce,
-};
+}
+;
 
 public enum class TextureReductionOp
 {
@@ -580,7 +613,8 @@ public enum class TextureReductionOp
     Comparison,
     Minimum,
     Maximum,
-};
+}
+;
 
 public struct SamplerStateDesc
 {
@@ -621,7 +655,7 @@ public interface ISamplerState
     /// Returns a native API handle representing this sampler state object.
     /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE.
     /// When using Vulkan, this will be a VkSampler.
-    public Result getNativeHandle(InteropHandle *outNativeHandle);
+    public Result getNativeHandle(InteropHandle* outNativeHandle);
 };
 
 public enum class ResourceViewType
@@ -635,7 +669,8 @@ public enum class ResourceViewType
     AccelerationStructure,
 
     CountOf_,
-};
+}
+;
 
 public struct RenderTargetDesc
 {
@@ -650,7 +685,8 @@ public struct ResourceViewDesc
 
     // Required fields for `RenderTarget` and `DepthStencil` views.
     public RenderTargetDesc renderTarget;
-    // Specifies the range of a texture resource for a ShaderRsource/UnorderedAccess/RenderTarget/DepthStencil view.
+    // Specifies the range of a texture resource for a
+    // ShaderRsource/UnorderedAccess/RenderTarget/DepthStencil view.
     public SubresourceRange subresourceRange;
     // Specifies the range of a buffer resource for a ShaderResource/UnorderedAccess view.
     public BufferRange bufferRange;
@@ -662,18 +698,19 @@ public interface IResourceView
     public ResourceViewDesc* getViewDesc();
 
     /// Returns a native API handle representing this resource view object.
-    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE or a buffer device address depending
-    /// on the type of the resource view.
-    /// When using Vulkan, this will be a VkImageView, VkBufferView, VkAccelerationStructure or a VkBuffer
-    /// depending on the type of the resource view.
-    public Result getNativeHandle(InteropHandle *outNativeHandle);
+    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE or a buffer device address
+    /// depending on the type of the resource view. When using Vulkan, this will be a VkImageView,
+    /// VkBufferView, VkAccelerationStructure or a VkBuffer depending on the type of the resource
+    /// view.
+    public Result getNativeHandle(InteropHandle* outNativeHandle);
 };
 
 public enum class AccelerationStructureKind
 {
     TopLevel,
     BottomLevel
-};
+}
+;
 
 // The public enum values are intentionally consistent with
 // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS.
@@ -686,12 +723,15 @@ public enum AccelerationStructureBuildFlags
     PreferFastBuild = 8,
     MinimizeMemory = 16,
     PerformUpdate = 32
-};
+}
+;
 
 public enum class GeometryType
 {
-    Triangles, ProcedurePrimitives
-};
+    Triangles,
+    ProcedurePrimitives
+}
+;
 
 public struct GeometryFlags
 {
@@ -702,7 +742,8 @@ public struct GeometryFlags
         None,
         Opaque = 1,
         NoDuplicateAnyHitInvocation = 2
-    };
+    }
+    ;
 };
 
 public struct TriangleDesc
@@ -746,8 +787,12 @@ public struct GeometryDesc
     public TriangleDesc triangles;
     public property ProceduralAABBDesc proceduralAABBs
     {
-        get { return reinterpret<ProceduralAABBDesc, TriangleDesc>(triangles); }
-        set { triangles = reinterpret<TriangleDesc, ProceduralAABBDesc>(newValue); }
+        get {
+            return reinterpret<ProceduralAABBDesc, TriangleDesc>(triangles);
+        }
+        set {
+            triangles = reinterpret<TriangleDesc, ProceduralAABBDesc>(newValue);
+        }
     }
 };
 
@@ -760,7 +805,8 @@ public enum GeometryInstanceFlags
     TriangleFrontCounterClockwise = 0x00000002,
     ForceOpaque = 0x00000004,
     NoOpaque = 0x00000008
-};
+}
+;
 
 // TODO: Should any of these be changed?
 // The layout of this public struct is intentionally consistent with D3D12_RAYTRACING_INSTANCE_DESC
@@ -769,19 +815,46 @@ public struct InstanceDesc
 {
     public float transform[3][4];
     public uint32_t instanceID24_mask8;
-    public property uint32_t instanceID { get { return instanceID24_mask8 & 0xFFFFFF; } set { instanceID24_mask8 = (instanceID24_mask8 & 0xFF000000) | (newValue & 0xFFFFFF); } }
-    public property uint32_t instanceMask { get { return instanceID24_mask8 >> 24; } set { instanceID24_mask8 = (newValue << 24) | (instanceID24_mask8 & 0x00FFFFFF); } }
+    public property uint32_t instanceID
+    {
+        get {
+            return instanceID24_mask8 & 0xFFFFFF;
+        }
+        set {
+            instanceID24_mask8 = (instanceID24_mask8 & 0xFF000000) | (newValue & 0xFFFFFF);
+        }
+    }
+    public property uint32_t instanceMask
+    {
+        get {
+            return instanceID24_mask8 >> 24;
+        }
+        set {
+            instanceID24_mask8 = (newValue << 24) | (instanceID24_mask8 & 0x00FFFFFF);
+        }
+    }
 
     public uint32_t instanceContributionToHitGroupIndex24_flags8;
     public property uint32_t instanceContributionToHitGroupIndex
     {
-        get { return instanceContributionToHitGroupIndex24_flags8 & 0xFFFFFF; }
-        set { instanceContributionToHitGroupIndex24_flags8 = (instanceContributionToHitGroupIndex24_flags8 & 0xFF000000) | (newValue & 0xFFFFFF); }
+        get {
+            return instanceContributionToHitGroupIndex24_flags8 & 0xFFFFFF;
+        }
+        set {
+            instanceContributionToHitGroupIndex24_flags8 =
+                (instanceContributionToHitGroupIndex24_flags8 & 0xFF000000) | (newValue & 0xFFFFFF);
+        }
     }
     public property GeometryInstanceFlags flags
     {
-        get { return (GeometryInstanceFlags)(instanceContributionToHitGroupIndex24_flags8 >> 24); }
-        set { instanceContributionToHitGroupIndex24_flags8 = ((uint32_t)newValue << 24) | (instanceContributionToHitGroupIndex24_flags8 & 0x00FFFFFF); }
+        get {
+            return (GeometryInstanceFlags)(instanceContributionToHitGroupIndex24_flags8 >> 24);
+        }
+        set {
+            instanceContributionToHitGroupIndex24_flags8 =
+                ((uint32_t)newValue << 24) |
+                (instanceContributionToHitGroupIndex24_flags8 & 0x00FFFFFF);
+        }
     }
     public DeviceAddress accelerationStructure;
 };
@@ -807,7 +880,7 @@ public struct AccelerationStructureBuildInputs
 
     /// Array of `GeometryDesc` values.
     /// Used when `kind` is `BottomLevel`.
-    public GeometryDesc *geometryDescs;
+    public GeometryDesc* geometryDescs;
 };
 
 public struct AccelerationStructureCreateDesc
@@ -842,13 +915,13 @@ public struct FenceDesc
 public interface IFence
 {
     /// Returns the currently signaled value on the device.
-    public Result getCurrentValue(uint64_t *outValue);
+    public Result getCurrentValue(uint64_t* outValue);
 
     /// Signals the fence from the host with the specified value.
     public Result setCurrentValue(uint64_t value);
 
-    public Result getSharedHandle(InteropHandle *outHandle);
-    public Result getNativeHandle(InteropHandle *outNativeHandle);
+    public Result getSharedHandle(InteropHandle* outHandle);
+    public Result getNativeHandle(InteropHandle* outNativeHandle);
 };
 
 public struct ShaderOffset
@@ -860,8 +933,11 @@ public struct ShaderOffset
 
 public enum class ShaderObjectContainerType
 {
-    None, Array, StructuredBuffer
-};
+    None,
+    Array,
+    StructuredBuffer
+}
+;
 
 [COM("c1fa997e-5ca2-45ae-9bcb-c4-35-9e-85-05-85")]
 public interface IShaderObject
@@ -870,19 +946,22 @@ public interface IShaderObject
     public ShaderObjectContainerType getContainerType();
     public GfxCount getEntryPointCount();
     public Result getEntryPoint(GfxIndex index, out Optional<IShaderObject> entryPoint);
-    public Result setData(ShaderOffset *offset, void *data, Size size);
-    public Result getObject(ShaderOffset *offset, out Optional<IShaderObject> object);
+    public Result setData(ShaderOffset* offset, void* data, Size size);
+    public Result getObject(ShaderOffset* offset, out Optional<IShaderObject> object);
     public Result setObject(ShaderOffset* offset, IShaderObject object);
     public Result setResource(ShaderOffset* offset, IResourceView resourceView);
     public Result setSampler(ShaderOffset* offset, ISamplerState sampler);
-    public Result setCombinedTextureSampler(ShaderOffset* offset, IResourceView textureView, ISamplerState sampler);
+    public Result setCombinedTextureSampler(
+        ShaderOffset* offset,
+        IResourceView textureView,
+        ISamplerState sampler);
 
     /// Manually overrides the specialization argument for the sub-object binding at `offset`.
     /// Specialization arguments are passed to the shader compiler to specialize the type
     /// of interface-typed shader parameters.
     public Result setSpecializationArgs(
         ShaderOffset* offset,
-        slang::SpecializationArg *args,
+        slang::SpecializationArg* args,
         GfxCount count);
 
     public Result getCurrentVersion(
@@ -907,26 +986,30 @@ public enum class StencilOp : uint8_t
     Invert,
     IncrementWrap,
     DecrementWrap,
-};
+}
+;
 
 public enum class FillMode : uint8_t
 {
     Solid,
     Wireframe,
-};
+}
+;
 
 public enum class CullMode : uint8_t
 {
     None,
     Front,
     Back,
-};
+}
+;
 
 public enum class FrontFaceMode : uint8_t
 {
     CounterClockwise,
     Clockwise,
-};
+}
+;
 
 public struct DepthStencilOpDesc
 {
@@ -1004,7 +1087,8 @@ public struct RasterizerDesc
 public enum class LogicOp
 {
     NoOp,
-};
+}
+;
 
 public enum class BlendOp
 {
@@ -1013,7 +1097,8 @@ public enum class BlendOp
     ReverseSubtract,
     Min,
     Max,
-};
+}
+;
 
 public enum class BlendFactor
 {
@@ -1034,7 +1119,8 @@ public enum class BlendFactor
     InvSecondarySrcColor,
     SecondarySrcAlpha,
     InvSecondarySrcAlpha,
-};
+}
+;
 
 public enum RenderTargetWriteMask
 {
@@ -1044,7 +1130,8 @@ public enum RenderTargetWriteMask
     EnableBlue = 0x04,
     EnableAlpha = 0x08,
     EnableAll = 0x0F,
-};
+}
+;
 
 public struct AspectBlendDesc
 {
@@ -1092,8 +1179,8 @@ public struct FramebufferTargetLayout
 public struct FramebufferLayoutDesc
 {
     public GfxCount renderTargetCount;
-    public FramebufferTargetLayout *renderTargets;
-    public FramebufferTargetLayout *depthStencil;
+    public FramebufferTargetLayout* renderTargets;
+    public FramebufferTargetLayout* depthStencil;
 };
 
 [COM("0a838785-c13a-4832-ad88-64-06-b5-4b-5e-ba")]
@@ -1114,9 +1201,9 @@ public struct GraphicsPipelineStateDesc
 
     public __init()
     {
-        program = {IShaderProgram()};
-        inputLayout = {IInputLayout()};
-        framebufferLayout = {IFramebufferLayout()};
+        program = { IShaderProgram() };
+        inputLayout = { IInputLayout() };
+        framebufferLayout = { IFramebufferLayout() };
         primitiveType = PrimitiveType::Triangle;
         depthStencil = {};
         rasterizer = {};
@@ -1127,7 +1214,7 @@ public struct GraphicsPipelineStateDesc
 public struct ComputePipelineStateDesc
 {
     public NativeRef<IShaderProgram> program;
-    public void *d3d12RootSignatureOverride;
+    public void* d3d12RootSignatureOverride;
 };
 
 public enum RayTracingPipelineFlags
@@ -1135,7 +1222,8 @@ public enum RayTracingPipelineFlags
     None = 0,
     SkipTriangles = 1,
     SkipProcedurals = 2,
-};
+}
+;
 
 public struct HitGroupDesc
 {
@@ -1149,7 +1237,7 @@ public struct RayTracingPipelineStateDesc
 {
     public NativeRef<IShaderProgram> program;
     public GfxCount hitGroupCount = 0;
-    public HitGroupDesc *hitGroups;
+    public HitGroupDesc* hitGroups;
     public int maxRecursion = 0;
     public Size maxRayPayloadSize = 0;
     public Size maxAttributeSizeInBytes = 8;
@@ -1168,15 +1256,15 @@ public struct ShaderTableDesc
 {
     public GfxCount rayGenShaderCount;
     public NativeString* rayGenShaderEntryPointNames;
-    public ShaderRecordOverwrite *rayGenShaderRecordOverwrites;
+    public ShaderRecordOverwrite* rayGenShaderRecordOverwrites;
 
     public GfxCount missShaderCount;
-    public NativeString *missShaderEntryPointNames;
-    public ShaderRecordOverwrite *missShaderRecordOverwrites;
+    public NativeString* missShaderEntryPointNames;
+    public ShaderRecordOverwrite* missShaderRecordOverwrites;
 
     public GfxCount hitGroupCount;
-    public NativeString *hitGroupNames;
-    public ShaderRecordOverwrite *hitGroupRecordOverwrites;
+    public NativeString* hitGroupNames;
+    public ShaderRecordOverwrite* hitGroupRecordOverwrites;
 
     NativeRef<IShaderProgram> program;
 };
@@ -1184,13 +1272,12 @@ public struct ShaderTableDesc
 [COM("a721522c-df31-4c2f-a5e7-3b-e0-12-4b-31-78")]
 public interface IShaderTable
 {
-
 };
 
 [COM("0ca7e57d-8a90-44f3-bdb1-fe-9b-35-3f-5a-72")]
 public interface IPipelineState
 {
-    Result getNativeHandle(InteropHandle *outHandle);
+    Result getNativeHandle(InteropHandle* outHandle);
 };
 
 public struct ScissorRect
@@ -1214,7 +1301,7 @@ public struct Viewport
 public struct FramebufferDesc
 {
     public GfxCount renderTargetCount;
-    public NativeRef<IResourceView> *renderTargetViews;
+    public NativeRef<IResourceView>* renderTargetViews;
     public NativeRef<IResourceView> depthStencilView;
     public NativeRef<IFramebufferLayout> layout;
 };
@@ -1229,22 +1316,23 @@ public enum class WindowHandleType
     Unknown,
     Win32Handle,
     XLibHandle,
-};
+}
+;
 
 public struct WindowHandle
 {
     public WindowHandleType type;
     public void* handleValues[2];
-    public static WindowHandle fromHwnd(void *hwnd)
+    public static WindowHandle fromHwnd(void* hwnd)
     {
-        WindowHandle handle = {WindowHandleType::Unknown, {nullptr, nullptr}};
+        WindowHandle handle = { WindowHandleType::Unknown, { nullptr, nullptr } };
         handle.type = WindowHandleType::Win32Handle;
         handle.handleValues[0] = hwnd;
         return handle;
     }
-    public static WindowHandle fromXWindow(void *xdisplay, uint32_t xwindow)
+    public static WindowHandle fromXWindow(void* xdisplay, uint32_t xwindow)
     {
-        WindowHandle handle = {WindowHandleType::Unknown, {nullptr, nullptr}};
+        WindowHandle handle = { WindowHandleType::Unknown, { nullptr, nullptr } };
         handle.type = WindowHandleType::XLibHandle;
         handle.handleValues[0] = xdisplay;
         handle.handleValues[1] = (void*)xwindow;
@@ -1254,17 +1342,24 @@ public struct WindowHandle
 
 public enum FaceMask
 {
-    Front = 1, Back = 2
-};
+    Front = 1,
+    Back = 2
+}
+;
 
 public enum class TargetLoadOp
 {
-    Load, Clear, DontCare
-};
+    Load,
+    Clear,
+    DontCare
+}
+;
 public enum class TargetStoreOp
 {
-    Store, DontCare
-};
+    Store,
+    DontCare
+}
+;
 public struct TargetAccessDesc
 {
     public TargetLoadOp loadOp;
@@ -1278,8 +1373,8 @@ public struct RenderPassLayoutDesc
 {
     public NativeRef<IFramebufferLayout> framebufferLayout;
     public GfxCount renderTargetCount;
-    public TargetAccessDesc *renderTargetAccess;
-    public TargetAccessDesc *depthStencilAccess;
+    public TargetAccessDesc* renderTargetAccess;
+    public TargetAccessDesc* depthStencilAccess;
 };
 
 [COM("daab0b1a-f45d-4ae9-bf2c-e0-bb-76-7d-fa-d1")]
@@ -1293,7 +1388,8 @@ public enum class QueryType
     AccelerationStructureCompactedSize,
     AccelerationStructureSerializedSize,
     AccelerationStructureCurrentSize,
-};
+}
+;
 
 public struct QueryPoolDesc
 {
@@ -1304,7 +1400,7 @@ public struct QueryPoolDesc
 [COM("c2cc3784-12da-480a-a874-8b-31-96-1c-a4-36")]
 public interface IQueryPool
 {
-    public Result getResult(GfxIndex queryIndex, GfxCount count, uint64_t *data);
+    public Result getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data);
     public Result reset();
 };
 
@@ -1351,17 +1447,18 @@ public enum ClearResourceViewFlags
     ClearDepth = 1,
     ClearStencil = 2,
     FloatClearValues = 4
-};
+}
+;
 
 [COM("F99A00E9-ED50-4088-8A0E-3B26755031EA")]
 public interface IResourceCommandEncoder : ICommandEncoder
 {
     public void copyBuffer(
-                 IBufferResource dst,
-                 Offset dstOffset,
-                 IBufferResource src,
-                 Offset srcOffset,
-                 Size size);
+        IBufferResource dst,
+        Offset dstOffset,
+        IBufferResource src,
+        Offset srcOffset,
+        Size size);
     /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0
     /// and layerCount = 0, the entire resource is being copied and dstOffset, srcOffset and extent
     /// arguments are ignored.
@@ -1392,20 +1489,28 @@ public interface IResourceCommandEncoder : ICommandEncoder
         SubresourceRange subResourceRange,
         int3 offset,
         int3 extent,
-        SubresourceData *subResourceData,
+        SubresourceData* subResourceData,
         GfxCount subResourceDataCount);
-    public void uploadBufferData(IBufferResource dst, Offset offset, Size size, void *data);
+    public void uploadBufferData(IBufferResource dst, Offset offset, Size size, void* data);
     public void textureBarrier(
-        GfxCount count, NativeRef<ITextureResource> *textures, ResourceState src, ResourceState dst);
+        GfxCount count,
+        NativeRef<ITextureResource>* textures,
+        ResourceState src,
+        ResourceState dst);
     public void textureSubresourceBarrier(
         ITextureResource texture,
         SubresourceRange subresourceRange,
         ResourceState src,
         ResourceState dst);
     public void bufferBarrier(
-        GfxCount count, NativeRef<IBufferResource> *buffers, ResourceState src, ResourceState dst);
+        GfxCount count,
+        NativeRef<IBufferResource>* buffers,
+        ResourceState src,
+        ResourceState dst);
     public void clearResourceView(
-        IResourceView view, ClearValue *clearValue, ClearResourceViewFlags flags);
+        IResourceView view,
+        ClearValue* clearValue,
+        ClearResourceViewFlags flags);
     public void resolveResource(
         ITextureResource source,
         ResourceState sourceState,
@@ -1434,17 +1539,19 @@ public interface IRenderCommandEncoder : IResourceCommandEncoder
     public Result bindPipeline(IPipelineState state, out IShaderObject outRootShaderObject);
 
     // Sets the current pipeline state along with a pre-created mutable root shader object.
-    public Result bindPipelineWithRootObject(IPipelineState state, NativeRef<IShaderObject> rootObject);
+    public Result bindPipelineWithRootObject(
+        IPipelineState state,
+        NativeRef<IShaderObject> rootObject);
 
-    public void setViewports(GfxCount count, Viewport *viewports);
-    public void setScissorRects(GfxCount count, ScissorRect *scissors);
+    public void setViewports(GfxCount count, Viewport* viewports);
+    public void setScissorRects(GfxCount count, ScissorRect* scissors);
 
     public void setPrimitiveTopology(PrimitiveTopology topology);
     public void setVertexBuffers(
         GfxIndex startSlot,
         GfxCount slotCount,
         NativeRef<IBufferResource>* buffers,
-        Offset *offsets);
+        Offset* offsets);
 
     public void setIndexBuffer(IBufferResource buffer, Format indexFormat, Offset offset);
     public void draw(GfxCount vertexCount, GfxIndex startVertex);
@@ -1463,7 +1570,9 @@ public interface IRenderCommandEncoder : IResourceCommandEncoder
         Offset countOffset = 0);
     public void setStencilReference(uint32_t referenceValue);
     public Result setSamplePositions(
-        GfxCount samplesPerPixel, GfxCount pixelCount, SamplePosition *samplePositions);
+        GfxCount samplesPerPixel,
+        GfxCount pixelCount,
+        SamplePosition* samplePositions);
     public void drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
@@ -1485,7 +1594,9 @@ public interface IComputeCommandEncoder : IResourceCommandEncoder
     // sub-shader-objects bound to it. The user must be responsible for ensuring that any
     // resources or shader objects that is set into `outRooShaderObject` stays alive during
     // the execution of the command buffer.
-    public Result bindPipeline(IPipelineState state, out Optional<IShaderObject> outRootShaderObject);
+    public Result bindPipeline(
+        IPipelineState state,
+        out Optional<IShaderObject> outRootShaderObject);
 
     // Sets the current pipeline state along with a pre-created mutable root shader object.
     public Result bindPipelineWithRootObject(IPipelineState state, IShaderObject rootObject);
@@ -1496,8 +1607,10 @@ public interface IComputeCommandEncoder : IResourceCommandEncoder
 
 public enum class AccelerationStructureCopyMode
 {
-    Clone, Compact
-};
+    Clone,
+    Compact
+}
+;
 
 public struct AccelerationStructureQueryDesc
 {
@@ -1512,18 +1625,18 @@ public struct AccelerationStructureQueryDesc
 public interface IRayTracingCommandEncoder : IResourceCommandEncoder
 {
     public void buildAccelerationStructure(
-        AccelerationStructureBuildDesc *desc,
+        AccelerationStructureBuildDesc* desc,
         GfxCount propertyQueryCount,
-        AccelerationStructureQueryDesc *queryDescs);
+        AccelerationStructureQueryDesc* queryDescs);
     public void copyAccelerationStructure(
         NativeRef<IAccelerationStructure> dest,
         NativeRef<IAccelerationStructure> src,
         AccelerationStructureCopyMode mode);
     public void queryAccelerationStructureProperties(
         GfxCount accelerationStructureCount,
-        NativeRef<IAccelerationStructure> *accelerationStructures,
+        NativeRef<IAccelerationStructure>* accelerationStructures,
         GfxCount queryCount,
-        AccelerationStructureQueryDesc *queryDescs);
+        AccelerationStructureQueryDesc* queryDescs);
     public void serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure source);
     public void deserializeAccelerationStructure(IAccelerationStructure dest, DeviceAddress source);
 
@@ -1532,7 +1645,8 @@ public interface IRayTracingCommandEncoder : IResourceCommandEncoder
     public Result bindPipelineWithRootObject(IPipelineState state, IShaderObject rootObject);
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
-    /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
+    /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray
+    /// generation shader.
     public void dispatchRays(
         GfxIndex rayGenShaderIndex,
         NativeRef<IShaderTable> shaderTable,
@@ -1568,7 +1682,8 @@ public interface ICommandBuffer
 public enum class QueueType
 {
     Graphics
-};
+}
+;
 public struct CommandQueueDesc
 {
     public QueueType type;
@@ -1581,7 +1696,7 @@ public interface ICommandQueue
 
     public void executeCommandBuffers(
         GfxCount count,
-        NativeRef<ICommandBuffer> *commandBuffers,
+        NativeRef<ICommandBuffer>* commandBuffers,
         Optional<IFence> fenceToSignal,
         uint64_t newFenceValue);
 
@@ -1590,14 +1705,18 @@ public interface ICommandQueue
     public void waitOnHost();
 
     /// Queues a device side wait for the given fences.
-    public Result waitForFenceValuesOnDevice(GfxCount fenceCount, NativeRef<IFence> *fences, uint64_t *waitValues);
+    public Result waitForFenceValuesOnDevice(
+        GfxCount fenceCount,
+        NativeRef<IFence>* fences,
+        uint64_t* waitValues);
 };
 
 public enum TransientResourceHeapFlags
 {
     None = 0,
     AllowResizing = 0x1,
-};
+}
+;
 
 public struct TransientResourceHeapDesc
 {
@@ -1619,8 +1738,8 @@ public interface ITransientResourceHeap
     // In most situations this method should be called at the beginning of each frame.
     public Result synchronizeAndReset();
 
-    // Must be called when the application has done using this heap to issue commands. In most situations
-    // this method should be called at the end of each frame.
+    // Must be called when the application has done using this heap to issue commands. In most
+    // situations this method should be called at the end of each frame.
     public Result finish();
 
     // Command buffers are one-time use. Once it is submitted to the queue via
@@ -1690,36 +1809,52 @@ public struct DeviceInfo
 
 public enum class DebugMessageType
 {
-    Info, Warning, Error
-};
+    Info,
+    Warning,
+    Error
+}
+;
 public enum class DebugMessageSource
 {
-    Layer, Driver, Slang
-};
+    Layer,
+    Driver,
+    Slang
+}
+;
 
 [COM("B219D7E8-255A-2572-D46C-A0E5D99CEB90")]
 public interface IDebugCallback
 {
-    public void handleMessage(DebugMessageType type, DebugMessageSource source, NativeString message);
+    public void handleMessage(
+        DebugMessageType type,
+        DebugMessageSource source,
+        NativeString message);
 };
 
 public struct SlangDesc
 {
-    public NativeRef<slang::IGlobalSession> slangGlobalSession = {slang::IGlobalSession()}; // (optional) A slang global session object. If null will create automatically.
+    public NativeRef<slang::IGlobalSession> slangGlobalSession = {
+        slang::IGlobalSession()
+    }; // (optional) A slang global session object. If null will create automatically.
 
-    public slang::SlangMatrixLayoutMode defaultMatrixLayoutMode = slang::SlangMatrixLayoutMode::SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+    public slang::SlangMatrixLayoutMode defaultMatrixLayoutMode =
+        slang::SlangMatrixLayoutMode::SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
-    public NativeString *searchPaths = nullptr;
+    public NativeString* searchPaths = nullptr;
     public GfxCount searchPathCount = 0;
 
-    public slang::PreprocessorMacroDesc *preprocessorMacros = nullptr;
+    public slang::PreprocessorMacroDesc* preprocessorMacros = nullptr;
     public GfxCount preprocessorMacroCount = 0;
 
-    public NativeString targetProfile = ""; // (optional) Target shader profile. If null this will be set to platform dependent default.
-    public slang::SlangFloatingPointMode floatingPointMode = slang::SlangFloatingPointMode::SLANG_FLOATING_POINT_MODE_DEFAULT;
-    public slang::SlangOptimizationLevel optimizationLevel = slang::SlangOptimizationLevel::SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    public NativeString targetProfile = ""; // (optional) Target shader profile. If null this will
+                                            // be set to platform dependent default.
+    public slang::SlangFloatingPointMode floatingPointMode =
+        slang::SlangFloatingPointMode::SLANG_FLOATING_POINT_MODE_DEFAULT;
+    public slang::SlangOptimizationLevel optimizationLevel =
+        slang::SlangOptimizationLevel::SLANG_OPTIMIZATION_LEVEL_DEFAULT;
     public slang::SlangTargetFlags targetFlags = slang::SlangTargetFlags.None;
-    public slang::SlangLineDirectiveMode lineDirectiveMode = slang::SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    public slang::SlangLineDirectiveMode lineDirectiveMode =
+        slang::SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 };
 
 public struct ShaderCacheDesc
@@ -1739,18 +1874,19 @@ public struct DeviceDesc
 {
     // The underlying API/Platform of the device.
     public DeviceType deviceType = DeviceType::Default;
-    // The device's handles (if they exist) and their associated API. For D3D12, this contains a single InteropHandle
-    // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
-    // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
+    // The device's handles (if they exist) and their associated API. For D3D12, this contains a
+    // single InteropHandle for the ID3D12Device. For Vulkan, the first InteropHandle is the
+    // VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice. For CUDA, this
+    // only contains a single value for the CUDADevice.
     public DeviceInteropHandles existingDeviceHandles = {};
     // Name to identify the adapter to use
     public NativeString adapter = "";
     // Number of required features.
     public GfxCount requiredFeatureCount = 0;
     // Array of required feature names, whose size is `requiredFeatureCount`.
-    public NativeString *requiredFeatures = nullptr;
+    public NativeString* requiredFeatures = nullptr;
     // A command dispatcher object that intercepts and handles actual low-level API call.
-    void *apiCommandDispatcher = nullptr;
+    void* apiCommandDispatcher = nullptr;
     // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
     public GfxIndex nvapiExtnSlot = -1;
     // Configurations for the shader cache.
@@ -1759,7 +1895,7 @@ public struct DeviceDesc
     public SlangDesc slang = {};
 
     public GfxCount extendedDescCount = 0;
-    public void **extendedDescs = nullptr;
+    public void** extendedDescs = nullptr;
 };
 
 [COM("715bdf26-5135-11eb-AE93-02-42-AC-13-00-02")]
@@ -1770,14 +1906,17 @@ public interface IDevice
     public bool hasFeature(NativeString feature);
 
     /// Returns a list of features supported by the renderer.
-    public Result getFeatures(NativeString *outFeatures, Size bufferSize, GfxCount *outFeatureCount);
+    public Result getFeatures(
+        NativeString* outFeatures,
+        Size bufferSize,
+        GfxCount* outFeatureCount);
 
-    public Result getFormatSupportedResourceStates(Format format, ResourceStateSet *outStates);
+    public Result getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates);
 
     public Result getSlangSession(NativeRef<slang::ISession>* outSlangSession);
 
     public Result createTransientResourceHeap(
-        TransientResourceHeapDesc *desc,
+        TransientResourceHeapDesc* desc,
         out Optional<ITransientResourceHeap> outHeap);
 
     /// Create a texture resource.
@@ -1796,7 +1935,7 @@ public interface IDevice
     ///
     public Result createTextureResource(
         TextureResourceDesc* desc,
-        SubresourceData *initData,
+        SubresourceData* initData,
         out ITextureResource outResource);
 
     public Result createTextureFromNativeHandle(
@@ -1806,14 +1945,14 @@ public interface IDevice
 
     public Result createTextureFromSharedHandle(
         InteropHandle handle,
-        TextureResourceDesc *srcDesc,
+        TextureResourceDesc* srcDesc,
         Size size,
         out ITextureResource outResource);
 
     /// Create a buffer resource
     public Result createBufferResource(
         BufferResourceDesc* desc,
-        void *initData,
+        void* initData,
         out Optional<IBufferResource> outResource);
 
     public Result createBufferFromNativeHandle(
@@ -1829,7 +1968,9 @@ public interface IDevice
     public Result createSamplerState(SamplerStateDesc* desc, out ISamplerState outSampler);
 
     public Result createTextureView(
-        ITextureResource texture, ResourceViewDesc* desc, out IResourceView outView);
+        ITextureResource texture,
+        ResourceViewDesc* desc,
+        out IResourceView outView);
 
     public Result createBufferView(
         IBufferResource buffer,
@@ -1837,7 +1978,9 @@ public interface IDevice
         ResourceViewDesc* desc,
         out Optional<IResourceView> outView);
 
-    public Result createFramebufferLayout(FramebufferLayoutDesc* desc, out IFramebufferLayout outFrameBuffer);
+    public Result createFramebufferLayout(
+        FramebufferLayoutDesc* desc,
+        out IFramebufferLayout outFrameBuffer);
 
     public Result createFramebuffer(FramebufferDesc* desc, out IFramebuffer outFrameBuffer);
 
@@ -1846,28 +1989,31 @@ public interface IDevice
         out IRenderPassLayout outRenderPassLayout);
 
     public Result createSwapchain(
-        SwapchainDesc* desc, WindowHandle window, out ISwapchain outSwapchain);
+        SwapchainDesc* desc,
+        WindowHandle window,
+        out ISwapchain outSwapchain);
 
-    public Result createInputLayout(
-        InputLayoutDesc* desc, out IInputLayout outLayout);
+    public Result createInputLayout(InputLayoutDesc* desc, out IInputLayout outLayout);
 
     public Result createCommandQueue(CommandQueueDesc* desc, out Optional<ICommandQueue> outQueue);
 
     public Result createShaderObject(
-        slang::TypeReflection *type,
+        slang::TypeReflection* type,
         ShaderObjectContainerType container,
         out IShaderObject outObject);
 
     public Result createMutableShaderObject(
-        slang::TypeReflection *type,
+        slang::TypeReflection* type,
         ShaderObjectContainerType container,
         out IShaderObject outObject);
 
     public Result createShaderObjectFromTypeLayout(
-        slang::TypeLayoutReflection *typeLayout, out IShaderObject outObject);
+        slang::TypeLayoutReflection* typeLayout,
+        out IShaderObject outObject);
 
     public Result createMutableShaderObjectFromTypeLayout(
-        slang::TypeLayoutReflection *typeLayout, out IShaderObject outObject);
+        slang::TypeLayoutReflection* typeLayout,
+        out IShaderObject outObject);
 
     public Result createMutableRootShaderObject(
         IShaderProgram program,
@@ -1876,17 +2022,17 @@ public interface IDevice
     public Result createShaderTable(ShaderTableDesc* desc, out IShaderTable outTable);
 
     public Result createProgram(
-        void *desc,
+        void* desc,
         out IShaderProgram outProgram,
         out slang::ISlangBlob outDiagnosticBlob);
 
     public Result createProgram2(
-        ShaderProgramDesc2 *desc,
+        ShaderProgramDesc2* desc,
         out Optional<IShaderProgram> outProgram,
         out Optional<slang::ISlangBlob> outDiagnosticBlob);
 
     public Result createGraphicsPipelineState(
-        GraphicsPipelineStateDesc *desc,
+        GraphicsPipelineStateDesc* desc,
         out Optional<IPipelineState> outState);
 
     public Result createComputePipelineState(
@@ -1894,7 +2040,8 @@ public interface IDevice
         out Optional<IPipelineState> outState);
 
     public Result createRayTracingPipelineState(
-        RayTracingPipelineStateDesc *desc, out Optional<IPipelineState> outState);
+        RayTracingPipelineStateDesc* desc,
+        out Optional<IPipelineState> outState);
 
     /// Read back texture resource and stores the result in `outBlob`.
     public Result readTextureResource(
@@ -1913,8 +2060,7 @@ public interface IDevice
     /// Get the type of this renderer
     public DeviceInfo* getDeviceInfo();
 
-    public Result createQueryPool(
-        QueryPoolDesc* desc, out IQueryPool outPool);
+    public Result createQueryPool(QueryPoolDesc* desc, out IQueryPool outPool);
 
     public Result getAccelerationStructurePrebuildInfo(
         AccelerationStructureBuildInputs* buildInputs,
@@ -1931,12 +2077,14 @@ public interface IDevice
     public Result waitForFences(
         GfxCount fenceCount,
         NativeRef<IFence>* fences,
-        uint64_t *values,
+        uint64_t* values,
         bool waitForAll,
         uint64_t timeout);
 
     public Result getTextureAllocationInfo(
-        TextureResourceDesc* desc, out Size outSize, out Size outAlignment);
+        TextureResourceDesc* desc,
+        out Size outSize,
+        out Size outAlignment);
 
     public Result getTextureRowAlignment(out Size outAlignment);
 };
@@ -1964,10 +2112,12 @@ SLANG_GFX_IMPORT public bool gfxIsCompressedFormat(Format format);
 SLANG_GFX_IMPORT public bool gfxIsTypelessFormat(Format format);
 
 /// Gets information about the format
-SLANG_GFX_IMPORT public Result gfxGetFormatInfo(Format format, FormatInfo *outInfo);
+SLANG_GFX_IMPORT public Result gfxGetFormatInfo(Format format, FormatInfo* outInfo);
 
 /// Given a type returns a function that can conpublic struct it, or nullptr if there isn't one
-SLANG_GFX_IMPORT public Result gfxCreateDevice(const DeviceDesc* desc, out Optional<IDevice> outDevice);
+SLANG_GFX_IMPORT public Result gfxCreateDevice(
+    const DeviceDesc* desc,
+    out Optional<IDevice> outDevice);
 
 /// Reports current set of live objects in gfx.
 /// Currently this only calls D3D's ReportLiveObjects.
@@ -1987,5 +2137,4 @@ public bool succeeded(Result code)
 {
     return code >= 0;
 }
-
 }

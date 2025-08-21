@@ -1,14 +1,16 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
 
-Tuple<bool, float> createTuple() {
+Tuple<bool, float> createTuple()
+{
     return {};
 }
 
 // We should also enable the following use of initialization list:
 
-Tuple<bool, float> createTuple2() {
-    return {false, 1.0};
+Tuple<bool, float> createTuple2()
+{
+    return { false, 1.0 };
 }
 
 

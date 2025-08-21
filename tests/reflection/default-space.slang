@@ -16,8 +16,14 @@ Texture2D a : register(t0, space99);
 // it is the first available space after all explicitly-bound
 // parameters have claimed their registers/spaces.
 //
-struct B { Texture2D b; }
+struct B
+{
+    Texture2D b;
+}
 ParameterBlock<B> b;
 
-float4 main() : SV_Target
-{ return 0.0; }
+float4 main()
+    : SV_Target
+{
+    return 0.0;
+}

@@ -10,25 +10,27 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum class Enum
 {
-    A, B
-};
+    A,
+    B
+}
+;
 
-struct A 
+struct A
 {
     typedef A Type;
     static const Enum kE = Enum::A;
 };
 
-struct B 
+struct B
 {
     typedef B Type;
     static const Enum kE = Enum::B;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-    let e = B::Type::kE;    
+    let e = B::Type::kE;
     outputBuffer[index] = int(e);
 }

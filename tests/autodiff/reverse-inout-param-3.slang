@@ -18,12 +18,12 @@ void f(inout float p, float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var x = diffPair(5.0, 0.0);
     var pp = diffPair(1.0, 3.0);
     __bwd_diff(f)(pp, x);
 
     outputBuffer[0] = pp.p; // should be 1, since bwd_diff does not write back new primal val.
-    outputBuffer[1] = x.d; // 3
+    outputBuffer[1] = x.d;  // 3
 }

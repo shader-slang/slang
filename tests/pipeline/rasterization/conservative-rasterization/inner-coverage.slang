@@ -9,9 +9,7 @@
 // CHECK: OpDecorate %{{.*}} BuiltIn FullyCoveredEXT
 
 [shader("fragment")]
-void main(
-    uint innerCoverage : SV_InnerCoverage,
-    out float4 result : SV_Target)
+void main(uint innerCoverage: SV_InnerCoverage, out float4 result: SV_Target)
 {
     result = innerCoverage;
 }

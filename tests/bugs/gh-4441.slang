@@ -13,7 +13,7 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex)
+void computeMain(uint tid: SV_GroupIndex)
 {
     bool K = (bool)outputBuffer[tid];
 

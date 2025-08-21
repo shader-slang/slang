@@ -37,18 +37,18 @@ struct Data
 
 int test(int val)
 {
-    int offsetX = val*4;
+    int offsetX = val * 4;
     int offsetY = offsetX & 0xFF;
 
     Data x = inputBuffer.Load<Data>(offsetX);
     tmpBuffer.Store<Data>(offsetY, x);
 
     uint16_t2 y = tmpBuffer.Load<uint16_t2>(offsetX);
-    return int(y.x)*256*16 + int(y.y);
+    return int(y.x) * 256 * 16 + int(y.y);
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     outputBuffer[tid] = test(tid);

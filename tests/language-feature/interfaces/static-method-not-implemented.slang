@@ -24,4 +24,3 @@ void computeMain()
 {
     result[0] = callGet<Impl>();
 }
-

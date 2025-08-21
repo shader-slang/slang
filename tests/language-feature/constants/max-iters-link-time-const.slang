@@ -4,7 +4,7 @@
 extern static const int num = 10;
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     [MaxIters(num)]

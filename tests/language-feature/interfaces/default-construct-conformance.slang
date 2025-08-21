@@ -28,15 +28,9 @@ struct Test1 : ITest
 struct TestAny : ITest
 {
     uint value = 5;
-    __init(uint v)
-    {
-        value = v;
-    }
+    __init(uint v) { value = v; }
 
-    __init()
-    {
-        value = 0;
-    }
+    __init() { value = 0; }
 
     uint getValue() { return value; }
 }

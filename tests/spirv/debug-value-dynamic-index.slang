@@ -6,13 +6,10 @@ struct TestType
     float3 memberB;
     float arrayVal[10];
     RWStructuredBuffer<float> memberC;
-    float getValue()
-    {
-        return memberA;
-    }
+    float getValue() { return memberA; }
 }
 RWStructuredBuffer<float> result;
-void main(int id : SV_DispatchThreadID)
+void main(int id: SV_DispatchThreadID)
 {
     TestType t;
     t.memberA = 1.0;

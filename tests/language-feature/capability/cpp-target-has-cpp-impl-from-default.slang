@@ -5,9 +5,10 @@
 layout(binding = 0) buffer MyBlockName
 {
     int v[1];
-} outputBuffer;
+}
+outputBuffer;
 
-// `default` only should try to define `glsl`, but glsl target is 
+// `default` only should try to define `glsl`, but glsl target is
 // present in a `case` statment. Therefore this code should error
 // since cpp is missing a target for a function called
 [require(cpp_glsl)]
@@ -25,7 +26,7 @@ void someMin()
 {
     someInternalFunc();
 }
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     someMin();

@@ -14,15 +14,12 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
     [BackwardDerivative(evalBwd)]
     public MLVec<OutputSize> eval(MLVec<InputSize> input)
     {
-        var output = matMulAdd<OutputSize>(
-            input,
-            weights,
-            biases);
+        var output = matMulAdd<OutputSize>(input, weights, biases);
         // ReLU activation
         for (int i = 0; i < OutputSize; i++)
             if (output.data[i] < 0.0)
                 output.data[i] *= 0.001h;
-        return output; 
+        return output;
     }
 
     public void evalBwd(
@@ -39,10 +36,7 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
         }
 
         // Back-prop gradients to the weights matrix.
-        outerProductAccumulate(
-            resultGrad,
-            input.p,
-            weightsGrad);
+        outerProductAccumulate(resultGrad, input.p, weightsGrad);
 
         // Back-prop gradients to the biases vector.
         for (int i = 0; i < OutputSize; i++)
@@ -54,6 +48,6 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
         // Back-prop gradients to the input vector.
         let dInput = matMulTransposed<InputSize>(resultGrad, weights);
 
-        input = {input.p, dInput};
+        input = { input.p, dInput };
     }
 }

@@ -10,8 +10,8 @@ struct S
 globallycoherent RWStructuredBuffer<S> buffer;
 
 RWStructuredBuffer<float> output;
-[numthreads(4,1,1)]
-void main(int tid : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void main(int tid: SV_DispatchThreadID)
 {
     InterlockedAdd(buffer[0].member, 1);
     AllMemoryBarrier();

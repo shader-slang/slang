@@ -7,11 +7,8 @@ struct DefaultStructNoInit
 {
     int data0 = 2;
     int data1 = 2;
-
 };
-extension DefaultStructNoInit
-{
-}
+extension DefaultStructNoInit {}
 
 struct DefaultStructWithInit
 {

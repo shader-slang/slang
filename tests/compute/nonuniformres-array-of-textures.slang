@@ -6,7 +6,7 @@
 Texture2D<float> textures[2];
 RWTexture2D<float2> outputTexture;
 [numthreads(1, 1, 1)]
-void main(uint2 pixelIndex : SV_DispatchThreadID)
+void main(uint2 pixelIndex: SV_DispatchThreadID)
 {
     // CHECK0: texelFetch({{.*}}[nonuniformEXT({{.*}})])
 
@@ -38,4 +38,3 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     float2 tmp1 = textures[NonUniformResourceIndex(uint(float(pixelIndex.x)))].Load(int3(0, 0, 0));
     outputTexture[1] = tmp1;
 }
-

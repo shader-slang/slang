@@ -30,7 +30,7 @@ int test(IFoo foo, int idx)
         val = a.foo(idx);
     }
     // CHECK: error 30015: undefined identifier 'a'.
-    else if(a == none)
+    else if (a == none)
     {
         val = -1;
     }

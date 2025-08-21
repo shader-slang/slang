@@ -11,9 +11,10 @@ using namespace linalg;
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    let mat = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(4.0);
-    var result = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(0);
+    let mat =
+        CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(4.0);
+    var result =
+        CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(0);
     result.copyFrom(mat);
     result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, 16);
 }
-

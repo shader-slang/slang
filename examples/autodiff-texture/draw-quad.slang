@@ -14,7 +14,7 @@ cbuffer Uniforms
 
 struct AssembledVertex
 {
-    float3	position : POSITION;
+    float3 position : POSITION;
 };
 
 struct Fragment
@@ -29,8 +29,7 @@ struct VertexStageOutput
 };
 
 [shader("vertex")]
-VertexStageOutput vertexMain(
-    AssembledVertex assembledVertex)
+VertexStageOutput vertexMain(AssembledVertex assembledVertex)
 {
     VertexStageOutput output;
 
@@ -45,8 +44,8 @@ VertexStageOutput vertexMain(
 }
 
 [shader("fragment")]
-float4 fragmentMain(
-    float2 uv : UV) : SV_Target
+float4 fragmentMain(float2 uv: UV)
+    : SV_Target
 {
     return float4(texture.Sample(sampler, uv).xyz, 1.0);
 }

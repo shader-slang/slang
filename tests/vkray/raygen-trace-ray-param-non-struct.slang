@@ -19,7 +19,7 @@ void main()
     RayDesc ray;
     ray.Origin = float3(0);
     ray.TMin = 1e-6;
-    ray.Direction = float3(0,0,1);
+    ray.Direction = float3(0, 0, 1);
     ray.TMax = 100.0f;
 
     // CHECK: RayPayload_t{{_[0-9]}} rayPayload{{_[0-9]}};
@@ -29,66 +29,33 @@ void main()
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: TraceRay(
     // CHECK: {{.*}} = rayPayload{{.*}}.data{{.*}};
-    TraceRay(as,
-             1,
-             0xff,
-             0,
-             0,
-             2,
-             ray,
-             someInData1);
-    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+    TraceRay(as, 1, 0xff, 0, 0, 2, ray, someInData1);
+    outputBuffer1[0] = outputBuffer1[0] + someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: TraceMotionRay(
     // CHECK: {{.*}} = rayPayload{{.*}}.data{{.*}};
-    TraceMotionRay(as,
-            1,
-            0xff,
-            0,
-            0,
-            2,
-            ray,
-            0.0f,
-            someInData1);
-    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+    TraceMotionRay(as, 1, 0xff, 0, 0, 2, ray, 0.0f, someInData1);
+    outputBuffer1[0] = outputBuffer1[0] + someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: NvTraceRayHitObject(
     // CHECK: {{.*}} = rayPayload{{.*}}.data{{.*}};
-    HitObject::TraceRay(as,
-             1,
-             0xff,
-             0,
-             0,
-             2,
-             ray,
-             someInData1);
-    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+    HitObject::TraceRay(as, 1, 0xff, 0, 0, 2, ray, someInData1);
+    outputBuffer1[0] = outputBuffer1[0] + someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: TraceMotionRay(
     // CHECK: {{.*}} = rayPayload{{.*}}.data{{.*}};
-    HitObject::TraceMotionRay(as,
-            1,
-            0xff,
-            0,
-            0,
-            2,
-            ray,
-            0.0f,
-            someInData1);
-    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+    HitObject::TraceMotionRay(as, 1, 0xff, 0, 0, 2, ray, 0.0f, someInData1);
+    outputBuffer1[0] = outputBuffer1[0] + someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: NvInvokeHitObject(
     // CHECK: {{.*}} = rayPayload{{.*}}.data{{.*}};
     HitObject hitObject_HitOrMiss;
-    HitObject::Invoke(
-        as,
-        hitObject_HitOrMiss,
-        someInData1);
-    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+    HitObject::Invoke(as, hitObject_HitOrMiss, someInData1);
+    outputBuffer1[0] = outputBuffer1[0] + someInData1;
 
     addComplexity2(someInData1);
 }

@@ -9,7 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-// Passing, but: slang-test: Test context Slang session is leaking #5610
+//  Passing, but: slang-test: Test context Slang session is leaking #5610
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // First we will define some fake interfaces for testing.
@@ -47,10 +47,7 @@ interface IModifier
 // Let's define a subroutine that will use these interfaces
 // to do something mildly interesting.
 //
-int test(
-    int                             seed,
-    IRandomNumberGenerationStrategy inStrategy,
-    IModifier                       modifier)
+int test(int seed, IRandomNumberGenerationStrategy inStrategy, IModifier modifier)
 {
     // HACK: The compiler currently has a problem with
     // looking up the conformance witness for `inStrategy`
@@ -96,8 +93,8 @@ uniform IRandomNumberGenerationStrategy gStrategy;
 void computeMain(
 //TEST_INPUT: entryPointSpecializationArg MyModifier
 //TEST_INPUT:set modifier = new MyModifier{}
-    uniform IModifier   modifier,
-            int3       dispatchThreadID : SV_DispatchThreadID)
+    uniform IModifier modifier,
+    int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -119,10 +116,7 @@ struct MyStrategy : IRandomNumberGenerationStrategy
         int state;
 
         [mutating]
-        int randomInt()
-        {
-            return state++;
-        }
+        int randomInt() { return state++; }
     }
 
     Generator makeGenerator(int seed)
@@ -134,8 +128,5 @@ struct MyStrategy : IRandomNumberGenerationStrategy
 
 struct MyModifier : IModifier
 {
-    int modify(int val)
-    {
-        return val * 16;
-    }
+    int modify(int val) { return val * 16; }
 }

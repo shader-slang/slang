@@ -4,7 +4,8 @@
 
 // Test that matrix swizzle works correctly
 // Matrix swizzles can either be one or zero indexed
-// Reference: https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-per-component-math
+// Reference:
+// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-per-component-math
 
 int test(int val)
 {
@@ -25,7 +26,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

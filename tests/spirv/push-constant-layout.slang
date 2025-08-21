@@ -12,15 +12,14 @@ ConstantBuffer<Transform> transform1;
 
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain1()
 {
     outputBuffer[0] = transform1.Translation.x;
 }
 
-[numthreads(1,1,1)]
-void computeMain2(
-    [vk::push_constant] ConstantBuffer<Transform> transform2)
+[numthreads(1, 1, 1)]
+void computeMain2([vk::push_constant] ConstantBuffer<Transform> transform2)
 {
     outputBuffer[0] = transform2.Translation.x;
 }

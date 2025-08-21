@@ -21,7 +21,10 @@ float lambdaGGX(const float alphaSqr, const float cosTheta)
 
 // CUDA-DAG: __device__ void lambdaGGX_bwd(DiffPair_float_[[#]] * alphaSqr_[[#]], DiffPair_float_[[#]] * cosTheta_[[#]], float d_out_[[#]])
 [CudaDeviceExport]
-void lambdaGGX_bwd(inout DifferentialPair<float> alphaSqr, inout DifferentialPair<float> cosTheta, const float d_out)
+void lambdaGGX_bwd(
+    inout DifferentialPair<float> alphaSqr,
+    inout DifferentialPair<float> cosTheta,
+    const float d_out)
 {
     __bwd_diff(lambdaGGX)(alphaSqr, cosTheta, d_out);
 }
@@ -42,10 +45,11 @@ float maskingSmithGGXCorrelated(const float alphaSqr, const float cosThetaI, con
 
 // CUDA-DAG: __device__ void maskingSmithGGXCorrelated_bwd(DiffPair_float_[[#]] * alphaSqr_[[#]], DiffPair_float_[[#]] * cosThetaI_[[#]], DiffPair_float_[[#]] * cosThetaO_[[#]], float d_out_[[#]])
 [CudaDeviceExport]
-void maskingSmithGGXCorrelated_bwd(inout DifferentialPair<float> alphaSqr,
-                                   inout DifferentialPair<float> cosThetaI,
-                                   inout DifferentialPair<float> cosThetaO,
-                                   const float d_out)
+void maskingSmithGGXCorrelated_bwd(
+    inout DifferentialPair<float> alphaSqr,
+    inout DifferentialPair<float> cosThetaI,
+    inout DifferentialPair<float> cosThetaO,
+    const float d_out)
 {
     __bwd_diff(maskingSmithGGXCorrelated)(alphaSqr, cosThetaI, cosThetaO, d_out);
 }

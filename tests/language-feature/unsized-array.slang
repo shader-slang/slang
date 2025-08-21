@@ -24,7 +24,7 @@ int test2<T>(inout T arr[])
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    int arr[3] = {1, 2, 3};
+    int arr[3] = { 1, 2, 3 };
 
     // CHECK: 4
     outputBuffer[0] = test(arr);
@@ -39,5 +39,4 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     // CHECK: 2
     outputBuffer[3] = test2(arr2);
-
 }

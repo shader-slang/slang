@@ -1,5 +1,6 @@
 // binding-attribute-ignored.slang
-// Test that binding attributes on uniforms that get packed into the default uniform buffer trigger a warning
+// Test that binding attributes on uniforms that get packed into the default uniform buffer trigger
+// a warning
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
@@ -16,7 +17,8 @@ uniform float4x4 g_transform;
 Texture2D g_texture;
 
 [shader("vertex")]
-float4 main(float4 pos : POSITION) : SV_POSITION
+float4 main(float4 pos: POSITION)
+    : SV_POSITION
 {
     return g_position;
-} 
+}

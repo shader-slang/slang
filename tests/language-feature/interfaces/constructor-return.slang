@@ -6,7 +6,8 @@
 // ordinary struct.
 
 // A constructor from the callsite's point of view is a function that returns the struct type.
-// A constructor from the inside the body is treated as a function that modifies `this` and not return.
+// A constructor from the inside the body is treated as a function that modifies `this` and not
+// return.
 
 // In the following test-cases where the constructor either returns an expr or no value,
 // such as `return ...` within a condition for early exit or not,
@@ -47,7 +48,7 @@ struct Impl
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint id : SV_DispatchThreadID)
+void computeMain(uint id: SV_DispatchThreadID)
 {
     // CHECK: 4.000000
     // CHECK: 2.000000

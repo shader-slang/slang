@@ -10,7 +10,8 @@ struct FragmentInput
 }
 
 [shader("fragment")]
-float4 main(FragmentInput input) : SV_Target
+float4 main(FragmentInput input)
+    : SV_Target
 {
     // CHECK-SPIRV: OpCapability FragmentDensityEXT
     // CHECK-SPIRV: OpExtension "SPV_EXT_fragment_invocation_density"

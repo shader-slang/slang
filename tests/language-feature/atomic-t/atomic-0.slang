@@ -6,7 +6,7 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<int>> outputBuffer;
 
-[NumThreads(1,1,1)]
+[NumThreads(1, 1, 1)]
 void computeMain()
 {
     bool result = true;
@@ -27,7 +27,8 @@ void computeMain()
     if (outputBuffer[0].exchange(4) != 1)
         result = false;
     if (outputBuffer[0].compareExchange(4, 5) != 4)
-    {} //result = false; // for some reason this fails on Metal Github CI, so disabling.
+    {
+    } // result = false; // for some reason this fails on Metal Github CI, so disabling.
     if (outputBuffer[0].load() != 5)
         result = false;
     if (outputBuffer[0].increment() != 5)

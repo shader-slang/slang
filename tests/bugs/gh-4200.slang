@@ -5,7 +5,7 @@
 //CHECK_HLSL: computeMain
 
 Texture2DMS<uint4> Src : register(t1);
-RWBuffer<uint4>    Dst : register(u2);
+RWBuffer<uint4> Dst : register(u2);
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -10,7 +10,8 @@ buffer MyBlockName2
     uint foo;
     uint bar;
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()

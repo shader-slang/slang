@@ -27,5 +27,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float a = 10.0;
     float inArray[2] = { 1, 2 };
-    __bwd_diff(getCode)(uint2(1,2), inArray);
+    __bwd_diff(getCode)(uint2(1, 2), inArray);
 }

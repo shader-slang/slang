@@ -25,7 +25,7 @@ void Test_out_param_wrapper(out int value)
     Test_out_param(value);
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // METALLIB: define void @computeMain

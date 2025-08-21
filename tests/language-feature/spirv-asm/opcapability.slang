@@ -12,7 +12,7 @@ RWStructuredBuffer<int> outputBuffer;
 // position OpCapability correctly
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
@@ -21,8 +21,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // We should be able to look this up directly, without having to
         // specify CapabilityMatrix or anything
         OpCapability Matrix;
-        OpConstant $$int %two 2;
-        OpIMul $$int result $n %two
+        OpConstant $$int % two 2;
+        OpIMul $$int result $n % two
     };
     outputBuffer[i] = r;
 }

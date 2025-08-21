@@ -7,9 +7,7 @@ RWStructuredBuffer<float> outputBuffer;
 [Differentiable]
 float h_outer(float a, float b, float c)
 {
-    const float3x2 m2 = float3x2(2 * a, 0.0,
-        0.0, 3 * b,
-        0.0, 5 * c);
+    const float3x2 m2 = float3x2(2 * a, 0.0, 0.0, 3 * b, 0.0, 5 * c);
 
     const float3x3 m1 = float3x3(1.f);
     return h(m1, m2);
@@ -23,7 +21,7 @@ float h(float3x3 x, float3x2 y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Do a bwd_diff test for h_outer
     var dpa = diffPair(1.f, 0.f);

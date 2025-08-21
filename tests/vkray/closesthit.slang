@@ -10,36 +10,33 @@ struct ReflectionRay
 
 StructuredBuffer<float4> colors;
 
-layout(shaderRecordNV)
-cbuffer ShaderRecord
+layout(shaderRecordNV) cbuffer ShaderRecord
 {
-   uint shaderRecordID;
+    uint shaderRecordID;
 }
 
-void main(
-   BuiltInTriangleIntersectionAttributes attributes,
-   in out ReflectionRay                  ioPayload)
+void main(BuiltInTriangleIntersectionAttributes attributes, in out ReflectionRay ioPayload)
 {
-   uint materialID = (InstanceIndex() << 1)
+    uint materialID = (InstanceIndex() << 1)
       + InstanceID()
       + PrimitiveIndex()
       + HitKind()
       + shaderRecordID;
 
-   float4 color = colors[materialID];
+    float4 color = colors[materialID];
 
-   color *= RayTCurrent() - RayTMin();
+    color *= RayTCurrent() - RayTMin();
 
-   ioPayload.color = color;
+    ioPayload.color = color;
 
-   uint index = 0U;
-   ioPayload.dummyOut = HitTriangleVertexPosition(index);
+    uint index = 0U;
+    ioPayload.dummyOut = HitTriangleVertexPosition(index);
 
-   index = 1U;
-   ioPayload.dummyOut += HitTriangleVertexPosition(index);
+    index = 1U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 
-   index = 2U;
-   ioPayload.dummyOut += HitTriangleVertexPosition(index);
+    index = 2U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 }
 
 // CHECK: OpCapability RayTracing

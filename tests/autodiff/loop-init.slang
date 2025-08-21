@@ -13,9 +13,9 @@ struct A : IDifferentiable
 
 // Check that the intermediate context of B.eval does not have any arrays.
 // This will fail if the induction variable is not properly detected, or
-// if the various loop restructuring passes accidentally introduce additional 
+// if the various loop restructuring passes accidentally introduce additional
 // loop state.
-// 
+//
 
 // CHECK: struct s_bwd_prop_B_eval_Intermediates_0
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
@@ -28,10 +28,13 @@ struct B
     float3 eval(const A miData, const float3 wi, const float3 wo)
     {
         float3 albedo;
-        for (uint i = 0; i < 3; i++) albedo[i] = miData.data[i];
+        for (uint i = 0; i < 3; i++)
+            albedo[i] = miData.data[i];
 
         float3 result = float3(1.f);
-        [ForceUnroll] for (uint i = 0; i < TBsdfCount; i++) result *= albedo;
+        [ForceUnroll]
+        for (uint i = 0; i < TBsdfCount; i++)
+            result *= albedo;
         return result;
     }
 };

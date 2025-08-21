@@ -1,25 +1,29 @@
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -fvk-use-entrypoint-name
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -fvk-use-entrypoint-name
 
-// 
-// Check that SPIRV quad control execution modes and GLSL layout/attribute decorations are only 
+//
+// Check that SPIRV quad control execution modes and GLSL layout/attribute decorations are only
 // set on entry points that contain quad control functions and/or quad control decorations.
 //
 
 Texture2D colorTexture1;
 SamplerState samplerState;
 
-struct FragmentInput {
+struct FragmentInput
+{
     float2 uv : TEXCOORD0;
 };
 
-float4 getFragColor(float2 uv) {
+float4 getFragColor(float2 uv)
+{
     float4 fragColor = float4(1.0, 1.0, 1.0, 1.0);
     bool nonUniformCondition = uv.x > 0.5;
 
-    if (QuadAny(nonUniformCondition)) {
+    if (QuadAny(nonUniformCondition))
+    {
         float4 color = colorTexture1.Sample(samplerState, uv);
-        if (nonUniformCondition) {
+        if (nonUniformCondition)
+        {
             fragColor = color;
         }
     }
@@ -33,15 +37,18 @@ float4 getFragColor(float2 uv) {
 // CHECK_GLSL: layout(quad_derivatives) in
 // CHECK_GLSL: [maximally_reconverges]
 [shader("fragment")]
-float4 fragmentMain1(FragmentInput input) : SV_Target
+float4 fragmentMain1(FragmentInput input)
+    : SV_Target
 {
     bool nonUniformCondition = input.uv.x > 0.5;
 
     float4 fragColor = float4(1.0, 1.0, 1.0, 1.0);
 
-    if (QuadAny(nonUniformCondition)) {
+    if (QuadAny(nonUniformCondition))
+    {
         float4 color = colorTexture1.Sample(samplerState, input.uv);
-        if (nonUniformCondition) {
+        if (nonUniformCondition)
+        {
             fragColor = color;
         }
     }
@@ -55,7 +62,8 @@ float4 fragmentMain1(FragmentInput input) : SV_Target
 // CHECK_GLSL: [maximally_reconverges]
 [MaximallyReconverges]
 [shader("fragment")]
-float4 fragmentMain2(FragmentInput input) : SV_Target
+float4 fragmentMain2(FragmentInput input)
+    : SV_Target
 {
     return float4(1.0, 1.0, 1.0, 1.0);
 }
@@ -69,7 +77,8 @@ float4 fragmentMain2(FragmentInput input) : SV_Target
 // CHECK_GLSL-NOT: [maximally_reconverges]
 [RequireFullQuads]
 [shader("fragment")]
-float4 fragmentMain3(FragmentInput input) : SV_Target
+float4 fragmentMain3(FragmentInput input)
+    : SV_Target
 {
     return float4(1.0, 1.0, 1.0, 1.0);
 }
@@ -79,7 +88,8 @@ float4 fragmentMain3(FragmentInput input) : SV_Target
 // CHECK_GLSL: layout(quad_derivatives) in
 // CHECK_GLSL: [maximally_reconverges]
 [shader("fragment")]
-float4 fragmentMain4(FragmentInput input) : SV_Target
+float4 fragmentMain4(FragmentInput input)
+    : SV_Target
 {
     return getFragColor(input.uv);
 }
@@ -91,7 +101,8 @@ float4 fragmentMain4(FragmentInput input) : SV_Target
 // CHECK_GLSL-NOT: layout(full_quads) in
 // CHECK_GLSL-NOT: [maximally_reconverges]
 [shader("fragment")]
-float4 fragmentMain5(FragmentInput input) : SV_Target
+float4 fragmentMain5(FragmentInput input)
+    : SV_Target
 {
     return float4(1.0, 1.0, 1.0, 1.0);
 }

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage closesthit -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage closesthit
-//   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
+//    Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage closesthit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
@@ -88,8 +88,12 @@ float CheckRayDispatchValues()
     uint3 ri = DispatchRaysIndex();
     uint3 rd = DispatchRaysDimensions();
 
-    val += ri.x; val += ri.y; val += ri.z;
-    val += rd.x; val += rd.y; val += rd.z;
+    val += ri.x;
+    val += ri.y;
+    val += ri.z;
+    val += rd.x;
+    val += rd.y;
+    val += rd.z;
 
     return val;
 }
@@ -99,10 +103,14 @@ float CheckRaySystemValues()
     float val = 0.0f;
 
     float3 wro = WorldRayOrigin();
-    val += wro.x; val += wro.y; val += wro.z;
+    val += wro.x;
+    val += wro.y;
+    val += wro.z;
 
     float3 wrd = WorldRayDirection();
-    val += wrd.x; val += wrd.y; val += wrd.z;
+    val += wrd.x;
+    val += wrd.y;
+    val += wrd.z;
 
     float rayTMin = RayTMin();
     val += rayTMin;
@@ -113,22 +121,22 @@ float CheckRaySystemValues()
     uint rayFlags = RayFlags();
     switch (rayFlags)
     {
-        case RAY_FLAG_NONE:
-        case RAY_FLAG_FORCE_OPAQUE:
-        case RAY_FLAG_FORCE_NON_OPAQUE:
-        case RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH:
-        case RAY_FLAG_SKIP_CLOSEST_HIT_SHADER:
-        case RAY_FLAG_CULL_BACK_FACING_TRIANGLES:
-        case RAY_FLAG_CULL_FRONT_FACING_TRIANGLES:
-        case RAY_FLAG_CULL_OPAQUE:
-        case RAY_FLAG_CULL_NON_OPAQUE:
-        case RAY_FLAG_SKIP_TRIANGLES:
-        case RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES:
-            val += 1.0f;
-            break;
+    case RAY_FLAG_NONE:
+    case RAY_FLAG_FORCE_OPAQUE:
+    case RAY_FLAG_FORCE_NON_OPAQUE:
+    case RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH:
+    case RAY_FLAG_SKIP_CLOSEST_HIT_SHADER:
+    case RAY_FLAG_CULL_BACK_FACING_TRIANGLES:
+    case RAY_FLAG_CULL_FRONT_FACING_TRIANGLES:
+    case RAY_FLAG_CULL_OPAQUE:
+    case RAY_FLAG_CULL_NON_OPAQUE:
+    case RAY_FLAG_SKIP_TRIANGLES:
+    case RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES:
+        val += 1.0f;
+        break;
 
-        default:
-            break;
+    default:
+        break;
     }
 
     return val;
@@ -144,32 +152,70 @@ float CheckObjectSpaceSystemValues()
     val += PrimitiveIndex();
 
     float3 oro = ObjectRayOrigin();
-    val += oro.x; val += oro.y; val += oro.z;
+    val += oro.x;
+    val += oro.y;
+    val += oro.z;
 
     float3 ord = ObjectRayDirection();
-    val += ord.x; val += ord.y; val += ord.z;
+    val += ord.x;
+    val += ord.y;
+    val += ord.z;
 
     float3x4 f3x4 = ObjectToWorld3x4();
-    val += f3x4._11; val += f3x4._12; val += f3x4._13; val += f3x4._14;
-    val += f3x4._21; val += f3x4._22; val += f3x4._23; val += f3x4._24;
-    val += f3x4._31; val += f3x4._32; val += f3x4._33; val += f3x4._34;
+    val += f3x4._11;
+    val += f3x4._12;
+    val += f3x4._13;
+    val += f3x4._14;
+    val += f3x4._21;
+    val += f3x4._22;
+    val += f3x4._23;
+    val += f3x4._24;
+    val += f3x4._31;
+    val += f3x4._32;
+    val += f3x4._33;
+    val += f3x4._34;
 
     float4x3 f4x3 = ObjectToWorld4x3();
-    val += f4x3._11; val += f4x3._12; val += f4x3._13;
-    val += f4x3._21; val += f4x3._22; val += f4x3._23;
-    val += f4x3._31; val += f4x3._32; val += f4x3._33;
-    val += f4x3._41; val += f4x3._42; val += f4x3._43;
+    val += f4x3._11;
+    val += f4x3._12;
+    val += f4x3._13;
+    val += f4x3._21;
+    val += f4x3._22;
+    val += f4x3._23;
+    val += f4x3._31;
+    val += f4x3._32;
+    val += f4x3._33;
+    val += f4x3._41;
+    val += f4x3._42;
+    val += f4x3._43;
 
     f3x4 = WorldToObject3x4();
-    val += f3x4._11; val += f3x4._12; val += f3x4._13; val += f3x4._14;
-    val += f3x4._21; val += f3x4._22; val += f3x4._23; val += f3x4._24;
-    val += f3x4._31; val += f3x4._32; val += f3x4._33; val += f3x4._34;
+    val += f3x4._11;
+    val += f3x4._12;
+    val += f3x4._13;
+    val += f3x4._14;
+    val += f3x4._21;
+    val += f3x4._22;
+    val += f3x4._23;
+    val += f3x4._24;
+    val += f3x4._31;
+    val += f3x4._32;
+    val += f3x4._33;
+    val += f3x4._34;
 
     f4x3 = WorldToObject4x3();
-    val += f4x3._11; val += f4x3._12; val += f4x3._13;
-    val += f4x3._21; val += f4x3._22; val += f4x3._23;
-    val += f4x3._31; val += f4x3._32; val += f4x3._33;
-    val += f4x3._41; val += f4x3._42; val += f4x3._43;
+    val += f4x3._11;
+    val += f4x3._12;
+    val += f4x3._13;
+    val += f4x3._21;
+    val += f4x3._22;
+    val += f4x3._23;
+    val += f4x3._31;
+    val += f4x3._32;
+    val += f4x3._33;
+    val += f4x3._41;
+    val += f4x3._42;
+    val += f4x3._43;
 
     return val;
 }
@@ -220,23 +266,95 @@ float CheckTraceRay(RayPayload payload, RayDesc rayDesc)
     val += payload.RayHitT;
     TraceMotionRay(accelStruct, RAY_FLAG_FORCE_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_FORCE_NON_OPAQUE,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
     TraceMotionRay(accelStruct, RAY_FLAG_CULL_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_NON_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_NON_OPAQUE,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
 #endif
 
@@ -256,18 +374,19 @@ float CheckSysValueIntrinsics()
 }
 
 [shader("closesthit")]
-void main( inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs )
+void main(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
 {
     float2 dir = (DispatchRaysIndex().xy / DispatchRaysDimensions().xy) * 2.0f - 1.0f;
     float aspectRatio = DispatchRaysDimensions().x / DispatchRaysDimensions().y;
 
     RayDesc rayDesc;
     rayDesc.Origin = float3(0.0f, 0.0f, 0.0f);
-    rayDesc.Direction = normalize(float3(dir.x * aspectRatio, -dir.y, 1)); ;
+    rayDesc.Direction = normalize(float3(dir.x * aspectRatio, -dir.y, 1));
+    ;
     rayDesc.TMin = T_MIN;
     rayDesc.TMax = T_MAX;
 
-    //RayPayload payload;
+    // RayPayload payload;
     payload.RayHitT = T_MAX;
 
     float val = 0.0f;
@@ -276,11 +395,16 @@ void main( inout RayPayload payload, in BuiltInTriangleIntersectionAttributes at
 
     val += CheckSysValueIntrinsics();
 
-    float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-    val += barycentrics.x; val += barycentrics.y; val += barycentrics.z;
+    float3 barycentrics = float3(
+        1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y);
+    val += barycentrics.x;
+    val += barycentrics.y;
+    val += barycentrics.z;
 
     CallableParams params;
-    CallShader( 0, params );
+    CallShader(0, params);
     val += params.value;
 
     payload.RayHitT = val;

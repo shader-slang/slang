@@ -12,8 +12,8 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-NEXT: 3
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    vector<int,1> i = vector<int,1>(dispatchThreadID.x);
+    vector<int, 1> i = vector<int, 1>(dispatchThreadID.x);
     outputBuffer[i.x] = i.x;
 }

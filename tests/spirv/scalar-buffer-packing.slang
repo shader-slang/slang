@@ -31,7 +31,7 @@ struct Val
 
 //TEST_INPUT:set result = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<Val> result;
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 1

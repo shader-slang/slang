@@ -13,7 +13,6 @@
 public interface ITensor<T : IDifferentiable, let D : int>
 {
     public T get(int idx);
-
 }
 
 public interface IRWTensor<T : IDifferentiable, let D : int> : ITensor<T, D>

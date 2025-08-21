@@ -62,7 +62,7 @@ struct TopFragment
 
 struct FragmentStageInput
 {
-	TopFragment	coarseVertex : CoarseVertex;
+    TopFragment coarseVertex : CoarseVertex;
 };
 
 // WGSL: fn fragmentMain{{[( ]*}}[[InputVar:[A-Za-z_0-9]+]]

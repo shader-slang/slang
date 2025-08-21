@@ -32,7 +32,8 @@ SamplerState followingSamplerState;
 // REFLECT: "binding": {"kind": "samplerState", "index": 1}
 
 // ------------------------
-Sampler2D explicitBindingSampler : register(t4): register(s3);
+Sampler2D explicitBindingSampler : register(t4)
+    : register(s3);
 
 // METAL-DAG: {{explicitBindingSampler_texture_[1-9]}} {{\[\[}}texture(4)]]
 // METAL-DAG: {{explicitBindingSampler_sampler_[1-9]}} {{\[\[}}sampler(3)]]
@@ -43,7 +44,9 @@ Sampler2D explicitBindingSampler : register(t4): register(s3);
 // REFLECT-NOT:}
 // REFLECT: {"kind": "samplerState", "index": 3}
 
-float4 computeMain() : SV_Target
+float4 computeMain()
+    : SV_Target
 {
-    return sampler.Sample(float2(0, 0)) + explicitBindingSampler.Sample(float2(0, 0)) + followingTexture.Sample(followingSamplerState, float2(0,0));
+    return sampler.Sample(float2(0, 0)) + explicitBindingSampler.Sample(float2(0, 0)) +
+           followingTexture.Sample(followingSamplerState, float2(0, 0));
 }

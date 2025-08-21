@@ -38,7 +38,13 @@ int32_t CombineOp(int32_t lhs, int32_t rhs)
 void computeMain()
 {
     let stride = 16;
-    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
+    let mat = coopMatLoad<
+        int32_t,
+        MemoryScope.Subgroup,
+        16,
+        16,
+        CoopMatMatrixUse.MatrixAccumulator,
+        CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
 #if TEST_MODE == 0
     let result = mat.ReduceRow<8>(CombineOp);
 #elif TEST_MODE == 1

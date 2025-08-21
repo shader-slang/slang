@@ -10,7 +10,7 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     float x = 0;
     f(x);
@@ -21,8 +21,10 @@ void f(inout float r)
 {
     r = 0;
     float a = 0;
-    do {
-        do {
+    do
+    {
+        do
+        {
             a = a + 1;
             if (a > 0)
                 break;

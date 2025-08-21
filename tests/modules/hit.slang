@@ -3,7 +3,7 @@
 
 import environment;
 
-StructuredBuffer <Environment_sample_data> environment_sample_buffer;
+StructuredBuffer<Environment_sample_data> environment_sample_buffer;
 
 float3 sample_lights(inout uint seed)
 {

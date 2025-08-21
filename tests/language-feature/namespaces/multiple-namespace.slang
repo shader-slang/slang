@@ -6,40 +6,49 @@
 
 namespace A
 {
-    struct Struct1
-    {
-        int a;
-    }
+struct Struct1
+{
+    int a;
+}
 }
 
 namespace A
 {
-    struct Struct2
-    {
-        int b;
-    }
+struct Struct2
+{
+    int b;
+}
 }
 
 namespace A
 {
-    struct Struct3
-    {
-        int c;
-    }
+struct Struct3
+{
+    int c;
 }
-   
-// A few more 
+}
 
-namespace A {}
-namespace A {}
-namespace A { namespace A {} }
-   
+// A few more
+
+namespace A
+{
+}
+namespace A
+{
+}
+namespace A
+{
+namespace A
+{
+}
+}
+
 int test(int val)
 {
     A.Struct1 s1 = {};
     A::Struct2 s2 = { val };
     A.Struct3 s3 = { val * val };
-    
+
     return s1.a + s2.b + s3.c;
 }
 
@@ -47,7 +56,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

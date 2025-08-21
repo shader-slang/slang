@@ -13,7 +13,7 @@ struct structOuterData
     static structData data1 = { 1 };
 };
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // BUF: 1

@@ -12,18 +12,21 @@
 //TEST_INPUT:ubuffer(data=[0x11 0x22 0x33 0x44], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
-RWStructuredBuffer<int> getInputBuffer() { return inputBuffer; }
+RWStructuredBuffer<int> getInputBuffer()
+{
+    return inputBuffer;
+}
 
 int test(int val)
 {
-	return getInputBuffer()[val];
+    return getInputBuffer()[val];
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

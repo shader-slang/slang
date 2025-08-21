@@ -23,29 +23,29 @@ RWTexture2D<half4> rwt2D_4;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint idx = dispatchThreadID.x;
-    
+
     float val = 0.0f;
- 
+
     val += rwt1D[idx];
-    
+
     half h0 = rwt2D[uint2(idx, idx)];
 
     val += float(h0);
-    
+
     half4 h1 = rwt2D_4[uint2(idx, idx)];
     float4 f1 = h1;
-   
+
     val += f1.x + f1.y + f1.z + f1.w;
-    
+
     // rwt1D[idx] = idx;
-    rwt2D[uint2(idx, idx)] = half(idx);    
-    
-    //val += rwt1D[idx];
+    rwt2D[uint2(idx, idx)] = half(idx);
+
+    // val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
-    //val += rwt3D[uint3(idx, idx, idx)];
- 
+    // val += rwt3D[uint3(idx, idx, idx)];
+
     outputBuffer[idx] = val;
 }

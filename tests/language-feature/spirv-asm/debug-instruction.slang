@@ -12,18 +12,15 @@ RWStructuredBuffer<int> outputBuffer;
 // This test tests that OpName is put in the correct location in the generated spriv
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    spirv_asm
-    {
-        OpName $$int "INTEGERRRRRRRRRRRRRRRRRRRRR"
-    };
+    spirv_asm { OpName $$int "INTEGERRRRRRRRRRRRRRRRRRRRR" };
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
     int r = spirv_asm
     {
-        OpConstant $$int %two 2;
-        OpIMul $$int result $n %two
+        OpConstant $$int % two 2;
+        OpIMul $$int result $n % two
     };
     outputBuffer[i] = r;
 }

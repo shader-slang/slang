@@ -17,20 +17,20 @@ int test(int val)
 {
     Color c = Color.Red;
 
-    if(val > 1)
+    if (val > 1)
     {
         c = Color.Green;
     }
 
-    if(c == Color.Red)
+    if (c == Color.Red)
     {
-        if((val & 1) != 0)
+        if ((val & 1) != 0)
         {
             c = Color.Blue;
         }
     }
 
-    switch(c)
+    switch (c)
     {
     case Color.Red:
         val = 1;
@@ -56,7 +56,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

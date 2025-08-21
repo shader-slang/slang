@@ -2,14 +2,13 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -stage fragment -entry MainPS -target spirv -emit-spirv-directly
 
-struct PS_OUTPUT 
+struct PS_OUTPUT
 {
-    [[vk::location(0) vk::index(0)]]    
-    float4 vColor : SV_Target0 ; 
-    
-    [[vk::location(0) vk::index(1)]] 
-    float4 vColor2 : SV_Target1 ; 
-    
+    [[vk::location(0) vk::index(0)]]
+    float4 vColor : SV_Target0;
+
+    [[vk::location(0) vk::index(1)]]
+    float4 vColor2 : SV_Target1;
 };
 
 // CHECK: OpDecorate %{{.*}}MainPS_vColor Location 0

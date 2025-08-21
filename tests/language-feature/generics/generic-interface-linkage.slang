@@ -14,13 +14,9 @@ struct GetterImpl : IGetter
 {
     float[8] data;
 
-    __init(float[8] data)
-    { this.data = data; }
+    __init(float[8] data) { this.data = data; }
 
-    float get(uint id)
-    {
-        return data[id];
-    }
+    float get(uint id) { return data[id]; }
 }
 interface IFoo<int N>
 {
@@ -29,31 +25,29 @@ interface IFoo<int N>
     Params bar();
 }
 
-struct FooImpl1: IFoo<8>
-{   
+struct FooImpl1 : IFoo<8>
+{
     typealias Params = GetterImpl;
 
-    __init()
-    { }
+    __init() {}
 
     Params bar()
     {
         float x = outputBuffer[0];
-        return GetterImpl({x, x+1, x+2, x+3, x+4, x+5, x+6, x+7});
+        return GetterImpl( { x, x + 1, x + 2, x + 3, x + 4, x + 5, x + 6, x + 7 });
     }
 }
 
-struct FooImpl2: IFoo<8>
+struct FooImpl2 : IFoo<8>
 {
     typealias Params = GetterImpl;
 
-    __init()
-    { }
+    __init() {}
 
     Params bar()
     {
         float x = 2 * outputBuffer[0];
-        return GetterImpl({x+3, x+5, x+7, x+9, x+11, x+13, x+15, x+17});
+        return GetterImpl( { x + 3, x + 5, x + 7, x + 9, x + 11, x + 13, x + 15, x + 17 });
     }
 }
 
@@ -72,7 +66,7 @@ float doThing(uint id)
 }
 
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 0
     outputBuffer[0] = doThing(0);

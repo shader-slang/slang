@@ -20,16 +20,16 @@ float4 run(Param p)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Param p;
     p.tex = diffuseMap;
     p.samplerState = samplerState;
     p.base = -0.5;
-	float4 outVal = run(p);
-	
+    float4 outVal = run(p);
+
     outputBuffer[0] = outVal.x;
-	outputBuffer[1] = outVal.y;
-	outputBuffer[2] = outVal.z;
-	outputBuffer[3] = outVal.w;
+    outputBuffer[1] = outVal.y;
+    outputBuffer[2] = outVal.z;
+    outputBuffer[3] = outVal.w;
 }

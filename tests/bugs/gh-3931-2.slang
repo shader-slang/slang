@@ -1,12 +1,15 @@
 //IGNORE:TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -O0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -O0 -xslang -DWORKAROUND
 
-// removes from code all uses of pointers, this fixes the code from removal of `PhysicalStorageBuffer64` -- note that the pointer branch is unused regardless of if toggled
-//#define WORKAROUND 
+// removes from code all uses of pointers, this fixes the code from removal of
+// `PhysicalStorageBuffer64` -- note that the pointer branch is unused regardless of if toggled
+// #define WORKAROUND
 
-// ensures the matrix byte offset is 0, this 'fixes' the issue since the issue is that member memory offsets were not being respected (and offset 0 was loaded for each struct)
-//#define WORKAROUND2 
-struct FooBar {
+// ensures the matrix byte offset is 0, this 'fixes' the issue since the issue is that member memory
+// offsets were not being respected (and offset 0 was loaded for each struct)
+// #define WORKAROUND2
+struct FooBar
+{
 #ifdef WORKAROUND2
     float4x4 c;
     uint64_t a;
@@ -17,11 +20,12 @@ struct FooBar {
     float4x4 c;
 #endif
 
-    int load() {
+    int load()
+    {
 #ifdef WORKAROUND
         return (int)a;
 #else
-        return *((int *)a);
+        return *((int*)a);
 #endif
     }
 };
@@ -35,11 +39,13 @@ uniform StructuredBuffer<FooBar, ScalarDataLayout> sb;
 int test(int val)
 {
     uint32_t res = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 4; ++i)
+    {
         res |= bit_cast<uint32_t>(sb[val].c[0][i]) << i * 8;
     }
 
-    if (val == 100000) { // will never use a pointer
+    if (val == 100000)
+    { // will never use a pointer
         res = sb[val].load();
     }
     return bit_cast<int>(res);
@@ -47,8 +53,7 @@ int test(int val)
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain(
-    int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

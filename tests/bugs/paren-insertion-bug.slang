@@ -7,15 +7,15 @@
 
 int test(float a)
 {
-	// This line performs a cast from a scalar result to a vector
-	float3 b = pow(a, 2.0);
+    // This line performs a cast from a scalar result to a vector
+    float3 b = pow(a, 2.0);
 
-	// If the computation of `b` above gets folded into this
-	// line of code (and we expect it to) we need to correctly
-	// parenthesize the generated cast so that the `.xyz` swizzle
-	// applies to the result of the cast, rather than the input.
-	//
-	return int(float4(b.xyz * 2.0, 1.0).x);
+    // If the computation of `b` above gets folded into this
+    // line of code (and we expect it to) we need to correctly
+    // parenthesize the generated cast so that the `.xyz` swizzle
+    // applies to the result of the cast, rather than the input.
+    //
+    return int(float4(b.xyz * 2.0, 1.0).x);
 }
 
 
@@ -23,12 +23,12 @@ int test(float a)
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	uint inVal = tid;
-	uint outVal = test(inVal);
+    uint inVal = tid;
+    uint outVal = test(inVal);
 
-	outputBuffer[tid] = outVal;
+    outputBuffer[tid] = outVal;
 }

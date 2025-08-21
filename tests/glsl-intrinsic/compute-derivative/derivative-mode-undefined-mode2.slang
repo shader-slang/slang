@@ -7,7 +7,8 @@
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 int someFunc()
 {
@@ -15,7 +16,7 @@ int someFunc()
 }
 
 [numthreads(2, 2, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer.result = someFunc();
 }

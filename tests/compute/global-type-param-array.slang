@@ -7,18 +7,17 @@
 RWStructuredBuffer<float> outputBuffer;
 import globalTypeParamArrayShared;
 
-float doCompute<T:IBase>(T t)
+float doCompute<T : IBase>(T t)
 {
     return t.compute(1.0);
 }
 
 [numthreads(1, 1, 1)]
-void computeMain<
-	TImpl : IBase>(
-	uniform ParameterBlock<TImpl> impl,
-	uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain<TImpl : IBase>(
+    uniform ParameterBlock<TImpl> impl,
+    uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
-	float outVal = doCompute<TImpl>(impl); 
-	outputBuffer[tid] = outVal;
+    uint tid = dispatchThreadID.x;
+    float outVal = doCompute<TImpl>(impl);
+    outputBuffer[tid] = outVal;
 }

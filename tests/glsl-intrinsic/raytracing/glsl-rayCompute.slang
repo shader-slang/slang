@@ -1,10 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage compute -entry computeMain -target spirv-assembly
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -entry computeMain 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -emit-spirv-directly -entry computeMain 
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -entry computeMain
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -allow-glsl -vk -compute -output-using-type -render-feature ray-query -emit-spirv-directly -entry computeMain
 
-// note: the referenced input data is in render-test-main kVertexData; 1 triangle at {(0,0,0.5),(0,1,0.5),(1,0,0.5)}
+// note: the referenced input data is in render-test-main kVertexData; 1 triangle at
+// {(0,0,0.5),(0,1,0.5),(1,0,0.5)}
 //TEST_INPUT: set scene = AccelerationStructure
 layout(binding = 0) uniform accelerationStructureEXT scene;
 
@@ -12,7 +13,8 @@ layout(binding = 0) uniform accelerationStructureEXT scene;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
@@ -21,11 +23,7 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     {
         for (int j = 0; j < M; j++)
         {
-            if (
-                lhs[i][j] 
-                !=
-                rhs[i][j]
-                )
+            if (lhs[i][j] != rhs[i][j])
             {
                 return false;
             }
@@ -34,9 +32,18 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     return true;
 }
 
-bool testAbortRayTrace() {
+bool testAbortRayTrace()
+{
     rayQueryEXT q;
-    rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
+    rayQueryInitializeEXT(
+        q,
+        scene,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f);
     rayQueryTerminateEXT(q);
 
     return true
@@ -44,9 +51,18 @@ bool testAbortRayTrace() {
         ;
 }
 
-bool testProceedRayTrace() {
+bool testProceedRayTrace()
+{
     rayQueryEXT q;
-    rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
+    rayQueryInitializeEXT(
+        q,
+        scene,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f);
     rayQueryProceedEXT(q);
 
     return true
@@ -55,9 +71,18 @@ bool testProceedRayTrace() {
         ;
 }
 
-bool testProceedRayAuxInfo() {
+bool testProceedRayAuxInfo()
+{
     rayQueryEXT q;
-    rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
+    rayQueryInitializeEXT(
+        q,
+        scene,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f);
     rayQueryProceedEXT(q);
 
     return true
@@ -79,9 +104,18 @@ bool testProceedRayAuxInfo() {
         && !equals(rayQueryGetIntersectionWorldToObjectEXT(q, true), mat4x3(0))
         ;
 }
-bool testRayTraceGenerate() {
+bool testRayTraceGenerate()
+{
     rayQueryEXT q;
-    rayQueryInitializeEXT(q, scene, gl_RayFlagsNoneEXT, 0xff, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f);
+    rayQueryInitializeEXT(
+        q,
+        scene,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f);
     rayQueryGenerateIntersectionEXT(q, 0.5);
     rayQueryConfirmIntersectionEXT(q);
 
@@ -103,4 +137,3 @@ void computeMain()
         ;
     // BUF: 1
 }
-

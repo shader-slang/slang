@@ -5,4 +5,7 @@ implementing main;
 // Cyclic include, OK.
 __include a;
 
-int f_a() { return 1; }
+int f_a()
+{
+    return 1;
+}

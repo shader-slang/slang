@@ -9,26 +9,26 @@ RWStructuredBuffer<int> outputBuffer;
 
 int2 reduce(int2 val)
 {
-	for(int ii = 0; ii < 4; ++ii)
-	{
-		if(inputBuffer[ii] != 8)
-		{
-			val.x = max(val.x, inputBuffer[ii]);
-			val.y = min(val.y, inputBuffer[ii + 4]);
-		}
-	}
-	return val;
+    for (int ii = 0; ii < 4; ++ii)
+    {
+        if (inputBuffer[ii] != 8)
+        {
+            val.x = max(val.x, inputBuffer[ii]);
+            val.y = min(val.y, inputBuffer[ii + 4]);
+        }
+    }
+    return val;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	int2 inVal = int2(inputBuffer[tid], inputBuffer[tid + 4]);
+    int2 inVal = int2(inputBuffer[tid], inputBuffer[tid + 4]);
 
-	int2 outVal = reduce(inVal);
+    int2 outVal = reduce(inVal);
 
-	outputBuffer[tid] = outVal.x;
-	outputBuffer[tid + 4] = outVal.y;
+    outputBuffer[tid] = outVal.x;
+    outputBuffer[tid + 4] = outVal.y;
 }

@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-T sum<T:IFloat>(IArray<T> array)
+T sum<T : IFloat>(IArray<T> array)
 {
     T result = T(0);
     for (int i = 0; i < array.getCount(); i++)
@@ -15,7 +15,7 @@ T sum<T:IFloat>(IArray<T> array)
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     float arr[3] = { 1.0, 2.0, 3.0 };
     float4 v = float4(1.0, 2.0, 3.0, 4.0);

@@ -13,17 +13,17 @@ RWStructuredBuffer<int> outputBuffer;
 // passed into a spirv_asm block
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
     int r;
     spirv_asm
     {
-        OpLoad $$int %n &n;
-        OpConstant $$int %two 2;
-        OpIMul $$int %r $n %two;
-        OpStore &r %r;
+        OpLoad $$int % n& n;
+        OpConstant $$int % two 2;
+        OpIMul $$int % r $n % two;
+        OpStore& r % r;
     };
     foo(r);
     outputBuffer[i] = r;
@@ -33,9 +33,8 @@ func foo(inout int x)
 {
     spirv_asm
     {
-        OpLoad $$int %x &x;
-        OpIAdd $$int %added %x %x;
-        OpStore &x %added;
+        OpLoad $$int % x& x;
+        OpIAdd $$int % added % x % x;
+        OpStore& x % added;
     };
 }
-

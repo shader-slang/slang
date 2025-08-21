@@ -29,10 +29,7 @@ interface IModifier
     int modify(int val);
 }
 
-int test(
-    int                             seed,
-    IRandomNumberGenerationStrategy inStrategy,
-    IModifier                       modifier)
+int test(int seed, IRandomNumberGenerationStrategy inStrategy, IModifier modifier)
 {
     let strategy = inStrategy;
     var generator = strategy.makeGenerator(seed);
@@ -53,8 +50,8 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 void computeMain(
 
 //TEST_INPUT:root_constants(data=[0 0 0 0 8 0 0 0], stride=4):
-    uniform IModifier   modifier,
-            uint3       dispatchThreadID : SV_DispatchThreadID)
+    uniform IModifier modifier,
+    uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -77,10 +74,7 @@ struct MyStrategy : IRandomNumberGenerationStrategy
         int state;
 
         [mutating]
-        int randomInt()
-        {
-            return state++;
-        }
+        int randomInt() { return state++; }
     }
 
     Generator makeGenerator(int seed)
@@ -94,10 +88,7 @@ struct MyModifier : IModifier
 {
     int localModifier;
 
-    int modify(int val)
-    {
-        return val ^ localModifier;
-    }
+    int modify(int val) { return val ^ localModifier; }
 }
 
 //TEST_INPUT: globalExistentialType MyStrategy

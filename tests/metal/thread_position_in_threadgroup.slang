@@ -17,11 +17,11 @@ void indirection(uint groupIndex)
 #define THREAD_COUNT 2
 [numthreads(THREAD_COUNT, 1, 1)]
 #ifdef GROUPID
-void computeMain(uint GI : SV_GroupIndex, uint GTID : SV_GroupThreadID)
+void computeMain(uint GI: SV_GroupIndex, uint GTID: SV_GroupThreadID)
 #else
-void computeMain(uint GI : SV_GroupIndex)
+void computeMain(uint GI: SV_GroupIndex)
 #endif
 {
     dst[GI + THREAD_COUNT] = GI;
     indirection(GI);
-} 
+}

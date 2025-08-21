@@ -33,17 +33,17 @@ cbuffer Test
     uint v5[4];
 
 //SPIRV: Offset 112
-// Array always starts on a new register.
+    //  Array always starts on a new register.
     uint3 v6[2];
 //SPIRV: Offset 140
-// Non-array can pack with a partially filled register
+    //  Non-array can pack with a partially filled register
     uint v7;
 
 //SPIRV: Offset 144
     uint2 v8;
 
 // SPIRV: Offset 160
-// Array always starts on a new register.
+    // Array always starts on a new register.
     uint v9[2];
 };
 
@@ -51,7 +51,7 @@ cbuffer Test
 RWStructuredBuffer<int> outputBuffer;
 
 __generic<T : IArithmetic, let N : int>
-bool comp(vector<T,N> v1, vector<T,N> v2)
+bool comp(vector<T, N> v1, vector<T, N> v2)
 {
     for (uint i = 0; i < N; i++)
         if (v1[i] != v2[i])
@@ -82,5 +82,7 @@ void computeMain()
             && comp(v8, uint2(23, 24))
             && v9[0] == 25
             && v9[1] == 26
-        ) ? 100 : 0;
+                       )
+                          ? 100
+                          : 0;
 }

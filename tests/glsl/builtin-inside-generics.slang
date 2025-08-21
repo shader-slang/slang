@@ -6,12 +6,12 @@
 
 RWStructuredBuffer<uint> outputBuffer;
 
-T getGlobalInvocationID<T: IInteger>(T value)
+T getGlobalInvocationID<T : IInteger>(T value)
 {
     return T(gl_GlobalInvocationID.x) + value;
 }
 
-T getWaveLaneIndex<T: IInteger>(T value)
+T getWaveLaneIndex<T : IInteger>(T value)
 {
     return T(WaveGetLaneIndex()) + value;
 }
@@ -37,5 +37,3 @@ void main()
     outputBuffer[0U] = getGlobalInvocationID(0U);
     outputBuffer[1U] = getWaveLaneIndex(0U);
 }
-
-

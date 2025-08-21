@@ -11,39 +11,39 @@ RWStructuredBuffer<uint> outputBuffer;
 
 namespace A1
 {
-    uint func()
-    {
-        return 1u;
-    }
+uint func()
+{
+    return 1u;
+}
 
-    namespace A2
-    {
-        uint func()
-        {
-            return 2u;
-        }
+namespace A2
+{
+uint func()
+{
+    return 2u;
+}
 
-        namespace A3
-        {
-            uint func()
-            {
-                return 3u;
-            }
+namespace A3
+{
+uint func()
+{
+    return 3u;
+}
 
-            uint test2()
-            {
-                return func();      // choose A3::func()
-            }
-        }
+uint test2()
+{
+    return func(); // choose A3::func()
+}
+}
 
-        namespace A4
-        {
-            uint test()
-            {
-                return func();      // choose A2::func()
-            }
-        }
-    }
+namespace A4
+{
+uint test()
+{
+    return func(); // choose A2::func()
+}
+}
+}
 }
 
 [numthreads(1, 1, 1)]

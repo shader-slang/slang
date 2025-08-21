@@ -6,8 +6,8 @@
 
 // CHECK_SPIRV: warning 41012{{.*}}'spvImageGatherExtended'
 // CHECK_GLSL: warning 41012{{.*}}'GLSL_150 + GL_ARB_texture_gather'
-float4 fragmentMain(float2 pos : SV_Position, Sampler2D<float> foo) : SV_Target
+float4 fragmentMain(float2 pos: SV_Position, Sampler2D<float> foo)
+    : SV_Target
 {
     return foo.Gather(uint2(pos));
 }
-

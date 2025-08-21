@@ -45,20 +45,27 @@ A f(A a, int i)
     aout.dv.m = aout.dv.n * 0.5f;
     // Test that writes to a potentially dynamic address multiple times
     // is allowed and will propagate the correct derivative.
-    aout.fb.arr[i].v = a.x * 2.0; // since this value is overwritten, the diff will not accumulate to a.x
+    aout.fb.arr[i].v =
+        a.x * 2.0; // since this value is overwritten, the diff will not accumulate to a.x
     aout.fb.arr[i].v = a.x * 3.0;
     return aout;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    A a = {1.0, 2.0};
+    A a = { 1.0, 2.0 };
 
     var dpa = diffPair(a);
 
-    A.Differential dout = { 1.0, 1.0, { float2(0), { { float3(1.0), 1.0 }, { float3(1.0), 1.0 } } }, { { float3(1.0), 1.0 }, { float3(1.0), 1.0 }, { float3(1.0), 1.0 } }, {1.0, 1.0} };
-    
+    A.Differential dout = {
+        1.0,
+        1.0,
+        { float2(0), { { float3(1.0), 1.0 }, { float3(1.0), 1.0 } } },
+        { { float3(1.0), 1.0 }, { float3(1.0), 1.0 }, { float3(1.0), 1.0 } },
+        { 1.0, 1.0 }
+    };
+
     __bwd_diff(f)(dpa, 1, dout);
     outputBuffer[0] = dpa.d.x; // Expect: 23
     outputBuffer[1] = dpa.d.y; // Expect: 0

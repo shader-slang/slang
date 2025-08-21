@@ -20,6 +20,6 @@ void computeMain()
     CoopVec<int32_t, 4> vec1 = coopVecLoad<4, int32_t>(input1);
     CoopVec<int32_t, 4> negVec = -vec1;
 
-    for(int i = 0; i < negVec.getCount(); ++i)
+    for (int i = 0; i < negVec.getCount(); ++i)
         outputBuffer[i] = negVec[i];
 }

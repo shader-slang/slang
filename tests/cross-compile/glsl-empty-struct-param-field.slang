@@ -8,12 +8,12 @@ struct E
 
 struct P
 {
-	E em;
-	float4 param;
+    E em;
+    float4 param;
 };
 ParameterBlock<P> pblock;
 
-float4 main(float4 pos : SV_POSITION)
+float4 main(float4 pos: SV_POSITION)
 {
-	return pblock.param;
+    return pblock.param;
 }

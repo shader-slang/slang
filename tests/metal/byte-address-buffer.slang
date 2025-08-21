@@ -14,7 +14,7 @@ struct TestStruct
     float4x3 d;
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main_kernel(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: uint [[WORD0:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);

@@ -11,9 +11,7 @@ RWStructuredBuffer<int> gX;
 //TEST_INPUT:set gY = ubuffer(data=[3 6 9 12], stride=4)
 RWStructuredBuffer<int> gY;
 
-void swap(
-    inout RWStructuredBuffer<int> a,
-    inout RWStructuredBuffer<int> b)
+void swap(inout RWStructuredBuffer<int> a, inout RWStructuredBuffer<int> b)
 {
     RWStructuredBuffer<int> t = a;
     a = b;
@@ -34,7 +32,7 @@ int test(int val)
 RWStructuredBuffer<int> gOutput;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

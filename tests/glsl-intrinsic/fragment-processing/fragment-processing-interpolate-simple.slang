@@ -6,9 +6,12 @@
 
 layout(location = 0) out ivec4 outColorActual;
 
-layout (location = 0) in float inDataV1;
+layout(location = 0) in float inDataV1;
 
-bool isOk(float a, float b)   { return (a == b); }
+bool isOk(float a, float b)
+{
+    return (a == b);
+}
 
 bool testFragmentProcessingInterpolateFunctions()
 {
@@ -21,8 +24,10 @@ bool testFragmentProcessingInterpolateFunctions()
         ;
 }
 
-void main() {
-    outColorActual = ivec4(true
+void main()
+{
+    outColorActual = ivec4(
+        true
         && testFragmentProcessingInterpolateFunctions()
-        );
+    );
 }

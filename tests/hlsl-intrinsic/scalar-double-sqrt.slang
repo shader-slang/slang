@@ -5,7 +5,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(in uint i : SV_GroupIndex)
+void computeMain(in uint i: SV_GroupIndex)
 {
     outputBuffer[i] = int(sqrt(double(i)) * 100);
 }

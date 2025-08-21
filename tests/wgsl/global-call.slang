@@ -8,12 +8,12 @@ RWStructuredBuffer<uint> outputBuffer;
 
 uint f(uint a)
 {
-    return a*inputBuffer[0];
+    return a * inputBuffer[0];
 }
 
 static uint b = f(2);
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputBuffer[0] = b;

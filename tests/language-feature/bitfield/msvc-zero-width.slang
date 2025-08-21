@@ -9,10 +9,11 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct S {
-    int foo : 8;      // First backing field
-    int breaker : 0;  // Forces new backing field
-    int bar : 24;     // Second backing field
+struct S
+{
+    int foo : 8;     // First backing field
+    int breaker : 0; // Forces new backing field
+    int bar : 24;    // Second backing field
 };
 
 [numthreads(1, 1, 1)]
@@ -25,6 +26,5 @@ void computeMain()
     outputBuffer[0] = s.foo;
     outputBuffer[1] = s.bar;
     outputBuffer[2] = sizeof(S) == sizeof(int) * 2; // Two backing fields
-    outputBuffer[3] = s.breaker; // Always returns 0
+    outputBuffer[3] = s.breaker;                    // Always returns 0
 }
-

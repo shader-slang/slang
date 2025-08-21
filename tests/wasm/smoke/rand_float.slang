@@ -1,6 +1,7 @@
 // Hybrid Tausworthe PRNG
 //
-// Code adapted from: https://indico.cern.ch/event/93877/papers/2118070/files/4416-acat3.pdf (See document for license)
+// Code adapted from: https://indico.cern.ch/event/93877/papers/2118070/files/4416-acat3.pdf (See
+// document for license)
 //
 
 uniform float seed;
@@ -19,7 +20,7 @@ uint tauStep(uint z, uint s1, uint s2, uint s3, uint M)
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
-void computeMain(uint2 dispatchThreadId : SV_DispatchThreadID)
+void computeMain(uint2 dispatchThreadId: SV_DispatchThreadID)
 {
     uint idx = dispatchThreadId.x;
     uint val = ((uint)idx) * 1099087573UL + ((uint)seed) * 12003927;

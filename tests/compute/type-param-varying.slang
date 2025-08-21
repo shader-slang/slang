@@ -41,9 +41,9 @@ RWStructuredBuffer<float> outputBuffer;
 struct AssembledVertex : IVertexFormat
 {
     typedef SingleColorSet ColorSet;
-    float3	position;
-    SingleColorSet	colorSet;
-    float2  uv;
+    float3 position;
+    SingleColorSet colorSet;
+    float2 uv;
     ColorSet getColorSet() { return colorSet; }
     float3 getPosition() { return position; }
     float2 getUv() { return uv; }
@@ -51,8 +51,8 @@ struct AssembledVertex : IVertexFormat
 
 struct CoarseVertex
 {
-    TVertex.ColorSet	color;
-    float2  uv;
+    TVertex.ColorSet color;
+    float2 uv;
 };
 
 struct Fragment
@@ -65,13 +65,13 @@ struct Fragment
 
 struct VertexStageInput
 {
-    TVertex assembledVertex	: A;
+    TVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-    CoarseVertex	coarseVertex	: CoarseVertex;
-    float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 VertexStageOutput vertexMain(VertexStageInput input)

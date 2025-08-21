@@ -17,12 +17,15 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-bool verifyResult<T: IFloat> (T expected, T actual, T tolerance)
+bool verifyResult<T : IFloat>(T expected, T actual, T tolerance)
 {
     return (expected - tolerance) <= actual && actual <= (expected + tolerance);
 }
 
-bool verifyResultVector<T: IFloat, let N: int>(vector<T, N> expected, vector<T, N> actual, T tolerance = T(0.01))
+bool verifyResultVector<T : IFloat, let N : int>(
+    vector<T, N> expected,
+    vector<T, N> actual,
+    T tolerance = T(0.01))
 {
     bool isValid = true;
     for (int i = 0; i < N; ++i)
@@ -31,7 +34,7 @@ bool verifyResultVector<T: IFloat, let N: int>(vector<T, N> expected, vector<T, 
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = 0U;
 

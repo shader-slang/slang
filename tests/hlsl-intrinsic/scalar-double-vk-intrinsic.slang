@@ -10,33 +10,33 @@
 RWStructuredBuffer<double> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     double f = idx * (1.0f / (4.0f));
-    
+
     double ft = 0.0l;
-    
+
     // fmod
     ft += int(((f % 0.11l) * 100) + 0.5l);
-    
+
     ft += rcp(1.0l + f);
     ft += sign(f - 0.5l);
-    
+
     ft += saturate(f * 4 - 2.0l);
-    
+
     ft += sqrt(f);
     ft += rsqrt(1.0l + f);
-        
+
     ft += frac(f * 3);
     ft += ceil(f * 5 - 3);
-    
+
     ft += floor(f * 10 - 7);
     ft += trunc(f * 7);
-       
+
     ft += abs(f * 4 - 2.0l);
-           
+
     ft += min(0.5l, f);
     ft += max(f, 0.75l);
 
@@ -52,6 +52,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         asuint(f * 2.0l, low, high);
         ft += asdouble(low, high);
     }
-    
+
     outputBuffer[idx] = ft;
 }

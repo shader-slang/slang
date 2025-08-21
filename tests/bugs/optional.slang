@@ -6,7 +6,11 @@ interface IFoo
     void foo();
 }
 
-struct S : IFoo { int x; void foo(); }
+struct S : IFoo
+{
+    int x;
+    void foo();
+}
 
 struct P
 {
@@ -14,7 +18,7 @@ struct P
 }
 struct Tr
 {
-    int test<T:IArithmetic>(T t, P p)
+    int test<T : IArithmetic>(T t, P p)
     {
         const IFoo hit = p.f;
         let castResult = hit as S;
@@ -28,7 +32,7 @@ struct Tr
 
 RWStructuredBuffer<int> buffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     P p;
@@ -39,4 +43,3 @@ void computeMain()
     // BUF: 2
     buffer[0] = tt.test(0, p);
 }
-

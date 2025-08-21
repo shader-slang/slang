@@ -6,7 +6,7 @@ struct RecordData
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadId : SV_GroupThreadID)
+void main(uint3 dispatchThreadId: SV_GroupThreadID)
 {
     spirv_asm
     {
@@ -29,4 +29,3 @@ void main(uint3 dispatchThreadId : SV_GroupThreadID)
 //CHK: ; Function
 //CHK: [[VarName:%[a-zA-Z_0-9]+]] = OpVariable [[PtrType]] NodePayloadAMDX
 //CHK: = OpAccessChain [[PtrType]] [[VarName]]
-

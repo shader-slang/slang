@@ -9,7 +9,7 @@ RWStructuredBuffer<float> output;
 
 uniform int64_t index;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     output[index] = 1;

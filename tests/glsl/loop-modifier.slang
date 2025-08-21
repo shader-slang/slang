@@ -8,7 +8,6 @@ void main()
     for (highp int i = 0; i < 5; i++)
         a += vec4(i);
     gl_Position = a;
-   
+
     // CHECK: OpEntryPoint
 }
-

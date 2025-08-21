@@ -12,7 +12,8 @@
 RasterizerOrderedByteAddressBuffer buffer;
 
 [shader("fragment")]
-float4 fragMain() : SV_Target
+float4 fragMain()
+    : SV_Target
 {
     // SPIRV: %fragMain{{.*}} = OpFunction
     // SPIRV: OpBeginInvocationInterlockEXT
@@ -25,7 +26,8 @@ float4 fragMain() : SV_Target
 RasterizerOrderedTexture2D tex;
 
 [shader("fragment")]
-float4 fragMain2() : SV_Target
+float4 fragMain2()
+    : SV_Target
 {
     // SPIRV: %fragMain2{{.*}} = OpFunction
     // SPIRV: OpBeginInvocationInterlockEXT
@@ -38,7 +40,8 @@ float4 fragMain2() : SV_Target
 RasterizerOrderedStructuredBuffer<float> buffer2;
 
 [shader("fragment")]
-float4 fragMain3() : SV_Target
+float4 fragMain3()
+    : SV_Target
 {
     // SPIRV: %fragMain3{{.*}} = OpFunction
     // SPIRV: OpBeginInvocationInterlockEXT
@@ -47,4 +50,3 @@ float4 fragMain3() : SV_Target
     buffer2[0] = 1;
     return float4(1, 0, 0, 1);
 }
-

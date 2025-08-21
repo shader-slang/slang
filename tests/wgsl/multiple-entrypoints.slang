@@ -4,7 +4,7 @@
 //WGSL-DAG: @compute
 
 [shader("compute")]
-void main_compute(uint3 dtid : SV_DispatchThreadID) 
+void main_compute(uint3 dtid: SV_DispatchThreadID)
 {
     // Empty compute shader
 }
@@ -13,16 +13,18 @@ void main_compute(uint3 dtid : SV_DispatchThreadID)
 //WGSL-DAG: @fragment
 
 [shader("fragment")]
-float4 main_fragment(bool isFront : SV_IsFrontFace) : SV_Target 
+float4 main_fragment(bool isFront: SV_IsFrontFace)
+    : SV_Target
 {
-    return float4(1,1,1,1);
+    return float4(1, 1, 1, 1);
 }
 
 //WGSL-DAG: @builtin(vertex_index)
 //WGSL-DAG: @vertex
 
 [shader("vertex")]
-float4 main_vertex(uint vertexID : SV_VertexID) : SV_Position 
+float4 main_vertex(uint vertexID: SV_VertexID)
+    : SV_Position
 {
-    return float4(1,1,1,1);
+    return float4(1, 1, 1, 1);
 }

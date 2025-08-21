@@ -11,84 +11,84 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 struct AssembledVertex
 {
-	float3	position;
-	float3	color;
-    float2  uv;
+    float3 position;
+    float3 color;
+    float2 uv;
 };
 
 struct CoarseVertex
 {
-	float3	color;
-    float2  uv;
+    float3 color;
+    float2 uv;
 };
 
 struct Fragment
 {
-	float4 color;
+    float4 color;
 };
 
 // Vertex  Shader
 
 struct VertexStageInput
 {
-	AssembledVertex assembledVertex	: A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 [shader("vertex")]
 VertexStageOutput vertexMain(VertexStageInput input)
 {
-	VertexStageOutput output;
+    VertexStageOutput output;
 
-	float3 position = input.assembledVertex.position;
-	float3 color	= input.assembledVertex.color;
+    float3 position = input.assembledVertex.position;
+    float3 color = input.assembledVertex.color;
 
-	output.coarseVertex.color = color;
-	output.sv_position = mul(modelViewProjection, float4(position, 1.0));
+    output.coarseVertex.color = color;
+    output.sv_position = mul(modelViewProjection, float4(position, 1.0));
     output.coarseVertex.uv = input.assembledVertex.uv;
-	return output;
+    return output;
 }
 
 // Fragment Shader
 
 struct FragmentStageInput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
+    CoarseVertex coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	Fragment fragment	: SV_Target;
+    Fragment fragment : SV_Target;
 };
 
 [shader("fragment")]
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
-	FragmentStageOutput output;
+    FragmentStageOutput output;
 
-	float3 color = input.coarseVertex.color;
+    float3 color = input.coarseVertex.color;
     float2 uv = input.coarseVertex.uv;
-	output.fragment.color = float4(color, 1.0);
+    output.fragment.color = float4(color, 1.0);
 
 
-	float4 result = 0;
-	$for(i in Range(0,5))
-	{
-		float4 v = t.Sample(s, uv, int2(i - 2, 0));
-		result += v;
-	}
+    float4 result = 0;
+    $for(i in Range(0, 5))
+    {
+        float4 v = t.Sample(s, uv, int2(i - 2, 0));
+        result += v;
+    }
 
-	outputBuffer[0] = result.x;
+    outputBuffer[0] = result.x;
 
-	return output;
+    return output;
 }

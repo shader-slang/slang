@@ -11,17 +11,17 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     if (idx < 3)
     {
         // Diverge!!
         outputBuffer[idx] = -1;
         return;
     }
-    
+
     int value = 0;
     outputBuffer[idx] = WaveIsFirstLane();
 }

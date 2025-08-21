@@ -2,10 +2,11 @@
 
 struct VS_OUT
 {
-	nointerpolation float drawID : DRAW_ID;	
+    nointerpolation float drawID : DRAW_ID;
 };
 
-float4 main(VS_OUT vsOut) : SV_Target
+float4 main(VS_OUT vsOut)
+    : SV_Target
 {
-	return float4(vsOut.drawID);
+    return float4(vsOut.drawID);
 }

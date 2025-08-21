@@ -9,7 +9,7 @@ Doesn't work because ...
 
 .slang(29): error 30027: 'Type' is not a member of '.This'.
     return e::Type::kE;
-    
+
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -17,12 +17,14 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum class Enum
 {
-    A, B
-};
+    A,
+    B
+}
+;
 
 interface IHasType
 {
-    associatedtype Type;   
+    associatedtype Type;
 };
 
 // This is a little perverse, because I'm defining as an associated type that is
@@ -45,12 +47,12 @@ Enum getType(IHasType e)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-   
+
     B b;
     let e = getType(b);
-    
+
     outputBuffer[dispatchThreadID.x] = int(e);
 }

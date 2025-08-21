@@ -13,7 +13,7 @@ RWStructuredBuffer<int> outputBuffer;
 RWByteAddressBuffer bbuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint originalValue;
     bbuffer.InterlockedAdd(0, 1);

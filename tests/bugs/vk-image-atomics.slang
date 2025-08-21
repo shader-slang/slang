@@ -8,9 +8,10 @@
 
 RWTexture2D<uint> t;
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-	uint u;
-	InterlockedAdd(t[uint2(0)], 1, u);
-	return u;
+    uint u;
+    InterlockedAdd(t[uint2(0)], 1, u);
+    return u;
 }

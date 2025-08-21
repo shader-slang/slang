@@ -41,7 +41,8 @@ bool test1Bitwise(uint4 mask)
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVBitwise(uint4 mask) {
+bool testVBitwise(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let andValue = GVec(T(gAndValue));
@@ -70,11 +71,11 @@ bool testBitwise(uint4 mask)
         & testVBitwise<uint, 4>(mask)
 
         // TODO: these are failing SPIRV validation and should be fixed.
-        // SPIRV's ops do not directly accept/return bool.
-        // & test1Bitwise<bool>(mask)
-        // & testVBitwise<bool, 2>(mask)
-        // & testVBitwise<bool, 3>(mask)
-        // & testVBitwise<bool, 4>(mask)
+    // SPIRV's ops do not directly accept/return bool.
+    // & test1Bitwise<bool>(mask)
+    // & testVBitwise<bool, 2>(mask)
+    // & testVBitwise<bool, 3>(mask)
+    // & testVBitwise<bool, 4>(mask)
 
 #if !defined(CUDA)
         & test1Bitwise<int8_t>(mask)
@@ -107,7 +108,7 @@ bool testBitwise(uint4 mask)
 
 [numthreads(32, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let index = dispatchThreadID.x;
 
@@ -132,7 +133,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             & testBitwise(mask)
-            ;
+        ;
 
     // CHECK-COUNT-32: 1
     outputBuffer[index] = uint(result);

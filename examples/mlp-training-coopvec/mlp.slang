@@ -20,14 +20,17 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
         // Compute mul(weights, inputVec) + biases.
         // `weights` is treated as an OutputSize(row) x InputSize(col) matrix.
         var output = coopVecMatMulAdd<NFloat, OutputSize>(
-            input.data, kComponentType, // input and format
-            weights, kComponentType, // weights and format
-            biases, kComponentType, // biases and format
+            input.data,
+            kComponentType, // input and format
+            weights,
+            kComponentType, // weights and format
+            biases,
+            kComponentType,               // biases and format
             CoopVecMatrixLayout.RowMajor, // matrix layout
             false, // transpose matrix? must be `false` since we specified RowMajor.
-            InputSize * sizeof(NFloat)); // matrix stride
+            InputSize * sizeof(NFloat));       // matrix stride
         output = max(output, output * 0.001h); // Leaky ReLU activation
-        return {output};
+        return { output };
     }
 
     [BackwardDerivativeOf(eval)]
@@ -53,7 +56,7 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
             0, // matrixStride, ignored since layout is TrainingOptimal
             CoopVecMatrixLayout.TrainingOptimal, // matrix layout, must be TrainingOptimal.
             kComponentType);
-        
+
         // Back-prop gradients to the biases vector.
         coopVecReduceSumAccumulate(resultGrad.data, (void*)biasesGrad);
 
@@ -62,12 +65,14 @@ public struct FeedForwardLayer<int InputSize, int OutputSize>
         // By specifying the matrix layout as ColumnMajor, we can
         // achieve the effect of transposing the weights matrix.
         let dInput = coopVecMatMul<NFloat, InputSize>(
-            resultGrad.data, kComponentType,
-            weights, kComponentType,
+            resultGrad.data,
+            kComponentType,
+            weights,
+            kComponentType,
             CoopVecMatrixLayout.ColumnMajor,
-            false,  // transpose, must be `false` since we specified ColumnMajor.
+            false, // transpose, must be `false` since we specified ColumnMajor.
             InputSize * sizeof(NFloat));
 
-        input = {input.p, {dInput}};
+        input = { input.p, { dInput } };
     }
 }

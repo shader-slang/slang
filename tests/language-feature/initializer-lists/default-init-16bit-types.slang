@@ -16,9 +16,9 @@ int test(int val)
 {
     S s = {};
     s.a += val;
-    s.b += int16_t(val*16);
-    s.c += float16_t(val*16*16);
-    s.d += val*16*16*16;
+    s.b += int16_t(val * 16);
+    s.c += float16_t(val * 16 * 16);
+    s.d += val * 16 * 16 * 16;
     return s.a + s.b + int(s.c) + s.d;
 }
 
@@ -26,7 +26,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

@@ -7,43 +7,40 @@
 
 interface IVertInterpolant
 {
-	float4 getColor();
+    float4 getColor();
 }
 
-type_param TVertInterpolant : IVertInterpolant; 
+type_param TVertInterpolant : IVertInterpolant;
 
 struct VertImpl : IVertInterpolant
 {
-	float3 color;
-	float4 getColor()
-	{
-		return float4(1.0);
-	}
+    float3 color;
+    float4 getColor() { return float4(1.0); }
 };
 
 RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 struct AssembledVertex
 {
-	float3	position;
-	TVertInterpolant interpolants;
-    float2  uv;
+    float3 position;
+    TVertInterpolant interpolants;
+    float2 uv;
 };
 
 struct CoarseVertex
 {
-	TVertInterpolant	interpolants;
-    float2  uv;
+    TVertInterpolant interpolants;
+    float2 uv;
 };
 
 struct Fragment
 {
-	float4 color;
+    float4 color;
 };
 
 
@@ -51,48 +48,48 @@ struct Fragment
 
 struct VertexStageInput
 {
-	AssembledVertex assembledVertex	: A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 VertexStageOutput vertexMain(VertexStageInput input)
 {
-	VertexStageOutput output;
+    VertexStageOutput output;
 
-	float3 position = input.assembledVertex.position;
-	output.coarseVertex.interpolants = input.assembledVertex.interpolants;
-	output.sv_position = mul(modelViewProjection, float4(position, 1.0));
+    float3 position = input.assembledVertex.position;
+    output.coarseVertex.interpolants = input.assembledVertex.interpolants;
+    output.sv_position = mul(modelViewProjection, float4(position, 1.0));
     output.coarseVertex.uv = input.assembledVertex.uv;
-	return output;
+    return output;
 }
 
 // Fragment Shader
 
 struct FragmentStageInput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
+    CoarseVertex coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	Fragment fragment	: SV_Target;
+    Fragment fragment : SV_Target;
 };
 
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
-	FragmentStageOutput output;
+    FragmentStageOutput output;
 
-	float4 color = input.coarseVertex.interpolants.getColor();
+    float4 color = input.coarseVertex.interpolants.getColor();
     float2 uv = input.coarseVertex.uv;
-	output.fragment.color = color;
+    output.fragment.color = color;
     outputBuffer[0] = color.x;
     outputBuffer[1] = color.y;
     outputBuffer[2] = color.z;
     outputBuffer[3] = color.w;
-	return output;
+    return output;
 }

@@ -12,7 +12,7 @@ struct Foo<let D : int>
         for (int i = 0; i < D; ++i)
             idx[i] = 0;
         [ForceUnroll]
-        for (int i = 0; i < D-2; ++i)
+        for (int i = 0; i < D - 2; ++i)
             idx[i] = 0;
         float result = 100.0;
         [ForceUnroll]

@@ -12,7 +12,8 @@ struct Vertex
 }
 
 [shader("fragment")]
-float4 fragMain(Vertex v) : SV_Target
+float4 fragMain(Vertex v)
+    : SV_Target
 {
     if (let c = v.color.get())
     {

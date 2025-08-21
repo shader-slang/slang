@@ -11,8 +11,8 @@ using namespace linalg;
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    var result : CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+    var result
+        : CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
     result.fill(10);
     result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, 16);
 }
-

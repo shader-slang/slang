@@ -23,19 +23,16 @@ struct GetFImpl2 : IGetF
 
 struct GenStruct<T : IGetF>
 {
-	T x;
-	float genGet<U : IGetF>(U y)
-    {
-        return x.getF() + y.getF();
-    }
+    T x;
+    float genGet<U : IGetF>(U y) { return x.getF() + y.getF(); }
 };
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
     GenStruct<GetFImpl> obj1;
     GetFImpl2 obj2;
-	float outVal = obj1.genGet(obj2);
-	outputBuffer[tid] = int(outVal);
+    float outVal = obj1.genGet(obj2);
+    outputBuffer[tid] = int(outVal);
 }

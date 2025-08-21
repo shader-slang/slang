@@ -16,10 +16,11 @@ struct CompositeType
     float data2;
 }
 
-[numthreads(1,1,1)]
-void computeMain(){
+[numthreads(1, 1, 1)]
+void computeMain()
+{
 
-    CompositeType composite = CompositeType(-1); 
+    CompositeType composite = CompositeType(-1);
     if (outputBuffer[0] == 0)
     {
         composite = outputBuffer[1] > -1 ? CompositeType(1) : CompositeType(-1);

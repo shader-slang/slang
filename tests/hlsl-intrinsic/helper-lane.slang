@@ -4,7 +4,8 @@
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -target spirv -stage fragment
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -target spirv-asm -stage fragment
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     //HLSL: IsHelperLane()
 

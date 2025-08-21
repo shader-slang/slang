@@ -114,7 +114,7 @@ void computeMain()
 {
 
     t1[0] = t2[0] + t2[0] + t4[0];
-    
+
 #ifdef SAMPLER
     t1[2] = t4.Sample(sampler, 0);
 #endif
@@ -148,7 +148,7 @@ void computeMain()
 #ifdef STORAGE_BUFFER
     t1[0] += rwBuffer[0];
 #endif
-  
+
 #ifdef ACCELERATION_STRUCTURE
     RayDesc ray;
     ray.Origin = float3(0.1f, 0.1f, 0.0f);

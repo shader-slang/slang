@@ -1,10 +1,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
 
-public interface ITest {
+public interface ITest
+{
     property int value;
 };
 
-struct Test : ITest {
+struct Test : ITest
+{
     int value;
 };
 

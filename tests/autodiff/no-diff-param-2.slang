@@ -17,7 +17,7 @@ struct A : IFoo
 {
     float x;
     [ForwardDifferentiable]
-    float getVal(){return x;}
+    float getVal() { return x; }
 }
 
 [ForwardDifferentiable]
@@ -27,7 +27,7 @@ float f(float x, no_diff IFoo y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         A a;

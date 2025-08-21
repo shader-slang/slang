@@ -1,9 +1,18 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-void writeToArray<U, T : IRWArray<U>>(inout T array, int index, U value) { array[index] = value; }
-void writeToBuffer<U, T : IRWArray<U>>(T array, int index, U value) { array[index] = value; }
-U readFromArray<U, T:IArray<U>>(T array, int index) { return array[index]; }
+void writeToArray<U, T : IRWArray<U>>(inout T array, int index, U value)
+{
+    array[index] = value;
+}
+void writeToBuffer<U, T : IRWArray<U>>(T array, int index, U value)
+{
+    array[index] = value;
+}
+U readFromArray<U, T : IArray<U>>(T array, int index)
+{
+    return array[index];
+}
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

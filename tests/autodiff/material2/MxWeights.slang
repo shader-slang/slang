@@ -19,6 +19,10 @@ public interface IMxLayeredMaterialData
 
 public interface IMxLayeredWeightCalculator
 {
-    public void calculateWeights<let TBsdfCount : int, let TLayerCount: int, TLayeredMaterialData : IMxLayeredMaterialData>(
-        const TLayeredMaterialData data, out MxWeights<TBsdfCount> weights);
+    public void calculateWeights<
+        let TBsdfCount : int,
+        let TLayerCount : int,
+        TLayeredMaterialData : IMxLayeredMaterialData>(
+        const TLayeredMaterialData data,
+        out MxWeights<TBsdfCount> weights);
 }

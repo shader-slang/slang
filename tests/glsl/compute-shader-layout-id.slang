@@ -13,7 +13,4 @@ const int constValue3 = 5;
 // CHECK-DAG: OpDecorate %[[C2]] SpecId 2
 
 layout(local_size_x_id = 1, local_size_y_id = 0, local_size_z = constValue3) in;
-void main()
-{
-}
-
+void main() {}

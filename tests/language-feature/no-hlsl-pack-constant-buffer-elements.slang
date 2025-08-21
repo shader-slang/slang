@@ -3,7 +3,8 @@
 
 // DXIL: define void @main()
 
-// Test that -no-hlsl-pack-constant-buffer-elements prevents packing of elements in the output HLSL code.
+// Test that -no-hlsl-pack-constant-buffer-elements prevents packing of elements in the output HLSL
+// code.
 
 // CHECK-DAG: cbuffer {{.*}} :
 cbuffer MyCB
@@ -15,7 +16,7 @@ cbuffer MyCB
 RWStructuredBuffer<float> MyBuffer;
 
 // CHECK-DAG: {{.*}} = member0{{.*}} + member1{{.*}};
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     MyBuffer[0] = member0 + member1;

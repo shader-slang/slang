@@ -7,7 +7,7 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = WaveGetLaneIndex();
 
@@ -38,4 +38,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[index] = uint(QuadAll(trueCondition));
     }
 }
-

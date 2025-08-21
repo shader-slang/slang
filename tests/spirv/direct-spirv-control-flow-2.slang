@@ -13,7 +13,7 @@ uint test(uint p)
     int result = 0;
     for (int i = 0; i < 5; i++)
     {
-        result += i*2;
+        result += i * 2;
     }
     switch (p)
     {
@@ -39,8 +39,8 @@ uint test(uint p)
     return result;
 }
 
-[numthreads(4,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint threadId = dispatchThreadID.x;
     uint result = test(threadId);

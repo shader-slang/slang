@@ -5,7 +5,8 @@
 //DISABLED_TEST: COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal
 
 // Test a pointer to a struct that has only one field and is an unsized array.
-struct MeshStorage {
+struct MeshStorage
+{
     uint64_t QuadData[];
 };
 
@@ -15,11 +16,11 @@ uniform MeshStorage* pStorage;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0],stride=4);
 uniform RWStructuredBuffer<uint> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 3
     // CHECK: 4
-    outputBuffer[0] = (int)(pStorage.QuadData[1]&0xFFFFFFFF);
-    outputBuffer[1] = (int)(pStorage.QuadData[1]>>32);
+    outputBuffer[0] = (int)(pStorage.QuadData[1] & 0xFFFFFFFF);
+    outputBuffer[1] = (int)(pStorage.QuadData[1] >> 32);
 }

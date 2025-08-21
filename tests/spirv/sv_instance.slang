@@ -9,7 +9,8 @@
 // GLSL: gl_InstanceIndex - gl_BaseInstance
 
 [shader("vertex")]
-float4 vertMain(int i : SV_InstanceID) : SV_Position
+float4 vertMain(int i: SV_InstanceID)
+    : SV_Position
 {
     return i;
 }

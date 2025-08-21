@@ -23,10 +23,8 @@
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0.0]):name matrixTestCBuf1
 ConstantBuffer<row_major float3x3> matrixTestCBuf1;
 
-// CPP/Metal/CUDA due to not having memory packing will recieve the following COL matrix post-transpose:
-// {1,0,6}
-// {2,4,0}
-// {3,5,7}
+// CPP/Metal/CUDA due to not having memory packing will recieve the following COL matrix
+// post-transpose: {1,0,6} {2,4,0} {3,5,7}
 
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 0.0  4.0 5.0 6.0 0.0  7.0 8.0 9.0 0.0]):name matrixTestCBuf2
 ConstantBuffer<column_major float3x3> matrixTestCBuf2;
@@ -47,7 +45,7 @@ bool floatCheck(float data, float valueToCheckFor)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float3x3 matrixTest1;
     matrixTest1 = matrixTestCBuf1;
@@ -55,7 +53,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3x3 matrixTest2;
     matrixTest2 = matrixTestCBuf2;
 
-    output[0] = uint(true
+    output[0] = uint(
+        true
 #ifdef TARGET_WITHOUT_PACKING
             && floatCheck(matrixTest1[0][0], 1)
             && floatCheck(matrixTest1[0][1], 2)
@@ -111,6 +110,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             && floatCheck(data2[1], 5)
             && floatCheck(data2[2], 6)
 #endif
-        );
+    );
     //BUF: 1
 }

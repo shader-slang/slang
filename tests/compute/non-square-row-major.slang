@@ -1,6 +1,6 @@
 // non-square-row-major.slang
 
-// Note! This test doesn't work on CUDA or CPU targets, because both these targets 
+// Note! This test doesn't work on CUDA or CPU targets, because both these targets
 // assume matrices are tightly packed, whereas GPU targets align rows to 16 bytes.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-slang -compute -wgpu -output-using-type -xslang -matrix-layout-row-major -shaderobj
@@ -19,12 +19,12 @@ ConstantBuffer<float3x2> matrixBuffer;
 RWStructuredBuffer<float> output;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float3 v = float3(1, 2, 1);
 
     float3x2 M = matrixBuffer;
-    
+
     float2 r = mul(v, M);
 
     // ALIGNED: 21

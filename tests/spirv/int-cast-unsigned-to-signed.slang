@@ -19,7 +19,7 @@ RWStructuredBuffer<uint8_t> input3;
 //
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = dispatchThreadID.x;
 

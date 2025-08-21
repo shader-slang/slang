@@ -8,7 +8,8 @@
 
 struct [raypayload] RayPayload
 {
-    float4 color : read(caller, anyhit) : write(caller);
+    float4 color : read(caller, anyhit)
+        : write(caller);
 };
 
 uniform RWTexture2D<float4> resultTexture;

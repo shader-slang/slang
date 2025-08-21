@@ -12,12 +12,13 @@
 buffer MyBlockName2
 {
     int data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     // There may be some issues with structure padding for global context containing
     // global builtin variables.
@@ -25,7 +26,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int idx = dispatchThreadID.x;
 
     uint laneId = gl_SubgroupInvocationID;
-    // The laneCount will be dependent on target hardware. It seems a count of 1 is valid in spec. 
+    // The laneCount will be dependent on target hardware. It seems a count of 1 is valid in spec.
     // For now we'll just check it's not 0.
     uint laneCount = gl_SubgroupSize;
     outputBuffer.data[idx] = int(((laneCount > 0) ? 0x100 : 0) + laneId);

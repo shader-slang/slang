@@ -9,7 +9,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct MixedTypes {
+struct MixedTypes
+{
     uint8_t a : 4;   // Uses uint8_t backing, bits 7-4
     uint8_t b : 4;   // Same backing, bits 3-0
     uint16_t c : 8;  // New uint16_t backing due to type change, bits 15-8
@@ -37,4 +38,3 @@ void computeMain()
     // Verify struct size includes all three backing fields
     outputBuffer[3] = sizeof(MixedTypes);
 }
-

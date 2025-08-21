@@ -1,7 +1,7 @@
-//DISABLE_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0 
+//DISABLE_TEST:SIMPLE:-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry fragmentMain -stage fragment
-//TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0 
+//TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry fragmentMain -profile sm_6_5 -stage fragment -DNV_SHADER_EXTN_SLOT=u0
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry fragmentMain -stage fragment
 
 //DISABLED_TEST:SIMPLE:-target spirv-assembly -entry fragmentMain -stage fragment
@@ -56,8 +56,7 @@ cbuffer Uniforms
     uniform uint granularity;
 };
 
-void fragmentMain(
-    float v : VARYING)
+void fragmentMain(float v: VARYING)
 {
     uint index = uint(v);
     uint r = 0;
@@ -73,4 +72,3 @@ void fragmentMain(
 
     outputBuffer[index] = r;
 }
-

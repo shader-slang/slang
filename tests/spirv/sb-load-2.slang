@@ -14,8 +14,7 @@ RWStructuredBuffer<float4> outputBuffer;
 // CHECK: outputBuffer{{.*}}._data[{{.*}}] =
 
 [numthreads(4, 4, 1)]
-void main(uint3 GTid : SV_GroupThreadID, 
-          uint GI    : SV_GroupIndex)
+void main(uint3 GTid: SV_GroupThreadID, uint GI: SV_GroupIndex)
 {
     var tmp = dp[0];
     var rs = tmp.a[0][0] + tmp.a[0][1];

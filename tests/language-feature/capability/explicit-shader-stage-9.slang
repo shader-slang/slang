@@ -14,8 +14,8 @@ RWStructuredBuffer<uint> outputBuffer;
 void main()
 {
     RayDesc ray;
-    ray.Origin = float3(0,0,0);
-    ray.Direction = float3(0,0,0);
+    ray.Origin = float3(0, 0, 0);
+    ray.Direction = float3(0, 0, 0);
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
     RayPayload payload = {};

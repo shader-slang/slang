@@ -5,10 +5,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -fvk-use-entrypoint-name -O0
 
 
-
 RWStructuredBuffer<int> outputBuffer;
 
-uint3 f() { return WorkgroupSize(); }
+uint3 f()
+{
+    return WorkgroupSize();
+}
 
 [shader("compute")]
 [numthreads(1u, 2u, 3)]

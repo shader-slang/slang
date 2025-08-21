@@ -5,24 +5,25 @@
 
 cbuffer A
 {
-					float3x4 aa;
-	row_major 		float3x4 ab;
-	column_major 	float3x4 ac;
+    float3x4 aa;
+    row_major float3x4 ab;
+    column_major float3x4 ac;
 }
 
 struct SB
 {
-					float3x4 ba;
-	row_major 		float3x4 bb;
-	column_major 	float3x4 bc;
+    float3x4 ba;
+    row_major float3x4 bb;
+    column_major float3x4 bc;
 };
 
 cbuffer B
 {
-	SB b;
+    SB b;
 }
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-	return 0.0;
+    return 0.0;
 }

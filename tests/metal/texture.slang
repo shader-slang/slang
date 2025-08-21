@@ -121,7 +121,10 @@ Texture2DArray<uint16_t4> t2DArray_u16;
 TextureCubeArray<uint16_t4> tCubeArray_u16;
 
 // Metal doc says "For depth texture types, T must be float."
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -131,10 +134,12 @@ typealias depth2d = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -144,10 +149,12 @@ typealias depth2d_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -157,10 +164,12 @@ typealias depthcube = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
@@ -170,8 +179,7 @@ typealias depthcube_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
 //TEST_INPUT: Texture2D(size=4, format=D32Float, content = zero):name d2D
 depth2d<float> d2D;
@@ -195,12 +203,12 @@ bool TEST_texture<T>(
     TextureCube<T> tCube,
     Texture1DArray<T> t1DArray,
     Texture2DArray<T> t2DArray,
-    TextureCubeArray<T> tCubeArray
-) where T: ITexelElement, IArithmetic
+    TextureCubeArray<T> tCubeArray)
+    where T : ITexelElement, IArithmetic
 {
     // METAL-LABEL: TEST_texture
     typealias Tvn = T;
-    typealias Tv4 = vector<T.Element,4>;
+    typealias Tv4 = vector<T.Element, 4>;
 
     float u = 0;
     float u2 = 0.5;
@@ -313,7 +321,8 @@ bool TEST_texture<T>(
     voidResult = voidResult && (uint(2) == elements);
     voidResult = voidResult && (uint(3) == numLevels);
 
-    bool result = voidResult
+    bool result =
+        voidResult
         // ===============================
         // float CalculateLevelOfDetail()
         // ===============================
@@ -340,9 +349,9 @@ bool TEST_texture<T>(
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(samplerState, normalize(float3(u, 1 - u, u)))
 
-        // SamplerComparisonState variant
+    // SamplerComparisonState variant
 
-        // Functional tests that require SM higher than 6.6 (as of writing) cannot run.
+    // Functional tests that require SM higher than 6.6 (as of writing) cannot run.
 #if !defined(EXCLUDE_SM_6_7)
         // METAL: t2D{{.*}}.calculate_clamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d(
@@ -391,7 +400,7 @@ bool TEST_texture<T>(
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
 
-        // SamplerComparisonState variant
+    // SamplerComparisonState variant
 #if !defined(EXCLUDE_SM_6_7)
         // METAL: t2D{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d(
@@ -614,11 +623,12 @@ bool TEST_texture<T>(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(0) == d2D.SampleCmpLevelZero(shadowSampler, float2(u2, u), 0, int2(0, 0))
 
-        // ===================================
-        //  float SampleCmpLevel()
-        // ===================================
+    // ===================================
+    //  float SampleCmpLevel()
+    // ===================================
 
-        // These require SM 6.7 for dx12 but functional compute tests currently do not run with the cs_6_7.
+    // These require SM 6.7 for dx12 but functional compute tests currently do not run with the
+    // cs_6_7.
 #if !defined(EXCLUDE_SM_6_7)
         // METAL: {{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
@@ -749,73 +759,73 @@ void computeMain()
 
     bool result = true
         && TEST_texture<float3>(
-            t1D_f32v3,
-            t2D_f32v3,
-            t3D_f32v3,
-            tCube_f32v3,
-            t1DArray_f32v3,
-            t2DArray_f32v3,
-            tCubeArray_f32v3)
-        // Metal textures support `Tv` types, which "denotes a 4-component vector
-        // type based on the templated type <T> for declaring the texture type:
-        //  - If T is float, Tv is float4.
-        //  - If T is half, Tv is half4.
-        //  - If T is int, Tv is int4.
-        //  - If T is uint, Tv is uint4.
-        //  - If T is short, Tv is short4.
-        //  - If T is ushort, Tv is ushort4."
+                        t1D_f32v3,
+                        t2D_f32v3,
+                        t3D_f32v3,
+                        tCube_f32v3,
+                        t1DArray_f32v3,
+                        t2DArray_f32v3,
+                        tCubeArray_f32v3)
+                  // Metal textures support `Tv` types, which "denotes a 4-component vector
+                  // type based on the templated type <T> for declaring the texture type:
+                  //  - If T is float, Tv is float4.
+                  //  - If T is half, Tv is half4.
+                  //  - If T is int, Tv is int4.
+                  //  - If T is uint, Tv is uint4.
+                  //  - If T is short, Tv is short4.
+                  //  - If T is ushort, Tv is ushort4."
         && TEST_texture<float4>(
-            t1D_f32,
-            t2D_f32,
-            t3D_f32,
-            tCube_f32,
-            t1DArray_f32,
-            t2DArray_f32,
-            tCubeArray_f32)
+                        t1D_f32,
+                        t2D_f32,
+                        t3D_f32,
+                        tCube_f32,
+                        t1DArray_f32,
+                        t2DArray_f32,
+                        tCubeArray_f32)
 #if !defined(EXCLUDE_HALF_TYPE)
         && TEST_texture<half4>(
-            t1D_f16,
-            t2D_f16,
-            t3D_f16,
-            tCube_f16,
-            t1DArray_f16,
-            t2DArray_f16,
-            tCubeArray_f16)
+                        t1D_f16,
+                        t2D_f16,
+                        t3D_f16,
+                        tCube_f16,
+                        t1DArray_f16,
+                        t2DArray_f16,
+                        tCubeArray_f16)
 #endif
 #if !defined(EXCLUDE_INTEGER_TYPE)
         && TEST_texture<int4>(
-            t1D_i32,
-            t2D_i32,
-            t3D_i32,
-            tCube_i32,
-            t1DArray_i32,
-            t2DArray_i32,
-            tCubeArray_i32)
+                        t1D_i32,
+                        t2D_i32,
+                        t3D_i32,
+                        tCube_i32,
+                        t1DArray_i32,
+                        t2DArray_i32,
+                        tCubeArray_i32)
         && TEST_texture<uint4>(
-            t1D_u32,
-            t2D_u32,
-            t3D_u32,
-            tCube_u32,
-            t1DArray_u32,
-            t2DArray_u32,
-            tCubeArray_u32)
+                        t1D_u32,
+                        t2D_u32,
+                        t3D_u32,
+                        tCube_u32,
+                        t1DArray_u32,
+                        t2DArray_u32,
+                        tCubeArray_u32)
 #if !defined(EXCLUDE_SHORT_TYPE)
         && TEST_texture<int16_t4>(
-            t1D_i16,
-            t2D_i16,
-            t3D_i16,
-            tCube_i16,
-            t1DArray_i16,
-            t2DArray_i16,
-            tCubeArray_i16)
+                        t1D_i16,
+                        t2D_i16,
+                        t3D_i16,
+                        tCube_i16,
+                        t1DArray_i16,
+                        t2DArray_i16,
+                        tCubeArray_i16)
         && TEST_texture<uint16_t4>(
-            t1D_u16,
-            t2D_u16,
-            t3D_u16,
-            tCube_u16,
-            t1DArray_u16,
-            t2DArray_u16,
-            tCubeArray_u16)
+                        t1D_u16,
+                        t2D_u16,
+                        t3D_u16,
+                        tCube_u16,
+                        t1DArray_u16,
+                        t2DArray_u16,
+                        tCubeArray_u16)
 #endif
 #endif
         ;

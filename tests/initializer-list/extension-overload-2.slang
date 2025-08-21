@@ -21,8 +21,9 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // it will prefer the explicit constructor defined in the extension instead of the synthesized one in the struct
-    Foo foo = {1.0f};
+    // it will prefer the explicit constructor defined in the extension instead of the synthesized
+    // one in the struct
+    Foo foo = { 1.0f };
     //CHECK: BUFFER: 6
     outputBuffer[0] = foo.a;
 }

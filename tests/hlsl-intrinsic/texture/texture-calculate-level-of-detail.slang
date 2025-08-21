@@ -15,13 +15,15 @@ float fragmentMain()
     // CHECK_HLSL: CalculateLevelOfDetailUnclamped
     // CHECK_SPIRV: OpImageQueryLod
     // CHECK_SPIRV: OpImageQueryLod
-    result += t.CalculateLevelOfDetail(s, float2(0,0)) + t.CalculateLevelOfDetailUnclamped(s, float2(0,0));
+    result += t.CalculateLevelOfDetail(s, float2(0, 0)) +
+              t.CalculateLevelOfDetailUnclamped(s, float2(0, 0));
 
     // CHECK_HLSL: CalculateLevelOfDetail
     // CHECK_HLSL: CalculateLevelOfDetailUnclamped
     // CHECK_SPIRV: OpImageQueryLod
     // CHECK_SPIRV: OpImageQueryLod
-    result += t.CalculateLevelOfDetail(sc, float2(0,0)) + t.CalculateLevelOfDetailUnclamped(sc, float2(0,0));
+    result += t.CalculateLevelOfDetail(sc, float2(0, 0)) +
+              t.CalculateLevelOfDetailUnclamped(sc, float2(0, 0));
 
     return result;
 }

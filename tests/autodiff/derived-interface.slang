@@ -8,8 +8,8 @@ RWStructuredBuffer<float> outputBuffer;
 interface IFoo : IDifferentiable
 {
     [Differentiable]
-    __init<T:IFoo>(T d); 
-    
+    __init<T : IFoo>(T d);
+
     [Differentiable]
     static This create(Differential d);
 
@@ -21,11 +21,8 @@ struct Impl : IFoo
 {
     float x;
     [Differentiable]
-    __init<T : IFoo>(T d)
-    {
-        this = (Impl)d;
-    }
-    
+    __init<T : IFoo>(T d) { this = (Impl)d; }
+
     [Differentiable]
     static This create(Differential d)
     {
@@ -39,12 +36,12 @@ struct Impl : IFoo
 }
 
 [Differentiable]
-float test<T:IFoo>(T.Differential d)
+float test<T : IFoo>(T.Differential d)
 {
     return T.create(d).getVal();
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain(uint threadId: SV_DispatchThreadID)
 {
     Impl.Differential d;

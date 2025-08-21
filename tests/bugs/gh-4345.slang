@@ -12,21 +12,21 @@ layout(location = 1) flat out highp ivec4 vtx_out_result1;
 layout(location = 2) flat out highp ivec4 vtx_out_result2;
 layout(location = 3) flat out highp ivec4 vtx_out_result3;
 
-void main (void)
+void main(void)
 {
-        gl_Position = a_position;
-        gl_PointSize = 1.0;
-        highp float coords = a_coords;
-        highp ivec4 result0;
-        highp ivec4 result1;
-        highp ivec4 result2;
-        highp ivec4 result3;
-        result0 = textureLod(texSampler[3], coords, 0.0);
-        result1 = textureLod(texSampler[2], coords, 0.0);
-        result2 = textureLod(texSampler[7], coords, 0.0);
-        result3 = textureLod(texSampler[2], coords, 0.0);
-        vtx_out_result0 = result0;
-        vtx_out_result1 = result1;
-        vtx_out_result2 = result2;
-        vtx_out_result3 = result3;
+    gl_Position = a_position;
+    gl_PointSize = 1.0;
+    highp float coords = a_coords;
+    highp ivec4 result0;
+    highp ivec4 result1;
+    highp ivec4 result2;
+    highp ivec4 result3;
+    result0 = textureLod(texSampler[3], coords, 0.0);
+    result1 = textureLod(texSampler[2], coords, 0.0);
+    result2 = textureLod(texSampler[7], coords, 0.0);
+    result3 = textureLod(texSampler[2], coords, 0.0);
+    vtx_out_result0 = result0;
+    vtx_out_result1 = result1;
+    vtx_out_result2 = result2;
+    vtx_out_result3 = result3;
 }

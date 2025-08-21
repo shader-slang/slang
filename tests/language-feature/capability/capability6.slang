@@ -3,11 +3,7 @@
 // CHECK_IGNORE_CAPS-NOT: error 36111
 
 
-
 [require(spirv, hlsl)]
 // CHECK: error 36111
 // CHECK_IGNORE_CAPS-NOT: error 36111
-void computeMain()
-{
-
-}
+void computeMain() {}

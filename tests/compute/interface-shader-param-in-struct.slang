@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-// Passing, but: slang-test: Test context Slang session is leaking #5610
+//  Passing, but: slang-test: Test context Slang session is leaking #5610
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // A lot of the setup is the same as for `interface-shader-param`,
@@ -30,10 +30,7 @@ interface IModifier
     int modify(int val);
 }
 
-int test(
-    int                             seed,
-    IRandomNumberGenerationStrategy inStrategy,
-    IModifier                       modifier)
+int test(int seed, IRandomNumberGenerationStrategy inStrategy, IModifier modifier)
 {
     let strategy = inStrategy;
     var generator = strategy.makeGenerator(seed);
@@ -58,7 +55,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 //TEST_INPUT: globalExistentialType MyStrategy
 cbuffer C
 {
-   IRandomNumberGenerationStrategy gStrategy;
+    IRandomNumberGenerationStrategy gStrategy;
 }
 
 struct Stuff
@@ -73,7 +70,7 @@ void computeMain(
 //TEST_INPUT: entryPointExistentialType MyModifier
     uniform Stuff stuff,
 
-    int3       dispatchThreadID : SV_DispatchThreadID)
+    int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -97,10 +94,7 @@ struct MyStrategy : IRandomNumberGenerationStrategy
         int state;
 
         [mutating]
-        int randomInt()
-        {
-            return state++;
-        }
+        int randomInt() { return state++; }
     }
 
     Generator makeGenerator(int seed)
@@ -114,8 +108,5 @@ struct MyModifier : IModifier
 {
     RWStructuredBuffer<int> localModifiers;
 
-    int modify(int val)
-    {
-        return val ^ localModifiers[val & 3];
-    }
+    int modify(int val) { return val ^ localModifiers[val & 3]; }
 }

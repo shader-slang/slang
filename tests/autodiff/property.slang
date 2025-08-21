@@ -3,7 +3,12 @@ public struct ReadOnlyIndex
 {
     private int _idx;
     __init(int i) { _idx = i; }
-    public property int idx { get { return _idx; } }
+    public property int idx
+    {
+        get {
+            return _idx;
+        }
+    }
 }
 struct GradientBuffer
 {
@@ -40,7 +45,7 @@ RWStructuredBuffer<float> gPrimal;
 //TEST_INPUT: set gGrad = ubuffer(data=[0.0 1.0 2.0 3.0 4.0 5.0 6.0 7.0], stride=4)
 StructuredBuffer<float> gGrad;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 5.0

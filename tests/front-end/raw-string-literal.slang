@@ -7,7 +7,7 @@ void writeChar(int8_t ch);
 void printLines(NativeString text)
 {
     NativeString str = text;
-    int8_t *ptr = bit_cast<Ptr<int8_t>>(str);
+    int8_t* ptr = bit_cast<Ptr<int8_t>>(str);
     for (int i = 0; i < text.length; i++)
     {
         if (ptr[i] != 13)

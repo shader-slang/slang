@@ -33,11 +33,12 @@ uniform ParameterBlock<Bvh<SnchNode, Triangle, Edge>> gBvh;
 
 [shader("compute")]
 [numthreads(256, 1, 1)]
-void rayIntersection(uint3 threadId: SV_DispatchThreadID,
-                     uniform StructuredBuffer<Ray> rays,
-                     uniform bool checkForOcclusion,
-                     uniform RWStructuredBuffer<Interaction> interactions,
-                     uniform uint nQueries)
+void rayIntersection(
+    uint3 threadId: SV_DispatchThreadID,
+    uniform StructuredBuffer<Ray> rays,
+    uniform bool checkForOcclusion,
+    uniform RWStructuredBuffer<Interaction> interactions,
+    uniform uint nQueries)
 {
     uint index = threadId.x;
     if (index >= nQueries)
@@ -56,11 +57,12 @@ void rayIntersection(uint3 threadId: SV_DispatchThreadID,
 
 [shader("compute")]
 [numthreads(256, 1, 1)]
-void sphereIntersection(uint3 threadId: SV_DispatchThreadID,
-                        uniform StructuredBuffer<BoundingSphere> boundingSpheres,
-                        uniform StructuredBuffer<float3> randNums,
-                        uniform RWStructuredBuffer<Interaction> interactions,
-                        uniform uint nQueries)
+void sphereIntersection(
+    uint3 threadId: SV_DispatchThreadID,
+    uniform StructuredBuffer<BoundingSphere> boundingSpheres,
+    uniform StructuredBuffer<float3> randNums,
+    uniform RWStructuredBuffer<Interaction> interactions,
+    uniform uint nQueries)
 {
     uint index = threadId.x;
     if (index >= nQueries)
@@ -72,7 +74,8 @@ void sphereIntersection(uint3 threadId: SV_DispatchThreadID,
     float3 randNum = randNums[index];
     ConstantBranchTraversalWeight branchTraversalWeight;
     Interaction i;
-    bool didIntersect = gBvh.intersect<ConstantBranchTraversalWeight>(s, randNum, branchTraversalWeight, i);
+    bool didIntersect =
+        gBvh.intersect<ConstantBranchTraversalWeight>(s, randNum, branchTraversalWeight, i);
     if (didIntersect)
     {
         interactions[index] = i;
@@ -81,11 +84,12 @@ void sphereIntersection(uint3 threadId: SV_DispatchThreadID,
 
 [shader("compute")]
 [numthreads(256, 1, 1)]
-void closestPoint(uint3 threadId: SV_DispatchThreadID,
-                  uniform StructuredBuffer<BoundingSphere> boundingSpheres,
-                  uniform RWStructuredBuffer<Interaction> interactions,
-                  uniform bool recordNormals,
-                  uniform uint nQueries)
+void closestPoint(
+    uint3 threadId: SV_DispatchThreadID,
+    uniform StructuredBuffer<BoundingSphere> boundingSpheres,
+    uniform RWStructuredBuffer<Interaction> interactions,
+    uniform bool recordNormals,
+    uniform uint nQueries)
 {
     uint index = threadId.x;
     if (index >= nQueries)
@@ -104,13 +108,14 @@ void closestPoint(uint3 threadId: SV_DispatchThreadID,
 
 [shader("compute")]
 [numthreads(256, 1, 1)]
-void closestSilhouettePoint(uint3 threadId: SV_DispatchThreadID,
-                            uniform StructuredBuffer<BoundingSphere> boundingSpheres,
-                            uniform StructuredBuffer<uint> flipNormalOrientation,
-                            uniform float squaredMinRadius,
-                            uniform float precision,
-                            uniform RWStructuredBuffer<Interaction> interactions,
-                            uniform uint nQueries)
+void closestSilhouettePoint(
+    uint3 threadId: SV_DispatchThreadID,
+    uniform StructuredBuffer<BoundingSphere> boundingSpheres,
+    uniform StructuredBuffer<uint> flipNormalOrientation,
+    uniform float squaredMinRadius,
+    uniform float precision,
+    uniform RWStructuredBuffer<Interaction> interactions,
+    uniform uint nQueries)
 {
     uint index = threadId.x;
     if (index >= nQueries)

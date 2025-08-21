@@ -33,14 +33,11 @@ float3 test_constructor(float3 x, float3 y)
 float3 test_complex_arith(float3 x, float2 y)
 {
     float2 t = float2(x.x, y.x) + 2.0 * float2(x.z, y.y);
-    return float3(
-        (2.0f * x.z + y.y * 4.0f - t.y), 
-        (3.0f * t + y).x,
-        t.x);
+    return float3((2.0f * x.z + y.y * 4.0f - t.y), (3.0f * t + y).x, t.x);
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat3 dpx = dpfloat3(float3(2.0, 3.0, 4.0), float3(0.0, 0.0, 0.0));
@@ -76,9 +73,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat2 dpy = dpfloat2(float2(1.5, 2.5), float2(0.0, 0.0));
 
         __bwd_diff(test_complex_arith)(dpx, dpy, float3(1.0, 1.5, 2.0));
-        outputBuffer[8] = dpx.d.y; // Expect: 0.0
-        outputBuffer[9] = dpy.d.x; // Expect: -1.0 + 1.5 = 0.5
+        outputBuffer[8] = dpx.d.y;  // Expect: 0.0
+        outputBuffer[9] = dpy.d.x;  // Expect: -1.0 + 1.5 = 0.5
         outputBuffer[10] = dpx.d.z; // Expect: 2.0 + 9.0 + 4.0 = 15.0
     }
-
 }

@@ -4,9 +4,9 @@ typedef uint4 Element;
 
 // UNORDERED ACCESS VIEW
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest3DUnordered(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -16,8 +16,10 @@ void resourceViewTest3DUnordered(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -33,9 +35,9 @@ void resourceViewTest3DUnordered(
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest2DUnordered(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -45,8 +47,10 @@ void resourceViewTest2DUnordered(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -62,9 +66,9 @@ void resourceViewTest2DUnordered(
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest1DUnordered(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -74,8 +78,10 @@ void resourceViewTest1DUnordered(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -92,9 +98,9 @@ void resourceViewTest1DUnordered(
 
 // SHADER RESOURCE VIEW
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest3DShader(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -104,8 +110,10 @@ void resourceViewTest3DShader(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -118,9 +126,9 @@ void resourceViewTest3DShader(
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest2DShader(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -130,8 +138,10 @@ void resourceViewTest2DShader(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -144,9 +154,9 @@ void resourceViewTest2DShader(
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void resourceViewTest1DShader(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform uint depth,
@@ -156,8 +166,10 @@ void resourceViewTest1DShader(
     uint tid = sv_dispatchThreadID.x;
 
     uint tmp = tid;
-    uint x = tmp % width; tmp /= width;
-    uint y = tmp % height; tmp /= height;
+    uint x = tmp % width;
+    tmp /= width;
+    uint y = tmp % height;
+    tmp /= height;
     uint z = tmp;
 
     uint3 coord = uint3(x, y, z);
@@ -173,8 +185,8 @@ void resourceViewTest1DShader(
 // Per-vertex attributes to be assembled from bound vertex buffers.
 struct AssembledVertex
 {
-    float3	position : POSITION;
-    float3	color    : COLOR;
+    float3 position : POSITION;
+    float3 color : COLOR;
 };
 
 // Output of the vertex shader, and input to the fragment shader.
@@ -193,18 +205,17 @@ struct Fragment
 
 struct VertexStageOutput
 {
-    CoarseVertex    coarseVertex    : CoarseVertex;
-    float4          sv_position     : SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 [shader("vertex")]
-VertexStageOutput vertexMain(
-    AssembledVertex assembledVertex)
+VertexStageOutput vertexMain(AssembledVertex assembledVertex)
 {
     VertexStageOutput output;
 
     float3 position = assembledVertex.position;
-    float3 color    = assembledVertex.color;
+    float3 color = assembledVertex.color;
 
     output.coarseVertex.color = color;
     output.sv_position = float4(position, 1.0);
@@ -215,7 +226,8 @@ VertexStageOutput vertexMain(
 // Fragment Shader
 
 [shader("fragment")]
-float4 fragmentMain() : SV_Target
+float4 fragmentMain()
+    : SV_Target
 {
     return float4(1.0, 2.0, 3.0, 4.0);
 }
@@ -288,7 +300,7 @@ void resourceViewTest<T:ITestCase>(
     uniform RWStructuredBuffer<Element> testResults)
 {
     uint tid = sv_dispatchThreadID.x;
-    
+
     uint tmp = tid;
     uint x = tmp % width; tmp /= width;
     uint y = tmp % height; tmp /= height;

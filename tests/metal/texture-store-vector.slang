@@ -8,9 +8,9 @@ RWTexture2D<float2> output;
 
 [shader("compute")]
 [numthreads(32, 32, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // This should expand float2(1,2) to float4(1,2,0,0)
     // CHECK: {{.*}}float4(1.0, 2.0,
     output.Store(dispatchThreadID.xy, float2(1, 2));
-} 
+}

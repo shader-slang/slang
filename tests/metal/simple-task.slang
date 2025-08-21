@@ -16,7 +16,7 @@ struct MeshPayload
 
 // METAL: MeshPayload_0 object_data* _slang_mesh_payload
 // METAL: mesh_grid_properties  _slang_mgp
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void taskMain()
 {
     // METAL: _slang_mesh_payload

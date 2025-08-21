@@ -3,6 +3,5 @@
 // CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
 uniform RaytracingAccelerationStructure accel;
 
-[numthreads(1,1,1)]
-void main()
-{}
+[numthreads(1, 1, 1)]
+void main() {}

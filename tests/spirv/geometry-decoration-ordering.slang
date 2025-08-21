@@ -8,7 +8,7 @@
 // CHECK: OpExecutionMode {{.*}} OutputTriangleStrip
 
 [maxvertexcount(4)]
-void main( point float4 input[1], inout TriangleStream<float4> OutputStream )
+void main(point float4 input[1], inout TriangleStream<float4> OutputStream)
 {
     OutputStream.Append(float4(0));
     OutputStream.Append(float4(1));

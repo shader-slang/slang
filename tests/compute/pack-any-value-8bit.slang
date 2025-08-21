@@ -19,10 +19,7 @@ struct Val : IInterface
     uint8_t v3;
     uint32_t v4;
     uint8_t v5;
-    float run()
-    {
-        return v0 + v1 + f0 + v2 + v3 + v4 + v5;
-    }
+    float run() { return v0 + v1 + f0 + v2 + v3 + v4 + v5; }
 };
 
 struct UserDefinedPackedType
@@ -36,12 +33,12 @@ RWStructuredBuffer<float> gOutputBuffer;
 //TEST_INPUT: type_conformance Val:IInterface = 11
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     UserDefinedPackedType objStorage;
     objStorage.values[0] = 0xA5A50201;
     objStorage.values[1] = asuint(3.0f);
-    objStorage.values[2] = 4u|(0xA505u<<16u);
+    objStorage.values[2] = 4u | (0xA505u << 16u);
     objStorage.values[3] = 6;
     objStorage.values[4] = 7;
 
@@ -58,11 +55,11 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     v.v4 = 6;
     v.v5 = 7;
 
-    IInterface dynamicObj1 = createDynamicObject<IInterface, Val>(11, v);;
+    IInterface dynamicObj1 = createDynamicObject<IInterface, Val>(11, v);
+    ;
     gOutputBuffer[1] = dynamicObj1.run();
 
     var packed = reinterpret<UserDefinedPackedType, Val>(v);
     var unpacked = reinterpret<Val, UserDefinedPackedType>(packed);
     gOutputBuffer[2] = unpacked.run();
 }
-

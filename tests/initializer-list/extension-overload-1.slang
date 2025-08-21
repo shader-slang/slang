@@ -11,8 +11,9 @@ import modulea;
 //     int b;
 // }
 
-// This test demonstrates that whether struct is a C-Style type only depends on the definition of the struct, not the extension.
-// Even we have an explicit constructor defined in extension of Foo, it is still a C-Style type.
+// This test demonstrates that whether struct is a C-Style type only depends on the definition of
+// the struct, not the extension. Even we have an explicit constructor defined in extension of Foo,
+// it is still a C-Style type.
 
 extension Foo
 {
@@ -31,8 +32,8 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
 
-    // This will miss both synthesized constructor and explicit constructor in extension, but it will still fall back
-    // to legacy initializer list because Foo is a C-Style type.
+    // This will miss both synthesized constructor and explicit constructor in extension, but it
+    // will still fall back to legacy initializer list because Foo is a C-Style type.
     Foo foo = {};
     //CHECK: BUFFER: 0
     //CHECK: BUFFER-NEXT: 0
@@ -41,7 +42,7 @@ void computeMain()
 
 
     // When providing 1 parameter, it will lookup for the explicit constructor in extension.
-    Foo foo1 = {1};
+    Foo foo1 = { 1 };
     //CHECK: BUFFER: 6
     //CHECK: BUFFER-NEXT: 3
     outputBuffer[2] = foo1.a;

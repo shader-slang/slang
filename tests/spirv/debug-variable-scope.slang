@@ -1,14 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
 
-Texture2D    testTex      :   register(t0);
-SamplerState testSampler  :   register(s0);
+Texture2D testTex : register(t0);
+SamplerState testSampler : register(s0);
 
 struct PSIn
 {
-   float4 pos      : SV_Position;
+    float4 pos : SV_Position;
 };
 
-float4 main(PSIn input) : SV_TARGET
+float4 main(PSIn input)
+    : SV_TARGET
 {
     uint4 testPos = input.pos;
     float bias = -1.0;

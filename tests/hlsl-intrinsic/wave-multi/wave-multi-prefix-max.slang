@@ -26,12 +26,14 @@ bool test1MinMax(uint4 mask)
     let smaller = T(gSmaller);
     let maxValue = T(gMaxValue);
 
-    // The larger values are set to be the last in the partition, exclusive variants will never get these values.
+    // The larger values are set to be the last in the partition, exclusive variants will never get
+    // these values.
     bool exclusiveRes = true
                         & (__partitionedExclusiveMax(maxValue, mask) == smaller)
-                        ;
-    // Do not check exclusive prefix for the first invocation in partition as their values(identity values) depend on the builtin type `T`. It would be
-    // nice to have something like T::min or T::max.
+        ;
+    // Do not check exclusive prefix for the first invocation in partition as their values(identity
+    // values) depend on the builtin type `T`. It would be nice to have something like T::min or
+    // T::max.
     if (isFirstInPartition)
     {
         exclusiveRes = true;
@@ -44,18 +46,21 @@ bool test1MinMax(uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVMinMax(uint4 mask) {
+bool testVMinMax(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let smaller = GVec(T(gSmaller));
     let maxValue = GVec(T(gMaxValue));
 
-    // The larger values are set to be the last in the partition, exclusive variants will never get these values.
+    // The larger values are set to be the last in the partition, exclusive variants will never get
+    // these values.
     bool exclusiveRes = true
                         & all(__partitionedExclusiveMax(maxValue, mask) == smaller)
-                        ;
-    // Do not check exclusive prefix for the first invocation in partition as their values(identity values) depend on the builtin type `T`. It would be
-    // nice to have something like T::min or T::max.
+        ;
+    // Do not check exclusive prefix for the first invocation in partition as their values(identity
+    // values) depend on the builtin type `T`. It would be nice to have something like T::min or
+    // T::max.
     if (isFirstInPartition)
     {
         exclusiveRes = true;
@@ -64,7 +69,7 @@ bool testVMinMax(uint4 mask) {
     return true
         & all(__partitionedInclusiveMax(maxValue, mask) == maxValue)
         & exclusiveRes;
-        ;
+    ;
 }
 
 bool testMinMax(uint4 mask)
@@ -120,7 +125,7 @@ bool testMinMax(uint4 mask)
 [numthreads(32, 1, 1)]
 [shader("compute")]
 [MaximallyReconverges]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let index = dispatchThreadID.x;
 
@@ -137,7 +142,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             & testMinMax(mask)
-            ;
+        ;
 
     // CHECK-COUNT-32: 1
     outputBuffer[index] = uint(result);

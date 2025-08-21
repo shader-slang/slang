@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage raygeneration -entry main -enable-experimental-passes
 
-// Check to ensure we make global ray-tracing objects. Ensure we store into these variables directly and not through a context-pointer.
+// Check to ensure we make global ray-tracing objects. Ensure we store into these variables directly
+// and not through a context-pointer.
 
 // CHECK-DAG: %[[RAYTRACING_AS_TYPE:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
 // CHECK-DAG: %[[RAYTRACING_AS_PTR_TYPE:[A-Za-z0-9_]+]] = OpTypePointer UniformConstant %[[RAYTRACING_AS_TYPE]]
@@ -21,23 +22,38 @@ layout(binding = 0) uniform accelerationStructureEXT as;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 layout(location = 2) rayPayloadEXT vec4 payload;
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 layout(location = 0) callableDataEXT vec4 outcall;
 
-bool testHitObjectTraceRay() {
+bool testHitObjectTraceRay()
+{
     hitObjectNV hit;
 
 
-    hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectTraceRayNV(
+        hit,
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
     return true
         && hitObjectIsHitNV(hit) == true
         ;
 }
 
 
-bool testPayloadReadWrite() {
+bool testPayloadReadWrite()
+{
     payload = vec4(2);
     vec4 read = payload;
     return true
@@ -45,7 +61,8 @@ bool testPayloadReadWrite() {
         ;
 }
 
-bool testAttributeReadWrite() {
+bool testAttributeReadWrite()
+{
     attrMain = vec4(2);
     vec4 read = attrMain;
     return true
@@ -53,7 +70,8 @@ bool testAttributeReadWrite() {
         ;
 }
 
-bool testCallableReadWrite() {
+bool testCallableReadWrite()
+{
     outcall = vec4(2);
     vec4 read = outcall;
     return true
@@ -61,12 +79,13 @@ bool testCallableReadWrite() {
         ;
 }
 
-bool testReadWriteOfObjects(){
+bool testReadWriteOfObjects()
+{
     return true
         && testPayloadReadWrite()
         && testAttributeReadWrite()
         && testCallableReadWrite();
-        ;       
+    ;
 }
 
 void main()

@@ -91,7 +91,7 @@ bool testRotate()
         & testVRotate<int16_t, 3>()
         & testVRotate<int16_t, 4>()
 
-        // Subgroup rotate operations on these builtin types are not supported on Metal.
+    // Subgroup rotate operations on these builtin types are not supported on Metal.
 #if !defined(METAL)
         & test1Rotate<uint8_t>()
         & testVRotate<uint8_t, 2>()
@@ -119,16 +119,15 @@ bool testRotate()
 
 [shader("compute")]
 [numthreads(SUBGROUP_SIZE, 1, 1)]
-void computeMain(uint3 dispatchID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchID: SV_DispatchThreadID)
 {
     threadIndex = dispatchID.x;
     rotatedValue = (threadIndex + DELTA) % SUBGROUP_SIZE;
 
     bool result = true
             & testRotate()
-            ;
+        ;
 
     // CHECK: 1
     outputBuffer[0] = uint(result);
 }
-

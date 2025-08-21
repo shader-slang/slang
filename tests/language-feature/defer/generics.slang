@@ -30,15 +30,9 @@ void genericFunc<T>(int param)
 
 struct TestType : IDroppable, IDiscombobulatable
 {
-    void drop(inout int i)
-    {
-        outputBuffer[i++] = 0xFF;
-    }
+    void drop(inout int i) { outputBuffer[i++] = 0xFF; }
 
-    void discombobulate(inout int i, int param)
-    {
-        outputBuffer[i++] = param;
-    }
+    void discombobulate(inout int i, int param) { outputBuffer[i++] = param; }
 }
 
 [numthreads(1, 1, 1)]

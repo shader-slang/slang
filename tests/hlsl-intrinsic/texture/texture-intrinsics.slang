@@ -92,33 +92,39 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         float Object.SampleCmpLevelZero()
     */
     // NOTE: These are having issues with vulkan (glsl)
-    // SampleCmpLevelZero() requires format with VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT.
+    // SampleCmpLevelZero() requires format with
+    // VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT.
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
     val += t1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
     val += tCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
     val += t2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
-    val += tCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1-u, u, u)), 0);
+    val += tCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1 - u, u, u)), 0);
 
     // Offset variant
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0));
-    // TextureCube does not have an offset version of this
+// TextureCube does not have an offset version of this
 
-    // Status variant
-    #if !defined(VK)
+// Status variant
+#if !defined(VK)
 
     val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0, status);
     val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0), status);
 
     val += t1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, 0, status);
-    val += t2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0, int2(0, 0), status);
+    val += t2DArray.SampleCmpLevelZero(
+        shadowSampler,
+        normalize(float3(u, 1 - u, u)),
+        0,
+        int2(0, 0),
+        status);
 #endif
 
     /*
         float Object.SampleCmpLevel().
-        These require SM 6.7 for dx12 but functional compute tests currently do not run with the cs_6_7,
-        hence only enable these for vk.
+        These require SM 6.7 for dx12 but functional compute tests currently do not run with the
+       cs_6_7, hence only enable these for vk.
     */
 #if defined(VK)
     float level = 1.0;
@@ -127,7 +133,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += t1DArray.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
     val += tCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
     val += t2DArray.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
-    val += tCubeArray.SampleCmpLevel(shadowSampler, normalize(float4(u, 1-u, u, u)), 0, level);
+    val += tCubeArray.SampleCmpLevel(shadowSampler, normalize(float4(u, 1 - u, u, u)), 0, level);
 
     // Offset variant
     val += t1D.SampleCmpLevel(shadowSampler, u, 0, level, 0);
@@ -254,7 +260,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     val += height;
     val += elements;
 
-    // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
+    // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray
+    // objects is unavailable on cs_5_0
 #if defined(CS60) || defined(VK)
     tCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
@@ -280,44 +287,93 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         <Template Type>4 Object.Gather()
     */
     float4 f4 = t2D_RGBA.Gather(samplerState, float2(u, u));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = tCube_RGBA.Gather(samplerState, normalize(float3(u, 1 - u, u)));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = t2DArray_RGBA.Gather(samplerState, float3(u, u, 0));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = tCubeArray_RGBA.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     // Offset variant
     f4 = t2D_RGBA.Gather(samplerState, float2(u, u), int2(0, 0));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = t2DArray_RGBA.Gather(samplerState, float3(u, u, 0), int2(0, 0));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     // Object.GatherGreen()
     f4 = t2D_RGBA.GatherGreen(samplerState, float2(u, u), int2(1, 2));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
-    f4 = t2D_RGBA.GatherGreen(samplerState, float2(u, u), int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    f4 = t2D_RGBA.GatherGreen(
+        samplerState,
+        float2(u, u),
+        int2(1, 2),
+        int2(3, 4),
+        int2(5, 6),
+        int2(7, 8));
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = tCubeArray_RGBA.GatherGreen(samplerState, float4(1.5, 1.5, 1.5, 1.5));
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     // status variant
 #if !defined(VK)
     f4 = t2D_RGBA.GatherGreen(samplerState, float2(u, u), int2(1, 2), status);
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
-    f4 = t2D_RGBA.GatherGreen(samplerState, float2(u, u), int2(1, 2), int2(3, 4), int2(5, 6), int2(7, 8), status);
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    f4 = t2D_RGBA.GatherGreen(
+        samplerState,
+        float2(u, u),
+        int2(1, 2),
+        int2(3, 4),
+        int2(5, 6),
+        int2(7, 8),
+        status);
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 
     f4 = tCubeArray_RGBA.GatherGreen(samplerState, float4(1.5, 1.5, 1.5, 1.5), status);
-    val += f4.x;  val += f4.y;  val += f4.z;  val += f4.w;
+    val += f4.x;
+    val += f4.y;
+    val += f4.z;
+    val += f4.w;
 #endif
 
     /*
@@ -332,7 +388,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     // Offset variant
     val += t1D.Load(int2(0, 0), 0);
-    val += t2D.Load(int3(0, 0, 0), int2(0,0));
+    val += t2D.Load(int3(0, 0, 0), int2(0, 0));
     val += t3D.Load(int4(0, 0, 0, 0), int3(0, 0, 0));
 
     val += t1DArray.Load(int3(0, 0, 0), 0);
@@ -345,28 +401,76 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
     val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
-    val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
+    val += t3D.SampleGrad(
+        samplerState,
+        float3(u, u, u),
+        float3(_ddx, _ddx, _ddx),
+        float3(_ddy, _ddy, _ddy));
+    val += tCube.SampleGrad(
+        samplerState,
+        normalize(float3(u, 1 - u, u)),
+        float3(_ddx, _ddx, _ddx),
+        float3(_ddy, _ddy, _ddy));
 
     val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy));
+    val += t2DArray.SampleGrad(
+        samplerState,
+        float3(u, u, 0.0f),
+        float2(_ddx, _ddx),
+        float2(_ddy, _ddy));
 
     // Offset variant
     val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0);
-    val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0));
+    val += t2D.SampleGrad(
+        samplerState,
+        float2(u, u),
+        float2(_ddx, _ddx),
+        float2(_ddy, _ddy),
+        int2(0, 0));
+    val += t3D.SampleGrad(
+        samplerState,
+        float3(u, u, u),
+        float3(_ddx, _ddx, _ddx),
+        float3(_ddy, _ddy, _ddy),
+        int3(0, 0, 0));
 
     val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
+    val += t2DArray.SampleGrad(
+        samplerState,
+        float3(u, u, 0.0f),
+        float2(_ddx, _ddx),
+        float2(_ddy, _ddy),
+        int2(0, 0));
 
     // Status variant
 #if !defined(VK)
-    val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0, clamp,  status);
-    val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0), clamp, status);
+    val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0, clamp, status);
+    val += t2D.SampleGrad(
+        samplerState,
+        float2(u, u),
+        float2(_ddx, _ddx),
+        float2(_ddy, _ddy),
+        int2(0, 0),
+        clamp,
+        status);
+    val += t3D.SampleGrad(
+        samplerState,
+        float3(u, u, u),
+        float3(_ddx, _ddx, _ddx),
+        float3(_ddy, _ddy, _ddy),
+        int3(0, 0, 0),
+        clamp,
+        status);
 
     val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0, clamp, status);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
+    val += t2DArray.SampleGrad(
+        samplerState,
+        float3(u, u, 0.0f),
+        float2(_ddx, _ddx),
+        float2(_ddy, _ddy),
+        int2(0, 0),
+        clamp,
+        status);
 #endif
 
     outputBuffer[idx] = val;

@@ -24,7 +24,7 @@ struct Bar
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     Bar b = { 0x1122334455667788 };
 
@@ -36,7 +36,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: 11223344
     outputBuffer[2] = f.c;
 
-    uint8_t4 v = {0x10, 0x20, 0x30, 0x40};
+    uint8_t4 v = { 0x10, 0x20, 0x30, 0x40 };
     uint32_t u = bit_cast<uint32_t>(v);
 
     // CHECK: 40302010

@@ -10,7 +10,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = 0;
     int j = 0;
-    defer {
+    defer
+    {
         if (j == 2)
         {
             outputBuffer[i++] = j;
@@ -20,7 +21,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
             outputBuffer[i++] = 2048;
         }
     }
-    defer {
+    defer
+    {
         if (j == 1)
         {
             outputBuffer[i++] = j;

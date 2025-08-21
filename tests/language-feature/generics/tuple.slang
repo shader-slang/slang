@@ -16,7 +16,7 @@ void write<each T : __BuiltinFloatingPointType>(Tuple<T> tuple)
     expand writeSingle(offset, each tuple);
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 1.0

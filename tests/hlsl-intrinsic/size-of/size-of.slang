@@ -1,4 +1,4 @@
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
@@ -12,7 +12,8 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum Enum : int8_t
 {
-};
+}
+;
 
 struct Hey
 {
@@ -27,7 +28,7 @@ struct Thing : Hey
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const int idx = asint(dispatchThreadID.x);
 
@@ -38,17 +39,25 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float g[sizeof(a)];
 
-    int f[sizeof(Thing) + sizeof(float2) + sizeof(g)]; 
+    int f[sizeof(Thing) + sizeof(float2) + sizeof(g)];
 
     int size;
 
     switch (idx)
-    {   
-        default:
-        case 0:     size = sizeof(float); break;
-        case 1:     size = sizeof(float3); break;
-        case 2:     size = sizeof(matrix<uint, 3, 2>); break;
-        case 3:     size = sizeof(idx); break;
+    {
+    default:
+    case 0:
+        size = sizeof(float);
+        break;
+    case 1:
+        size = sizeof(float3);
+        break;
+    case 2:
+        size = sizeof(matrix<uint, 3, 2>);
+        break;
+    case 3:
+        size = sizeof(idx);
+        break;
     }
 
     outputBuffer[idx] = size + a + b + c + d + sizeof(f);

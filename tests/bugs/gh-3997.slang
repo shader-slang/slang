@@ -18,6 +18,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID) {
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+{
     atomicAdd(outputBuffer[0], 1);
 }

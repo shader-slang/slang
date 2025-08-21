@@ -1,9 +1,9 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain 
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -34,5 +34,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         && noInit.data2 == 2
         && noInit.data3 == 2
         && noInit.data4 == 0;
-        ;
+    ;
 }

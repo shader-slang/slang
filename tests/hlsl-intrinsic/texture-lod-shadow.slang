@@ -9,7 +9,7 @@ SamplerComparisonState s;
 // CHECK: %{{[0-9]*}} = OpImageSampleDrefExplicitLod %float %{{[0-9]*}} %{{[0-9]*}} %{{[0-9]*}} Lod|ConstOffset %float_0 %{{[0-9]*}}
 // CHECK: %{{[0-9]*}} = OpImageSampleDrefExplicitLod %float %{{[0-9]*}} %{{[0-9]*}} %{{[0-9]*}} Lod|ConstOffset %float_1_5 %{{[0-9]*}}
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     result[0] = t2dArray.SampleCmpLevelZero(s, float3(1, 2, 3), 0.5, int2(0, 0));

@@ -10,29 +10,29 @@ RWStructuredBuffer<int> outputBuffer;
 __generic<T>
 struct GenStruct
 {
-	T x;
-	T y;
+    T x;
+    T y;
 };
 
 __generic<T>
 T test(T val)
 {
-	GenStruct<T> gs;
-	gs.x = val;
-	gs.y = val;
-	return gs.x;
+    GenStruct<T> gs;
+    gs.x = val;
+    gs.y = val;
+    return gs.x;
 }
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	float outVal = 0;
+    float outVal = 0;
 
-	outVal += test<uint>(tid);
-	outVal += test<float>(tid * 16.0f);
+    outVal += test<uint>(tid);
+    outVal += test<float>(tid * 16.0f);
 
-	outputBuffer[tid] = int(outVal);
+    outputBuffer[tid] = int(outVal);
 }

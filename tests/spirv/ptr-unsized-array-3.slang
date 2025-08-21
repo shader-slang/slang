@@ -6,7 +6,8 @@
 
 // Test a pointer to a struct with a trailing unsized array.
 
-struct MeshStorage {
+struct MeshStorage
+{
     int foo;
     uint64_t QuadData[];
 };
@@ -17,13 +18,13 @@ uniform MeshStorage* pStorage;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0],stride=4);
 uniform RWStructuredBuffer<uint> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 5
     // CHECK: 6
     // CHECK: 1
-    outputBuffer[0] = (int)(pStorage.QuadData[1]&0xFFFFFFFF);
-    outputBuffer[1] = (int)(pStorage.QuadData[1]>>32);
+    outputBuffer[0] = (int)(pStorage.QuadData[1] & 0xFFFFFFFF);
+    outputBuffer[1] = (int)(pStorage.QuadData[1] >> 32);
     outputBuffer[2] = pStorage.foo;
 }

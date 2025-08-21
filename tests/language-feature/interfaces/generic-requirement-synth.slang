@@ -24,30 +24,31 @@ interface ITestInterface<Real : IFloat>
 
     __init<T : IBar>(T t);
 
-    __generic<T : IBar> 
-    __subscript(T t)->Real { get; }
+    __generic<T : IBar>
+    __subscript(T t)->Real {
+        get;
+    }
 }
 
 struct TestInterfaceImpl<Real : IFloat> : ITestInterface<Real>
 {
-    // The signature of this sample method is different from the one in the 
+    // The signature of this sample method is different from the one in the
     // interface. However, we should be able to form a call into this method
     // from the synthesized implementation matching the interface definition,
     // so the conformance should hold.
-    Real sample<T : IBase>(T t)
-    {
-        return x + Real(T.get());
-    }
-    
+    Real sample<T : IBase>(T t) { return x + Real(T.get()); }
+
     // Test the same thing for constructors.
-    __init<T : IBase>(T t)
-    {
-        x = Real(T.get());
-    }
+    __init<T : IBase>(T t) { x = Real(T.get()); }
 
     // Test the same thing for subscript operators.
     __generic<T : IBase>
-    __subscript(T t)->Real { get { return x + Real(T.get()); } }
+    __subscript(T t)->Real
+    {
+        get {
+            return x + Real(T.get());
+        }
+    }
     Real x;
 }
 
@@ -63,7 +64,7 @@ float test1(ITestInterface<float> obj)
     return obj[b];
 }
 
-float test2<T:ITestInterface<float>>()
+float test2<T : ITestInterface<float>>()
 {
     Bar b = {};
     T obj = T(b);

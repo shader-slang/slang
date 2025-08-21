@@ -30,7 +30,7 @@ void atomicOp(inout int array[2])
 
 RWStructuredBuffer<int> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     modify(gArray0);

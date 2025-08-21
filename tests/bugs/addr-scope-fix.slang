@@ -13,10 +13,7 @@ struct PathInfo
 {
     HitInfo hit;
     [mutating]
-    void setVal(float x)
-    {
-        hit.val = x;
-    }
+    void setVal(float x) { hit.val = x; }
 }
 
 void someOp(HitInfo hitInfo)
@@ -40,7 +37,7 @@ void func(int x)
         // future use and will try to create a local var for it. This will
         // result a pointer typed var being created, and leads to invalid
         // hlsl/glsl code.
-        // 
+        //
         // The fix is to hoist all always-fold insts to earliest point
         // in the program instead of creating a var for it.
         //

@@ -2,10 +2,11 @@
 
 struct VS_OUT
 {
-	nointerpolation uint layerID : SV_RenderTargetArrayIndex;	
+    nointerpolation uint layerID : SV_RenderTargetArrayIndex;
 };
 
-float4 main(VS_OUT vsOut) : SV_Target
+float4 main(VS_OUT vsOut)
+    : SV_Target
 {
-	return float4(float(vsOut.layerID));
+    return float4(float(vsOut.layerID));
 }

@@ -5,12 +5,14 @@ volatile buffer MyBlockName1
 {
     writeonly uint data2;
     readonly writeonly uint data3;
-} inputBuffer1;
+}
+inputBuffer1;
 
 buffer MyBlockName2
 {
     uint data;
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()

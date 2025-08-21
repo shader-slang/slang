@@ -23,7 +23,7 @@ struct B : IInterface
     static float calc(float x) { return 2.0; }
 };
 
-DifferentialPair<float> dsqr<T:IInterface>(T obj, DifferentialPair<float> x)
+DifferentialPair<float> dsqr<T : IInterface>(T obj, DifferentialPair<float> x)
 {
     float primal = obj.calc(x.p) + x.p * x.p;
     float diff = 2.0 * x.p * x.d;
@@ -31,7 +31,7 @@ DifferentialPair<float> dsqr<T:IInterface>(T obj, DifferentialPair<float> x)
 }
 
 [ForwardDerivative(dsqr)]
-float sqr<T:IInterface>(T obj, float x)
+float sqr<T : IInterface>(T obj, float x)
 {
     return no_diff(obj.calc(x)) + x * x;
 }
@@ -41,14 +41,14 @@ float sqr<T:IInterface>(T obj, float x)
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 0); // A
     var p = DifferentialPair<float>(2.0, 1.0);
-   
-    outputBuffer[0] =  __fwd_diff(sqr)(obj, p).d; // A.calc, expect 4
+
+    outputBuffer[0] = __fwd_diff(sqr)(obj, p).d; // A.calc, expect 4
 
     obj = createDynamicObject<IInterface>(dispatchThreadID.x + 1, 0); // B
     p = DifferentialPair<float>(1.5, 1.0);
-    outputBuffer[1] = __fwd_diff(sqr)(obj, p).d;  // B.calc, expect 3
+    outputBuffer[1] = __fwd_diff(sqr)(obj, p).d; // B.calc, expect 3
 }

@@ -4,7 +4,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature double
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-// Not supported in WGSL: Double and other unsupported scalar types
+//  Not supported in WGSL: Double and other unsupported scalar types
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // inf, -inf, nan, finite
@@ -15,7 +15,7 @@ RWStructuredBuffer<uint> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
@@ -23,12 +23,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint high = inputBuffer[idx * 2 + 1];
 
     double v = asdouble(low, high);
-    
+
     int flags = 0;
-    
+
     flags |= isnan(v) ? 1 : 0;
     flags |= isfinite(v) ? 2 : 0;
     flags |= isinf(v) ? 4 : 0;
-    
+
     outputBuffer[idx] = flags;
 }

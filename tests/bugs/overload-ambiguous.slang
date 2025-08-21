@@ -18,10 +18,7 @@ uint getData()
 struct DataObtainer
 {
     uint data;
-    uint getData()
-    {
-        return data;
-    }
+    uint getData() { return data; }
 
     uint getValue()
     {
@@ -39,7 +36,7 @@ uint myFunc(uint a)
     return a + 1u;
 }
 
-__generic<T: __BuiltinIntegerType>
+__generic<T : __BuiltinIntegerType>
 uint myFunc(T a)
 {
     uint b = __intCast<uint, T>(a);
@@ -51,7 +48,7 @@ uint myFunc(T a)
 [shader("compute")]
 void computeMain(uint3 threadID: SV_DispatchThreadID)
 {
-    DataObtainer obtainer = {2u};
+    DataObtainer obtainer = { 2u };
     outputBuffer[0] = obtainer.getValue();
     outputBuffer[1] = obtainer.getValue2();
 

@@ -1,8 +1,9 @@
 // Test packing/unpacking different types of fields into `AnyValue`s.
 
-//dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -output-using-type
-//dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
-//dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -output-using-type
+// dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -output-using-type
+// dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
+// dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+// -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
@@ -19,7 +20,7 @@ RWStructuredBuffer<float> gOutputBuffer;
 RWStructuredBuffer<IInterface> gObj;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Test unpacking.
     float result = 0.0;
@@ -32,11 +33,11 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     // Test packing.
     IInterface v[2];
     Float4Val cval;
-    cval.val.val = float4(1,2,3,4);
+    cval.val.val = float4(1, 2, 3, 4);
     v[0] = cval;
 
     Int4Val ival;
-    ival.val = int4(2,3,4,5);
+    ival.val = int4(2, 3, 4, 5);
     v[1] = ival;
 
     for (int i = 0; i < 2; i++)
@@ -50,34 +51,29 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 export struct FloatVal : IInterface
 {
     float val;
-    float run()
-    {
-        return val;
-    }
+    float run() { return val; }
 };
-interface ISomething{void g();}
-struct Float4Struct : ISomething { float4 val; void g() {} }
+interface ISomething
+{
+    void g();
+}
+struct Float4Struct : ISomething
+{
+    float4 val;
+    void g() {}
+}
 export struct Float4Val : IInterface
 {
     Float4Struct val;
-    float run()
-    {
-        return val.val.x;
-    }
+    float run() { return val.val.x; }
 };
 export struct IntVal : IInterface
 {
     int val;
-    float run()
-    {
-        return val;
-    }
+    float run() { return val; }
 };
 export struct Int4Val : IInterface
 {
     int4 val;
-    float run()
-    {
-        return val.x;
-    }
+    float run() { return val.x; }
 };

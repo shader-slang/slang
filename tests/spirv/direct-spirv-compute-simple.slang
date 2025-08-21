@@ -7,8 +7,8 @@
 //TEST_INPUT:set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> resultBuffer;
 
-[numthreads(4,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint threadId = dispatchThreadID.x;
     uint result = threadId + 1;

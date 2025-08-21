@@ -24,28 +24,29 @@ RWTexture2D<float4> rwt2D_4;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     float val = 0;
- 
+
     // Do a format converting write2!
     rwt2D[uint2(idx, idx)] = idx - 1;
     rwt2D_2[uint2(idx, idx)] = float2(idx + idx, idx * idx);
-    rwt2D_4[uint2(idx, idx)] = float4(idx + 97, idx + 8, idx + 16, idx + 24);    
-    
+    rwt2D_4[uint2(idx, idx)] = float4(idx + 97, idx + 8, idx + 16, idx + 24);
+
     // May not be strictly necessary
     AllMemoryBarrierWithGroupSync();
-    
+
     // Do read converting
-    // There is *only* CUDA support for half/float *converting* reads for 1d, 2d, 3d shapes for RWTexture/surface
-    
+    // There is *only* CUDA support for half/float *converting* reads for 1d, 2d, 3d shapes for
+    // RWTexture/surface
+
     float4 v4 = rwt2D_4[uint2(idx, idx)];
     float2 v2 = rwt2D_2[uint2(idx, idx)];
     float v = rwt2D[uint2(idx, idx)];
-    
+
     val += v4.x + v2.x + v;
-    
+
     outputBuffer[idx] = val;
 }

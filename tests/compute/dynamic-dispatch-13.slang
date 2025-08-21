@@ -21,7 +21,7 @@ RWStructuredBuffer<IInterface> gCb;
 RWStructuredBuffer<IInterface> gCb1;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -37,16 +37,10 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
 export struct MyImpl : IInterface
 {
     int val;
-    int run(int input)
-    {
-        return input + val;
-    }
+    int run(int input) { return input + val; }
 };
 export struct MyImpl2 : IInterface
 {
     int val;
-    int run(int input)
-    {
-        return input - val;
-    }
+    int run(int input) { return input - val; }
 };

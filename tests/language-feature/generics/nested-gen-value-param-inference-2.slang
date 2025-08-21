@@ -1,8 +1,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-interface IValueGeneric<let D : int> {}
-struct ValGenericImpl<let D : int> : IValueGeneric<D> {}
+interface IValueGeneric<let D : int>
+{
+}
+struct ValGenericImpl<let D : int> : IValueGeneric<D>
+{
+}
 
 struct NestedValueGeneric<let D : int, S : IValueGeneric<D>>
 {

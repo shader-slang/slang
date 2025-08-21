@@ -12,11 +12,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 int selectDims<int N, int M>(bool cond)
 {
-    return select(
-        matrix<bool, N, M>(cond),
-        matrix<int, N, M>(1),
-        matrix<int, N, M>(0)
-    )[0][0];
+    return select(matrix<bool, N, M>(cond), matrix<int, N, M>(1), matrix<int, N, M>(0)) [0][0];
 }
 
 int selectDimsDigit<int N, int M, int D>(int x)
@@ -25,7 +21,7 @@ int selectDimsDigit<int N, int M, int D>(int x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = 324;
 
@@ -42,4 +38,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // CHK: 324
     outputBuffer[0] = s;
-} 
+}

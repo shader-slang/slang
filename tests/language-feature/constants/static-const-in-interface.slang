@@ -34,11 +34,12 @@ struct EnsureCompileTimeEval<let u : int>
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;
-    static const int result = EnsureCompileTimeEval<GetValue<int>.value - GetValue<int16_t>.value>.value;
+    static const int result =
+        EnsureCompileTimeEval<GetValue<int>.value - GetValue<int16_t>.value>.value;
     int outVal = result;
     outputBuffer[tid] = outVal;
 }

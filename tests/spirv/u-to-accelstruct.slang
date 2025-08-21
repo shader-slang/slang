@@ -7,7 +7,7 @@ RWStructuredBuffer<int> output;
 // CHECK: %[[REG:[A-Za-z0-9_]+]] = OpConvertUToAccelerationStructureKHR
 // CHECK: OpRayQueryInitializeKHR %rayQuery{{.*}} %[[REG]]
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     let accelStruct = RaytracingAccelerationStructure(accelStructAddr);

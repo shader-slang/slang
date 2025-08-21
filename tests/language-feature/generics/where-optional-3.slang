@@ -28,16 +28,13 @@ struct Container<K, V>
     }
 }
 
-struct HeavyEntry: IReleaseable
+struct HeavyEntry : IReleaseable
 {
     int index;
     int value;
 
     [mutating]
-    void release()
-    {
-        outputBuffer[index] = value;
-    }
+    void release() { outputBuffer[index] = value; }
 };
 
 struct LightEntry
@@ -59,8 +56,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     }
     { // K is IReleaseable
         var c = Container<HeavyEntry, LightEntry>();
-        c.k[0] = HeavyEntry(0,1);
-        c.k[1] = HeavyEntry(1,2);
+        c.k[0] = HeavyEntry(0, 1);
+        c.k[1] = HeavyEntry(1, 2);
         c.v[0] = LightEntry(3);
         c.v[1] = LightEntry(4);
         // CHECK: 1
@@ -72,8 +69,8 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         var c = Container<LightEntry, HeavyEntry>();
         c.k[0] = LightEntry(1);
         c.k[1] = LightEntry(2);
-        c.v[0] = HeavyEntry(2,3);
-        c.v[1] = HeavyEntry(3,4);
+        c.v[0] = HeavyEntry(2, 3);
+        c.v[1] = HeavyEntry(3, 4);
         // CHECK-NEXT: 3
         c.erase(0);
         // CHECK-NEXT: 4
@@ -81,10 +78,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     }
     { // K and V are IReleaseable
         var c = Container<HeavyEntry, HeavyEntry>();
-        c.k[0] = HeavyEntry(4,5);
-        c.k[1] = HeavyEntry(6,7);
-        c.v[0] = HeavyEntry(5,6);
-        c.v[1] = HeavyEntry(7,8);
+        c.k[0] = HeavyEntry(4, 5);
+        c.k[1] = HeavyEntry(6, 7);
+        c.v[0] = HeavyEntry(5, 6);
+        c.v[1] = HeavyEntry(7, 8);
         // CHECK-NEXT: 5
         // CHECK-NEXT: 6
         c.erase(0);

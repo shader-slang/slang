@@ -12,7 +12,8 @@ enum class Enum
 {
     A,
     B,
-};
+}
+;
 
 struct A
 {
@@ -25,9 +26,9 @@ struct B
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-    
+
     outputBuffer[dispatchThreadID.x] = int(B::kE);
 }

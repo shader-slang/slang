@@ -4,9 +4,9 @@
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type  -render-feature double
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type  -render-feature double
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
-//metal currently does not support `double` 
+// metal currently does not support `double`
 //DISABLE_TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl -output-using-type
-// Not supported in WGSL: Double and other unsupported scalar types
+//  Not supported in WGSL: Double and other unsupported scalar types
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // BUF:      type: int32_t
@@ -23,7 +23,7 @@ RWStructuredBuffer<double> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     var exponent : int;
     frexp(inputBuffer[i], exponent);

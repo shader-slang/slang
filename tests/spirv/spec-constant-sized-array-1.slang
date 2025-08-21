@@ -22,7 +22,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(12, 1, 1)]
-void computeMain(uint3 id : SV_GroupThreadID)
+void computeMain(uint3 id: SV_GroupThreadID)
 {
     buffer[id.x] = id.x;
 

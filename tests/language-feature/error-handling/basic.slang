@@ -15,13 +15,15 @@ RWStructuredBuffer<int> outputBuffer;
 enum MyError1
 {
     Fail
-};
+}
+;
 
 enum MyError2
 {
     Fail1,
     Fail2 = 0x12
-};
+}
+;
 
 void throwingFunc() throws MyError1
 {
@@ -30,13 +32,15 @@ void throwingFunc() throws MyError1
 
 int maybeBadFunc1(int n) throws MyError1
 {
-    if (n == 1) throw MyError1.Fail;
+    if (n == 1)
+        throw MyError1.Fail;
     return n;
 }
 
 int maybeBadFunc2(int n) throws MyError2
 {
-    if (n == 2) throw MyError2.Fail2;
+    if (n == 2)
+        throw MyError2.Fail2;
     return n;
 }
 
@@ -44,15 +48,19 @@ int multiCatchFunc(int n)
 {
     do
     {
-        let a = try maybeBadFunc1(n);
-        let b = try maybeBadFunc2(n);
-        return a+b;
+        let a =
+        try
+            maybeBadFunc1(n);
+        let b =
+        try
+            maybeBadFunc2(n);
+        return a + b;
     }
-    catch(err: MyError1)
+    catch (err: MyError1)
     {
         return 0x11;
     }
-    catch(err: MyError2)
+    catch (err: MyError2)
     {
         return reinterpret<int>(err);
     }
@@ -64,7 +72,7 @@ int containedThrow()
     {
         throw MyError1.Fail;
     }
-    catch(err: MyError1)
+    catch (err: MyError1)
     {
         return 1;
     }
@@ -75,10 +83,11 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     do
     {
-        try throwingFunc();
+        try
+            throwingFunc();
         outputBuffer[0] = 1;
     }
-    catch(err: MyError1)
+    catch (err: MyError1)
     {
         outputBuffer[0] = 2;
     }

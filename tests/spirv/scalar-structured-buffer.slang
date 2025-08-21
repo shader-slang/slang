@@ -1,6 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
 
-float getData<L:IBufferDataLayout>(StructuredBuffer<float3, L> p, int index)
+float getData<L : IBufferDataLayout>(StructuredBuffer<float3, L> p, int index)
 {
     return p[index].x;
 }
@@ -12,7 +12,7 @@ StructuredBuffer<float3, ScalarDataLayout> scalarBuffer;
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=12)
 RWStructuredBuffer<float3, ScalarDataLayout> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 1

@@ -36,19 +36,18 @@ int fallback2(float x, float)
 
 // Make sure that we have enough invocations to saturate the first workgroup
 [numthreads(128, 1, 1)]
-void computeMain(uint tig : SV_GroupIndex)
+void computeMain(uint tig: SV_GroupIndex)
 {
     // The values we're cooperating over are {0, 2, 3}
     // We track the number of sets evaluated in the "count" variable, and write
     // that at index 0
     //
     // If these are not fused, then we'd expect count to be incremented three
-    // times then doubled three times. What we want to see is 
+    // times then doubled three times. What we want to see is
     // 0, +1, *2, +1, *2, +1, *2 = 14
     let i = tig < 4 ? float(outputBuffer[tig]) : 0;
     let y = saturated_cooperation(cooperate, fallback, i, 1);
     let x = saturated_cooperation(cooperate2, fallback2, i, 2.f);
-    if(tig < 4)
+    if (tig < 4)
         outputBuffer[tig] = tig == 0 ? count : x;
-
 }

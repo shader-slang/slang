@@ -37,6 +37,3 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     outputBuffer[0] = x.d; // -1.0
 }
-
-
-

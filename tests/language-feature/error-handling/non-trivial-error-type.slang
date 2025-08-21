@@ -28,12 +28,16 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     int i = 0;
     do
     {
-        outputBuffer[i] = try func(1);
-        i+=1;
-        outputBuffer[i] = try func(3);
-        i+=1;
+        outputBuffer[i] =
+        try
+            func(1);
+        i += 1;
+        outputBuffer[i] =
+        try
+            func(3);
+        i += 1;
     }
-    catch(err: MyError)
+    catch (err: MyError)
     {
         outputBuffer[i] = err.code * 0x10 + err.param;
     }

@@ -24,7 +24,7 @@ void computeMain()
     float buffer[constValue0 / 2 + (constValue0 >> 2)];
     // CHECK: OpVariable %[[PT_TYPE]] Function
 
-    static const int size = constValue0 / 2 + (constValue0 >> 2);   // 16 + 8 = 24
+    static const int size = constValue0 / 2 + (constValue0 >> 2); // 16 + 8 = 24
     for (uint i = 0; i < size; i++)
     {
         buffer[i] = i;

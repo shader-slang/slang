@@ -3,7 +3,7 @@
 //WGSL-DAG: @builtin(local_invocation_index)
 //WGSL-DAG: @compute
 
-void main(uint idx : SV_GroupIndex) 
+void main(uint idx: SV_GroupIndex)
 {
     // Empty compute shader
 }

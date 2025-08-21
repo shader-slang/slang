@@ -8,7 +8,7 @@ public interface IThing
     int f(This other);
 }
 
-public extension Ptr<int>: IThing
+public extension Ptr<int> : IThing
 {
     public int f(This other)
     {
@@ -22,7 +22,7 @@ void main()
     Ptr<int> p;
     Ptr<int> other;
     int result = p.f(other);
-    
+
     // CHECK: 1
     printf("%d\n", result);
 }

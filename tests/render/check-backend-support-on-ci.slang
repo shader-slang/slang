@@ -13,7 +13,7 @@ RWStructuredBuffer<float> gOutput;
 
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     gOutput[tid] = gInput[tid];

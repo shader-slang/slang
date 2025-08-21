@@ -11,7 +11,7 @@ interface IThing
     int thing(int index);
 }
 
-struct MyThing: IThing
+struct MyThing : IThing
 {
     int val;
 
@@ -29,16 +29,17 @@ struct NotMyThing
     int val;
 }
 
-void f<T>(inout T t, int index) where optional T: IThing
+void f<T>(inout T t, int index)
+    where optional T : IThing
 {
     if (T is IThing)
     {
-        outputBuffer[index+1] = 2 * t.thing(index);
+        outputBuffer[index + 1] = 2 * t.thing(index);
     }
     else
     {
         outputBuffer[index] = 0;
-        outputBuffer[index+1] = 0;
+        outputBuffer[index + 1] = 0;
     }
 }
 

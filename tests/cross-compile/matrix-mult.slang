@@ -5,10 +5,11 @@
 
 cbuffer C
 {
-	float4x3 m;
+    float4x3 m;
 };
 
-float4 main(float3 v) : SV_Target
+float4 main(float3 v)
+    : SV_Target
 {
-	return mul(m, v);
+    return mul(m, v);
 }

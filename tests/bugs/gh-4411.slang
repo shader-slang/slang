@@ -10,13 +10,15 @@ RWTexture2D<uint> texture2D;
 //TEST_INPUT:ubuffer(data=[0]):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-void computeMain() {
+void computeMain()
+{
     texture1D[1].x = 15;
     texture2D[uint2(2, 3)].x = 16;
 
-    outputBuffer[0] = uint(true
+    outputBuffer[0] = uint(
+        true
             && texture1D[1].x == 15
             && texture2D[uint2(2, 3)].x == 16
-        );
+    );
     //BUF: 1
 }

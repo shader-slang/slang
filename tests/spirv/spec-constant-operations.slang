@@ -4,9 +4,11 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// `OpSpecConstantOp` can only contain integer operations when targeting Vulkan SPIRV, not floating-point operations.
-// This test checks that floating-point operations that strictly contain specialization constant variables are not declared with `OpSpecContantOp`,
-// while integer operations that strictly contain specializaton constant operands are declared as `OpSpecConstantOp`.
+// `OpSpecConstantOp` can only contain integer operations when targeting Vulkan SPIRV, not
+// floating-point operations. This test checks that floating-point operations that strictly contain
+// specialization constant variables are not declared with `OpSpecContantOp`, while integer
+// operations that strictly contain specializaton constant operands are declared as
+// `OpSpecConstantOp`.
 
 // CHECK-DAG: OpSpecConstant %float 1
 // CHECK-DAG: OpSpecConstant %ulong 256

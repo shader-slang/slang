@@ -14,7 +14,7 @@ VOutput main()
 {
     VOutput output;
     output.v = float4(1, 2, 3, 4);
-    
+
     // CHECK: [[TMP:[_A-Za-z0-9]+]].y = - output_0.v_0.y;
     // CHECK: gl_Position = [[TMP]];
     return output;

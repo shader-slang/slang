@@ -14,7 +14,7 @@ struct Indirect
 
 struct PushConstant
 {
-    Indirect *ptr;
+    Indirect* ptr;
 };
 
 struct Payload

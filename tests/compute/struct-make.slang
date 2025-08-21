@@ -3,7 +3,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
-// Confirm that scoping on enums and types works 
+// Confirm that scoping on enums and types works
 
 struct Thing
 {
@@ -20,7 +20,7 @@ struct Thing
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

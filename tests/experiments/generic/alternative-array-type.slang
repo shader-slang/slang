@@ -1,6 +1,6 @@
 //DISABLE_TEST:SIMPLE:-target hlsl -entry computeMain -profile cs_6_2
 
-/* The docs claim that for arrays we can use the 'alternate' style 
+/* The docs claim that for arrays we can use the 'alternate' style
 
 https://github.com/shader-slang/slang/blob/master/docs/language-reference/04-types.md
 
@@ -15,11 +15,11 @@ But that produces an error:
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 4, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = dispatchThreadID.x;
 
     int[4] a = { 1, 4, 2, 1 };
-   
+
     outputBuffer[x] = a[x];
 }

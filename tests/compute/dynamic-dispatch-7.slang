@@ -22,19 +22,19 @@ interface IInterface
     TAssoc GetAssoc();
 };
 
-T.TAssoc CreateT_Assoc_Inner<T:IInterface>(int inVal)
+T.TAssoc CreateT_Assoc_Inner<T : IInterface>(int inVal)
 {
     T obj;
     obj.SetVal(inVal);
     return obj.GetAssoc();
 }
 
-T.TAssoc CreateT_Assoc<T:IInterface>(int inVal)
+T.TAssoc CreateT_Assoc<T : IInterface>(int inVal)
 {
     return CreateT_Assoc_Inner<T>(inVal);
 }
 
-T CreateT<T:IInterface>(int inVal)
+T CreateT<T : IInterface>(int inVal)
 {
     T obj;
     obj.SetVal(inVal);
@@ -46,23 +46,14 @@ struct Impl : IInterface
     struct TAssoc : IAssoc
     {
         int base;
-        int Compute()
-        {
-            return base;
-        }
+        int Compute() { return base; }
     };
 
     TAssoc assoc;
     [mutating]
-    void SetVal(int inVal)
-    {
-        assoc.base = inVal;
-    }
+    void SetVal(int inVal) { assoc.base = inVal; }
 
-    TAssoc GetAssoc()
-    {
-        return assoc;
-    }
+    TAssoc GetAssoc() { return assoc; }
 };
 
 int test()
@@ -79,7 +70,7 @@ int test()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int outVal = test();

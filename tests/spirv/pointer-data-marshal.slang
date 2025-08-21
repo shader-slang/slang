@@ -1,11 +1,13 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
 
-struct Foo {
-  column_major float3x2 m;
+struct Foo
+{
+    column_major float3x2 m;
 };
 
-struct Params {
-  Foo *foo;
+struct Params
+{
+    Foo* foo;
 };
 
 // CHECK: %[[PTR0:[A-Za-z0-9_]+]] = Op{{.*}}AccessChain %_ptr_PhysicalStorageBuffer__arr_v3float_int_2 %{{.*}} %int_0
@@ -15,7 +17,8 @@ struct Params {
 ConstantBuffer<Params> params;
 
 [shader("compute")]
-[numthreads(1,1,1)]
-void main() {
-  params.foo.m[2][1] += 1.0;
+[numthreads(1, 1, 1)]
+void main()
+{
+    params.foo.m[2][1] += 1.0;
 }

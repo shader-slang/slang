@@ -43,7 +43,7 @@ VS_OUT GetInputPatch(InputPatch<VS_OUT, 4> patch, int index)
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("constants")]
-HS_OUT hullMain(InputPatch<VS_OUT, 4> patch, uint i : SV_OutputControlPointID)
+HS_OUT hullMain(InputPatch<VS_OUT, 4> patch, uint i: SV_OutputControlPointID)
 {
     HS_OUT o;
     o.position = patch[i].position;
@@ -74,7 +74,7 @@ HS_OUT GetOutputPatch(const OutputPatch<HS_OUT, 4> patch, int index)
 
 [domain("quad")]
 DS_OUT domainMain(
-    float2 uv : SV_DomainLocation,      // Tessellated coordinates (u, v)
+    float2 uv: SV_DomainLocation,       // Tessellated coordinates (u, v)
     const OutputPatch<HS_OUT, 4> patch, // Control points from the hull shader
     const HSC_OUT patchConstants        // Patch constants calculated by the hull shader
 )
@@ -88,8 +88,7 @@ DS_OUT domainMain(
     float3 p3 = patch[3].position;
 
     // Bilinear interpolation of the position in the quad
-    float3 interpolatedPosition =
-          p0 * (1 - uv.x) * (1 - uv.y)
+    float3 interpolatedPosition = p0 * (1 - uv.x) * (1 - uv.y)
         + p1 * uv.x * (1 - uv.y)
         + p3 * uv.x * uv.y
         + p2 * (1 - uv.x) * uv.y;

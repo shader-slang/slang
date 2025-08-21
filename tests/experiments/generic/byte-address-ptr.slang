@@ -1,10 +1,12 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 /* The purpose of these tests is to use generics to be able to traverse
-a 'linked list' of different related types. 
+a 'linked list' of different related types.
 
-tests/current-bugs/generic/byte-address-ptr.slang(77): note 99999: an internal error threw an exception while working on code near this location
-(0): error 99999: Slang compilation aborted due to an exception of class Slang::InternalError: assert failure: witnessTableVal->getOp() != kIROp_StructKey
+tests/current-bugs/generic/byte-address-ptr.slang(77): note 99999: an internal error threw an
+exception while working on code near this location (0): error 99999: Slang compilation aborted due
+to an exception of class Slang::InternalError: assert failure: witnessTableVal->getOp() !=
+kIROp_StructKey
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -17,9 +19,10 @@ enum Type : int
     A,
     B,
     C,
-};
+}
+;
 
-interface IBase 
+interface IBase
 {
     static bool isType(Type type);
 };
@@ -33,9 +36,12 @@ struct Base : IBase
 struct Ptr
 {
     Type getType() { return gB.Load<Base>(offset).type; }
-    
+
     __generic<T : IBase>
-    bool isType() { return T::isType(getType()); }
+    bool isType()
+    {
+        return T::isType(getType());
+    }
     // Changing to T : IBase causes an internal compiler crash
     __generic<T : IBase>
     T as()
@@ -70,12 +76,12 @@ struct C : B
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     Ptr ptr = { 0 };
     int total = 0;
-    
-    while (ptr.isType<A>())    
+
+    while (ptr.isType<A>())
     {
         A a = ptr.as<A>();
         total += a.something;

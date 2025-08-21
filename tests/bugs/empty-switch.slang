@@ -7,12 +7,12 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    int index = int(dispatchThreadID.x);   
-    
+    int index = int(dispatchThreadID.x);
+
     int a = index;
-    
+
     // This is kind of silly - but it is a valid construct.
     // We want to check condition expression is executed though
     switch (++a)

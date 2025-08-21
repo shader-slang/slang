@@ -2,11 +2,13 @@
 
 //CHECK: OpEntryPoint
 
-public interface ITest {
+public interface ITest
+{
     public property int val;
 };
 
-public struct TestImpl : ITest {
+public struct TestImpl : ITest
+{
     public int val;
 }
 
@@ -16,7 +18,7 @@ StructuredBuffer<Test> data;
 RWStructuredBuffer<int> output;
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     int val = data[0].val;

@@ -3,7 +3,7 @@
 // Test that we can mix explicit and implicit locations for global varyings.
 
 #version 450
-layout(location=1) in vec4 color_0;
+layout(location = 1) in vec4 color_0;
 in vec2 texcoord_0;
 in vec2 texCoord_1;
 

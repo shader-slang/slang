@@ -41,8 +41,12 @@ public BoundingSphere transformSphere(float3x4 t, BoundingSphere s)
     return BoundingSphere(c, r2);
 }
 
-public void transformInteraction(float3x4 t, float3x4 tInv, float3 x,
-                                 bool overwriteDistance, inout Interaction i)
+public void transformInteraction(
+    float3x4 t,
+    float3x4 tInv,
+    float3 x,
+    bool overwriteDistance,
+    inout Interaction i)
 {
     float3 p = transformPoint(t, i.p);
     float3 n = normalize(mul(transpose(extractLinearTransform(tInv)), i.n));

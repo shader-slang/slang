@@ -16,7 +16,7 @@ ConstantBuffer<float> cb;
 
 RWStructuredBuffer<float> ob : register(u9, space7);
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     ob[0] = cb + texA.Load(int3(0)).x;

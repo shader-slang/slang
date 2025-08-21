@@ -18,9 +18,7 @@ struct Foo<T, A access = A::V1, B addrSpace = B::V1>
 {
     int a;
     __init(int b) { a = b; }
-    __init<U, A accessOther>(Foo<U, accessOther, addrSpace> ptr)
-    {
-    }
+    __init<U, A accessOther>(Foo<U, accessOther, addrSpace> ptr) {}
 
     // internally Slang is throwing an error, we just don't drain the error
     // from our sink

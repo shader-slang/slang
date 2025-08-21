@@ -2,9 +2,9 @@
 
 struct GsOut
 {
-    float2 uv                               : TexCoord;
-    float2 texelPos                         : TexelPosition;
-    float4 posH                             : SV_Position;
+    float2 uv : TexCoord;
+    float2 texelPos : TexelPosition;
+    float4 posH : SV_Position;
 };
 
 // CHECK-DAG: OpEntryPoint Geometry %gsMain "main" %[[OUT1:[A-Za-z0-9_]+]] %[[OUT2:[A-Za-z0-9_]+]] %gl_Position
@@ -22,15 +22,15 @@ struct GsOut
 // CHECK: OpEndPrimitive
 
 [maxvertexcount(15)]
-void gsMain(uint triIdx : SV_PrimitiveID, inout TriangleStream<GsOut> outStream)
+void gsMain(uint triIdx: SV_PrimitiveID, inout TriangleStream<GsOut> outStream)
 {
     for (int j = 0; j < 5; j++)
     {
         for (int i = 0; i < 3; i++)
         {
             GsOut v;
-            v.uv = float2(j,i);
-            v.texelPos = float2(0,0);
+            v.uv = float2(j, i);
+            v.texelPos = float2(0, 0);
             v.posH = float4(j, i, 1, 1);
             outStream.Append(v);
         }

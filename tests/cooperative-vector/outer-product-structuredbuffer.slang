@@ -1,4 +1,5 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
+// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue
+// #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
 // These platforms don't support these operations into structured buffers
@@ -40,11 +41,11 @@
 // CHECK-NEXT: 32.000000
 
 //TEST_INPUT:ubuffer(data=[ 0x40003C00 0x44004200 ], stride=4),name=inputA
-// [1,2,3,4]
+//  [1,2,3,4]
 StructuredBuffer<half> inputA;
 
 //TEST_INPUT:ubuffer(data=[ 0x40003C00 0x44004200 0x46004500 0x48004700 ], stride=4),name=inputB
-// [1,2,3,4,5,6,7,8]
+//  [1,2,3,4,5,6,7,8]
 StructuredBuffer<half> inputB;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=output
@@ -65,6 +66,5 @@ void computeMain()
         0,
         32,
         CoopVecMatrixLayout::RowMajor,
-        CoopVecComponentType::Float16,
-    );
+        CoopVecComponentType::Float16, );
 }

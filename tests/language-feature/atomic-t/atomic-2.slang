@@ -7,7 +7,7 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<int> outputBuffer;
 
-[NumThreads(1,1,1)]
+[NumThreads(1, 1, 1)]
 void computeMain()
 {
     static groupshared Atomic<int> atomicInt;
@@ -31,7 +31,8 @@ void computeMain()
     if (atomicInt.exchange(4) != 1)
         result = false;
     if (atomicInt.compareExchange(4, 5) != 4)
-    {} //  result = false;  // for some reason this fails on Metal Github CI, so disabling.
+    {
+    } //  result = false;  // for some reason this fails on Metal Github CI, so disabling.
     if (atomicInt.load() != 5)
         result = false;
     if (atomicInt.increment() != 5)

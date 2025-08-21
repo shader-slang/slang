@@ -20,12 +20,12 @@ struct X : IThing<int>
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
     X x;
     IThing<int> i = x;
-    
-	outputBuffer[index] = i.get();
+
+    outputBuffer[index] = i.get();
 }

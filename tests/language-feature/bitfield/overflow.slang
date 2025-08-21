@@ -8,7 +8,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-struct S {
+struct S
+{
     int foo : 8;
     uint bar : 24;
 };

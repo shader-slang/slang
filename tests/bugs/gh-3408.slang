@@ -5,15 +5,15 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK-NOT: {{\b}}if{{\b}}
 
     int tid = dispatchThreadID.x;
-    
+
     static int a[] = { 1, 2 };
-    
-	outputBuffer[dispatchThreadID.x] = a[tid & 1];
+
+    outputBuffer[dispatchThreadID.x] = a[tid & 1];
     // BUF: 1
     // BUF: 2
     // BUF: 1

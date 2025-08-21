@@ -8,7 +8,8 @@ const float X = 10.0;
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void computeMain() : SV_Target
+void computeMain()
+    : SV_Target
 {
     float arr[int(X)];
     float a = arr[0];

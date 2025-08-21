@@ -9,13 +9,15 @@
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=buffer
-[vk::binding(2, 3)] RWByteAddressBuffer buffer;
-struct Block {
+[vk::binding(2, 3)]
+RWByteAddressBuffer buffer;
+struct Block
+{
     float4 val[2];
 };
 [shader("compute")]
-[numthreads(1,1,1)]
-void computeMain(uint3 threadId : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     // CHECK-NOT: warning
 
@@ -36,4 +38,3 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     buffer.Store(0, buffer.LoadAligned<Block>(0));
     buffer.StoreAligned(16, buffer.LoadAligned<Block>(4, 16));
 }
-

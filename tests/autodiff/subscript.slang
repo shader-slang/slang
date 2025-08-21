@@ -2,16 +2,21 @@
 
 interface ITest
 {
-    __subscript(int i) -> float
+    __subscript(int i)->float
     {
-        [BackwardDifferentiable] get;
+        [BackwardDifferentiable]
+        get;
     }
 }
 struct Test : ITest
 {
-    __subscript(int i) -> float
+    __subscript(int i)->float
     {
-        [BackwardDifferentiable] get { return 5.0f * i; }
+        [BackwardDifferentiable]
+        get
+        {
+            return 5.0f * i;
+        }
     }
 }
 
@@ -24,7 +29,7 @@ float test(ITest arg)
 //TEST_INPUT:set output = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Test t = {};

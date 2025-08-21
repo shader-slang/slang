@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST_DISABLED(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-// Not supported in WGSL: Arrays of textures or buffers
+//  Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // Note: can't actually test this on Vulkan right now because
@@ -24,12 +24,12 @@ float broken(Texture2D t[2])
 
 int test(int val)
 {
-    return val*int(broken(gTextures));
+    return val * int(broken(gTextures));
 }
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int val = int(tid);

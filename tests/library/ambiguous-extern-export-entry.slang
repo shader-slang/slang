@@ -7,7 +7,7 @@ import "ambiguous-extern-export-lib1.slang";
 import "ambiguous-extern-export-lib2.slang";
 
 export static const int call_data_len = 6;
-export static const int call_group_vector[call_data_len] = {1,2,3,4,5,6};
+export static const int call_group_vector[call_data_len] = { 1, 2, 3, 4, 5, 6 };
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

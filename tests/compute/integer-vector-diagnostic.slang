@@ -14,7 +14,7 @@ cbuffer VectorBuffer
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[0] = int8Vector.x + int16Vector.y + int64Vector.z;
 }

@@ -1,5 +1,5 @@
 //TEST:SIMPLE:
-// test that `struct` decls work
+//  test that `struct` decls work
 
 // Note(tfoley): disabled during syntax transition
 // #include "pipeline-simple.slang.h"
@@ -7,18 +7,18 @@
 // struct declaration
 struct Foo
 {
-	float3 a;
-	float3 b;
+    float3 a;
+    float3 b;
 };
 
 // function on a struct
 Foo makeFoo(float x, float y)
 {
-	// local of struct type
-	Foo foo;
-	foo.a = float3(x);
-	foo.b = float3(y);
-	return foo;
+    // local of struct type
+    Foo foo;
+    foo.a = float3(x);
+    foo.b = float3(y);
+    return foo;
 }
 
 /* Note(tfoley): disabled during syntax transition
@@ -26,8 +26,8 @@ Foo makeFoo(float x, float y)
 template shader Test()
 //    targets StandardPipeline
 {
-	// Uniform of struct type
-	param Foo foo1;
+        // Uniform of struct type
+        param Foo foo1;
 
     @MeshVertex float3 position;
     @MeshVertex float3 color;

@@ -4,5 +4,4 @@
 // CHECK: ([[#@LINE+1]]): error
 import a;
 
-int main()
-{}
+int main() {}

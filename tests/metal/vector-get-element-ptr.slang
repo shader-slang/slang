@@ -10,8 +10,8 @@ void modify(inout int v)
     v = 2;
 }
 
-[numthreads(1,1,1)]
-void computeMain(int3 v : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(int3 v: SV_DispatchThreadID)
 {
     int3 u = v;
     // CHECK: int [[TEMP:[a-zA-Z0-9_]+]] = u{{.*}}.x;

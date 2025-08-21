@@ -9,8 +9,9 @@
 //TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp16 ftz
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-vk -compute -Xslang -denorm-mode-fp16 -Xslang preserve
-// Capability shaderDenormFlushToZeroFloat16 is VK_FALSE on the Vulkan device used for CI testing, resulting in
-// runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat16-06299 during CI testing
+//  Capability shaderDenormFlushToZeroFloat16 is VK_FALSE on the Vulkan device used for CI testing,
+//  resulting in
+//  runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat16-06299 during CI testing
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp16 -Xslang ftz
 
 // CHECK_ANY-NOT: DenormPreserve
@@ -49,6 +50,6 @@ void computeMain()
 {
     half smallestNormal = inputBuffer[0];
     half denormal = smallestNormal / 10;
-    
+
     outputBuffer[0] = denormal;
 }

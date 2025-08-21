@@ -11,8 +11,5 @@
 // If the user specified an explicit spirv version, we will use it.
 // SPIRV14: Version: 1.4
 
-[numthreads(1,1,1)]
-void main()
-{
-
-}
+[numthreads(1, 1, 1)]
+void main() {}

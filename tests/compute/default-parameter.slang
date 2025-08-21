@@ -16,9 +16,9 @@ int test(int val)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    int inVal = (int) dispatchThreadID.x;
+    int inVal = (int)dispatchThreadID.x;
     int outVal = test(inVal);
     outputBuffer[dispatchThreadID.x] = outVal;
 }

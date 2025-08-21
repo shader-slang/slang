@@ -13,18 +13,18 @@ RWStructuredBuffer<int> outputBuffer;
 // block references the type parameter 'T', specialization resolves this before
 // the SPIR-V is rendered.
 //
-func foo<T : __BuiltinFloatingPointType>(T x) -> T
+func foo<T : __BuiltinFloatingPointType>(T x)->T
 {
     return spirv_asm
     {
-        OpConstant $$int %int_10 10;
-        OpConvertSToF $$T %float_10 %int_10;
-        OpFMul $$T result $x %float_10;
+        OpConstant $$int % int_10 10;
+        OpConvertSToF $$T % float_10 % int_10;
+        OpFMul $$T result $x % float_10;
     };
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];

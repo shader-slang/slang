@@ -4,8 +4,8 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage vertex
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage vertex
 
-Texture2DMS <int3> t1;
-Texture2DMSArray <float4> t2;
+Texture2DMS<int3> t1;
+Texture2DMSArray<float4> t2;
 
 float4 main()
 {

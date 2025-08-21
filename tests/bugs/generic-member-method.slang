@@ -18,18 +18,21 @@ struct Nothing : INothing
 
 interface IImpl
 {
-    int computeAdd<TNothing : INothing, TNothing2 : INothing>(TNothing nothingArg, TNothing2 nothing, int otherVal);
+    int computeAdd<TNothing : INothing, TNothing2 : INothing>(
+        TNothing nothingArg,
+        TNothing2 nothing,
+        int otherVal);
 }
 
 struct Impl : IImpl
 {
     int thisVal;
-    __init()
-    {
-        thisVal = 1;
-    }
+    __init() { thisVal = 1; }
     // Introduce two generic parameters so we can construct a partially specialized invoke.
-    int computeAdd<TNothing : INothing, TNothing2 : INothing>(TNothing nothingArg, TNothing2 nothing, int otherVal)
+    int computeAdd<TNothing : INothing, TNothing2 : INothing>(
+        TNothing nothingArg,
+        TNothing2 nothing,
+        int otherVal)
     {
         return thisVal + otherVal + nothingArg.getVal();
     }

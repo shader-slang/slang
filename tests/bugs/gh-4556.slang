@@ -13,7 +13,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 id: SV_DispatchThreadID)
 {
-    float3x4 a = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    float3x4 a = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
     double3x4 b = (double3x4)a;
 
     // CHECK: 1.000000

@@ -6,15 +6,17 @@
 
 layout(location = 0) out ivec4 outColorActual;
 
-layout (location = 0) in float inDataV1;
+layout(location = 0) in float inDataV1;
 bool testFragmentProcessingInterpolateFunctions()
 {
     float v = 1.0f;
     return interpolateAtCentroid(v) != -1.0f;
 }
 
-void main() {
-    outColorActual = ivec4(true
+void main()
+{
+    outColorActual = ivec4(
+        true
         && testFragmentProcessingInterpolateFunctions()
-        );
+    );
 }

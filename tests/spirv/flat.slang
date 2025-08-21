@@ -8,7 +8,7 @@
 struct VertexOutput
 {
     nointerpolation int a : SOME_VALUE;
-    float4              b : SV_Position;
+    float4 b : SV_Position;
 };
 
 [shader("vertex")]

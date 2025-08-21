@@ -8,7 +8,7 @@
 int test(int val)
 {
     int tmp = 0;
-    switch(val)
+    switch (val)
     {
     case 0:
         tmp = 1;
@@ -33,7 +33,7 @@ int test(int val)
 RWStructuredBuffer<int> gBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int val = int(tid);

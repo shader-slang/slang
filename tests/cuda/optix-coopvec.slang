@@ -72,7 +72,7 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     resultCopy.copyFrom<float>(vec2);
 
     CoopVec<float, 4> resultFMA = fma(vec1, vec2, vec3);
-    
+
     CoopVec<float, 4> vec = coopVecLoad<4, float>(input1);
     let resultMul = coopVecMatMulAdd<float, 4, 4>(
         vec,
@@ -85,14 +85,13 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         CoopVecComponentType::SignedInt32,
         CoopVecMatrixLayout::RowMajor,
         false,
-        4
-    );
-    
+        4);
+
     CoopVec<float, 4> resultMax = max(vec1, vec2);
     CoopVec<float, 4> resultMin = min(vec1, vec2);
-    
+
     CoopVec<float, 4> resultVecMul = vec1 * vec2;
-    
+
     outputMat.Store<float>(0, float(1));
     coopVecOuterProductAccumulate(
         vec1,
@@ -101,39 +100,24 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         0,
         32,
         CoopVecMatrixLayout::RowMajor,
-        CoopVecComponentType::Float32,
-    );
+        CoopVecComponentType::Float32, );
 
     outputMat2.Store(0, float(1));
-    coopVecReduceSumAccumulate(
-        vec1,
-        outputMat2,
-        0,
-    );
-    
+    coopVecReduceSumAccumulate(vec1, outputMat2, 0, );
+
     CoopVec<float, 4> resultStep = step(vec1, vec2);
 
     CoopVec<float, 4> resultSub = vec1 - vec2;
-    
+
     CoopVec<float, 4> resultLog2 = log2(vec1);
-    
+
     CoopVec<float, 4> resultExp2 = exp2(vec1);
 
-    for(int i = 0; i < resultTan.getCount(); ++i)
+    for (int i = 0; i < resultTan.getCount(); ++i)
     {
-        outputBuffer[i] = resultTan[i]  +
-                          resultAdd[i]  +
-                          resultCopy[i] +
-                          resultFMA[i]  +
-                          resultMul[i]  +
-                          resultMax[i]  +
-                          resultMin[i]  +
-                          resultVecMul[i] +
-                          outputMat.Load<float>(i)  +
-                          outputMat2.Load<float>(i) +
-                          resultStep[i] +
-                          resultSub[i]  +
-                          resultLog2[i] +
-                          resultExp2[i];
+        outputBuffer[i] = resultTan[i] + resultAdd[i] + resultCopy[i] + resultFMA[i] +
+                          resultMul[i] + resultMax[i] + resultMin[i] + resultVecMul[i] +
+                          outputMat.Load<float>(i) + outputMat2.Load<float>(i) + resultStep[i] +
+                          resultSub[i] + resultLog2[i] + resultExp2[i];
     }
 }

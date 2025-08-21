@@ -7,7 +7,8 @@
 buffer MyBlockName2
 {
     uint data[1];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 
@@ -21,12 +22,12 @@ layout(local_size_x = 4) in;
 //CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|NonWritable|NonReadable)}}
 //CHECK_SPV: OpDecorate %{{.*}} {{(Restrict|NonWritable|NonReadable)}}
 //TEST_INPUT: set someImage = RWTexture2D(format=RGBA16Float, size=1, content=one, mipMaps = 1)
-uniform layout(binding=0,rgba16f) restrict writeonly readonly image2D someImage;
+uniform layout(binding = 0, rgba16f) restrict writeonly readonly image2D someImage;
 
 //CHECK_GLSL: writeonly
 //CHECK_SPV: OpDecorate {{.*}} {{(Restrict|NonWritable|NonReadable)}}
 //TEST_INPUT: set someImage2 = RWTexture2D(format=RGBA16Float, size=1, content=one, mipMaps = 1)
-uniform layout(binding=1,rgba16f) writeonly image2D someImage2;
+uniform layout(binding = 1, rgba16f) writeonly image2D someImage2;
 
 bool checkAllImageSizesParamSameQualifiers(writeonly readonly image2D val)
 {
@@ -49,5 +50,4 @@ void computeMain()
         && checkAllImageSizesParamMoreQualifiers(someImage2)
         ;
     // BUF: 1
-
 }

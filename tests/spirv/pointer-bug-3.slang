@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
-[[vk::push_constant]] float4 *positions;
+[[vk::push_constant]]
+float4* positions;
 [shader("vertex")]
 float4 main()
 {

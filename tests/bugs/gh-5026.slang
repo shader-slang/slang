@@ -15,9 +15,9 @@ T myMod<T : __BuiltinArithmeticType>(T x, T y)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int c = 1;
     int d = 1;
-    outputBuffer[dispatchThreadID.x] = myMod(c,d);
+    outputBuffer[dispatchThreadID.x] = myMod(c, d);
 }

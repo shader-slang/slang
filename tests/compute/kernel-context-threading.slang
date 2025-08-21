@@ -1,8 +1,9 @@
 // kernel-context-threading.slang
 
-// This test tests out the slang-ir-explicit-global-context functionality for C++ like targets. 
-// In particular these require that the KernelContext is threaded through functions that access globals. 
-// Currently this is only really applicable to C++, but for completeness all targets are tested.
+// This test tests out the slang-ir-explicit-global-context functionality for C++ like targets.
+// In particular these require that the KernelContext is threaded through functions that access
+// globals. Currently this is only really applicable to C++, but for completeness all targets are
+// tested.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
@@ -20,7 +21,7 @@ RWStructuredBuffer<float> rowOrderMatrixOutput;
 void writeRow2(float4 v, int rowIndex)
 {
     int baseIndex = rowIndex * 4;
-    
+
     rowOrderMatrixOutput[baseIndex + 0] = v.x;
     rowOrderMatrixOutput[baseIndex + 1] = v.y;
     rowOrderMatrixOutput[baseIndex + 2] = v.z;
@@ -34,14 +35,14 @@ void writeRow(float4 v, int rowIndex)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float4 v = float4(1, 2, 3, 1);
 
     float4x4 M = matrixBuffer;
-    
+
     float4 r = mul(v, M);
-    
+
     writeRow(M[0], 0);
     writeRow(M[1], 1);
     writeRow(M[2], 2);

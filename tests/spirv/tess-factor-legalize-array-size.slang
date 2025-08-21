@@ -27,7 +27,7 @@ struct HsOut
 
 struct HscOut
 {
-    float EdgeTessFactor[3] : SV_TessFactor; // Should be legalized to float[4]
+    float EdgeTessFactor[3] : SV_TessFactor;         // Should be legalized to float[4]
     float InsideTessFactor[1] : SV_InsideTessFactor; // Should be legalized to float[2]
 };
 

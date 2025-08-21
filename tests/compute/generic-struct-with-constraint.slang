@@ -15,32 +15,26 @@ interface IElement
 struct SingleElement : IElement
 {
     float4 value;
-    float4 getValue()
-    {
-        return value;
-    }
+    float4 getValue() { return value; }
 };
 
 struct ListElement<THead : IElement> : IElement
 {
     THead head;
-    float4 getValue()
-    {
-        return head.getValue();
-    }
+    float4 getValue() { return head.getValue(); }
 };
 
 float4 test<T : IElement>(T val)
 {
-	return val.getValue();
+    return val.getValue();
 }
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     ListElement<SingleElement> list;
     list.head.value = float4(1.0);
-    float4 outVal = test<ListElement<SingleElement> >(list);
-	outputBuffer[0] = outVal;
+    float4 outVal = test<ListElement<SingleElement>>(list);
+    outputBuffer[0] = outVal;
 }

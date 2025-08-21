@@ -28,7 +28,7 @@ Texture1D<float> t4;
 //CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 9
 
 #ifndef IS_DEFAULT
-export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+export T getDescriptorFromHandle<T : IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
     return defaultGetDescriptorFromHandle(handleValue, BindlessDescriptorOptions.VkMutable);
 }
@@ -79,5 +79,4 @@ void computeMain()
     rq.CommitNonOpaqueTriangleHit();
     rq.Abort();
     t1[13] = (float)rq.RayFlags();
-
 }

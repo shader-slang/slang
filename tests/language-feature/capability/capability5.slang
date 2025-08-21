@@ -20,9 +20,10 @@
 buffer MyBlockName
 {
     int data;
-} inputBuffer;
+}
+inputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     inputBuffer.data = firstbithigh(1);

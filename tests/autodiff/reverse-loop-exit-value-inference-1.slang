@@ -37,7 +37,7 @@ float test_strided(float y)
 {
     float t = y;
 
-    for (int i = 0; i < 5; i+=2)
+    for (int i = 0; i < 5; i += 2)
     {
         t = t * (i + 1);
     }
@@ -50,7 +50,7 @@ float test_offset(float y)
 {
     float t = y;
 
-    for (int i = 2; i < 5; i+=2)
+    for (int i = 2; i < 5; i += 2)
     {
         t = t * (i + 1);
     }
@@ -63,7 +63,7 @@ float test_negative_stride(float y)
 {
     float t = y;
 
-    for (int i = 7; i >= 1; i-=2)
+    for (int i = 7; i >= 1; i -= 2)
     {
         t = t * (i + 1);
     }
@@ -152,7 +152,7 @@ float test_nested_with_continue(float y)
     {
         if (i % 2 == 0)
             continue;
-    
+
         for (int j = 0; j < 3; j++)
         {
             if (j % 2 == 0)
@@ -169,7 +169,7 @@ float test_nested_with_continue(float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[0] = 0.0f; // CHECK: 0.000000
 

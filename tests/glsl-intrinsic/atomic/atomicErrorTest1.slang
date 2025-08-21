@@ -5,9 +5,6 @@
 // CHECK: error 20002
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):name=one
-layout(binding = 1, offset = ) uniform atomic_uint one;
+layout(binding = 1, offset =) uniform atomic_uint one;
 
-void computeMain()
-{
-
-}
+void computeMain() {}

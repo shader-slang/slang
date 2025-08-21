@@ -27,7 +27,7 @@ RWStructuredBuffer<int> outputBuffer;
 int a()
 {
     int j = 0;
-    for(int i = 0; i < 10; ++i)
+    for (int i = 0; i < 10; ++i)
         j += i;
     return j;
 }
@@ -44,7 +44,7 @@ int b()
 {
     int j = 0;
     int i = 0;
-    while(i < 10)
+    while (i < 10)
     {
         j += i;
         i++;
@@ -66,13 +66,14 @@ int c()
     int i = 0;
     do
     {
-        if(i < 10)
-            {}
+        if (i < 10)
+        {
+        }
         else
             break;
         j += i;
         i++;
-    } while(true);
+    } while (true);
     return j;
 }
 
@@ -90,18 +91,19 @@ int d()
     int i = 0;
     do
     {
-        if(i >= 10)
+        if (i >= 10)
             break;
         else
-            {}
+        {
+        }
         j += i;
         i++;
-    } while(true);
+    } while (true);
     return j;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[dispatchThreadID.x] = a() + b() + c() + d();
 }

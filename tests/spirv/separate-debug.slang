@@ -5,10 +5,7 @@ struct TestType
     float memberA;
     float3 memberB;
     RWStructuredBuffer<float> memberC;
-    float getValue()
-    {
-        return memberA;
-    }
+    float getValue() { return memberA; }
 }
 RWStructuredBuffer<float> result;
 void main()

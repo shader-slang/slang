@@ -1,8 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-// Test that we can disambiguiate subscript decls by prefering the candidate that contains a super set of
-// accessors than the other candidates.
+// Test that we can disambiguiate subscript decls by prefering the candidate that contains a super
+// set of accessors than the other candidates.
 interface IBuf<T>
 {
     T read(int x);
@@ -13,15 +13,28 @@ interface IRWBuf<T> : IBuf<T>
     void write(int x, T v);
 }
 
-#pragma warning(disable:30856)
+#pragma warning(disable: 30856)
 extension<T, U : IBuf<T>> U
 {
-    __subscript(int x) -> T { get { return read(x); } }
+    __subscript(int x)->T
+    {
+        get {
+            return read(x);
+        }
+    }
 }
 
 extension<T, U : IRWBuf<T>> U
 {
-    __subscript(int x)->T { get { return read(x); } set { write(x, newValue); } }
+    __subscript(int x)->T
+    {
+        get {
+            return read(x);
+        }
+        set {
+            write(x, newValue);
+        }
+    }
 }
 
 struct MyArray<T> : IRWBuf<T>
@@ -36,10 +49,10 @@ struct MyArray<T> : IRWBuf<T>
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
-    MyArray<int> arr = {{1, 2, 3, 4}};
+    MyArray<int> arr = { { 1, 2, 3, 4 } };
     arr[0] = 1;
     arr[1] = 2;
     // CHECK: 1

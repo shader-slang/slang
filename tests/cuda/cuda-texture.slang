@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -compute 
-//TEST(compute):COMPARE_COMPUTE:-cuda -compute 
+//TEST(compute):COMPARE_COMPUTE:-cpu -compute
+//TEST(compute):COMPARE_COMPUTE:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer : register(u0);
@@ -11,9 +11,9 @@ Texture2D<float> texture;
 SamplerState sampler;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = int(dispatchThreadID.x);
+    int tid = int(dispatchThreadID.x);
     float u = tid * (1.0f / 3.0f);
     float v = 1.0f - u;
     float2 uv = float2(u, v);

@@ -18,7 +18,8 @@ struct Impl1 : Base
 
 struct Impl2 : Base
 {
-    // This is static with one default parameter and allowed to implement interface's non-static method.
+    // This is static with one default parameter and allowed to implement interface's non-static
+    // method.
     static int getValue(int a = 3) { return a + 5; }
     int getValue(float a) { return int(a) + 5; }
 }

@@ -1,7 +1,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 /* A test to use generics to treat an enum as a set. */
-/* Doesn't work because doesn't know can convert E into an int type. 
+/* Doesn't work because doesn't know can convert E into an int type.
 
 If E could be specified as any enum type then perhaps this could work.
 */
@@ -12,23 +12,25 @@ RWStructuredBuffer<float> outputBuffer;
 enum Enum
 {
     A = 0x1,
-    B = 0x2, 
+    B = 0x2,
     C = 0x4,
-};
+}
+;
 
 __generic<E>
 struct Flags
 {
-    [mutating] void set(E e) { value |= (int)e; }
+    [mutating]
+    void set(E e) { value |= (int)e; }
     void isSet(E e) { return (((int)e) & value) != 0; }
     int value = 0;
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
-    
+
     Flags<Enum> flags;
 
     if (index & 1)
@@ -36,7 +38,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         flags.set(Enum::A);
     }
     bool isASet = flags.isSet(Enum::A);
-   
-	outputBuffer[index] = isASet ? 2 : 1;
-}
 
+    outputBuffer[index] = isASet ? 2 : 1;
+}

@@ -20,16 +20,29 @@ struct DifferentiableTexture
         return texture.Load(location, offset);
     }
 
-    void bwd_LoadTexel(int3 location, constexpr int2 offset, uint dLayerW, uint dMipOffset, float4 val)
+    void bwd_LoadTexel(
+        int3 location,
+        constexpr int2 offset,
+        uint dLayerW,
+        uint dMipOffset,
+        float4 val)
     {
         // Ignore alpha dimension for this example..
         int4 uval = int4(int3(val.xyz * 65536), 1);
 
         // We'll use fast fixed point atomics instead of floats.
-        InterlockedAdd(accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 0], uval.x);
-        InterlockedAdd(accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 1], uval.y);
-        InterlockedAdd(accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 2], uval.z);
-        InterlockedAdd(accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 3], uval.w);
+        InterlockedAdd(
+            accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 0],
+            uval.x);
+        InterlockedAdd(
+            accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 1],
+            uval.y);
+        InterlockedAdd(
+            accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 2],
+            uval.z);
+        InterlockedAdd(
+            accumulateBuffer[dMipOffset + ((uint)location.y * dLayerW + (uint)location.x) * 4 + 3],
+            uval.w);
     }
 
     // Software reference implementation of linear filtering.
@@ -46,10 +59,14 @@ struct DifferentiableTexture
         float fracY = loc.y - y0;
         float x1 = x0 + 1;
         float y1 = y0 + 1;
-        if (x0 < 0) x0 += w;
-        if (y0 < 0) y0 += h;
-        if (x1 >= w) x1 -= w;
-        if (y1 >= h) y1 -= h;
+        if (x0 < 0)
+            x0 += w;
+        if (y0 < 0)
+            y0 += h;
+        if (x1 >= w)
+            x1 -= w;
+        if (y1 >= h)
+            y1 -= h;
         float weight0 = 1.0f - fracY;
         float weight1 = fracY;
         float weight00 = weight0 * (1.0f - fracX);
@@ -99,10 +116,16 @@ struct DifferentiableTexture
         return t.texture.Sample(s, uv);
     }
 
-    // Software reference implementation of DifferentiableTexture.sample (trilinear only in this example)
+    // Software reference implementation of DifferentiableTexture.sample (trilinear only in this
+    // example)
     [PrimalSubstituteOf(DifferentiableTexture.sample)]
     [BackwardDifferentiable]
-    static float4 sample_reference_impl(DifferentiableTexture t, SamplerState s, float2 uv, float2 dX, float2 dY)
+    static float4 sample_reference_impl(
+        DifferentiableTexture t,
+        SamplerState s,
+        float2 uv,
+        float2 dX,
+        float2 dY)
     {
         uint w;
         uint h;
@@ -124,7 +147,7 @@ cbuffer Uniforms
 
 struct AssembledVertex
 {
-    float3	position : POSITION;
+    float3 position : POSITION;
 };
 
 struct Fragment
@@ -135,7 +158,7 @@ struct Fragment
 struct VertexStageOutput
 {
     float2 uv : UV;
-    float4          sv_position     : SV_Position;
+    float4 sv_position : SV_Position;
 };
 
 [BackwardDifferentiable]
@@ -161,8 +184,7 @@ float3 loss(no_diff float2 uv, no_diff float4 screenPos)
 }
 
 [shader("vertex")]
-VertexStageOutput vertexMain(
-    AssembledVertex assembledVertex)
+VertexStageOutput vertexMain(AssembledVertex assembledVertex)
 {
     VertexStageOutput output;
 
@@ -174,19 +196,21 @@ VertexStageOutput vertexMain(
     return output;
 }
 
-float3 sqr(float3 v) { return v * v; }
+float3 sqr(float3 v)
+{
+    return v * v;
+}
 
 [shader("fragment")]
-float4 fragmentMain(
-    float2 uv : UV) : SV_Target
+float4 fragmentMain(float2 uv: UV)
+    : SV_Target
 {
     return shadeFragment(uv);
 }
 
 [shader("fragment")]
-float4 diffFragmentMain(
-    float2 uv : UV,
-    float4 screenPos : SV_POSITION) : SV_Target
+float4 diffFragmentMain(float2 uv: UV, float4 screenPos: SV_POSITION)
+    : SV_Target
 {
     __bwd_diff(loss)(uv, screenPos, float3(1.0));
     return float4(loss(uv, screenPos), 1.0);

@@ -28,7 +28,7 @@ int bar<let U : uint>(B<U> b)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     A<1> a;
     B<1> b;

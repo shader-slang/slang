@@ -9,7 +9,7 @@ RWByteAddressBuffer outputBuffer;
 // CHECK_HLSL: InterlockedAdd64
 
 [numthreads(16, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint64_t indata1;
     int64_t indata2;

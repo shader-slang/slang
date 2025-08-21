@@ -7,15 +7,12 @@ RWStructuredBuffer<float> buf;
 //
 void foo(const int constParam)
 {
-    spirv_asm
-    {
+    spirv_asm {
         // Make sure we diagnose the first offending operand
-        OpLoad
-            %a
-            %b
-            %c
-            %d
+        OpLoad % a % b % c %
+        d
         // CHECK: too-many-operands.slang([[#@LINE+1]]): warning {{.*}}: too many operands for OpLoad
-        %r : $$int = OpIAdd %r %r
+        %
+        r : $$int = OpIAdd % r % r
     };
 }

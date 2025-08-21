@@ -27,7 +27,7 @@ struct Stuff
     RWStructuredBuffer<uint> b;
 }
 
-static const Stuff gStuff = Stuff( inputBuffer, inputBuffer );
+static const Stuff gStuff = Stuff(inputBuffer, inputBuffer);
 
 uint test(uint x)
 {
@@ -37,7 +37,7 @@ uint test(uint x)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
     let inVal = tid;

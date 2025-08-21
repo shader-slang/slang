@@ -8,7 +8,7 @@ groupshared float s_shared;
 [BackwardDifferentiable]
 float get_thread_5_value(float v, uint group_thread_id)
 {
-    if(group_thread_id == 5)
+    if (group_thread_id == 5)
     {
         // Using 'detach(v)' makes the error go away
         s_shared = v;
@@ -22,7 +22,9 @@ float get_thread_5_value(float v, uint group_thread_id)
 
 [shader("compute")]
 [numthreads(128, 1, 1)]
-void computeMain(uint3 group_thread_id: SV_GroupThreadID, uint3 dispatch_thread_id: SV_DispatchThreadID)
+void computeMain(
+    uint3 group_thread_id: SV_GroupThreadID,
+    uint3 dispatch_thread_id: SV_DispatchThreadID)
 {
     DifferentialPair<float> value = diffPair(3.f, 0.f);
 

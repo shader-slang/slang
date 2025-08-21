@@ -12,9 +12,10 @@ RWStructuredBuffer<int> outputBuffer;
 enum MyError
 {
     Fail = 1
-};
+}
+;
 
-T func<T: __BuiltinFloatingPointType>(T val) throws MyError
+T func<T : __BuiltinFloatingPointType>(T val) throws MyError
 {
     do
     {
@@ -22,7 +23,7 @@ T func<T: __BuiltinFloatingPointType>(T val) throws MyError
             throw MyError.Fail;
         return val * T(2);
     }
-    catch(err: MyError)
+    catch (err: MyError)
     {
         // Just rethrow to test catching inside a generic as well.
         throw err;
@@ -36,11 +37,11 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     do
     {
         outputBuffer[i] = int(try func(2.5f));
-        i+=1;
+        i += 1;
         outputBuffer[i] = int(try func(3.5f));
-        i+=1;
+        i += 1;
     }
-    catch(err: MyError)
+    catch (err: MyError)
     {
         outputBuffer[i] = reinterpret<int>(err);
     }

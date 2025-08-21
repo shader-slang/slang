@@ -33,11 +33,11 @@ void computeMain()
 {
     double t1 = -1.0;
     uint64_t t2 = 2;
-    gOutputBuffer[0] = icast(t1);    // 0xBFF0000000000000 => 13830554455654793216
-    gOutputBuffer[1] = icast(t2);    // 0x0000000000000002 => 2
+    gOutputBuffer[0] = icast(t1); // 0xBFF0000000000000 => 13830554455654793216
+    gOutputBuffer[1] = icast(t2); // 0x0000000000000002 => 2
 
     double t3 = 3.0;
     int64_t t4 = -4;
-    gOutputBuffer[2] = ucast(t3);   // 0x4008000000000000 => 4613937818241073152
-    gOutputBuffer[3] = ucast(t4);   // 0xFFFFFFFFFFFFFFFC => 18446744073709551612
+    gOutputBuffer[2] = ucast(t3); // 0x4008000000000000 => 4613937818241073152
+    gOutputBuffer[3] = ucast(t4); // 0xFFFFFFFFFFFFFFFC => 18446744073709551612
 }

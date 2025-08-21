@@ -3,7 +3,11 @@
 
 module test;
 
-public enum class MaterialID : uint { invalid = 0xffffffff };
+public enum class MaterialID : uint
+{
+    invalid = 0xffffffff
+}
+;
 
 public struct Material : IDifferentiable
 {
@@ -47,8 +51,7 @@ void main(
     uniform Scene scene,
     uniform StructuredBuffer<uint> input,
     uniform RWStructuredBuffer<float> output,
-    uniform RWStructuredBuffer<float> grads
-)
+    uniform RWStructuredBuffer<float> grads)
 {
     Hit hit;
     hit.material = MaterialID(input[0]);

@@ -14,7 +14,8 @@ struct C<T>
     __init<U>(U value)
     {
         for (int i = 0; i < 1; ++i)
-        {}
+        {
+        }
     }
 }
 
@@ -26,8 +27,7 @@ int use<T>(T x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     outputBuffer[0] = use(c);
 }
-

@@ -17,10 +17,11 @@ struct Buf
 
 struct Push
 {
-    Buf * b;
+    Buf* b;
 };
 
-[[vk::push_constant]] Push push;
+[[vk::push_constant]]
+Push push;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

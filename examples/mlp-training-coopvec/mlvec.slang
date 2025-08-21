@@ -31,10 +31,7 @@ public struct MLVec<int N> : IDifferentiable
         values = diffPair(values.p, coopVecToArray(dResult.data));
     }
 
-    internal static NFloat[N] toArray(MLVec<N> vec)
-    {
-        return coopVecToArray(vec.data);
-    }
+    internal static NFloat[N] toArray(MLVec<N> vec) { return coopVecToArray(vec.data); }
 
     [BackwardDerivativeOf(toArray)]
     internal static void toArrayBwd(inout DifferentialPair<MLVec<N>> vec, NFloat[N] dResult)
@@ -43,21 +40,15 @@ public struct MLVec<int N> : IDifferentiable
     }
 
     [Differentiable]
-    public NFloat[N] toArray()
-    {
-        return toArray(this);
-    }
+    public NFloat[N] toArray() { return toArray(this); }
 
     public override static Differential dadd(Differential d0, Differential d1)
     {
-        return {d0.data + d1.data};
+        return { d0.data + d1.data };
     }
-    public override static Differential dmul<U:__BuiltinRealType>(U s, Differential d)
+    public override static Differential dmul<U : __BuiltinRealType>(U s, Differential d)
     {
-        return {d.data * __realCast<NFloat>(s)};
+        return { d.data * __realCast<NFloat>(s) };
     }
-    public override static Differential dzero()
-    {
-        return {};
-    }
+    public override static Differential dzero() { return {}; }
 }

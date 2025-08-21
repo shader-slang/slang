@@ -14,7 +14,8 @@ struct PartlyDiffable : IDifferentiable
 }
 
 
-func breaker(x:PartlyDiffable.Differential) {
+func breaker(x: PartlyDiffable.Differential)
+{
     return;
 }
 
@@ -23,9 +24,12 @@ func breaker(x:PartlyDiffable.Differential) {
 float4 fragment(float4 in: SV_Position)
     : SV_Target
 {
-    if (PartlyDiffable.Differential(0).q == 0) {
+    if (PartlyDiffable.Differential(0).q == 0)
+    {
         return float4(0);
-    } else {
+    }
+    else
+    {
         return float4(1);
     }
 }

@@ -3,12 +3,12 @@
 //WGSL-DAG: @builtin(frag_depth)
 //WGSL-DAG: @fragment
 
-struct Out 
+struct Out
 {
     float depth : SV_Depth;
 };
 
-Out main() 
+Out main()
 {
     Out output;
     output.depth = 1.0;

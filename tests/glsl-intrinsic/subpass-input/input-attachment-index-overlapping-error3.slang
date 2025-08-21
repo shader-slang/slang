@@ -5,14 +5,16 @@
 buffer MyBlockName
 {
     uvec4 idata[2];
-} keepAliveBuffer;
+}
+keepAliveBuffer;
 
-layout (input_attachment_index = 0, binding = 1) uniform isubpassInput isubpass;
-layout (input_attachment_index = 1, binding = 1) uniform isubpassInputMS isubpassMS;
+layout(input_attachment_index = 0, binding = 1) uniform isubpassInput isubpass;
+layout(input_attachment_index = 1, binding = 1) uniform isubpassInputMS isubpassMS;
 
-layout (location = 0) out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
-void main() {
+void main()
+{
     keepAliveBuffer.idata[0] = subpassLoad(isubpass);
     keepAliveBuffer.idata[1] = subpassLoad(isubpassMS, 0);
 

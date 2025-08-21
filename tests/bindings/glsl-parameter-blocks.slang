@@ -6,13 +6,13 @@
 struct Test
 {
     float4 a;
-	Texture2D t;
-	SamplerState s;
+    Texture2D t;
+    SamplerState s;
 };
 
 ParameterBlock<Test> gTest;
 
-float4 main(float2 uv : UV)
+float4 main(float2 uv: UV)
 {
-	return gTest.a + gTest.t.Sample(gTest.s, uv);
+    return gTest.a + gTest.t.Sample(gTest.s, uv);
 }

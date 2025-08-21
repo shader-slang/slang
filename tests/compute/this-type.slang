@@ -7,42 +7,42 @@
 
 interface IFrobable
 {
-	This frob();
-	int getValue();
+    This frob();
+    int getValue();
 }
 
 struct Thing : IFrobable
 {
-	int value;
+    int value;
 
-	Thing frob()
-	{
-		Thing result = { value * 16 };
-		return result;
-	}
+    Thing frob()
+    {
+        Thing result = { value * 16 };
+        return result;
+    }
 
-	int getValue() { return value; }
+    int getValue() { return value; }
 }
 
-int frobnicate<F:IFrobable>(F f)
+int frobnicate<F : IFrobable>(F f)
 {
-	return f.frob().getValue();
+    return f.frob().getValue();
 }
 
 int test(int value)
 {
-	Thing t = { value };
-	return frobnicate(t) + value;
+    Thing t = { value };
+    return frobnicate(t) + value;
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
-	int inVal = outputBuffer[tid];
-	int outVal = test(inVal);
-	outputBuffer[tid] = outVal;
+    uint tid = dispatchThreadID.x;
+    int inVal = outputBuffer[tid];
+    int outVal = test(inVal);
+    outputBuffer[tid] = outVal;
 }

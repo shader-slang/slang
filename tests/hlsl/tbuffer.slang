@@ -34,7 +34,8 @@ tbuffer tbuf2 : register(t1)
 // METALLIB: @computeMain
 
 RWStructuredBuffer<float4> outputBuffer;
-[numthreads(1,1,1)]
-void computeMain() {
+[numthreads(1, 1, 1)]
+void computeMain()
+{
     outputBuffer[0] = tb_val1 + texture2D[0] + tb_val2;
 }

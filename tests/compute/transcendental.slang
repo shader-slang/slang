@@ -12,13 +12,13 @@ float quantize(float value)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float values[] = { -9, 9, -3, 3 };
 
-	int tid = int(dispatchThreadID.x);
+    int tid = int(dispatchThreadID.x);
     float value = values[tid];
-    
+
     outputBuffer[tid * 2] = quantize(sin(value));
     outputBuffer[tid * 2 + 1] = quantize(cos(value));
 }

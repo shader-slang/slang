@@ -1,8 +1,9 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* A test of a generic function returning a generic struct.  
+/* A test of a generic function returning a generic struct.
 
-Since T could be any type, the compiler can't determine if it's convertable from an int. That may be surprising.
+Since T could be any type, the compiler can't determine if it's convertable from an int. That may be
+surprising.
 
 Fails because:
 
@@ -27,12 +28,11 @@ Another<T> getAnother<T>(int i)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
     Another<int> a = getAnother<int>(index);
-    
-	outputBuffer[index] = a.value;
-}
 
+    outputBuffer[index] = a.value;
+}

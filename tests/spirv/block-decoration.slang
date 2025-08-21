@@ -5,7 +5,8 @@
 // CHECK: OpDecorate %RWStructuredBuffer Block
 // CHECK-NOT: OpDecorate %RWStructuredBuffer Block
 
-struct Particle {
+struct Particle
+{
     float4 _m0;
 };
 
@@ -13,6 +14,8 @@ struct Particle {
 RWStructuredBuffer<Particle> particleOut;
 
 [shader("fragment")]
-float4 main() : SV_TARGET {
+float4 main()
+    : SV_TARGET
+{
     return particleOut[0]._m0;
 }

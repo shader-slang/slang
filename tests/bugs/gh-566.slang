@@ -12,12 +12,12 @@ struct Helper
 {
     RWStructuredBuffer<uint> o;
     RWStructuredBuffer<uint> i;
-    uint                    t;  
+    uint t;
 };
 
 void test(Helper h)
 {
-    h.o[h.t] = h.i[h.t] * 16 + h.t;    
+    h.o[h.t] = h.i[h.t] * 16 + h.t;
 }
 
 void test(uint t)
@@ -27,7 +27,7 @@ void test(uint t)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     test(tid);

@@ -10,14 +10,14 @@
 // CHECK-SPIRV:  {{.*}} OpFunction
 // CHECK-SPIRV:  {{.*}} = OpExtInst %void {{.*}} DebugLine
 
-struct PS_OUTPUT 
-{ 
-    float4 vColor : SV_Target0 ; 
-} ; 
+struct PS_OUTPUT
+{
+    float4 vColor : SV_Target0;
+};
 
-PS_OUTPUT MainPs ( ) 
-{ 
-    PS_OUTPUT o ; 
-    o . vColor = float4 ( 0 , 0 , 0 , 0 ) ; 
-    return o ; 
-} 
+PS_OUTPUT MainPs()
+{
+    PS_OUTPUT o;
+    o.vColor = float4(0, 0, 0, 0);
+    return o;
+}

@@ -19,7 +19,7 @@ groupshared int shareMemI[4];
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint groupIndex : SV_GroupIndex)
+void computeMain(uint groupIndex: SV_GroupIndex)
 {
     if (groupIndex == 0)
     {
@@ -30,7 +30,7 @@ void computeMain(uint groupIndex : SV_GroupIndex)
         }
     }
     AllMemoryBarrierWithGroupSync();
-    
+
     int idx = groupIndex;
     float val = 0.0f;
 
@@ -42,7 +42,7 @@ void computeMain(uint groupIndex : SV_GroupIndex)
 
     //MTL: atomic_int threadgroup*{{.*}}shareMemI
     //LIB: call {{.*}}.atomic.local.add.s.i32
-    InterlockedAdd(shareMemI[idx],  2);
+    InterlockedAdd(shareMemI[idx], 2);
     val += shareMemI[idx];
 
     //MTL: atomic_uint device*{{.*}}uintBuffer

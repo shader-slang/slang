@@ -19,7 +19,7 @@
 // HLSL-NOT: sm_5_1
 // HLSL-SAME: sm_6_0
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     if (WaveIsFirstLane())

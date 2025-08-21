@@ -14,7 +14,8 @@ uniform int a;
 //SPV14: OpDemoteToHelperInvocation
 
 [shader("fragment")]
-float4 frag() : SV_Target
+float4 frag()
+    : SV_Target
 {
     if (a == 0)
         discard;

@@ -4,15 +4,15 @@
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
 
 // TODO: requires changes in parser
-//static_assert(true, "PASS_global");
-//static_assert(false, "FAIL_global");
+// static_assert(true, "PASS_global");
+// static_assert(false, "FAIL_global");
 
-__generic<T:IArithmetic>
+__generic<T : IArithmetic>
 void TEST_specialize()
 {
-    static_assert(true,   "TEST_specialize true");
+    static_assert(true, "TEST_specialize true");
     static_assert(T is float, "TEST_specialize T_is_float");
-    static_assert(T is int,   "TEST_specialize T_is_int");
+    static_assert(T is int, "TEST_specialize T_is_int");
 }
 
 void TEST_target_switch()
@@ -32,12 +32,12 @@ void TEST_target_switch()
     }
 }
 
-__generic<T:IArithmetic>
+__generic<T : IArithmetic>
 struct MyType
 {
     // TODO: requires changes in parser
-    //static_assert(true, "PASS_struct");
-    //static_assert(false, "FAIL_struct");
+    // static_assert(true, "PASS_struct");
+    // static_assert(false, "FAIL_struct");
 
     __init()
     {
@@ -46,12 +46,10 @@ struct MyType
     }
 };
 
-__generic<T:IFloat>
-extension MyType<T>
-{
-};
+__generic<T : IFloat>
+extension MyType<T> {};
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHK-DAG: error {{.*}} TEST_specialize T_is_int
@@ -86,4 +84,3 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     //CHK: ([[#@LINE+1]]): error
     static_assert(dispatchThreadID.x == 0, "not constant");
 }
-

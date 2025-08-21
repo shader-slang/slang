@@ -8,7 +8,12 @@
 #define CBUFFER_REF(NAME, FIELD) FIELD
 #else
 #define BEGIN_CBUFFER(NAME) struct SLANG_ParameterGroup_##NAME
-#define END_CBUFFER(NAME, REG) ; cbuffer NAME : REG { SLANG_ParameterGroup_##NAME NAME; }
+#define END_CBUFFER(NAME, REG)            \
+    ;                                     \
+    cbuffer NAME : REG                    \
+    {                                     \
+        SLANG_ParameterGroup_##NAME NAME; \
+    }
 #define CBUFFER_REF(NAME, FIELD) NAME.FIELD
 
 #define A A_0
@@ -22,23 +27,24 @@
 
 struct A
 {
-	float x;
+    float x;
 };
 
 struct B
 {
-	float y;
-	Texture2D t;
+    float y;
+    Texture2D t;
 };
 
 BEGIN_CBUFFER(C)
 {
-	A a;
-	B b;
+    A a;
+    B b;
 }
-END_CBUFFER(C,register(b0))
+END_CBUFFER(C, register(b0))
 
-float4 main() : SV_TARGET
+float4 main()
+    : SV_TARGET
 {
-	return CBUFFER_REF(C,a).x;
+    return CBUFFER_REF(C, a).x;
 }

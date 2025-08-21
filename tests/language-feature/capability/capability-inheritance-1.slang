@@ -71,7 +71,5 @@ struct Foo5 : IFoo5
 }
 
 [require(hlsl)]
-[numthreads(1,1,1)]
-void computeMain()
-{
-}
+[numthreads(1, 1, 1)]
+void computeMain() {}

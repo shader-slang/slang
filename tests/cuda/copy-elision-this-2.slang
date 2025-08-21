@@ -6,10 +6,7 @@ struct Data
     int val;
 
 
-    __init(int val)
-    {
-        this.val = val;
-    }
+    __init(int val) { this.val = val; }
 };
 
 struct DataWrapped
@@ -52,7 +49,7 @@ int nested(Data data, int val)
 // CUDA: addCopyElision{{.*}}FixedArray{{.*}}*{{.*}}data
 int addCopyElision(int data[10], int val)
 {
-// ensure we do not introduce a temporary
+    // ensure we do not introduce a temporary
 // CUDA-NOT: {{.*}}FixedArray{{.*}};
     return data[1] + val;
 }
@@ -70,7 +67,7 @@ void modify(inout int data[10])
 // CUDA: notDirectlyUsingParam{{.*}}Array{{.*}}*{{.*}}data
 int notDirectlyUsingParam(int data[10], int val)
 {
-// ensure we create a temporary for the array
+    // ensure we create a temporary for the array
 // CUDA: FixedArray{{.*}};
     modify(data);
     return data[1] + val;
@@ -114,28 +111,22 @@ void computeMain()
     // not directly using param
     int notDirectlyUsingParamVal = notDirectlyUsingParam(val, input[1]);
 
-    output[0] = 
-        structVal == 3 &&
-        globalParamStructVal == 3 &&
-        nestedStructVal == 3 &&
-        fieldVal == 3 &&
-        elementVal == 3 &&
-        nonVariableVal == 3 &&
-        arrayVal == 3 &&
-        nestedArrayVal == 3 &&
-        notDirectlyUsingParamVal == 3
-        ? 1 : 0;
+    output[0] = structVal == 3 && globalParamStructVal == 3 && nestedStructVal == 3 &&
+                        fieldVal == 3 && elementVal == 3 && nonVariableVal == 3 && arrayVal == 3 &&
+                        nestedArrayVal == 3 && notDirectlyUsingParamVal == 3
+                    ? 1
+                    : 0;
 
     // For debugging
-    //output[1] = structVal;
-    //output[2] = globalParamStructVal;
-    //output[3] = nestedStructVal;
-    //output[4] = fieldVal;
-    //output[5] = elementVal;
-    //output[6] = nonVariableVal;
-    //output[7] = arrayVal;
-    //output[8] = nestedArrayVal;
-    //output[9] = notDirectlyUsingParamVal;
+    // output[1] = structVal;
+    // output[2] = globalParamStructVal;
+    // output[3] = nestedStructVal;
+    // output[4] = fieldVal;
+    // output[5] = elementVal;
+    // output[6] = nonVariableVal;
+    // output[7] = arrayVal;
+    // output[8] = nestedArrayVal;
+    // output[9] = notDirectlyUsingParamVal;
 }
 
 //BUF: 1

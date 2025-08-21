@@ -17,7 +17,7 @@ struct TopStruct
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     TopStruct val = {};
 // BUF: 1

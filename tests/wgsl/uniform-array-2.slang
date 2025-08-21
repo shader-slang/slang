@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgpu -output-using-type
 
-struct Params{
+struct Params
+{
     int2 data[2];
     int scalarData[2];
 }
@@ -12,12 +13,13 @@ ConstantBuffer<Params> params;
 RWStructuredBuffer<float> outputBuffer;
 
 float helper(float2 v)
-{return v.y;}
+{
+    return v.y;
+}
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 17
     outputBuffer[0] = helper(params.data[1]) + params.scalarData[1];
 }
-

@@ -4,10 +4,13 @@
 
 public interface IThing
 {
-	public float getValue();
+    public float getValue();
 }
 
 public extension float : IThing
 {
-	public float getValue() { return this; }
+    public float getValue()
+    {
+        return this;
+    }
 }

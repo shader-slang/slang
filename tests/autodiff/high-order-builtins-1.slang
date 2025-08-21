@@ -24,7 +24,7 @@ float df(float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Given f(x) = sin^2(x),
     // f'(x) = 2*sin(x)*cos(x)

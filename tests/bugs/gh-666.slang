@@ -5,7 +5,8 @@
 static const uint foo = 1;
 static const uint bar = foo;
 
-float4 main() : SV_TARGET
+float4 main()
+    : SV_TARGET
 {
-	return bar;
+    return bar;
 }

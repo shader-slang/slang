@@ -16,12 +16,14 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum class Enum
 {
-    A, B
-};
+    A,
+    B
+}
+;
 
 interface IHasType
 {
-    associatedtype Type;   
+    associatedtype Type;
 };
 
 // This is a little perverse, because I'm defining as an associated type that is
@@ -39,11 +41,11 @@ struct B : IHasType
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-    
+
     let e = B::Type::kE;
-    
+
     outputBuffer[dispatchThreadID.x] = int(e);
 }

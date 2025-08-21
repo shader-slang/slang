@@ -18,7 +18,8 @@ RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 int MapOp(uint32_t row, uint32_t col, int value)
 {
@@ -57,7 +58,8 @@ void computeMain()
 
 #elif TEST_MODE == 4
     // Directly use lambda (capture)
-    result = mat1.MapElement((uint32_t row, uint32_t column, int value) => value * 2 + c0 + c1 + c2);
+    result =
+        mat1.MapElement((uint32_t row, uint32_t column, int value) => value * 2 + c0 + c1 + c2);
 #endif
 
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);

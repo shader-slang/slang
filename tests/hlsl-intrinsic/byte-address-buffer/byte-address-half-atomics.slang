@@ -12,17 +12,17 @@ RWByteAddressBuffer tmpBuffer;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     half originalValue;
-    
+
     // SPIRV: OpAtomicFAddEXT
     // HLSL: NvInterlockedAddFp16x2
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);
     tmpBuffer.InterlockedAddF16(2, 2.0h, originalValue);
-    
+
     half2 v = tmpBuffer.Load<half2>(0);
-    
+
     // CHECK: 1.0
     outputBuffer[0] = v.x;
     // CHECK: 2.0

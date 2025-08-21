@@ -1,4 +1,5 @@
-// This test checks the SPIR-V output when compiling a library containing generics with embedded downstream IR.
+// This test checks the SPIR-V output when compiling a library containing generics with embedded
+// downstream IR.
 
 //TEST:SIMPLE(filecheck=CHECK): -o tests/library/export-library-generics-test.slang-module -target spirv -embed-downstream-ir -profile lib_6_6 -incomplete-library -dump-ir -verbose-paths
 
@@ -6,7 +7,8 @@
 
 module "export-library-generics";
 
-public cbuffer Constants {
+public cbuffer Constants
+{
     public float x;
     public float y;
 }
@@ -18,13 +20,10 @@ interface MyInterface
 
 struct MyType : MyInterface
 {
-    int myMethod(int a)
-    {
-        return a * 3;
-    }
+    int myMethod(int a) { return a * 3; }
 }
 
-int genericFunc<T: MyInterface>(T arg)
+int genericFunc<T : MyInterface>(T arg)
 {
     return arg.myMethod(3);
 }

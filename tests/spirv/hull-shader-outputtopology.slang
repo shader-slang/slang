@@ -6,16 +6,19 @@
 // SPIRV_TRICW: OpExecutionMode %hullMain_triangle_cw VertexOrderCw
 // SPIRV_TRICCW: OpExecutionMode %hullMain_triangle_ccw VertexOrderCcw
 
-struct Out {
+struct Out
+{
     float x;
 };
 
-struct PatchConst {
+struct PatchConst
+{
     float EdgeTessFactor[4] : SV_TessFactor;
     float InsideTessFactor[2] : SV_InsideTessFactor;
 };
 
-PatchConst patchConst() {
+PatchConst patchConst()
+{
     PatchConst o;
     o.EdgeTessFactor[0] = 1;
     o.EdgeTessFactor[1] = 1;
@@ -31,7 +34,8 @@ PatchConst patchConst() {
 [outputtopology("point")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("patchConst")]
-Out hullMain_point() {
+Out hullMain_point()
+{
     Out o;
     o.x = 0;
     return o;
@@ -42,7 +46,8 @@ Out hullMain_point() {
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("patchConst")]
-Out hullMain_triangle_cw() {
+Out hullMain_triangle_cw()
+{
     Out o;
     o.x = 0;
     return o;
@@ -53,7 +58,8 @@ Out hullMain_triangle_cw() {
 [outputtopology("triangle_ccw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("patchConst")]
-Out hullMain_triangle_ccw() {
+Out hullMain_triangle_ccw()
+{
     Out o;
     o.x = 0;
     return o;

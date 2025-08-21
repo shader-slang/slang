@@ -1,4 +1,4 @@
 //TEST:SIMPLE:
-\
-\
+
+
 int x;

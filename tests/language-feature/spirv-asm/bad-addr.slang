@@ -10,9 +10,9 @@ int foo(const int constParam)
 {
     return spirv_asm
     {
-        OpLoad $$int %foo &buf;
+        OpLoad $$int % foo& buf;
         // CHECK: bad-addr.slang([[#@LINE-1]]): note {{.*}}: unable to take the address of this address-of asm operand
-        OpLoad $$int result &constParam;
+        OpLoad $$int result& constParam;
         // CHECK: bad-addr.slang([[#@LINE-1]]): note {{.*}}: unable to take the address of this address-of asm operand
     };
 }

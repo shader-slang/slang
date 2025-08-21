@@ -20,40 +20,39 @@ RWTexture2D<float> gExplicitFormat;
 
 struct PB
 {
-	RWTexture2D<float4> noFormat;
+    RWTexture2D<float4> noFormat;
 
-	[format("rgba8")]
-	RWTexture2D<float4> explicitFormat;
+    [format("rgba8")]
+    RWTexture2D<float4> explicitFormat;
 }
 ParameterBlock<PB> gBlock;
 
 cbuffer C
 {
-	uint2 index;
+    uint2 index;
 }
 
 float4 main(
 
-	// In entry-point parameter list
+    // In entry-point parameter list
 
-	uniform RWTexture2D<float4> noFormat,
+    uniform RWTexture2D<float4> noFormat,
 
-	[format("rgba16f")]
-	uniform RWTexture2D<float4> explicitFormat
-	) : SV_Target
+    [format("rgba16f")] uniform RWTexture2D<float4> explicitFormat)
+    : SV_Target
 {
     float4 result = 0;
 
 #define USE(NAME) result += NAME[index]
 
-	USE(gNoFormat);
-	USE(gExplicitFormat);
+    USE(gNoFormat);
+    USE(gExplicitFormat);
 
-	USE(gBlock.noFormat);
-	USE(gBlock.explicitFormat);
+    USE(gBlock.noFormat);
+    USE(gBlock.explicitFormat);
 
-	USE(noFormat);
-	USE(explicitFormat);
+    USE(noFormat);
+    USE(explicitFormat);
 
 #undef USE
 

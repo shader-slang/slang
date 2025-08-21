@@ -5,4 +5,5 @@ public enum TestEnum
 {
     CASE_A,
     CASE_B
-};
+}
+;

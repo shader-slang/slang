@@ -8,7 +8,8 @@ precision highp int;
 buffer MyBlockName2
 {
     uint data[1];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 

@@ -13,9 +13,8 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain()
 {
     // CHECK: 6.0
-    outputBuffer[0] = (float3x3(15.0) / 2.5)[0][0];
+    outputBuffer[0] = (float3x3(15.0) / 2.5) [0][0];
 
     // CHECK: 4.0
-    outputBuffer[1] = (float4x4(14.0) / inputBuffer[0])[0][0];
+    outputBuffer[1] = (float4x4(14.0) / inputBuffer[0]) [0][0];
 }
-

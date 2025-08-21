@@ -27,15 +27,15 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         dpfloat dpx = dpfloat(2.0, 1.0);
         dpfloat res = __fwd_diff(diffSqrt)(dpx);
-        outputBuffer[0] = res.p;               // Expect: 1.414214
-        outputBuffer[1] = res.d;               // Expect: 0.353553
+        outputBuffer[0] = res.p; // Expect: 1.414214
+        outputBuffer[1] = res.d; // Expect: 0.353553
     }
 
     {
         dpfloat dpx = dpfloat(100.0, -3.0);
         dpfloat res = __fwd_diff(diffSqrt)(dpx);
-        outputBuffer[2] = res.p;               // Expect: 10.000000
-        outputBuffer[3] = res.d;               // Expect: -0.150000
+        outputBuffer[2] = res.p; // Expect: 10.000000
+        outputBuffer[3] = res.d; // Expect: -0.150000
     }
 
     {
@@ -55,8 +55,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         var dpx = diffPair(float2x2(4.0, 9.0, 16.0, 25.0), float2x2(0.0, 0.0, 0.0, 0.0));
         __bwd_diff(sqrt)(dpx, float2x2(1.0, 2.0, 3.0, 4.0));
-        outputBuffer[8] = dpx.d[0][0]; // Expect: 0.25
-        outputBuffer[9] = dpx.d[0][1]; // Expect: 0.3333
+        outputBuffer[8] = dpx.d[0][0];  // Expect: 0.25
+        outputBuffer[9] = dpx.d[0][1];  // Expect: 0.3333
         outputBuffer[10] = dpx.d[1][0]; // Expect: 0.375
         outputBuffer[11] = dpx.d[1][1]; // Expect: 0.4
     }

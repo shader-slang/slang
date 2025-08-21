@@ -20,7 +20,7 @@ void bwd_f(inout DifferentialPair<float> dpx, in float.Differential dy)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         float o;
@@ -30,7 +30,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpo = dpfloat(2.0, 1.0);
         __bwd_diff(f)(dpa, o);
 
-        outputBuffer[0] = o; // Expect: 9
+        outputBuffer[0] = o;     // Expect: 9
         outputBuffer[1] = dpa.d; // Expect: 36
     }
 }

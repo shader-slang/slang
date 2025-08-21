@@ -5,7 +5,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(in uint i : SV_GroupIndex)
+void computeMain(in uint i: SV_GroupIndex)
 {
     outputBuffer[i] = int(lerp(-100.0, 100.0, double(i) / 3.0) * 100);
 }

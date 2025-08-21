@@ -17,10 +17,10 @@ float sin_series(float x, int iterations)
     {
         term *= -1.0f * x * x / ((2 * i) * (2 * i + 1));
         result += term;
-        if(result > 1000000)
+        if (result > 1000000)
         {
             i += 1;
-            if(result > 2000000)
+            if (result > 2000000)
             {
                 term += 1;
                 i += 1;

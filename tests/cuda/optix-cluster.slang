@@ -10,7 +10,7 @@ struct RayPayload
 [shader("closesthit")]
 void closestHitShaderA(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    //CHECK-PTX:_optix_get_cluster_id 
+    //CHECK-PTX:_optix_get_cluster_id
     int clusterId = GetClusterID();
     float4 color = float4(0, 0, 0, 1);
     if (clusterId >= 0)

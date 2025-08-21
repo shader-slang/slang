@@ -9,6 +9,4 @@ struct S
 };
 
 [numthreads(1, 1, 1)]
-void computeMain()
-{
-}
+void computeMain() {}

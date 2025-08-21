@@ -9,7 +9,7 @@ interface IShape
 struct Circle : IShape
 {
     float radius;
-    
+
     float getArea() { return 3.14159 * radius * radius; }
 }
 
@@ -17,19 +17,23 @@ struct Rectangle : IShape
 {
     float width;
     float height;
-    
+
     float getArea() { return width * height; }
 }
 
-struct ShapeDataBlob { uint type; uint payload[16]; }
+struct ShapeDataBlob
+{
+    uint type;
+    uint payload[16];
+}
 
 struct ShapeBuffer
 {
     StructuredBuffer<ShapeDataBlob> shapes;
     IShape getShape(uint index)
     {
-      uint type = shapes[index].type;
-      return createDynamicObject<IShape, ShapeDataBlob>(type, shapes[index]);
+        uint type = shapes[index].type;
+        return createDynamicObject<IShape, ShapeDataBlob>(type, shapes[index]);
     }
 }
 
@@ -48,12 +52,12 @@ struct VertexOutput
 
 
 [shader("vertex")]
-func vs_main( input: VertexInput, shapes: ShapeBuffer)->VertexOutput
+func vs_main(input: VertexInput, shapes: ShapeBuffer)->VertexOutput
 {
     VertexOutput output;
     output.position = float4(input.position, 0.0, 1.0);
     output.color = input.color;
-    output.area = shapes.getShape(0).getArea(); 
+    output.area = shapes.getShape(0).getArea();
     return output;
 }
 

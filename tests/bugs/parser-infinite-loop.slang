@@ -7,6 +7,6 @@ struct test
 }
 void f()
 {
-    test x; x
-    vector<int,2> v;
+    test x;
+    x vector<int, 2> v;
 }

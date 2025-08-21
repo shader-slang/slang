@@ -1,15 +1,18 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -profile glsl_460
 
-struct WorkData {
+struct WorkData
+{
     float A[2048 * 2048];
     float B[2048 * 2048];
 };
-struct PushData {
+struct PushData
+{
     WorkData* Input;
     float* Dest;
 };
 
-[vk::push_constant] ConstantBuffer<PushData> cb;
+[vk::push_constant]
+ConstantBuffer<PushData> cb;
 
 // CHECK: OpEntryPoint
 

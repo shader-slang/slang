@@ -6,14 +6,20 @@
 // resource-type function parameters, even when working with
 // arrays of resources.
 
-int f(RWStructuredBuffer<int> fx,   uint fi)         { return fx[fi]    ; }
+int f(RWStructuredBuffer<int> fx, uint fi)
+{
+    return fx[fi];
+}
 
 // TODO: Note that we are declaring the function
 // parameter here with an explicitly-sized array
 // because Slang currently doesn't support converison
 // from a sized to an unsized array type.
 //
-int g(RWStructuredBuffer<int> gx[3], uint gi, uint gj) { return gx[gi][gj]; }
+int g(RWStructuredBuffer<int> gx[3], uint gi, uint gj)
+{
+    return gx[gi][gj];
+}
 
 RWStructuredBuffer<int> a;
 RWStructuredBuffer<int> b[3];
@@ -28,7 +34,7 @@ RWStructuredBuffer<int> b[3];
 //
 RWStructuredBuffer<int> c[4][3];
 
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
     uint ii = tid.x;
     uint jj = tid.y;

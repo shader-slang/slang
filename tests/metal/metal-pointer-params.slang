@@ -17,8 +17,13 @@ RWStructuredBuffer<uint64_t> outputBuffer;
 //CHK_AIR: !"int", !"d{{[^"]*}}", !"air.indirect_argument"
 //CHK_AIR: !"float", !"e{{[^"]*}}", !"air.indirect_argument"
 
-[numthreads(1,1,1)]
-void computeMain(uniform uint64_t* a, uniform int64_t* b, uniform uint32_t* c, uniform int32_t* d, uniform float* e)
+[numthreads(1, 1, 1)]
+void computeMain(
+    uniform uint64_t* a,
+    uniform int64_t* b,
+    uniform uint32_t* c,
+    uniform int32_t* d,
+    uniform float* e)
 {
     outputBuffer[0] = (uint64_t)(*a);
     outputBuffer[1] = (uint64_t)(*b);

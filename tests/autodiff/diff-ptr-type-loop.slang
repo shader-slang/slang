@@ -32,7 +32,7 @@ void load_bwd(DifferentialPtrPair<MyPtrType> b, uint idx, float grad)
 // ------
 [Differentiable]
 float reduce(MyPtrType a, uint num)
-{   
+{
     float sum = 0;
     [MaxIters(3)]
     for (uint i = 0; i < num; i++)
@@ -50,13 +50,14 @@ float test(MyPtrType b, uint num)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint id : SV_DispatchThreadID)
+void computeMain(uint id: SV_DispatchThreadID)
 {
     outputBuffer[0] = 1; // CHECK: 1
     outputBuffer[1] = 2; // CHECK: 2
 
-    // Denote the first two elements in the buffer as the primal buffer and the last two elements for the derivative.
-    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 } );
+    // Denote the first two elements in the buffer as the primal buffer and the last two elements
+    // for the derivative.
+    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 });
 
     bwd_diff(test)(b, 2, 1.5f);
 

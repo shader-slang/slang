@@ -15,13 +15,17 @@ enum Channel
 
 int test(int val)
 {
-    Channel channel= Channel(val);
+    Channel channel = Channel(val);
 
     int result = 0;
-    if(channel == Channel.Red)      result += 1;
-    if(channel != Channel.Green)    result += 16;
-    if(channel == Channel.Blue)     result += 16*16;
-    if(channel != Channel.Alpha)    result += 16*16*16;
+    if (channel == Channel.Red)
+        result += 1;
+    if (channel != Channel.Green)
+        result += 16;
+    if (channel == Channel.Blue)
+        result += 16 * 16;
+    if (channel != Channel.Alpha)
+        result += 16 * 16 * 16;
 
     return result;
 }
@@ -31,7 +35,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

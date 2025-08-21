@@ -9,13 +9,13 @@ ConstantBuffer<float4x4> matrixBuffer;
 RWStructuredBuffer<float> output;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float4 v = float4(1, 2, 3, 1);
 
     // Produces an error but not a location(!)
     float4 M = matrixBuffer;
-    
+
     float4 r = mul(v, M);
 
     output[0] = r.x;

@@ -16,8 +16,8 @@ RWBuffer<uint4> b;
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
-    let v = t.Load(int2(0, 0), 1) + tExplicit.Load(int2(1,1),2);
+    let v = t.Load(int2(0, 0), 1) + tExplicit.Load(int2(1, 1), 2);
     b[tid.x] = v;
 }

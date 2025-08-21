@@ -17,7 +17,8 @@
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 // float
 
@@ -148,22 +149,22 @@ uniform usampler2DMS uniform_usampler2DMS;
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
 __generic<T : ITexelElement>
-bool textureFuncs( Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
-    , Sampler2DMS<T> gsampler2DMS
-    , Sampler2DMSArray<T> gsampler2DMSArray
-    , bool ignoreResult
-)
+bool textureFuncs(
+    Sampler1D<T> gsampler1D,
+    Sampler2D<T> gsampler2D,
+    Sampler2DRect<T> gsampler2DRect,
+    Sampler3D<T> gsampler3D,
+    SamplerCube<T> gsamplerCube,
+    Sampler1DArray<T> gsampler1DArray,
+    Sampler2DArray<T> gsampler2DArray,
+    SamplerCubeArray<T> gsamplerCubeArray,
+    SamplerBuffer<T> gsamplerBuffer,
+    Sampler2DMS<T> gsampler2DMS,
+    Sampler2DMSArray<T> gsampler2DMSArray,
+    bool ignoreResult)
 {
     // GLSL-LABEL: textureFuncs_0
-    typealias gvec4 = vector<T.Element,4>;
+    typealias gvec4 = vector<T.Element, 4>;
 
     constexpr float coord = 0.5;
 
@@ -175,7 +176,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
     bool ignoreResultI32 = ignoreResult && T.Element is int32_t;
 
     return true
-        // 8.9.1. Texture Query Functions
+           // 8.9.1. Texture Query Functions
 
         // GLSL: textureSize({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
@@ -439,7 +440,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR: OpImageQuerySamples{{.*}}[[IMAGE]]
         && int(1) == textureSamples(gsampler2DMSArray)
 
-        // 8.9.2. Texel Lookup Functions
+           // 8.9.2. Texel Lookup Functions
 
         // GLSL: texture({{.*}}sampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
@@ -1261,8 +1262,8 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR: OpImageSampleProjDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Grad|ConstOffset %
         && (float(0) == textureProjGradOffset(uniform_sampler2DShadow, vec4(coord), vec2(0), vec2(0), offset2D) || ignoreResultF32)
-        
-        // 8.9.4. Texture Gather Functions
+
+           // 8.9.4. Texture Gather Functions
 
         // GLSL-COUNT-2: textureGather({{.*}}sampler2D
         // SPIR-COUNT-2: [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
@@ -1385,11 +1386,11 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR: OpImageDrefGather {{.*}}[[LOAD]]{{.*}} ConstOffsets %
         && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(coord), float(0), offsets)
 
-        // 8.9.5. Compatibility Profile Texture Functions
-        // Compatibility functions work for GLSL but not for SPIR-V.
-        // We cannot test the SPIR-V asm here for these functions.
-        // We also cannot test GLSL source for them because we don't directly
-        // call them. If we do, the spirv-via-glsl path cannot work.
+           // 8.9.5. Compatibility Profile Texture Functions
+           // Compatibility functions work for GLSL but not for SPIR-V.
+           // We cannot test the SPIR-V asm here for these functions.
+           // We also cannot test GLSL source for them because we don't directly
+           // call them. If we do, the spirv-via-glsl path cannot work.
 
         && vec4(0) == texture1D(uniform_sampler1D, float(coord))
         && vec4(0) == texture1D(uniform_sampler1D, float(coord), float(0))
@@ -1459,48 +1460,45 @@ __extern_cpp void TEST_main()
 
     bool result = true
         && textureFuncs(
-            uniform_sampler1D
-            , uniform_sampler2D
-            , uniform_sampler2DRect
-            , uniform_sampler3D
-            , uniform_samplerCube
-            , uniform_sampler1DArray
-            , uniform_sampler2DArray
-            , uniform_samplerCubeArray
-            , uniform_samplerBuffer
-            , uniform_sampler2DMS
-            , uniform_sampler2DMSArray
-            , ignoreResult
-            )
+                        uniform_sampler1D,
+                        uniform_sampler2D,
+                        uniform_sampler2DRect,
+                        uniform_sampler3D,
+                        uniform_samplerCube,
+                        uniform_sampler1DArray,
+                        uniform_sampler2DArray,
+                        uniform_samplerCubeArray,
+                        uniform_samplerBuffer,
+                        uniform_sampler2DMS,
+                        uniform_sampler2DMSArray,
+                        ignoreResult)
 #if !defined(HLSL)
         && textureFuncs(
-            uniform_isampler1D
-            , uniform_isampler2D
-            , uniform_isampler2DRect
-            , uniform_isampler3D
-            , uniform_isamplerCube
-            , uniform_isampler1DArray
-            , uniform_isampler2DArray
-            , uniform_isamplerCubeArray
-            , uniform_isamplerBuffer
-            , uniform_isampler2DMS
-            , uniform_isampler2DMSArray
-            , ignoreResult
-            )
+                        uniform_isampler1D,
+                        uniform_isampler2D,
+                        uniform_isampler2DRect,
+                        uniform_isampler3D,
+                        uniform_isamplerCube,
+                        uniform_isampler1DArray,
+                        uniform_isampler2DArray,
+                        uniform_isamplerCubeArray,
+                        uniform_isamplerBuffer,
+                        uniform_isampler2DMS,
+                        uniform_isampler2DMSArray,
+                        ignoreResult)
         && textureFuncs(
-            uniform_usampler1D
-            , uniform_usampler2D
-            , uniform_usampler2DRect
-            , uniform_usampler3D
-            , uniform_usamplerCube
-            , uniform_usampler1DArray
-            , uniform_usampler2DArray
-            , uniform_usamplerCubeArray
-            , uniform_usamplerBuffer
-            , uniform_usampler2DMS
-            , uniform_usampler2DMSArray
-            , ignoreResult
-            )
+                        uniform_usampler1D,
+                        uniform_usampler2D,
+                        uniform_usampler2DRect,
+                        uniform_usampler3D,
+                        uniform_usamplerCube,
+                        uniform_usampler1DArray,
+                        uniform_usampler2DArray,
+                        uniform_usamplerCubeArray,
+                        uniform_usamplerBuffer,
+                        uniform_usampler2DMS,
+                        uniform_usampler2DMSArray,
+                        ignoreResult)
 #endif
         ;
 
@@ -1510,7 +1508,7 @@ __extern_cpp void TEST_main()
 [shader("compute")]
 [DerivativeGroupLinear]
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     TEST_main();
 }

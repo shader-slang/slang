@@ -19,14 +19,14 @@ void set_bwd(uint idx, inout DifferentialPair<float> x)
 }
 
 [Differentiable]
-void run(
-    uint idx,
-    float x)
+void run(uint idx, float x)
 {
-    if (idx >= 1) return;
+    if (idx >= 1)
+        return;
 
     if (idx == 0)
-    { }
+    {
+    }
 
     for (int i = 0; i < 1; i++)
     {
@@ -36,25 +36,26 @@ void run(
         }
 
         if (idx == 0)
-        { 
+        {
             x = x * 2.0f;
         }
     }
 
     if (idx == 0)
-    { }
+    {
+    }
 
     set(idx, x);
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // bwd_diff
     DifferentialPair<float> dpa = DifferentialPair<float>(1.0, 0.0);
     bwd_diff(run)(dispatchThreadID.x, dpa);
-    outputBuffer[dispatchThreadID.x] = dpa.d; 
-    
+    outputBuffer[dispatchThreadID.x] = dpa.d;
+
     // CHECK: type: float
     // CHECK: 2.0
 }

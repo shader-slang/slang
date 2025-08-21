@@ -17,7 +17,7 @@ const int constValue0 = 4;
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-static const int size = constValue0 << (1 + (constValue0 & 0x01 | 0x02));   // 4 << 3 = 32
+static const int size = constValue0 << (1 + (constValue0 & 0x01 | 0x02)); // 4 << 3 = 32
 
 // This test is to verify that if two array has the same spec constant size, they are the same type.
 void func(out float buffer[constValue0 << (1 + (constValue0 & 0x01 | 0x02))], int idx)
@@ -30,7 +30,7 @@ void func(out float buffer[constValue0 << (1 + (constValue0 & 0x01 | 0x02))], in
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(uint tid:SV_DispatchThreadID)
+void computeMain(uint tid: SV_DispatchThreadID)
 {
     float buffer[constValue0 << (1 + (constValue0 & 0x01 | 0x02))];
     // CHECK: OpVariable %[[PT_TYPE]] Function

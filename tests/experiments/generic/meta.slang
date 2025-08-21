@@ -12,14 +12,13 @@ struct GetVector4<T>
 {
     typedef vector<T, 4> Value;
 };
-  
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
     GetVector4<float>::Value v = { 1, 2, 3, 4 };
-    
-	outputBuffer[index] = dot(v, v);
-}
 
+    outputBuffer[index] = dot(v, v);
+}

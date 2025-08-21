@@ -1,7 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 import glsl;
-[[vk::binding(0,0)]] RWTexture2D<uint64_t> tex[];
+[[vk::binding(0, 0)]]
+RWTexture2D<uint64_t> tex[];
 
 // CHECK: OpEntryPoint
 // CHECK: %{{.*}} = OpImageTexelPointer %{{.*}} %{{.*}} %{{.*}} %int_0
@@ -10,5 +11,5 @@ import glsl;
 [numthreads(1, 1, 1)]
 void main()
 {
-    imageAtomicAdd(tex[0], int2(0,0), uint64_t(0));
+    imageAtomicAdd(tex[0], int2(0, 0), uint64_t(0));
 }

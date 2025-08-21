@@ -3,8 +3,9 @@
 struct Set<each T>
 {
     Tuple<expand each T> data;
-    void f(expand each T v){}
-    __init(expand each T d) {
+    void f(expand each T v) {}
+    __init(expand each T d)
+    {
         f(d);
         data = makeTuple(d);
     }
@@ -13,7 +14,7 @@ struct Set<each T>
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     let set = Set<float>(1.0);

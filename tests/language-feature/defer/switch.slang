@@ -7,8 +7,8 @@ RWStructuredBuffer<int> outputBuffer;
 
 void testFunc(int i, int param)
 {
-    defer outputBuffer[i++] = param*3+2;
-    switch(param)
+    defer outputBuffer[i++] = param * 3 + 2;
+    switch (param)
     {
     case 0:
         defer outputBuffer[i++] = 1;

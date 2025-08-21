@@ -7,14 +7,14 @@
 
 interface IConvertible
 {
-    __init( int value );
+    __init(int value);
 
     property value : int { get; }
 }
 
-ToType convert< ToType : IConvertible, FromType : IConvertible >( FromType fromVal )
+ToType convert<ToType : IConvertible, FromType : IConvertible>(FromType fromVal)
 {
-    return ToType( fromVal.value*0x10 );
+    return ToType(fromVal.value * 0x10);
 }
 
 struct A : IConvertible
@@ -30,7 +30,7 @@ struct B : IConvertible
 }
 
 
-int test( int value )
+int test(int value)
 {
     A a = A(value);
     B b = convert<B>(a);
@@ -42,7 +42,7 @@ int test( int value )
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     outputBuffer[tid] = test(tid);

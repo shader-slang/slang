@@ -10,10 +10,7 @@ struct A : IDifferentiable
     float x;
 
     [ForwardDerivative(diff_f)]
-    static float f(float v)
-    {
-        return v * v;
-    }
+    static float f(float v) { return v * v; }
 
     static DifferentialPair<float> diff_f(DifferentialPair<float> v)
     {
@@ -21,10 +18,7 @@ struct A : IDifferentiable
     }
 
     [BackwardDerivative(diff_g)]
-    static float g(float v)
-    {
-        return v * v;
-    }
+    static float g(float v) { return v * v; }
 
     static void diff_g(inout DifferentialPair<float> v, float.Differential dOut)
     {
@@ -45,11 +39,11 @@ float test2(A obj, float v)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    A a = {0.0};
+    A a = { 0.0 };
     var p = diffPair(3.0, 1.0);
-    let rs = fwd_diff(test)(diffPair(a, {1.0}), p);
+    let rs = fwd_diff(test)(diffPair(a, { 1.0 }), p);
 
     var q = diffPair(3.0);
     var qa = diffPair(a);

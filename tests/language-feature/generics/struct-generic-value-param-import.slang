@@ -6,14 +6,14 @@
 // for `struct` decalrations in Slang files, including
 // any `import`ed code.
 
-public interface IData {}
+public interface IData
+{
+}
 
 public struct Data<let kCount : int> : IData
 {
     public int state;
 
-    [mutating] public void doStuff()
-    {
-        state++;
-    }
+    [mutating]
+    public void doStuff() { state++; }
 }

@@ -9,6 +9,5 @@
 // CHECK: OpEntryPoint GLCompute %computeMain "main"
 // CHECK: OpExecutionMode %computeMain LocalSize 4 1 1
 
-[numthreads(4,1,1)]
-void computeMain()
-{}
+[numthreads(4, 1, 1)]
+void computeMain() {}

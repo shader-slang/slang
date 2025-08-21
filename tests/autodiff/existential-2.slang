@@ -31,7 +31,11 @@ struct B : IInterface
     float data2;
 
     [Differentiable]
-    __init(float data1, float data2) { this.data1 = data1; this.data2 = data2; }
+    __init(float data1, float data2)
+    {
+        this.data1 = data1;
+        this.data2 = data2;
+    }
 
     [Differentiable]
     float calc(float x) { return x * x * data1 * data2; }
@@ -42,7 +46,7 @@ float doThing(IInterface obj, float x)
 {
     return obj.calc(x);
 }
- 
+
 [Differentiable]
 float f(uint id, float x)
 {
@@ -60,11 +64,11 @@ float f(uint id, float x)
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         var dpx = diffPair(1.0);
-        bwd_diff(f)(dispatchThreadID.x, dpx, 2.0); 
+        bwd_diff(f)(dispatchThreadID.x, dpx, 2.0);
         outputBuffer[0] = dpx.d; // Expect: 2 * 4 * x^3 * dx = 8 * x^3 * dx = 16
     }
 

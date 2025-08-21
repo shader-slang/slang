@@ -16,7 +16,7 @@ RWStructuredBuffer<int> output;
 int factorial(int n)
 {
     int result = 1;
-    while(n > 0)
+    while (n > 0)
     {
         result *= n;
         n--;
@@ -25,9 +25,7 @@ int factorial(int n)
 }
 
 [numthreads(1, 1, 1)]
-void main(
-    uint tid   : SV_DispatchThreadID)
+void main(uint tid: SV_DispatchThreadID)
 {
     output[tid] = factorial(input[tid]);
 }
-

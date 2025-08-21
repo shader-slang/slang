@@ -30,10 +30,7 @@ interface IModifier
     int modify(int val);
 }
 
-int test(
-    int                             seed,
-    IRandomNumberGenerationStrategy inStrategy,
-    IModifier                       modifier)
+int test(int seed, IRandomNumberGenerationStrategy inStrategy, IModifier modifier)
 {
     let strategy = inStrategy;
     var generator = strategy.makeGenerator(seed);
@@ -72,25 +69,25 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 [numthreads(4, 1, 1)]
 void computeMain(
 
-// Similarly to the previous test, we are declaring two `uniform`
-// parameters on the entry point, where one will be plugged in
-// with a concrete type, and thus get laid out second.
-//
-    uniform IModifier   modifier,
-    uniform int         extra,
-//
-// The uniform/ordinary data for these two parameters will end
-// up in the constant buffers, so let's declare that. Unlike
-// the previous test, the concrete type plugged in for `modifier`
-// has no uniform/ordinary data, so we don't need to fill it in.
-//
-// We *do* need to reserve space in the constant buffer for the
-// existential value (RTTI, witness table, any-value) and that
-// needs to come *before* the value for `extra`.
-//
+    // Similarly to the previous test, we are declaring two `uniform`
+    // parameters on the entry point, where one will be plugged in
+    // with a concrete type, and thus get laid out second.
+    //
+    uniform IModifier modifier,
+    uniform int extra,
+    //
+    // The uniform/ordinary data for these two parameters will end
+    // up in the constant buffers, so let's declare that. Unlike
+    // the previous test, the concrete type plugged in for `modifier`
+    // has no uniform/ordinary data, so we don't need to fill it in.
+    //
+    // We *do* need to reserve space in the constant buffer for the
+    // existential value (RTTI, witness table, any-value) and that
+    // needs to come *before* the value for `extra`.
+    //
 //TEST_INPUT:root_constants(data=[0 0 0 0 0 0 0 0 256]):
 
-            uint3       dispatchThreadID : SV_DispatchThreadID)
+    uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -107,17 +104,14 @@ void computeMain(
 
 struct MyStrategy : IRandomNumberGenerationStrategy
 {
-	RWStructuredBuffer<int> globalSeeds;
+    RWStructuredBuffer<int> globalSeeds;
 
     struct Generator : IRandomNumberGenerator
     {
         int state;
 
         [mutating]
-        int randomInt()
-        {
-            return state++;
-        }
+        int randomInt() { return state++; }
     }
 
     Generator makeGenerator(int seed)
@@ -129,12 +123,9 @@ struct MyStrategy : IRandomNumberGenerationStrategy
 
 struct MyModifier : IModifier
 {
-	RWStructuredBuffer<int> localModifiers;
+    RWStructuredBuffer<int> localModifiers;
 
-    int modify(int val)
-    {
-        return val ^ localModifiers[val & 3];
-    }
+    int modify(int val) { return val ^ localModifiers[val & 3]; }
 }
 
 // Here's the data for `modifier`:

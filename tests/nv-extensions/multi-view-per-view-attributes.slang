@@ -6,16 +6,16 @@
 
 struct VS_OUT
 {
-	float4 left : SV_Position;
+    float4 left : SV_Position;
     float4 right : NV_X_RIGHT;
-    uint4  mask : NV_VIEWPORT_MASK;
+    uint4 mask : NV_VIEWPORT_MASK;
 };
 
 VS_OUT main(float4 ll, float4 rr)
 {
-	VS_OUT res;
-	res.left = ll;
-	res.right = rr;
-	res.mask = 0x1;
-	return res;	
+    VS_OUT res;
+    res.left = ll;
+    res.right = rr;
+    res.mask = 0x1;
+    return res;
 }

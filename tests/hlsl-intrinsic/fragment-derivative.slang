@@ -43,7 +43,7 @@ bool testFragmentProcessingDerivativeFunctionsScalar()
         && fwidth_coarse(1.0f) != -1.0f
         ;
 }
-__generic<let N:int>
+__generic<let N : int>
 bool testFragmentProcessingDerivativeFunctionsVector()
 {
 // CHECK_HLSL: ddx
@@ -98,8 +98,11 @@ bool testFragmentProcessingFunctions()
 }
 
 [shader("pixel")]
-int4 main() : SV_Target {
-    return int4(true
+int4 main()
+    : SV_Target
+{
+    return int4(
+        true
         && testFragmentProcessingFunctions()
-        );
+    );
 }

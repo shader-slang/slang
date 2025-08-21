@@ -12,21 +12,22 @@ struct A : IDifferentiable
     [Differentiable]
     __init()
     {
-        [ForceUnroll] for (uint i = 0; i < 3; i++) data[i] = 0.f;
+        [ForceUnroll]
+        for (uint i = 0; i < 3; i++)
+            data[i] = 0.f;
     }
 
     [mutating]
     [Differentiable]
-    void write(float value, inout uint offset)
-    {
-        data[offset++] = value;
-    }
+    void write(float value, inout uint offset) { data[offset++] = value; }
 
     [mutating]
     [Differentiable]
     void write<let N : int>(vector<float, N> value, inout uint offset)
     {
-        [ForceUnroll] for (uint i = 0; i < N; i++) write(value[i], offset);
+        [ForceUnroll]
+        for (uint i = 0; i < N; i++)
+            write(value[i], offset);
     }
 }
 

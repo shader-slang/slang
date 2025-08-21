@@ -33,7 +33,7 @@ float runAndSum<Pass0 : IMLP, Pass1 : IMLP>(float base)
         pass1_inputs[i] = __realCast<Pass1Precision>(pass0_outputs[i]);
 
         // Working
-        //pass1_inputs[i] = (WARCastPass1)__realCast<WARActualTypePass0>(pass0_outputs[i]);
+        // pass1_inputs[i] = (WARCastPass1)__realCast<WARActualTypePass0>(pass0_outputs[i]);
     }
 
     float result = 0;

@@ -8,15 +8,9 @@ struct ShadingData
     float3 T;
     float3 B;
 
-    float3 fromLocal(float3 v)
-    {
-        return T * v.x + B * v.y + N * v.z;
-    }
+    float3 fromLocal(float3 v) { return T * v.x + B * v.y + N * v.z; }
 
-    float3 toLocal(float3 v)
-    {
-        return float3(dot(v, T), dot(v, B), dot(v, N));
-    }
+    float3 toLocal(float3 v) { return float3(dot(v, T), dot(v, B), dot(v, N)); }
 };
 
 struct Auto_Bwd_ScatterSample : IDifferentiable
@@ -33,7 +27,10 @@ struct Auto_Bwd_BSDFParameters : IDifferentiable
 };
 
 [BackwardDifferentiable]
-bool bsdfGGXSample(in ShadingData sd, in Auto_Bwd_BSDFParameters params, out Auto_Bwd_ScatterSample result)
+bool bsdfGGXSample(
+    in ShadingData sd,
+    in Auto_Bwd_BSDFParameters params,
+    out Auto_Bwd_ScatterSample result)
 {
     float3 wiLocal = no_diff(sd.toLocal(sd.V));
     float2 u = float2(0.8, 0.3);
@@ -91,7 +88,8 @@ float3 evalGGXDivByPDF(in float3 wi, in float3 wo, in float3 h, in Auto_Bwd_BSDF
 {
     const float3 F0Color = params.albedo;
     let F90Color = float3(1.0, 1.0, 1.0);
-    return F(F0Color, F90Color, dot(wi, h)) * G(params.roughness, wi.z, wo.z) * dot(wi, h) / (wi.z * h.z);
+    return F(F0Color, F90Color, dot(wi, h)) * G(params.roughness, wi.z, wo.z) * dot(wi, h) /
+           (wi.z * h.z);
 }
 
 [BackwardDifferentiable]

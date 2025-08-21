@@ -7,9 +7,18 @@
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16], stride=4):name inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
-int16_t readI(inout int index) { return int16_t(inputBuffer[(index++) & 0xF]); }
-uint16_t readU(inout int index) { return int16_t(inputBuffer[(index++) & 0xF]); }
-float16_t readF(inout int index) { return float16_t(float(inputBuffer[(index++) & 0xF])); }
+int16_t readI(inout int index)
+{
+    return int16_t(inputBuffer[(index++) & 0xF]);
+}
+uint16_t readU(inout int index)
+{
+    return int16_t(inputBuffer[(index++) & 0xF]);
+}
+float16_t readF(inout int index)
+{
+    return float16_t(float(inputBuffer[(index++) & 0xF]));
+}
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -17,7 +26,7 @@ RWStructuredBuffer<int> outputBuffer;
 void write(int initial, inout int index, uint value)
 {
     let tmp = index++;
-    if((tmp & 3) == initial)
+    if ((tmp & 3) == initial)
     {
         outputBuffer[tmp & 0xF] = int(value);
     }
@@ -93,12 +102,11 @@ void test(int initial)
         write(initial, output, d.x);
         write(initial, output, d.y);
     }
-
 }
 
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     test(dispatchThreadID.x);
 }

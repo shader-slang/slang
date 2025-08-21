@@ -35,7 +35,8 @@ bool test1MinMax(uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVMinMax(uint4 mask) {
+bool testVMinMax(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let minResult = GVec(T(gMinResult));
@@ -103,7 +104,7 @@ bool testMinMax(uint4 mask)
 
 [numthreads(32, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = dispatchThreadID.x;
 
@@ -120,7 +121,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             && testMinMax(mask)
-            ;
+        ;
 
     // CHECK-COUNT-32: 1
     outputBuffer[index] = uint(result);

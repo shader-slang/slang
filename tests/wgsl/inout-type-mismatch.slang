@@ -18,7 +18,7 @@ void A(inout int param)
 }
 
 [numthreads(1, 1, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
+void main(uint3 DTid: SV_DispatchThreadID)
 {
     int param = 5;
     A(param);

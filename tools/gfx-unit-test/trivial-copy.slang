@@ -2,9 +2,9 @@
 
 // Copy the contents of "tex" into "buffer". These are for textures containing FLOAT data.
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexFloat4(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform uint width,
     uniform uint height,
     uniform RWTexture2D<float4> tex,

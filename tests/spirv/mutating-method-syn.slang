@@ -12,13 +12,10 @@ struct Val : IFoo
 {
     int x;
 
-    int bar(int y)
-    {
-        return x + y;
-    }
+    int bar(int y) { return x + y; }
 }
 
-int test<T:IFoo>(inout T f, inout int y)
+int test<T : IFoo>(inout T f, inout int y)
 {
     return f.bar(y);
 }
@@ -26,13 +23,13 @@ int test<T:IFoo>(inout T f, inout int y)
 //TEST_INPUT:set result = out ubuffer(data=[0 0 0 0], stride=4)
 
 RWStructuredBuffer<int> result;
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
-{    
+{
     Val v;
     int y = 0;
     v.x = 1;
-    
+
     // CHECK: 1
     result[0] = test(v, y);
 }

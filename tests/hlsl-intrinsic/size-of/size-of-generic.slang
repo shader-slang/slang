@@ -16,19 +16,26 @@ struct Thing<T>
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const int idx = asint(dispatchThreadID.x);
 
     int size = 0;
-    
+
     switch (idx)
-    {   
-        
-        case 0:     size = sizeof(Thing<float>); break;
-        case 1:     size = sizeof(Thing<float3>); break;
-        case 2:     size = sizeof(Thing<matrix<uint, 3, 2>>); break;
-        default: break;
+    {
+
+    case 0:
+        size = sizeof(Thing<float>);
+        break;
+    case 1:
+        size = sizeof(Thing<float3>);
+        break;
+    case 2:
+        size = sizeof(Thing<matrix<uint, 3, 2>>);
+        break;
+    default:
+        break;
     }
 
     outputBuffer[idx] = size;

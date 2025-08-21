@@ -10,8 +10,8 @@ uniform float3 v1;
 uniform float v2;
 
 
-
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     return float4(v2);
 }

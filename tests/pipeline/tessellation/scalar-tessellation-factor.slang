@@ -19,7 +19,7 @@ struct HSOutput
 struct ConstantsHSOutput
 {
     float TessLevelOuter[3] : SV_TessFactor;
-    float TessLevelInner : SV_InsideTessFactor;  // Scalar (should convert to float[2] for GLSL)
+    float TessLevelInner : SV_InsideTessFactor; // Scalar (should convert to float[2] for GLSL)
 };
 
 ConstantsHSOutput ConstantsHS()

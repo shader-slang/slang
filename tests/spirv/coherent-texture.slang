@@ -9,10 +9,9 @@
 //VK_MEM_MODEL: OpImageRead %{{.*}} MakeTexelVisible|NonPrivateTexel %
 //VK_MEM_MODEL: OpImageWrite %{{.*}} MakeTexelAvailable|NonPrivateTexel %
 
-globallycoherent
-RWTexture2D<int4> outputTexture2D;
+globallycoherent RWTexture2D<int4> outputTexture2D;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // This line issues kIROp_ImageLoad/Store
@@ -20,5 +19,5 @@ void computeMain()
 
     // The current implementation uses spirv_asm for subscription,
     // which goes through a different part of implementation in slang-emit-spirv.cpp.
-    outputTexture2D[uint2(0,0)] = outputTexture2D[uint2(1,1)];
+    outputTexture2D[uint2(0, 0)] = outputTexture2D[uint2(1, 1)];
 }

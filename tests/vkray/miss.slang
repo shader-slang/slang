@@ -7,5 +7,5 @@ struct ShadowRay
 
 void main(in out ShadowRay ray)
 {
-	ray.hitDistance = 10000.0f;
+    ray.hitDistance = 10000.0f;
 }

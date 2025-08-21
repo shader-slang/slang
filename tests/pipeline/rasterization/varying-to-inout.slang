@@ -15,7 +15,8 @@ void test(inout PS_IN v)
 }
 
 [shader("fragment")]
-float4 main(PS_IN psIn):SV_Target
+float4 main(PS_IN psIn)
+    : SV_Target
 {
     test(psIn);
     return psIn.color;

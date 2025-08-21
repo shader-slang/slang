@@ -3,7 +3,7 @@
 // CHECK: OpEntryPoint
 
 ConstantBuffer<Ptr<int>> cbPtr;
-void main(int id : SV_DispatchThreadID)
+void main(int id: SV_DispatchThreadID)
 {
     // Check that the index operand is translated directly into a 64bit integer
     // in th resulting SPIR-V without any truncations.

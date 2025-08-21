@@ -3,12 +3,9 @@ implementing mlp_sw;
 public struct MLVec<int N> : IDifferentiable
 {
     public NFloat data[N];
-    
+
     [Differentiable]
-    public NFloat[N] toArray()
-    {
-        return data;
-    }
+    public NFloat[N] toArray() { return data; }
 
     [Differentiable]
     public static MLVec<N> fromArray(NFloat[N] values)
@@ -21,9 +18,12 @@ public struct MLVec<int N> : IDifferentiable
     }
 }
 
-MLVec<OutputSize> matMulAdd<int OutputSize, int InputSize>(MLVec<InputSize> input, NFloat* matrix, NFloat* bias)
+MLVec<OutputSize> matMulAdd<int OutputSize, int InputSize>(
+    MLVec<InputSize> input,
+    NFloat* matrix,
+    NFloat* bias)
 {
-    let getMatElem = (int row, int col) => matrix[row*InputSize + col];
+    let getMatElem = (int row, int col) => matrix[row * InputSize + col];
     let getBias = (int idx) => bias[idx];
     MLVec<OutputSize> result = {};
     for (int i = 0; i < OutputSize; i++)
@@ -36,9 +36,11 @@ MLVec<OutputSize> matMulAdd<int OutputSize, int InputSize>(MLVec<InputSize> inpu
     return result;
 }
 
-MLVec<OutputSize> matMulTransposed<int OutputSize, int InputSize>(MLVec<InputSize> input, NFloat* matrix)
+MLVec<OutputSize> matMulTransposed<int OutputSize, int InputSize>(
+    MLVec<InputSize> input,
+    NFloat* matrix)
 {
-    let getMatElem = (int row, int col) => matrix[col*OutputSize + row];
+    let getMatElem = (int row, int col) => matrix[col * OutputSize + row];
     MLVec<OutputSize> result = {};
     for (int i = 0; i < OutputSize; i++)
     {
@@ -58,7 +60,7 @@ void outerProductAccumulate<int M, int N>(MLVec<M> v0, MLVec<N> v1, NFloat* matr
         {
             let elem = v0.data[i] * v1.data[j];
             half original;
-            InterlockedAddF16Emulated(matrix + (i*N + j), elem, original);
+            InterlockedAddF16Emulated(matrix + (i * N + j), elem, original);
         }
     }
 }

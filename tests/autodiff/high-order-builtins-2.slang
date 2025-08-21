@@ -24,7 +24,7 @@ float df(float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Given f(x) = sin(x^3) + x^6
     // f'(x) = cos(x^3)*(3*x^2) + 6*x^5

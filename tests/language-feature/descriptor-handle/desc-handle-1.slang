@@ -8,10 +8,10 @@ uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
 uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 
 [vk::binding(0, 10)]
-__DynamicResource<__DynamicResourceKind.General> resourceHeap[]; 
+__DynamicResource<__DynamicResourceKind.General> resourceHeap[];
 
 // A customized function that overrides the default behavior of fetch texture resources.
-export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+export T getDescriptorFromHandle<T : IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
     __target_switch
     {
@@ -25,7 +25,7 @@ export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     }
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     buffer[0] = t[0]->SampleLevel(float2(0.0), 0.0);

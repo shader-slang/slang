@@ -9,12 +9,12 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const WaveMask mask0 = 0xff;
-    
+
     int idx = int(dispatchThreadID.x);
-    
+
     const WaveMask mask1 = WaveMaskBallot(mask0, idx < 3);
     if (idx < 3)
     {
@@ -22,8 +22,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[idx] = -1;
         return;
     }
-    
+
     const WaveMask mask2 = mask0 & ~mask1;
-   
+
     outputBuffer[idx] = WaveMaskIsFirstLane(mask2);
 }

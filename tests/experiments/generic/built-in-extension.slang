@@ -1,11 +1,11 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* Test around extension to a built in, to allow associating types with builtins. 
+/* Test around extension to a built in, to allow associating types with builtins.
 
 Doesn't work
 
-.slang(22): internal error 99999: unexpected condition encountered in Slang compiler: should not appear in input syntax
-    int.Unsigned v = (int.Unsigned)10;
+.slang(22): internal error 99999: unexpected condition encountered in Slang compiler: should not
+appear in input syntax int.Unsigned v = (int.Unsigned)10;
 
 */
 
@@ -24,10 +24,10 @@ extension int : IIntegral
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-    
+
     // Works
     int.Unsigned u = 10;
 

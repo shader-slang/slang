@@ -3,45 +3,47 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 
-// As per vulkan specification: https://registry.khronos.org/vulkan/specs/1.3/html/chap34.html#formats-definition
-// i64/u64 images do not require sampled image support; support is currently unlikley on hardware
-//#define test_when_hardware_supports_i64_and_u64_sampled_textures
+// As per vulkan specification:
+// https://registry.khronos.org/vulkan/specs/1.3/html/chap34.html#formats-definition i64/u64 images
+// do not require sampled image support; support is currently unlikley on hardware
+// #define test_when_hardware_supports_i64_and_u64_sampled_textures
 // i64/u64 images do not require texel buffers support; support is currently unlikley on hardware
-//#define TEST_when_hardware_supports_i64_and_u64_buffers
+// #define TEST_when_hardware_supports_i64_and_u64_buffers
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
     uint data[1];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 
 //TEST_INPUT: set image_1d = RWTexture1D(format=R64Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=0,r64i) i64image1D image_1d;
+uniform layout(binding = 0, r64i) i64image1D image_1d;
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
 //COM:TEST_INPUT: set image_buffer = RWTextureBuffer(format=R64Sint, stride=8, data=[0 1 0 1 0 1 0 1])
-uniform layout(binding=1,r64i) i64imageBuffer image_buffer;
+uniform layout(binding = 1, r64i) i64imageBuffer image_buffer;
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
 //TEST_INPUT: set image_1dArray = RWTexture1D(format=R64Sint, size=4, content=one, mipMaps = 1, arrayLength=2)
-uniform layout(binding=2,r64i) i64image1DArray image_1dArray;
+uniform layout(binding = 2, r64i) i64image1DArray image_1dArray;
 //TEST_INPUT: set image_2d = RWTexture2D(format=R64Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=3,r64i) i64image2D image_2d;
+uniform layout(binding = 3, r64i) i64image2D image_2d;
 //TEST_INPUT: set image_2dRect = RWTexture2D(format=R64Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=4,r64i) i64image2DRect image_2dRect;
+uniform layout(binding = 4, r64i) i64image2DRect image_2dRect;
 //TEST_INPUT: set image_2dArray = RWTexture2D(format=R64Sint, size=4, content=one, mipMaps = 1, arrayLength=2)
-uniform layout(binding=6,r64i) i64image2DArray image_2dArray;
+uniform layout(binding = 6, r64i) i64image2DArray image_2dArray;
 //TEST_INPUT: set image_3d = RWTexture3D(format=R64Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=7,r64i) i64image3D image_3d;
+uniform layout(binding = 7, r64i) i64image3D image_3d;
 //TEST_INPUT: set image_cube = RWTextureCube(format=R64Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=8,r64i) i64imageCube image_cube;
+uniform layout(binding = 8, r64i) i64imageCube image_cube;
 //TEST_INPUT: set image_cubeArray = RWTextureCube(format=R64Sint, size=4, content=one, mipMaps = 1, arrayLength=2)
-uniform layout(binding=9,r64i) i64imageCubeArray image_cubeArray;
+uniform layout(binding = 9, r64i) i64imageCubeArray image_cubeArray;
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
 //COM:TEST_INPUT: set image_2dMultiSample = RWTexture2D(format=R64Sint, size=4, content=one, mipMaps = 1, sampleCount = two)
-uniform layout(binding=5,r64i) i64image2DMS image_2dMultiSample;
+uniform layout(binding = 5, r64i) i64image2DMS image_2dMultiSample;
 //COM:TEST_INPUT: set image_2dMultiSampleArray = RWTexture2D(format=R64Sint, size=4, content=one, mipMaps = 1, arrayLength=2, sampleCount = two)
-uniform layout(binding=10,r64i) i64image2DMSArray image_2dMultiSampleArray;
+uniform layout(binding = 10, r64i) i64image2DMSArray image_2dMultiSampleArray;
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
 
 bool checkAllImageSize()
@@ -87,20 +89,20 @@ bool checkAllImageLoad()
 }
 bool resetAllImageValues()
 {
-    imageStore(image_1d, 0,i64vec4(1));
+    imageStore(image_1d, 0, i64vec4(1));
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(image_buffer, 0,i64vec4(1));
+    imageStore(image_buffer, 0, i64vec4(1));
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(image_1dArray, ivec2(0),i64vec4(1));
-    imageStore(image_2d, ivec2(0),i64vec4(1));
-    imageStore(image_2dRect, ivec2(0),i64vec4(1));
-    imageStore(image_2dArray, ivec3(0),i64vec4(1));
-    imageStore(image_3d, ivec3(0),i64vec4(1));
-    imageStore(image_cube, ivec3(0),i64vec4(1));
-    imageStore(image_cubeArray, ivec3(0),i64vec4(1));
+    imageStore(image_1dArray, ivec2(0), i64vec4(1));
+    imageStore(image_2d, ivec2(0), i64vec4(1));
+    imageStore(image_2dRect, ivec2(0), i64vec4(1));
+    imageStore(image_2dArray, ivec3(0), i64vec4(1));
+    imageStore(image_3d, ivec3(0), i64vec4(1));
+    imageStore(image_cube, ivec3(0), i64vec4(1));
+    imageStore(image_cubeArray, ivec3(0), i64vec4(1));
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     imageStore(image_2dMultiSample, ivec2(0), 1, i64vec4(1));
-    imageStore(image_2dMultiSampleArray, ivec3(0), 1,i64vec4(1));
+    imageStore(image_2dMultiSampleArray, ivec3(0), 1, i64vec4(1));
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     return true;
 }
@@ -158,30 +160,30 @@ bool checkAllImageStore()
 {
     bool loadCheck = true;
 
-    imageStore(image_1d, 0,i64vec4(0));
+    imageStore(image_1d, 0, i64vec4(0));
     loadCheck = loadCheck && load_image_1d() == 0;
 #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(image_buffer, 0,i64vec4(0));
+    imageStore(image_buffer, 0, i64vec4(0));
     loadCheck = loadCheck && load_image_buffer() == 0;
 #endif // #ifdef TEST_when_hardware_supports_i64_and_u64_buffers
-    imageStore(image_1dArray, ivec2(0),i64vec4(0));
+    imageStore(image_1dArray, ivec2(0), i64vec4(0));
     loadCheck = loadCheck && load_image_1dArray() == 0;
-    imageStore(image_2d, ivec2(0),i64vec4(0));
+    imageStore(image_2d, ivec2(0), i64vec4(0));
     loadCheck = loadCheck && load_image_2d() == 0;
-    imageStore(image_2dRect, ivec2(0),i64vec4(0));
+    imageStore(image_2dRect, ivec2(0), i64vec4(0));
     loadCheck = loadCheck && load_image_2dRect() == 0;
-    imageStore(image_2dArray, ivec3(0),i64vec4(0));
+    imageStore(image_2dArray, ivec3(0), i64vec4(0));
     loadCheck = loadCheck && load_image_2dArray() == 0;
-    imageStore(image_3d, ivec3(0),i64vec4(0));
+    imageStore(image_3d, ivec3(0), i64vec4(0));
     loadCheck = loadCheck && load_image_3d() == 0;
-    imageStore(image_cube, ivec3(0),i64vec4(0));
+    imageStore(image_cube, ivec3(0), i64vec4(0));
     loadCheck = loadCheck && load_image_cube() == 0;
-    imageStore(image_cubeArray, ivec3(0),i64vec4(0));
+    imageStore(image_cubeArray, ivec3(0), i64vec4(0));
     loadCheck = loadCheck && load_image_cubeArray() == 0;
 #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     imageStore(image_2dMultiSample, ivec2(0), 1, i64vec4(0));
     loadCheck = loadCheck && load_image_2dMultiSample() == 0;
-    imageStore(image_2dMultiSampleArray, ivec3(0), 1,i64vec4(0));
+    imageStore(image_2dMultiSampleArray, ivec3(0), 1, i64vec4(0));
     loadCheck = loadCheck && load_image_2dMultiSampleArray() == 0;
 #endif // #ifdef test_when_hardware_supports_i64_and_u64_sampled_textures
     resetAllImageValues();

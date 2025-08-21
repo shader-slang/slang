@@ -23,7 +23,10 @@ struct DS_OUTPUT
 
 // Domain Shader (DS)
 [domain("quad")]
-DS_OUTPUT main(HS_CONSTANT_DATA_OUTPUT input, const OutputPatch<HS_CONTROL_POINT_OUTPUT, 4> patch, float2 uv : SV_DomainLocation)
+DS_OUTPUT main(
+    HS_CONSTANT_DATA_OUTPUT input,
+    const OutputPatch<HS_CONTROL_POINT_OUTPUT, 4> patch,
+    float2 uv: SV_DomainLocation)
 {
     DS_OUTPUT output;
     output.Position = input.EdgeTessFactor[0];

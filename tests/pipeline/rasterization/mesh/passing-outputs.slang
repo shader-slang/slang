@@ -25,28 +25,28 @@ struct Vertex
 {
     float4 pos : SV_Position;
     float3 col : Color;
-    Texes  ts  : Coord;
+    Texes ts : Coord;
 };
 
 void everything<let N : uint>(OutputVertices<Vertex, N> vs)
 {
-    vs[0] = {float4(0), float3(1)};
+    vs[0] = { float4(0), float3(1) };
 }
 
 void just_one(out Vertex v)
 {
-    v = {float4(0), float3(1)};
+    v = { float4(0), float3(1) };
 }
 
 void just_two(out Vertex v, out Vertex w)
 {
-    v = {float4(0), float3(1)};
+    v = { float4(0), float3(1) };
     w = v;
 }
 
 void part_of_one(out float4 p)
 {
-    p = float4(1,2,3,4);
+    p = float4(1, 2, 3, 4);
 }
 
 void write_struct(out Texes t)
@@ -92,16 +92,16 @@ void e<let N : uint>(OutputVertices<Vertex, N> vs, uint tig)
 [outputtopology("triangle")]
 [numthreads(3, 1, 1)]
 void main(
-    in uint tig : SV_GroupIndex,
+    in uint tig: SV_GroupIndex,
     OutputVertices<Vertex, MAX_VERTS> verts,
-    OutputIndices<uint3, MAX_PRIMS> triangles
-    )
+    OutputIndices<uint3, MAX_PRIMS> triangles)
 {
     const uint numVertices = 3;
     const uint numPrimitives = 1;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    if(tig < numVertices) {
+    if (tig < numVertices)
+    {
         a(verts);
         b(verts);
         c(verts, tig);
@@ -109,8 +109,8 @@ void main(
         e(verts, tig);
     }
 
-    if(tig < numPrimitives) {
-        triangles[tig] = uint3(0,1,2);
+    if (tig < numPrimitives)
+    {
+        triangles[tig] = uint3(0, 1, 2);
     }
 }
-

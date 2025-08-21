@@ -16,7 +16,7 @@ struct MyStruct : MyStruct_base
     int d;
 };
 
-Array<MyStruct,2> getStructs()
+Array<MyStruct, 2> getStructs()
 {
     Array<MyStruct, 2> outData;
     return outData;
@@ -25,7 +25,7 @@ Array<MyStruct,2> getStructs()
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    Array<MyStruct,2> myStruct = getStructs();
+    Array<MyStruct, 2> myStruct = getStructs();
 
 // BUF: 1
     outputBuffer[0] = true

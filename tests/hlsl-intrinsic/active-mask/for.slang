@@ -4,7 +4,7 @@
 // loop over an integer, with no `break` or `continue`
 // logic.
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
@@ -14,19 +14,19 @@
 RWStructuredBuffer<int> buffer;
 
 #define THREAD_COUNT 4
-#define WRITE(IDX) buffer[IDX*THREAD_COUNT + tid] = WaveGetActiveMask()
+#define WRITE(IDX) buffer[IDX * THREAD_COUNT + tid] = WaveGetActiveMask()
 
 void test(int tid)
 {
-	for(int ii = 0; ii < tid; ++ii)
-	{
-		WRITE(ii);
-	}
-	WRITE(THREAD_COUNT);
+    for (int ii = 0; ii < tid; ++ii)
+    {
+        WRITE(ii);
+    }
+    WRITE(THREAD_COUNT);
 }
 
 [numthreads(THREAD_COUNT, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	test(dispatchThreadID.x);
+    test(dispatchThreadID.x);
 }

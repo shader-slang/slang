@@ -10,10 +10,10 @@ interface IBSDF
 struct ShaderGraph
 {
     IBSDF bsdf_stack[8]; // Intentionally uninitialized.
-    int next_bsdf = 0; // must be zero.
+    int next_bsdf = 0;   // must be zero.
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     // CHECK: ([[# @LINE+1]]): error

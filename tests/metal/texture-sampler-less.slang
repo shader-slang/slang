@@ -12,7 +12,7 @@
 //   (*(kernelContext_0->t1D_sampler_0) = (kernelContext_0->t1D_texture_0).get_width(0));
 // when it is expected to be,
 //   (*&width = (kernelContext_0->t1D_texture_0).get_width(0));
-//#define TEST_WHEN_DEFAULT_SAMPLER_WORKS_PROPERLY
+// #define TEST_WHEN_DEFAULT_SAMPLER_WORKS_PROPERLY
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -29,7 +29,10 @@ Sampler2DArray<float> t2DArray;
 SamplerCubeArray<float> tCubeArray;
 
 // Metal doc says "For depth texture types, T must be float."
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -39,10 +42,12 @@ typealias depth2d = _Texture<
     0, // access
     1, // isShadow
     1, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -52,10 +57,12 @@ typealias depth2d_array = _Texture<
     0, // access
     1, // isShadow
     1, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -65,10 +72,12 @@ typealias depthcube = _Texture<
     0, // access
     1, // isShadow
     1, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
@@ -78,8 +87,7 @@ typealias depthcube_array = _Texture<
     0, // access
     1, // isShadow
     1, // isCombined
-    format
->;
+    format>;
 
 depth2d<float> d2D;
 depthcube<float> dCube;
@@ -96,7 +104,7 @@ bool TEST_texture_float()
     //  - If T is uint, Tv is uint4.
     //  - If T is short, Tv is short4.
     //  - If T is ushort, Tv is ushort4."
-    typealias Tv = vector<float,4>;
+    typealias Tv = vector<float, 4>;
 
     float u = 0;
     float u2 = 0.5;
@@ -211,7 +219,8 @@ bool TEST_texture_float()
     voidResult = voidResult && (uint(3) == numLevels);
 #endif
 
-    bool result = voidResult
+    bool result =
+        voidResult
         // ===============================
         // float CalculateLevelOfDetail()
         // ===============================
@@ -575,9 +584,9 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.sample_texture_2d_array_grad.v4f32(
         && all(Tv(1) == t2DArray.SampleGrad(float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
-        // ===================
-        //  T Load()
-        // ===================
+    // ===================
+    //  T Load()
+    // ===================
 
 #if defined(TEST_WHEN_DEFAULT_SAMPLER_WORKS_PROPERLY)
         // M-ETAL: t1D{{.*}}.read(

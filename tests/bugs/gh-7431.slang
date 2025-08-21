@@ -5,7 +5,8 @@
 // CHECKOUT-NEXT: 30
 // CHECKOUT-NEXT: 40
 
-struct Test {
+struct Test
+{
     int f_int;
 };
 
@@ -34,4 +35,3 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     results[2] = u_struct_array[0].f_int;
     results[3] = u_struct_array[1].f_int;
 }
-

@@ -13,7 +13,7 @@
 
 struct PowActivationEx : IDifferentiable
 {
-	float power;
+    float power;
 }
 RWStructuredBuffer<float> return_value;
 
@@ -21,5 +21,5 @@ RWStructuredBuffer<float> return_value;
 void computeMain()
 {
     PowActivationEx args;
-	return_value[0] = args.power;
+    return_value[0] = args.power;
 }

@@ -16,10 +16,11 @@ RWStructuredBuffer<uint> outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
-void computeMain(uint3 threadIndex : SV_DispatchThreadID)
+void computeMain(uint3 threadIndex: SV_DispatchThreadID)
 {
     let stride = 4;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;

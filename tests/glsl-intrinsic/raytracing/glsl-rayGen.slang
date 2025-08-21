@@ -7,7 +7,8 @@ layout(binding = 0) uniform accelerationStructureEXT as;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 // CHECK_GLSL-DAG: rayPayloadEXT
 // CHECK_SPV-DAG: RayPayload{{NV|KHR}}
@@ -26,11 +27,7 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     {
         for (int j = 0; j < M; j++)
         {
-            if (
-                lhs[i][j] 
-                !=
-                rhs[i][j]
-                )
+            if (lhs[i][j] != rhs[i][j])
             {
                 return false;
             }
@@ -39,11 +36,24 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
     return true;
 }
 
-bool testHitObjectTraceRay() {
+bool testHitObjectTraceRay()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectTraceRayNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayNV
-    hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectTraceRayNV(
+        hit,
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -51,11 +61,24 @@ bool testHitObjectTraceRay() {
         ;
 }
 
-bool testHitObjectTraceRayWithAuxInfo() {
+bool testHitObjectTraceRayWithAuxInfo()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectTraceRayNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayNV
-    hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectTraceRayNV(
+        hit,
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
 // CHECK_GLSL-DAG: hitObjectGetAttributesNV
 // CHECK_SPV-DAG: OpHitObjectGetAttributesNV
     hitObjectGetAttributesNV(hit, 2);
@@ -90,13 +113,13 @@ bool testHitObjectTraceRayWithAuxInfo() {
         && hitObjectGetRayTMaxNV(hit) == 1e4f
 // CHECK_GLSL-DAG: hitObjectGetObjectRayOriginNV
 // CHECK_SPV-DAG: OpHitObjectGetObjectRayOriginNV
-        && hitObjectGetObjectRayOriginNV(hit) == vec3(0.1, 0.1, 0.0) 
+        && hitObjectGetObjectRayOriginNV(hit) == vec3(0.1, 0.1, 0.0)
 // CHECK_GLSL-DAG: hitObjectGetObjectRayDirectionNV
 // CHECK_SPV-DAG: OpHitObjectGetObjectRayDirectionNV
         && hitObjectGetObjectRayDirectionNV(hit) == vec3(0, 0, 1)
 // CHECK_GLSL-DAG: hitObjectGetWorldRayOriginNV
 // CHECK_SPV-DAG: OpHitObjectGetWorldRayOriginNV
-        && hitObjectGetWorldRayOriginNV(hit) == vec3(0.1, 0.1, 0.0) 
+        && hitObjectGetWorldRayOriginNV(hit) == vec3(0.1, 0.1, 0.0)
 // CHECK_GLSL-DAG: hitObjectGetWorldRayDirectionNV
 // CHECK_SPV-DAG: OpHitObjectGetWorldRayDirectionNV
         && hitObjectGetWorldRayDirectionNV(hit) == vec3(0, 0, 1)
@@ -124,11 +147,24 @@ bool testHitObjectTraceRayWithAuxInfo() {
         ;
 }
 
-bool testHitObjectTraceRayLaunchSubShaders() {
+bool testHitObjectTraceRayLaunchSubShaders()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectTraceRayNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayNV
-    hitObjectTraceRayNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectTraceRayNV(
+        hit,
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
 // CHECK_GLSL-DAG: hitObjectExecuteShaderNV
 // CHECK_SPV-DAG: OpHitObjectExecuteShaderNV
     hitObjectExecuteShaderNV(hit, 2);
@@ -139,11 +175,25 @@ bool testHitObjectTraceRayLaunchSubShaders() {
         ;
 }
 
-bool testHitObjectTraceRayMotion() {
+bool testHitObjectTraceRayMotion()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectTraceRayMotionNV
 // CHECK_SPV-DAG: OpHitObjectTraceRayMotionNV
-    hitObjectTraceRayMotionNV(hit, as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
+    hitObjectTraceRayMotionNV(
+        hit,
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        0.0f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -154,15 +204,16 @@ bool testHitObjectTraceRayMotion() {
         ;
 }
 
-bool testTraceRayFunctions() {
+bool testTraceRayFunctions()
+{
 // CHECK_GLSL-DAG: traceRayEXT
 // CHECK_SPV-DAG: OpTraceRayKHR
     traceRayEXT(as, 0, 0, 0, 0, 0, vec3(0), 0, vec3(0), 0, 2);
-    return true
-        ;
+    return true;
 }
 
-bool testTraceRayCalls() {
+bool testTraceRayCalls()
+{
     return true
         && testHitObjectTraceRay()
         && testHitObjectTraceRayWithAuxInfo()
@@ -172,11 +223,25 @@ bool testTraceRayCalls() {
         ;
 }
 
-bool testHitObjectRecord() {
+bool testHitObjectRecord()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordHitNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitNV
-    hitObjectRecordHitNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectRecordHitNV(
+        hit,
+        as,
+        0,
+        0,
+        0,
+        gl_HitKindFrontFacingTriangleEXT,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -184,11 +249,24 @@ bool testHitObjectRecord() {
         ;
 }
 
-bool testHitObjectRecordIndex() {
+bool testHitObjectRecordIndex()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordHitWithIndexNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitWithIndexNV
-    hitObjectRecordHitWithIndexNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectRecordHitWithIndexNV(
+        hit,
+        as,
+        0,
+        0,
+        0,
+        gl_HitKindFrontFacingTriangleEXT,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -196,11 +274,26 @@ bool testHitObjectRecordIndex() {
         ;
 }
 
-bool testHitObjectRecordMotion() {
+bool testHitObjectRecordMotion()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordHitMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitMotionNV
-    hitObjectRecordHitMotionNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
+    hitObjectRecordHitMotionNV(
+        hit,
+        as,
+        0,
+        0,
+        0,
+        gl_HitKindFrontFacingTriangleEXT,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        0.0f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -208,11 +301,25 @@ bool testHitObjectRecordMotion() {
         ;
 }
 
-bool testHitObjectRecordIndexMotion() {
+bool testHitObjectRecordIndexMotion()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordHitWithIndexMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordHitWithIndexMotionNV
-    hitObjectRecordHitWithIndexMotionNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
+    hitObjectRecordHitWithIndexMotionNV(
+        hit,
+        as,
+        0,
+        0,
+        0,
+        gl_HitKindFrontFacingTriangleEXT,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        0.0f,
+        2);
     return true
 // CHECK_GLSL-DAG: hitObjectIsHitNV
 // CHECK_SPV-DAG: OpHitObjectIsHitNV
@@ -220,16 +327,18 @@ bool testHitObjectRecordIndexMotion() {
         ;
 }
 
-bool testRecordHitCalls() {
+bool testRecordHitCalls()
+{
     return true
     && testHitObjectRecord()
     && testHitObjectRecordIndex()
     && testHitObjectRecordMotion()
     && testHitObjectRecordIndexMotion()
-    ;
+        ;
 }
 
-bool testHitObjectRecordMiss() {
+bool testHitObjectRecordMiss()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordMissNV
 // CHECK_SPV-DAG: OpHitObjectRecordMissNV
@@ -241,7 +350,8 @@ bool testHitObjectRecordMiss() {
         ;
 }
 
-bool testHitObjectRecordMissMotion() {
+bool testHitObjectRecordMissMotion()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordMissMotionNV
 // CHECK_SPV-DAG: OpHitObjectRecordMissMotionNV
@@ -253,14 +363,16 @@ bool testHitObjectRecordMissMotion() {
         ;
 }
 
-bool testRecordMissCalls() {
+bool testRecordMissCalls()
+{
     return true
     && testHitObjectRecordMiss()
     && testHitObjectRecordMissMotion()
-    ;
+        ;
 }
 
-bool testHitObjectRecordEmpty() {
+bool testHitObjectRecordEmpty()
+{
     hitObjectNV hit;
 // CHECK_GLSL-DAG: hitObjectRecordEmptyNV
 // CHECK_SPV-DAG: OpHitObjectRecordEmptyNV
@@ -272,23 +384,36 @@ bool testHitObjectRecordEmpty() {
         ;
 }
 
-bool testRecordEmptyCalls() {
+bool testRecordEmptyCalls()
+{
     return true
     && testHitObjectRecordEmpty()
-    ;
+        ;
 }
 
-bool testTraceRayMotion() {
+bool testTraceRayMotion()
+{
 // CHECK_GLSL-DAG: traceRayMotionNV
 // CHECK_SPV-DAG: OpTraceRayMotionNV
-    traceRayMotionNV(as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
-    attrMain = vec4(1); //ensure traceRayMotionNV does not get optimized out 
-    return true &&
-        attrMain == vec4(1)
-        ;       
+    traceRayMotionNV(
+        as,
+        gl_RayFlagsNoneEXT,
+        0xff,
+        0,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        0.0f,
+        2);
+    attrMain = vec4(1); // ensure traceRayMotionNV does not get optimized out
+    return true && attrMain == vec4(1);
 }
 
-bool testPayloadReadWrite() {
+bool testPayloadReadWrite()
+{
     payload = vec4(2);
     vec4 read = payload;
     return true
@@ -296,7 +421,8 @@ bool testPayloadReadWrite() {
         ;
 }
 
-bool testAttributeReadWrite() {
+bool testAttributeReadWrite()
+{
     attrMain = vec4(2);
     vec4 read = attrMain;
     return true
@@ -304,7 +430,8 @@ bool testAttributeReadWrite() {
         ;
 }
 
-bool testCallableReadWrite() {
+bool testCallableReadWrite()
+{
     outcall = vec4(2);
     vec4 read = outcall;
     return true
@@ -312,12 +439,13 @@ bool testCallableReadWrite() {
         ;
 }
 
-bool testReadWriteOfObjects(){
+bool testReadWriteOfObjects()
+{
     return true
         && testPayloadReadWrite()
         && testAttributeReadWrite()
         && testCallableReadWrite();
-        ;       
+    ;
 }
 
 void main()
@@ -329,6 +457,6 @@ void main()
         && testRecordEmptyCalls()
         && testTraceRayMotion()
         && testReadWriteOfObjects()
-        ;    
+        ;
     //BUF: 1
 }

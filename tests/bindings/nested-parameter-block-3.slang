@@ -1,5 +1,5 @@
 // nested-parameter-block-3.slang
-// 
+//
 // Same as nest-parameter-block-2, the only difference is that we added member methods
 // to ParameterBlock element types to exercise the legalization logic of method calls.
 
@@ -42,12 +42,13 @@ ParameterBlock<MyBuffer> pb2;
 // Main entry-point. Applies the transformation encoded by `transformer`
 // to all elements in `buffer`.
 [shader("compute")]
-[numthreads(1,1,1)]
-void computeMain(uint3 sv_dispatchThreadID : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 sv_dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: type: uint32_t
     // CHECK-NEXT: 4
     // CHECK-NEXT: 2
-    pb2.resultBuffer[0] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
+    pb2.resultBuffer[0] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x +
+                          scene.material.data[0].x;
     pb2.resultBuffer[1] = scene.readMaterialData().y;
 }

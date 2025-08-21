@@ -5,8 +5,8 @@
 #if 1
 // Octal warning
 000
-/// Unclosed string literal
-"Hello!
+    /// Unclosed string literal
+    "Hello!
 #else
 Hello
 #endif

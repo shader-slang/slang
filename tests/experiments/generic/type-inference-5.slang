@@ -12,15 +12,15 @@ T getFirst<T, let N : int>(vector<T, N> val)
 {
     return val[2];
 }
-    
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
-    float4 values = { 1, 2, 3, 4 }; 
-    
+    float4 values = { 1, 2, 3, 4 };
+
     let val = getFirst(values);
-    
-	outputBuffer[index] = val;
+
+    outputBuffer[index] = val;
 }

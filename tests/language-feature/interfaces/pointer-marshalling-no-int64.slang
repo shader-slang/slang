@@ -6,7 +6,7 @@ RWStructuredBuffer<uint> result;
 
 struct Data
 {
-    uint *index_buffer;
+    uint* index_buffer;
     uint type;
 };
 
@@ -19,13 +19,10 @@ interface IIndexFetcher
 
 struct IndexFetcherU32 : IIndexFetcher
 {
-    uint *m_ptr;
+    uint* m_ptr;
 
-    __init(uint *ptr) 
-    {
-        m_ptr = ptr;
-    }
-    
+    __init(uint* ptr) { m_ptr = ptr; }
+
     uint get_index()
     {
         return 42; // Simplified to avoid dereference issues
@@ -36,26 +33,23 @@ struct IndexFetcherSimple : IIndexFetcher
 {
     uint value;
 
-    __init(uint val) 
-    {
-        value = val;
-    }
+    __init(uint val) { value = val; }
 
-    uint get_index()
-    {
-        return value;
-    }
+    uint get_index() { return value; }
 };
 
 [shader("compute")]
 void main()
 {
     IIndexFetcher pf;
-    if (global_data.type == 0) {
+    if (global_data.type == 0)
+    {
         pf = IndexFetcherU32(global_data.index_buffer);
-    } else {
+    }
+    else
+    {
         pf = IndexFetcherSimple(100);
-    } 
-  
+    }
+
     result[0] = pf.get_index();
 }

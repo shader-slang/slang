@@ -7,11 +7,7 @@
 //CHECK_HLSL: void entry_mesh
 
 
-const static float2 positions[3] = {
-    float2(0.0, -0.5),
-    float2(0.5, 0.5),
-    float2(-0.5, 0.5)
-};
+const static float2 positions[3] = { float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5) };
 
 interface VertexI
 {
@@ -34,7 +30,8 @@ struct Vertex : VertexI
 
 struct Primitive : PrimitiveI
 {
-    [[vk::location(0)]] nointerpolation float3 tint;
+    [[vk::location(0)]]
+    nointerpolation float3 tint;
     [mutating]
     func set_tint(float3 v) { tint = v; }
 }
@@ -52,7 +49,8 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
     const uint numPrimitives = 1;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    if (tig < numVertices) {
+    if (tig < numVertices)
+    {
         V v;
         if (V is Vertex)
         {
@@ -63,7 +61,8 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
         verts[tig] = v;
     }
 
-    if (tig < numPrimitives) {
+    if (tig < numPrimitives)
+    {
         triangles[tig] = uint3(0, 1, 2);
         primitives[tig].set_tint(float3(1, 0, 0));
     }
@@ -83,7 +82,8 @@ void entry_mesh(
 
 struct FragmentOut
 {
-    [[vk::location(0)]] float3 color;
+    [[vk::location(0)]]
+    float3 color;
 };
 
 [shader("fragment")]

@@ -5,12 +5,15 @@ RWStructuredBuffer<int> outputBuffer;
 
 // CHECK: error 20001
 // Previously this definition would lead to an infinite loop in parsing.
-int doThing<1>() { return 2; }
+int doThing<1>()
+{
+    return 2;
+}
 
 [numthreads(4, 4, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
-   
+
     outputBuffer[index] = index;
 }

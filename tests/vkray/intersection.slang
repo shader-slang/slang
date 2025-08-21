@@ -3,47 +3,43 @@
 //TEST:SIMPLE(filecheck=CHECK): -emit-spirv-directly -stage intersection -entry main -target spirv-assembly
 struct Sphere
 {
-	float3 position;
-	float radius;
+    float3 position;
+    float radius;
 };
 
 struct SphereHitAttributes
 {
-	float3 normal;
+    float3 normal;
 };
 
-bool rayIntersectsSphere(
-	RayDesc 				ray,
-	Sphere 					sphere,
-	out float 				tHit,
-	out SphereHitAttributes attrs)
+bool rayIntersectsSphere(RayDesc ray, Sphere sphere, out float tHit, out SphereHitAttributes attrs)
 {
 	// HACK: this is obviously incorrect,
-	// but we just need some code for testing
-	tHit = sphere.radius;
-	attrs.normal = sphere.position;
-	return tHit >= ray.TMin;
+    // but we just need some code for testing
+    tHit = sphere.radius;
+    attrs.normal = sphere.position;
+    return tHit >= ray.TMin;
 }
 
 cbuffer U
 {
-	Sphere gSphere;
+    Sphere gSphere;
 }
 
 void main()
 {
-	RayDesc ray;
-	ray.Origin = ObjectRayOrigin();
-	ray.Direction = ObjectRayDirection();
-	ray.TMin = RayTMin();
-	ray.TMax = RayTCurrent();
+    RayDesc ray;
+    ray.Origin = ObjectRayOrigin();
+    ray.Direction = ObjectRayDirection();
+    ray.TMin = RayTMin();
+    ray.TMax = RayTCurrent();
 
-	float tHit;
-	SphereHitAttributes attrs;
-	if(rayIntersectsSphere(ray, gSphere, tHit, attrs))
-	{
-		ReportHit(tHit, 0, attrs);
-	}
+    float tHit;
+    SphereHitAttributes attrs;
+    if (rayIntersectsSphere(ray, gSphere, tHit, attrs))
+    {
+        ReportHit(tHit, 0, attrs);
+    }
 }
 
 // CHECK: OpEntryPoint Intersection{{NV|KHR}} %main "main"

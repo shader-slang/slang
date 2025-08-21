@@ -13,26 +13,26 @@ RWStructuredBuffer<int> outputBuffer;
 // can look up names through that wrapped operand kind
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
     int r = spirv_asm
     {
-        OpConstant $$int %two 2;
+        OpConstant $$int % two 2;
         // A dummy barrier, this tests that we can look up these names without
         // their Scope and MemorySemantics prefixes, and correctly wrap them in
         // OpConstant.
         OpMemoryBarrier Invocation
-            // Test that an unqualified enum works
-              AcquireRelease
+                // Test that an unqualified enum works
+                AcquireRelease
             // Test that a decimal integer literal works
             | 64
             // Test that a hex integer literal works
             | 0x800
             // Test that an explicit scope works
             | MemorySemanticsAtomicCounterMemory;
-        OpIMul $$int result $n %two
+        OpIMul $$int result $n % two
     };
     outputBuffer[i] = r;
 }

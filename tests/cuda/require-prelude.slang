@@ -1,6 +1,6 @@
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type 
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type
 
 int myIntrinsicFunc()
@@ -31,7 +31,7 @@ int myIntrinsicFunc1()
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 201
     outputBuffer[0] = myIntrinsicFunc() + myIntrinsicFunc1();

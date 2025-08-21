@@ -4,17 +4,10 @@
 // Mesh shader
 //
 
-const static float2 positions[3] = {
-    float2(0.0, -0.5),
-    float2(0.5, 0.5),
-    float2(-0.5, 0.5)
-};
+const static float2 positions[3] = { float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5) };
 
-const static float3 colors[3] = {
-    float3(1.0, 1.0, 0.0),
-    float3(0.0, 1.0, 1.0),
-    float3(1.0, 0.0, 1.0)
-};
+const static float3 colors[3] =
+    { float3(1.0, 1.0, 0.0), float3(0.0, 1.0, 1.0), float3(1.0, 0.0, 1.0) };
 
 struct MeshPayload
 {
@@ -46,8 +39,7 @@ void meshMain(
     // METAL: const MeshPayload_0 object_data* meshPayload_0
     OutputVertices<Vertex, MAX_VERTS> verts,
     OutputIndices<uint3, MAX_PRIMS> triangles,
-    OutputPrimitives<Primitive, MAX_PRIMS> primitives
-    )
+    OutputPrimitives<Primitive, MAX_PRIMS> primitives)
 {
     const uint numVertices = 12;
     const uint numPrimitives = 4;
@@ -56,7 +48,12 @@ void meshMain(
     if (tig < numVertices)
     {
         const int tri = tig / 3;
-        verts[tig] = { float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, int(pow(tri, meshPayload.exponent)) };
+        verts[tig] = {
+            float4(positions[tig % 3], 0, 1),
+            colors[tig % 3],
+            tri,
+            int(pow(tri, meshPayload.exponent))
+        };
     }
 
     if (tig < numPrimitives)

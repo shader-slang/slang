@@ -6,21 +6,30 @@
 
 // CHECK: OpEntryPoint
 
-struct Constants {
-  uint *buffer;
+struct Constants
+{
+    uint* buffer;
 }
-[[vk::push_constant]] Constants push_constants;
+[[vk::push_constant]]
+Constants push_constants;
 
-[shader("compute")] [numthreads(1, 1, 1)] void compute(void) {
-  uint index = push_constants.buffer[0];
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void compute(void)
+{
+    uint index = push_constants.buffer[0];
 
-  [[unroll]] for (uint i = 0; i < 2; i++) {
-    GroupMemoryBarrierWithWaveSync();
+    [[unroll]]
+    for (uint i = 0; i < 2; i++)
+    {
+        GroupMemoryBarrierWithWaveSync();
 
-    if (index > 0 && i < push_constants.buffer[index - 1]) {
-      do {
-        index--;
-      } while (index > 0 && i < push_constants.buffer[index - 1]);
+        if (index > 0 && i < push_constants.buffer[index - 1])
+        {
+            do
+            {
+                index--;
+            } while (index > 0 && i < push_constants.buffer[index - 1]);
+        }
     }
-  }
 }

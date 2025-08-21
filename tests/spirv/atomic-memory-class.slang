@@ -4,7 +4,7 @@ uniform Atomic<int>* pInt;
 RWStructuredBuffer<Atomic<int>> bInt;
 static groupshared Atomic<int> sInt;
 
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void computeMain()
 {
     // CHECK: OpAtomicLoad {{.*}} %uint_258

@@ -9,20 +9,14 @@ struct Foo1<A> : IGen<A>
 {
     typealias TB = int;
     int val = 0;
-    TB getVal()
-    {
-       return val; 
-    }
+    TB getVal() { return val; }
 }
 
 struct Foo2<A> : IGen<A>
 {
     typealias TB = int;
     int val = 0;
-    TB getVal()
-    {
-       return val; 
-    }
+    TB getVal() { return val; }
 }
 
 struct Logic<A1, C1 : IGen<A1>, C2 : IGen<A1>>

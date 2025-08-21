@@ -12,18 +12,12 @@ interface IFoo
 
 struct HitInfo
 {
-    static int makeHitInfo<let f : int>(RayQuery<f> q)
-    {
-        return 0;
-    }
+    static int makeHitInfo<let f : int>(RayQuery<f> q) { return 0; }
 }
 
 struct Impl : IFoo
 {
-    int doThing<let f : int>(RayQuery<f> arr)
-    {
-        return HitInfo.makeHitInfo(arr);
-    }
+    int doThing<let f : int>(RayQuery<f> arr) { return HitInfo.makeHitInfo(arr); }
 }
 
 RWStructuredBuffer<int> outVal;

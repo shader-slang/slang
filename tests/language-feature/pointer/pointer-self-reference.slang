@@ -15,23 +15,23 @@ struct Thing
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     Thing things[2];
-    
+
     things[0].next = &things[1];
     things[0].value = 27;
-    
+
     things[1].next = &things[0];
     things[1].value = idx * idx;
-    
+
     Ptr<Thing> cur = &things[0];
-    
+
     for (int i = 0; cur && i < idx; ++i)
     {
         cur = cur.next;
     }
-    
+
     int v = cur.value;
-    
-    outputBuffer[idx] = v; 
+
+    outputBuffer[idx] = v;
 }

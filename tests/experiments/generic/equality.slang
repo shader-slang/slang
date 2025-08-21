@@ -28,16 +28,14 @@ struct A : IEquality
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
     A a = { 1 };
     A b = { 2 };
-    
+
     bool isEqual = a.isEqual(b);
 
-	outputBuffer[index] = 1 + int(isEqual);
+    outputBuffer[index] = 1 + int(isEqual);
 }
-
-

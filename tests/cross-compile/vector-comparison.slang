@@ -17,7 +17,8 @@ struct Param
     float4 a, b;
 };
 ParameterBlock<Param> params;
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     float4 v0 = params.a;
     float4 v1 = params.b;

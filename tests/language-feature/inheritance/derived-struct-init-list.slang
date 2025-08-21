@@ -7,7 +7,7 @@
 // an empty initializer list) is still possible
 // when using `struct` inheritance.
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 struct Base
 {
@@ -18,13 +18,13 @@ struct Derived : Base
 {
     int b = 2;
 
-    void write(inout int val) { val = val*0x100 + a*0x10 + b; }
+    void write(inout int val) { val = val * 0x100 + a * 0x10 + b; }
 }
 
 int test(int val)
 {
     Derived x = {};
-    Derived y = { val, val+1 };
+    Derived y = { val, val + 1 };
 
     int result = 1;
     x.write(result);
@@ -36,7 +36,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

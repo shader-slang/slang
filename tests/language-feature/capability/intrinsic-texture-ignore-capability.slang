@@ -3,13 +3,14 @@
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -ignore-capabilities
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl -ignore-capabilities
-//RWStructuredBuffer<float> outputBuffer;
-//layout(location = 0) out vec4 o_color;
+// RWStructuredBuffer<float> outputBuffer;
+// layout(location = 0) out vec4 o_color;
 
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 uniform sampler1DShadow uniform_sampler1DShadow;
 uniform sampler2DShadow uniform_sampler2DShadow;
@@ -51,23 +52,23 @@ uniform usamplerCubeArray uniform_usamplerCubeArray;
 uniform usamplerBuffer uniform_usamplerBuffer;
 
 __generic<T : ITexelElement>
-bool textureFuncs( Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
-)
+bool textureFuncs(
+    Sampler1D<T> gsampler1D,
+    Sampler2D<T> gsampler2D,
+    Sampler2DRect<T> gsampler2DRect,
+    Sampler3D<T> gsampler3D,
+    SamplerCube<T> gsamplerCube,
+    Sampler1DArray<T> gsampler1DArray,
+    Sampler2DArray<T> gsampler2DArray,
+    SamplerCubeArray<T> gsamplerCubeArray,
+    SamplerBuffer<T> gsamplerBuffer)
 {
-    typealias gvec4 = vector<T.Element,4>;
+    typealias gvec4 = vector<T.Element, 4>;
 
     constexpr ivec2 ivec2_0 = ivec2(0);
 
     return true
-        // 8.9.1. Texture Query Functions
+           // 8.9.1. Texture Query Functions
         && int(0) == textureSize(gsampler1D, int(0))
         && ivec2(0) == textureSize(gsampler2D, int(0))
         && ivec3(0) == textureSize(gsampler3D, int(0))
@@ -110,7 +111,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         && int(0) == textureQueryLevels(uniform_sampler1DArrayShadow)
         && int(0) == textureQueryLevels(uniform_sampler2DArrayShadow)
         && int(0) == textureQueryLevels(uniform_samplerCubeArrayShadow)
-        // 8.9.2. Texel Lookup Functions
+           // 8.9.2. Texel Lookup Functions
         && gvec4(T.Element(0)) == texture(gsampler1D, float(0))
         && gvec4(T.Element(0)) == texture(gsampler1D, float(0), float(0))
         && gvec4(T.Element(0)) == texture(gsampler2D, vec2(0))
@@ -280,8 +281,8 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         && float(0) == textureProjGradOffset(uniform_sampler2DRectShadow, vec4(0), vec2(0), vec2(0), { __LINE__ })
         && float(0) == textureProjGradOffset(uniform_sampler1DShadow, vec4(0), float(0), float(0), __LINE__)
         && float(0) == textureProjGradOffset(uniform_sampler2DShadow, vec4(0), vec2(0), vec2(0), { __LINE__ })
-        
-        // 8.9.4. Texture Gather Functions
+
+           // 8.9.4. Texture Gather Functions
         && gvec4(T.Element(0)) == textureGather(gsampler2D, vec2(0))
         && gvec4(T.Element(0)) == textureGather(gsampler2D, vec2(0), int(0))
         && gvec4(T.Element(0)) == textureGather(gsampler2DArray, vec3(0))
@@ -316,7 +317,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         && gvec4(T.Element(0)) == textureGatherOffsets(gsampler2DRect, vec2(0), { __LINE__ }, int(0))
         && vec4(0) == textureGatherOffsets(uniform_sampler2DRectShadow, vec2(0), float(0), { __LINE__ })
 
-        // 8.9.5. Compatibility Profile Texture Functions
+           // 8.9.5. Compatibility Profile Texture Functions
         && vec4(0) == texture1D(uniform_sampler1D, float(0))
         && vec4(0) == texture1D(uniform_sampler1D, float(0), float(0))
         && vec4(0) == texture1DProj(uniform_sampler1D, vec2(0))
@@ -360,23 +361,23 @@ bool textureFuncs( Sampler1D<T> gsampler1D
 }
 
 __generic<T : ITexelElement>
-bool itextureFuncs(Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
-)
+bool itextureFuncs(
+    Sampler1D<T> gsampler1D,
+    Sampler2D<T> gsampler2D,
+    Sampler2DRect<T> gsampler2DRect,
+    Sampler3D<T> gsampler3D,
+    SamplerCube<T> gsamplerCube,
+    Sampler1DArray<T> gsampler1DArray,
+    Sampler2DArray<T> gsampler2DArray,
+    SamplerCubeArray<T> gsamplerCubeArray,
+    SamplerBuffer<T> gsamplerBuffer)
 {
     typealias gvec4 = vector<T.Element, 4>;
 
     constexpr ivec2 ivec2_0 = ivec2(0);
 
     return true
-        // 8.9.1. Texture Query Functions
+           // 8.9.1. Texture Query Functions
         && int(0) == textureSize(gsampler1D, int(0))
         && ivec2(0) == textureSize(gsampler2D, int(0))
         && ivec3(0) == textureSize(gsampler3D, int(0))
@@ -408,7 +409,7 @@ bool itextureFuncs(Sampler1D<T> gsampler1D
         && gvec4(T.Element(0)) == texelFetchOffset(gsampler2DRect, ivec2(0), { __LINE__ })
         && gvec4(T.Element(0)) == texelFetchOffset(gsampler1DArray, ivec2(0), int(0), __LINE__)
         && gvec4(T.Element(0)) == texelFetchOffset(gsampler2DArray, ivec3(0), int(0), { __LINE__ })
-        // 8.9.4. Texture Gather Functions
+           // 8.9.4. Texture Gather Functions
         && gvec4(T.Element(0)) == textureGather(gsampler2D, vec2(0))
         && gvec4(T.Element(0)) == textureGather(gsampler2D, vec2(0), int(0))
         && gvec4(T.Element(0)) == textureGather(gsampler2DArray, vec3(0))
@@ -448,7 +449,7 @@ bool itextureFuncs(Sampler1D<T> gsampler1D
 #ifdef COMPUTE
 [numthreads(2, 2, 1)]
 #endif
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
@@ -459,40 +460,36 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer.result = true
         && textureFuncs(
-            uniform_sampler1D
-            , uniform_sampler2D
-            , uniform_sampler2DRect
-            , uniform_sampler3D
-            , uniform_samplerCube
-            , uniform_sampler1DArray
-            , uniform_sampler2DArray
-            , uniform_samplerCubeArray
-            , uniform_samplerBuffer
-            )
+                                uniform_sampler1D,
+                                uniform_sampler2D,
+                                uniform_sampler2DRect,
+                                uniform_sampler3D,
+                                uniform_samplerCube,
+                                uniform_sampler1DArray,
+                                uniform_sampler2DArray,
+                                uniform_samplerCubeArray,
+                                uniform_samplerBuffer)
         && itextureFuncs(
-            uniform_isampler1D
-            , uniform_isampler2D
-            , uniform_isampler2DRect
-            , uniform_isampler3D
-            , uniform_isamplerCube
-            , uniform_isampler1DArray
-            , uniform_isampler2DArray
-            , uniform_isamplerCubeArray
-            , uniform_isamplerBuffer
-            )
+                                uniform_isampler1D,
+                                uniform_isampler2D,
+                                uniform_isampler2DRect,
+                                uniform_isampler3D,
+                                uniform_isamplerCube,
+                                uniform_isampler1DArray,
+                                uniform_isampler2DArray,
+                                uniform_isamplerCubeArray,
+                                uniform_isamplerBuffer)
         && itextureFuncs(
-            uniform_usampler1D
-            , uniform_usampler2D
-            , uniform_usampler2DRect
-            , uniform_usampler3D
-            , uniform_usamplerCube
-            , uniform_usampler1DArray
-            , uniform_usampler2DArray
-            , uniform_usamplerCubeArray
-            , uniform_usamplerBuffer
-            );
+                                uniform_usampler1D,
+                                uniform_usampler2D,
+                                uniform_usampler2DRect,
+                                uniform_usampler3D,
+                                uniform_usamplerCube,
+                                uniform_usampler1DArray,
+                                uniform_usampler2DArray,
+                                uniform_usamplerCubeArray,
+                                uniform_usamplerBuffer);
 
-    //outputBuffer[0] = float(r);
-    //o_color[0] = float(r);
+    // outputBuffer[0] = float(r);
+    // o_color[0] = float(r);
 }
-

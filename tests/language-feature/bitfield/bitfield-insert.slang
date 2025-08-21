@@ -45,7 +45,7 @@ void computeMain()
         u32Buffer[5] = bitfieldInsert(base, value, 6, 8); // 0b11111111000000
 
         // Test with int input
-        u32Buffer[6] = bitfieldInsert(0b10100000, 0b1111, 0, 4);  // 0b10101111
+        u32Buffer[6] = bitfieldInsert(0b10100000, 0b1111, 0, 4); // 0b10101111
 
         // Test with a vector
         uint4 base4 = uint4(0x12345678, 0x9abcdef0, 0x87654321, 0xfedcba98);

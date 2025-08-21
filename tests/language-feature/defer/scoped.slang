@@ -24,10 +24,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     for (int j = 0; j < 4; ++j)
     {
         {
-            defer outputBuffer[i++] = j+3;
+            defer outputBuffer[i++] = j + 3;
             if (j == 2)
                 continue;
         }
-        outputBuffer[i++] = j+0x13;
+        outputBuffer[i++] = j + 0x13;
     }
 }

@@ -46,29 +46,17 @@ public struct BvhNode : IBvhNode
     public uint offset;
 
     // returns the bounding box of the node
-    public BoundingBox getBoundingBox()
-    {
-        return box;
-    }
+    public BoundingBox getBoundingBox() { return box; }
 
     // sets the bounding box of the node
     [mutating]
-    public void setBoundingBox(BoundingBox box_)
-    {
-        box = box_;
-    }
+    public void setBoundingBox(BoundingBox box_) { box = box_; }
 
     // checks if the node has a bounding cone
-    public bool hasBoundingCone()
-    {
-        return false;
-    }
+    public bool hasBoundingCone() { return false; }
 
     // returns the bounding cone of the node
-    public BoundingCone getBoundingCone()
-    {
-        return BoundingCone();
-    }
+    public BoundingCone getBoundingCone() { return BoundingCone(); }
 
     // sets the bounding cone of the node
     [mutating]
@@ -78,40 +66,22 @@ public struct BvhNode : IBvhNode
     }
 
     // checks if the node is a leaf node
-    public bool isLeaf()
-    {
-        return nPrimitives > 0;
-    }
+    public bool isLeaf() { return nPrimitives > 0; }
 
     // returns the offset to the right child of the interior node
-    public uint getRightChildOffset()
-    {
-        return offset;
-    }
+    public uint getRightChildOffset() { return offset; }
 
     // returns the number of primitives in the node
-    public uint getNumPrimitives()
-    {
-        return nPrimitives;
-    }
+    public uint getNumPrimitives() { return nPrimitives; }
 
     // returns the offset to the first primitive of the leaf node
-    public uint getPrimitiveOffset()
-    {
-        return offset;
-    }
+    public uint getPrimitiveOffset() { return offset; }
 
     // returns the number of silhouettes in the node
-    public uint getNumSilhouettes()
-    {
-        return 0;
-    }
+    public uint getNumSilhouettes() { return 0; }
 
     // returns the offset to the first silhouette of the leaf node
-    public uint getSilhouetteOffset()
-    {
-        return 0;
-    }
+    public uint getSilhouetteOffset() { return 0; }
 };
 
 public struct SnchNode : IBvhNode
@@ -124,70 +94,37 @@ public struct SnchNode : IBvhNode
     public uint silhouetteOffset;
 
     // returns the bounding box of the node
-    public BoundingBox getBoundingBox()
-    {
-        return box;
-    }
+    public BoundingBox getBoundingBox() { return box; }
 
     // sets the bounding box of the node
     [mutating]
-    public void setBoundingBox(BoundingBox box_)
-    {
-        box = box_;
-    }
+    public void setBoundingBox(BoundingBox box_) { box = box_; }
 
     // checks if the node has a bounding cone
-    public bool hasBoundingCone()
-    {
-        return true;
-    }
+    public bool hasBoundingCone() { return true; }
 
     // returns the bounding cone of the node
-    public BoundingCone getBoundingCone()
-    {
-        return cone;
-    }
+    public BoundingCone getBoundingCone() { return cone; }
 
     // sets the bounding cone of the node
     [mutating]
-    public void setBoundingCone(BoundingCone cone_)
-    {
-        cone = cone_;
-    }
+    public void setBoundingCone(BoundingCone cone_) { cone = cone_; }
 
     // checks if the node is a leaf node
-    public bool isLeaf()
-    {
-        return nPrimitives > 0;
-    }
+    public bool isLeaf() { return nPrimitives > 0; }
 
     // returns the offset to the right child of the interior node
-    public uint getRightChildOffset()
-    {
-        return offset;
-    }
+    public uint getRightChildOffset() { return offset; }
 
     // returns the number of primitives in the node
-    public uint getNumPrimitives()
-    {
-        return nPrimitives;
-    }
+    public uint getNumPrimitives() { return nPrimitives; }
 
     // returns the offset to the first primitive of the leaf node
-    public uint getPrimitiveOffset()
-    {
-        return offset;
-    }
+    public uint getPrimitiveOffset() { return offset; }
 
     // returns the number of silhouettes in the node
-    public uint getNumSilhouettes()
-    {
-        return nSilhouettes;
-    }
+    public uint getNumSilhouettes() { return nSilhouettes; }
 
     // returns the offset to the first silhouette of the leaf node
-    public uint getSilhouetteOffset()
-    {
-        return silhouetteOffset;
-    }
+    public uint getSilhouetteOffset() { return silhouetteOffset; }
 };

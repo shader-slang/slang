@@ -11,11 +11,11 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint idx = dispatchThreadID.x;
     uint laneId = WaveGetLaneIndex();
-    // The laneCount will be dependent on target hardware. It seems a count of 1 is valid in spec. 
+    // The laneCount will be dependent on target hardware. It seems a count of 1 is valid in spec.
     // For now we'll just check it's not 0.
     uint laneCount = WaveGetLaneCount();
     outputBuffer[idx] = int(((laneCount > 0) ? 0x100 : 0) + laneId);

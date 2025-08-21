@@ -18,7 +18,7 @@ int f<let n : int>(G<n> v)
 static const int c = (int8_t)255;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     G<2> g;
     int tid = dispatchThreadID.x;

@@ -29,7 +29,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(3.0, 2.0);
         dpfloat dpy = dpfloat(-1.0, 1.0);
         dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[0] = res.p;               
+        outputBuffer[0] = res.p;
         outputBuffer[1] = res.d;
     }
 
@@ -38,7 +38,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(-2.0, 1.5);
         dpfloat dpy = dpfloat(4.0, -0.5);
         dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[2] = res.p;               
+        outputBuffer[2] = res.p;
         outputBuffer[3] = res.d;
     }
 
@@ -47,7 +47,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(0.0, 3.0);
         dpfloat dpy = dpfloat(-1.0, 2.0);
         dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[4] = res.p;               
+        outputBuffer[4] = res.p;
         outputBuffer[5] = res.d;
     }
 
@@ -56,9 +56,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat2 dpx = dpfloat2(float2(5.0, -3.0), float2(1.0, 2.0));
         dpfloat2 dpy = dpfloat2(float2(-2.0, 4.0), float2(0.5, -1.0));
         dpfloat2 res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[6] = res.p[0];            
-        outputBuffer[7] = res.d[0];            
-        outputBuffer[8] = res.p[1];            
+        outputBuffer[6] = res.p[0];
+        outputBuffer[7] = res.d[0];
+        outputBuffer[8] = res.p[1];
         outputBuffer[9] = res.d[1];
     }
 
@@ -67,16 +67,16 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(4.0, 0.0);
         dpfloat dpy = dpfloat(-2.0, 0.0);
         __bwd_diff(diffCopysign)(dpx, dpy, 1.0);
-        outputBuffer[10] = dpx.d;              
+        outputBuffer[10] = dpx.d;
         outputBuffer[11] = dpy.d;
     }
 
-    // Test 6: backward diff copysign(-3.0, 5.0)  
+    // Test 6: backward diff copysign(-3.0, 5.0)
     {
         dpfloat dpx = dpfloat(-3.0, 0.0);
         dpfloat dpy = dpfloat(5.0, 0.0);
         __bwd_diff(diffCopysign)(dpx, dpy, 2.0);
-        outputBuffer[12] = dpx.d;              
+        outputBuffer[12] = dpx.d;
         outputBuffer[13] = dpy.d;
     }
 
@@ -85,7 +85,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(3.0, 2.0);
         dpfloat dpy = dpfloat(0.0, 1.0);
         dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[14] = res.p;               
+        outputBuffer[14] = res.p;
         outputBuffer[15] = res.d;
     }
 
@@ -94,7 +94,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(0.0, 2.0);
         dpfloat dpy = dpfloat(-1.0, 1.0);
         dpfloat res = __fwd_diff(diffCopysign)(dpx, dpy);
-        outputBuffer[16] = res.p;               
+        outputBuffer[16] = res.p;
         outputBuffer[17] = res.d;
     }
 
@@ -103,7 +103,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat2 dpx = dpfloat2(float2(2.0, -1.0), float2(0.0, 0.0));
         dpfloat2 dpy = dpfloat2(float2(-3.0, 4.0), float2(0.0, 0.0));
         __bwd_diff(diffCopysign)(dpx, dpy, float2(1.0, 3.0));
-        outputBuffer[18] = dpx.d[0];           
-        outputBuffer[19] = dpx.d[1];           
+        outputBuffer[18] = dpx.d[0];
+        outputBuffer[19] = dpx.d[1];
     }
 }

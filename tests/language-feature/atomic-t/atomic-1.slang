@@ -7,28 +7,29 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<uint>> outputBuffer;
 
-[NumThreads(1,1,1)]
+[NumThreads(1, 1, 1)]
 void computeMain()
 {
     bool result = true;
-    if ((outputBuffer[0]+=1) != 1)
+    if ((outputBuffer[0] += 1) != 1)
         result = false;
-    if ((outputBuffer[0]-=1) != 0)
+    if ((outputBuffer[0] -= 1) != 0)
         result = false;
     if (outputBuffer[0].max(2) != 0)
         result = false;
     if (outputBuffer[0].min(1) != 2)
         result = false;
-    if ((outputBuffer[0]|=3) != 3)
+    if ((outputBuffer[0] |= 3) != 3)
         result = false;
-    if ((outputBuffer[0]&=2) != 2)
+    if ((outputBuffer[0] &= 2) != 2)
         result = false;
-    if ((outputBuffer[0]^=3) != 1)
+    if ((outputBuffer[0] ^= 3) != 1)
         result = false;
     if (outputBuffer[0].exchange(4) != 1)
         result = false;
     if (outputBuffer[0].compareExchange(4, 5) != 4)
-    {}; // result = false;  // for some reason this fails on Metal Github CI, so disabling.
+    {
+    }; // result = false;  // for some reason this fails on Metal Github CI, so disabling.
     if (outputBuffer[0].load() != 5)
         result = false;
     if ((outputBuffer[0]++) != 5)

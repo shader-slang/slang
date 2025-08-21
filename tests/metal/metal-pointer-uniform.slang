@@ -20,8 +20,8 @@ RWStructuredBuffer<int> outputBuffer;
 uniform int* src;
 
 [shader("compute")]
-[numthreads(4,1,1)]
-void computeMain(uint3 threadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint3 threadID: SV_DispatchThreadID)
 {
     let input = src[threadID.x];
     outputBuffer[threadID.x] = input;

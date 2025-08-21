@@ -19,13 +19,13 @@ void computeMain()
 
 static let x = 1;
 
-func f() -> int
+func f()->int
 {
     let y = x; // should refer to the global x
     let x = 3;
     return x + y; // should refer to the local x
 }
-func g() -> int
+func g()->int
 {
     // Can we shadow this keyword
     int out;
@@ -34,7 +34,7 @@ func g() -> int
 }
 
 static var input = 999;
-func h() -> int
+func h()->int
 {
     // This should still parse as an identifier (it's a keyword, being shadowed
     // by something in a parent scope)

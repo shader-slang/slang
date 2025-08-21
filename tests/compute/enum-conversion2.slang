@@ -8,32 +8,32 @@
 
 enum Flower
 {
-	Rose,
-	Violet,
-	Tulip,
-	Orchid,
-	Chrysanthemum,
+    Rose,
+    Violet,
+    Tulip,
+    Orchid,
+    Chrysanthemum,
 }
 
 int test(int val)
 {
-	Flower a = Flower(val);
-	Flower b = Flower(uint(val));
+    Flower a = Flower(val);
+    Flower b = Flower(uint(val));
 
-	uint x = uint(a);
-	int y = int(b);
+    uint x = uint(a);
+    int y = int(b);
 
-	uint z = (x + y)/2 + uint(Flower.Violet);
+    uint z = (x + y) / 2 + uint(Flower.Violet);
 
-	Flower c = Flower(z);
-	return int(c);
+    Flower c = Flower(z);
+    return int(c);
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 

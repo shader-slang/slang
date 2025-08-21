@@ -7,7 +7,7 @@
 
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputBuffer[0] = 1;

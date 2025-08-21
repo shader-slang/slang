@@ -24,7 +24,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 void computeMain()
 {
     let a = coopVecLoad<4>(inputBuffer, 0);
-    let b = coopVecLoad<4>(inputBuffer, 4*4);
+    let b = coopVecLoad<4>(inputBuffer, 4 * 4);
     b.store(outputBuffer, 0);
-    a.store(outputBuffer, 4*4);
+    a.store(outputBuffer, 4 * 4);
 }

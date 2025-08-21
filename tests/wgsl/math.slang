@@ -3,7 +3,7 @@
 RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
-__generic<T:__BuiltinFloatingPointType>
+__generic<T : __BuiltinFloatingPointType>
 bool Test_Scalar()
 {
     // WGSL-LABEL: Test_Scalar
@@ -112,17 +112,17 @@ bool Test_Scalar()
         ;
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int>
+__generic<T : __BuiltinFloatingPointType, let N : int>
 bool Test_Vector()
 {
     // WGSL-LABEL: Test_Vector_0
-    const vector<T,N> zero = T(inputBuffer[0]);
-    const vector<T,N> one = T(inputBuffer[1]);
+    const vector<T, N> zero = T(inputBuffer[0]);
+    const vector<T, N> one = T(inputBuffer[1]);
 
-    const vector<int,N> zeroInt = int(inputBuffer[0]);
+    const vector<int, N> zeroInt = int(inputBuffer[0]);
 
-    vector<T,N> outFloat1, outFloat2;
-    vector<int,N> outInt;
+    vector<T, N> outFloat1, outFloat2;
+    vector<int, N> outInt;
 
     return true
         // WGSL: acos(
@@ -253,7 +253,7 @@ bool Test_Vector()
     // WGSL-LABEL: Test_Vector_1
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // GLSL: void main(

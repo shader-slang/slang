@@ -12,28 +12,22 @@ struct A : IDifferentiable
     float x;
 
     [ForwardDifferentiable]
-    float getVal(float y){ return x * x + y * y; }
+    float getVal(float y) { return x * x + y * y; }
 
     [ForwardDifferentiable]
     [NoDiffThis]
     float getVal2(float y) { return x * x + y * y; }
 
     [ForwardDifferentiable]
-    static float f(A obj, float y)
-    {
-        return obj.getVal(y);
-    }
+    static float f(A obj, float y) { return obj.getVal(y); }
 
     [ForwardDifferentiable]
-    static float f2(A obj, float y)
-    {
-        return obj.getVal2(y);
-    }
+    static float f2(A obj, float y) { return obj.getVal2(y); }
 }
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     A a;
     a.x = 2.0;

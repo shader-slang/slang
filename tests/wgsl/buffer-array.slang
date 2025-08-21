@@ -9,7 +9,8 @@ struct PerInstanceUniforms
 };
 
 // WGSL: @binding(0) @group(0) var<uniform> perInstance_0 : array<PerInstanceUniforms_std140_0, i32(3)>;
-[[vk::binding(0, 0)]] ConstantBuffer<PerInstanceUniforms> perInstance[cubeCount] : register(b0, space0);
+[[vk::binding(0, 0)]]
+ConstantBuffer<PerInstanceUniforms> perInstance[cubeCount] : register(b0, space0);
 
 struct VertexInput
 {

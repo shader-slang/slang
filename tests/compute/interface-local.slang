@@ -18,14 +18,14 @@
 
 interface IHelper
 {
-	int getVal();
+    int getVal();
 }
 
 struct HelperImpl : IHelper
 {
-	int storedVal;
+    int storedVal;
 
-	int getVal() { return storedVal; }
+    int getVal() { return storedVal; }
 }
 
 int test(int val)
@@ -41,10 +41,10 @@ int test(int val)
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
-	int inputVal = int(tid);
-	int outputVal = test(inputVal);
-	gOutputBuffer[tid] = outputVal;
+    uint tid = dispatchThreadID.x;
+    int inputVal = int(tid);
+    int outputVal = test(inputVal);
+    gOutputBuffer[tid] = outputVal;
 }

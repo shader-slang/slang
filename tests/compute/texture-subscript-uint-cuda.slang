@@ -29,58 +29,58 @@ RWStructuredBuffer<uint> cudaOutputBuffer;
 
 [numthreads(3, 1, 1)]
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
-    switch (idx)
-    {   
-    case 0:
-    {
-        int2 var = int2(1, 2);
-        uint result = cudaT2D_u[var];
-        cudaOutputBuffer[idx] = result;
-            
-        uint2 result2 = cudaT2D_u2[var];
-        cudaOutputBuffer[idx] += result2.x;
 
-        uint4 result4 = cudaT2D_u4[var];
-        cudaOutputBuffer[idx] += result4.x;
-        cudaOutputBuffer[idx] += result4.y;
-    }
-    break;
+    switch (idx)
+    {
+    case 0:
+        {
+            int2 var = int2(1, 2);
+            uint result = cudaT2D_u[var];
+            cudaOutputBuffer[idx] = result;
+
+            uint2 result2 = cudaT2D_u2[var];
+            cudaOutputBuffer[idx] += result2.x;
+
+            uint4 result4 = cudaT2D_u4[var];
+            cudaOutputBuffer[idx] += result4.x;
+            cudaOutputBuffer[idx] += result4.y;
+        }
+        break;
 
     case 1:
-    {
-        int3 var = int3(1, 1, 1);
-        uint result = cudaT3D_u[var];
-        cudaOutputBuffer[idx] = result;
-            
-        uint2 result2 = cudaT3D_u2[var];
-        cudaOutputBuffer[idx] += result2.x;
+        {
+            int3 var = int3(1, 1, 1);
+            uint result = cudaT3D_u[var];
+            cudaOutputBuffer[idx] = result;
 
-        uint4 result4 = cudaT3D_u4[var];
-        cudaOutputBuffer[idx] += result4.x;
-        cudaOutputBuffer[idx] += result4.w;
-    }
-    break;
+            uint2 result2 = cudaT3D_u2[var];
+            cudaOutputBuffer[idx] += result2.x;
+
+            uint4 result4 = cudaT3D_u4[var];
+            cudaOutputBuffer[idx] += result4.x;
+            cudaOutputBuffer[idx] += result4.w;
+        }
+        break;
 
     case 2:
-    {
-        int3 var = int3(0, 0, 1);
-        uint result = cudaT2DArray_u[var];
-        cudaOutputBuffer[idx] = result;
-            
-        uint2 result2 = cudaT2DArray_u2[var];
-        cudaOutputBuffer[idx] += result2.y;
+        {
+            int3 var = int3(0, 0, 1);
+            uint result = cudaT2DArray_u[var];
+            cudaOutputBuffer[idx] = result;
 
-        uint4 result4 = cudaT2DArray_u4[var];
-        cudaOutputBuffer[idx] += result4.x;
-        cudaOutputBuffer[idx] += result4.y;
+            uint2 result2 = cudaT2DArray_u2[var];
+            cudaOutputBuffer[idx] += result2.y;
+
+            uint4 result4 = cudaT2DArray_u4[var];
+            cudaOutputBuffer[idx] += result4.x;
+            cudaOutputBuffer[idx] += result4.y;
+        }
+        break;
     }
-    break;
-    }
-} 
+}
 // CHECK:FE000000
 // CHECK:FE000000
 // CHECK:FE000000

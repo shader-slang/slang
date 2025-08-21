@@ -8,7 +8,7 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true;
     result = result && firstbithigh(0) == -1;

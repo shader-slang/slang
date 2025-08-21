@@ -5,7 +5,8 @@ interface IFoo
     float get();
 }
 
-extension<FooType : IFoo> FooType {
+extension<FooType : IFoo> FooType
+{
     float load()
     {
         return get();

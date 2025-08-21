@@ -4,7 +4,7 @@
 // not testing hlsl due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
@@ -13,15 +13,17 @@
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 
 __generic<T : __BuiltinLogicalType>
-bool test1Logical() {
+bool test1Logical()
+{
     return true
         & subgroupClusteredAnd(T(1), 1) == T(1)
         & subgroupClusteredOr(T(1), 1) == T(1)
@@ -30,17 +32,19 @@ bool test1Logical() {
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVLogical() {
+bool testVLogical()
+{
     typealias gvec = vector<T, N>;
 
     return true
         & subgroupClusteredAnd(gvec(T(1)), 1) == gvec(T(1))
         & subgroupClusteredOr(gvec(T(1)), 1) == gvec(T(1))
-        & subgroupClusteredXor(gvec(T(1)), 1) == gvec(T(1))   
-        ;     
+        & subgroupClusteredXor(gvec(T(1)), 1) == gvec(T(1))
+        ;
 }
 
-bool testLogical() {
+bool testLogical()
+{
     return true
         & test1Logical<int>()
         & testVLogical<int, 2>()
@@ -82,7 +86,8 @@ bool testLogical() {
 }
 
 __generic<T : __BuiltinArithmeticType>
-bool test1Arithmetic() {
+bool test1Arithmetic()
+{
     return true
         & subgroupClusteredAdd(T(1), 1) == T(1)
         & subgroupClusteredMul(T(1), 1) == T(1)
@@ -92,7 +97,8 @@ bool test1Arithmetic() {
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVArithmetic() {
+bool testVArithmetic()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -103,17 +109,18 @@ bool testVArithmetic() {
         ;
 }
 
-bool testArithmetic() {
+bool testArithmetic()
+{
     return true
         & test1Arithmetic<float>()
         & testVArithmetic<float, 2>()
         & testVArithmetic<float, 3>()
         & testVArithmetic<float, 4>()
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-        & testVArithmetic<double, 2>() 
+        & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
         & testVArithmetic<double, 4>()
-        & test1Arithmetic<half>() 
+        & test1Arithmetic<half>()
         & testVArithmetic<half, 2>()
         & testVArithmetic<half, 3>()
         & testVArithmetic<half, 4>()
@@ -121,15 +128,15 @@ bool testArithmetic() {
         & testVArithmetic<int, 2>()
         & testVArithmetic<int, 3>()
         & testVArithmetic<int, 4>()
-        & test1Arithmetic<int8_t>() 
+        & test1Arithmetic<int8_t>()
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int16_t>() 
+        & test1Arithmetic<int16_t>()
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()
         & testVArithmetic<int16_t, 4>()
-        & test1Arithmetic<int64_t>() 
+        & test1Arithmetic<int64_t>()
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
@@ -137,15 +144,15 @@ bool testArithmetic() {
         & testVArithmetic<uint, 2>()
         & testVArithmetic<uint, 3>()
         & testVArithmetic<uint, 4>()
-        & test1Arithmetic<uint8_t>() 
+        & test1Arithmetic<uint8_t>()
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
-        & test1Arithmetic<uint16_t>() 
+        & test1Arithmetic<uint16_t>()
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
         & testVArithmetic<uint16_t, 4>()
-        & test1Arithmetic<uint64_t>() 
+        & test1Arithmetic<uint64_t>()
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()

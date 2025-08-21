@@ -19,7 +19,7 @@ int getCount<each T>(Tuple<T> t)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var t = makeTuple(1, 2.0);
     var u = makeTuple(3u, 4.0);

@@ -8,10 +8,10 @@ import extension_import_helper;
 
 float test<T : IThing>(T value)
 {
-	return value.getValue();
+    return value.getValue();
 }
 
 float id(float x)
 {
-	return test(x);
+    return test(x);
 }

@@ -10,18 +10,16 @@ struct IntersectionPayload
 
 RaytracingAccelerationStructure accelerationStructure;
 
-void main(
-	BuiltInTriangleIntersectionAttributes 	attributes,
-	in out IntersectionPayload 				ioPayload)
+void main(BuiltInTriangleIntersectionAttributes attributes, in out IntersectionPayload ioPayload)
 {
-	RayQuery<RAY_FLAG_NONE> rayQuery;
+    RayQuery<RAY_FLAG_NONE> rayQuery;
 
-	uint instanceInclusionMask = 0x00;
-	RayDesc rayDesc;
-	rayQuery.TraceRayInline(accelerationStructure, RAY_FLAG_NONE, instanceInclusionMask, rayDesc);
+    uint instanceInclusionMask = 0x00;
+    RayDesc rayDesc;
+    rayQuery.TraceRayInline(accelerationStructure, RAY_FLAG_NONE, instanceInclusionMask, rayDesc);
 
-	ioPayload.triangleVerticeCommitted = rayQuery.CandidateGetIntersectionTriangleVertexPositions();
-	ioPayload.triangleVerticeCandidate = rayQuery.CommittedGetIntersectionTriangleVertexPositions();
+    ioPayload.triangleVerticeCommitted = rayQuery.CandidateGetIntersectionTriangleVertexPositions();
+    ioPayload.triangleVerticeCandidate = rayQuery.CommittedGetIntersectionTriangleVertexPositions();
 }
 
 // CHECK: OpCapability RayQueryKHR

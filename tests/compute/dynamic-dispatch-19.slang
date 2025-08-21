@@ -10,13 +10,10 @@ interface IValueGetter
     float get();
 }
 
-struct MyWrapper<T:IValueGetter>
+struct MyWrapper<T : IValueGetter>
 {
     T getter;
-    float getVal()
-    {
-        return getter.get();
-    }
+    float getVal() { return getter.get(); }
 }
 
 interface IFoo
@@ -27,14 +24,18 @@ interface IFoo
 [anyValueSize(16)]
 interface IInterface
 {
-    float callGetter<T:IFoo>(T foo);
+    float callGetter<T : IFoo>(T foo);
 }
 
 struct Impl : IInterface
 {
     int data;
-    struct GetterImpl : IValueGetter { float val; float get(){return val;} }
-    float callGetter<T:IFoo>(T foo)
+    struct GetterImpl : IValueGetter
+    {
+        float val;
+        float get() { return val; }
+    }
+    float callGetter<T : IFoo>(T foo)
     {
         // We should be able to specialize `wrapper` even if it is
         // used in this dynamically dispatched method.
@@ -44,11 +45,14 @@ struct Impl : IInterface
     }
 };
 
-struct IdentityFoo : IFoo { int getIntVal(int x) { return x; } }
+struct IdentityFoo : IFoo
+{
+    int getIntVal(int x) { return x; }
+}
 
 float test()
 {
-    IInterface obj = createDynamicObject<IInterface, uint4>(3, uint4(1,2,3,4));
+    IInterface obj = createDynamicObject<IInterface, uint4>(3, uint4(1, 2, 3, 4));
     IdentityFoo foo;
     // Call via dynamic dispatch
     return obj.callGetter(foo);
@@ -60,7 +64,7 @@ RWStructuredBuffer<float> gOutputBuffer;
 //TEST_INPUT: type_conformance Impl:IInterface = 3
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     gOutputBuffer[0] = test();
 }

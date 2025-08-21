@@ -9,9 +9,7 @@
 // CHECK: error 36104: 'processDataBad' uses undeclared capability 'sm_6_0'
 
 [require(glsl_hlsl_metal_spirv)]
-void processDataGood()
-{
-}
+void processDataGood() {}
 
 // CHECK-DAG: capability7.slang([[@LINE+2]]): note: see definition of 'processDataBadNested'
 [require(hlsl, sm_6_0)]
@@ -44,7 +42,7 @@ void myNestedCall()
     myNestedNestedBadCall();
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     myNestedCall();

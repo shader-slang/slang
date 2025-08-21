@@ -24,7 +24,7 @@ ConstantBuffer<Params> gCb;
 ConstantBuffer<Params> gCb2;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -41,8 +41,5 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
 export struct MyImpl : IInterface
 {
     int val;
-    int run(int input)
-    {
-        return input + val;
-    }
+    int run(int input) { return input + val; }
 };

@@ -14,10 +14,7 @@ struct A : IFoo
 {
     float x;
 
-    float3 f(float v, uint offset)
-    {
-        return v * v;
-    }
+    float3 f(float v, uint offset) { return v * v; }
 
     // Provide a backward diff, but leave out forward diff.
     [BackwardDerivativeOf(f)]
@@ -28,10 +25,7 @@ struct A : IFoo
     }
 
     [BackwardDifferentiable]
-    float3 test(float v, uint offset)
-    {
-        return f(v, 0);
-    }
+    float3 test(float v, uint offset) { return f(v, 0); }
 }
 
 [BackwardDifferentiable]
@@ -41,9 +35,9 @@ float3 test(IFoo obj, float v)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    A a = {0.0};
+    A a = { 0.0 };
     var p = diffPair(3.0, 0.0);
     let rs = __bwd_diff(test)(a, p, 1.0);
     outputBuffer[0] = p.d;

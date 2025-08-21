@@ -6,7 +6,8 @@
 // doesn't report warnings for these constant coercions.
 
 struct BoolG<let v : bool>
-{ }
+{
+}
 
 struct Test<let v : uint>
 {

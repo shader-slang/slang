@@ -13,8 +13,8 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex)
+void computeMain(uint tid: SV_GroupIndex)
 {
-    vector<bool,4> k = true;
+    vector<bool, 4> k = true;
     outputBuffer[tid] = all(k);
 }

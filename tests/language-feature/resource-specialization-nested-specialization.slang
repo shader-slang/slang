@@ -13,25 +13,16 @@ struct GridGeo
 {
     Grid grids[2];
 
-    void getGrid(uint index, out Grid grid)
-    {
-        grid = grids[index];
-    }
+    void getGrid(uint index, out Grid grid) { grid = grids[index]; }
 };
 
 struct Scene
 {
     GridGeo gridGeo;
 
-    void getGrid_BAD(uint index, out Grid grid)
-    {
-        gridGeo.getGrid(index, grid);
-    }
+    void getGrid_BAD(uint index, out Grid grid) { gridGeo.getGrid(index, grid); }
 
-    void getGrid_GOOD(uint index, out Grid grid)
-    {
-        grid = gridGeo.grids[index];
-    }
+    void getGrid_GOOD(uint index, out Grid grid) { grid = gridGeo.grids[index]; }
 };
 
 ParameterBlock<Scene> gScene;
@@ -46,12 +37,12 @@ void direct_getGrid_BAD(uint index, out Grid grid)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
-   
+
     Grid grid;
 
 #ifdef MEMBER_FUNCTION_CALL
     direct_getGrid_BAD(1, grid);
-#else 
+#else
     gScene.getGrid_BAD(1, grid);
 #endif
     gridBuffers[0][1] = grid.buf[1];

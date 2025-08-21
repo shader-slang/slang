@@ -18,8 +18,7 @@ interface IModifier
 //TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8], stride=4):
 uniform IModifier gModifier;
 
-int test(
-    int val)
+int test(int val)
 {
     return gModifier.modify(val);
 }
@@ -29,8 +28,7 @@ int test(
 RWStructuredBuffer<int> gOutputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(
-    uint3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 

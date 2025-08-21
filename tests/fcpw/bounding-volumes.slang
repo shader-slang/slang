@@ -28,16 +28,10 @@ public struct BoundingBox
     }
 
     // checks whether box is valid
-    public bool isValid()
-    {
-        return all(pMin <= pMax);
-    }
+    public bool isValid() { return all(pMin <= pMax); }
 
     // returns box centroid
-    public float3 getCentroid()
-    {
-        return 0.5 * (pMin + pMax);
-    }
+    public float3 getCentroid() { return 0.5 * (pMin + pMax); }
 
     // checks for overlap with sphere
     public bool overlap(BoundingSphere s, out float d2Min, out float d2Max)
@@ -146,16 +140,17 @@ public struct BoundingCone
     }
 
     // checks whether cone is valid
-    public bool isValid()
-    {
-        return halfAngle >= 0.0;
-    }
+    public bool isValid() { return halfAngle >= 0.0; }
 
     // check for overlap between this cone and the "view" cone defined by the given
     // point o and bounding box b; the two cones overlap when there exist two vectors,
     // one in each cone, that are orthogonal to each other.
-    public bool overlap(float3 o, BoundingBox b, float distToBox,
-                        out float minAngleRange, out float maxAngleRange)
+    public bool overlap(
+        float3 o,
+        BoundingBox b,
+        float distToBox,
+        out float minAngleRange,
+        out float maxAngleRange)
     {
         // initialize angle bounds
         minAngleRange = 0.0f;
@@ -235,9 +230,12 @@ public float3 rotate(float3 u, float3 v, float theta)
     return mul(R, u);
 }
 
-public BoundingCone mergeBoundingCones(BoundingCone coneA, BoundingCone coneB,
-                                       float3 originA, float3 originB,
-                                       float3 newOrigin)
+public BoundingCone mergeBoundingCones(
+    BoundingCone coneA,
+    BoundingCone coneB,
+    float3 originA,
+    float3 originB,
+    float3 newOrigin)
 {
     BoundingCone cone;
     if (coneA.isValid() && coneB.isValid())
@@ -248,8 +246,9 @@ public BoundingCone mergeBoundingCones(BoundingCone coneA, BoundingCone coneB,
         float halfAngleB = coneB.halfAngle;
         float3 dOriginA = newOrigin - originA;
         float3 dOriginB = newOrigin - originB;
-        cone.radius = sqrt(max(coneA.radius * coneA.radius + dot(dOriginA, dOriginA),
-                               coneB.radius * coneB.radius + dot(dOriginB, dOriginB)));
+        cone.radius = sqrt(
+            max(coneA.radius * coneA.radius + dot(dOriginA, dOriginA),
+                coneB.radius * coneB.radius + dot(dOriginB, dOriginB)));
 
         if (halfAngleB > halfAngleA)
         {

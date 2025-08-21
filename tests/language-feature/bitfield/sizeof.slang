@@ -10,26 +10,30 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct S {
+struct S
+{
     int foo : 8;
     int bar : 24;
 };
 
 // This packs the smaller int into the int64
-struct T {
+struct T
+{
     int64_t foo : 33;
     int bar : 24;
 };
 
 // This takes two ints to store all the bits
-struct P {
+struct P
+{
     int foo : 24;
     int bar : 24;
 };
 
 // Even though the smaller field comes first, it's still packed with the larger
 // one
-struct Q {
+struct Q
+{
     int8_t foo : 1;
     int64_t bar : 63;
 };

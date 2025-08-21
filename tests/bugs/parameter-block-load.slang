@@ -24,7 +24,7 @@ struct MyParameters
 ParameterBlock<MyParameters> gObj;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float result = 0.0;
     gOutputBuffer[dispatchThreadID.x] = gObj.calc();

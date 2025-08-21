@@ -48,18 +48,15 @@ struct CompositeTransformer : ITransformer
 {
     ITransformer func0;
     ITransformer func1;
-    float transform(float x)
-    {
-        return func0.transform(func1.transform(x));
-    }
+    float transform(float x) { return func0.transform(func1.transform(x)); }
 };
 
 // Main entry-point. Applies the transformation encoded by `transformer`
 // to all elements in `buffer`.
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void computeMain(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform RWStructuredBuffer<float> buffer,
     uniform ITransformer transformer)
 {

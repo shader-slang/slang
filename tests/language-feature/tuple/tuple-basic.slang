@@ -14,7 +14,7 @@ void store(inout Tuple<int, float, uint> t)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var t = Tuple<int, float, uint>(1, 2.0, 3u);
     store(t);

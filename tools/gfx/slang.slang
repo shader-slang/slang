@@ -19,14 +19,16 @@ public enum SlangSeverity
     SLANG_SEVERITY_WARNING,      /**< A warning, which indicates a possible proble. */
     SLANG_SEVERITY_ERROR,        /**< An error, indicating that compilation failed. */
     SLANG_SEVERITY_FATAL,        /**< An unrecoverable error, which forced compilation to abort. */
-    SLANG_SEVERITY_INTERNAL,     /**< An internal error, indicating a logic error in the compiler. */
-};
+    SLANG_SEVERITY_INTERNAL, /**< An internal error, indicating a logic error in the compiler. */
+}
+;
 
 public enum SlangDiagnosticFlags
 {
     SLANG_DIAGNOSTIC_FLAG_VERBOSE_PATHS = 0x01,
     SLANG_DIAGNOSTIC_FLAG_TREAT_WARNINGS_AS_ERRORS = 0x02
-};
+}
+;
 
 public enum SlangBindableResourceType
 {
@@ -35,7 +37,8 @@ public enum SlangBindableResourceType
     SLANG_SAMPLER,
     SLANG_UNIFORM_BUFFER,
     SLANG_STORAGE_BUFFER,
-};
+}
+;
 
 public enum SlangCompileTarget
 {
@@ -51,19 +54,21 @@ public enum SlangCompileTarget
     SLANG_DXBC_ASM,
     SLANG_DXIL,
     SLANG_DXIL_ASM,
-    SLANG_C_SOURCE,              ///< The C language
-    SLANG_CPP_SOURCE,            ///< C++ code for shader kernels.
+    SLANG_C_SOURCE,   ///< The C language
+    SLANG_CPP_SOURCE, ///< C++ code for shader kernels.
     SLANG_CPP_PYTORCH_BINDING,
     SLANG_HOST_EXECUTABLE,       ///<  Standalone binary executable (for hosting CPU/OS)
     SLANG_SHADER_SHARED_LIBRARY, ///< A shared library/Dll for shader kernels (for hosting CPU/OS)
-    SLANG_SHADER_HOST_CALLABLE,  ///< A CPU target that makes the compiled shader code available to be run immediately
+    SLANG_SHADER_HOST_CALLABLE,  ///< A CPU target that makes the compiled shader code available to
+                                 ///< be run immediately
     SLANG_CUDA_SOURCE,           ///< Cuda source
     SLANG_PTX,                   ///< PTX
     SLANG_OBJECT_CODE,           ///< Object code that can be used for later linking
     SLANG_HOST_CPP_SOURCE,       ///< C++ code for host library or executable.
     SLANG_HOST_HOST_CALLABLE,    ///<
     SLANG_TARGET_COUNT_OF,
-};
+}
+;
 
 /* A "container format" describes the way that the outputs
 for multiple files, entry points, targets, etc. should be
@@ -76,7 +81,8 @@ public enum SlangContainerFormat
     /* Generate a container in the `.slang-module` format,
     which includes reflection information, compiled kernels, etc. */
     SLANG_CONTAINER_FORMAT_SLANG_MODULE,
-};
+}
+;
 
 public enum SlangPassThrough : int
 {
@@ -88,12 +94,14 @@ public enum SlangPassThrough : int
     SLANG_PASS_THROUGH_CLANG,         ///< Clang C/C++ compiler
     SLANG_PASS_THROUGH_VISUAL_STUDIO, ///< Visual studio C/C++ compiler
     SLANG_PASS_THROUGH_GCC,           ///< GCC C/C++ compiler
-    SLANG_PASS_THROUGH_GENERIC_C_CPP, ///< Generic C or C++ compiler, which is decided by the source type
+    SLANG_PASS_THROUGH_GENERIC_C_CPP, ///< Generic C or C++ compiler, which is decided by the source
+                                      ///< type
     SLANG_PASS_THROUGH_NVRTC,         ///< NVRTC Cuda compiler
     SLANG_PASS_THROUGH_LLVM,          ///< LLVM 'compiler' - includes LLVM and Clang
     SLANG_PASS_THROUGH_SPIRV_OPT,
     SLANG_PASS_THROUGH_COUNT_OF,
-};
+}
+;
 
 /* Defines an archive type used to holds a 'file system' type structure. */
 public enum SlangArchiveType : int
@@ -104,7 +112,8 @@ public enum SlangArchiveType : int
     SLANG_ARCHIVE_TYPE_RIFF_DEFLATE,
     SLANG_ARCHIVE_TYPE_RIFF_LZ4,
     SLANG_ARCHIVE_TYPE_COUNT_OF,
-};
+}
+;
 
 /*!
 Flags to control compilation behavior.
@@ -125,7 +134,8 @@ public enum SlangCompileFlags
     their default state. */
     SLANG_COMPILE_FLAG_NO_CHECKING = 0,
     SLANG_COMPILE_FLAG_SPLIT_MIXED_TYPES = 0,
-};
+}
+;
 
 /*!
 @brief Flags to control code generation behavior of a compilation target */
@@ -151,7 +161,8 @@ public enum SlangTargetFlags
 
     /* When set, will generate SPIRV directly instead of going through glslang. */
     SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
-};
+}
+;
 
 /*!
 @brief Options to control floating-point precision guarantees for a target.
@@ -161,7 +172,8 @@ public enum SlangFloatingPointMode
     SLANG_FLOATING_POINT_MODE_DEFAULT = 0,
     SLANG_FLOATING_POINT_MODE_FAST,
     SLANG_FLOATING_POINT_MODE_PRECISE,
-};
+}
+;
 
 /*!
 @brief Options to control emission of `#line` directives
@@ -171,8 +183,10 @@ public enum SlangLineDirectiveMode
     SLANG_LINE_DIRECTIVE_MODE_DEFAULT = 0, /**< Default behavior: pick behavior base on target. */
     SLANG_LINE_DIRECTIVE_MODE_NONE,        /**< Don't emit line directives at all. */
     SLANG_LINE_DIRECTIVE_MODE_STANDARD,    /**< Emit standard C-style `#line` directives. */
-    SLANG_LINE_DIRECTIVE_MODE_GLSL,        /**< Emit GLSL-style directives with file *number* instead of name */
-};
+    SLANG_LINE_DIRECTIVE_MODE_GLSL, /**< Emit GLSL-style directives with file *number* instead of
+                                       name */
+}
+;
 
 public enum SlangSourceLanguage : int
 {
@@ -184,24 +198,28 @@ public enum SlangSourceLanguage : int
     SLANG_SOURCE_LANGUAGE_CPP,
     SLANG_SOURCE_LANGUAGE_CUDA,
     SLANG_SOURCE_LANGUAGE_COUNT_OF,
-};
+}
+;
 
 public enum SlangProfileID
 {
     SLANG_PROFILE_UNKNOWN,
-};
+}
+;
 
 public enum SlangCapabilityID
 {
     SLANG_CAPABILITY_UNKNOWN = 0,
-};
+}
+;
 
 public enum SlangMatrixLayoutMode
 {
     SLANG_MATRIX_LAYOUT_MODE_UNKNOWN = 0,
     SLANG_MATRIX_LAYOUT_ROW_MAJOR,
     SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
-};
+}
+;
 
 public enum SlangStage
 {
@@ -220,23 +238,31 @@ public enum SlangStage
     SLANG_STAGE_CALLABLE,
     SLANG_STAGE_MESH,
     SLANG_STAGE_AMPLIFICATION,
-};
+}
+;
 
 public enum SlangDebugInfoLevel
 {
     SLANG_DEBUG_INFO_LEVEL_NONE = 0, /**< Don't emit debug information at all. */
-    SLANG_DEBUG_INFO_LEVEL_MINIMAL,  /**< Emit as little debug information as possible, while still supporting stack trackes. */
-    SLANG_DEBUG_INFO_LEVEL_STANDARD, /**< Emit whatever is the standard level of debug information for each target. */
-    SLANG_DEBUG_INFO_LEVEL_MAXIMAL,  /**< Emit as much debug infromation as possible for each target. */
-};
+    SLANG_DEBUG_INFO_LEVEL_MINIMAL,  /**< Emit as little debug information as possible, while still
+                                        supporting stack trackes. */
+    SLANG_DEBUG_INFO_LEVEL_STANDARD, /**< Emit whatever is the standard level of debug information
+                                        for each target. */
+    SLANG_DEBUG_INFO_LEVEL_MAXIMAL, /**< Emit as much debug infromation as possible for each target.
+                                     */
+}
+;
 
 public enum SlangOptimizationLevel
 {
     SLANG_OPTIMIZATION_LEVEL_NONE = 0, /**< Don't optimize at all. */
-    SLANG_OPTIMIZATION_LEVEL_DEFAULT,  /**< Default optimization level: balance code quality and compilation time. */
+    SLANG_OPTIMIZATION_LEVEL_DEFAULT,  /**< Default optimization level: balance code quality and
+                                          compilation time. */
     SLANG_OPTIMIZATION_LEVEL_HIGH,     /**< Optimize aggressively. */
-    SLANG_OPTIMIZATION_LEVEL_MAXIMAL,  /**< Include optimizations that may take a very long time, or may involve severe space-vs-speed tradeoffs */
-};
+    SLANG_OPTIMIZATION_LEVEL_MAXIMAL,  /**< Include optimizations that may take a very long time, or
+                                          may involve severe space-vs-speed tradeoffs */
+}
+;
 public enum SlangTypeKind
 {
     NONE,
@@ -257,7 +283,8 @@ public enum SlangTypeKind
     SPECIALIZED,
     FEEDBACK,
     COUNT,
-};
+}
+;
 
 public enum SlangScalarType
 {
@@ -275,7 +302,8 @@ public enum SlangScalarType
     UINT8,
     INT16,
     UINT16,
-};
+}
+;
 
 public struct TypeReflection
 {
@@ -284,12 +312,13 @@ public struct TypeReflection
 public enum CompileStdLibFlags
 {
     WriteDocumentation = 0x1,
-};
+}
+;
 
 [COM("8BA5FB08-5195-40e2-AC58-0D-98-9C-3A-01-02")]
 public interface ISlangBlob
 {
-    public void *getBufferPointer();
+    public void* getBufferPointer();
     public Size getBufferSize();
 };
 
@@ -314,15 +343,18 @@ public struct TargetDesc
 
     /** Default mode to use for floating-point operations on the target.
      */
-    public SlangFloatingPointMode floatingPointMode = SlangFloatingPointMode.SLANG_FLOATING_POINT_MODE_DEFAULT;
+    public SlangFloatingPointMode floatingPointMode =
+        SlangFloatingPointMode.SLANG_FLOATING_POINT_MODE_DEFAULT;
 
     /** Optimization level to use for the target.
      */
-    public SlangOptimizationLevel optimizationLevel = SlangOptimizationLevel.SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    public SlangOptimizationLevel optimizationLevel =
+        SlangOptimizationLevel.SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
     /** The line directive mode for output source code.
      */
-    public SlangLineDirectiveMode lineDirectiveMode = SlangLineDirectiveMode.SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
+    public SlangLineDirectiveMode lineDirectiveMode =
+        SlangLineDirectiveMode.SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
 
     /** Whether to force `scalar` layout for glsl shader storage buffers.
      */
@@ -332,7 +364,8 @@ public struct TargetDesc
 public enum SessionFlags
 {
     kSessionFlags_None = 0
-};
+}
+;
 
 public struct PreprocessorMacroDesc
 {
@@ -348,7 +381,7 @@ public struct SessionDesc
 
     /** Code generation targets to include in the session.
      */
-    public TargetDesc *targets = nullptr;
+    public TargetDesc* targets = nullptr;
     public Int targetCount = 0;
 
     /** Flags to configure the session.
@@ -357,17 +390,18 @@ public struct SessionDesc
 
     /** Default layout to assume for variables with matrix types.
      */
-    public SlangMatrixLayoutMode defaultMatrixLayoutMode = SlangMatrixLayoutMode.SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+    public SlangMatrixLayoutMode defaultMatrixLayoutMode =
+        SlangMatrixLayoutMode.SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
     /** Paths to use when searching for `#include`d or `import`ed files.
      */
-    public NativeString *searchPaths = nullptr;
+    public NativeString* searchPaths = nullptr;
     public Int searchPathCount = 0;
 
-    public PreprocessorMacroDesc *preprocessorMacros = nullptr;
+    public PreprocessorMacroDesc* preprocessorMacros = nullptr;
     public Int preprocessorMacroCount = 0;
 
-    public void *fileSystem = nullptr;
+    public void* fileSystem = nullptr;
 };
 
 /** A global session for interaction with the Slang library.
@@ -387,8 +421,13 @@ public interface IGlobalSession
 
 public enum class ContainerType
 {
-    None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
-};
+    None,
+    UnsizedArray,
+    StructuredBuffer,
+    ConstantBuffer,
+    ParameterBlock
+}
+;
 
 /** A session provides a scope for code that is loaded.
 
@@ -425,20 +464,22 @@ public interface IComponentType
 {
 }
 
-public struct TypeLayoutReflection { }
+public struct TypeLayoutReflection
+{
+}
 
 /** The kind of specialization argument. */
 public enum class SpecializationArgKind : int32_t
 {
     Unknown, /**< An invalid specialization argument. */
     Type,    /**< Specialize to a type. */
-};
+}
+;
 
 public struct SpecializationArg
 {
     public SpecializationArgKind kind;
     /** A type specialization argument, used for `Kind::Type`. */
-    public TypeReflection *type;
+    public TypeReflection* type;
 }
-
 }

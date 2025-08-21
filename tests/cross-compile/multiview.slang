@@ -5,7 +5,7 @@
 
 //TEST:CROSS_COMPILE:-target spirv-assembly -entry main -stage vertex
 
-void main(uint viewId : SV_ViewID, out float4 p : SV_Position)
+void main(uint viewId: SV_ViewID, out float4 p: SV_Position)
 {
-  p = float4(viewId, 0, 0, 0);
+    p = float4(viewId, 0, 0, 0);
 }

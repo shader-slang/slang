@@ -23,7 +23,7 @@ void func(out float buffer[constValue0 / constValue1])
     }
 }
 
-struct MyStruct<let N: int>
+struct MyStruct<let N : int>
 {
     float buffer[N / constValue1];
 }

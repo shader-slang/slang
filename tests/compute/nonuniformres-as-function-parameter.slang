@@ -34,7 +34,7 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint2 pixelIndex : SV_DispatchThreadID)
+void main(uint2 pixelIndex: SV_DispatchThreadID)
 {
 
     // CHECK_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
@@ -105,8 +105,9 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK_HLSL: func_0(globalBuffer_0[NonUniformResourceIndex({{.*}})])
     MyStruct myStruct2 = func(buffer2);
 
-    // Test case 3: Test the case that we handle the uniformity correctly, the NonUniformResourceIndex will not propagate
-    // to the function, so there should no NonUniform decoration appeared.
+    // Test case 3: Test the case that we handle the uniformity correctly, the
+    // NonUniformResourceIndex will not propagate to the function, so there should no NonUniform
+    // decoration appeared.
     int bufferIdx3 = pixelIndex.y;
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
@@ -117,8 +118,8 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     MyStruct myStruct3 = func(buffer3);
 
 
-    // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a NonUniformResourceIndex
-    // is still a NonUniformResourceIndex.
+    // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a
+    // NonUniformResourceIndex is still a NonUniformResourceIndex.
 
     // CHECK_SPV: %[[VAR5:[a-zA-Z0-9_]+]] = OpBitcast %uint %{{.*}}
     // CHECK_SPV: %[[VAR3]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %[[VAR5]]
@@ -128,9 +129,11 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK_GLSL-SPV: %[[VAR17]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR16]] %int_0 %int_0
     // CHECK_GLSL-SPV: %[[VAR18]] = OpLoad %uint %[[VAR17]]
     //
-    // Since after the nested cast, the index data type is 'uint' now, make sure it calls the same function as the test case 1.
+    // Since after the nested cast, the index data type is 'uint' now, make sure it calls the same
+    // function as the test case 1.
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
-    RWStructuredBuffer<uint> buffer4 = globalBuffer[(uint)((int)NonUniformResourceIndex(bufferIdx))];
+    RWStructuredBuffer<uint> buffer4 =
+        globalBuffer[(uint)((int)NonUniformResourceIndex(bufferIdx))];
     MyStruct myStruct4 = func(buffer4);
 
     outputBuffer[0] = uint3(myStruct.a, myStruct.b, myStruct.c);
@@ -138,4 +141,3 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     outputBuffer[2] = uint3(myStruct3.a, myStruct3.b, myStruct3.c);
     outputBuffer[3] = uint3(myStruct4.a, myStruct4.b, myStruct4.c);
 }
-

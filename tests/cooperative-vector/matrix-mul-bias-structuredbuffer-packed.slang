@@ -1,4 +1,5 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
+// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue
+// #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
 // These platforms don't support these operations from structured buffers
@@ -41,8 +42,7 @@ void computeMain()
         CoopVecComponentType::SignedInt32,
         CoopVecMatrixLayout::RowMajor,
         false,
-        4
-    );
+        4);
 
     result.store(outputBuffer);
 }

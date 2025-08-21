@@ -6,15 +6,19 @@ RWStructuredBuffer<float> output;
 struct Tx
 {
     float x;
-    __subscript<I>(I index) -> float
-        where I:IInteger
+    __subscript<I>(I index)->float
+        where I : IInteger
     {
-        get { return x + index.toInt(); }
-        set { x = newValue;}
+        get {
+            return x + index.toInt();
+        }
+        set {
+            x = newValue;
+        }
     }
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Tx obj;

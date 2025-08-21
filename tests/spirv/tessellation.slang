@@ -46,7 +46,7 @@ struct DS_OUT
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("constants")]
-HS_OUT hullMain(InputPatch<VS_OUT, 4> patch, uint i : SV_OutputControlPointID)
+HS_OUT hullMain(InputPatch<VS_OUT, 4> patch, uint i: SV_OutputControlPointID)
 {
     HS_OUT o;
     o.position = patch[i].position;
@@ -61,7 +61,7 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
     float3 p3 = patch[3].position;
 
     HSC_OUT o;
-    o.EdgeTessFactor[0] = dot(p0, p1); 
+    o.EdgeTessFactor[0] = dot(p0, p1);
     o.EdgeTessFactor[1] = dot(p0, p3);
     o.EdgeTessFactor[2] = dot(p2, p3);
     o.EdgeTessFactor[3] = dot(p1, p2);
@@ -72,7 +72,7 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
 
 [domain("quad")]
 DS_OUT domainMain(
-    float2 uv : SV_DomainLocation,      // Tessellated coordinates (u, v)
+    float2 uv: SV_DomainLocation,       // Tessellated coordinates (u, v)
     const OutputPatch<HS_OUT, 4> patch, // Control points from the hull shader
     const HSC_OUT patchConstants        // Patch constants calculated by the hull shader
 )
@@ -86,8 +86,7 @@ DS_OUT domainMain(
     float3 p3 = patch[3].position;
 
     // Bilinear interpolation of the position in the quad
-    float3 interpolatedPosition = 
-          p0 * (1 - uv.x) * (1 - uv.y)
+    float3 interpolatedPosition = p0 * (1 - uv.x) * (1 - uv.y)
         + p1 * uv.x * (1 - uv.y)
         + p3 * uv.x * uv.y
         + p2 * (1 - uv.x) * uv.y;

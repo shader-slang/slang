@@ -7,16 +7,16 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     half2 v1 = half2(1.0h, half(1 << idx));
-    
+
     // CHECK_SPV: OpGroupNonUniformFAdd
     // CHECK_WGSL: subgroupExclusiveAdd
     // CHECK_METAL: simd_prefix_exclusive_sum
     float2 r1 = WavePrefixSum(v1);
-    
+
     outputBuffer[idx] = (int)r1.x;
 }

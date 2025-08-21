@@ -2,5 +2,5 @@
 
 struct Foo
 {
-	float4 bar;
+    float4 bar;
 };

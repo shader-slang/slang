@@ -23,7 +23,7 @@ void func(float v)
 // CHECK: (&kernelContext{{.*}})->myArr{{.*}} = &myArr{{.*}};
 // CHECK-ASM: define void @main_kernel
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main_kernel(uint3 tid: SV_DispatchThreadID)
 {
     myArr[tid.x] = tid.x;

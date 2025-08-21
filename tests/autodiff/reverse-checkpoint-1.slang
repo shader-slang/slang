@@ -38,7 +38,7 @@ float f(int p, float x)
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     dpfloat dpa = dpfloat(2.0, 0.0);
 

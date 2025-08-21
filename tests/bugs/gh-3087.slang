@@ -19,11 +19,12 @@
 struct PSInput
 {
     uint vInstance : SV_InstanceID;
-	float4 color : COLOR;
+    float4 color : COLOR;
 };
 
 [shader("pixel")]
-float4 main(PSInput input) : SV_TARGET
+float4 main(PSInput input)
+    : SV_TARGET
 {
-	return input.color + float(input.vInstance).xxxx;
+    return input.color + float(input.vInstance).xxxx;
 }

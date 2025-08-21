@@ -3,9 +3,9 @@
 
 struct Output
 {
-  float4 Diffuse  : SV_Target0;
-  float4 Normal   : SV_Target1;
-  float4 Material : SV_Target2;
+    float4 Diffuse : SV_Target0;
+    float4 Normal : SV_Target1;
+    float4 Material : SV_Target2;
 }
 
 // CHECK-ASM: define {{.*}} @fragMain

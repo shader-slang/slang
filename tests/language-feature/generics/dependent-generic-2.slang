@@ -1,7 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-// Test that we can infer a generic type parameter from the base type of a dependent generic argument.
+// Test that we can infer a generic type parameter from the base type of a dependent generic
+// argument.
 
 interface IFoo : IDefaultInitializable
 {
@@ -10,10 +11,7 @@ interface IFoo : IDefaultInitializable
 
 struct Foo : IFoo
 {
-    int get()
-    {
-        return 1;
-    }
+    int get() { return 1; }
 }
 
 interface IBar<T : IFoo>
@@ -30,7 +28,7 @@ struct Bar<T : IFoo> : IBar<T>
     }
 }
 
-int test<T:IFoo, B : IBar<T>>(B b)
+int test<T : IFoo, B : IBar<T>>(B b)
 {
     return b.getVal();
 }
@@ -39,7 +37,7 @@ int test<T:IFoo, B : IBar<T>>(B b)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     Bar<Foo> obj2;
     let result = test(obj2);

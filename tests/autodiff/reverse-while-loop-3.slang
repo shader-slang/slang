@@ -5,9 +5,10 @@
 //TEST_INPUT:ubuffer(data=[1], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// This test isn't actually testing the output, but rather that the compiler doesn't crash upon 
-// encountering a specific loop pattern. ('Data' is non-differentiable here, so the expected output is 0)
-// 
+// This test isn't actually testing the output, but rather that the compiler doesn't crash upon
+// encountering a specific loop pattern. ('Data' is non-differentiable here, so the expected output
+// is 0)
+//
 
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
@@ -21,10 +22,7 @@ struct P
 
 struct Data
 {
-    __init(float dataIn)
-    {
-        this.t = dataIn;
-    }
+    __init(float dataIn) { this.t = dataIn; }
     float t;
 };
 
@@ -59,7 +57,7 @@ float test_simple_while(float y, uint n)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(1.0, 0.0);

@@ -44,12 +44,11 @@ int doThing(Tuple2<float, int> v)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
-    let t  = makeTuple(index + 1.0f, index - 1);
-    
-	outputBuffer[index] = doThing(t);
-}
+    let t = makeTuple(index + 1.0f, index - 1);
 
+    outputBuffer[index] = doThing(t);
+}

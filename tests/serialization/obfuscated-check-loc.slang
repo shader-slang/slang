@@ -15,7 +15,7 @@ int silly(int a)
 {
     int t = 0;
     [ForceUnroll(10)]
-    while ( a > 0)
+    while (a > 0)
     {
         t = t + t + a;
     }
@@ -23,14 +23,12 @@ int silly(int a)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = int(dispatchThreadID.x);
-    
-    //String v = getString();
-    int v = silly(x);
-    
-    outputBuffer[x] = v;
-    
-}
 
+    // String v = getString();
+    int v = silly(x);
+
+    outputBuffer[x] = v;
+}

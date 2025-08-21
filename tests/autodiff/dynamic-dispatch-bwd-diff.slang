@@ -19,7 +19,7 @@ struct A : IInterface
     float a;
     [BackwardDifferentiable]
     [NoDiffThis]
-    float calc(float x) { return a*x*x; }
+    float calc(float x) { return a * x * x; }
 };
 
 struct B : IInterface
@@ -27,7 +27,7 @@ struct B : IInterface
     float a;
     [BackwardDifferentiable]
     [NoDiffThis]
-    float calc(float x) { return a*x*x*x; }
+    float calc(float x) { return a * x * x * x; }
 };
 
 [BackwardDifferentiable]
@@ -40,7 +40,7 @@ float run(IInterface obj, float x)
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 0.5f); // A
     var p = diffPair(3.0);

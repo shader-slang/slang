@@ -3,12 +3,12 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
-void computeMain(uint tig : SV_GroupIndex)
+void computeMain(uint tig: SV_GroupIndex)
 {
     outputBuffer[tig] = zap();
 }
 
-func foo(f : functype (float) -> int) -> int
+func foo(f: functype(float)->int)->int
 {
     return f(0);
 }

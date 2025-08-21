@@ -16,8 +16,7 @@ float fetchData(uint2 coords, uint index)
     return gParams.textures[NonUniformResourceIndex(index)][coords];
 }
 
-float4 main(
-	uint3 uv : UV)
+float4 main(uint3 uv: UV)
     : SV_Target
 {
     // CHECK: OpDecorate %{{.*}} NonUniform

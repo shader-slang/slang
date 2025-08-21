@@ -5,17 +5,18 @@
 
 struct Fragment
 {
-	uint foo;
+    uint foo;
 };
 
 cbuffer U
 {
-	uint bar;
+    uint bar;
 }
 
-Fragment main() : SV_Target
+Fragment main()
+    : SV_Target
 {
-	Fragment result;
-	result.foo = bar;
-	return result;
+    Fragment result;
+    result.foo = bar;
+    return result;
 }

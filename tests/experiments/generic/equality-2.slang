@@ -2,7 +2,7 @@
 
 /* A test for equality around interface types
 
-This does work. 
+This does work.
 
 It is here, because it seems like an awkward to do things, and only applys to struct like types.
  */
@@ -19,24 +19,19 @@ interface IEquality
 struct A : IEquality
 {
     typedef A Type;
-    bool isEqual(IEquality rhs)
-    {
-        return value == rhs.value;
-    }
+    bool isEqual(IEquality rhs) { return value == rhs.value; }
     int value;
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
     A a = { 1 };
     A b = { 2 };
-    
+
     bool isEqual = a.isEqual(b);
 
-	outputBuffer[index] = 1 + int(isEqual);
+    outputBuffer[index] = 1 + int(isEqual);
 }
-
-

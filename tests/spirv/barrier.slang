@@ -3,7 +3,7 @@
 
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 [shader("compute")]
 void main()
 {

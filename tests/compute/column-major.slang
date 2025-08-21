@@ -8,7 +8,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -Xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute -shaderobj -Xslang -matrix-layout-column-major
 
-// This data is in column major layout order.... 
+// This data is in column major layout order....
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 10.0  0.0 1.0 0.0 20.0  0.0 0.0 1.0 30.0  0.0 0.0 0.0 1.0]):name matrixBuffer
 
 ConstantBuffer<float4x4> matrixBuffer;
@@ -22,24 +22,21 @@ bool floatCheck(float data, float valueToCheckFor)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float4 v = float4(1, 2, 3, 1);
 
     float4x4 M1 = matrixBuffer;
-    
+
     float4 r = mul(v, M1);
 
     float4x4 M2 = mul(M1, M1);
 
-    float4x4 M3 = float4x4(
-            1.0, 0.0, 0.0, 10.0, 
-            0.0, 1.0, 0.0, 20.0,
-            0.0, 0.0, 1.0, 30.0,
-            0.0, 0.0, 0.0, 1.0
-        );
+    float4x4 M3 =
+        float4x4(1.0, 0.0, 0.0, 10.0, 0.0, 1.0, 0.0, 20.0, 0.0, 0.0, 1.0, 30.0, 0.0, 0.0, 0.0, 1.0);
 
-    output[0] = uint(true
+    output[0] = uint(
+        true
             && floatCheck(r.x, 11)
             && floatCheck(r.y, 22)
             && floatCheck(r.z, 33)
@@ -54,6 +51,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             && floatCheck(M2._42_33[0], 40)
 
             && floatCheck(M3[0][3], 10)
-        );
+    );
     //BUF: 1
 }

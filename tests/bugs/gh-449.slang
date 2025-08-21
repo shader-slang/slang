@@ -6,7 +6,10 @@
 // mix scalars with vectors that have a different
 // element type.
 
-struct S { int dummy; };
+struct S
+{
+    int dummy;
+};
 
 void foo(S s);
 
@@ -15,7 +18,7 @@ void main()
     // This works fine right now. The `uint` gets converted to a
     // `float`, and then we do the addition.
     float2 a = float2(1, 2);
-    uint   b = 3;
+    uint b = 3;
     foo(a + b);
     // CHECK:      tests/bugs/gh-449.slang([[#@LINE-1]]): error 30019: expected an expression of type 'S', got 'vector<float,2>'
     // CHECK-NEXT:     foo(a + b);

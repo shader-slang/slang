@@ -5,7 +5,7 @@ SamplerComparisonState sampler;
 
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     output[0] = texture.SampleCmpLevelZero(sampler, float2(0, 0), 0);

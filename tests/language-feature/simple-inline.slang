@@ -7,7 +7,7 @@
 [ForceInline]
 int test(int r)
 {
-    return r+2;
+    return r + 2;
 }
 
 [ForceInline]

@@ -9,7 +9,10 @@ void expectUniform(dynamic_uniform int v)
 }
 
 [NonUniformReturn]
-int produceNonUniform() { return 0; }
+int produceNonUniform()
+{
+    return 0;
+}
 
 struct B
 {
@@ -43,7 +46,7 @@ void main(int tid: SV_DispatchThreadID)
     int d = ub.a + ub.c;
     int f = ub.a + tid;
     int ff = ub.a + produceNonUniform();
-    
+
     // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     expectUniform(f);
     // CHECK-DAG: ([[# @LINE+1]]): warning 41201
@@ -82,7 +85,7 @@ void main(int tid: SV_DispatchThreadID)
 
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(getBdFromInout(obj));
-    
+
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     obj.d4 = d; // OK
 
@@ -94,5 +97,4 @@ void main(int tid: SV_DispatchThreadID)
 
     // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(asDynamicUniform(ff));
-
 }

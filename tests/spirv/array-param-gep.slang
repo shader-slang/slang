@@ -21,10 +21,10 @@ RWStructuredBuffer<float4> result;
 
 float4 shade(Scene scene, Material mat)
 {
-    return scene.textures[mat.texture].SampleLevel(scene.samplers[mat.sampler], float2(0,0), 0);
+    return scene.textures[mat.texture].SampleLevel(scene.samplers[mat.sampler], float2(0, 0), 0);
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain(uniform Material mat)
 {
     // CHECK: OpEntryPoint

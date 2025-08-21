@@ -14,7 +14,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let result = CoopVec<float, 4>(int(1),half(2),uint(3),double(4));
-    for(int i = 0; i < result.getCount(); ++i)
+    let result = CoopVec<float, 4>(int(1), half(2), uint(3), double(4));
+    for (int i = 0; i < result.getCount(); ++i)
         outputBuffer[i] = result[i];
 }

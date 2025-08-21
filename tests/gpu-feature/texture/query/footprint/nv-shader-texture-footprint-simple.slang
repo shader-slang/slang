@@ -58,8 +58,7 @@ cbuffer Uniforms
     uniform uint granularity;
 };
 
-void fragmentMain(
-    float v : VARYING)
+void fragmentMain(float v: VARYING)
 {
     uint index = uint(v);
     uint r = 0;
@@ -73,4 +72,3 @@ void fragmentMain(
 
     outputBuffer[index] = r;
 }
-

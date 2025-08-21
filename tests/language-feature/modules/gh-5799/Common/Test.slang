@@ -1,8 +1,7 @@
-//#pragma once
+// #pragma once
 #include "Simple.h"
 //
-//#ifndef HOST_CODE
-//implementing Common;
-//#endif
+// #ifndef HOST_CODE
+// implementing Common;
+// #endif
 implementing Common;
-

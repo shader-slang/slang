@@ -3,7 +3,7 @@
 
 // Test that we can use `where` clause to constrain generic type dependant on generic parameters.
 
-T process<T, int N>(vector<T, N> v) 
+T process<T, int N>(vector<T, N> v)
     where T : IFloat
     where vector<T, N> : IArithmetic
 {
@@ -13,7 +13,7 @@ T process<T, int N>(vector<T, N> v)
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     float a = 1.0;

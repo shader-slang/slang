@@ -16,22 +16,19 @@ interface ISimple
 struct Simple : ISimple
 {
     typedef float U;
-    U addt(U v0, float v1)
-    {
-        return v0 + v1;
-    }
+    U addt(U v0, float v1) { return v0 + v1; }
 };
 
-__generic<T:ISimple>
+__generic<T : ISimple>
 T.U test(T simple, T.U v0, T.U v1)
 {
     return simple.addt(v0, v1);
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Simple s;
-	float outVal = test<Simple>(s, 2.0, 1.0); // == 3.0
-	outputBuffer[dispatchThreadID.x] = outVal;
+    float outVal = test<Simple>(s, 2.0, 1.0); // == 3.0
+    outputBuffer[dispatchThreadID.x] = outVal;
 }

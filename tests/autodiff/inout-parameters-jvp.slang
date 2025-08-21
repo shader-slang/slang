@@ -25,7 +25,7 @@ void h(float x, float y, inout float z)
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float x = 2.0;
     float y = 3.5;
@@ -45,5 +45,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer[2] = dpz.d; // Expect: 21.5
     outputBuffer[3] = dpz.p; // Expect: 12.5
-
 }

@@ -20,9 +20,9 @@ float f(A obj)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    A a = {2.0, 3.0};
+    A a = { 2.0, 3.0 };
     var p = diffPair(a);
     let rs = __bwd_diff(f)(p, 1.0);
     outputBuffer[0] = p.d.x;

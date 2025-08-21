@@ -19,7 +19,7 @@ float lengthDiffZ(float3 x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         let x = float3(12, 23, 31);
@@ -30,8 +30,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[2] = dpx.d[2];
 
         // for reference:
-        //outputBuffer[3] = lengthDiffX(x);
-        //outputBuffer[4] = lengthDiffY(x);
-        //outputBuffer[5] = lengthDiffZ(x);
+        // outputBuffer[3] = lengthDiffX(x);
+        // outputBuffer[4] = lengthDiffY(x);
+        // outputBuffer[5] = lengthDiffZ(x);
     }
 }

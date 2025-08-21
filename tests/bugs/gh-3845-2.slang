@@ -1,15 +1,19 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj -vk -output-using-type
 
-struct Foo {float v;};
+struct Foo
+{
+    float v;
+};
 
-namespace foo {
-    typedef ::Foo Foo; // unexpected '::', expected identifier; works in dxc/hlsl
+namespace foo
+{
+typedef ::Foo Foo; // unexpected '::', expected identifier; works in dxc/hlsl
 
-    float test(Foo f)
-    {
-        return f.v;
-    }
+float test(Foo f)
+{
+    return f.v;
+}
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

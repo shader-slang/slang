@@ -17,7 +17,7 @@ Buffer<unorm float4> input;
 RWStructuredBuffer<float4> output;
 
 [numthreads(4, 1, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     output[tid] = input[tid];

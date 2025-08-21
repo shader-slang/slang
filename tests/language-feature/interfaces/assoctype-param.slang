@@ -1,17 +1,21 @@
 //TEST:INTERPRET(filecheck=CHECK):
 
-public interface IDataTrait {
+public interface IDataTrait
+{
     public associatedtype InputType;
     public static const int32_t kElementCount;
 }
 
-public struct DataTrait0 : IDataTrait {
+public struct DataTrait0 : IDataTrait
+{
     public typedef float InputType;
     public static const int32_t kElementCount = 2;
 }
 
-public interface IGenericInterface<Ti : IFloat> {
-    public Array<Di.InputType, Di.kElementCount> eval<Di : IDataTrait>(const Di.InputType interface_input);
+public interface IGenericInterface<Ti : IFloat>
+{
+    public Array<Di.InputType, Di.kElementCount> eval<Di : IDataTrait>(
+        const Di.InputType interface_input);
 }
 
 public struct GenericImpl<T : IFloat> : IGenericInterface<T>

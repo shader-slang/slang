@@ -12,11 +12,12 @@
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct MixedSizes {
-    uint8_t a : 4;   // First backing field (uint8_t)
-    uint8_t b : 4;   // Same backing field
-    uint16_t c : 8;  // New backing field (uint16_t) due to type change
-    uint16_t d : 8;  // Same backing field
+struct MixedSizes
+{
+    uint8_t a : 4;  // First backing field (uint8_t)
+    uint8_t b : 4;  // Same backing field
+    uint16_t c : 8; // New backing field (uint16_t) due to type change
+    uint16_t d : 8; // Same backing field
 };
 
 [numthreads(1, 1, 1)]
@@ -35,4 +36,3 @@ void computeMain()
     outputBuffer[0] = uint(*p8);
     outputBuffer[1] = uint(*p16);
 }
-

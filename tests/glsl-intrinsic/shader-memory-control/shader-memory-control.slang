@@ -11,18 +11,20 @@
 buffer MyBlockName1
 {
     uint data[];
-} raceCondition;
+}
+raceCondition;
 
 groupshared uint raceConditionShared;
 
 //TEST_INPUT: set raceConditionImage = RWTexture1D(format=R32Sint, size=4, content=one, mipMaps = 1)
-uniform layout(binding=0,r32i) iimage1D raceConditionImage;
+uniform layout(binding = 0, r32i) iimage1D raceConditionImage;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 

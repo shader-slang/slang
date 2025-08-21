@@ -7,9 +7,11 @@ layout(binding = 0) uniform accelerationStructureEXT as;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
-bool testVars() {
+bool testVars()
+{
     return true
 // CHECK_GLSL-DAG: gl_HitTEXT
 // CHECK_SPV-DAG: RayTmax{{NV|KHR}}
@@ -17,7 +19,7 @@ bool testVars() {
 // CHECK_GLSL-DAG: gl_HitKindEXT
 // CHECK_SPV-DAG: HitKind{{NV|KHR}}
         && gl_HitKindEXT != 0xFFFFFFFF
-        ;    
+        ;
 }
 
 void main()

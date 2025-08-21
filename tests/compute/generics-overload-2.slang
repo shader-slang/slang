@@ -10,29 +10,26 @@ RWStructuredBuffer<float> outputBuffer;
 __generic<T : __BuiltinFloatingPointType>
 struct Foo
 {
-	T test(uint index, T x)
-    {
-        return __realCast<T, float>(1.f);
-	}
+    T test(uint index, T x) { return __realCast<T, float>(1.f); }
 
-	__generic<let N: int>
-	T test(vector<uint, N> index, T x)
+    __generic<let N : int>
+    T test(vector<uint, N> index, T x)
     {
         return __realCast<T, float>(2.f);
-	}
+    }
 };
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x + 2;
-	
-	Foo<float> obj;
+    uint tid = dispatchThreadID.x + 2;
 
-	float outVal = obj.test(tid, 0.f);
-	outputBuffer[0] = outVal; // Expect: 1
+    Foo<float> obj;
 
-	float outVal2 = obj.test(uint2(tid, tid), 0.f);
-	outputBuffer[1] = outVal2; // Expect: 2
+    float outVal = obj.test(tid, 0.f);
+    outputBuffer[0] = outVal; // Expect: 1
+
+    float outVal2 = obj.test(uint2(tid, tid), 0.f);
+    outputBuffer[1] = outVal2; // Expect: 2
 }

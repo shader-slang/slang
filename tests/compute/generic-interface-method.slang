@@ -11,7 +11,7 @@ struct DisneyBRDFPattern
     float specular, metallic, roughness;
     float opacity;
     float3 emmissive;
-    float ambientOcclusion;  
+    float ambientOcclusion;
 };
 
 struct VertexPosition
@@ -37,29 +37,29 @@ interface IVertexInterpolant
 
 interface IDisneyBRDFPattern
 {
-    __generic<TVertexInterpolant:IVertexInterpolant>
+    __generic<TVertexInterpolant : IVertexInterpolant>
     DisneyBRDFPattern evalPattern(
-        CameraView cam, 
-        VertexPosition vWorld,  
-        VertexPosition vObject, 
+        CameraView cam,
+        VertexPosition vWorld,
+        VertexPosition vObject,
         TVertexInterpolant interpolants);
 }
 
 struct StandardVertexInterpolant : IVertexInterpolant
 {
     float4 getVertexColor(int index) { return float4(0.0); }
-    int getVertexColorCount() { return 0;}
+    int getVertexColorCount() { return 0; }
     float2 getUV(int index) { return float2(0.0); }
-    int getUVCount() {return 1; }
+    int getUVCount() { return 1; }
 };
 
 struct MaterialPattern1 : IDisneyBRDFPattern
 {
-    __generic<TVertexInterpolant:IVertexInterpolant>
+    __generic<TVertexInterpolant : IVertexInterpolant>
     DisneyBRDFPattern evalPattern(
-        CameraView cam, 
-        VertexPosition vWorld,  
-        VertexPosition vObject, 
+        CameraView cam,
+        VertexPosition vWorld,
+        VertexPosition vObject,
         TVertexInterpolant interpolants)
     {
         DisneyBRDFPattern rs;
@@ -69,19 +69,21 @@ struct MaterialPattern1 : IDisneyBRDFPattern
     }
 };
 
-__generic<TVertexInterpolant:IVertexInterpolant, TPattern : IDisneyBRDFPattern>
+__generic<
+    TVertexInterpolant : IVertexInterpolant,
+    TPattern : IDisneyBRDFPattern>
 float test(TVertexInterpolant vertInterps, TPattern pattern)
 {
     CameraView cam;
     VertexPosition vW, vO;
-    DisneyBRDFPattern rs = pattern.evalPattern(cam, vW, vO, vertInterps);    
+    DisneyBRDFPattern rs = pattern.evalPattern(cam, vW, vO, vertInterps);
     return rs.baseColor.x;
 }
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     StandardVertexInterpolant vertInterp;
     MaterialPattern1 mp1;
-	float outVal = test<StandardVertexInterpolant, MaterialPattern1>(vertInterp, mp1);
-	outputBuffer[dispatchThreadID.x] = outVal;
+    float outVal = test<StandardVertexInterpolant, MaterialPattern1>(vertInterp, mp1);
+    outputBuffer[dispatchThreadID.x] = outVal;
 }

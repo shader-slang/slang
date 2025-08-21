@@ -10,13 +10,11 @@ interface ITwoParamGeneric<A, B>
 struct Foo<A, B> : ITwoParamGeneric<A, B>
 {
     int val = 0;
-    int getVal()
-    {
-       return val; 
-    }
+    int getVal() { return val; }
 }
 
-extension<A, B> Foo<A,B> where A == B
+extension<A, B> Foo<A, B>
+    where A == B
 {
     [mutating]
     void setVal(int dataIn)
@@ -25,9 +23,8 @@ extension<A, B> Foo<A,B> where A == B
     }
 }
 
-void test<A, B>(Foo<A,B> x) where A == B
-{
-}
+void test<A, B>(Foo<A, B> x)
+    where A == B {}
 
 //TEST_INPUT: set outBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float4> outBuffer;

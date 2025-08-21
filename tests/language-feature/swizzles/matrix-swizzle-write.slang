@@ -4,13 +4,14 @@
 
 // Test that matrix swizzle writes work correctly
 // Matrix swizzles can either be one or zero indexed
-// Reference: https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-per-component-math
+// Reference:
+// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-per-component-math
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex)
+void computeMain(uint tid: SV_GroupIndex)
 {
     // 0 0
     // 0 0
@@ -24,5 +25,5 @@ void computeMain(uint tid : SV_GroupIndex)
     // 4 3
     m._m00_m11 = float2(2, 3);
 
-    outputBuffer[tid] = m[tid/2][tid%2];
+    outputBuffer[tid] = m[tid / 2][tid % 2];
 }

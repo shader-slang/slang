@@ -42,10 +42,9 @@
 
 // CHECK_2026: OpEntryPoint
 
-[numthreads(1,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK_LEGACY: ([[# @LINE+1]]): error 30027
-    let x = (1,2,3)._1_2;
-    
+    let x = (1, 2, 3)._1_2;
 }

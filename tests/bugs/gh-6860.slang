@@ -1,10 +1,15 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 // CHECK: OpEntryPoint
-func breaker()->float {
-    var x: float;
-    for (int i = 0; i < 1; ++i) {
-        if (true) {
-        } else {
+func breaker()->float
+{
+    var x : float;
+    for (int i = 0; i < 1; ++i)
+    {
+        if (true)
+        {
+        }
+        else
+        {
             x = 0.0;
         }
     }

@@ -11,7 +11,7 @@ public struct DiffuseMaterial : IMaterial
 
     public DiffuseMaterialInstance setupMaterialInstance()
     {
-        DiffuseMaterialInstance mi = { {baseColor} };
+        DiffuseMaterialInstance mi = { { baseColor } };
         return mi;
     }
 };

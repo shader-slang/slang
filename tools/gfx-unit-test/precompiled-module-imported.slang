@@ -4,8 +4,8 @@ __include "precompiled-module-included.slang";
 
 namespace ns
 {
-    public int helperFunc()
-    {
-        return 1;
-    }
+public int helperFunc()
+{
+    return 1;
+}
 }

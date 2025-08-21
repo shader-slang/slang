@@ -10,21 +10,21 @@
 
 int test(int val)
 {
-	int squared = val * val;
-	float result = sqrt(squared);
-	return int(result);
+    int squared = val * val;
+    float result = sqrt(squared);
+    return int(result);
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name gBuffer
 RWStructuredBuffer<int> gBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	int inVal = int(tid);
-	int outVal = test(inVal);
+    int inVal = int(tid);
+    int outVal = test(inVal);
 
-	gBuffer[tid] = outVal;
+    gBuffer[tid] = outVal;
 }

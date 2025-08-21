@@ -19,12 +19,18 @@ interface IMyInterface : IArithmetic
 
 extension float : IMyInterface
 {
-    int myMethod() { return 4; }
+    int myMethod()
+    {
+        return 4;
+    }
 }
 
 extension double : IMyInterface
 {
-    int myMethod() { return 8; }
+    int myMethod()
+    {
+        return 8;
+    }
 }
 
 int genTest<T : IMyInterface>(T v0, T v1)
@@ -37,7 +43,7 @@ int genTest<T : IMyInterface>(T v0, T v1)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     outputBuffer[tid] = int(simpleTest<float>(1.0f, 2.0f)) + genTest<float>(1.0f, 2.0f);

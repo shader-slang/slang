@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
 //TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
-// due to implementation limitations (slang-check-expr.cpp, `void visitMemberExpr()`) we are unable to 
-// implement and use .length with glsl vectors to test `readonly writeonly` 
-//#define TEST_whenVectorLengthIsImplemented
+// due to implementation limitations (slang-check-expr.cpp, `void visitMemberExpr()`) we are unable
+// to implement and use .length with glsl vectors to test `readonly writeonly`
+// #define TEST_whenVectorLengthIsImplemented
 
 // CHECK_SPV: OpEntryPoint
 
@@ -29,16 +29,19 @@ restrict volatile buffer Block1
     writeonly uint data4;
     coherent uint data5;
     volatile uint data6;
-} inputBuffer1;
+}
+inputBuffer1;
 
 //CHECK_GLSL: coherent
 //CHECK_GLSL: readonly
 //CHECK_SPV: OpMemberDecorate %{{.*}} 0 NonWritable
 //CHECK_SPV: OpDecorate %{{.*}} Coherent
-coherent buffer Block2 {
+coherent buffer Block2
+{
     readonly vec4 member1;
     vec4 member2;
-}inputBuffer2;
+}
+inputBuffer2;
 
 //CHECK_GLSL: {{(coherent|readonly)}} {{(coherent|readonly)}}
 //CHECK_GLSL: coherent
@@ -46,10 +49,12 @@ coherent buffer Block2 {
 //CHECK_SPV: OpMemberDecorate %{{.*}} 0 {{(Coherent|NonWritable)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 1 Coherent
 //CHECK_SPV: OpDecorate %{{.*}}
-buffer Block3 {
+buffer Block3
+{
     coherent readonly vec4 member1;
     coherent vec4 member2;
-}inputBuffer3;
+}
+inputBuffer3;
 
 //CHECK_GLSL: {{(coherent|readonly)}} {{(coherent|readonly)}}
 //CHECK_GLSL: coherent
@@ -61,7 +66,8 @@ buffer Block3 {
 //CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonReadable|Volatile)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 2 {{(NonReadable|Volatile)}}
 //CHECK_SPV: OpMemberDecorate %{{.*}} 3 NonWritable
-buffer Block4 {
+buffer Block4
+{
     struct structTmp
     {
         int val;
@@ -70,7 +76,8 @@ buffer Block4 {
     coherent int member2;
     volatile writeonly int member3;
     readonly structTmp member4;
-}inputBuffer4;
+}
+inputBuffer4;
 
 // CHECK_GLSL: main
 layout(local_size_x = 1) in;

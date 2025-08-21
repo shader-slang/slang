@@ -21,10 +21,10 @@ float test(MyType* pObj)
 
 cbuffer Constants
 {
-    MyType *ptr;
+    MyType* ptr;
 };
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputBuffer[0] = test(ptr);

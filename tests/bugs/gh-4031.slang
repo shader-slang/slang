@@ -7,14 +7,14 @@ RWStructuredBuffer<int> outputBuffer;
 
 bool Test_unpackUnorm4x8()
 {
-    vector<float,4> val;
+    vector<float, 4> val;
     val[0] = 1.f / 1.f;
     val[1] = 1.f / 2.f;
     val[2] = 1.f / 4.f;
     val[3] = 1.f / 8.f;
 
     const uint32_t packed = packUnorm4x8(val);
-    const vector<float,4> unpacked = unpackUnorm4x8(packed);
+    const vector<float, 4> unpacked = unpackUnorm4x8(packed);
 
     return true
         && int(unpacked[0] * 1.f) == 1
@@ -26,14 +26,14 @@ bool Test_unpackUnorm4x8()
 
 bool Test_unpackSnorm4x8()
 {
-    vector<float,4> val;
+    vector<float, 4> val;
     val[0] = 1.f / 1.f;
     val[1] = 1.f / 2.f;
     val[2] = 1.f / 4.f;
     val[3] = 1.f / 8.f;
 
     const uint32_t packed = packSnorm4x8(val);
-    const vector<float,4> unpacked = unpackSnorm4x8(packed);
+    const vector<float, 4> unpacked = unpackSnorm4x8(packed);
 
     return true
         && int(unpacked[0] * 1.f) == 1
@@ -44,10 +44,11 @@ bool Test_unpackSnorm4x8()
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     //BUF:1
-    outputBuffer[0] = int(true
+    outputBuffer[0] =
+        int(true
         && Test_unpackUnorm4x8()
         && Test_unpackSnorm4x8()
         );

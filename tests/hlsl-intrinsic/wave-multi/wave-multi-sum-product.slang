@@ -30,7 +30,8 @@ bool test1SumProduct(uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVSumProduct(uint4 mask) {
+bool testVSumProduct(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let sumResult = GVec(T(gSumResult));
@@ -96,7 +97,7 @@ bool testSumProduct(uint4 mask)
 
 [numthreads(32, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = dispatchThreadID.x;
 
@@ -107,7 +108,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             & testSumProduct(mask)
-            ;
+        ;
 
     // CHECK-COUNT-32: 1
     outputBuffer[index] = uint(result);

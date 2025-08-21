@@ -8,7 +8,8 @@ enum unscopedEnum : uint32_t
 {
     kEnumVal1 = 5,
     kEnumVal2 = 6,
-};
+}
+;
 
 struct structWithEnumVal
 {
@@ -21,7 +22,7 @@ void takeInToWriteFruit(unscopedEnum inData, structWithEnumVal inData2)
     outputBuffer[1] = inData2.val;
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 5

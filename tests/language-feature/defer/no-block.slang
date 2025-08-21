@@ -22,7 +22,9 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     while (i < 7)
         defer outputBuffer[i++] = 0x81;
 
-    do defer outputBuffer[i++] = 0x82; while (false);
+    do
+        defer outputBuffer[i++] = 0x82;
+    while (false);
 
     outputBuffer[i++] = 5;
 }

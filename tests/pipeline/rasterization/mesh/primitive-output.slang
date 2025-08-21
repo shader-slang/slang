@@ -8,17 +8,10 @@
 //SPV_CHECK: SPV_EXT_mesh_shader
 //SPV_CHECK: CullPrimitiveEXT
 
-const static float2 positions[3] = {
-    float2(0.0, -0.5),
-    float2(0.5, 0.5),
-    float2(-0.5, 0.5)
-};  
+const static float2 positions[3] = { float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5) };
 
-const static float3 colors[3] = {
-    float3(1.0, 1.0, 0.0),
-    float3(0.0, 1.0, 1.0),
-    float3(1.0, 0.0, 1.0)
-};
+const static float3 colors[3] =
+    { float3(1.0, 1.0, 0.0), float3(0.0, 1.0, 1.0), float3(1.0, 0.0, 1.0) };
 
 struct Vertex
 {
@@ -39,23 +32,23 @@ const static uint MAX_PRIMS = 1;
 [outputtopology("triangle")]
 [numthreads(3, 1, 1)]
 void main(
-    in uint tig : SV_GroupIndex,
+    in uint tig: SV_GroupIndex,
     OutputIndices<uint3, MAX_PRIMS> triangles,
     OutputVertices<Vertex, MAX_VERTS> verts,
-    OutputPrimitives<Prim, MAX_PRIMS> primitives
-    )
+    OutputPrimitives<Prim, MAX_PRIMS> primitives)
 {
     const uint numVertices = 3;
     const uint numPrimitives = 1;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    if(tig < numVertices) {
-        verts[tig] = {float4(positions[tig], 0, 1), colors[tig]};
+    if (tig < numVertices)
+    {
+        verts[tig] = { float4(positions[tig], 0, 1), colors[tig] };
     }
 
-    if(tig < numPrimitives) {
-        triangles[tig] = uint3(0,1,2);
-        primitives[tig] = {float3(0,0,1), tig, false};
+    if (tig < numPrimitives)
+    {
+        triangles[tig] = uint3(0, 1, 2);
+        primitives[tig] = { float3(0, 0, 1), tig, false };
     }
 }
-

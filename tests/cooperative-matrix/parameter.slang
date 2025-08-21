@@ -14,10 +14,11 @@ RWStructuredBuffer<float> outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 static let stride = 16;
-//static let matrixLayout = CoopMatMatrixLayout::RowMajor;
+// static let matrixLayout = CoopMatMatrixLayout::RowMajor;
 static const CoopMatMatrixLayout matrixLayout = CoopMatMatrixLayout::RowMajor;
 
 void processCoopMat(CoopMatType mat)

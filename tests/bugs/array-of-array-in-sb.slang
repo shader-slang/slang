@@ -18,7 +18,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 6
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     s_buf[0].vertices[1][1] = 5;
     outputBuffer[0] = s_buf[0].vertices[1][1] + cs.vertices[1][0];

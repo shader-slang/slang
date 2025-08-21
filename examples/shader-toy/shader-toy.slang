@@ -38,7 +38,7 @@ interface IShaderToyImageShader
     //
     // We can translate that signature almost verbatim into Slang:
     //
-    void mainImage( out float4 fragColor, in float2 fragCoord );
+    void mainImage(out float4 fragColor, in float2 fragCoord);
 
     // An image shader effect will thus be a Slang `struct` type
     // that implements the `IShaderToyImageShader` interface.
@@ -87,7 +87,7 @@ interface IShaderToyImageShader
 // triangle, so it is almost trivial:
 //
 [shader("vertex")]
-float4 vertexMain(float2 position : POSITION)
+float4 vertexMain(float2 position: POSITION)
     : SV_Position
 {
     // TODO: We could even turn this into a shader that
@@ -106,8 +106,7 @@ float4 vertexMain(float2 position : POSITION)
 // interface.
 //
 [shader("fragment")]
-float4 fragmentMain<T : IShaderToyImageShader>(
-    float4 sv_position : SV_Position)
+float4 fragmentMain<T : IShaderToyImageShader>(float4 sv_position: SV_Position)
     : SV_Target
 {
     // Because the Slang compiler knows the interface that `T`
@@ -160,7 +159,7 @@ float4 fragmentMain<T : IShaderToyImageShader>(
 //
 [shader("compute")]
 void computeMain<T : IShaderToyImageShader>(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform RWTexture2D<float4> image)
 {
     // The operations required to set up and execute
@@ -302,10 +301,7 @@ struct mat2
 {
     float2x2 data;
 
-    __init(float e00, float e01, float e10, float e11)
-    {
-        data = float2x2(e00, e01, e10, e11);
-    }
+    __init(float e00, float e01, float e10, float e11) { data = float2x2(e00, e01, e10, e11); }
 
     // TODO: We need to fill in the other intializers and members
     // available on matrices here.

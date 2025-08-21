@@ -22,45 +22,46 @@ TextureCubeArray<float> cudaTCubeArray;
 RWStructuredBuffer<uint> cudaOutputBuffer;
 
 [numthreads(7, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    
+
     switch (idx)
     {
-        case 0:
+    case 0:
         {
             // Test 1D texture width
             cudaT1D.GetDimensions(width);
             cudaOutputBuffer[idx] = width;
             break;
         }
-        case 1:
+    case 1:
         {
             // Test 2D texture width and height
             cudaT2D.GetDimensions(width, height);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
-        case 2:
+    case 2:
         {
             // Test 3D texture width, height and depth
             cudaT3D.GetDimensions(width, height, depth);
-            cudaOutputBuffer[idx] = ((0xff & width) << 16) | ((0xff & height) << 8) | (0xff & depth);
+            cudaOutputBuffer[idx] =
+                ((0xff & width) << 16) | ((0xff & height) << 8) | (0xff & depth);
             break;
         }
-        case 3:
+    case 3:
         {
             // Test Cube texture width and height
             cudaTCube.GetDimensions(width, height);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
-        case 4:
+    case 4:
         {
             // Test 2D array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
@@ -68,7 +69,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
-        case 5:
+    case 5:
         {
             // Test Cube array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
@@ -76,11 +77,11 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
-        case 6:
+    case 6:
         {
             // Reserved for future use
             cudaOutputBuffer[idx] = 0;
             break;
         }
     }
-} 
+}

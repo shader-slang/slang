@@ -8,22 +8,26 @@ RWStructuredBuffer<int> outputBuffer;
 enum MyError1
 {
     Fail = 0x10
-};
+}
+;
 
 enum MyError2
 {
     Fail = 0x20
-};
+}
+;
 
 int f(int n) throws MyError1
 {
-    if (n == 1) throw MyError1.Fail;
+    if (n == 1)
+        throw MyError1.Fail;
     return n;
 }
 
 int g(int n) throws MyError2
 {
-    if (n == 2) throw MyError2.Fail;
+    if (n == 2)
+        throw MyError2.Fail;
     return n;
 }
 
@@ -31,12 +35,16 @@ void handlerFunc(int i, int n)
 {
     do
     {
-        int a = try f(n);
-        int b = try g(n);
-        int c = a+b+1;
+        int a =
+        try
+            f(n);
+        int b =
+        try
+            g(n);
+        int c = a + b + 1;
         outputBuffer[i] = c;
     }
-    catch(err: MyError1)
+    catch (err: MyError1)
     {
         outputBuffer[i] = reinterpret<int>(err);
     }

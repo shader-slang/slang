@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* Find max algorithm. 
+/* Find max algorithm.
 
 Works.
  */
@@ -13,10 +13,10 @@ interface IComparable
     bool isLess(This other);
 };
 
-extension int : IComparable
-{
-	bool isLess(int other) { return this < other; }
-};
+extension int : IComparable { bool isLess(int other) { return this < other;
+}
+}
+;
 
 T findMax<T : IComparable, let SIZE : int>(T arr[SIZE])
 {
@@ -33,13 +33,11 @@ T findMax<T : IComparable, let SIZE : int>(T arr[SIZE])
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
-    int values[] = { 1, 3, - 1};
-    
-	outputBuffer[index] = findMax<int, 3>(values);
+    int values[] = { 1, 3, -1 };
+
+    outputBuffer[index] = findMax<int, 3>(values);
 }
-
-

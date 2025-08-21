@@ -9,10 +9,7 @@ struct A
 {
     float x;
 
-    float f(float v)
-    {
-        return v * v;
-    }
+    float f(float v) { return v * v; }
 }
 
 extension A
@@ -48,9 +45,9 @@ float test(Foo<float> obj, float v)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    Foo<float> a = {0.0};
+    Foo<float> a = { 0.0 };
     var p = diffPair(3.0, 1.0);
     let rs = __fwd_diff(test)(a, p);
     outputBuffer[0] = rs.d;

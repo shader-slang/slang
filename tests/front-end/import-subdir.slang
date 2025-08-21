@@ -4,4 +4,7 @@
 
 __import subdir.import_subdir_a;
 
-float bar(float x) { return foo(x); }
+float bar(float x)
+{
+    return foo(x);
+}

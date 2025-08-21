@@ -36,9 +36,7 @@ struct idefault4
     uint data;
 };
 
-extension idefault4 : IDefaultInitializable
-{
-}
+extension idefault4 : IDefaultInitializable {}
 
 struct idefault5_base : IDefaultInitializable
 {
@@ -68,7 +66,7 @@ idefault3 getDefault3()
 idefault4 getDefault4()
 {
     idefault4 default4;
-    return default4;   
+    return default4;
 }
 
 idefault5 getDefault5()

@@ -16,14 +16,14 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 struct AssembledVertex
 {
-	float3	position;
-	float3	color;
-    float2  uv;
+    float3 position;
+    float3 color;
+    float2 uv;
 #ifdef COLUMN_MAJOR
     column_major float4x4 m;
 #else
@@ -33,52 +33,52 @@ struct AssembledVertex
 
 struct CoarseVertex
 {
-	float3	color;
+    float3 color;
 };
 
 struct Fragment
 {
-	float4 color;
+    float4 color;
 };
 
 // Vertex  Shader
 
 struct VertexStageInput
 {
-	AssembledVertex assembledVertex	: A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 VertexStageOutput vertexMain(VertexStageInput input)
 {
-	VertexStageOutput output;
-	output.coarseVertex.color = input.assembledVertex.m[1][2];
+    VertexStageOutput output;
+    output.coarseVertex.color = input.assembledVertex.m[1][2];
     output.sv_position = mul(modelViewProjection, float4(input.assembledVertex.position, 1.0));
-	return output;
+    return output;
 }
 
 struct FragmentStageInput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
+    CoarseVertex coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	Fragment fragment	: SV_Target;
+    Fragment fragment : SV_Target;
 };
 
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
-	FragmentStageOutput output;
-	float3 color = input.coarseVertex.color;
-	output.fragment.color = float4(color, 1.0);
-	outputBuffer[0] = color.x;
+    FragmentStageOutput output;
+    float3 color = input.coarseVertex.color;
+    output.fragment.color = float4(color, 1.0);
+    outputBuffer[0] = color.x;
     // ROWMAJOR: 7.0
     // COLMAJOR: 10.0
-	return output;
+    return output;
 }

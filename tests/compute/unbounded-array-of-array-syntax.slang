@@ -14,7 +14,7 @@ RWStructuredBuffer<int> g_aoa[];
 //TEST_INPUT:ubuffer(data=[8 17 34], stride=4):name=g_aoa[1]
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // DXIL: cs_5_1
     // CHECK: OpCapability {{(ShaderNonUniform|StorageBufferArrayNonUniformIndexing)}}
@@ -35,13 +35,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
     int index = int(dispatchThreadID.x);
-    
+
     int baseIndex = index >> 2;
     int innerIndex = index & 3;
 
     RWStructuredBuffer<int> buffer = g_aoa[NonUniformResourceIndex(baseIndex)];
 
-    // Get the size 
+    // Get the size
     uint bufferCount, bufferStride;
     buffer.GetDimensions(bufferCount, bufferStride);
 
@@ -49,5 +49,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         innerIndex = int(bufferCount - 1);
     }
-	outputBuffer[index] = buffer[innerIndex]; 
+    outputBuffer[index] = buffer[innerIndex];
 }

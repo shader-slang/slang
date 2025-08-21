@@ -7,13 +7,14 @@
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 RWStructuredBuffer<int> outputBuffer;
 
 enum Enum : int8_t
 {
-};
+}
+;
 
 struct Hey
 {
@@ -28,7 +29,7 @@ struct Thing : Hey
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const int idx = asint(dispatchThreadID.x);
 
@@ -39,17 +40,25 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float g[alignof(a)];
 
-    int f[alignof(Thing) + alignof(float2) + alignof(g)]; 
+    int f[alignof(Thing) + alignof(float2) + alignof(g)];
 
     int size;
 
     switch (idx)
-    {   
-        default:
-        case 0:     size = alignof(float); break;
-        case 1:     size = alignof(float3); break;
-        case 2:     size = alignof(matrix<uint, 3, 2>); break;
-        case 3:     size = alignof(idx); break;
+    {
+    default:
+    case 0:
+        size = alignof(float);
+        break;
+    case 1:
+        size = alignof(float3);
+        break;
+    case 2:
+        size = alignof(matrix<uint, 3, 2>);
+        break;
+    case 3:
+        size = alignof(idx);
+        break;
     }
 
     outputBuffer[idx] = size + a + b + c + d + alignof(f);

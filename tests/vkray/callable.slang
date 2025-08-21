@@ -10,10 +10,7 @@ SamplerState gSampler;
 
 void main(in out MaterialPayload ioPayload)
 {
-	ioPayload.albedo = gAlbedoMap.SampleLevel(
-		gSampler,
-		ioPayload.uv,
-		0);
+    ioPayload.albedo = gAlbedoMap.SampleLevel(gSampler, ioPayload.uv, 0);
 }
 
 // CHECK-DAG: OpCapability RayTracingKHR

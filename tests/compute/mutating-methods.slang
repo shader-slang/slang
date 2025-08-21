@@ -6,22 +6,19 @@
 
 interface IAccumulator
 {
-	[mutating] void accumulate(int v);
+    [mutating]
+    void accumulate(int v);
 }
 
 struct Accumulator : IAccumulator
 {
     int state;
 
-	[mutating] void accumulate(int v)
-	{
-		state += v;
-	}
+    [mutating]
+    void accumulate(int v) { state += v; }
 
-	[mutating] void accumulateMore(int v)
-	{
-		this.state += v;
-	}
+    [mutating]
+    void accumulateMore(int v) { this.state += v; }
 }
 
 void doStuff<A : IAccumulator>(inout A a)
@@ -45,8 +42,8 @@ int test(int x)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
-	outputBuffer[tid] = test(tid);
+    int tid = dispatchThreadID.x;
+    outputBuffer[tid] = test(tid);
 }

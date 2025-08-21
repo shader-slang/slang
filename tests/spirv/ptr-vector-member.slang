@@ -5,15 +5,16 @@
 
 struct Push2
 {
-    uint4 * value;
+    uint4* value;
 };
 
-[[vk::push_constant]] Push2 push2;
+[[vk::push_constant]]
+Push2 push2;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main()
 {
-    uint * v = &push2.value[0].x;
+    uint* v = &push2.value[0].x;
     InterlockedAdd(*v, 1);
 }

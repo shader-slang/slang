@@ -7,5 +7,5 @@
 
 void broken()
 {
-	int a = b;
+    int a = b;
 }

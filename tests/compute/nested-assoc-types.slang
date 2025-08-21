@@ -32,10 +32,7 @@ struct A_Assoc_Assoc : IFoo
 {
     float a;
 
-    float foo()
-    {
-        return a;
-    }
+    float foo() { return a; }
 }
 
 struct A_Assoc : INestedInterface
@@ -47,7 +44,7 @@ struct A : IInterface
 {
     typedef A_Assoc MyAssocType
 
-    int data1;
+        int data1;
 
     __init(int data1) { this.data1 = data1; }
 
@@ -60,10 +57,7 @@ struct B_Assoc_Assoc : IFoo
 {
     float b;
 
-    float foo()
-    {
-        return b;
-    }
+    float foo() { return b; }
 }
 
 struct B_Assoc : INestedInterface
@@ -75,10 +69,14 @@ struct B : IInterface
 {
     typedef B_Assoc MyAssocType
 
-    int data1;
+        int data1;
     int data2;
 
-    __init(int data1, int data2) { this.data1 = data1; this.data2 = data2; }
+    __init(int data1, int data2)
+    {
+        this.data1 = data1;
+        this.data2 = data2;
+    }
 
     B_Assoc_Assoc calc(float x) { return { x * x * data1 * data2 }; }
 };
@@ -97,12 +95,12 @@ float f(uint id, float x)
 
     switch (id)
     {
-        case 0:
-            obj = A(2);
-            break;
+    case 0:
+        obj = A(2);
+        break;
 
-        default:
-            obj = B(2, 3);
+    default:
+        obj = B(2, 3);
     }
 
     return doThing(obj, x);
@@ -112,8 +110,8 @@ float f(uint id, float x)
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    outputBuffer[0] = f(dispatchThreadID.x, 1.0); // A.calc, expect 2
+    outputBuffer[0] = f(dispatchThreadID.x, 1.0);     // A.calc, expect 2
     outputBuffer[1] = f(dispatchThreadID.x + 1, 1.5); // B.calc, expect 13.5
 }

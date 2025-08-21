@@ -28,7 +28,7 @@ struct LineSegment : IDifferentiable
 [ForwardDerivative(fwd_loadLineSegment)]
 LineSegment loadLineSegment(uint id)
 {
-    return {endpointBuffer[id * 2], endpointBuffer[id * 2 + 1]};
+    return { endpointBuffer[id * 2], endpointBuffer[id * 2 + 1] };
 }
 
 [BackwardDerivative(d_fwd_loadLineSegment)]
@@ -57,7 +57,7 @@ float something()
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         LineSegment ls = __fwd_diff(loadLineSegment)(0).p;
@@ -73,6 +73,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         // Expect: 2.0 in endpointDifferentialBuffer[2]
         // Expect: 2.0 in endpointDifferentialBuffer[3]
-        __bwd_diff(something)(2.0); 
+        __bwd_diff(something)(2.0);
     }
 }

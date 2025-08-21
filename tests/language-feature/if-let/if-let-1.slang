@@ -41,7 +41,7 @@ int test1<T>(T t)
     {
         return 1;
     }
-    else if(let a = t as float)
+    else if (let a = t as float)
     {
         return 2;
     }

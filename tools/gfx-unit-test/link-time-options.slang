@@ -11,9 +11,9 @@ float getMacroDefinedForDownstream()
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void computeMain(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform RWStructuredBuffer<float> buffer)
 {
     buffer[sv_dispatchThreadID.x] = getMacroDefinedForDownstream();

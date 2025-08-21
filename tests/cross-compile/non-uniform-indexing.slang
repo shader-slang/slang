@@ -8,8 +8,7 @@
 Texture2D t[10];
 SamplerState s;
 
-float4 main(
-    float3 uv : UV)
+float4 main(float3 uv: UV)
     : SV_Target
 {
 #if defined(GLSL)

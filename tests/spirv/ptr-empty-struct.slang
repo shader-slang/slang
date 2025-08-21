@@ -2,14 +2,17 @@
 
 // CHECK: OpPtrAccessChain
 
-struct EmptyStruct {
+struct EmptyStruct
+{
 };
 
-[vk::push_constant] EmptyStruct* pc;
+[vk::push_constant]
+EmptyStruct* pc;
 
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(64)]
-void ComputeMain(uint tid: SV_DispatchThreadID) {
+void ComputeMain(uint tid: SV_DispatchThreadID)
+{
     outputBuffer[tid] = ((int*)(pc))[0];
 }

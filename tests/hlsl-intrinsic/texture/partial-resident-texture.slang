@@ -54,7 +54,10 @@ Texture2DMS<float4> t2DMS_f32v4;
 //
 // Depth textures.
 //
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -64,10 +67,12 @@ typealias depth2d = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -77,10 +82,12 @@ typealias depth2d_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -90,10 +97,12 @@ typealias depthcube = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
+__generic<
+    T : ITexelElement,
+    let sampleCount : int = 0,
+    let format : int = 0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
@@ -103,8 +112,7 @@ typealias depthcube_array = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
 //TEST_INPUT: Texture2D(size=4, content = zero, format=D32Float):name d2D
 depth2d<float> d2D;
@@ -134,21 +142,21 @@ bool TEST_depthTexture()
     uint status;
 
     return true
-        // =================
-        // float SampleCmp()
-        // =================
+           // =================
+           // float SampleCmp()
+           // =================
         && (status = getNotMapped(), all(0.0 == d2D.SampleCmp(samplerCmpState, float2(u), compareValue, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(0.0 == d2DArray.SampleCmp(samplerCmpState, float3(u, u, slice), compareValue, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
 
-        // ==========================
-        // float SampleCmpLevelZero()
-        // ==========================
+           // ==========================
+           // float SampleCmpLevelZero()
+           // ==========================
         && (status = getNotMapped(), all(0.0 == d2D.SampleCmpLevelZero(samplerCmpState, float2(u), compareValue, int2(offset), status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(0.0 == d2DArray.SampleCmpLevelZero(samplerCmpState, float3(u, u, slice), compareValue, int2(offset), status))) && CheckAccessFullyMapped(status)
 
-        // ======================
-        // float SampleCmpLevel()
-        // ======================
+           // ======================
+           // float SampleCmpLevel()
+           // ======================
         && (status = getNotMapped(), all(0.0 == d2D.SampleCmpLevel(samplerCmpState, float2(u), compareValue, level, int2(offset), status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(0.0 == d2DArray.SampleCmpLevel(samplerCmpState, float3(u, u, slice), compareValue, level, int2(offset), status))) && CheckAccessFullyMapped(status)
         ;
@@ -161,8 +169,7 @@ bool TEST_texture<T>(
     TextureCube<T> tCube,
     Texture1DArray<T> t1DArray,
     Texture2DArray<T> t2DArray,
-    TextureCubeArray<T> tCubeArray,
-    )
+    TextureCubeArray<T> tCubeArray, )
     where T : ITexelElement, IArithmetic
 {
     typealias TN = T;
@@ -180,36 +187,36 @@ bool TEST_texture<T>(
     uint status;
 
     return true
-        // ==========
-        // T Sample()
-        // ==========
+           // ==========
+           // T Sample()
+           // ==========
         && (status = getNotMapped(), all(TN(T(1)) == t1D.Sample(samplerState, u, offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.Sample(samplerState, float2(u), int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t3D.Sample(samplerState, float3(u), int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t1DArray.Sample(samplerState, float2(u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2DArray.Sample(samplerState, float3(u, u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
 
-        // ==============
-        // T SampleBias()
-        // ==============
+           // ==============
+           // T SampleBias()
+           // ==============
         && (status = getNotMapped(), all(TN(T(1)) == t1D.SampleBias(samplerState, u, bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.SampleBias(samplerState, float2(u), bias, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t3D.SampleBias(samplerState, float3(u), bias, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t1DArray.SampleBias(samplerState, float2(u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2DArray.SampleBias(samplerState, float3(u, u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
 
-        // ==============
-        // T SampleGrad()
-        // ==============
+           // ==============
+           // T SampleGrad()
+           // ==============
         && (status = getNotMapped(), all(TN(T(1)) == t1D.SampleGrad(samplerState, u, ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.SampleGrad(samplerState, float2(u), ddx, ddy, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t3D.SampleGrad(samplerState, float3(u), ddx, ddy, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t1DArray.SampleGrad(samplerState, float2(u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2DArray.SampleGrad(samplerState, float3(u, u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
 
-        // ==============
-        // T SampleLevel()
-        // ==============
+           // ==============
+           // T SampleLevel()
+           // ==============
         && (status = getNotMapped(), all(TN(T(1)) == t1D.SampleLevel(samplerState, u, level, offset, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.SampleLevel(samplerState, float2(u), level, int2(offset), status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t3D.SampleLevel(samplerState, float3(u), level, int3(offset), status))) && CheckAccessFullyMapped(status)
@@ -218,9 +225,7 @@ bool TEST_texture<T>(
         ;
 }
 
-bool TEST_load<T>(
-    Texture2D<T> t2D,
-    Texture2DMS<T> t2DMS)
+bool TEST_load<T>(Texture2D<T> t2D, Texture2DMS<T> t2DMS)
     where T : ITexelElement, IArithmetic
 {
     typealias TN = T;
@@ -238,7 +243,7 @@ bool TEST_load<T>(
 
         && (status = getNotMapped(), all(TN(T(1)) == t2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
-            // SPIRV does not support sparse buffer loads.
+// SPIRV does not support sparse buffer loads.
 #if !defined(VK)
         && (status = getNotMapped(), 2 == outputBuffer.Load(0, status)) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), 1 == iBuf.Load(0, status)) && CheckAccessFullyMapped(status)
@@ -253,26 +258,24 @@ bool TEST_load<T>(
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true
-        // Make sure CheckAccessFullyMapped can return false
+                  // Make sure CheckAccessFullyMapped can return false
         && (!CheckAccessFullyMapped(getNotMapped()))
         && TEST_texture(
-            t1D_f32v3,
-            t2D_f32v3,
-            t3D_f32v3,
-            tCube_f32v3,
-            t1DArray_f32v3,
-            t2DArray_f32v3,
-            tCubeArray_f32v3,
-            )
+                        t1D_f32v3,
+                        t2D_f32v3,
+                        t3D_f32v3,
+                        tCube_f32v3,
+                        t1DArray_f32v3,
+                        t2DArray_f32v3,
+                        tCubeArray_f32v3, )
         &&  TEST_texture(
-            t1D_f32v4,
-            t2D_f32v4,
-            t3D_f32v4,
-            tCube_f32v4,
-            t1DArray_f32v4,
-            t2DArray_f32v4,
-            tCubeArray_f32v4,
-            )
+                        t1D_f32v4,
+                        t2D_f32v4,
+                        t3D_f32v4,
+                        tCube_f32v4,
+                        t1DArray_f32v4,
+                        t2DArray_f32v4,
+                        tCubeArray_f32v4, )
         && TEST_depthTexture()
         && TEST_load(t2D_f32v4, t2DMS_f32v4)
         ;

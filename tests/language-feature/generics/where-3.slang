@@ -18,7 +18,8 @@ void add(inout int a, int b)
     a += b;
 }
 
-int process<each T>(T v) where T == int
+int process<each T>(T v)
+    where T == int
 {
     int result = 0;
     expand add(result, each v);
@@ -28,9 +29,9 @@ int process<each T>(T v) where T == int
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = process(1,2,3);
+    outputBuffer[0] = process(1, 2, 3);
     // CHECK: 6.0
 }

@@ -44,7 +44,7 @@ float3 test_makeVector(float x, float2 y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat3 dpx = dpfloat3(float3(2.0, 3.0, 4.0), float3(0.0, 0.0, 0.0));
@@ -85,9 +85,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat2 dpy = dpfloat2(float2(1.5, 2.5), float2(0.0, 0.0));
 
         __bwd_diff(test_makeVector)(dpx, dpy, float3(1.0, 1.5, 2.0));
-        outputBuffer[8] = dpx.d; // Expect: 1.0
-        outputBuffer[9] = dpy.d.x; // Expect: 1.5
+        outputBuffer[8] = dpx.d;    // Expect: 1.0
+        outputBuffer[9] = dpy.d.x;  // Expect: 1.5
         outputBuffer[10] = dpy.d.y; // Expect: 2.0
     }
-
 }

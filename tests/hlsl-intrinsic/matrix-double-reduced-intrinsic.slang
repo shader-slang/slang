@@ -23,8 +23,8 @@ Float calcTotal(FloatVector v)
     return v.x + v.y;
 }
 
-Float calcTotal(FloatMatrix v) 
-{ 
+Float calcTotal(FloatMatrix v)
+{
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
@@ -41,40 +41,41 @@ IntMatrix makeIntMatrix(int v)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
     Float scalarF = idx * (1.0f / (4.0f));
 
-    FloatMatrix ft = {}; 
+    FloatMatrix ft = {};
 
-    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02}, { scalarF + 0.011, scalarF + 0.022}};
-    
+    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02 }, { scalarF + 0.011, scalarF + 0.022 } };
+
     // fmod - doesn't work on double on D3D/DX
-    // ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
-    
+    // ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) +
+    // makeFloatMatrix(0.5)));
+
     ft += rcp(makeFloatMatrix(1.0l) + f);
     ft += FloatMatrix(sign(f - makeFloatMatrix(0.5l)));
-    
+
     // Lets try some matrix/matrix
     ft = f * ft;
-    
+
     // Lets try some vector matrix
-    
+
     {
-        FloatMatrix r = {mul(f[0], ft), mul(ft, f[1])};
+        FloatMatrix r = { mul(f[0], ft), mul(ft, f[1]) };
         ft += r;
     }
-    
+
     ft += saturate(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
-       
+
     ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
-           
+
     ft += min(makeFloatMatrix(0.5l), f);
     ft += max(f, makeFloatMatrix(0.75l));
 
     ft += clamp(f, makeFloatMatrix(0.1l), makeFloatMatrix(0.3l));
-    
+
     outputBuffer[idx] = calcTotal(ft);
 }

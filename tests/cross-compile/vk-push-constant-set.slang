@@ -9,7 +9,7 @@
 
 struct S
 {
-	float4 v;
+    float4 v;
 }
 
 [[vk::push_constant]]
@@ -20,7 +20,8 @@ ConstantBuffer<S> x;
 
 ParameterBlock<S> y;
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     return x.v + y.v;
 }

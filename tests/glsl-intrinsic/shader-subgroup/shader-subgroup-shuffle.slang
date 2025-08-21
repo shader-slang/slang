@@ -25,12 +25,14 @@
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 
 __generic<T : __BuiltinLogicalType>
-bool test1ShuffleX() {
+bool test1ShuffleX()
+{
     return true
         & subgroupShuffle(T(1), 1) == T(1)
 #ifdef TEST_when_subgroupShuffleXor_is_implemented
@@ -39,7 +41,8 @@ bool test1ShuffleX() {
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVShuffleX() {
+bool testVShuffleX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -51,7 +54,8 @@ bool testVShuffleX() {
 }
 
 __generic<T : __BuiltinFloatingPointType>
-bool test1ShuffleX() {
+bool test1ShuffleX()
+{
     return true
         & subgroupShuffle(T(1), 1) == T(1)
 #if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
@@ -60,7 +64,8 @@ bool test1ShuffleX() {
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
-bool testVShuffleX() {
+bool testVShuffleX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -70,7 +75,8 @@ bool testVShuffleX() {
 #endif // #if !defined(TARGET_CUDA) & !defined(TARGET_HLSL)
         ;
 }
-bool testShuffleX() {
+bool testShuffleX()
+{
     return true
         & test1ShuffleX<float>()
         & testVShuffleX<float, 2>()
@@ -89,7 +95,7 @@ bool testShuffleX() {
         & testVShuffleX<uint, 3>()
         & testVShuffleX<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
 #if !defined(WGPU) && !defined(METAL)
         & test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
         & testVShuffleX<double, 2>()
@@ -116,7 +122,7 @@ bool testShuffleX() {
         & testVShuffleX<uint64_t, 3>()
         & testVShuffleX<uint64_t, 4>()
 #endif
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined(WGPU)
         & test1ShuffleX<int16_t>()
         & testVShuffleX<int16_t, 2>()

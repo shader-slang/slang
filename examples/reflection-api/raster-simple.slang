@@ -3,8 +3,8 @@
 struct AssembledVertex
 {
     float3 position : POSITION;
-    float3 normal   : NORMAL;
-    float2 uv       : TEXCOORD;
+    float3 normal : NORMAL;
+    float2 uv : TEXCOORD;
 };
 
 struct RasterVertex
@@ -50,33 +50,33 @@ struct Environment
     DirectionalLight light;
 }
 
-uniform Model                       model;
-uniform ParameterBlock<Material>    material;
-uniform ConstantBuffer<Camera>      camera;
+uniform Model model;
+uniform ParameterBlock<Material> material;
+uniform ConstantBuffer<Camera> camera;
 uniform ParameterBlock<Environment> environment;
 
 [shader("vertex")]
 [require(sm_6_0)]
 void vertexMain(
-    in AssembledVertex assembledVertex : A,
-    out RasterVertex rasterVertex : R,
-    in uint vertexID : SV_VertexID,
-    out float4 projPosition :  SV_Position)
+    in AssembledVertex assembledVertex: A,
+    out RasterVertex rasterVertex: R,
+    in uint vertexID: SV_VertexID,
+    out float4 projPosition: SV_Position)
 {
-    float3 worldPosition = mul(model.modelToWorld, float4(assembledVertex.position,1));
+    float3 worldPosition = mul(model.modelToWorld, float4(assembledVertex.position, 1));
 
     rasterVertex.worldPosition = worldPosition;
-    rasterVertex.worldNormal = mul(model.modelToWorld_inverseTranspose, float4(assembledVertex.normal,0));
+    rasterVertex.worldNormal =
+        mul(model.modelToWorld_inverseTranspose, float4(assembledVertex.normal, 0));
     rasterVertex.uv = assembledVertex.uv;
 
-    float3 viewPosition = mul(camera.worldToView, float4(worldPosition,1));
-    projPosition = mul(camera.viewToProj, float4(viewPosition,1));
+    float3 viewPosition = mul(camera.worldToView, float4(worldPosition, 1));
+    projPosition = mul(camera.viewToProj, float4(viewPosition, 1));
 }
 
 [shader("fragment")]
 [require(sm_6_0)]
-float4 fragmentMain(
-    in RasterVertex vertex : R)
+float4 fragmentMain(in RasterVertex vertex: R)
     : SV_Target0
 {
     float3 normal = vertex.worldNormal;

@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-// Doesn't work on DX11 currently - locks up on binding
+//  Doesn't work on DX11 currently - locks up on binding
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
-// Produces a different result on DX12 with DXBC than expected(!). So disabled for now
+//  Produces a different result on DX12 with DXBC than expected(!). So disabled for now
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
@@ -31,46 +31,46 @@ RWTexture3D<float4> rwt3D_float4;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     float val = 0.0f;
- 
+
     // float texture operations
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
     val += rwt3D[uint3(idx, idx, idx)];
-    
+
     rwt1D[idx] = idx;
-    rwt2D[uint2(idx, idx)] = idx;    
-    rwt3D[uint3(idx, idx, idx)] = idx;    
-            
+    rwt2D[uint2(idx, idx)] = idx;
+    rwt3D[uint3(idx, idx, idx)] = idx;
+
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
     val += rwt3D[uint3(idx, idx, idx)];
-    
+
     // float2 texture operations for 1D
     float2 val2_1d = rwt1D_float2[idx];
     rwt1D_float2[idx] = float2(idx, idx);
     val2_1d = rwt1D_float2[idx];
     val += val2_1d.x;
     val += val2_1d.y;
-    
+
     // float2 texture operations for 2D
     float2 val2 = rwt2D_float2[uint2(idx, idx)];
     rwt2D_float2[uint2(idx, idx)] = float2(idx, idx);
     val2 = rwt2D_float2[uint2(idx, idx)];
     val += val2.x;
     val += val2.y;
-    
+
     // float2 texture operations for 3D
     float2 val2_3d = rwt3D_float2[uint3(idx, idx, idx)];
     rwt3D_float2[uint3(idx, idx, idx)] = float2(idx, idx);
     val2_3d = rwt3D_float2[uint3(idx, idx, idx)];
     val += val2_3d.x;
     val += val2_3d.y;
-    
+
     // float4 texture operations for 1D
     float4 val4_1d = rwt1D_float4[idx];
     rwt1D_float4[idx] = float4(idx, idx, idx, idx);
@@ -79,7 +79,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     val += val4_1d.y;
     val += val4_1d.z;
     val += val4_1d.w;
-    
+
     // float4 texture operations for 2D
     float4 val4 = rwt2D_float4[uint2(idx, idx)];
     rwt2D_float4[uint2(idx, idx)] = float4(idx, idx, idx, idx);
@@ -88,7 +88,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     val += val4.y;
     val += val4.z;
     val += val4.w;
-    
+
     // float4 texture operations for 3D
     float4 val4_3d = rwt3D_float4[uint3(idx, idx, idx)];
     rwt3D_float4[uint3(idx, idx, idx)] = float4(idx, idx, idx, idx);
@@ -97,6 +97,6 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     val += val4_3d.y;
     val += val4_3d.z;
     val += val4_3d.w;
-    
+
     outputBuffer[idx] = val;
 }

@@ -15,7 +15,7 @@ struct B : IDifferentiable
 struct A : IDifferentiable
 {
     typedef B Differential;
-    
+
     [DerivativeMember(B.z)]
     float x;
     no_diff float y;
@@ -23,21 +23,21 @@ struct A : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        B b = {0.0};
+        B b = { 0.0 };
         return b;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
-        B o = {a.z + b.z};
+        B o = { a.z + b.z };
         return o;
     }
 
     [__unsafeForceInlineEarly]
     static Differential dmul<T : __BuiltinRealType>(T a, Differential b)
     {
-        B o = {__realCast<float, T>(a) * b.z};
+        B o = { __realCast<float, T>(a) * b.z };
         return o;
     }
 };
@@ -55,14 +55,14 @@ A f(A a)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
-        A a = {1.0, 2.0};
-        B b = {0.2};
+        A a = { 1.0, 2.0 };
+        B b = { 0.2 };
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __fwd_diff(f)(dpa).d.z;                    // Expect: 1
+        outputBuffer[0] = __fwd_diff(f)(dpa).d.z; // Expect: 1
     }
 }

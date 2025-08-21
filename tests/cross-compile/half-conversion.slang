@@ -6,10 +6,11 @@
 
 cbuffer C
 {
-	uint4 u;
+    uint4 u;
 }
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-	return f16tof32(u);
+    return f16tof32(u);
 }

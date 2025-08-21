@@ -16,7 +16,7 @@ import printing;
 //
 [shader("compute")]
 [numthreads(32)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // The `printing` module defines two main printing routines.
     //

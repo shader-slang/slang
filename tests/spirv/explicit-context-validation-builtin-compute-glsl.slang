@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage compute -entry computeMain -enable-experimental-passes
 
-// Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin is referenced directly.
+// Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin
+// is referenced directly.
 
 // CHECK: OpEntryPoint {{.*}} %gl_NumWorkGroups
 // CHECK: OpDecorate %gl_NumWorkGroups BuiltIn NumWorkgroups

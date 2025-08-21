@@ -32,7 +32,7 @@ void closestHitShaderLss(inout RayPayload payload, in BuiltInTriangleIntersectio
     payload.lssData = GetLssPositionsAndRadii();
     payload.isSphere = IsSphereHit();
     payload.isLss = IsLssHit();
-    
+
     // Test HitObject API functions
     HitObject hitObj;
     float4 sphereData = hitObj.GetSpherePositionAndRadius();

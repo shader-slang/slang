@@ -11,8 +11,11 @@ int g() throws MyError
 
 void f() throws MyError
 {
-    defer {
-        let n = try g();
+    defer
+    {
+        let n =
+        try
+            g();
     }
 }
 

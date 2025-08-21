@@ -14,7 +14,7 @@ RWStructuredBuffer<float> outputBuffer : register(u2);
 // CHECK-DAG: RWStructuredBuffer<int > inputBuffer;
 RWStructuredBuffer<int> inputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     outputBuffer[0] = inputBuffer[0] + member;

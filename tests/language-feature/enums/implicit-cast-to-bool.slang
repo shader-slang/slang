@@ -1,4 +1,4 @@
-// Test enums can be implicitly casted to bool. 
+// Test enums can be implicitly casted to bool.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
 
@@ -19,7 +19,7 @@ int test<let n : bool>()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     BitFlags x = BitFlags.One | BitFlags.Two;
     if (x & BitFlags.One)

@@ -19,6 +19,6 @@ void computeMain()
 {
     var result = coopVecLoad<4, int32_t>(inputBuffer);
 
-    for(int i = 0; i < result.getCount(); ++i)
+    for (int i = 0; i < result.getCount(); ++i)
         outputBuffer[i] = result[i];
 }

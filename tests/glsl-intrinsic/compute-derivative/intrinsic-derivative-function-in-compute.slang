@@ -24,7 +24,7 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL_C): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
 // CHECK_HLSL_C: computeMain(
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_F): -allow-glsl -stage fragment -entry computeMain -target glsl 
+//TEST:SIMPLE(filecheck=CHECK_GLSL_F): -allow-glsl -stage fragment -entry computeMain -target glsl
 // CHECK_GLSL_F-NOT: GL_NV_compute_shader_derivatives
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DQUAD
@@ -45,19 +45,20 @@
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 uniform sampler1D uniform_sampler1D;
 
 __generic<T : ITexelElement>
 bool textureFuncs(Sampler1D<T> gsampler1D)
 {
-    typealias gvec4 = vector<T.Element,4>;
+    typealias gvec4 = vector<T.Element, 4>;
 
     constexpr ivec2 ivec2_0 = ivec2(0);
 
     return true
-        // 8.9.1. Texture Query Functions
+           // 8.9.1. Texture Query Functions
         && int(0) == textureSize(gsampler1D, int(0))
         && vec2(0) == textureQueryLod(gsampler1D, float(0))
         && int(0) == textureQueryLevels(gsampler1D)
@@ -124,7 +125,7 @@ bool derivativeFunc()
 #ifdef COMPUTE
 [numthreads(2, 2, 1)]
 #endif
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK_SPV: OpEntryPoint
     outputBuffer.result = true

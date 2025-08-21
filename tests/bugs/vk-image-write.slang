@@ -7,13 +7,14 @@ RWTexture2D<float4> t;
 
 void writeColor(float3 v)
 {
-    t[uint2(0,0)].xyz += v;
+    t[uint2(0, 0)].xyz += v;
 }
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     // CHECK: OpImageRead
     // CHECK: OpImageWrite
-	writeColor(float3(1.0));
-	return float4(0);
+    writeColor(float3(1.0));
+    return float4(0);
 }

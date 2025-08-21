@@ -5,14 +5,14 @@
 
 RWTexture2D<uint> texArray[2];
 
-[numthreads(1,1,1)]
-void main( uint2 dispatchThreadID : SV_DispatchThreadID, uint2 groupThreadID : SV_GroupThreadID )
+[numthreads(1, 1, 1)]
+void main(uint2 dispatchThreadID: SV_DispatchThreadID, uint2 groupThreadID: SV_GroupThreadID)
 {
 
     // CHECK0: {{.*}}imageAtomicAdd(texArray_{{.*}}[nonuniformEXT({{.*}})]
 
     // CHECK1: InterlockedAdd(texArray_{{.*}}[NonUniformResourceIndex({{.*}})]
-    
+
     // CHECK2-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2-DAG: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform

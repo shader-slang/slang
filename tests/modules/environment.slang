@@ -10,7 +10,7 @@ uint lcg(inout uint prev)
 
 public float rnd(inout uint prev)
 {
-    return ((float) lcg(prev) / (float) 0x01000000);
+    return ((float)lcg(prev) / (float)0x01000000);
 }
 
 public struct Environment_sample_data
@@ -19,7 +19,9 @@ public struct Environment_sample_data
     float q;
 };
 
-public float3 environment_sample(StructuredBuffer <Environment_sample_data> sample_buffer, inout int seed)
+public float3 environment_sample(
+    StructuredBuffer<Environment_sample_data> sample_buffer,
+    inout int seed)
 {
     float3 xi;
     xi.x = rnd(seed);

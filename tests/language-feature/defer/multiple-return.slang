@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-// ^ Due to DeviceMemoryBarrier() missing.
+//  ^ Due to DeviceMemoryBarrier() missing.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -31,5 +31,5 @@ void testFunc(int index1, int index2, int condition)
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     for (int i = 0; i < 3; ++i)
-        testFunc(2*i, 2*i+1, i);
+        testFunc(2 * i, 2 * i + 1, i);
 }

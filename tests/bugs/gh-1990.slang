@@ -19,16 +19,17 @@ interface IMaterial
 
 struct StandardBSDF : IBSDF
 {
-    uint getLobes()
-    {
-        return 0;
-    }
+    uint getLobes() { return 0; }
 }
 
 struct StandardMaterial : IMaterial
 {
     typedef StandardBSDF BSDF;
-    StandardBSDF setupBSDF() { StandardBSDF g; return g; }
+    StandardBSDF setupBSDF()
+    {
+        StandardBSDF g;
+        return g;
+    }
 };
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
@@ -42,7 +43,7 @@ interface IInterface
 };
 struct Impl : IInterface
 {
-    void randomStuff(){}
+    void randomStuff() {}
 };
 
 void test<R : IInterface>(R r, int id)
@@ -56,7 +57,7 @@ void test<R : IInterface>(R r, int id)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Impl impl;
     test(impl, int(dispatchThreadID.x));

@@ -8,7 +8,7 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint tid : SV_GroupIndex)
+void computeMain(uint tid: SV_GroupIndex)
 {
     // 0 0
     // 0 0
@@ -18,5 +18,5 @@ void computeMain(uint tid : SV_GroupIndex)
     // 0 0
     const float x = m._m01 = 2;
 
-    outputBuffer[tid] = x + m[tid/2][tid%2];
+    outputBuffer[tid] = x + m[tid / 2][tid % 2];
 }

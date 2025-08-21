@@ -9,45 +9,39 @@ RWStructuredBuffer<int> outputBuffer;
 
 interface ITest
 {
-	int doThing(int x);
+    int doThing(int x);
 };
 
 struct Impl1 : ITest
 {
-	int doThing(int x)
-	{
-		return x * 2;
-	}
+    int doThing(int x) { return x * 2; }
 };
 
 struct Impl2 : ITest
 {
-    int doThing(int x)
-    {
-        return x * 3;
-    }
+    int doThing(int x) { return x * 3; }
 };
 
 __generic<T : ITest = Impl1>
 struct GenStruct
 {
-	T obj = T();
+    T obj = T();
 };
 
 int test(GenStruct gs, int val)
 {
-	return gs.obj.doThing(val);
+    return gs.obj.doThing(val);
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
 
-	int outVal = 0;
+    int outVal = 0;
 
-	GenStruct<Impl1> gs;
-	outVal += test(gs, tid);
+    GenStruct<Impl1> gs;
+    outVal += test(gs, tid);
 
-	outputBuffer[tid] = outVal;
+    outputBuffer[tid] = outVal;
 }

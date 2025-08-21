@@ -20,7 +20,7 @@ uniform Obj* pObj;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0],stride=4);
 uniform RWStructuredBuffer<uint> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     pObj->addOne();

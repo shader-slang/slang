@@ -19,7 +19,7 @@ float foo(S s)
 }
 
 [numthreads(4, 1, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     S s;
     s.a = 0;

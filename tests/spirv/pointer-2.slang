@@ -73,4 +73,3 @@ VSOutput vertexMain(int vertexIndex: SV_VulkanVertexID)
 
     return output;
 }
-

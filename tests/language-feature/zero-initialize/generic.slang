@@ -109,5 +109,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     && getValueVector<float, 4>()
     && getValueVector<double, 4>()
     && getValueVectorBoolean<4>()
-    ;
+        ;
 }

@@ -8,7 +8,10 @@ layout(location = 0) in highp vec4 a_position;
 layout(location = 1) in highp vec4 a_coords;
 
 layout(location = 0) out mediump vec4 v_color;
-layout (std140, set=0, binding=0) uniform buffer0 { highp int ui_two; };
+layout(std140, set = 0, binding = 0) uniform buffer0
+{
+    highp int ui_two;
+};
 
 void vertexMain(void)
 {
@@ -20,26 +23,25 @@ void vertexMain(void)
     switch (ui_two)
     {
         //SPV-NOT:([[# @LINE+1]]): error
-        case int(0.0):
-            res = coords.xyz;
-            break;
+    case int(0.0):
+        res = coords.xyz;
+        break;
 
         //SPV-NOT:([[# @LINE+1]]): error
-        case 2-1:
-            res = coords.wzy;
-            break;
+    case 2 - 1:
+        res = coords.wzy;
+        break;
 
         //SPV-NOT:([[# @LINE+1]]): error
-        case 3&(1<<1):
-            res = coords.yzw;
-            break;
+    case 3 & (1 << 1):
+        res = coords.yzw;
+        break;
 
         //SPV-NOT:([[# @LINE+1]]): error
-        case t+1:
-            res = coords.zyx;
-            break;
+    case t + 1:
+        res = coords.zyx;
+        break;
     }
 
     v_color = vec4(res, 1.0);
 }
-

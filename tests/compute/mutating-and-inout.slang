@@ -9,41 +9,42 @@ RWStructuredBuffer<int> outputBuffer;
 
 struct A
 {
-	int x;
+    int x;
 
-	[mutating] void doThings(inout int y)
-	{
-		int tmp = x;
-		x = y;
-		y = tmp;
-	}
+    [mutating]
+    void doThings(inout int y)
+    {
+        int tmp = x;
+        x = y;
+        y = tmp;
+    }
 }
 
 int doThings(inout A a, int val)
 {
-	a.doThings(val);
-	return val;
+    a.doThings(val);
+    return val;
 }
 
 int test(int val)
 {
-	A a = { val };
-	int b = val ^ 3;
+    A a = { val };
+    int b = val ^ 3;
 
-	int c = doThings(a, b);
+    int c = doThings(a, b);
 
-	int result = 0;
-	result = result*16 + a.x;
-	result = result*16 + b;
-	result = result*16 + c;
+    int result = 0;
+    result = result * 16 + a.x;
+    result = result * 16 + b;
+    result = result * 16 + c;
 
-	return result;
+    return result;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
-	int val = tid.x;
-	val = test(val);
-	outputBuffer[tid.x] = val;
+    int val = tid.x;
+    val = test(val);
+    outputBuffer[tid.x] = val;
 }

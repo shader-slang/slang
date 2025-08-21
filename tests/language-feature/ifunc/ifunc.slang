@@ -5,10 +5,7 @@
 
 struct Functor : IFunc<int, int, bool>
 {
-    int operator()(int p, bool t)
-    {
-        return p + 1;
-    }
+    int operator()(int p, bool t) { return p + 1; }
 }
 
 struct MutatingFunctor : IMutatingFunc<int, int, bool>

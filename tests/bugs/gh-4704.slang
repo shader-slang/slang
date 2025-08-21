@@ -7,7 +7,8 @@
 // HLSL: computeMain
 
 
-[[vk::binding(0, 0)]] uniform ConstantBuffer<uint64_t[1000]> addresses;
+[[vk::binding(0, 0)]]
+uniform ConstantBuffer<uint64_t[1000]> addresses;
 RWStructuredBuffer<uint> buffer;
 
 [shader("compute")]

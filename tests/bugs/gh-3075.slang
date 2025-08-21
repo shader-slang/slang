@@ -10,6 +10,6 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint3 vLookup = 3;
-    vLookup.yx += int2(1, 2); // calling += (inout int2, int2).
+    vLookup.yx += int2(1, 2);                     // calling += (inout int2, int2).
     outputBuffer[dispatchThreadID.x] = vLookup.x; // expect 5
 }

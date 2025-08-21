@@ -44,7 +44,7 @@ float test_nested_ifelse(float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(1.0, 0.0);
@@ -55,14 +55,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
-        
+
         __bwd_diff(test_nested_ifelse)(dpa, 1.0f);
         outputBuffer[1] = dpa.d; // Expect: 3.0
     }
 
     {
         dpfloat dpa = dpfloat(0.2, 0.0);
-        
+
         __bwd_diff(test_nested_ifelse)(dpa, 1.0f);
         outputBuffer[2] = dpa.d; // Expect: 4.0
     }
@@ -76,7 +76,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
-        
+
         __bwd_diff(test_if_only)(dpa, 1.0f);
         outputBuffer[4] = dpa.d; // Expect: 1.0
     }

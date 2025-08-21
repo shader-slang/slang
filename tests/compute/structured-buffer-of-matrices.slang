@@ -30,13 +30,13 @@ RWStructuredBuffer<int> gOutput;
 
 int test(int val)
 {
-	return asint(gInput[0][(val+1)&3][(val+3)&3]);
+    return asint(gInput[0][(val + 1) & 3][(val + 3) & 3]);
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
-	int value = tid.x;
-	value = test(value);
-	gOutput[tid.x] = value;
+    int value = tid.x;
+    value = test(value);
+    gOutput[tid.x] = value;
 }

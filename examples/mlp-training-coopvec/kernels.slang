@@ -8,8 +8,8 @@ import adam;
 [numthreads(256, 1, 1)]
 [require(spvGroupNonUniformBallot, spvGroupNonUniformArithmetic, spvCooperativeVectorNV)]
 void learnGradient(
-    uint32_t tid : SV_DispatchThreadID,
-    uniform MyNetwork* network, 
+    uint32_t tid: SV_DispatchThreadID,
+    uniform MyNetwork* network,
     uniform Atomic<uint32_t>* lossBuffer,
     uniform float2* inputs,
     uniform uint32_t count)
@@ -28,7 +28,12 @@ void learnGradient(
 }
 
 [numthreads(256, 1, 1)]
-void adjustParameters(uint32_t tid : SV_DispatchThreadID, uniform AdamState* states, uniform NFloat* params, uniform NFloat* gradients, uniform uint32_t count)
+void adjustParameters(
+    uint32_t tid: SV_DispatchThreadID,
+    uniform AdamState* states,
+    uniform NFloat* params,
+    uniform NFloat* gradients,
+    uniform uint32_t count)
 {
     if (tid >= count)
         return;

@@ -2,21 +2,27 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-enum MyEnum { A, B, C };
+enum MyEnum
+{
+    A,
+    B,
+    C
+}
+;
 
 [BackwardDerivative(mDiff)]
-float m<let M : MyEnum>(float x) 
-{ 
+float m<let M : MyEnum>(float x)
+{
     switch (M)
     {
-        case MyEnum.A:
-            return x * x;
-        case MyEnum.B:
-            return x;
-        case MyEnum.C:
-            return 3 * x;
-        default:
-            return 0;
+    case MyEnum.A:
+        return x * x;
+    case MyEnum.B:
+        return x;
+    case MyEnum.C:
+        return 3 * x;
+    default:
+        return 0;
     }
 }
 
@@ -24,18 +30,18 @@ void mDiff<let M : MyEnum>(inout DifferentialPair<float> x, float dResult)
 {
     switch (M)
     {
-        case MyEnum.A:
-            updateDiff(x, 2 * dResult * x.p);
-            break;
-        case MyEnum.B:
-            updateDiff(x, dResult);
-            break;
-        case MyEnum.C:
-            updateDiff(x, 3 * dResult);
-            break;
-        default:
-            updateDiff(x, 0);
-            break;
+    case MyEnum.A:
+        updateDiff(x, 2 * dResult * x.p);
+        break;
+    case MyEnum.B:
+        updateDiff(x, dResult);
+        break;
+    case MyEnum.C:
+        updateDiff(x, 3 * dResult);
+        break;
+    default:
+        updateDiff(x, 0);
+        break;
     }
 }
 

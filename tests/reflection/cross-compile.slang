@@ -14,10 +14,11 @@ SamplerState s;
 
 cbuffer C
 {
-	float3 c;
+    float3 c;
 }
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-	return 0.0;
+    return 0.0;
 }

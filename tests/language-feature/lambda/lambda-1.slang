@@ -24,17 +24,18 @@ struct Applier
     float c;
     void apply(inout Matrix m)
     {
-        m.map((float x) =>
-        {
-            if (x > 2.5)
-                return x * c;
-            else
-                return x + c;
-        });
+        m.map(
+            (float x) =>
+            {
+                if (x > 2.5)
+                    return x * c;
+                else
+                    return x + c;
+            });
     }
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Matrix m = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };

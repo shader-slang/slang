@@ -1,7 +1,6 @@
 //TEST:REFLECTION(filecheck=CHECK): -target metal
 
 
-
 // CHECK: "name": "gParams",
 // CHECK: "binding": {"kind": "constantBuffer", "index": 0},
 
@@ -20,7 +19,10 @@
 // CHECK: "name": "output",
 // CHECK: "binding": {"kind": "constantBuffer", "index": 1},
 //
-struct Data { int3 content; }
+struct Data
+{
+    int3 content;
+}
 struct Params
 {
     ParameterBlock<Data> pdata;
@@ -28,7 +30,7 @@ struct Params
 }
 ParameterBlock<Params> gParams;
 RWStructuredBuffer<float4> output;
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     output[0] = gParams.tex.Load(gParams.pdata.content);

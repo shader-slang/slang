@@ -7,7 +7,7 @@ struct PlusOne<let v : int>
 
 struct GetConst<let v : int, let u : int>
 {
-    static const int value = (u/2+v)*(u+v) / PlusOne<u-1>.value;
+    static const int value = (u / 2 + v) * (u + v) / PlusOne<u - 1>.value;
     int arr[value];
 }
 
@@ -15,7 +15,7 @@ struct GetConst<let v : int, let u : int>
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

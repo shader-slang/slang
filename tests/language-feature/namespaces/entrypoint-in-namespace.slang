@@ -5,16 +5,17 @@
 // CHECK: OpEntryPoint
 struct PSInput
 {
-	float4 color : COLOR;
+    float4 color : COLOR;
 };
 
 namespace Pixel
 {
-    struct MyType
+struct MyType
+{
+    static float4 Main(PSInput input)
+        : SV_TARGET
     {
-        static float4 Main(PSInput input) : SV_TARGET
-        {
-            return input.color;
-        }
-    }    
+        return input.color;
+    }
+}
 }

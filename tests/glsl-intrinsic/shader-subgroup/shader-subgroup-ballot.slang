@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
@@ -17,25 +17,28 @@
 #version 430
 
 // breaks on Nvidia GPU by returning 0 which is trivially wrong (works on Intel Iris Xe)
-//#define TEST_when_glsl_subgroupBallotExclusiveBitCount_is_not_bugged
+// #define TEST_when_glsl_subgroupBallotExclusiveBitCount_is_not_bugged
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 
 __generic<T : __BuiltinLogicalType>
-bool test1BroadcastX() {
+bool test1BroadcastX()
+{
     return true
         & subgroupBroadcast(T(1), 0) == T(1)
         & subgroupBroadcastFirst(T(1)) == T(1)
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVBroadcastX() {
+bool testVBroadcastX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -45,14 +48,16 @@ bool testVBroadcastX() {
 }
 
 __generic<T : __BuiltinFloatingPointType>
-bool test1BroadcastX() {
+bool test1BroadcastX()
+{
     return true
         & subgroupBroadcast(T(1), 0) == T(1)
         & subgroupBroadcastFirst(T(1)) == T(1)
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
-bool testVBroadcastX() {
+bool testVBroadcastX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -60,13 +65,14 @@ bool testVBroadcastX() {
         & subgroupBroadcastFirst(gvec(T(1))) == gvec(T(1))
         ;
 }
-bool testBroadcastX() {
+bool testBroadcastX()
+{
     return true
         & test1BroadcastX<float>()
         & testVBroadcastX<float, 2>()
         & testVBroadcastX<float, 3>()
         & testVBroadcastX<float, 4>()
-        & test1BroadcastX<half>() 
+        & test1BroadcastX<half>()
         & testVBroadcastX<half, 2>()
         & testVBroadcastX<half, 3>()
         & testVBroadcastX<half, 4>()
@@ -79,25 +85,25 @@ bool testBroadcastX() {
         & testVBroadcastX<uint, 3>()
         & testVBroadcastX<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
 #if !defined(WGPU) && !defined(METAL)
         & test1BroadcastX<double>() // WARNING: intel GPU's lack FP64 support
         & testVBroadcastX<double, 2>()
         & testVBroadcastX<double, 3>()
         & testVBroadcastX<double, 4>()
-        & test1BroadcastX<int8_t>() 
+        & test1BroadcastX<int8_t>()
         & testVBroadcastX<int8_t, 2>()
         & testVBroadcastX<int8_t, 3>()
         & testVBroadcastX<int8_t, 4>()
-        & test1BroadcastX<int64_t>() 
+        & test1BroadcastX<int64_t>()
         & testVBroadcastX<int64_t, 2>()
         & testVBroadcastX<int64_t, 3>()
         & testVBroadcastX<int64_t, 4>()
-        & test1BroadcastX<uint8_t>() 
+        & test1BroadcastX<uint8_t>()
         & testVBroadcastX<uint8_t, 2>()
         & testVBroadcastX<uint8_t, 3>()
         & testVBroadcastX<uint8_t, 4>()
-        & test1BroadcastX<uint64_t>() 
+        & test1BroadcastX<uint64_t>()
         & testVBroadcastX<uint64_t, 2>()
         & testVBroadcastX<uint64_t, 3>()
         & testVBroadcastX<uint64_t, 4>()
@@ -107,13 +113,13 @@ bool testBroadcastX() {
         & testVBroadcastX<bool, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined(WGPU)
-        & test1BroadcastX<int16_t>() 
+        & test1BroadcastX<int16_t>()
         & testVBroadcastX<int16_t, 2>()
         & testVBroadcastX<int16_t, 3>()
         & testVBroadcastX<int16_t, 4>()
-        & test1BroadcastX<uint16_t>() 
+        & test1BroadcastX<uint16_t>()
         & testVBroadcastX<uint16_t, 2>()
         & testVBroadcastX<uint16_t, 3>()
         & testVBroadcastX<uint16_t, 4>()
@@ -121,8 +127,9 @@ bool testBroadcastX() {
         ;
 }
 
-bool testBallot() {
-    return true 
+bool testBallot()
+{
+    return true
         & (subgroupBallot(true).x == 0xFFFFFFFF)
 
 #if !defined(WGPU) && !defined(METAL)

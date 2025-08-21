@@ -1,4 +1,4 @@
-//Tests automatic synthesis of Differential type requirement.
+// Tests automatic synthesis of Differential type requirement.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -dx12
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
@@ -9,7 +9,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct PathData : IDifferentiable
 {
-    float3 thp;    
+    float3 thp;
     uint length;
     bool terminated;
     bool isHit;
@@ -26,8 +26,10 @@ struct PathData : IDifferentiable
 
 bool traceRayInline(uint length)
 {
-    if (length < 2) return true;
-    else return false;
+    if (length < 2)
+        return true;
+    else
+        return false;
 }
 
 float3 getAlbedo(uint length)
@@ -93,9 +95,11 @@ float3 tracePath()
         {
             handleHit(pathData);
 
-            //pathData.isHit = traceRayInline(pathData.length);
-            if (!traceRayInline(pathData.length)) pathData.isHit = false;
-            else pathData.isHit = true;
+            // pathData.isHit = traceRayInline(pathData.length);
+            if (!traceRayInline(pathData.length))
+                pathData.isHit = false;
+            else
+                pathData.isHit = true;
         }
         else
         {

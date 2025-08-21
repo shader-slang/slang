@@ -10,5 +10,5 @@ groupshared uint globalMem = 1;
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    outputBuffer[0] = globalMem ;
+    outputBuffer[0] = globalMem;
 }

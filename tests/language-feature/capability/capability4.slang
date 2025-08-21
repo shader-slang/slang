@@ -13,15 +13,10 @@ struct Type
     int member;
     [require(glsl)]
     [mutating]
-    void f()
-    {
-    }
+    void f() {}
 
     [require(glsl)]
-    static void f1()
-    {
-    }
+    static void f1() {}
 }
 
-void main()
-{}
+void main() {}

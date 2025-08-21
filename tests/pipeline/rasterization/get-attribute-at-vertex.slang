@@ -21,10 +21,10 @@
 
 [shader("fragment")]
 void main(
-    pervertex float4 color : COLOR,
-    float3 bary : SV_Barycentrics,
-    noperspective float3 baryNoPerspective : SV_Barycentrics,
-    out float4 result : SV_Target)
+    pervertex float4 color: COLOR,
+    float3 bary: SV_Barycentrics,
+    noperspective float3 baryNoPerspective: SV_Barycentrics,
+    out float4 result: SV_Target)
 {
     result = bary.x * GetAttributeAtVertex(color, 0)
            + bary.y * GetAttributeAtVertex(color, 1)

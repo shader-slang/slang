@@ -15,7 +15,7 @@ interface IFoo
 interface IInterface
 {
     [BackwardDifferentiable]
-    float calc<T:IFoo>(T t, float x);
+    float calc<T : IFoo>(T t, float x);
 }
 
 struct A : IFoo
@@ -26,10 +26,7 @@ struct A : IFoo
 struct B : IInterface
 {
     [BackwardDifferentiable]
-    float calc<T : IFoo>(T t, float x)
-    {
-        return t.f() * x;
-    }
+    float calc<T : IFoo>(T t, float x) { return t.f() * x; }
 };
 
 [BackwardDifferentiable]
@@ -42,10 +39,10 @@ float test(IFoo foo, IInterface obj, float x)
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 1); // B
-    var foo = createDynamicObject<IFoo>(0, 0); // A
+    var foo = createDynamicObject<IFoo>(0, 0);                        // A
     var p = diffPair(3.0);
     __bwd_diff(test)(foo, obj, p, 1.0);
     outputBuffer[0] = p.d;

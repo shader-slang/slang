@@ -11,7 +11,9 @@ int g() throws MyError
 
 void f()
 {
-    let n = try g();
+    let n =
+    try
+        g();
     throw MyError.Fail;
 }
 

@@ -10,15 +10,30 @@ layout(binding = 0) uniform accelerationStructureEXT as;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
-bool testHitObjectRecord() {
+bool testHitObjectRecord()
+{
     hitObjectNV hit;
     // CHECK_GLSL: hitObjectRecordHitNV
     // CHECK_SPV: OpHitObjectRecordHitNV
-    hitObjectRecordHitNV(hit, as, 0, 0, 0, gl_HitKindFrontFacingTriangleEXT, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 2);
+    hitObjectRecordHitNV(
+        hit,
+        as,
+        0,
+        0,
+        0,
+        gl_HitKindFrontFacingTriangleEXT,
+        0,
+        0,
+        vec3(0.1, 0.1, 0.0),
+        0.01f,
+        vec3(0, 0, 1),
+        1e4f,
+        2);
     return true
            // CHECK_GLSL: hitObjectIsHitNV
            // CHECK_SPV: OpHitObjectIsHitNV

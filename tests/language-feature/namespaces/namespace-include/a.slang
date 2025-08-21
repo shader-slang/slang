@@ -8,7 +8,10 @@ namespace ns1
 {
 namespace ns2
 {
-    int l() { return k(); } // should be able to find k() in b.
+int l()
+{
+    return k();
+} // should be able to find k() in b.
 }
 }
 

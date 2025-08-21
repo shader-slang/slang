@@ -19,7 +19,7 @@ RWStructuredBuffer<float> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     var exponent : int = 0;
     frexp(inputBuffer[i], exponent);

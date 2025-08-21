@@ -1,9 +1,10 @@
 // Tests automatic synthesis of Differential type requirement for generic types.
 //
-// This specifically tests a synthesis path that occurs when the lookup of the Differential type happens before the conformance-check.
-// If this path doesn't construct the generic differential type correctly, it will throw an error when constructing the array
-// in this line: Feature<3>.Differential b = {0.2, 0.3, 0.4};
-// 
+// This specifically tests a synthesis path that occurs when the lookup of the Differential type
+// happens before the conformance-check. If this path doesn't construct the generic differential
+// type correctly, it will throw an error when constructing the array in this line:
+// Feature<3>.Differential b = {0.2, 0.3, 0.4};
+//
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
@@ -12,8 +13,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-__generic<let C : int> 
-struct Feature: IDifferentiable
+__generic<let C : int>
+struct Feature : IDifferentiable
 {
     float vals[C];
 }
@@ -50,8 +51,8 @@ Feature<3> f(Feature<3> a, Linear<3> layer)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    Feature<3> a = {1.0, 2.0, 3.0};
-    Feature<3>.Differential b = {0.2, 0.3, 0.4};
+    Feature<3> a = { 1.0, 2.0, 3.0 };
+    Feature<3>.Differential b = { 0.2, 0.3, 0.4 };
 
     Linear<3> layer;
 

@@ -25,7 +25,8 @@ RWStructuredBuffer<uint32_t> outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 groupshared float[256] tempShared;
 
@@ -34,7 +35,13 @@ void computeMain()
 {
     let stride = 16;
 
-    let mat = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
+    let mat = coopMatLoad<
+        uint32_t,
+        MemoryScope.Subgroup,
+        16,
+        16,
+        CoopMatMatrixUse.MatrixAccumulator,
+        CoopMatMatrixLayout.RowMajor>(input, 0, stride);
     mat.Store<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
 
     let result = CoopMatType.Load<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);

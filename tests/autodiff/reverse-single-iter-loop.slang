@@ -26,7 +26,7 @@ float test_simple_single_iter_loop(float y)
             break;
         }
     }
-    
+
     return x;
 }
 
@@ -59,7 +59,7 @@ float test_nested_if_else_single_iter_loop(float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(1.0, 0.0);
@@ -70,7 +70,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
-        
+
         __bwd_diff(test_simple_single_iter_loop)(dpa, 1.0f);
         outputBuffer[1] = dpa.d; // Expect: 6.0
     }

@@ -3,20 +3,24 @@
 
 // CHECK: error 41001:
 
-interface IFoo {}
-struct TA<T:IFoo> : IFoo
+interface IFoo
+{
+}
+struct TA<T : IFoo> : IFoo
 {
     TB<T> tb;
 }
 
-struct TB<T:IFoo>
+struct TB<T : IFoo>
 {
     TA<T> ta[2];
 }
 
-struct TC : IFoo {}
+struct TC : IFoo
+{
+}
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     TA<TC> ta;

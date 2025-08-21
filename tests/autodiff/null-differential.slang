@@ -28,7 +28,11 @@ struct B : IInterface
     int data1;
     int data2;
 
-    __init(int data1, int data2) { this.data1 = data1; this.data2 = data2; }
+    __init(int data1, int data2)
+    {
+        this.data1 = data1;
+        this.data2 = data2;
+    }
 
     [Differentiable]
     float calc(float x) { return x * x * data1 * data2; }
@@ -44,7 +48,7 @@ float doThing(IInterface obj, IInterface obj2, float x)
 //TEST_INPUT: type_conformance B:IInterface = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         IInterface obj;

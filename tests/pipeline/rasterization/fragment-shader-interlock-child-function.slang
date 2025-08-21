@@ -3,8 +3,8 @@
 RasterizerOrderedTexture2D<float4> texture;
 
 //
-// Tests that an interlock region place at a non-entry point function will properly apply the SPIRV execution mode
-// to the entry point function and not the child function.
+// Tests that an interlock region place at a non-entry point function will properly apply the SPIRV
+// execution mode to the entry point function and not the child function.
 //
 
 // CHECK: OpEntryPoint
@@ -25,7 +25,8 @@ float4 foo(float4 coords)
 }
 
 [shader("fragment")]
-float4 main(float4 coords : COORDS) : SV_Target
+float4 main(float4 coords: COORDS)
+    : SV_Target
 {
     return foo(coords);
 }

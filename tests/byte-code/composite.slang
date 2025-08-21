@@ -12,7 +12,7 @@ struct MyType
 }
 MyType getValue()
 {
-    MyType t = { float3(1, 2, 3), float3(-1,-2, 3), { 4, { 5, 6, 7 } } };
+    MyType t = { float3(1, 2, 3), float3(-1, -2, 3), { 4, { 5, 6, 7 } } };
     return t;
 }
 int main()

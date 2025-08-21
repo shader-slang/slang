@@ -16,7 +16,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    int myArray[4] = {4, 3, 2, 1};
+    int myArray[4] = { 4, 3, 2, 1 };
     outputBuffer[0] = myArray[0];
     outputBuffer[1] = myArray[1];
     outputBuffer[2] = myArray[2];
@@ -29,6 +29,3 @@ void computeMain()
     // BUF-NEXT: 1
     // BUF-NEXT: 4
 }
-
-
-

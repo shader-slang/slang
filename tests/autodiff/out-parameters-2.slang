@@ -27,11 +27,11 @@ void h(float x, float y, out Foo result)
     float n = x - y;
     float r = m * n + 2 * x * y;
 
-    result = {r, 2};
+    result = { r, 2 };
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float x = 2.0;
     float y = 3.5;

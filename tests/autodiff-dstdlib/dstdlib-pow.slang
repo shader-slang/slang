@@ -28,18 +28,18 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpx = dpfloat(5.0, 1.0);
         dpfloat dpy = dpfloat(3.0, 0.0);
         dpfloat res = __fwd_diff(diffPow)(dpx, dpy);
-        outputBuffer[0] = res.p;               // Expect: 125.000000
-        outputBuffer[1] = res.d;               // Expect: 75.000000
+        outputBuffer[0] = res.p; // Expect: 125.000000
+        outputBuffer[1] = res.d; // Expect: 75.000000
     }
 
     {
         dpfloat2 dpx = dpfloat2(float2(10.0, 3.0), float2(0.0, -2.0));
         dpfloat2 dpy = dpfloat2(float2(2.5, 4.0), float2(1.0, 1.0));
         dpfloat2 res = __fwd_diff(diffPow)(dpx, dpy);
-        outputBuffer[2] = res.p[0];            // Expect: 316.227722
-        outputBuffer[3] = res.d[0];            // Expect: 728.141235
-        outputBuffer[4] = res.p[1];            // Expect: 81.000000
-        outputBuffer[5] = res.d[1];            // Expect: -127.012398
+        outputBuffer[2] = res.p[0]; // Expect: 316.227722
+        outputBuffer[3] = res.d[0]; // Expect: 728.141235
+        outputBuffer[4] = res.p[1]; // Expect: 81.000000
+        outputBuffer[5] = res.d[1]; // Expect: -127.012398
     }
 
     {

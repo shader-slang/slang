@@ -19,7 +19,7 @@ void f(float x, out float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var x = diffPair(5.0);
     float yDiffOut = 1.0;

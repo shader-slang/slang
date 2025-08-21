@@ -6,7 +6,8 @@ StructuredBuffer<uint> x;
 // CHECK_SPV: OpDecorate %y NonWritable
 ByteAddressBuffer y;
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     return x[0] + y.Load<uint>(0);
 }

@@ -35,7 +35,7 @@ int tupleSize4<each T>(T vals)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[0] = tupleSize2(); // CHECK: 0
     outputBuffer[1] = tupleSize3(); // CHECK-NEXT: 4

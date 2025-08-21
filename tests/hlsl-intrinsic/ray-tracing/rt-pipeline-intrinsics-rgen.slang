@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage raygeneration -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage raygeneration
-//   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
+//    Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage raygeneration -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
@@ -57,8 +57,12 @@ float CheckRayDispatchValues()
     uint3 ri = DispatchRaysIndex();
     uint3 rd = DispatchRaysDimensions();
 
-    val += ri.x; val += ri.y; val += ri.z;
-    val += rd.x; val += rd.y; val += rd.z;
+    val += ri.x;
+    val += ri.y;
+    val += ri.z;
+    val += rd.x;
+    val += rd.y;
+    val += rd.z;
 
     return val;
 }
@@ -96,23 +100,95 @@ float CheckTraceRay(RayPayload payload, RayDesc rayDesc)
     val += payload.RayHitT;
     TraceMotionRay(accelStruct, RAY_FLAG_FORCE_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_FORCE_NON_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_FORCE_NON_OPAQUE,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
     TraceMotionRay(accelStruct, RAY_FLAG_CULL_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_CULL_NON_OPAQUE, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_CULL_NON_OPAQUE,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_TRIANGLES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_TRIANGLES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
-    TraceMotionRay(accelStruct, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES, ~0, 0, 1, 0, rayDesc, currentTime, payload);
+    TraceMotionRay(
+        accelStruct,
+        RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES,
+        ~0,
+        0,
+        1,
+        0,
+        rayDesc,
+        currentTime,
+        payload);
     val += payload.RayHitT;
 #endif
 
@@ -131,15 +207,16 @@ float CheckSysValueIntrinsics()
 [shader("raygeneration")]
 void main()
 {
-    
+
     float2 dir = (DispatchRaysIndex().xy / DispatchRaysDimensions().xy) * 2.0f - 1.0f;
     float aspectRatio = DispatchRaysDimensions().x / DispatchRaysDimensions().y;
 
     RayDesc rayDesc;
-    rayDesc.Origin    = float3(0.0f, 0.0f, 0.0f);
-    rayDesc.Direction = normalize(float3(dir.x * aspectRatio, -dir.y, 1));;
-    rayDesc.TMin      = T_MIN;
-    rayDesc.TMax      = T_MAX;
+    rayDesc.Origin = float3(0.0f, 0.0f, 0.0f);
+    rayDesc.Direction = normalize(float3(dir.x * aspectRatio, -dir.y, 1));
+    ;
+    rayDesc.TMin = T_MIN;
+    rayDesc.TMax = T_MAX;
 
     RayPayload payload;
     payload.RayHitT = T_MAX;
@@ -147,8 +224,8 @@ void main()
     float val = 0.0f;
 
     val += CheckTraceRay(payload, rayDesc);
-   
-    if( val < T_MAX )
+
+    if (val < T_MAX)
     {
         val += CheckSysValueIntrinsics();
         screenOutput[DispatchRaysIndex().xy] = float4(val, val, val, 1);
@@ -158,6 +235,7 @@ void main()
         CallableParams params;
         CallShader(0, params);
 
-        screenOutput[DispatchRaysIndex().xy] = float4(params.value, params.value, params.value, params.value);
+        screenOutput[DispatchRaysIndex().xy] =
+            float4(params.value, params.value, params.value, params.value);
     }
 }

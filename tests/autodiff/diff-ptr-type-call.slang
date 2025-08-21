@@ -42,13 +42,14 @@ float test(MyPtrType b)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint id : SV_DispatchThreadID)
+void computeMain(uint id: SV_DispatchThreadID)
 {
     outputBuffer[0] = 1; // CHECK: 1
     outputBuffer[1] = 2; // CHECK: 2
 
-    // Denote the first two elements in the buffer as the primal buffer and the last two elements for the derivative.
-    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 } );
+    // Denote the first two elements in the buffer as the primal buffer and the last two elements
+    // for the derivative.
+    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 });
 
     bwd_diff(test)(b, 1.5f);
 

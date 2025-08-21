@@ -37,15 +37,9 @@ struct A
 
     [ForwardDifferentiable]
     [NoDiffThis]
-    float doSomethingDifferentiable(float b)
-    {
-        return o + b;
-    }
+    float doSomethingDifferentiable(float b) { return o + b; }
 
-    float doSomethingNotDifferentiable(float b)
-    {
-        return o * b;
-    }
+    float doSomethingNotDifferentiable(float b) { return o * b; }
 }
 
 [ForwardDifferentiable]
@@ -56,13 +50,14 @@ float h2(A a, float k)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-     {
-         outputBuffer[0] = f2(1.0); // Expect: 2.0
-         outputBuffer[1] = __fwd_diff(f2)(dpfloat(1.0, 1.0)).d; // Expect: 5.0
-         outputBuffer[2] = __fwd_diff(f2)(dpfloat(1.0, 1.0)).p; // Expect: 2.0
-         outputBuffer[3] = __fwd_diff(g2)(dpfloat(1.0, 1.0)).d; // Expect: 0.0
-         outputBuffer[4] = __fwd_diff(h2)({1.0}, DifferentialPair<float>(1.0, 2.0)).d; // Expect: 4.0
+    {
+        outputBuffer[0] = f2(1.0);                             // Expect: 2.0
+        outputBuffer[1] = __fwd_diff(f2)(dpfloat(1.0, 1.0)).d; // Expect: 5.0
+        outputBuffer[2] = __fwd_diff(f2)(dpfloat(1.0, 1.0)).p; // Expect: 2.0
+        outputBuffer[3] = __fwd_diff(g2)(dpfloat(1.0, 1.0)).d; // Expect: 0.0
+        outputBuffer[4] =
+            __fwd_diff(h2)( { 1.0 }, DifferentialPair<float>(1.0, 2.0)).d; // Expect: 4.0
     }
 }

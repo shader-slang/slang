@@ -4,18 +4,21 @@
 readonly writeonly buffer MyBlockName3
 {
     uint data1;
-} inputBuffer1;
+}
+inputBuffer1;
 
 readonly buffer MyBlockName5
 {
     uint data1;
-} inputBuffer2;
+}
+inputBuffer2;
 
 buffer dontOptimizeOutBlock
 {
     uint data1;
     uint data2;
-} optimizeBlock;
+}
+optimizeBlock;
 
 layout(local_size_x = 1) in;
 void computeMain()

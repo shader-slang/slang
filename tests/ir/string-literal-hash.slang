@@ -15,10 +15,8 @@ import string_literal_module;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(
-    uint3 tid   : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");   
+    int value = doSomethingElse() + getStringHash("Hello \t\n\0x083 World");
     outputBuffer[tid.x] = value;
 }
-

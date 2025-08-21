@@ -13,17 +13,17 @@
 
 struct Signs
 {
-	int a;
+    int a;
 }
 
 struct Stuff
 {
-	int b;
+    int b;
 }
 
 struct Things
 {
-	int c;
+    int c;
 }
 
 // A shader parameter at global scope should be assigned
@@ -35,22 +35,22 @@ ConstantBuffer<Signs> signs;
 [numthreads(4, 1, 1)]
 void computeMain(
 //TEST_INPUT:uniform(data=[2]):name=stuff
-	uniform Stuff  stuff,
+    uniform Stuff stuff,
 //TEST_INPUT:uniform(data=[3]):name=things
-	uniform Things things,
+    uniform Things things,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-	uniform RWStructuredBuffer<int> outputBuffer,
+    uniform RWStructuredBuffer<int> outputBuffer,
 
-	int3 dispatchThreadID : SV_DispatchThreadID)
+    int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
+    int tid = dispatchThreadID.x;
 
-	int val = 0;
-	val = val*16 + signs.a;
-	val = val*16 + stuff.b;
-	val = val*16 + things.c;
-	val = val*16 + tid;
+    int val = 0;
+    val = val * 16 + signs.a;
+    val = val * 16 + stuff.b;
+    val = val * 16 + things.c;
+    val = val * 16 + tid;
 
-	outputBuffer[tid] = val;
+    outputBuffer[tid] = val;
 }

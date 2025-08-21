@@ -12,17 +12,17 @@ RWStructuredBuffer<float> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
     float v = inputBuffer[idx];
-    
+
     int flags = 0;
-    
+
     flags |= isnan(v) ? 1 : 0;
     flags |= isfinite(v) ? 2 : 0;
     flags |= isinf(v) ? 4 : 0;
-    
+
     outputBuffer[idx] = flags;
 }

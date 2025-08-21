@@ -24,22 +24,22 @@ RWByteAddressBuffer outputBuffer;
 
 void test(uint val)
 {
-	uint tmp = val;
+    uint tmp = val;
 
-	tmp = inputBuffer.Load(uint(tmp * 4));
+    tmp = inputBuffer.Load(uint(tmp * 4));
 
-	uint2 pair = inputBuffer.Load2(uint(tmp * 4));
-	tmp = (pair.x + pair.y) & 0xF;
+    uint2 pair = inputBuffer.Load2(uint(tmp * 4));
+    tmp = (pair.x + pair.y) & 0xF;
 
-	uint4 quad = inputBuffer.Load4(uint(tmp * 4));
-	tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
+    uint4 quad = inputBuffer.Load4(uint(tmp * 4));
+    tmp = (quad.x + quad.y + quad.z + quad.w) & 0xF;
 
-	outputBuffer.Store(val*4, tmp);
+    outputBuffer.Store(val * 4, tmp);
 }
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 

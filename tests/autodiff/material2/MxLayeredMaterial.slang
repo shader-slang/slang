@@ -17,10 +17,15 @@ public struct LayeredData_mixedLobes : IMxLayeredMaterialData
 
 public struct Layered_mixedLobes_WeightsCalculator : IMxLayeredWeightCalculator
 {
-    public void calculateWeights<let TBsdfCount : int, let TLayerCount : int, TLayeredMaterialData : IMxLayeredMaterialData>(
-        const TLayeredMaterialData data, out MxWeights<TBsdfCount> weights)
+    public void calculateWeights<
+        let TBsdfCount : int,
+        let TLayerCount : int,
+        TLayeredMaterialData : IMxLayeredMaterialData>(
+        const TLayeredMaterialData data,
+        out MxWeights<TBsdfCount> weights)
     {
-        for (uint i = 0; i < TBsdfCount; i++) weights.weights[i] = float3(0.f);
+        for (uint i = 0; i < TBsdfCount; i++)
+            weights.weights[i] = float3(0.f);
     }
 }
 
@@ -28,13 +33,14 @@ public struct MxLayeredMaterial : IMaterial
 {
     public float3 baseColor;
 
-    public typealias UsedMaterialInstance = MxLayeredMaterialInstance<3, 1, TMxLayeredMaterialData, Layered_mixedLobes_WeightsCalculator>;
+    public typealias UsedMaterialInstance = MxLayeredMaterialInstance<
+        3,
+        1,
+        TMxLayeredMaterialData,
+        Layered_mixedLobes_WeightsCalculator>;
     public typedef UsedMaterialInstance MaterialInstance;
 
-    public float3 getAlbedo(float3 albedo)
-    {
-        return albedo;
-    }
+    public float3 getAlbedo(float3 albedo) { return albedo; }
 
     [ForwardDerivativeOf(getAlbedo)]
     [TreatAsDifferentiable]
@@ -48,7 +54,8 @@ public struct MxLayeredMaterial : IMaterial
     public void __bwd_d_getAlbedo(inout DifferentialPair<float3> dpAlbedo, float3 dOut)
     {
         [unroll]
-        for (int j = 0; j < 3; j++) outputBuffer[j + 6] += dOut[j];
+        for (int j = 0; j < 3; j++)
+            outputBuffer[j + 6] += dOut[j];
     }
 
     [Differentiable]
@@ -57,12 +64,13 @@ public struct MxLayeredMaterial : IMaterial
     {
         float3 albedo = getAlbedo(baseColor);
         UsedMaterialInstance mi;
-        for (uint i = 0; i < 3; i++) miData.data[i] = albedo[i];
+        for (uint i = 0; i < 3; i++)
+            miData.data[i] = albedo[i];
 
         // unused
         miData.data[3] = 0.f;
         miData.data[4] = 0.f;
-        
+
         return mi;
     }
 }

@@ -9,14 +9,18 @@
 // CHECK: OpStore
 
 static const uint staticArr[] = {
-    uint((((uint)round(saturate(1) * 255) << 24) | ((uint)round(saturate(0) * 255) << 16) | ((uint)round(saturate(0) * 255) << 8) | 0xff)),
-    uint((((uint)round(saturate(1) * 255) << 24) | ((uint)round(saturate(0) * 255) << 16) | ((uint)round(saturate(1) * 255) << 8) | 0xff))
+    uint(
+        (((uint)round(saturate(1) * 255) << 24) | ((uint)round(saturate(0) * 255) << 16) |
+         ((uint)round(saturate(0) * 255) << 8) | 0xff)),
+    uint(
+        (((uint)round(saturate(1) * 255) << 24) | ((uint)round(saturate(0) * 255) << 16) |
+         ((uint)round(saturate(1) * 255) << 8) | 0xff))
 };
 
 RWStructuredBuffer<int> buffer;
 
-[numthreads(1,1,1)]
-void main(int i : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void main(int i: SV_DispatchThreadID)
 {
     buffer[0] = staticArr[i] + staticArr[1];
 }

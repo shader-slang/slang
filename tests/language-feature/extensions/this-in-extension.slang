@@ -10,7 +10,7 @@ interface IFoo
     static const This identity;
 }
 
-__generic<T:IFoo>
+__generic<T : IFoo>
 extension T
 {
     This getIdentity()
@@ -22,7 +22,7 @@ extension T
 struct FooImpl : IFoo
 {
     int v = 1;
-    static const This identity = This();   
+    static const This identity = This();
 }
 
 
@@ -30,7 +30,7 @@ struct FooImpl : IFoo
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     FooImpl foo = {};
     var ident = foo.getIdentity();

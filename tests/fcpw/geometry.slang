@@ -34,9 +34,17 @@ public interface IPrimitive
     uint getIndex();
 };
 
-public bool intersectLineSegment(float3 pa, float3 pb,
-                                 float3 ro, float3 rd, float rtMax, bool checkForOcclusion,
-                                 inout float3 p, inout float3 n, inout float2 uv, inout float d)
+public bool intersectLineSegment(
+    float3 pa,
+    float3 pb,
+    float3 ro,
+    float3 rd,
+    float rtMax,
+    bool checkForOcclusion,
+    inout float3 p,
+    inout float3 n,
+    inout float2 uv,
+    inout float d)
 {
     float3 u = pa - ro;
     float3 v = pb - pa;
@@ -116,10 +124,7 @@ public struct LineSegment : IPrimitive
     }
 
     // returns the centroid of the primitive
-    public float3 getCentroid()
-    {
-        return 0.5 * (pa + pb);
-    }
+    public float3 getCentroid() { return 0.5 * (pa + pb); }
 
     // returns the normal of the primitive
     public float3 getNormal()
@@ -131,16 +136,14 @@ public struct LineSegment : IPrimitive
     }
 
     // returns the surface area of the primitive
-    public float getSurfaceArea()
-    {
-        return length(pb - pa);
-    }
+    public float getSurfaceArea() { return length(pb - pa); }
 
     // intersects primitive with ray
     // NOTE: specialized to 2D (z coordinate == 0)
     public bool intersect(Ray r, bool checkForOcclusion, inout Interaction i)
     {
-        bool didIntersect = intersectLineSegment(pa, pb, r.o, r.d, r.tMax, checkForOcclusion, i.p, i.n, i.uv, i.d);
+        bool didIntersect =
+            intersectLineSegment(pa, pb, r.o, r.d, r.tMax, checkForOcclusion, i.p, i.n, i.uv, i.d);
         if (didIntersect)
         {
             i.index = index;
@@ -193,15 +196,21 @@ public struct LineSegment : IPrimitive
     }
 
     // returns the index of the primitive
-    public uint getIndex()
-    {
-        return index;
-    }
+    public uint getIndex() { return index; }
 };
 
-public bool intersectTriangle(float3 pa, float3 pb, float3 pc,
-                              float3 ro, float3 rd, float rtMax, bool checkForOcclusion,
-                              inout float3 p, inout float3 n, inout float2 uv, inout float d)
+public bool intersectTriangle(
+    float3 pa,
+    float3 pb,
+    float3 pc,
+    float3 ro,
+    float3 rd,
+    float rtMax,
+    bool checkForOcclusion,
+    inout float3 p,
+    inout float3 n,
+    inout float2 uv,
+    inout float d)
 {
     // Möller–Trumbore intersection algorithm
     float3 v1 = pb - pa;
@@ -248,7 +257,13 @@ public bool intersectTriangle(float3 pa, float3 pb, float3 pc,
     return false;
 }
 
-public float findClosestPointTriangle(float3 pa, float3 pb, float3 pc, float3 x, out float3 p, out float2 t)
+public float findClosestPointTriangle(
+    float3 pa,
+    float3 pb,
+    float3 pc,
+    float3 x,
+    out float3 p,
+    out float2 t)
 {
     // source: real time collision detection
     // check if x in vertex region outside pa
@@ -346,16 +361,10 @@ public struct Triangle : IPrimitive
     }
 
     // returns the centroid of the primitive
-    public float3 getCentroid()
-    {
-        return (pa + pb + pc) / 3.0;
-    }
+    public float3 getCentroid() { return (pa + pb + pc) / 3.0; }
 
     // returns the surface area of the primitive
-    public float getSurfaceArea()
-    {
-        return 0.5 * length(cross(pb - pa, pc - pa));
-    }
+    public float getSurfaceArea() { return 0.5 * length(cross(pb - pa, pc - pa)); }
 
     // returns the normal of the primitive
     public float3 getNormal()
@@ -368,7 +377,8 @@ public struct Triangle : IPrimitive
     // intersects primitive with ray
     public bool intersect(Ray r, bool checkForOcclusion, inout Interaction i)
     {
-        bool didIntersect = intersectTriangle(pa, pb, pc, r.o, r.d, r.tMax, checkForOcclusion, i.p, i.n, i.uv, i.d);
+        bool didIntersect =
+            intersectTriangle(pa, pb, pc, r.o, r.d, r.tMax, checkForOcclusion, i.p, i.n, i.uv, i.d);
         if (didIntersect)
         {
             i.index = index;
@@ -424,10 +434,7 @@ public struct Triangle : IPrimitive
     }
 
     // returns the index of the primitive
-    public uint getIndex()
-    {
-        return index;
-    }
+    public uint getIndex() { return index; }
 };
 
 public interface ISilhouette
@@ -442,9 +449,12 @@ public interface ISilhouette
     float3 getNormal(uint fIndex);
 
     // finds closest silhouette point on primitive from sphere center
-    bool findClosestSilhouettePoint(BoundingSphere s, bool flipNormalOrientation,
-                                    float squaredMinRadius, float precision,
-                                    inout Interaction i);
+    bool findClosestSilhouettePoint(
+        BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i);
 
     // returns the index of the silhouette
     uint getIndex();
@@ -455,39 +465,36 @@ public struct NoSilhouette : ISilhouette
     public uint index;
 
     // returns the centroid of the silhouette
-    public float3 getCentroid()
-    {
-        return float3(0.0, 0.0, 0.0);
-    }
+    public float3 getCentroid() { return float3(0.0, 0.0, 0.0); }
 
     // returns whether silhouette has two adjacent faces
-    public bool hasTwoAdjacentFaces()
-    {
-        return false;
-    }
+    public bool hasTwoAdjacentFaces() { return false; }
 
     // returns normal of adjacent face
-    public float3 getNormal(uint fIndex)
-    {
-        return float3(0.0, 0.0, 0.0);
-    }
+    public float3 getNormal(uint fIndex) { return float3(0.0, 0.0, 0.0); }
 
     // finds closest silhouette point on primitive from sphere center
-    public bool findClosestSilhouettePoint(BoundingSphere s, bool flipNormalOrientation,
-                                           float squaredMinRadius, float precision,
-                                           inout Interaction i)
+    public bool findClosestSilhouettePoint(
+        BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i)
     {
         return false;
     }
 
     // returns the index of the silhouette
-    public uint getIndex()
-    {
-        return UINT_MAX;
-    }
+    public uint getIndex() { return UINT_MAX; }
 };
 
-public bool isSilhouetteVertex(float3 n0, float3 n1, float3 viewDir, float d, bool flipNormalOrientation, float precision)
+public bool isSilhouetteVertex(
+    float3 n0,
+    float3 n1,
+    float3 viewDir,
+    float d,
+    bool flipNormalOrientation,
+    float precision)
 {
     float sign = flipNormalOrientation ? 1.0 : -1.0;
 
@@ -530,16 +537,10 @@ public struct Vertex : ISilhouette
     public uint hasOneAdjacentFace;
 
     // returns the centroid of the silhouette
-    public float3 getCentroid()
-    {
-        return p;
-    }
+    public float3 getCentroid() { return p; }
 
     // returns whether silhouette has two adjacent faces
-    public bool hasTwoAdjacentFaces()
-    {
-        return hasOneAdjacentFace == 0;
-    }
+    public bool hasTwoAdjacentFaces() { return hasOneAdjacentFace == 0; }
 
     // returns normal of adjacent face
     public float3 getNormal(uint fIndex)
@@ -553,9 +554,12 @@ public struct Vertex : ISilhouette
     }
 
     // finds closest silhouette point on primitive from sphere center
-    public bool findClosestSilhouettePoint(BoundingSphere s, bool flipNormalOrientation,
-                                           float squaredMinRadius, float precision,
-                                           inout Interaction i)
+    public bool findClosestSilhouettePoint(
+        BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i)
     {
         if (squaredMinRadius >= s.r2)
         {
@@ -590,14 +594,18 @@ public struct Vertex : ISilhouette
     }
 
     // returns the index of the silhouette
-    public uint getIndex()
-    {
-        return index;
-    }
+    public uint getIndex() { return index; }
 };
 
-public bool isSilhouetteEdge(float3 pa, float3 pb, float3 n0, float3 n1, float3 viewDir,
-                             float d, bool flipNormalOrientation, float precision)
+public bool isSilhouetteEdge(
+    float3 pa,
+    float3 pb,
+    float3 n0,
+    float3 n1,
+    float3 viewDir,
+    float d,
+    bool flipNormalOrientation,
+    float precision)
 {
     float sign = flipNormalOrientation ? 1.0 : -1.0;
 
@@ -642,16 +650,10 @@ public struct Edge : ISilhouette
     public uint hasOneAdjacentFace;
 
     // returns the centroid of the silhouette
-    public float3 getCentroid()
-    {
-        return 0.5 * (pa + pb);
-    }
+    public float3 getCentroid() { return 0.5 * (pa + pb); }
 
     // returns whether silhouette has two adjacent faces
-    public bool hasTwoAdjacentFaces()
-    {
-        return hasOneAdjacentFace == 0;
-    }
+    public bool hasTwoAdjacentFaces() { return hasOneAdjacentFace == 0; }
 
     // returns normal of adjacent face
     public float3 getNormal(uint fIndex)
@@ -665,9 +667,12 @@ public struct Edge : ISilhouette
     }
 
     // finds closest silhouette point on primitive from sphere center
-    public bool findClosestSilhouettePoint(BoundingSphere s, bool flipNormalOrientation,
-                                           float squaredMinRadius, float precision,
-                                           inout Interaction i)
+    public bool findClosestSilhouettePoint(
+        BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i)
     {
         if (squaredMinRadius >= s.r2)
         {
@@ -686,7 +691,8 @@ public struct Edge : ISilhouette
         if (!process)
         {
             float3 viewDir = s.c - i.p;
-            process = isSilhouetteEdge(pa, pb, n0, n1, viewDir, d, flipNormalOrientation, precision);
+            process =
+                isSilhouetteEdge(pa, pb, n0, n1, viewDir, d, flipNormalOrientation, precision);
         }
 
         if (process && d * d <= s.r2)
@@ -701,8 +707,5 @@ public struct Edge : ISilhouette
     }
 
     // returns the index of the silhouette
-    public uint getIndex()
-    {
-        return index;
-    }
+    public uint getIndex() { return index; }
 };

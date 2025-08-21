@@ -13,8 +13,7 @@ int helper(RaytracingAccelerationStructure a, int b)
 }
 
 [shader("compute")]
-void main(
-    uniform RaytracingAccelerationStructure x)
+void main(uniform RaytracingAccelerationStructure x)
 {
     helper(x, 1);
 }

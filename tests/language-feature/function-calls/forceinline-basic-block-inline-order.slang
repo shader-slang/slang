@@ -20,13 +20,13 @@ int inlineSingleBasicBlock2(int value1, int value2)
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    
+
     // Call the forceinline function
     int result = inlineSingleBasicBlock2(16, 10);
-    
+
     outputBuffer[i] = result;
 }
 

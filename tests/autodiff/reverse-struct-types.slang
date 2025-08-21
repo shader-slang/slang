@@ -25,16 +25,16 @@ A f(A a)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
-        A a = {1.0, 2.0};
-        A.Differential azero = {0.0, 0.0};
+        A a = { 1.0, 2.0 };
+        A.Differential azero = { 0.0, 0.0 };
 
         dpA dpa = dpA(a, azero);
 
-        A.Differential dout = {1.0, 1.0};
-        
+        A.Differential dout = { 1.0, 1.0 };
+
         __bwd_diff(f)(dpa, dout);
         outputBuffer[0] = dpa.d.x; // Expect: 7
         outputBuffer[1] = dpa.d.y; // Expect: 0

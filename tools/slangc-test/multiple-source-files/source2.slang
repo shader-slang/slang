@@ -1,2 +1,2 @@
 [shader("compute")]
-void computeMain2() { }
+void computeMain2() {}

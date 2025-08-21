@@ -8,10 +8,9 @@
 
 RWStructuredBuffer<float> buffer;
 
-void main(
-	uniform float value) 
+void main(uniform float value)
 {
-	buffer[DispatchRaysIndex().x] = value;
+    buffer[DispatchRaysIndex().x] = value;
 }
 
 // CHECK: OpCapability RayTracingKHR

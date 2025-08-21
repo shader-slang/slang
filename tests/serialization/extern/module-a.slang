@@ -4,7 +4,7 @@
 
 export struct Thing
 {
-    int a; 
+    int a;
     int b;
 };
 
@@ -16,8 +16,7 @@ export Thing makeThing(int a, int b)
     return thing;
 }
 
-export int foo(Thing thing) 
-{ 
-    return thing.a + thing.b * 2; 
+export int foo(Thing thing)
+{
+    return thing.a + thing.b * 2;
 }
-

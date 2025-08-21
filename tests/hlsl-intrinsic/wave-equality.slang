@@ -9,24 +9,24 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     int value = 0;
-    
+
     // Scalar
-    
-    value |= WaveActiveAllEqual(idx * 0 + 1)  ? 1 : 0;     // true
-    value |= WaveActiveAllEqual(idx & 2)      ? 2 : 0;     // false
-   
+
+    value |= WaveActiveAllEqual(idx * 0 + 1) ? 1 : 0; // true
+    value |= WaveActiveAllEqual(idx & 2) ? 2 : 0;     // false
+
     // Vector
-   
-    int2 v0 = int2(idx & 0xf0, (idx & 0xf00) + 1);      // (0, 1)
+
+    int2 v0 = int2(idx & 0xf0, (idx & 0xf00) + 1); // (0, 1)
     int2 v1 = int2(idx & 2, (idx & 2) + 1);
-    
-    value |= WaveActiveAllEqual(v0)           ? 0x10 : 0;     // true
-    value |= WaveActiveAllEqual(v1)           ? 0x20 : 0;     // false
-    
+
+    value |= WaveActiveAllEqual(v0) ? 0x10 : 0; // true
+    value |= WaveActiveAllEqual(v1) ? 0x20 : 0; // false
+
     outputBuffer[idx] = value;
 }

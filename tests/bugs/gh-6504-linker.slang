@@ -24,11 +24,11 @@ struct StandardVertexInput : IVertexInput
     float4 tangent;
     float2 uv;
 
-    float3 GetPosition() {return position;}
-    float3 GetNormal() {return normal;}
-    float4 GetTangent() {return tangent;}
-    float2 GetUV() { return uv;}
-    float4 GetBone() { return float4(0,0,0,0);}
+    float3 GetPosition() { return position; }
+    float3 GetNormal() { return normal; }
+    float4 GetTangent() { return tangent; }
+    float2 GetUV() { return uv; }
+    float4 GetBone() { return float4(0, 0, 0, 0); }
 }
 
 extern struct VertexInput : IVertexInput = StandardVertexInput;
@@ -37,7 +37,7 @@ struct PushConstant
 {
     float4x4 model;
     float4x4 invTspModel;
-} 
+}
 
 [vk_push_constant]
 PushConstant pconst;
@@ -53,7 +53,6 @@ struct VertexOutput
 }
 
 
-
 VertexOutput SceneLitVertex(VertexInput input)
 {
     VertexOutput output;
@@ -63,7 +62,7 @@ VertexOutput SceneLitVertex(VertexInput input)
 
     output.positionWS = mul(pconst.model, float4(vertexPos, 1)).xyz;
 
-    matrix<float,3,3> model33 = (float3x3)pconst.invTspModel;
+    matrix<float, 3, 3> model33 = (float3x3)pconst.invTspModel;
     output.normalWS = mul(model33, normal).xyz;
     output.tangentWS = mul(model33, tangent.xyz);
     output.bitangentWS = tangent.w * cross(output.normalWS, output.tangentWS);

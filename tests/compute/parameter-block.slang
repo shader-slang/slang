@@ -10,7 +10,7 @@
 
 struct P
 {
-	RWStructuredBuffer<int> buffer;
+    RWStructuredBuffer<int> buffer;
 };
 
 //TEST_INPUT: set block0 = new{ out ubuffer(data=[0 0 0 0], stride=4) }
@@ -20,13 +20,13 @@ ParameterBlock<P> block0;
 ParameterBlock<P> block1;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	int inVal = block1.buffer[tid];
+    int inVal = block1.buffer[tid];
 
-	int outVal = inVal;
+    int outVal = inVal;
 
-	block0.buffer[tid] = outVal;
+    block0.buffer[tid] = outVal;
 }

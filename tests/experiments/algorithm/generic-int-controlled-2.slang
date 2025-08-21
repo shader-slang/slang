@@ -8,7 +8,7 @@ Works.
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-int reduce<let Clustering : int, let DupTest : int>( int a)
+int reduce<let Clustering : int, let DupTest : int>(int a)
 {
     if (Clustering)
     {
@@ -22,12 +22,11 @@ int reduce<let Clustering : int, let DupTest : int>( int a)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
     int r = reduce<1, 2>(index);
-    
-	outputBuffer[index] = r;
-}
 
+    outputBuffer[index] = r;
+}

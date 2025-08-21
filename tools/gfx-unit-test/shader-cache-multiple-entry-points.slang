@@ -9,7 +9,7 @@ void computeA(
     var input = buffer[sv_dispatchThreadID.x];
     buffer[sv_dispatchThreadID.x] = input + 1.0f;
 }
-           
+
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void computeB(

@@ -2,9 +2,9 @@
 
 void main()
 {
-  int2x2 a;
-  int4 b;
+    int2x2 a;
+    int4 b;
 
   //CHK-NOT:error 39999: ambiguous call
-  b.zw = mul(a, b.yx);
+    b.zw = mul(a, b.yx);
 }

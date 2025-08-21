@@ -5,7 +5,7 @@
 
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     float x = output[0];

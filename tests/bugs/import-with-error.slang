@@ -7,5 +7,5 @@ import import_with_error_extra;
 
 void main()
 {
-	broken();
+    broken();
 }

@@ -10,9 +10,9 @@ Texture2D g_texture;
 SamplerState g_sampler;
 RWStructuredBuffer<float> outputBuffer;
 
-float4 sample(float2 uv, constexpr int2 ofs )
+float4 sample(float2 uv, constexpr int2 ofs)
 {
-    return g_texture.SampleLevel(g_sampler, uv, 0.0, ofs); 
+    return g_texture.SampleLevel(g_sampler, uv, 0.0, ofs);
 }
 
 [numthreads(1, 1, 1)]

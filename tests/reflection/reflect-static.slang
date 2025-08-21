@@ -20,15 +20,15 @@ ConstantBuffer<AnotherThing> cbAnotherThing;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Texture2D t = AnotherThing::t;
-    
+
     float4 v = t.Load(int3(dispatchThreadID.x, dispatchThreadID.y, 0));
-    
+
     int m = cbAnotherThing.a + cbAnotherThing.b + Thing::value;
-    
+
     m += int(v.x);
-    
+
     outputBuffer[dispatchThreadID.x] = m;
 }

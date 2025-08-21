@@ -11,8 +11,8 @@ void writeFlags(int2 position, RWTexture2D<uint> flagsTexture, uint flags)
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
-void main(uint3 threadId : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void main(uint3 threadId: SV_DispatchThreadID)
 {
     uint16_t2 position = uint16_t2(threadId.xy);
     uint flags = 1;

@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry computeMain -enable-experimental-passes
 
-// Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin is referenced directly.
+// Check to ensure builtin is not moved into a kernelContext (part of entry-point). Ensure builtin
+// is referenced directly.
 
 // CHECK: OpEntryPoint{{.*}} %val
 // CHECK: %[[GROUP_SHARED_VAR:(.*)]] = OpVariable{{.*}} Workgroup
@@ -22,7 +23,7 @@ void nestedCall(uint index)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     val = 0;
     GroupMemoryBarrierWithGroupSync();

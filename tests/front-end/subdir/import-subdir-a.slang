@@ -2,4 +2,7 @@
 
 // This is the imported code.
 
-public float foo(float x) { return x; }
+public float foo(float x)
+{
+    return x;
+}

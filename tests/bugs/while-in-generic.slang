@@ -7,7 +7,8 @@ struct Context
         while (true)
         {
             i++;
-            if (i > 5) break;
+            if (i > 5)
+                break;
         }
         return i;
     }
@@ -16,7 +17,7 @@ struct Context
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Context c;
     outputBuffer[dispatchThreadID.x] = c.genFunc<int>(5);

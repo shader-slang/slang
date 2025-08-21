@@ -23,7 +23,7 @@ float myFunc2(DifferentialPair<B>.Differential d)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     B.Differential bd;
     bd.x = 1.0;

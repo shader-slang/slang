@@ -31,7 +31,7 @@ ConstantBuffer<Globals> gGlobals;
 
 RWStructuredBuffer<uint> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main(int3 tid: SV_DispatchThreadID)
 {
     if (gGlobals.pStruct.isValid())

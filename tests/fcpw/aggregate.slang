@@ -13,10 +13,7 @@ public interface IBranchTraversalWeight
 public struct ConstantBranchTraversalWeight : IBranchTraversalWeight
 {
     // computes the traversal weight for a given squared distance
-    public float compute(float r2)
-    {
-        return 1.0;
-    }
+    public float compute(float r2) { return 1.0; }
 };
 
 public interface IAggregate
@@ -29,18 +26,22 @@ public interface IAggregate
     bool intersect(inout Ray r, bool checkForOcclusion, inout Interaction i);
 
     // intersects aggregate geometry with sphere
-    bool intersect<T : IBranchTraversalWeight>(BoundingSphere s, float3 randNums,
-                                               T branchTraversalWeight,
-                                               inout Interaction i);
+    bool intersect<T : IBranchTraversalWeight>(
+        BoundingSphere s,
+        float3 randNums,
+        T branchTraversalWeight,
+        inout Interaction i);
 
     // finds closest point on aggregate geometry from sphere center
-    bool findClosestPoint(inout BoundingSphere s, inout Interaction i,
-                          bool recordNormal = false);
+    bool findClosestPoint(inout BoundingSphere s, inout Interaction i, bool recordNormal = false);
 
     // finds closest silhouette point on aggregate geometry from sphere center
-    bool findClosestSilhouettePoint(inout BoundingSphere s, bool flipNormalOrientation,
-                                    float squaredMinRadius, float precision,
-                                    inout Interaction i);
+    bool findClosestSilhouettePoint(
+        inout BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i);
 };
 
 public struct TransformedAggregate<A : IAggregate> : IAggregate
@@ -53,10 +54,7 @@ public struct TransformedAggregate<A : IAggregate> : IAggregate
     // NOTE: refitting of transformed aggregates is currently quite inefficient, since the
     // shared aggregate is refit every time this function is called
     [mutating]
-    public void refit(uint nodeIndex)
-    {
-        aggregate.refit(nodeIndex);
-    }
+    public void refit(uint nodeIndex) { aggregate.refit(nodeIndex); }
 
     // intersects aggregate geometry with ray
     public bool intersect(inout Ray r, bool checkForOcclusion, inout Interaction i)
@@ -79,9 +77,11 @@ public struct TransformedAggregate<A : IAggregate> : IAggregate
     }
 
     // intersects aggregate geometry with sphere
-    public bool intersect<T : IBranchTraversalWeight>(BoundingSphere s, float3 randNums,
-                                                      T branchTraversalWeight,
-                                                      inout Interaction i)
+    public bool intersect<T : IBranchTraversalWeight>(
+        BoundingSphere s,
+        float3 randNums,
+        T branchTraversalWeight,
+        inout Interaction i)
     {
         // apply inverse transform to sphere
         BoundingSphere sInv = transformSphere(tInv, s);
@@ -100,8 +100,10 @@ public struct TransformedAggregate<A : IAggregate> : IAggregate
     }
 
     // finds closest point on aggregate geometry from sphere center
-    public bool findClosestPoint(inout BoundingSphere s, inout Interaction i,
-                                 bool recordNormal = false)
+    public bool findClosestPoint(
+        inout BoundingSphere s,
+        inout Interaction i,
+        bool recordNormal = false)
     {
         // apply inverse transform to sphere
         BoundingSphere sInv = transformSphere(tInv, s);
@@ -121,9 +123,12 @@ public struct TransformedAggregate<A : IAggregate> : IAggregate
     }
 
     // finds closest silhouette point on aggregate geometry from sphere center
-    public bool findClosestSilhouettePoint(inout BoundingSphere s, bool flipNormalOrientation,
-                                           float squaredMinRadius, float precision,
-                                           inout Interaction i)
+    public bool findClosestSilhouettePoint(
+        inout BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i)
     {
         // apply inverse transform to sphere
         BoundingSphere sInv = transformSphere(tInv, s);
@@ -131,8 +136,9 @@ public struct TransformedAggregate<A : IAggregate> : IAggregate
         BoundingSphere sMinInv = transformSphere(tInv, sMin);
 
         // find closest silhouette point
-        bool didFindClosestSilhouettePoint = aggregate.findClosestSilhouettePoint(
-            sInv, flipNormalOrientation, sMinInv.r2, precision, i);
+        bool didFindClosestSilhouettePoint =
+            aggregate
+                .findClosestSilhouettePoint(sInv, flipNormalOrientation, sMinInv.r2, precision, i);
 
         // apply transform to sphere and interaction
         s.r2 = transformSphere(t, sInv).r2;

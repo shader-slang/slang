@@ -1,12 +1,20 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d11 -output-using-type
 
-struct Test {
+struct Test
+{
     RWStructuredBuffer<int> val;
     __subscript(int x, int y)->int
     {
-        get { return val[x * 3 + y]; }
-        [nonmutating] set { val[x * 3 + y] = newValue; }
+        get
+        {
+            return val[x * 3 + y];
+        }
+        [nonmutating]
+        set
+        {
+            val[x * 3 + y] = newValue;
+        }
     }
 }
 Test test;
@@ -21,5 +29,5 @@ void computeMain()
     // which means that it can be called even when `test` is not mutable.
 
     // CHECK: 1
-    test[0,0] = 1;
+    test[0, 0] = 1;
 }

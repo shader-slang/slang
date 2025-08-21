@@ -13,8 +13,8 @@ RWStructuredBuffer<uint> resultBuffer;
 [vk::image_format("r32ui")]
 RWTexture2D<uint> tex;
 
-[numthreads(1,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: OpImageTexelPointer
     InterlockedAdd(tex[uint2(0, 0)], 1);

@@ -5,7 +5,10 @@
 extern static const int N;
 
 // SPIRV: ([[# @LINE+3]]): warning 31000
-struct S { int xs[N]; }
+struct S
+{
+    int xs[N];
+}
 
 RWStructuredBuffer<S> b;
 
@@ -17,6 +20,6 @@ void computeMain()
     // check that we multiply by our special number
     // SPIRV: [[fisqr:%[a-zA-Z0-9_]+]] = OpConstant %int 1597463007
     // SPIRV: {{%[0-9]+}} = OpIMul %int {{%[0-9]+}} [[fisqr]]
-    for(int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i)
         b[0].xs[i] = p.xs[i] * N;
 }

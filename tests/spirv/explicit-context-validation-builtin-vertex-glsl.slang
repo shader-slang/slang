@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage vertex -entry vertexMain -enable-experimental-passes
 
-// Check to ensure varying output/input and builtin is not moved into a kernelContext (part of entry-point). Ensure varying output/input and builtin is referenced directly.
+// Check to ensure varying output/input and builtin is not moved into a kernelContext (part of
+// entry-point). Ensure varying output/input and builtin is referenced directly.
 
 // CHECK: OpEntryPoint{{((.*)(%.*data1In|%.*data2In|%.*data1Out)(.*))|((.*)(%.*data1In|%.*data2In|%.*data1Out)(.*))|((.*)(%.*data1In|%.*data2In|%.*data1Out)(.*))}}
 

@@ -10,7 +10,8 @@ RWStructuredBuffer<uint> outputBuffer;
 
 typedef uint MyUInt;
 
-struct S {
+struct S
+{
     MyInt foo : 8;
     MyUInt bar : 24;
 };

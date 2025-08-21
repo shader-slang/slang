@@ -13,7 +13,7 @@ RWBuffer<uint4> b;
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
     // DXIL: @dx.op.textureGather.i32
     // DXIL: @dx.op.textureGather.f32

@@ -20,6 +20,6 @@ void computeMain()
     CoopVec<float, 4> vec = coopVecLoad<4, float>(input1);
     CoopVec<float, 4> result = vec * 2.0;
 
-    for(int i = 0; i < result.getCount(); ++i)
+    for (int i = 0; i < result.getCount(); ++i)
         outputBuffer[i] = result[i];
 }

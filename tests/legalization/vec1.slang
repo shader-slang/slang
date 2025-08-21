@@ -37,7 +37,7 @@ V getV()
     v.oo.x.x = 1;
 
     // Test assigning into subscript
-    v.on[0].wzyx = float4(4,3,2,1);
+    v.on[0].wzyx = float4(4, 3, 2, 1);
 
     // Test assigning from vector
     v.no.x = vector<float, 1>(1);
@@ -46,7 +46,7 @@ V getV()
     v.no.y.x = 2;
 
     // Test assigning from vector of vector
-    v.no.wz = vector<vector<float, 1>, 2>(3,4);
+    v.no.wz = vector<vector<float, 1>, 2>(3, 4);
 
     return v;
 }
@@ -58,7 +58,7 @@ float sumV(V v)
         + v.on.x.y
         + v.on.x.z
         + v.on.x.w
-        // Test arithmetic
+           // Test arithmetic
         + (v.no.x + v.no.y + v.no.z + v.no.w).x;
 }
 
@@ -73,21 +73,20 @@ float3 splat(vector<float, 1> v)
 float triangle<let N : int>()
 {
     vector<float, N> v;
-    for(int i = 0; i < N; ++i)
-        v[i] = i+1;
+    for (int i = 0; i < N; ++i)
+        v[i] = i + 1;
 
     float ret = 0;
-    for(int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i)
         ret += v[i];
     return ret;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const V v = getV();
-    outputBuffer[dispatchThreadID.x]
-        = sumV(v)
+    outputBuffer[dispatchThreadID.x] = sumV(v)
         + triangle<1>()
         + splat(v.oo.x).z;
 }

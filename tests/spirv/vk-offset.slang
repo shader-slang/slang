@@ -11,7 +11,7 @@ struct S1
 
     [[vk::offset(16)]]
     float4 c;
-  }
+}
 
 [[vk::push_constant]]
 S1 pc;
@@ -39,4 +39,3 @@ VertexOutput vertexMain()
     output.position = float3(pc.a.x, pc.b.y, pc.c.z);
     return output;
 }
-

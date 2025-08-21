@@ -10,34 +10,34 @@ RWStructuredBuffer<int> outputBuffer;
 int calcThing(int offset)
 {
     int total = 0;
-    int another[2] = { 1, 2};
-    
+    int another[2] = { 1, 2 };
+
     for (int k = 0; k < 20; ++k)
-    {       
+    {
         for (int i = 0; i < 17; ++i)
         {
             another[i & 1] += k + i;
         }
-        
+
         total += another[k & 1];
-        
+
         if ((k + 7) % 5 == 4)
         {
             return 1;
         }
     }
-    
+
     if (total > 4)
     {
         total = -total;
     }
-    
+
     return total;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = int(dispatchThreadID.x);
 
     outputBuffer[index] = calcThing(index);

@@ -17,12 +17,9 @@ struct Impl : IFoo
 {
     float x;
     [Differentiable]
-    __init()
-    {
-        x = 4.0;
-    }
+    __init() { x = 4.0; }
 
-    float compute(int id) { return outputBuffer[id] = detach(x);}
+    float compute(int id) { return outputBuffer[id] = detach(x); }
 }
 
 float test<T : IFoo>(int id)
@@ -32,8 +29,8 @@ float test<T : IFoo>(int id)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint id : SV_DispatchThreadID)
+void computeMain(uint id: SV_DispatchThreadID)
 {
     // CHECK: 4.0
-    test<Impl>(id); 
+    test<Impl>(id);
 }

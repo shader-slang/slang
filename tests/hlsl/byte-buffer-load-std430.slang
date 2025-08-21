@@ -14,7 +14,7 @@ struct MyStruct
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var v = inBuffer.Load<MyStruct>(0);
     var g = inBuffer.Load<float4>(4);

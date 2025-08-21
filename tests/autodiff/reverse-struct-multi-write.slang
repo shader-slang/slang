@@ -31,18 +31,17 @@ A f(A a)
     aout.x = tmp + 5 * a.x;
     */
     return aout;
-
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    A a = {1.0, 2.0};
+    A a = { 1.0, 2.0 };
 
     var dpa = diffPair(a);
 
-    A.Differential dout = {1.0, 1.0};
-    
+    A.Differential dout = { 1.0, 1.0 };
+
     __bwd_diff(f)(dpa, dout);
     outputBuffer[0] = dpa.d.x; // Expect: 13
     outputBuffer[1] = dpa.d.y; // Expect: 0

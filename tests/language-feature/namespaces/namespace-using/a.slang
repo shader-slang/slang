@@ -4,7 +4,10 @@ __include a1;
 
 namespace ns2
 {
-    public int f() { return 1; }
+public int f()
+{
+    return 1;
+}
 }
 
 using ns;

@@ -8,18 +8,18 @@
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
-[vk::binding(2, 3)] RWByteAddressBuffer buffer;
-struct Block {
+[vk::binding(2, 3)]
+RWByteAddressBuffer buffer;
+struct Block
+{
     float4 val[2];
 };
 [shader("compute")]
-[numthreads(1,1,1)]
-void computeMain(uint3 threadId : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     // CHECK: error 41300: invalid alignment `{{.*}}` specified for the byte address buffer resource with the element size of `{{.*}}`
     // CHECK: error 41300: invalid alignment `{{.*}}` specified for the byte address buffer resource with the element size of `{{.*}}`
     buffer.Store<Block>(0, buffer.LoadAligned<Block>(1, 5));
     buffer.Store<Block>(1, buffer.Load<Block>(0), 3);
-
 }
-

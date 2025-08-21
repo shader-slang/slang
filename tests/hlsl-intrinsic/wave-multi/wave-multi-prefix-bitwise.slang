@@ -52,7 +52,8 @@ bool test1Bitwise(uint4 mask)
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVBitwise(uint4 mask) {
+bool testVBitwise(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let andValue = GVec(T(gAndValue));
@@ -82,11 +83,11 @@ bool testBitwise(uint4 mask)
         & testVBitwise<uint, 4>(mask)
 
         // TODO: these are failing SPIRV validation and should be fixed.
-        // SPIRV's ops do not directly accept/return bool.
-        // & test1Bitwise<bool>(mask)
-        // & testVBitwise<bool, 2>(mask)
-        // & testVBitwise<bool, 3>(mask)
-        // & testVBitwise<bool, 4>(mask)
+    // SPIRV's ops do not directly accept/return bool.
+    // & test1Bitwise<bool>(mask)
+    // & testVBitwise<bool, 2>(mask)
+    // & testVBitwise<bool, 3>(mask)
+    // & testVBitwise<bool, 4>(mask)
 
 #if defined(VK)
         & test1Bitwise<int8_t>(mask)
@@ -122,7 +123,7 @@ bool testBitwise(uint4 mask)
 
 [numthreads(32, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let index = dispatchThreadID.x;
 
@@ -136,7 +137,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Prefix and.
     // - Both groups use 1 except for the last invocation in each partition where input is 0.
     // - For inclusive ops, result is 1 except for last invocation in each partition.
-    // - For exclusive ops, first in partition is always results to ~0(identity). Otherwise exclusive ops result to 1.
+    // - For exclusive ops, first in partition is always results to ~0(identity). Otherwise
+    // exclusive ops result to 1.
     gAndValue = isLastInPartition ? uint(0) : uint(1);
     gAndResultExclusive = isFirstInPartition ? uint(~0) : uint(1);
 
@@ -148,7 +150,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     gOrValue = isLastInPartition ? uint(1) : uint(0);
 
     // Prefix xor.
-    // - First group input is always 1. Inclusive results alternate between 1 and 0, starting at 1. Exclusive result is also alternates but starts at 0 (opposite of inclusive result).
+    // - First group input is always 1. Inclusive results alternate between 1 and 0, starting at 1.
+    // Exclusive result is also alternates but starts at 0 (opposite of inclusive result).
     // - Second group is always 0. Results are all 0.
     gXorValue = isSecondGroup ? uint(0) : uint(1);
     gXorResultInclusive = (isSecondGroup || (index % 2 != 0)) ? uint(0) : uint(1);
@@ -156,7 +159,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             & testBitwise(mask)
-            ;
+        ;
 
     // CHECK-COUNT-32: 1
     outputBuffer[index] = uint(result);

@@ -9,12 +9,12 @@
 
 struct Params
 {
-	RWTexture2DArray<float> tex;
+    RWTexture2DArray<float> tex;
 }
 
 ParameterBlock<Params> gParams;
 
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: OpImageRead
     // CHECK: OpImageWrite

@@ -49,7 +49,7 @@ struct S
     // struct   4       8       4
     // std430   4       8       4
     //
-    A      a;
+    A a;
 
     // Now we insert an ordinary `int` field just as
     // a way to probe the offset so far.
@@ -62,7 +62,7 @@ struct S
     // struct   12      4       4
     // std430   12      4       4
     //
-    int    b;
+    int b;
 
     // As our next stress-test case, we will insert an
     // array with elements that aren't a multiple of
@@ -101,7 +101,7 @@ struct S
     // struct   32      4      4
     // std430   32      4      4
     //
-    int    d;
+    int d;
 }
 
 //TEST_INPUT:cbuffer(data=[0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32]):name=cb
@@ -112,17 +112,16 @@ RWStructuredBuffer<S> sb;
 
 int test(int val)
 {
-    val = val+1;
-    val = val*16  + cb.b;
-    val = val*256 + cb.d;
-    val = val*256 + sb[0].b;
-    val = val*256 + sb[0].d;
+    val = val + 1;
+    val = val * 16 + cb.b;
+    val = val * 256 + cb.d;
+    val = val * 256 + sb[0].b;
+    val = val * 256 + sb[0].d;
     return val;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(
-    int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

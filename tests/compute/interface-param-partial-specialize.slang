@@ -15,10 +15,7 @@ interface IInterface
 export struct Impl : IInterface
 {
     uint val;
-    uint eval()
-    {
-        return val;
-    }
+    uint eval() { return val; }
 };
 
 struct Params
@@ -37,7 +34,8 @@ void compute(uint tid, Params p)
 //TEST_INPUT: entryPointExistentialType __Dynamic
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID,
+void computeMain(
+    uint3 dispatchThreadID: SV_DispatchThreadID,
 
 //TEST_INPUT:begin_buffer(stride=8):name=params.obj
 //TEST_INPUT:begin_object(type=Impl)
@@ -46,6 +44,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID,
 //TEST_INPUT:end
     uniform Params params)
 {
-	uint tid = dispatchThreadID.x;
-	compute(tid, params);
+    uint tid = dispatchThreadID.x;
+    compute(tid, params);
 }

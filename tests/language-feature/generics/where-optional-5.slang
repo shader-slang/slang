@@ -5,8 +5,8 @@ interface IThing
 }
 
 void f<T, U>(T t, U u)
-    where optional T: IThing
-    where optional U: IThing
+    where optional T : IThing
+    where optional U : IThing
 {
     // Error: cannot upgrade optional to non-optional witness in unchecked context.
     if (U is IThing)

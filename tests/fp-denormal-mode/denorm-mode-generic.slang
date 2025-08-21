@@ -16,11 +16,12 @@
 // CHECK_PRESERVE: DenormPreserve 32
 // CHECK_FTZ: DenormFlushToZero 32
 
-[shader("compute")]  
+[shader("compute")]
 [numthreads(1, 1, 1)]
-__generic<T : __BuiltinArithmeticType> void genericEntry()
+__generic<T : __BuiltinArithmeticType>
+void genericEntry()
 {
     T a = T(1);
-    T b = T(2);  
+    T b = T(2);
     T result = a + b;
 }

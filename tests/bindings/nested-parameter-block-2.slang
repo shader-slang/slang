@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -use-dxil -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -shaderobj -output-using-type -render-features argument-buffer-tier-2
-// nested-parameter-block-2.slang
+//  nested-parameter-block-2.slang
 
 struct CB
 {
@@ -35,13 +35,14 @@ ParameterBlock<MyBuffer> pb2;
 // Main entry-point. Applies the transformation encoded by `transformer`
 // to all elements in `buffer`.
 [shader("compute")]
-[numthreads(4,1,1)]
-void computeMain(uint3 sv_dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint3 sv_dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: type: uint32_t
     // CHECK-NEXT: 4
     // CHECK-NEXT: 4
     // CHECK-NEXT: 4
     // CHECK-NEXT: 4
-    pb2.resultBuffer[sv_dispatchThreadID.x] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
+    pb2.resultBuffer[sv_dispatchThreadID.x] = scene.sceneCb.value.x + scene.data[0].x +
+                                              scene.material.cb.value.x + scene.material.data[0].x;
 }

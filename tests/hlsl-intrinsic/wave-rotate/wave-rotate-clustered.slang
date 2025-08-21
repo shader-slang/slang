@@ -35,7 +35,8 @@ bool testVRClusteredRotate()
 #if defined(USE_GLSL_SYNTAX)
     return (__clusteredRotate(gvec(T(threadIndex)), DELTA, CLUSTER_SIZE) == gvec(T(rotatedValue)));
 #else
-    return (__clusteredRotate(gvec(T(threadIndex)), DELTA, CLUSTER_SIZE) == gvec(T(rotatedValue)))[0];
+    return (
+        __clusteredRotate(gvec(T(threadIndex)), DELTA, CLUSTER_SIZE) == gvec(T(rotatedValue)))[0];
 #endif
 }
 
@@ -56,7 +57,8 @@ bool testVRClusteredRotateBool()
 #if defined(USE_GLSL_SYNTAX)
     return (__clusteredRotate(gvec(currentValue), DELTA, CLUSTER_SIZE) == gvec(rotatedValueBool));
 #else
-    return (__clusteredRotate(gvec(currentValue), DELTA, CLUSTER_SIZE) == gvec(rotatedValueBool))[0];
+    return (
+        __clusteredRotate(gvec(currentValue), DELTA, CLUSTER_SIZE) == gvec(rotatedValueBool))[0];
 #endif
 }
 
@@ -112,21 +114,21 @@ bool testClusteredRotate()
 
 [shader("compute")]
 [numthreads(SUBGROUP_SIZE, 1, 1)]
-void computeMain(uint3 dispatchID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchID: SV_DispatchThreadID)
 {
     threadIndex = dispatchID.x;
     clusterIndex = dispatchID.x % CLUSTER_SIZE;
 
     // Determine expected value of clustered rotate in current invocation.
-    // The values passed in are global invocation ids, and we rotate them withina cluster of size `CLUSTER_SIZE`.
+    // The values passed in are global invocation ids, and we rotate them withina cluster of size
+    // `CLUSTER_SIZE`.
     uint clusterStart = (threadIndex / CLUSTER_SIZE) * CLUSTER_SIZE;
     rotatedValue = clusterStart + ((threadIndex - clusterStart + DELTA) % CLUSTER_SIZE);
 
     bool result = true
             & testClusteredRotate()
-            ;
+        ;
 
     // CHECK: 1
     outputBuffer[0] = uint(result);
 }
-

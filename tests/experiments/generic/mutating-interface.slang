@@ -6,7 +6,7 @@ Doesn't work because
 
 .slang(18): error 30050: mutating method 'lock' cannot be called on an immutable value
     lockable.lock();
-    
+
 If that section is removed we get on `doThing(count)`
 
 .slang(31): error 30047: argument passed to parameter '0' must be l-value.
@@ -19,33 +19,37 @@ RWStructuredBuffer<int> outputBuffer;
 
 interface ILockable
 {
-    [mutating] void lock();
-    [mutating] void unlock();
+    [mutating]
+    void lock ();
+    [mutating]
+    void unlock();
 };
 
 struct IntCount : ILockable
 {
-    [mutating] void lock() { count ++; }
-    [mutating] void unlock() { --count; }
+    [mutating]
+    void lock () { count++; }
+    [mutating]
+    void unlock() { --count; }
     int count = 0;
 };
 
 int doThing(inout ILockable lockable)
 {
-    lockable.lock();
+    lockable.lock ();
     // do something...
-    
+
     lockable.unlock();
     return 0;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
-    
+
     IntCount count;
     doThing(count);
-    
+
     outputBuffer[dispatchThreadID.x] = count.count;
 }

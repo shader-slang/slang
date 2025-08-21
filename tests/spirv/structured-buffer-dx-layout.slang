@@ -26,7 +26,7 @@ RWStructuredBuffer<Test_t> testBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 __generic<T : IArithmetic, let N : int>
-bool comp(vector<T,N> v1, vector<T,N> v2)
+bool comp(vector<T, N> v1, vector<T, N> v2)
 {
     for (uint i = 0; i < N; i++)
         if (v1[i] != v2[i])
@@ -53,5 +53,7 @@ void computeMain()
             && test.v5[3] == 15
             && comp(test.v6[0], uint3( 16, 17, 18 ))
             && comp(test.v6[1], uint3( 19, 20, 21 ))
-        ) ? 100 : 0;
+                       )
+                          ? 100
+                          : 0;
 }

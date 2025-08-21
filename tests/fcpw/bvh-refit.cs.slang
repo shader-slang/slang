@@ -29,10 +29,11 @@ uniform ParameterBlock<Bvh<SnchNode, Triangle, Edge>> gBvh;
 
 [shader("compute")]
 [numthreads(256, 1, 1)]
-void refit(uint3 threadId: SV_DispatchThreadID,
-           uniform StructuredBuffer<uint> nodeIndices,
-           uniform uint firstNodeOffset,
-           uniform uint nodeCount)
+void refit(
+    uint3 threadId: SV_DispatchThreadID,
+    uniform StructuredBuffer<uint> nodeIndices,
+    uniform uint firstNodeOffset,
+    uniform uint nodeCount)
 {
     uint index = threadId.x;
     if (index >= nodeCount)

@@ -21,10 +21,10 @@ outter:
             case 1:
                 break jLoop;
             default:
-            {
-                result++;
-                break;
-            }
+                {
+                    result++;
+                    break;
+                }
             }
         }
         result++;

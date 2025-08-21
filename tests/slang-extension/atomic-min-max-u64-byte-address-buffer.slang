@@ -7,12 +7,12 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64 -compile-arg -O2 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64 -shaderobj
-// For some reason this doesn't work correctly on CUDA? That it behaves as if always does Min. Min and Max do appropriate 
-// things tho, because if I force the condition I do get the right answer
+// For some reason this doesn't work correctly on CUDA? That it behaves as if always does Min. Min
+// and Max do appropriate things tho, because if I force the condition I do get the right answer
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
-// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
-// Only strictly necessary on the D3D12 path
+// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI
+// is going to be used Only strictly necessary on the D3D12 path
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
 RWStructuredBuffer<int> nvapiBuffer;
 
@@ -23,12 +23,12 @@ RWByteAddressBuffer outputBuffer;
 RWStructuredBuffer<uint> inputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+{
     int tid = dispatchThreadID.x;
 
     // Produces a different result on CUDA?
-   
+
     uint64_t value;
     {
         int idx = tid & 3;
@@ -48,5 +48,3 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         }
     }
 }
-
-

@@ -6,10 +6,7 @@
 struct DiffFunctor : IDifferentiableFunc<float, float>
 {
     [Differentiable]
-    float operator()(float p)
-    {
-        return p + 1;
-    }
+    float operator()(float p) { return p + 1; }
 }
 
 float apply(IMutatingFunc<float, float> f, float p)
@@ -24,7 +21,9 @@ float applyDiff(IDifferentiableFunc<float, float> f, float p)
 }
 
 [Differentiable]
-TR applyDiffGen<TR : IDifferentiable, each TP : IDifferentiable>(IDifferentiableFunc<TR, TP> f, expand each TP p)
+TR applyDiffGen<TR : IDifferentiable, each TP : IDifferentiable>(
+    IDifferentiableFunc<TR, TP> f,
+    expand each TP p)
 {
     return f(expand each p);
 }
@@ -40,5 +39,6 @@ void computeMain(uint tid: SV_DispatchThreadID)
     // CHECK: 1
     outputBuffer[1] = (uint)fwd_diff(applyDiff)(DiffFunctor(), diffPair(2.0, 1.0)).d;
     // CHECK: 1
-    outputBuffer[2] = (uint)fwd_diff(applyDiffGen<float, float>)(DiffFunctor(), diffPair(2.0, 1.0)).d;
+    outputBuffer[2] =
+        (uint)fwd_diff(applyDiffGen<float, float>)(DiffFunctor(), diffPair(2.0, 1.0)).d;
 }

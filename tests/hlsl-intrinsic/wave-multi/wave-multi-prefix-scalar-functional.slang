@@ -11,13 +11,13 @@ RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(8, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint index = int(dispatchThreadID.x);
 
     // Split into two groups.
     uint4 mask = 0b00001111;
-    if (index >=  4)
+    if (index >= 4)
     {
         mask = 0b11110000;
     }

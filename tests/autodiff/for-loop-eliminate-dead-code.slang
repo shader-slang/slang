@@ -36,7 +36,7 @@ void execute(const uint2 pixel)
 }
 
 [numthreads(64, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     execute(dispatchThreadID.xy);
 }

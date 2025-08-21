@@ -8,9 +8,9 @@ int doThing(int a)
 }
 
 [numthreads(4, 4, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = (int)dispatchThreadID.x;
-    
+
     outputBuffer[x] = doThing(x);
 }

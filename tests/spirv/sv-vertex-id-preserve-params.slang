@@ -7,7 +7,8 @@
 // SPIRV: OpEntryPoint
 
 [shader("vertex")]
-float4 VertexMain(uint vertexId: SV_VertexID, uint instanceId: SV_InstanceID) : SV_Position
+float4 VertexMain(uint vertexId: SV_VertexID, uint instanceId: SV_InstanceID)
+    : SV_Position
 {
     return float4(0.0);
 }

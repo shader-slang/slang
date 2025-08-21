@@ -19,12 +19,12 @@ layout(location = 0) out mediump vec4 dEQP_FragColor;
 layout(location = 0) flat in uint out0;
 layout(binding = 0, std140) uniform Reference
 {
-	uint out0;
-} ref;
+    uint out0;
+}
+ref;
 
 void main()
 {
-    dEQP_FragColor = mix(vec4(0.0, 1.0, 0.0, 1.0),
-                         vec4(0.0, 1.0, 0.0, 1.0),
-                         vec4(0.0, 1.0, 0.0, 1.0));
+    dEQP_FragColor =
+        mix(vec4(0.0, 1.0, 0.0, 1.0), vec4(0.0, 1.0, 0.0, 1.0), vec4(0.0, 1.0, 0.0, 1.0));
 }

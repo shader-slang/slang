@@ -9,16 +9,18 @@ enum unscopedEnum1 : uint32_t
 {
     ENUM1_A = 1,
     ENUM1_B = 2
-};
+}
+;
 
 [UnscopedEnum]
 enum unscopedEnum2 : uint32_t
 {
     ENUM2_A = 3,
     ENUM2_B = 4
-};
+}
+;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 1
@@ -30,4 +32,3 @@ void computeMain()
     outputBuffer[2] = ENUM2_A;
     outputBuffer[3] = ENUM2_B;
 }
-

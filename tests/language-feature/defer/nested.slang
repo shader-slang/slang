@@ -9,7 +9,8 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = 0;
-    defer {
+    defer
+    {
         defer outputBuffer[i++] = 3;
         defer outputBuffer[i++] = 2;
         outputBuffer[i++] = 1;

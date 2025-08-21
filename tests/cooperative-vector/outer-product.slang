@@ -1,4 +1,5 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
+// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue
+// #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
 // HLSL doesn't support the training operations
@@ -52,10 +53,10 @@ void computeMain()
 {
     CoopVec<half, 4> vecA;
     CoopVec<half, 8> vecB;
-    for(int i = 0; i < vecA.getCount(); ++i)
-        vecA[i] = half(i+1);
-    for(int i = 0; i < vecB.getCount(); ++i)
-        vecB[i] = half(i+1);
+    for (int i = 0; i < vecA.getCount(); ++i)
+        vecA[i] = half(i + 1);
+    for (int i = 0; i < vecB.getCount(); ++i)
+        vecB[i] = half(i + 1);
 
     output.Store<half>(0, half(111));
 
@@ -66,9 +67,8 @@ void computeMain()
         0,
         32,
         CoopVecMatrixLayout::RowMajor,
-        CoopVecComponentType::Float16,
-    );
+        CoopVecComponentType::Float16, );
 
-    for(int i = 0; i < vecA.getCount() * vecB.getCount(); ++i)
+    for (int i = 0; i < vecA.getCount() * vecB.getCount(); ++i)
         outputBuffer[i] = output.Load<half>(i * 2);
 }

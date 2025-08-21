@@ -21,7 +21,7 @@
 
 import struct_generic_value_param_import;
 
-Data<N> makeData<let N : int>( int val )
+Data<N> makeData<let N : int>(int val)
 {
     Data<N> result = { val };
     return result;
@@ -48,14 +48,14 @@ int test(int val)
     //
     doThings(data, val);
 
-    return data.state + val*16;
+    return data.state + val * 16;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

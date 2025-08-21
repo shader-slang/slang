@@ -39,7 +39,7 @@ RWStructuredBuffer<uint> vals;
 //
 uint test(uint value)
 {
-	return value * 16 + vals[(value + kOffset) & 0xF];
+    return value * 16 + vals[(value + kOffset) & 0xF];
 }
 
 // And finally we have the boilerplate cruft that almost
@@ -49,11 +49,10 @@ uint test(uint value)
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(
-	uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
-	uint inVal = tid;
-	uint outVal = test(inVal);
-	outputBuffer[tid] = outVal;
+    uint tid = dispatchThreadID.x;
+    uint inVal = tid;
+    uint outVal = test(inVal);
+    outputBuffer[tid] = outVal;
 }

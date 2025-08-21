@@ -9,12 +9,12 @@ struct X<B, each T, each U>
     int getUSize() { return countof(U); }
 }
 
-func foo<each T, each U>() -> X<bool, expand Ptr<each T>, int, expand Ptr<each U>, float> // unify
+func foo<each T, each U>()->X<bool, expand Ptr<each T>, int, expand Ptr<each U>, float> // unify
 {
     return {};
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     let x = foo<int, float>();

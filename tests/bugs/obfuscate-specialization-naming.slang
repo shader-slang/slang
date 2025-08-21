@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -compile-arg -obfuscate -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -compile-arg -obfuscate -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -compile-arg -obfuscate -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name a
@@ -15,9 +15,9 @@ int doThing(RWStructuredBuffer<int> buf, int index)
 }
 
 [numthreads(16, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    int tid = int(dispatchThreadID.x); 
+    int tid = int(dispatchThreadID.x);
 
     output[tid] = doThing(a, tid) | doThing(b, tid);
 }

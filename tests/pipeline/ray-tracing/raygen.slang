@@ -11,5 +11,5 @@ void raygenMain()
 {
     uint3 tid = DispatchRaysIndex();
 
-    gOutput[tid.x] = tid.x*11;
+    gOutput[tid.x] = tid.x * 11;
 }

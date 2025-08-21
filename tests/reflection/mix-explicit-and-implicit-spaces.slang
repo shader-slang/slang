@@ -5,14 +5,22 @@
 // when mixing implicit and explicit spaces for
 // parameter blocks.
 
-struct A { float x; }
+struct A
+{
+    float x;
+}
 ParameterBlock<A> a : register(space0);
 
-struct B { float y; }
+struct B
+{
+    float y;
+}
 ParameterBlock<B> b : register(space1);
 
-struct C { float z; }
+struct C
+{
+    float z;
+}
 ParameterBlock<C> c;
 
-void main()
-{}
+void main() {}

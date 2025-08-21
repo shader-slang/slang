@@ -33,14 +33,14 @@ A f(A a)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     A a = makeTuple(1.0, makeTuple(1.0, 2.0));
 
     var dpa = diffPair(a);
 
     A.Differential dout = makeTuple(1.0, makeTuple(1.0, 1.0));
-    
+
     bwd_diff(f)(dpa, dout);
     // CHECK: 13
     outputBuffer[0] = dpa.d._1._0; // Expect: 13

@@ -12,7 +12,9 @@ SamplerComparisonState sc;
 float main()
 {
     float result = 0.0;
-    result += t.CalculateLevelOfDetail(s, float2(0,0)) + t.CalculateLevelOfDetailUnclamped(s, float2(0,0));
-    result += t.CalculateLevelOfDetail(sc, float2(0,0)) + t.CalculateLevelOfDetailUnclamped(sc, float2(0,0));
+    result += t.CalculateLevelOfDetail(s, float2(0, 0)) +
+              t.CalculateLevelOfDetailUnclamped(s, float2(0, 0));
+    result += t.CalculateLevelOfDetail(sc, float2(0, 0)) +
+              t.CalculateLevelOfDetailUnclamped(sc, float2(0, 0));
     return result;
 }

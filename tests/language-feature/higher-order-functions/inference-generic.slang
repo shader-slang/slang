@@ -1,7 +1,7 @@
 //DISABLE_TEST:SIMPLE:
-// Disabled because we don't actually perform this inference yet
+//  Disabled because we don't actually perform this inference yet
 
-func foo(f : functype (float) -> int) -> int
+func foo(f: functype(float)->int)->int
 {
     return f(0);
 }

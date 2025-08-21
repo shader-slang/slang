@@ -8,10 +8,10 @@ struct Test
     uint v0;
 
 //SPIRV: Offset 4
-// matrix always start on a new register
+    //  matrix always start on a new register
     float3x3 v1;
 //SPIRV: Offset 40
-// Non-matrix can pack with a partially filled register
+    //  Non-matrix can pack with a partially filled register
     uint v2;
 };
 
@@ -21,7 +21,7 @@ ConstantBuffer<Test, ScalarDataLayout> buffer;
 RWStructuredBuffer<int> outputBuffer;
 
 __generic<T : IArithmetic, let N : int>
-bool comp(vector<T,N> v1, vector<T,N> v2)
+bool comp(vector<T, N> v1, vector<T, N> v2)
 {
     for (uint i = 0; i < N; i++)
         if (v1[i] != v2[i])
@@ -41,5 +41,7 @@ void computeMain()
             && comp(buffer.v1[1], float3(5, 6, 7))
             && comp(buffer.v1[2], float3(8, 9, 10))
             && buffer.v2 == 11
-        ) ? 100 : 0;
+                       )
+                          ? 100
+                          : 0;
 }

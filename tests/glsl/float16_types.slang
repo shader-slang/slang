@@ -11,7 +11,8 @@
 layout(binding = 0) buffer MyBlockNameIn
 {
     uvec4 a[4];
-} inputBuffer;
+}
+inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0  0 0 0 0], stride=4):out,name=outputBuffer
 layout(binding = 1) buffer MyBlockName
@@ -19,7 +20,8 @@ layout(binding = 1) buffer MyBlockName
     uvec4 a;
     uvec4 b;
     uvec3 c;
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()
@@ -61,7 +63,6 @@ void computeMain()
         // BUF-NEXT: 6
         // BUF-NEXT: 8
     }
-
 
 
     // CHECK_GLSL: f16mat4x4

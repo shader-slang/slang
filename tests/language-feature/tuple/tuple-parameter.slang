@@ -13,7 +13,7 @@ ConstantBuffer<Tuple<Texture2D, SamplerState>> g_texture;
 ConstantBuffer<Tuple<Texture2D, SamplerState>> g_texture2;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 4
     outputBuffer[0] = (int)g_texture2._0.SampleLevel(g_texture._1, float2(0.0), 0).x;

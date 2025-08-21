@@ -4,7 +4,7 @@
 // not testing hlsl due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
@@ -16,22 +16,25 @@
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 
 __generic<T : __BuiltinLogicalType>
-bool test1ShuffleX() {
+bool test1ShuffleX()
+{
     return true
         & subgroupShuffleUp(T(1), 1) == T(1)
         & subgroupShuffleDown(T(1), 1) == T(1)
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVShuffleX() {
+bool testVShuffleX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -41,14 +44,16 @@ bool testVShuffleX() {
 }
 
 __generic<T : __BuiltinFloatingPointType>
-bool test1ShuffleX() {
+bool test1ShuffleX()
+{
     return true
         & subgroupShuffleUp(T(1), 1) == T(1)
         & subgroupShuffleDown(T(1), 1) == T(1)
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
-bool testVShuffleX() {
+bool testVShuffleX()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -56,13 +61,14 @@ bool testVShuffleX() {
         & subgroupShuffleDown(gvec(T(1)), 1) == gvec(T(1))
         ;
 }
-bool testShuffleX() {
+bool testShuffleX()
+{
     return true
         & test1ShuffleX<float>()
         & testVShuffleX<float, 2>()
         & testVShuffleX<float, 3>()
         & testVShuffleX<float, 4>()
-        & test1ShuffleX<half>() 
+        & test1ShuffleX<half>()
         & testVShuffleX<half, 2>()
         & testVShuffleX<half, 3>()
         & testVShuffleX<half, 4>()
@@ -81,19 +87,19 @@ bool testShuffleX() {
         & testVShuffleX<double, 2>()
         & testVShuffleX<double, 3>()
         & testVShuffleX<double, 4>()
-        & test1ShuffleX<int8_t>() 
+        & test1ShuffleX<int8_t>()
         & testVShuffleX<int8_t, 2>()
         & testVShuffleX<int8_t, 3>()
         & testVShuffleX<int8_t, 4>()
-        & test1ShuffleX<int64_t>() 
+        & test1ShuffleX<int64_t>()
         & testVShuffleX<int64_t, 2>()
         & testVShuffleX<int64_t, 3>()
         & testVShuffleX<int64_t, 4>()
-        & test1ShuffleX<uint8_t>() 
+        & test1ShuffleX<uint8_t>()
         & testVShuffleX<uint8_t, 2>()
         & testVShuffleX<uint8_t, 3>()
         & testVShuffleX<uint8_t, 4>()
-        & test1ShuffleX<uint64_t>() 
+        & test1ShuffleX<uint64_t>()
         & testVShuffleX<uint64_t, 2>()
         & testVShuffleX<uint64_t, 3>()
         & testVShuffleX<uint64_t, 4>()
@@ -103,7 +109,7 @@ bool testShuffleX() {
         & testVShuffleX<bool, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined(WGPU)
         & test1ShuffleX<int16_t>()
         & testVShuffleX<int16_t, 2>()

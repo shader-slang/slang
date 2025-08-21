@@ -10,11 +10,11 @@ Sampler2D sampler;
 
 RWStructuredBuffer<float4> outputBuffer;
 
-[NumThreads(1,1,1)]
+[NumThreads(1, 1, 1)]
 void testMain()
 {
     uint w, h, l;
     sampler.GetDimensions(0, w, h, l);
-    var result = sampler.Load(int3(1,1,1), int2(1,2));
+    var result = sampler.Load(int3(1, 1, 1), int2(1, 2));
     outputBuffer[0] = result + float(w);
 }

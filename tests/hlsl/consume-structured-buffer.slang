@@ -12,15 +12,15 @@ RWStructuredBuffer<float> outputBuffer;
 ConsumeStructuredBuffer<float> consumeBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     uint size, stride;
     consumeBuffer.GetDimensions(size, stride);
 
-    if(i == 0)
+    if (i == 0)
         outputBuffer[0] = size;
 
-    outputBuffer[i+1] = consumeBuffer.Consume();
+    outputBuffer[i + 1] = consumeBuffer.Consume();
 
     // BUF: type: float
     // The total size of the ConsumeStructuredBuffer (from GetDimensions)

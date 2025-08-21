@@ -25,5 +25,5 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     DifferentialPair<float> dpx = DifferentialPair<float>(4.f, 1.f);
     bool res = __fwd_diff(myFunc)(fIn, dpx);
 
-    outputBuffer[0] = res?1:0;
+    outputBuffer[0] = res ? 1 : 0;
 }

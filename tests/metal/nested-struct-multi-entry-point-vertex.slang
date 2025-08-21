@@ -38,12 +38,12 @@ struct SharedStruct
 
 struct VertexStageInput
 {
-	SharedStruct assembledVertex	: CoarseVertex;
+    SharedStruct assembledVertex : CoarseVertex;
 };
 
 float4 vertexMain1(VertexStageInput vertex)
 {
-	return vertex.assembledVertex.position;
+    return vertex.assembledVertex.position;
 }
 
 struct sharedStructWrapper
@@ -53,10 +53,10 @@ struct sharedStructWrapper
 };
 struct VertexStageInput2
 {
-	sharedStructWrapper assembledVertex	: CoarseVertex;
+    sharedStructWrapper assembledVertex : CoarseVertex;
 };
 
 float4 vertexMain2(VertexStageInput2 vertex)
 {
-	return vertex.assembledVertex.sharedData.position;
+    return vertex.assembledVertex.sharedData.position;
 }

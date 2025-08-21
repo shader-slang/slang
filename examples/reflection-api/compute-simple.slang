@@ -15,7 +15,7 @@ struct ImageProcessingOptions
 [shader("compute")]
 [numthreads(THREADGROUP_SIZE_X, THREADGROUP_SIZE_Y)]
 void processImage(
-    uint3 threadID : SV_DispatchThreadID,
+    uint3 threadID: SV_DispatchThreadID,
     uniform Texture2D inputImage,
     uniform RWTexture2D outputImage,
     uniform ImageProcessingOptions options)

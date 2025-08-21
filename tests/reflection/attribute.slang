@@ -32,14 +32,15 @@ struct A
 struct B
 {
     float x;
-    [DefaultValue(1+1)]
+    [DefaultValue(1 + 1)]
     float z;
 };
 
 ParameterBlock<A> param;
 ParameterBlock<B> param2;
 
-[DefaultValue(2)] int globalInt;
+[DefaultValue(2)]
+int globalInt;
 
 [__AttributeUsage(_AttributeTargets.Struct)]
 [__AttributeUsage(_AttributeTargets.Var)]
@@ -57,15 +58,15 @@ struct D
 
 D param3;
 
-[StructVarParam(1)] int globalInt2;
+[StructVarParam(1)]
+int globalInt2;
 
 
 [MyStruct(2, 3.0, "main")]
 [MyStruct(-2, -3.0, "")]
 [numthreads(1, 1, 1)]
-void main(
-    uint3 dispatchThreadID : SV_DispatchThreadID,
-    [DefaultValue(3)] float a,
-    [StructVarParam(2)] float b)
+void main(uint3 dispatchThreadID: SV_DispatchThreadID, [DefaultValue(3)] float a, [
+    StructVarParam(2)
+] float b)
 {
 }

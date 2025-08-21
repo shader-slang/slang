@@ -4,7 +4,9 @@
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct Unit{};
+struct Unit
+{
+};
 
 static int count = 0;
 
@@ -22,7 +24,7 @@ int fallback(float x, Unit)
 
 // Make sure that we have enough invocations to saturate the first workgroup
 [numthreads(128, 1, 1)]
-void computeMain(uint tig : SV_GroupIndex)
+void computeMain(uint tig: SV_GroupIndex)
 {
     // The values we're cooperating over are {0, 2, 3}
     // We track the number of sets evaluated in the "count" variable, and write
@@ -30,7 +32,6 @@ void computeMain(uint tig : SV_GroupIndex)
     let i = tig < 4 ? float(outputBuffer[tig]) : 0;
     Unit unit;
     let x = saturated_cooperation(cooperate, fallback, i, unit);
-    if(tig < 4)
+    if (tig < 4)
         outputBuffer[tig] = tig == 0 ? count : x;
-
 }

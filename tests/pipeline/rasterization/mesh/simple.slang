@@ -17,31 +17,24 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 //
 // Mesh shader
 //
 
-const static float2 positions[3] = {
-  float2(0.0, -0.5),
-  float2(0.5, 0.5),
-  float2(-0.5, 0.5)
-};
+const static float2 positions[3] = { float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5) };
 
-const static float3 colors[3] = {
-  float3(1.0, 1.0, 0.0),
-  float3(0.0, 1.0, 1.0),
-  float3(1.0, 0.0, 1.0)
-};
+const static float3 colors[3] =
+    { float3(1.0, 1.0, 0.0), float3(0.0, 1.0, 1.0), float3(1.0, 0.0, 1.0) };
 
 struct Vertex
 {
-  float4 pos : SV_Position;
-  float3 color : Color;
-  int index : Index;
-  int value : Value;
+    float4 pos : SV_Position;
+    float3 color : Color;
+    int index : Index;
+    int value : Value;
 };
 
 const static uint MAX_VERTS = 12;
@@ -50,7 +43,7 @@ const static uint MAX_PRIMS = 4;
 [outputtopology("triangle")]
 [numthreads(12, 1, 1)]
 void meshMain(
-    in uint tig : SV_GroupIndex,
+    in uint tig: SV_GroupIndex,
     OutputVertices<Vertex, MAX_VERTS> verts,
     OutputIndices<uint3, MAX_PRIMS> triangles)
 {
@@ -58,14 +51,14 @@ void meshMain(
     const uint numPrimitives = 4;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    if(tig < numVertices)
+    if (tig < numVertices)
     {
         const int tri = tig / 3;
-        verts[tig] = {float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, tri*tri};
+        verts[tig] = { float4(positions[tig % 3], 0, 1), colors[tig % 3], tri, tri * tri };
     }
 
-    if(tig < numPrimitives)
-        triangles[tig] = tig * 3 + uint3(0,1,2);
+    if (tig < numPrimitives)
+        triangles[tig] = tig * 3 + uint3(0, 1, 2);
 }
 
 //
@@ -79,9 +72,9 @@ struct Fragment
 
 Fragment fragmentMain(Vertex input)
 {
-	outputBuffer[input.index] = input.value;
+    outputBuffer[input.index] = input.value;
 
-	Fragment output;
-	output.color = float4(input.color, 1.0);
-	return output;
+    Fragment output;
+    output.color = float4(input.color, 1.0);
+    return output;
 }

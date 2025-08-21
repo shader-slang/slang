@@ -1,15 +1,15 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain 
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-directly
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -compute -entry computeMain
 
-#pragma warning(disable:30816)
+#pragma warning(disable: 30816)
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 static int myTwo = 2;
-static int myThree = 1+2;
+static int myThree = 1 + 2;
 
 struct DefaultStruct_base
 {
@@ -37,9 +37,7 @@ struct DefaultStruct1 : DefaultStruct_base
 
 struct DefaultStruct2 : DefaultStruct_base
 {
-    __init()
-    {
-    }
+    __init() {}
 };
 
 [numthreads(1, 1, 1)]

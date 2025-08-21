@@ -7,26 +7,36 @@
 // without having lookup ambiguity issues at use
 // sites.
 
-interface A { float getA(); }
+interface A
+{
+    float getA();
+}
 
-interface B : A {}
+interface B : A
+{
+}
 
-interface C : A {}
+interface C : A
+{
+}
 
-interface D : B, C {}
+interface D : B,
+              C
+{
+}
 
 float doIt<T : D>(T value)
 {
-	return value.getA();
+    return value.getA();
 }
 
 struct Thing : D
 {
-	float getA() { return 0.0f; }
+    float getA() { return 0.0f; }
 }
 
 float test()
 {
-	Thing thing;
-	return doIt(thing);
+    Thing thing;
+    return doIt(thing);
 }

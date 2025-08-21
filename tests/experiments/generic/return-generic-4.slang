@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* A test of a generic function returning a generic struct.  types. 
+/* A test of a generic function returning a generic struct.  types.
 
 Was unable to determine T
 
@@ -15,22 +15,22 @@ RWStructuredBuffer<int> outputBuffer;
 
 vector<T> makeVector4<T>(T values[4])
 {
-   	vector<T, 4> v;
+    vector<T, 4> v;
     v.x = values[0];
     v.y = values[1];
     v.z = values[2];
     v.w = values[3];
     return v;
 }
-    
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
-    float values[] = { 1, 2, 3, 4};
-    
+    float values[] = { 1, 2, 3, 4 };
+
     let vec = makeVector4(values);
-    
-	outputBuffer[index] = dot(vec, vec);
+
+    outputBuffer[index] = dot(vec, vec);
 }

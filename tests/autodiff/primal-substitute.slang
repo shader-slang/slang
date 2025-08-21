@@ -18,10 +18,10 @@ float primalSubst(float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var a = diffPair(3.0, 1.0);
     __bwd_diff(original)(a, 1.0);
-    outputBuffer[0] = a.d;                                       // Expect: 12.0
+    outputBuffer[0] = a.d;                                        // Expect: 12.0
     outputBuffer[1] = __fwd_diff(original)(diffPair(3.0, 1.0)).p; // Expect: 18.0
 }

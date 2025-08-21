@@ -12,14 +12,14 @@ interface IInterface
     int Compute();
 };
 
-T CreateT_Inner<T:IInterface>(int inVal)
+T CreateT_Inner<T : IInterface>(int inVal)
 {
     T obj;
     obj.SetVal(inVal);
     return obj;
 }
 
-T CreateT<T:IInterface>(int inVal)
+T CreateT<T : IInterface>(int inVal)
 {
     return CreateT_Inner<T>(inVal);
 }
@@ -28,14 +28,8 @@ struct Impl : IInterface
 {
     int base;
     [mutating]
-    void SetVal(int inVal)
-    {
-        base = inVal;
-    }
-    int Compute()
-    {
-        return base;
-    }
+    void SetVal(int inVal) { base = inVal; }
+    int Compute() { return base; }
 };
 
 int test()
@@ -49,7 +43,7 @@ int test()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int outVal = test();

@@ -14,16 +14,16 @@ struct Thing
 
 Thing makeThing()
 {
- 	Thing t;
+    Thing t;
     t.a = 10;
     t.t = g_t;
     return t;
 }
 
 [numthreads(4, 4, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int x = dispatchThreadID.x;
     Thing thing = makeThing();
-    outputBuffer[dispatchThreadID.x] = x + thing.t.Load(1); 
+    outputBuffer[dispatchThreadID.x] = x + thing.t.Load(1);
 }

@@ -6,12 +6,15 @@
 // syntax which creates the equivalent of `{} : S`. In the example below this
 // then proceeds to be coerced to type T.
 
-struct S {};
-struct T {};
+struct S
+{
+};
+struct T
+{
+};
 
 void main()
 {
     // Should generate a type error.
     T t = (S)0;
 }
-

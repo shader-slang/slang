@@ -21,7 +21,8 @@ struct Primitive
 
 struct [raypayload] RayPayload
 {
-    float4 color : read(caller) : write(caller, closesthit, miss);
+    float4 color : read(caller)
+        : write(caller, closesthit, miss);
 };
 
 uniform RWTexture2D resultTexture;
@@ -33,14 +34,18 @@ uniform Uniforms uniforms;
 void rayGenShader()
 {
     uint2 threadIdx = DispatchRaysIndex().xy;
-    if (threadIdx.x >= (int)uniforms.screenWidth) return;
-    if (threadIdx.y >= (int)uniforms.screenHeight) return;
+    if (threadIdx.x >= (int)uniforms.screenWidth)
+        return;
+    if (threadIdx.y >= (int)uniforms.screenHeight)
+        return;
 
     float frameWidth = uniforms.screenWidth / uniforms.screenHeight * uniforms.frameHeight;
     float imageY = (threadIdx.y / uniforms.screenHeight - 0.5f) * uniforms.frameHeight;
     float imageX = (threadIdx.x / uniforms.screenWidth - 0.5f) * frameWidth;
     float imageZ = uniforms.focalLength;
-    float3 rayDir = normalize(uniforms.cameraDir.xyz*imageZ - uniforms.cameraUp.xyz * imageY + uniforms.cameraRight.xyz * imageX);
+    float3 rayDir = normalize(
+        uniforms.cameraDir.xyz * imageZ - uniforms.cameraUp.xyz * imageY +
+        uniforms.cameraRight.xyz * imageX);
 
     // Trace the ray.
     RayDesc ray;
@@ -92,16 +97,14 @@ void shadowRayHitShader(inout RayPayload payload, in BuiltInTriangleIntersection
 /// Vertex and fragment shader for displaying the final image.
 
 [shader("vertex")]
-float4 vertexMain(float2 position : POSITION)
+float4 vertexMain(float2 position: POSITION)
     : SV_Position
 {
     return float4(position, 0.5, 1.0);
 }
 
 [shader("fragment")]
-float4 fragmentMain(
-    float4 sv_position : SV_Position,
-    uniform RWTexture2D t)
+float4 fragmentMain(float4 sv_position: SV_Position, uniform RWTexture2D t)
     : SV_Target
 {
     return t.Load(uint2(sv_position.xy));

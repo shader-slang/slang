@@ -5,7 +5,7 @@
 // Test that `static const` variable declarations inside of
 // a generic `interface` type correctly translate to interface requirements.
 
-interface ITest<T:__BuiltinIntegerType>
+interface ITest<T : __BuiltinIntegerType>
 {
     static const T kUserDefinedValue;
 }
@@ -24,7 +24,7 @@ struct EnsureCompileTimeEval<T : __BuiltinIntegerType>
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     static const int result = EnsureCompileTimeEval<int>.getValue<Impl>();
     int outVal = result;

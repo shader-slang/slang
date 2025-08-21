@@ -14,26 +14,19 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
-const static float2 positions[3] = {
-  float2(0.0, -0.5),
-  float2(0.5, 0.5),
-  float2(-0.5, 0.5)
-};
+const static float2 positions[3] = { float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5) };
 
-const static float3 colors[3] = {
-  float3(1.0, 1.0, 0.0),
-  float3(0.0, 1.0, 1.0),
-  float3(1.0, 0.0, 1.0)
-};
+const static float3 colors[3] =
+    { float3(1.0, 1.0, 0.0), float3(0.0, 1.0, 1.0), float3(1.0, 0.0, 1.0) };
 struct Vertex
 {
-  float4 pos : SV_Position;
-  float3 color : Color;
-  int index : Index;
-  int value : Value;
+    float4 pos : SV_Position;
+    float3 color : Color;
+    int index : Index;
+    int value : Value;
 };
 
 const static uint MAX_VERTS = 12;
@@ -43,7 +36,7 @@ const static uint MAX_PRIMS = 4;
 [shader("mesh")]
 [numthreads(3, 1, 1)]
 void meshMain(
-    in uint tig : SV_GroupIndex,
+    in uint tig: SV_GroupIndex,
     OutputVertices<Vertex, MAX_VERTS> verts,
     OutputIndices<uint3, MAX_PRIMS> triangles)
 {
@@ -51,15 +44,15 @@ void meshMain(
     const uint numPrimitives = 4;
     SetMeshOutputCounts(numVertices, numPrimitives);
 
-    for(uint i = tig; i < numVertices; ++i)
+    for (uint i = tig; i < numVertices; ++i)
     {
         const int tri = i / 3;
-        verts[i] = {float4(positions[i % 3], 0, 1), colors[i % 3], tri, tri*tri};
+        verts[i] = { float4(positions[i % 3], 0, 1), colors[i % 3], tri, tri * tri };
     }
 
-    for(uint i = tig; i < numPrimitives; ++i)
+    for (uint i = tig; i < numPrimitives; ++i)
     {
-        triangles[i] = i * 3 + uint3(0,1,2);
+        triangles[i] = i * 3 + uint3(0, 1, 2);
     }
 }
 
@@ -74,9 +67,9 @@ struct Fragment
 
 Fragment fragmentMain(Vertex input)
 {
-	outputBuffer[input.index] = input.value;
+    outputBuffer[input.index] = input.value;
 
-	Fragment output;
-	output.color = float4(input.color, 1.0);
-	return output;
+    Fragment output;
+    output.color = float4(input.color, 1.0);
+    return output;
 }

@@ -18,12 +18,12 @@ ConstantBuffer<float3x2> matrixBuffer;
 RWStructuredBuffer<float> output;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float3 v = float3(1, 2, 1);
 
     float3x2 M = matrixBuffer;
-    
+
     float2 r = mul(v, M);
 
     // Metal always uses scalar layout + row major, so it is computing

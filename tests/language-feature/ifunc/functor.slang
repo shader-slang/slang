@@ -15,7 +15,7 @@ struct Functor : IMutatingFunc<float, float>
     }
 }
 
-float apply<T:IMutatingFunc<float,float>>(inout T f, float p)
+float apply<T : IMutatingFunc<float, float>>(inout T f, float p)
 {
     return f(p);
 }
@@ -28,7 +28,7 @@ void computeMain(uint tid: SV_DispatchThreadID)
 {
     Functor f;
     f.context = 0;
-    
+
     f(1.0f);
     f.operator()(1.0f); // explicit operator () call should also work.
 

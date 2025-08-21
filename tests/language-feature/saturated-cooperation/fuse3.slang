@@ -39,14 +39,14 @@ int coopExp(float x, int i)
 {
     int c = count;
     count = 1;
-    for(int j = 0; j < i; ++j)
+    for (int j = 0; j < i; ++j)
         count *= c;
     return int(x) * 2;
 }
 
 // Make sure that we have enough invocations to saturate the first workgroup
 [numthreads(128, 1, 1)]
-void computeMain(uint tig : SV_GroupIndex)
+void computeMain(uint tig: SV_GroupIndex)
 {
     // The values we're cooperating over are {0, 2, 3}
     // We track the number of sets evaluated in the "count" variable, and write
@@ -60,9 +60,8 @@ void computeMain(uint tig : SV_GroupIndex)
     let m = 2.f;
     let x = saturated_cooperation(coopMul, fallback2, i, m);
     // Put some calculation between the calls to check that the fusion still takes place
-    let e = min(m*100, 2);
+    let e = min(m * 100, 2);
     let z = saturated_cooperation(coopExp, fallback, i, int(e));
-    if(tig < 4)
+    if (tig < 4)
         outputBuffer[tig] = tig == 0 ? count : z;
-
 }

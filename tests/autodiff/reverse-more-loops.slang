@@ -39,7 +39,8 @@ float tracePath()
 
             L = thp * 1.0;
 
-            if (depth >= 2) break;
+            if (depth >= 2)
+                break;
 
             depth = depth + 1;
         }
@@ -48,7 +49,7 @@ float tracePath()
             L = 0.0;
         }
     }
-    
+
     return L;
 }
 

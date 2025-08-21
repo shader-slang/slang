@@ -16,11 +16,14 @@ enum Flag
 struct Data
 {
     uint flags;
-    [mutating] void setFlag(Flag g, bool v)
+    [mutating]
+    void setFlag(Flag g, bool v)
     {
         const uint bit = uint(g) << 8;
-        if (v) flags |= bit;
-        else flags &= ~bit;
+        if (v)
+            flags |= bit;
+        else
+            flags &= ~bit;
     }
     bool hasFlag(Flag g)
     {
@@ -40,8 +43,8 @@ cbuffer Uniforms
 // BUFFER: 1
 // BUFFER: 0
 
-[numthreads(1,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Data d1 = d;
     d1.setFlag(Flag.BBB, true);

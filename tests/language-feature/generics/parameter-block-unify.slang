@@ -2,7 +2,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type -render-features argument-buffer-tier-2
 
-struct TestStruct<Format:__BuiltinIntegerType, let count : int>
+struct TestStruct<Format : __BuiltinIntegerType, let count : int>
 {
     Format f;
 };
@@ -22,7 +22,7 @@ ConstantBuffer<TestStruct<int, 2>> testBlock2;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 13
     outputBuffer[0] = testFunction(testBlock);

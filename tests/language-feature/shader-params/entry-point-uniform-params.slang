@@ -10,13 +10,13 @@
 
 struct Data
 {
-	int a;
-	int b;
+    int a;
+    int b;
 }
 
 int test(int val, int a, int b)
 {
-	return a*(val+1) + b*(val+2);
+    return a * (val + 1) + b * (val + 2);
 }
 
 [numthreads(4, 1, 1)]
@@ -24,12 +24,12 @@ int test(int val, int a, int b)
 void computeMain(
 
 //TEST_INPUT:uniform(data=[256 1]):name=d
-	uniform Data d,
+    uniform Data d,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-	uniform RWStructuredBuffer<int> outputBuffer,
+    uniform RWStructuredBuffer<int> outputBuffer,
 
-	int3 dispatchThreadID : SV_DispatchThreadID)
+    int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

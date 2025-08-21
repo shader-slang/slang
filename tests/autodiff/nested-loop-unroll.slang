@@ -10,12 +10,14 @@ static const uint levels = 8;
 [Differentiable]
 void eval(float3 p, out float4 output[levels])
 {
-    [ForceUnroll] for (int level = 0; level < 3; ++level) 
+    [ForceUnroll]
+    for (int level = 0; level < 3; ++level)
     {
         float4 f = 0.f;
 
         // tri-linear time!
-        [ForceUnroll] for (int z = 0; z < 2; ++z)
+        [ForceUnroll]
+        for (int z = 0; z < 2; ++z)
         {
             float wx = 0;
             if (z != 0)

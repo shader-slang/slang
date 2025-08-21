@@ -7,6 +7,7 @@ uniform RWStructuredBuffer<uint64_t> out;
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain() {
+void computeMain()
+{
     out[0] = bit_cast<uint64_t, uint32_t>(in[0]);
 }

@@ -17,14 +17,10 @@ struct GetterImpl : IGetter
     float[8] data;
 
     [Differentiable]
-    __init(float[8] data)
-    { this.data = data; }
+    __init(float[8] data) { this.data = data; }
 
     [Differentiable]
-    float get(uint id)
-    {
-        return data[id];
-    }
+    float get(uint id) { return data[id]; }
 }
 interface IFoo<int N>
 {
@@ -51,23 +47,23 @@ void load_bwd(uint id, float.Differential dOut)
     outputBuffer[id + 8] = dOut;
 }
 
-struct FooImpl1: IFoo<8>
-{   
+struct FooImpl1 : IFoo<8>
+{
     typealias Params = GetterImpl;
 
-    __init()
-    { }
+    __init() {}
 
     [Differentiable]
     Params bar()
     {
         float x = load(0);
-        return GetterImpl({x, x+1, x+2, x+3, x+4, x+5, x+6, x+7});
+        return GetterImpl( { x, x + 1, x + 2, x + 3, x + 4, x + 5, x + 6, x + 7 });
     }
 }
 
 /*
-// There's a slight issue with dynamic dispatch over generic interfaces. Uncomment after that is fixed.
+// There's a slight issue with dynamic dispatch over generic interfaces. Uncomment after that is
+fixed.
 
 struct FooImpl2: IFoo<8>
 {
@@ -102,7 +98,7 @@ float doThing(uint id)
 }
 
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[0] = doThing(0); // CHECK: 2.0
     outputBuffer[1] = doThing(1); // CHECK: 4.0

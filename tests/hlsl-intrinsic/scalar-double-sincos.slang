@@ -5,7 +5,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(in uint i : SV_GroupIndex)
+void computeMain(in uint i: SV_GroupIndex)
 {
     double s, c;
     sincos(double(i), s, c);

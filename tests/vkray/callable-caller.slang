@@ -8,18 +8,18 @@ import callable_shared;
 
 cbuffer C
 {
-	uint shaderIndex;
+    uint shaderIndex;
 };
 
 RWTexture2D<float4> gImage;
 
 void main()
 {
-	MaterialPayload payload;
-	payload.albedo = 0;
-	payload.uv = float2(DispatchRaysIndex().xy) / float2(DispatchRaysDimensions().xy);
+    MaterialPayload payload;
+    payload.albedo = 0;
+    payload.uv = float2(DispatchRaysIndex().xy) / float2(DispatchRaysDimensions().xy);
 	// CHECK: OpExecuteCallable
-	CallShader(shaderIndex, payload);
+    CallShader(shaderIndex, payload);
 
-	gImage[DispatchRaysIndex().xy] = payload.albedo;
+    gImage[DispatchRaysIndex().xy] = payload.albedo;
 }

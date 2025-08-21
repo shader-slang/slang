@@ -19,20 +19,20 @@ bool condition2()
 
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     float weight = 0.0;
-    do 
+    do
     {
-        if (condition2()) 
-        { 
+        if (condition2())
+        {
             continue;
         }
         AllMemoryBarrier();
     } while (condition1());
 
-    while(condition1())
+    while (condition1())
     {
         if (condition2())
         {

@@ -15,17 +15,17 @@
 const
 #endif
 #ifdef USE_STATIC
-static
+    static
 #endif
 #ifdef USE_EXTERN
-extern int num;
+    extern int num;
 #else
 export int num = 10;
 #endif
 
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputBuffer[0] = num;

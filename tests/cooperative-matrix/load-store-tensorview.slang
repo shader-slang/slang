@@ -30,9 +30,9 @@
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24], stride=4, count=256),name=buf
 
 #if defined(RW)
-    RWByteAddressBuffer inputBuffer;
-#else // #if defined(RW)
-    ByteAddressBuffer inputBuffer;
+RWByteAddressBuffer inputBuffer;
+#else  // #if defined(RW)
+ByteAddressBuffer inputBuffer;
 #endif // #else // #if defined(RW)
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
@@ -40,7 +40,8 @@ RWByteAddressBuffer outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 int32_t decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])
 {

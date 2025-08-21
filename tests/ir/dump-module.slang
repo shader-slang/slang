@@ -11,7 +11,8 @@
 
 module "export-library-generics";
 
-public cbuffer Constants {
+public cbuffer Constants
+{
     public float x;
     public float y;
 }
@@ -23,13 +24,10 @@ interface MyInterface
 
 struct MyType : MyInterface
 {
-    int myMethod(int a)
-    {
-        return a * 3;
-    }
+    int myMethod(int a) { return a * 3; }
 }
 
-int genericFunc<T: MyInterface>(T arg)
+int genericFunc<T : MyInterface>(T arg)
 {
     return arg.myMethod(3);
 }
@@ -50,4 +48,3 @@ public int normalFunc(int a, float b)
 
 // CHECK2-NOT:EmbeddedDownstreamIR(6 : Int,
 // CHECK2-NOT:               OpCapability Linkage
-

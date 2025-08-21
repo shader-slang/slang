@@ -17,12 +17,11 @@ void rng_bwd(int inState, inout DifferentialPair<float> x, float dOut)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var x = diffPair(2.0, 1.0);
 
     __bwd_diff(rng)(4, x, 3.0);
 
     outputBuffer[0] = x.d; // should be 6
-
 }

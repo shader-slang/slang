@@ -6,10 +6,10 @@
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
- 
+
 float f(float x)
 {
-    return x*x;
+    return x * x;
 }
 
 [ForwardDerivativeOf(f)]
@@ -32,7 +32,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(3.0, 1.0);
 
-        outputBuffer[0] = f(dpa.p);        // Expect: 9.0
+        outputBuffer[0] = f(dpa.p);             // Expect: 9.0
         outputBuffer[1] = __fwd_diff(g)(dpa).d; // Expect: 6.0
     }
 }

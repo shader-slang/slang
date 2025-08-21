@@ -10,13 +10,15 @@
 buffer MyBlockName1
 {
     int data[10];
-} inputBuffer;
+}
+inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -52,9 +54,10 @@ bool Test_ScalarType()
     genUType outGenUType, outGenUType2;
 
     constexpr const float epsilon = 0.000001;
-    const mat2 identity2x2 = mat2(vec2(1,0),vec2(0,1));
-    const mat3 identity3x3 = mat3(vec3(1,0,0),vec3(0,1,0),vec3(0,0,1));
-    const mat4 identity4x4 = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),vec4(0,0,0,1));
+    const mat2 identity2x2 = mat2(vec2(1, 0), vec2(0, 1));
+    const mat3 identity3x3 = mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1));
+    const mat4 identity4x4 =
+        mat4(vec4(1, 0, 0, 0), vec4(0, 1, 0, 0), vec4(0, 0, 1, 0), vec4(0, 0, 0, 1));
 
     // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
     const int zero = inputBuffer.data[0];
@@ -78,7 +81,7 @@ bool Test_ScalarType()
     voidResults = voidResults && genIType(0) == outGenIType2;
 
     return voidResults
-        // 8.1. Angle and Trigonometry Functions
+           // 8.1. Angle and Trigonometry Functions
 
         // CHECK_GLSL: radians(
         // CHECK_SPIR: Radians{{ }}
@@ -138,7 +141,7 @@ bool Test_ScalarType()
         // CHECK_SPIR: Atanh{{ }}
         && genFType(0) == atanh(genFType(zero))
 
-        // 8.2. Exponential Functions
+           // 8.2. Exponential Functions
 
         // CHECK_GLSL: pow(
         // CHECK_SPIR: Pow{{ }}
@@ -170,7 +173,7 @@ bool Test_ScalarType()
         && genFType(1) == inversesqrt(genFType(one))
         && genDType(1) == inversesqrt(genDType(one))
 
-        // 8.3. Common Functions
+           // 8.3. Common Functions
 
         // CHECK_GLSL-COUNT-3: abs(
         // CHECK_SPIR: FAbs{{ }}
@@ -187,7 +190,7 @@ bool Test_ScalarType()
         && genFType(0) == sign(genFType(zero))
 #if !defined(TARGET_CUDA)
         && genIType(0) == sign(genIType(zero))
-#endif // #if !defined(TARGET_CUDA)
+#endif     // #if !defined(TARGET_CUDA)
         && genDType(0) == sign(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: floor(
@@ -325,7 +328,7 @@ bool Test_ScalarType()
         && genFType(0) == ldexp(genFType(zero), genIType(zero))
         && genDType(0) == ldexp(genDType(zero), genIType(zero))
 
-        // 8.4. Floating-Point Pack and Unpack Functions
+           // 8.4. Floating-Point Pack and Unpack Functions
 
         // CHECK_GLSL: packUnorm2x16(
         // CHECK_SPIR: PackUnorm2x16{{ }}
@@ -375,7 +378,7 @@ bool Test_ScalarType()
         // CHECK_SPIR: UnpackDouble2x32{{ }}
         && uvec2(0) == unpackDouble2x32(packDouble2x32(uvec2(zero)))
 
-        // 8.5. Geometric Functions
+           // 8.5. Geometric Functions
 
         // CHECK_GLSL-COUNT-2: length(
         // CHECK_SPIR-COUNT-2: Length{{ }}
@@ -388,7 +391,7 @@ bool Test_ScalarType()
         && double(0) == distance(genDType(zero), genDType(zero))
 
         // CHECK_GLSL-COUNT-2: dot(
-        // SPIR-V doesn't have OpDot for scalar types
+           // SPIR-V doesn't have OpDot for scalar types
         && float(0)  == dot(genFType(zero), genFType(zero))
         && double(0) == dot(genDType(zero), genDType(zero))
 
@@ -417,7 +420,7 @@ bool Test_ScalarType()
         && genFType(0) == refract(genFType(zero), genFType(zero), float(zero))
         && genDType(0) == refract(genDType(zero), genDType(zero), double(zero))
 
-        // 8.6. Matrix Functions
+           // 8.6. Matrix Functions
 
         // CHECK_GLSL-COUNT-9: matrixCompMult(
         && equals(mat2x2(0), matrixCompMult(mat2x2(0), mat2x2(zero)))
@@ -466,7 +469,7 @@ bool Test_ScalarType()
         && equals(identity3x3, inverse(identity3x3))
         && equals(identity4x4, inverse(identity4x4))
 
-        // 8.8. Integer Functions
+           // 8.8. Integer Functions
 
         // CHECK_GLSL: uaddCarry(
         // CHECK_SPIR: OpIAddCarry{{ }}
@@ -526,10 +529,10 @@ bool Test_VectorType()
     typealias genIType = vector<int, N>;
     typealias genUType = vector<uint, N>;
     typealias genBType = vector<bool, N>;
-    typealias vec      = vector<float, N>;
-    typealias ivec     = vector<int, N>;
-    typealias uvec     = vector<uint, N>;
-    typealias bvec     = vector<bool, N>;
+    typealias vec = vector<float, N>;
+    typealias ivec = vector<int, N>;
+    typealias uvec = vector<uint, N>;
+    typealias bvec = vector<bool, N>;
 
     // Temporary variables
     genFType outGenFType;
@@ -568,7 +571,7 @@ bool Test_VectorType()
     voidResults = voidResults && genIType(0) == outGenIType2;
 
     return voidResults
-        // 8.1. Angle and Trigonometry Functions
+           // 8.1. Angle and Trigonometry Functions
 
         // CHECK_GLSL: radians(
         // CHECK_GLSL-NOT: radians(
@@ -659,7 +662,7 @@ bool Test_VectorType()
         && genFType(0) == atanh(genFType(zero))
 #endif // #if !defined(TARGET_CUDA)
 
-        // 8.2. Exponential Functions
+           // 8.2. Exponential Functions
 
         // CHECK_GLSL: pow(
         // CHECK_GLSL-NOT: pow(
@@ -705,7 +708,7 @@ bool Test_VectorType()
         && genFType(1) == inversesqrt(genFType(one))
         && genDType(1) == inversesqrt(genDType(one))
 
-        // 8.3. Common Functions
+           // 8.3. Common Functions
 
         // CHECK_GLSL-COUNT-3: abs(
         // CHECK_GLSL-NOT: abs(
@@ -941,7 +944,7 @@ bool Test_VectorType()
         && genFType(0) == ldexp(genFType(zero), genIType(zero))
         && genDType(0) == ldexp(genDType(zero), genIType(zero))
 
-        // 8.5. Geometric Functions
+           // 8.5. Geometric Functions
 
         // CHECK_GLSL-COUNT-2: length(
         // CHECK_GLSL-NOT: length(
@@ -990,7 +993,7 @@ bool Test_VectorType()
         && genFType(0) == refract(genFType(zero), genFType(zero), float(zero))
         && genDType(0) == refract(genDType(zero), genDType(zero), double(zero))
 
-        // 8.7. Vector Relational Functions
+    // 8.7. Vector Relational Functions
 
 #if !defined(TARGET_CUDA)
         // CHECK_GLSL-COUNT-3: lessThan(
@@ -1042,7 +1045,7 @@ bool Test_VectorType()
         && bvec(1) == not(bvec(zero))
 #endif // #if !defined(TARGET_CUDA)
 
-        // 8.8. Integer Functions
+           // 8.8. Integer Functions
 
         // CHECK_GLSL: uaddCarry(
         // CHECK_GLSL-NOT: uaddCarry(
@@ -1110,7 +1113,7 @@ bool Test_VectorType()
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK_GLSL: void main(
     // CHECK_GLSL_SPIRV: OpEntryPoint

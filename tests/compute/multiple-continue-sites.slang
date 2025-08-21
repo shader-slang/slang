@@ -12,29 +12,29 @@
 
 int test(int inVal)
 {
-	int ii = inVal;
-	for(;!bool(ii & 0x20); ii += 0x10)
-	{
-		if(ii == 2)
-		{
-			continue;
-		}
+    int ii = inVal;
+    for (; !bool(ii & 0x20); ii += 0x10)
+    {
+        if (ii == 2)
+        {
+            continue;
+        }
 
-		ii += 0x100;
-		// there is an implicit `continue` here
-	}
+        ii += 0x100;
+        // there is an implicit `continue` here
+    }
 
-	return ii;
+    return ii;
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
-	int inVal = outputBuffer[tid];
-	int outVal = test(inVal);
-	outputBuffer[tid] = outVal;
+    uint tid = dispatchThreadID.x;
+    int inVal = outputBuffer[tid];
+    int outVal = test(inVal);
+    outputBuffer[tid] = outVal;
 }

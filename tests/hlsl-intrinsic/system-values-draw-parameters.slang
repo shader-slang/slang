@@ -16,10 +16,11 @@ struct VSOutput
     float4 position : SV_POSITION;
 };
 
-VSOutput main(VSInput input, 
-              uint startVertexLocation : SV_StartVertexLocation, 
-              uint startInstanceLocation : SV_StartInstanceLocation,
-              uint viewIndex : SV_ViewID)
+VSOutput main(
+    VSInput input,
+    uint startVertexLocation: SV_StartVertexLocation,
+    uint startInstanceLocation: SV_StartInstanceLocation,
+    uint viewIndex: SV_ViewID)
 {
     VSOutput output;
 
@@ -44,4 +45,3 @@ VSOutput main(VSInput input,
 
     return output;
 }
-

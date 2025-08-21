@@ -80,5 +80,3 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[index++] = dpx.d;
     }
 }
-
-

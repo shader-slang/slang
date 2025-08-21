@@ -36,14 +36,14 @@ float func2(float a)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(2.0, 1.0);
         dpfloat dpb = dpfloat(1.5, 1.0);
 
         outputBuffer[0] = fwd_diff(func1)(dpa).d;                 // Expect: 1
-        outputBuffer[1] = fwd_diff(func2)(dpfloat(dpa.p, 0.0)).d;   // Expect: 0
+        outputBuffer[1] = fwd_diff(func2)(dpfloat(dpa.p, 0.0)).d; // Expect: 0
     }
 }
 

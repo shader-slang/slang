@@ -15,7 +15,7 @@ interface IInterface
 }
 
 interface IInterface2
-{ 
+{
     float innerCalc(float x);
 }
 
@@ -33,7 +33,7 @@ struct A : IInterface
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));
-        return a*b*x; 
+        return a * b * x;
     }
 };
 
@@ -46,7 +46,7 @@ struct B : IInterface
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));
-        return a*b*x*x;
+        return a * b * x * x;
     }
 };
 
@@ -63,7 +63,7 @@ float run(int id, float x, no_diff float y)
 //TEST_INPUT: type_conformance C:IInterface2 = 0
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         var p = diffPair(3.0);

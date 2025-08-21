@@ -17,9 +17,12 @@ SamplerState followingSamplerState;
 
 // CHECK-DAG: Texture2D<float4 > explicitBindingSampler_texture{{.*}} : register(t4);
 // CHECK-DAG: SamplerState explicitBindingSampler_sampler{{.*}} : register(s3);
-Sampler2D explicitBindingSampler : register(t4): register(s3);
+Sampler2D explicitBindingSampler : register(t4)
+    : register(s3);
 
-float4 fragMain() : SV_Target
+float4 fragMain()
+    : SV_Target
 {
-    return sampler.Sample(float2(0, 0)) + explicitBindingSampler.Sample(float2(0, 0)) + followingTexture.Sample(followingSamplerState, float2(0,0));
+    return sampler.Sample(float2(0, 0)) + explicitBindingSampler.Sample(float2(0, 0)) +
+           followingTexture.Sample(followingSamplerState, float2(0, 0));
 }

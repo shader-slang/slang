@@ -1,4 +1,4 @@
-//DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp 
+//DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d11 -compute -shaderobj
@@ -30,11 +30,11 @@ RWStructuredBuffer<Thing> buffer3;
 RWByteAddressBuffer buffer4;
 
 [numthreads(5, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = int(dispatchThreadID.x);
     int last = -1;
-    
+
     uint count = 0, stride = 0;
     if (index == 0)
     {
@@ -54,7 +54,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (index == 3)
     {
         buffer3.GetDimensions(count, stride);
-        
+
         last = buffer3.Load(int(count - 1)).a;
     }
     else
@@ -62,6 +62,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         buffer4.GetDimensions(count);
         last = buffer4.Load(count - 4);
     }
-	outputBuffer[index * 2] = int(count);
+    outputBuffer[index * 2] = int(count);
     outputBuffer[index * 2 + 1] = last;
 }

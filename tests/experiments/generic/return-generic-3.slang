@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* A test of a generic function returning a generic struct. 
+/* A test of a generic function returning a generic struct.
 
 Works, and deduces the input type of broadcast.
  */
@@ -10,17 +10,17 @@ RWStructuredBuffer<int> outputBuffer;
 
 vector<T, 4> broadcast4<T>(T v)
 {
-	vector<T, 4> vec;
- 	vec.x = vec.y = vec.z = vec.w = v;
+    vector<T, 4> vec;
+    vec.x = vec.y = vec.z = vec.w = v;
     return vec;
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
     let vec = broadcast4(2.0f);
-    
-	outputBuffer[index] = dot(vec, vec);
+
+    outputBuffer[index] = dot(vec, vec);
 }

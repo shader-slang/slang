@@ -15,11 +15,18 @@
 // CHECK_LEGACY: error 38029
 // CHECK_LEGACY: getObject<Child>();
 
-interface IFoo {};
-struct Parent : IFoo {};
-struct Child : Parent {};
+interface IFoo
+{
+};
+struct Parent : IFoo
+{
+};
+struct Child : Parent
+{
+};
 
-T getObject<T>() where T : IFoo
+T getObject<T>()
+    where T : IFoo
 {
     return T();
 }

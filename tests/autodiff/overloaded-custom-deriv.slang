@@ -34,7 +34,7 @@ float test(float v)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var p = diffPair(3.0, 1.0);
     let rs = __fwd_diff(test)(p);

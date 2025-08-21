@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
-// Metal lacks RWTexture GFX backend support. 
-// Due to this, Metal compute test is disabled
+//  Metal lacks RWTexture GFX backend support.
+//  Due to this, Metal compute test is disabled
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
 
@@ -24,7 +24,7 @@ RWTexture2DArray<int4> outputTexture2DArray;
 RWStructuredBuffer<uint> outputBuffer;
 
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputTexture1D[0].xz = int2(1, 2).xx;
@@ -43,7 +43,8 @@ void computeMain()
     AllMemoryBarrier();
     outputTexture2DArray[int3(0, 0, 1)].xz = int2(3, 4);
     AllMemoryBarrier();
-    outputBuffer[0] = uint(true
+    outputBuffer[0] = uint(
+        true
             && all(outputTexture1D[0] == int4(1, 0, 1, 0)) == true
             && all(outputTexture1D[1] == int4(4, 0, 0, 0)) == true
 
@@ -55,7 +56,7 @@ void computeMain()
 
             && all(outputTexture2DArray[0] == int4(1, 0, 2, 0)) == true
             && all(outputTexture2DArray[int3(0, 0, 1)] == int4(3, 0, 4, 0))  == true
-            );
+    );
 }
 
 //BUF: 1

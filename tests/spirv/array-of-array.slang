@@ -6,7 +6,7 @@ RWStructuredBuffer<float4> outputBuffer;
 // CHECK: OpEntryPoint
 
 [shader("compute")]
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
-    outputBuffer[0] = texArray[tid.x][tid.y][tid.z].Load(int3(1,2,3));
+    outputBuffer[0] = texArray[tid.x][tid.y][tid.z].Load(int3(1, 2, 3));
 }

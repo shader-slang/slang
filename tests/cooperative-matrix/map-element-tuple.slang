@@ -24,7 +24,8 @@ RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType =
+    CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 int MapOp(uint32_t row, uint32_t col, int a, int b, int c)
 {
@@ -54,14 +55,18 @@ void computeMain()
     result = makeTuple(mat1, mat2, mat3).MapElement(f);
 
 #elif TEST_MODE == 2
-    result = makeTuple(mat1, mat2, mat3).MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + 1 + 2 + 3);
+    result =
+        makeTuple(mat1, mat2, mat3)
+            .MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + 1 + 2 + 3);
 
 #elif TEST_MODE == 3
     let f = ((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
     result = makeTuple(mat1, mat2, mat3).MapElement(f);
 
 #elif TEST_MODE == 4
-    result = makeTuple(mat1, mat2, mat3).MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
+    result =
+        makeTuple(mat1, mat2, mat3)
+            .MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
 #endif
 
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);

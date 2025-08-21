@@ -21,6 +21,4 @@ Texture2D R11G11B10Texture;
 Texture2D<uint3> RGB10_A2_UI_Texture;
 
 [numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-}
+void main(uint3 dispatchThreadID: SV_DispatchThreadID) {}

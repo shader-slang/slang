@@ -35,60 +35,62 @@
 // CHECK:layout(binding = 1000)
 // CHECK-NEXT:layout(std140) uniform
 
-Texture2D texture0; 
+Texture2D texture0;
 SamplerState sampler0;
 
-Texture2D texture1 : register(t1, space2); 
-SamplerState sampler1 : register(s1, space2); 
+Texture2D texture1 : register(t1, space2);
+SamplerState sampler1 : register(s1, space2);
 
 float g_value;
 
-cbuffer ConstantBufferA 
-{ 
+cbuffer ConstantBufferA
+{
     float constantA;
-}; 
+};
 
-cbuffer ConstantBufferB 
-{ 
+cbuffer ConstantBufferB
+{
     float constantB;
-}; 
+};
 
 cbuffer ConstantBufferC
 {
-    float constantC; 
-}; 
+    float constantC;
+};
 
 cbuffer ConstantBufferD
-{ 
+{
     float constantD;
-}; 
+};
 
-struct StructA 
-{ 
+struct StructA
+{
     float a;
 };
 
-[[ vk::push_constant ]]
+[[vk::push_constant]]
 StructA pushConstantA;
 
 struct PixelInput
-{ 
-    float4 t : TEXCOORD0; 
-}; 
+{
+    float4 t : TEXCOORD0;
+};
 
 struct PixelOutput
-{ 
-    float4 color : SV_Target0; 
-}; 
+{
+    float4 color : SV_Target0;
+};
 
-float4 use(Texture2D t, SamplerState s) { return t.SampleLevel(s, 0.0, 0.0); }
+float4 use(Texture2D t, SamplerState s)
+{
+    return t.SampleLevel(s, 0.0, 0.0);
+}
 
 PixelOutput main(PixelInput i)
-{ 
-    PixelOutput o ; 
+{
+    PixelOutput o;
     float4 b = use(texture0, sampler0) + use(texture1, sampler1);
     float a = pushConstantA.a + constantD + constantC + constantB + constantA + g_value + length(b);
     o.color = float4(1, 2, 3, 4) * a;
-    return o ; 
-} 
-
+    return o;
+}

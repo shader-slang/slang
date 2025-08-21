@@ -12,18 +12,18 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     defer outputBuffer[i++] = 128;
     for (int j = 0; j < 4; j++)
     {
-        defer outputBuffer[i++] = j*2+1;
-        outputBuffer[i++] = j*2;
+        defer outputBuffer[i++] = j * 2 + 1;
+        outputBuffer[i++] = j * 2;
     }
 
     for (int j = 0; j < 5; j++)
     {
         if (j == 1)
             continue;
-        defer outputBuffer[i++] = j*2+1;
+        defer outputBuffer[i++] = j * 2 + 1;
         if (j == 2)
             continue;
-        outputBuffer[i++] = j*2;
+        outputBuffer[i++] = j * 2;
         if (j == 3)
             break;
     }

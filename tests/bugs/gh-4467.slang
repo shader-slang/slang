@@ -15,7 +15,8 @@ interface IFoo
 
 interface IBar
 {
-    [mutating] void method(out IFoo o);
+    [mutating]
+    void method(out IFoo o);
 };
 
 struct FooImpl : IFoo
@@ -26,13 +27,10 @@ struct FooImpl : IFoo
 
 struct BarImpl : IBar
 {
-    void method(out IFoo o)
-    {
-        o = FooImpl(1);
-    }
+    void method(out IFoo o) { o = FooImpl(1); }
 };
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     BarImpl bar;

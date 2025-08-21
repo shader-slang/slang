@@ -1,12 +1,12 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
-interface IFoo<let n: uint>
+interface IFoo<let n : uint>
 {
     static int sum(int arr[n]);
 }
 
-struct MyType<let n:uint> : IFoo<n>
+struct MyType<let n : uint> : IFoo<n>
 {
     static int sum(int arr[n])
     {
@@ -17,10 +17,10 @@ struct MyType<let n:uint> : IFoo<n>
     }
 }
 
-int test<let n:uint>(IFoo<n> foo)
+int test<let n : uint>(IFoo<n> foo)
 {
     int arr[n];
-    for (int i =0; i < n; i++)
+    for (int i = 0; i < n; i++)
         arr[i] = i;
     return foo.sum(arr);
 }
@@ -29,14 +29,14 @@ int test<let n:uint>(IFoo<n> foo)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     MyType<3> t;
     test(t);
     // CHECK: 3
     outputBuffer[0] = test(t);
 
-    int arr[3] = {1,2,3};
+    int arr[3] = { 1, 2, 3 };
     // CHECK: 3
     outputBuffer[1] = MyType<3>.sum(arr);
 }

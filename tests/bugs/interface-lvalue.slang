@@ -10,11 +10,8 @@ interface IFoo
 
 class Impl : IFoo
 {
-    __init() { }
-    int method()
-    {
-        return 0;
-    }
+    __init() {}
+    int method() { return 0; }
 }
 
 void createFoo(out IFoo val)

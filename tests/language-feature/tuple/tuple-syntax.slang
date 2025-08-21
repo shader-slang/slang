@@ -19,14 +19,15 @@ struct MyType
 {
     int x;
     int y;
-    __init(Tuple<int, int> t){
+    __init(Tuple<int, int> t)
+    {
         x = t._0;
         y = t._1;
     }
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var t = (1, 2.0, 3u);
     store(t);
@@ -36,7 +37,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = y._1;
 
     // This should mean cast<MyType>(makeTuple(1,2))
-    let m = (MyType)(1,2);
+    let m = (MyType)(1, 2);
     // CHECK: 3
     outputBuffer[1] = m.x + m.y;
 }

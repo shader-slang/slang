@@ -8,18 +8,19 @@
 
 // SPIRV: OpEntryPoint
 
-float4 main(float2 v : V) : SV_Target
+float4 main(float2 v: V)
+    : SV_Target
 {
-	precise float z;
+    precise float z;
 
-	if(v.x > 0)
-	{
-		z = v.x * v.y + v.x;
-	}
-	else
-	{
-		z = v.y * v.x + v.y;
-	}
+    if (v.x > 0)
+    {
+        z = v.x * v.y + v.x;
+    }
+    else
+    {
+        z = v.y * v.x + v.y;
+    }
 
-	return z;
+    return z;
 }

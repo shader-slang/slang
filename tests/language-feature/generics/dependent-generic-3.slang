@@ -6,24 +6,21 @@ RWStructuredBuffer<int> outputBuffer;
 
 interface IOperation<T : __BuiltinFloatingPointType>
 {
-  static T apply(T lhs, T rhs);
+    static T apply(T lhs, T rhs);
 };
- 
-T applyOp<T:__BuiltinFloatingPointType, TOp:IOperation<T>>(T lhs, T rhs)
+
+T applyOp<T : __BuiltinFloatingPointType, TOp : IOperation<T>>(T lhs, T rhs)
 {
-  return TOp::apply(lhs, rhs);
+    return TOp::apply(lhs, rhs);
 }
 
 struct AddOp<T : __BuiltinFloatingPointType> : IOperation<T>
 {
-    static T apply(T lhs, T rhs)
-    {
-        return lhs + rhs;
-    }
+    static T apply(T lhs, T rhs) { return lhs + rhs; }
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let result = applyOp<float, AddOp<float>>(1.0, 2.0);
 

@@ -11,13 +11,13 @@ static const int kArray[] = { 16, 1, 32, 2 };
 
 int test(int val)
 {
-	return kArray[val];
+    return kArray[val];
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
-	int inVal = tid.x;
-	int outVal = test(inVal);
-	outputBuffer[inVal] = outVal;
+    int inVal = tid.x;
+    int outVal = test(inVal);
+    outputBuffer[inVal] = outVal;
 }

@@ -24,9 +24,21 @@ void computeMain()
 {
     let stride = 16;
 
-    let mat = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
+    let mat = coopMatLoad<
+        uint32_t,
+        MemoryScope.Subgroup,
+        16,
+        16,
+        CoopMatMatrixUse.MatrixAccumulator,
+        CoopMatMatrixLayout.RowMajor>(input, 0, stride);
     mat.Store<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
 
-    let result = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
+    let result = coopMatLoad<
+        uint32_t,
+        MemoryScope.Subgroup,
+        16,
+        16,
+        CoopMatMatrixUse.MatrixAccumulator,
+        CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
 }

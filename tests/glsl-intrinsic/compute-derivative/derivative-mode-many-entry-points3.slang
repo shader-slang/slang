@@ -8,17 +8,18 @@ layout(derivative_group_quadsNV) in;
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 [shader("compute")]
-[numthreads(2,2,1)]
-void main1(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(2, 2, 1)]
+void main1(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    outputBuffer.result = asint(ddx(1)) + asint(ddx(1)) ;
+    outputBuffer.result = asint(ddx(1)) + asint(ddx(1));
 }
 
 [shader("compute")]
-void main2(uint3 dispatchThreadID : SV_DispatchThreadID)
+void main2(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer.result = 1;
 }

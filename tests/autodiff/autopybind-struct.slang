@@ -22,7 +22,7 @@ void myKernel(Foo foo, TensorView<float> outValues)
 
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
 // TORCH-NEXT: __kernel__myKernel(Foo_[[#]] {{[[:alnum:]_]+}}, TensorView {{[[:alnum:]_]+}});
-// 
+//
 //
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
 // TORCH-NEXT: void myKernel(std::tuple<uint32_t, uint32_t, uint32_t> {{[[:alnum:]_]+}}, std::tuple<uint32_t, uint32_t, uint32_t> {{[[:alnum:]_]+}}, std::tuple<torch::Tensor, torch::Tensor> {{[[:alnum:]_]+}}, torch::Tensor {{[[:alnum:]_]+}})
@@ -32,4 +32,3 @@ void myKernel(Foo foo, TensorView<float> outValues)
 //
 // TORCH:      {{^SLANG_PRELUDE_EXPORT$}}
 // TORCH-NEXT: std::tuple<std::tuple<const char*, const char*>, std::tuple<const char*, const char*>> __typeinfo__Foo()
-

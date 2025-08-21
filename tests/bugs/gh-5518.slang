@@ -5,14 +5,15 @@
 
 // GLSL-NOT: #extension GL_EXT_samplerless_texture_functions : require
 
-layout(binding=1) Sampler3D sampler;
+layout(binding = 1) Sampler3D sampler;
 
 [shader("fragment")]
-float4 fragmentMain() : SV_Target
+float4 fragmentMain()
+    : SV_Target
 {
-	int sizeX;
-	int sizeY;
-	int sizeZ;
-	sampler.GetDimensions(sizeX, sizeY, sizeZ);
-	return float4(sizeX, sizeY, sizeZ, 1.0);
+    int sizeX;
+    int sizeY;
+    int sizeZ;
+    sampler.GetDimensions(sizeX, sizeY, sizeZ);
+    return float4(sizeX, sizeY, sizeZ, 1.0);
 }

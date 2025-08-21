@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
 //TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib
-// for some reason, metal textures dont have an overload for less-than-four component
-// writes, they need to be converted to 4-components in a legalize step, as the other components
-// get discarded
+//  for some reason, metal textures dont have an overload for less-than-four component
+//  writes, they need to be converted to 4-components in a legalize step, as the other components
+//  get discarded
 struct TextureWrite
 {
     //TEST_INPUT: RWTexture2D(size=4, content = zero):name t2D_f32

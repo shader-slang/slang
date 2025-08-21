@@ -32,10 +32,10 @@ void computeMain()
     // Propagate the gradient of the output (1.0f) to the input parameters.
     bwd_diff(sumOfSquares)(dpX, dpY, testPtr, 1.0);
 
-    outputBuffer[0] = result;     // 2^2 + 3^2 * (1 + 2 + 3) = 58
-    outputBuffer[1] = diffX.d;    // 2*x * dx + 2*y * dy * (1 + 2 + 3) = 4
-    outputBuffer[2] = diffX.p;    // 2^2 + 3^2 * (1 + 2 + 3) = 58
-    outputBuffer[3] = dpX.d;      // 2*x = 4
+    outputBuffer[0] = result;  // 2^2 + 3^2 * (1 + 2 + 3) = 58
+    outputBuffer[1] = diffX.d; // 2*x * dx + 2*y * dy * (1 + 2 + 3) = 4
+    outputBuffer[2] = diffX.p; // 2^2 + 3^2 * (1 + 2 + 3) = 58
+    outputBuffer[3] = dpX.d;   // 2*x = 4
 
-    outputBuffer[4] = dpY.d;      // 2*y * (1 + 2 +3) = 36
+    outputBuffer[4] = dpY.d; // 2*y * (1 + 2 +3) = 36
 }

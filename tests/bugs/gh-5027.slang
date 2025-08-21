@@ -6,7 +6,7 @@ RWStructuredBuffer<uint> outputBuffer;
 
 in uint3 gid : SV_GroupID;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     uint expr = WorkgroupSize().x + gid.x;

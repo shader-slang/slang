@@ -4,8 +4,8 @@
 // missing implementation of most builtin values due to non trivial translation
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 // missing implementation of most builtin values due to non trivial translation
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
-//missing implementation of system (varying?) values
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
+// missing implementation of system (varying?) values
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -xslang -DTARGET_VK
@@ -21,18 +21,20 @@
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 32) in;
 
 [shader("compute")]
 void computeMain()
 {
-    if (gl_GlobalInvocationID.x == 3) {
+    if (gl_GlobalInvocationID.x == 3)
+    {
         outputBuffer.data[0] = true
             && gl_SubgroupSize == 32
             && gl_SubgroupInvocationID == 3
-            // These intrinsics are only available on Vulkan(SPIRV and GLSL).
+// These intrinsics are only available on Vulkan(SPIRV and GLSL).
 #if defined(TARGET_VK)
             && gl_SubgroupID  == 0 //1 subgroup, 0 based indexing
             && gl_NumSubgroups == 1

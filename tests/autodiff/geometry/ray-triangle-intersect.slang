@@ -32,7 +32,7 @@ float3 diffRayIntersectTriangle2(no_diff float3 rayOrigin, float3 rayTarget, no_
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float3 shadePos = float3(0.674034, 0.0, 0.123171);
     float3 targetPos = float3(0.5, 0.2, -1.0);
@@ -42,8 +42,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     DifferentialPair<float3> dpIsectPos = fwd_diff(diffRayIntersectTriangle2)(
         shadePos,
         DifferentialPair<float3>(targetPos, float3(1.0, 0.0, 0.0)),
-        triPos
-    );
+        triPos);
 
     outputBuffer[0] = dpIsectPos.d[0]; // Expect: 5.0
     outputBuffer[1] = dpIsectPos.d[1]; // Expect: 0.0
@@ -51,12 +50,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Reverse-mode
     DifferentialPair<float3> dpTargetPos = diffPair(targetPos, float3(0.f));
-    bwd_diff(diffRayIntersectTriangle2)(
-        shadePos,
-        dpTargetPos,
-        triPos,
-        float3(1.f, 1.f, 1.f)
-    );
+    bwd_diff(diffRayIntersectTriangle2)(shadePos, dpTargetPos, triPos, float3(1.f, 1.f, 1.f));
 
     outputBuffer[3] = dpTargetPos.d[0]; // Expect: 5.0
     outputBuffer[4] = dpTargetPos.d[1]; // Expect: 32.4301

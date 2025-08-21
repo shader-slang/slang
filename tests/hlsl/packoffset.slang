@@ -32,7 +32,7 @@ cbuffer Constants
 // GLSL: layout(offset = 28)
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer[dispatchThreadID.x] = v2;
 }

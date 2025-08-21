@@ -98,7 +98,10 @@ bool bsdfGGXSample(const MaterialParam bsdfParams, out BSDFSample result)
 }
 
 [BackwardDifferentiable]
-bool generateScatterRay(const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes)
+bool generateScatterRay(
+    const MaterialParam bsdfParams,
+    inout PathState path,
+    inout PathResult pathRes)
 {
     BSDFSample result;
     bool valid = bsdfGGXSample(bsdfParams, result);
@@ -112,9 +115,15 @@ bool generateScatterRay(const MaterialParam bsdfParams, inout PathState path, in
     \return True if a ray was generated, false otherwise.
 */
 [BackwardDifferentiable]
-bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes, bool valid)
+bool generateScatterRay(
+    const BSDFSample bs,
+    const MaterialParam bsdfParams,
+    inout PathState path,
+    inout PathResult pathRes,
+    bool valid)
 {
-    if (valid) valid = generateScatterRay(bs, bsdfParams, path, pathRes);
+    if (valid)
+        valid = generateScatterRay(bs, bsdfParams, path, pathRes);
     return valid;
 }
 
@@ -128,7 +137,11 @@ bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, ino
 
 //CHK-DAG: note: checkpointing context of 16 bytes associated with function: 'generateScatterRay'
 [BackwardDifferentiable]
-bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes)
+bool generateScatterRay(
+    const BSDFSample bs,
+    const MaterialParam bsdfParams,
+    inout PathState path,
+    inout PathResult pathRes)
 {
     //CHK-DAG: note: 8 bytes (s_bwd_prop_updatePathThroughput_Intermediates_0) used to checkpoint the following item:
     //CHK-DAG: note: 8 bytes (PathResult_0) used to checkpoint the following item:
@@ -147,7 +160,7 @@ void handleHit(inout PathState path, inout PathResult rs, inout VisibilityQuery 
         path.terminated = true;
         return;
     }
-     
+
     generateScatterRay(param, path, rs);
 
     rs.L = rs.thp * lightEval(path.depth);
@@ -193,7 +206,8 @@ bool tracePath(uint pathID, out PathState path, inout PathResult pathRes)
             VisibilityQuery vq;
             handleHit(path, pathRes, vq);
 
-            if (path.isTerminated()) break;
+            if (path.isTerminated())
+                break;
 
             ClosestHitQuery chq;
             nextHit(path, pathRes, chq);
@@ -203,7 +217,7 @@ bool tracePath(uint pathID, out PathState path, inout PathResult pathRes)
             handleMiss(path, pathRes);
         }
     }
-    
+
     return true;
 }
 

@@ -7,10 +7,7 @@
 export struct MyImpl
 {
     Texture2D tex;
-    float run()
-    {
-        return tex.Load({0, 0, 0}).x;
-    }
+    float run() { return tex.Load( { 0, 0, 0 }).x; }
 };
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
@@ -19,7 +16,7 @@ RWStructuredBuffer<uint> gOutputBuffer;
 StructuredBuffer<MyImpl> gCb;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 

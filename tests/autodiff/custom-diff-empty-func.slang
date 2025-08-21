@@ -10,8 +10,7 @@ void foo_bwd(float a, inout DifferentialPair<float> dpx)
 }
 
 [Differentiable, BackwardDerivative(foo_bwd)]
-void foo(no_diff float a, float x)
-{ }
+void foo(no_diff float a, float x) {}
 
 [Differentiable]
 float outerFunc(no_diff float a, float x)
@@ -27,7 +26,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     float a = 10.0;
     DifferentialPair<float> dpx = DifferentialPair<float>(4.f, 1.f);
     bwd_diff(outerFunc)(a, dpx, 1.0);
-    
+
     // CHECK: type: float
     // CHECK: 0.0
     // CHECK: 0.0

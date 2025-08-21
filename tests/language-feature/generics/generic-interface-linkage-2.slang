@@ -16,7 +16,8 @@ float testBool<let doStuff : bool>()
     }
 }
 
-enum Color {
+enum Color
+{
     RED,
     GREEN
 }
@@ -34,7 +35,7 @@ float testEnum<let e : Color>()
 }
 
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 1.0
     outputBuffer[0] = testBool<true>();

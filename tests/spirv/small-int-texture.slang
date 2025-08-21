@@ -9,7 +9,8 @@ RWTexture2D<uint8_t> g_Image;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int id: SV_DispatchThreadID) {
+void computeMain(int id: SV_DispatchThreadID)
+{
     g_Image[id] = uint8_t(23);
     AllMemoryBarrier();
     // CHECK: 23

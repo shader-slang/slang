@@ -24,7 +24,7 @@ float f(D d, int i, out D outArray[1][2])
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     D d = { 1.0, 2.0 };
     D.Differential dd = { 1.0, 1.0 };
@@ -43,5 +43,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = dOut.d[0][0].m;
     outputBuffer[3] = darrCopy[0][1].n;
     outputBuffer[4] = darrCopy[0][1].m;
-    
 }

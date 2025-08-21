@@ -13,15 +13,12 @@ RWStructuredBuffer<int> gOutputBuffer;
 uniform IGetter gGetter;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     gOutputBuffer[dispatchThreadID.x] = gGetter.get(dispatchThreadID.x);
 }
 
 struct MyGetter : IGetter
 {
-    int get(int x)
-    {
-        return x + 1;
-    }
+    int get(int x) { return x + 1; }
 }

@@ -9,7 +9,10 @@ __target_intrinsic(glsl, "@")
 __target_intrinsic(cpp, "@")
 __target_intrinsic(cuda, "@")
 [__readNone]
-int produceSyntaxError() { return 0; }
+int produceSyntaxError()
+{
+    return 0;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)

@@ -11,7 +11,8 @@ layout(binding = 0) buffer MyBlockName
     int b;
     int c;
     int d;
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()

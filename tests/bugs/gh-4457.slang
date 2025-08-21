@@ -6,22 +6,23 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [UnscopedEnum]
-enum Number {
-  First = 1,
-  Second,
-};
+enum Number
+{
+    First = 1,
+    Second,
+}
+;
 
 static ::Number foo = First;
 
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-  // The scope(::) should be recognized
-  static ::Number bar = Second;
+    // The scope(::) should be recognized
+    static ::Number bar = Second;
 
   //CHK:1
   //CHK-NEXT:2
-  outputBuffer[0] = int(foo);
-  outputBuffer[1] = int(bar);
+    outputBuffer[0] = int(foo);
+    outputBuffer[1] = int(bar);
 }
-

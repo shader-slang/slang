@@ -77,8 +77,14 @@ struct View
 // us to ensure that specific parameters are seen as
 // "used" during code generation.
 
-void use(inout float4 r, float4 v) { r += v; }
-void use(inout float4 r, float3 v) { r.xyz += v; }
+void use(inout float4 r, float4 v)
+{
+    r += v;
+}
+void use(inout float4 r, float3 v)
+{
+    r.xyz += v;
+}
 
 void use(inout float4 r, Texture2D t, SamplerState s)
 {

@@ -9,7 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-// Slang-RHI/WGPU: Too small buffer is bound #5604
+//  Slang-RHI/WGPU: Too small buffer is bound #5604
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 interface IModifier
@@ -34,8 +34,7 @@ int test(int val)
 
 
 [numthreads(4, 1, 1)]
-void computeMain(
-    int3       dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     let tid = dispatchThreadID.x;
 
@@ -50,8 +49,5 @@ struct MyModifier : IModifier
     RWStructuredBuffer<int> data;
     int extra;
 
-    int modify(int val)
-    {
-        return val*65536 + data[val]*256 + val*extra;
-    }
+    int modify(int val) { return val * 65536 + data[val] * 256 + val * extra; }
 }

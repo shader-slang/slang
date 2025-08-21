@@ -9,10 +9,7 @@ struct GradientBuffer
     void write(int idx, float value) { /* Discard write */ }
 
     [BackwardDerivativeOf(write)]
-    void write_bwd(int idx, inout DifferentialPair<float> d)
-    {
-        d = diffPair(d.p, grads[idx]);
-    }
+    void write_bwd(int idx, inout DifferentialPair<float> d) { d = diffPair(d.p, grads[idx]); }
 }
 
 [Differentiable]
@@ -31,7 +28,7 @@ uniform RWStructuredBuffer<float> grad_out;
 uniform RWStructuredBuffer<float> output;
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     GradientBuffer grads = { grad_in };

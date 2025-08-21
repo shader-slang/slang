@@ -13,7 +13,8 @@ layout(scalar) buffer MyBlock1
     uint32_t d;
     uint32_t e;
     uint32_t f;
-} inputBuffer;
+}
+inputBuffer;
 // BUF: A802
 // BUF-NEXT: 1349
 // BUF-NEXT: C2
@@ -44,7 +45,8 @@ layout(scalar) buffer MyBlock2
 
     uint32_t m;
     uint32_t n;
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 1) in;
 void computeMain()
@@ -83,36 +85,36 @@ void computeMain()
     // BUF-NEXT: 5678
     // BUF-NEXT: FFFFF284
 
-    u16vec2 g = {0xF256, 0x1234};
+    u16vec2 g = { 0xF256, 0x1234 };
     outputBuffer.g = pack32(g);
     // BUF-NEXT: 1234F256
 
-    i16vec2 h = {0xF256, 0x1234};
+    i16vec2 h = { 0xF256, 0x1234 };
     outputBuffer.h = pack32(h);
     // BUF-NEXT: 1234F256
 
-    u8vec4 i = {0xF2, 0x56, 0x12, 0x34};
+    u8vec4 i = { 0xF2, 0x56, 0x12, 0x34 };
     outputBuffer.i = pack32(i);
     // BUF-NEXT: 341256F2
 
-    i8vec4 j = {0x82, 0x56, 0x12, 0x80};
+    i8vec4 j = { 0x82, 0x56, 0x12, 0x80 };
     outputBuffer.j = pack32(j);
     // BUF-NEXT: 80125682
 
     // Note: Below tests are mainly to verify that we don't emit invalid spirv code
-    u16vec2 k = {inputBuffer.a, inputBuffer.b};
+    u16vec2 k = { inputBuffer.a, inputBuffer.b };
     outputBuffer.k = pack32(k);
     // BUF-NEXT: 1349A802
 
-    i16vec2 l = {inputBuffer.a, inputBuffer.b};
+    i16vec2 l = { inputBuffer.a, inputBuffer.b };
     outputBuffer.l = pack32(l);
     // BUF-NEXT: 1349A802
 
-    u8vec4 m = {inputBuffer.c, inputBuffer.d, inputBuffer.e, inputBuffer.f};
+    u8vec4 m = { inputBuffer.c, inputBuffer.d, inputBuffer.e, inputBuffer.f };
     outputBuffer.m = pack32(m);
     // BUF-NEXT: 72B291C2
 
-    u8vec4 n = {inputBuffer.c, inputBuffer.d, inputBuffer.e, inputBuffer.f};
+    u8vec4 n = { inputBuffer.c, inputBuffer.d, inputBuffer.e, inputBuffer.f };
     outputBuffer.n = pack32(n);
     // BUF-NEXT: 72B291C2
 }

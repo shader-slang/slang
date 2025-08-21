@@ -6,7 +6,9 @@
 [Flags]
 enum BitFlags
 {
-    One, Two, Three
+    One,
+    Two,
+    Three
 }
 
 int test<let F : BitFlags>()
@@ -23,7 +25,7 @@ int testInt<let f : int>()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHECK: 3
     outputBuffer[0] = test<BitFlags.One | BitFlags.Two>();

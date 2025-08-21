@@ -3,14 +3,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx11 -compute  -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute  -output-using-type
 
-public interface ITestInterface<Real : IFloat> {
+public interface ITestInterface<Real : IFloat>
+{
     Real sample();
 }
 
-struct TestInterfaceImpl<Real : IFloat> : ITestInterface<Real> {
-    Real sample() {
-        return x;
-    }
+struct TestInterfaceImpl<Real : IFloat> : ITestInterface<Real>
+{
+    Real sample() { return x; }
     Real x;
 }
 

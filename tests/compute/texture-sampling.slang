@@ -12,8 +12,8 @@
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name=tCubeArray
 //TEST_INPUT: Sampler:name=samplerState
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-// There is no texture_1d_array type in WGSL https://github.com/shader-slang/slang/issues/5223
-// Not supported in WGSL: 1D array texture not supported in WGSL
+//  There is no texture_1d_array type in WGSL https://github.com/shader-slang/slang/issues/5223
+//  Not supported in WGSL: 1D array texture not supported in WGSL
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 Texture1D t1D;
@@ -28,25 +28,25 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 struct AssembledVertex
 {
-	float3	position;
-	float3	color;
-    float2  uv;
+    float3 position;
+    float3 color;
+    float2 uv;
 };
 
 struct CoarseVertex
 {
-	float3	color;
-    float2  uv;
+    float3 color;
+    float2 uv;
 };
 
 struct Fragment
 {
-	float4 color;
+    float4 color;
 };
 
 
@@ -54,56 +54,56 @@ struct Fragment
 
 struct VertexStageInput
 {
-	AssembledVertex assembledVertex	: A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 VertexStageOutput vertexMain(VertexStageInput input)
 {
-	VertexStageOutput output;
+    VertexStageOutput output;
 
-	float3 position = input.assembledVertex.position;
-	float3 color	= input.assembledVertex.color;
+    float3 position = input.assembledVertex.position;
+    float3 color = input.assembledVertex.color;
 
-	output.coarseVertex.color = color;
-	output.sv_position = mul(modelViewProjection, float4(position, 1.0));
+    output.coarseVertex.color = color;
+    output.sv_position = mul(modelViewProjection, float4(position, 1.0));
     output.coarseVertex.uv = input.assembledVertex.uv;
-	return output;
+    return output;
 }
 
 // Fragment Shader
 
 struct FragmentStageInput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
+    CoarseVertex coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	Fragment fragment	: SV_Target;
+    Fragment fragment : SV_Target;
 };
 
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
-	FragmentStageOutput output;
+    FragmentStageOutput output;
 
-	float3 color = input.coarseVertex.color;
+    float3 color = input.coarseVertex.color;
     float2 uv = input.coarseVertex.uv;
-	output.fragment.color = float4(color, 1.0);
+    output.fragment.color = float4(color, 1.0);
 
     float4 val = 0.0;
     val += t1D.Sample(samplerState, uv.x);
     val += t2D.Sample(samplerState, uv);
-    val += t3D.Sample (samplerState, float3(uv, 0.5));
+    val += t3D.Sample(samplerState, float3(uv, 0.5));
     val += t1dArray.Sample(samplerState, float2(uv.x, 0.0));
-    
+
     val += t2dArray.Sample(samplerState, float3(uv, 0.0));
-    
+
     val += tCubeArray.Sample(samplerState, float4(uv, 0.5, 0.0));
     val += tCube.Sample(samplerState, float3(uv, 0.5));
 
@@ -117,5 +117,5 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
     int w, h, l, lods;
     t2dArray.GetDimensions(0, w, h, l, lods);
     outputBuffer[1] = w + h + l + lods;
-	return output;
+    return output;
 }

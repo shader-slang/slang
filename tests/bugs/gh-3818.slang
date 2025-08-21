@@ -13,15 +13,9 @@ struct TOperationMax : IOperation
     float result;
 
     [mutating]
-    void Store(float v)
-    {
-        result = v;
-    }
+    void Store(float v) { result = v; }
 
-    float Load()
-    {
-        return result;
-    }
+    float Load() { return result; }
 };
 
 float Run(inout IOperation op, float val)
@@ -35,7 +29,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     TOperationMax opMax;
     opMax.result = 0.f;

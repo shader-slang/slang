@@ -24,9 +24,20 @@ struct Impl : IInterface
     struct Getter : IReturnsZero
     {
         bool data;
-        float get() { if (data) return 0.0; else return 1.0;}
+        float get()
+        {
+            if (data)
+                return 0.0;
+            else
+                return 1.0;
+        }
     }
-    Getter createGetter() { Getter g; g.data = true; return g; }
+    Getter createGetter()
+    {
+        Getter g;
+        g.data = true;
+        return g;
+    }
 };
 
 
@@ -44,7 +55,7 @@ RWStructuredBuffer<IInterface> gObj;
 //TEST_INPUT: type_conformance Impl:IInterface = 3
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float result = 0.0;
     let i = createDynamicObject<IInterface, int>(3, 0);

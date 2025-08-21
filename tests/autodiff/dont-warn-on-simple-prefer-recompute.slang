@@ -16,7 +16,9 @@ float comp(float a, float b)
 
 [shader("compute")]
 [numthreads(128, 1, 1)]
-void computeMain(uint3 group_thread_id: SV_GroupThreadID, uint3 dispatch_thread_id: SV_DispatchThreadID)
+void computeMain(
+    uint3 group_thread_id: SV_GroupThreadID,
+    uint3 dispatch_thread_id: SV_DispatchThreadID)
 {
     DifferentialPair<float> value1 = diffPair(3.f, 0.f);
     DifferentialPair<float> value2 = diffPair(3.f, 0.f);

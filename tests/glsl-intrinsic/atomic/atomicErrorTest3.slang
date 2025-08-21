@@ -7,7 +7,4 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):name=one
 layout(offset = 4) uniform atomic_uint one;
 
-void computeMain()
-{
-
-}
+void computeMain() {}

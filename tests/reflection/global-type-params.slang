@@ -3,16 +3,16 @@
 // Confirm that we handle global generic parameters
 
 
-
 interface IBase
-{};
+{
+};
 
 type_param TParam : IBase;
 type_param TParam2 : IBase;
 
 struct S
 {
-	TParam2 p;
+    TParam2 p;
 };
 
 ParameterBlock<S> arg;
@@ -23,13 +23,14 @@ SamplerState s;
 
 cbuffer CB
 {
-	float4 u;
-	float4 v;
-	float4 w;
+    float4 u;
+    float4 v;
+    float4 w;
 }
 
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-	return u + v + w + t.Sample(s, u.xy);
+    return u + v + w + t.Sample(s, u.xy);
 }

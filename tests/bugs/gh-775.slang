@@ -3,14 +3,9 @@
 
 int test(int inVal)
 {
-    float4x4 identity = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
+    float4x4 identity = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 
-    float4 v = float4(inVal, inVal+1, inVal+2, inVal+3);
+    float4 v = float4(inVal, inVal + 1, inVal + 2, inVal + 3);
 
     v = mul(identity, v);
 
@@ -21,12 +16,12 @@ int test(int inVal)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	int inVal = int(tid);
-	int outVal = test(inVal);
+    int inVal = int(tid);
+    int outVal = test(inVal);
 
-	outputBuffer[tid] = outVal;
+    outputBuffer[tid] = outVal;
 }

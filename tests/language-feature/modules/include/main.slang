@@ -16,5 +16,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     outputBuffer[tid] = f_c();
-    // CHECK: 4 
+    // CHECK: 4
 }

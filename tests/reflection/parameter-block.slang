@@ -9,13 +9,16 @@
 
 struct Helper
 {
-	Texture2D t;
-	SamplerState s;	
+    Texture2D t;
+    SamplerState s;
 };
 
 ParameterBlock<Helper> a;
 
 Texture2D b;
 
-float4 main() : SV_target
-{ return 0.0; }
+float4 main()
+    : SV_target
+{
+    return 0.0;
+}

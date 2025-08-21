@@ -24,7 +24,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     AggType v = { 0, 2.0 };
     AggType.Differential dv = { 1.3, 4.2 };
 
-    var f2pair = diffPair(2.0, 0.0); 
+    var f2pair = diffPair(2.0, 0.0);
 
     __bwd_diff(makeTypeWithNonDiffOps)(1.0, f2pair, dv);
     outputBuffer[0] = f2pair.d;

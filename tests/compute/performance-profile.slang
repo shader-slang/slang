@@ -11,18 +11,19 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(16, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint i = dispatchThreadID.x;
     float v = outputBuffer[i];
     v = v < 0.0f ? (v * v) : (v + v + v);
-	outputBuffer[i] = v;
+    outputBuffer[i] = v;
 }
 
 
 #else
 
-namespace { // anonymous
+namespace
+{ // anonymous
 
 struct LocalUniformState
 {
@@ -35,7 +36,7 @@ static void _calc(const RWStructuredBuffer<float>& buf, int start, int end)
 {
     assert(start >= 0 && end <= buf.count);
     float* data = buf.data;
-    
+
     for (int i = start; i < end; ++i)
     {
         float v = data[i];
@@ -47,7 +48,10 @@ SLANG_PRELUDE_EXPORT
 void computeMain(ComputeVaryingInput* varyingInput, void* inParams, void* inUniformState)
 {
     LocalUniformState* uniformState = (LocalUniformState*)inUniformState;
-    _calc(uniformState->outputBuffer_0, varyingInput->startGroupID.x * 16, varyingInput->endGroupID.x * 16);
+    _calc(
+        uniformState->outputBuffer_0,
+        varyingInput->startGroupID.x * 16,
+        varyingInput->endGroupID.x * 16);
 }
- 
+
 #endif

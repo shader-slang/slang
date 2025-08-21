@@ -9,7 +9,6 @@ RWStructuredBuffer<int> outputBuffer;
 
 interface I
 {
-
 }
 
 struct A : I
@@ -22,7 +21,7 @@ struct B : I
     float2 f2 = float2(0.0f);
 };
 
-func test<T : I>(T t) -> int
+func test<T : I>(T t)->int
 {
     int rs = 0;
     if (T is A)
@@ -31,13 +30,13 @@ func test<T : I>(T t) -> int
     }
     if (T is B)
     {
-        rs+=2;
+        rs += 2;
     }
     return rs;
 }
 
 [shader("compute")]
-[numthreads(1,1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     B b = {};

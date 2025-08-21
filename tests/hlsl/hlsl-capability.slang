@@ -3,7 +3,8 @@
 //TEST:SIMPLE(filecheck=CHECK_CS_CAP): -target hlsl -stage compute -entry computeMain -profile cs_6_3 -capability hlsl_2018
 //TEST:SIMPLE(filecheck=CHECK_SM_CAP): -target hlsl -stage compute -entry computeMain -profile sm_6_3 -capability hlsl_2018
 
-// Test IR code generation for the `?:` "select" operator with the hlsl_2018 capability and cs_6_3 profile.
+// Test IR code generation for the `?:` "select" operator with the hlsl_2018 capability and cs_6_3
+// profile.
 
 // Verify that select is emitted for cs_6_3 and sm_6_3.
 // CHECK_CS: select({{.*}})
@@ -26,7 +27,7 @@ bool2 assignFunc(int index)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 

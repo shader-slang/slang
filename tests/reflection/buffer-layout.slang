@@ -44,7 +44,7 @@ struct S
     // struct   4       8       4
     // std430   4       8       4
     //
-    A      a;
+    A a;
 
     // Now we insert an ordinary `int` field just as
     // a way to probe the offset so far.
@@ -57,7 +57,7 @@ struct S
     // struct   12      4       4
     // std430   12      4       4
     //
-    int    b;
+    int b;
 
     // As our next stress-test case, we will insert an
     // array with elements that aren't a multiple of
@@ -96,14 +96,11 @@ struct S
     // struct   32      4      4
     // std430   32      4      4
     //
-    int    d;
+    int d;
 }
 
 ConstantBuffer<S> cb;
 RWStructuredBuffer<S> sb;
 
 [numthreads(1, 1, 1)]
-void main(
-    uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-}
+void main(uint3 dispatchThreadID: SV_DispatchThreadID) {}

@@ -2,14 +2,20 @@
 
 //CHECK: OpEntryPoint
 
-interface IBsdf {};
-struct Foo : IBsdf {}
-//TEST_INPUT:type_conformance Foo:IBsdf = 0
-struct Mesh {
-    float4 *vertices;
-    IBsdf *bsdf;
+interface IBsdf
+{
+};
+struct Foo : IBsdf
+{
 }
-[[vk::push_constant]] Mesh* mesh;
+//TEST_INPUT:type_conformance Foo:IBsdf = 0
+struct Mesh
+{
+    float4* vertices;
+    IBsdf* bsdf;
+}
+[[vk::push_constant]]
+Mesh* mesh;
 RWStructuredBuffer<float4> outputBuffer;
 
 [shader("compute")]

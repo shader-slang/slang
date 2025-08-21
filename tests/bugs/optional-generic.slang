@@ -13,10 +13,9 @@ Optional<T> genFunc<T : IArithmetic>(T v)
 
 RWStructuredBuffer<int> buffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // BUF: 2
     buffer[0] = genFunc(2).value;
 }
-

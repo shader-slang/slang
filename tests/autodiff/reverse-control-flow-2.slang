@@ -40,7 +40,8 @@ bool doWork2(float x, out float y)
 {
     y = 0;
 
-    if (x == 0.0) return false;
+    if (x == 0.0)
+        return false;
 
     [ForceUnroll]
     for (int i = 0; i < 2; ++i)
@@ -49,7 +50,8 @@ bool doWork2(float x, out float y)
         {
             y += x;
 
-            if (x == 1.0) break;
+            if (x == 1.0)
+                break;
 
             y += x;
         }

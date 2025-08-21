@@ -15,17 +15,16 @@ RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     float originalValue;
-    
+
     // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}1.0{{.*}});
     // MTL: atomic_fetch_add
     t.InterlockedAddF32(uint2(1, 0), 1.0, originalValue);
-    
+
     AllMemoryBarrier();
 
     // CHECK: 4.0
     outputBuffer[0] = t[uint2(1, 0)] + originalValue;
-
 }

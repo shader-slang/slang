@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): 
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):
 
 int check<int v>()
 {
@@ -9,7 +9,7 @@ int check<int v>()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     const int a[] = { 1, 2, 3, 4 };

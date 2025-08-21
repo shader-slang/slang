@@ -10,9 +10,9 @@
 import common;
 
 ParameterBlock<Environment> environment;
-ParameterBlock<View>        view;
-ParameterBlock<Material>    material;
-ParameterBlock<Mesh>        mesh;
+ParameterBlock<View> view;
+ParameterBlock<Material> material;
+ParameterBlock<Mesh> mesh;
 
 [shader("compute")]
 void main()

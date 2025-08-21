@@ -6,21 +6,24 @@
 
 interface IGenerator
 {
-    [mutating] int generate();
+    [mutating]
+    int generate();
 }
 
 struct SimpleGenerator : IGenerator
 {
     int state = 0;
 
-    [mutating] int generate() { return state++; }
+    [mutating]
+    int generate() { return state++; }
 }
 
 
 struct Reducer
 {
     int state = 0;
-    [mutating] void update<S : IGenerator>(inout S g)
+    [mutating]
+    void update<S : IGenerator>(inout S g)
     {
         state = (state << 8) | state;
         state = state + g.generate();
@@ -30,7 +33,7 @@ struct Reducer
 int test(int val)
 {
     SimpleGenerator g = { 0 };
-    Reducer r = { val+1 };
+    Reducer r = { val + 1 };
 
     r.update(g);
     r.update(g);
@@ -42,7 +45,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int val = test(tid);

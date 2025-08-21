@@ -9,7 +9,8 @@
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 

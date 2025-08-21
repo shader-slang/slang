@@ -2,6 +2,8 @@
 
 // CHECK: BuiltIn ShadingRateKHR
 [shader("fragment")]
-uint main(uint shading_rate : SV_ShadingRate) : SV_Target {
+uint main(uint shading_rate: SV_ShadingRate)
+    : SV_Target
+{
     return shading_rate;
 }

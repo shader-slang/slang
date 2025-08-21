@@ -3,7 +3,8 @@
 //TEST:SIMPLE(filecheck=GL-SPIRV): -stage anyhit -entry main -target spirv-assembly -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=SPIRV): -stage anyhit -entry main -target spirv
 
-// This test checks that the only the resource with Uniform, Storage or UniformConstant storage class can be decorated by binding or descriptor set.
+// This test checks that the only the resource with Uniform, Storage or UniformConstant storage
+// class can be decorated by binding or descriptor set.
 struct MyStruct
 {
     float3 org;
@@ -20,19 +21,16 @@ ConstantBuffer<MyStruct> myStruct1 : register(b1, space1);
 RWStructuredBuffer<MyStruct> myStruct2 : register(u2, space1);
 
 // UniformConstant
-Texture2D<float>    texture: register(t3, space1);
-SamplerState        sampler: register(s4, space1);
+Texture2D<float> texture : register(t3, space1);
+SamplerState sampler : register(s4, space1);
 
 [shader("anyhit")]
 void main(out float3 pos)
 {
-    pos = myStruct.org + myStruct.dir +
-          myStruct1.org + myStruct1.dir +
-          myStruct2[0].org + myStruct2[0].dir;
+    pos = myStruct.org + myStruct.dir + myStruct1.org + myStruct1.dir + myStruct2[0].org +
+          myStruct2[0].dir;
 
-    pos.x = texture.SampleLevel(
-            sampler,
-            pos.xy, 0);
+    pos.x = texture.SampleLevel(sampler, pos.xy, 0);
 }
 
 // SPIRV-DAG: OpDecorate %myStruct1{{.*}} Binding 1

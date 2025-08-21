@@ -14,8 +14,15 @@ interface IFoo
 
 struct Impl : IFoo
 {
-    struct Assoc : IAssoc { int getInner() { return 1; } }
-    Assoc getValue() { Assoc r; return r; }
+    struct Assoc : IAssoc
+    {
+        int getInner() { return 1; }
+    }
+    Assoc getValue()
+    {
+        Assoc r;
+        return r;
+    }
 }
 
 struct GenType<T : IFoo> : IDefaultInitializable
@@ -25,7 +32,8 @@ struct GenType<T : IFoo> : IDefaultInitializable
     {
         IAssoc soc = obj.getValue(); // "boxing" into an existential
 
-        // a specialized version of this function should call specialized method instead of going through dynamic dispatch.
+        // a specialized version of this function should call specialized method instead of going
+        // through dynamic dispatch.
         return soc.getInner();
     }
 }

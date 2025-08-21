@@ -16,9 +16,11 @@ float f(float x, float[3] y)
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    var dpx = fwd_diff(f)(DifferentialPair<float>(1.0f, 1.0f), DifferentialPair<float[3]>( { 1.0f, 2.0f, 3.0f }, { 1.0f, 2.0f, 3.0f }));
+    var dpx = fwd_diff(f)(
+        DifferentialPair<float>(1.0f, 1.0f),
+        DifferentialPair<float[3]>( { 1.0f, 2.0f, 3.0f }, { 1.0f, 2.0f, 3.0f }));
     outputBuffer[0] = dpx.p; // Expect: 6.0
     outputBuffer[1] = dpx.d; // Expect: 12.0
 }

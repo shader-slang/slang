@@ -11,11 +11,11 @@ typedef float.Differential dfloat;
 [BackwardDifferentiable]
 float f(float x, float y)
 {
-    return x > 0.0 ? sqrt(x)*sqrt(x) : y;
+    return x > 0.0 ? sqrt(x) * sqrt(x) : y;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(2.0, 1.0);
@@ -23,8 +23,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         __bwd_diff(f)(dpa, dpb, 1.0);
 
-        outputBuffer[0] = dpa.d;    // Expect: 1.0
-        outputBuffer[1] = dpb.d;    // Expect: 0.0
+        outputBuffer[0] = dpa.d; // Expect: 1.0
+        outputBuffer[1] = dpb.d; // Expect: 0.0
     }
 
     {

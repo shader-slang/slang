@@ -9,4 +9,3 @@ int doSomething(int a)
 {
     return a * a + 1;
 }
-

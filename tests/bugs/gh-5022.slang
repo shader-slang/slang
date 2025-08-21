@@ -10,11 +10,17 @@ RWStructuredBuffer<int> outputBuffer;
 
 groupshared int myInt;
 
-void set(__ref groupshared int i){ i = 1; }
-int use(__ref groupshared int i){ return i; }
+void set(__ref groupshared int i)
+{
+    i = 1;
+}
+int use(__ref groupshared int i)
+{
+    return i;
+}
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     set(myInt);
     use(myInt);

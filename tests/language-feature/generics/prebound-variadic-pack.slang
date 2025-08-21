@@ -3,8 +3,8 @@
 struct Set<each T>
 {
     Tuple<expand each T> data;
-    void f(expand each T v){}
-    void h<each U>(U x){}
+    void f(expand each T v) {}
+    void h<each U>(U x) {}
     void g(expand each T d)
     {
         //CHECK-NOT: ([[# @LINE+1]]): error
@@ -21,7 +21,7 @@ struct Set<each T>
     }
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Set<float> v;

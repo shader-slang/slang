@@ -35,9 +35,10 @@ RWStructuredBuffer<uint> gPrintBuffer;
 //
 enum PrintingOp
 {
-#define GPU_PRINTING_OP(NAME) NAME ,
+#define GPU_PRINTING_OP(NAME) NAME,
 #include "gpu-printing-ops.h"
-};
+}
+;
 
 // It is critical that when printing something, we allocate
 // all the words it requires in the print buffer contiguously.
@@ -188,7 +189,10 @@ extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrinta
 {
     // Printing a `uint` uses up two words in the buffer
     //
-    uint getPrintWordCount() { return 2; }
+    uint getPrintWordCount()
+    {
+        return 2;
+    }
 
     // Writing a command to print a `uint` is straightforward,
     // given knowledge of our encoding.
@@ -202,7 +206,10 @@ extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrinta
 
 extension String : IPrintable
 {
-    uint getPrintWordCount() { return 2; }
+    uint getPrintWordCount()
+    {
+        return 2;
+    }
 
     void writePrintWords(RWStructuredBuffer<uint> buffer, uint offset)
     {
@@ -228,8 +235,10 @@ void println<A : IPrintable, B : IPrintable>(A a, B b)
     // required to print the values.
     //
     uint wordCount = 0;
-    uint aCount = a.getPrintWordCount(); wordCount += aCount;
-    uint bCount = b.getPrintWordCount(); wordCount += bCount;
+    uint aCount = a.getPrintWordCount();
+    wordCount += aCount;
+    uint bCount = b.getPrintWordCount();
+    wordCount += bCount;
 
     // Then we can allocate those words atomically
     // with a single `_beginPrint()`.
@@ -241,26 +250,33 @@ void println<A : IPrintable, B : IPrintable>(A a, B b)
     // without having to worry about other threads inserting
     // print commands between them.
     //
-    a.writePrintWords(gPrintBuffer, wordOffset); wordOffset += aCount;
-    b.writePrintWords(gPrintBuffer, wordOffset); wordOffset += bCount;
+    a.writePrintWords(gPrintBuffer, wordOffset);
+    wordOffset += aCount;
+    b.writePrintWords(gPrintBuffer, wordOffset);
+    wordOffset += bCount;
 }
 
 // We can then continue to build up to `println()` functions with
 // three or more arguments.
 
-void println<A : IPrintable, B : IPrintable, C : IPrintable>(
-             A a,            B b,            C c)
+void println<A : IPrintable, B : IPrintable, C : IPrintable>(A a, B b, C c)
 {
     uint wordCount = 0;
-    uint aCount = a.getPrintWordCount(); wordCount += aCount;
-    uint bCount = b.getPrintWordCount(); wordCount += bCount;
-    uint cCount = c.getPrintWordCount(); wordCount += cCount;
+    uint aCount = a.getPrintWordCount();
+    wordCount += aCount;
+    uint bCount = b.getPrintWordCount();
+    wordCount += bCount;
+    uint cCount = c.getPrintWordCount();
+    wordCount += cCount;
 
     uint wordOffset = _beginPrintln(wordCount);
 
-    a.writePrintWords(gPrintBuffer, wordOffset); wordOffset += aCount;
-    b.writePrintWords(gPrintBuffer, wordOffset); wordOffset += bCount;
-    c.writePrintWords(gPrintBuffer, wordOffset); wordOffset += cCount;
+    a.writePrintWords(gPrintBuffer, wordOffset);
+    wordOffset += aCount;
+    b.writePrintWords(gPrintBuffer, wordOffset);
+    wordOffset += bCount;
+    c.writePrintWords(gPrintBuffer, wordOffset);
+    wordOffset += cCount;
 }
 
 // Further generalizing to four or more arguments is straightforward but tedious.
@@ -297,7 +313,7 @@ uint _beginPrintf(String format, uint wordCount)
     // words for all the format arguments.
     //
     uint wordOffset = _allocatePrintWords(wordCount + 2);
-    gPrintBuffer[wordOffset++] = (uint(PrintingOp.PrintF) << 16) | (wordCount+1);
+    gPrintBuffer[wordOffset++] = (uint(PrintingOp.PrintF) << 16) | (wordCount + 1);
     gPrintBuffer[wordOffset++] = getStringHash(format);
     return wordOffset;
 }
@@ -323,7 +339,10 @@ extension uint : IPrintf
     // Note: unlike the case for `IPrintable` above, the encoding
     // for format args for `printf()` doesn't include type information.
     //
-    uint getPrintfWordCount() { return 1; }
+    uint getPrintfWordCount()
+    {
+        return 1;
+    }
 
     // Writing the required data to the payload for `printf()` is simple
     void writePrintfWords(RWStructuredBuffer<uint> buffer, uint offset)
@@ -334,7 +353,10 @@ extension uint : IPrintf
 
 extension String : IPrintf
 {
-    uint getPrintfWordCount() { return 1; }
+    uint getPrintfWordCount()
+    {
+        return 1;
+    }
 
     void writePrintfWords(RWStructuredBuffer<uint> buffer, uint offset)
     {
@@ -357,7 +379,8 @@ void printf_<A : IPrintf>(String format, A a)
     // and sum them up.
     //
     uint wordCount = 0;
-    uint aCount = a.getPrintfWordCount(); wordCount += aCount;
+    uint aCount = a.getPrintfWordCount();
+    wordCount += aCount;
 
     // We need to allocate a `printf()` command in the buffer with
     // the required number of words for format argument payload.
@@ -367,19 +390,24 @@ void printf_<A : IPrintf>(String format, A a)
     // We need to write each format argument to the appropriate offset
     // in the payload part of the `printf()` command.
     //
-    a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
+    a.writePrintfWords(gPrintBuffer, wordOffset);
+    wordOffset += aCount;
 }
 
 void printf_<A : IPrintf, B : IPrintf>(String format, A a, B b)
 {
     uint wordCount = 0;
-    uint aCount = a.getPrintfWordCount(); wordCount += aCount;
-    uint bCount = b.getPrintfWordCount(); wordCount += bCount;
+    uint aCount = a.getPrintfWordCount();
+    wordCount += aCount;
+    uint bCount = b.getPrintfWordCount();
+    wordCount += bCount;
 
     uint wordOffset = _beginPrintf(format, wordCount);
 
-    a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
-    b.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += bCount;
+    a.writePrintfWords(gPrintBuffer, wordOffset);
+    wordOffset += aCount;
+    b.writePrintfWords(gPrintBuffer, wordOffset);
+    wordOffset += bCount;
 }
 
 // Extending this `printf()` implementation to handle more format arguments

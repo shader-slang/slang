@@ -11,7 +11,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // uint variant
     double d = double(dispatchThreadID.x);
@@ -37,6 +37,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // status
     outputBuffer[0] = (int(r) == 0)
-        && (int(s.x) == 1) 
+        && (int(s.x) == 1)
         && (int(s.y) == 2);
 }

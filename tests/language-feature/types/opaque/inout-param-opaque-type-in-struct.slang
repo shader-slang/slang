@@ -19,9 +19,7 @@ cbuffer C
     Things gY;
 }
 
-void swap(
-    inout Things a,
-    inout Things b)
+void swap(inout Things a, inout Things b)
 {
     Things t = a;
     a = b;
@@ -30,7 +28,7 @@ void swap(
 
 int eval(Things t, int val)
 {
-    return t.first*256 + t.rest[val];
+    return t.first * 256 + t.rest[val];
 }
 
 int test(int val)
@@ -40,14 +38,14 @@ int test(int val)
 
     swap(f, g);
 
-    return (eval(f,val) << 16) + eval(g,val);
+    return (eval(f, val) << 16) + eval(g, val);
 }
 
 //TEST_INPUT:set gOutput = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> gOutput;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

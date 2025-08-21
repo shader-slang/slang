@@ -69,7 +69,7 @@ RWStructuredBuffer<OutputData> outputBuffer;
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dTid : SV_DispatchThreadID)
+void computeMain(uint3 dTid: SV_DispatchThreadID)
 {
     int scalarVal = dTid.x;
     uint4 mask = WaveMatch(scalarVal);
@@ -93,7 +93,8 @@ void computeMain(uint3 dTid : SV_DispatchThreadID)
     float floatScalarSum = WaveMultiPrefixSum(floatScalarVal, floatMask);
     float floatScalarProduct = WaveMultiPrefixProduct(floatScalarVal, floatMask);
 
-    float3 floatVectorVal = float3(dTid.x, dTid.y, dTid.z) + 0.5f; // Example floating-point vector value
+    float3 floatVectorVal =
+        float3(dTid.x, dTid.y, dTid.z) + 0.5f; // Example floating-point vector value
     float3 floatVectorSum = WaveMultiPrefixSum(floatVectorVal, floatMask);
     float3 floatVectorProduct = WaveMultiPrefixProduct(floatVectorVal, floatMask);
 
@@ -114,21 +115,23 @@ void computeMain(uint3 dTid : SV_DispatchThreadID)
     output.floatVectorProduct = floatVectorProduct.x;
 
     float3x3 floatMatrixVal = float3x3(
-        float(dTid.x) + 0.5f, float(dTid.y) + 0.5f, float(dTid.z) + 0.5f,
-        float(dTid.z) + 0.5f, float(dTid.x) + 0.5f, float(dTid.y) + 0.5f,
-        float(dTid.y) + 0.5f, float(dTid.z) + 0.5f, float(dTid.x) + 0.5f
-    );
+        float(dTid.x) + 0.5f,
+        float(dTid.y) + 0.5f,
+        float(dTid.z) + 0.5f,
+        float(dTid.z) + 0.5f,
+        float(dTid.x) + 0.5f,
+        float(dTid.y) + 0.5f,
+        float(dTid.y) + 0.5f,
+        float(dTid.z) + 0.5f,
+        float(dTid.x) + 0.5f);
     float3x3 floatMatrixSum = WaveMultiPrefixSum(floatMatrixVal, floatMask);
     float3x3 floatMatrixProduct = WaveMultiPrefixProduct(floatMatrixVal, floatMask);
     output.floatMatrixSum = floatMatrixSum[0][0];
     output.floatMatrixProduct = floatMatrixProduct[0][0];
 
 #if !defined(NO_INTEGER_MATRIX)
-    int3x3 matrixVal = int3x3(
-        dTid.x, dTid.y, dTid.z,
-        dTid.z, dTid.x, dTid.y,
-        dTid.y, dTid.z, dTid.x
-    );
+    int3x3 matrixVal =
+        int3x3(dTid.x, dTid.y, dTid.z, dTid.z, dTid.x, dTid.y, dTid.y, dTid.z, dTid.x);
     int3x3 matrixSum = WaveMultiPrefixSum(matrixVal, mask);
     int3x3 matrixProduct = WaveMultiPrefixProduct(matrixVal, mask);
     int3x3 matrixBitAnd = WaveMultiPrefixBitAnd(matrixVal, mask);
@@ -143,4 +146,3 @@ void computeMain(uint3 dTid : SV_DispatchThreadID)
 
     outputBuffer[dTid.x] = output;
 }
-

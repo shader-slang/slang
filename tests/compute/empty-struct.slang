@@ -9,13 +9,13 @@ RWStructuredBuffer<float> outputBuffer;
 
 struct Simple
 {
-    float getVal() {return 1.0;}
+    float getVal() { return 1.0; }
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Simple s;
-	float outVal = s.getVal();
-	outputBuffer[dispatchThreadID.x] = outVal;
+    float outVal = s.getVal();
+    outputBuffer[dispatchThreadID.x] = outVal;
 }

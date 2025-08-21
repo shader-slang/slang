@@ -22,11 +22,10 @@ void computeMain()
     // First half of input.
     let a = coopVecLoad<4, int32_t>(inputBuffer, 0);
     // Second half of input.
-    let b = coopVecLoad<4, int32_t>(inputBuffer + 4, 4*4);
+    let b = coopVecLoad<4, int32_t>(inputBuffer + 4, 4 * 4);
 
     // Store second half of input to first half of output buffer.
     b.store(outputBuffer, 0);
     // Store first half of input to second half of output buffer.
-    a.store(outputBuffer, 4*4);
+    a.store(outputBuffer, 4 * 4);
 }
-

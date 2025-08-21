@@ -9,7 +9,7 @@
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     vector<vector<int, 2>, 2> v;
     v.x[0] = 1;

@@ -4,7 +4,9 @@
 
 enum
 {
-    Red,Green,Blue
+    Red,
+    Green,
+    Blue
 }
 
 RWStructuredBuffer<int> buffer;

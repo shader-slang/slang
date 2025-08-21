@@ -20,10 +20,10 @@ int test(int val)
 
     int tmp = 0;
 
-    tmp = tmp*N + gMatrices[val%2][(val  )%3][(val  )%4];
-    tmp = tmp*N + gMatrices[val%2][(val+1)%3][(val  )%4];
-    tmp = tmp*N + gMatrices[val%2][(val  )%3][(val+1)%4];
-    tmp = tmp*N + val;
+    tmp = tmp * N + gMatrices[val % 2][(val) % 3][(val) % 4];
+    tmp = tmp * N + gMatrices[val % 2][(val + 1) % 3][(val) % 4];
+    tmp = tmp * N + gMatrices[val % 2][(val) % 3][(val + 1) % 4];
+    tmp = tmp * N + val;
     tmp = tmp + 0x80000000;
 
     return tmp;
@@ -33,7 +33,7 @@ int test(int val)
 RWStructuredBuffer<int> buffer;
 
 [numthreads(12, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

@@ -30,7 +30,7 @@ void test<let TSize : uint>()
     // BUFFER-NEXT: 3
     outputBuffer[7] = vec.getCount();
 
-    matrix<float, TSize, TSize-1> mat = {};
+    matrix<float, TSize, TSize - 1> mat = {};
 
     // BUFFER-NEXT: 0
     outputBuffer[8] = (int)mat[0][0];
@@ -39,12 +39,13 @@ void test<let TSize : uint>()
     // BUFFER-NEXT: 0
     outputBuffer[10] = (int)mat[2][1];
     // BUFFER-NEXT: 3
-    outputBuffer[11] = mat.getCount();  // this is a bad name, getCount() is actually get the number of row.
+    outputBuffer[11] =
+        mat.getCount(); // this is a bad name, getCount() is actually get the number of row.
 }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     test<3>();
 }

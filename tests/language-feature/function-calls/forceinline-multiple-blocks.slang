@@ -3,11 +3,10 @@ RWStructuredBuffer<int> outputBuffer;
 
 // This tests the following use cases:
 // Inline single block function in multiple places.
-// Inline single block function into multi-block function(This also covers multiple blocks with a phi node.)
-// Inline single block function in multiple places in the same function.
-// Inline multi-block function into another function
-// Inline multi-block function multiple times
-// Recursive inlining use case.
+// Inline single block function into multi-block function(This also covers multiple blocks with a
+// phi node.) Inline single block function in multiple places in the same function. Inline
+// multi-block function into another function Inline multi-block function multiple times Recursive
+// inlining use case.
 
 [ForceInline]
 int calculateAdjustment(int value)
@@ -19,7 +18,7 @@ int calculateAdjustment(int value)
 int inlineMultipleBasicBlocks(int value)
 {
     int result = 0;
-    
+
     result = value * 2;
     result = calculateAdjustment(result);
 
@@ -44,7 +43,7 @@ int inlineMultipleBasicBlocks(int value)
 
     result = value * 10;
     result = calculateAdjustment(result);
-    
+
     if (result < 250)
     {
         result = result + 100;
@@ -54,17 +53,17 @@ int inlineMultipleBasicBlocks(int value)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    
+
     // Call the forceinline function
     int result1 = inlineMultipleBasicBlocks(16);
 
     int result2 = inlineMultipleBasicBlocks(22);
 
     int result3 = calculateAdjustment(2);
-    
+
     outputBuffer[i] = result1 + result2 + result3;
 }
 

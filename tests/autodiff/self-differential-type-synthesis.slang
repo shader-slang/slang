@@ -5,17 +5,19 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// Test that struct types made up of differentiable members who are self-differential (i.e. their Differential type is the same as their type) 
-// are considered self-differential as well. We should be able to assign T.Differential = T and T = T.Differential without errors.
+// Test that struct types made up of differentiable members who are self-differential (i.e. their
+// Differential type is the same as their type) are considered self-differential as well. We should
+// be able to assign T.Differential = T and T = T.Differential without errors.
 // 1
 
-struct Ray : IDifferentiable {
+struct Ray : IDifferentiable
+{
     float a;
     float3 dir, o;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Ray ray = {};
     Ray.Differential ray2;

@@ -7,7 +7,8 @@ layout(binding = 0) uniform accelerationStructureEXT as;
 buffer MyBlockName
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 // CHECK_GLSL-DAG: rayPayloadInEXT
 // CHECK_SPV-DAG: IncomingRayPayload{{NV|KHR}}
@@ -16,7 +17,8 @@ layout(location = 2) rayPayloadInEXT vec4 payload;
 // CHECK_SPV-DAG: HitObjectAttributeNV
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
-bool testVars() {
+bool testVars()
+{
     payload = vec4(1);
     attrMain = vec4(1);
     return true
@@ -24,13 +26,13 @@ bool testVars() {
 // CHECK_SPV-DAG-N: LaunchIdNV
         && gl_LaunchIDNV != uint3(99)
 // CHECK_GLSL-DAG: gl_LaunchIDEXT
-// spirv checked with CHECK_SPV-DAG-N
+           // spirv checked with CHECK_SPV-DAG-N
         && gl_LaunchIDEXT != uint3(99)
 // CHECK_GLSL-DAG: gl_LaunchSizeNV
 // CHECK_SPV-DAG-N: LaunchSizeNV
         && gl_LaunchSizeNV != uint3(99)
 // CHECK_GLSL-DAG: gl_LaunchSizeEXT
-// spirv checked with CHECK_SPV-DAG-N
+           // spirv checked with CHECK_SPV-DAG-N
         && gl_LaunchSizeEXT != uint3(99)
 // CHECK_GLSL-DAG: gl_WorldRayOriginEXT
 // CHECK_SPV-DAG: WorldRayOrigin{{NV|KHR}}

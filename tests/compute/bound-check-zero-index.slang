@@ -25,30 +25,30 @@ RWStructuredBuffer<int> outputBuffer;
 RWStructuredBuffer<int> outputBuffer2;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
-    
-    int fixedArray[3] = { 2, 5, 9};
-    
+    int tid = dispatchThreadID.x;
+
+    int fixedArray[3] = { 2, 5, 9 };
+
     int total = 0;
     total += byteAddressBuffer.Load<int>(tid * 4);
     total += byteAddressBuffer.Load<int>(-tid * 4);
-    
+
     total += rwByteAddressBuffer.Load<int>(tid * 4);
     total += rwByteAddressBuffer.Load<int>(-tid * 4);
-    
+
     total += structuredBuffer[tid];
     total += structuredBuffer[-tid];
-    
+
     total += rwStructuredBuffer[tid];
     total += rwStructuredBuffer[-tid];
-    
+
     total += fixedArray[tid];
     total += fixedArray[-tid];
-    
+
     outputBuffer[tid] = total;
-    
+
     // NOTE! Different threads could access this if being performed in parallel.
     // So undeterministic if we write to same index (because out of range) when running in parallel
     // By just adding one, all indices should be hit once

@@ -20,10 +20,10 @@ cbuffer Test
     uint v0;
 
 //SPIRV: Offset 16
-// struct's always start on a new register
+    //  struct's always start on a new register
     Int_wrapper v1;
 //SPIRV: Offset 24
-// Non-struct can pack with a partially filled register
+    //  Non-struct can pack with a partially filled register
     uint v2;
 };
 
@@ -40,13 +40,14 @@ void computeMain()
     outputBuffer[2] = v1.v0;
     outputBuffer[3] = v1.v1;
     outputBuffer[4] = v2;
-    
-    
+
 
     outputBuffer[0] = (true
             && v0 == 1
             && v1.v0 == 2
             && v1.v1 == 3
             && v2 == 4
-        ) ? 100 : 0;
+                       )
+                          ? 100
+                          : 0;
 }

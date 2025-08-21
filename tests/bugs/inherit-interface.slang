@@ -25,14 +25,14 @@ int doThing<B : IB>(B b, int c)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
     Struct s;
     int v = doThing(s, int(tid));
-    
-	float inVal = float(tid + v);
 
-	outputBuffer[tid] = inVal;
+    float inVal = float(tid + v);
+
+    outputBuffer[tid] = inVal;
 }

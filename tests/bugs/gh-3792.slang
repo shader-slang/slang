@@ -2,11 +2,16 @@
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 
-interface From<X> {
-  __init(const X x);
+interface From<X>
+{
+    __init(const X x);
 }
-extension float: From<float> {
-  __init(const float x) { this = x; }
+extension float : From<float>
+{
+    __init(const float x)
+    {
+        this = x;
+    }
 }
 T test<T : From<float>>(float v)
 {
@@ -16,7 +21,7 @@ T test<T : From<float>>(float v)
 }
 
 RWStructuredBuffer<float> outputBuffer;
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     float v = test<float>(5.0);

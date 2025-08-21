@@ -14,11 +14,12 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-struct MixedSizes {
-    uint8_t a : 4;   // bits 0-3
-    uint8_t b : 4;   // bits 4-7
-    uint16_t c : 8;  // bits 8-15
-    uint16_t d : 8;  // bits 16-23
+struct MixedSizes
+{
+    uint8_t a : 4;  // bits 0-3
+    uint8_t b : 4;  // bits 4-7
+    uint16_t c : 8; // bits 8-15
+    uint16_t d : 8; // bits 16-23
 };
 
 [numthreads(1, 1, 1)]
@@ -33,4 +34,3 @@ void computeMain()
     // With default packing, all fields are in one backing field
     outputBuffer[0] = *((uint*)&m) & 0xFFFFFF; // Mask to 24 bits
 }
-

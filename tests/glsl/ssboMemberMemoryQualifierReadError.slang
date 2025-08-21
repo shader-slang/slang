@@ -5,7 +5,8 @@ volatile buffer MyBlockName1
 {
     readonly uint data2;
     readonly writeonly uint data3;
-} inputBuffer1;
+}
+inputBuffer1;
 
 layout(local_size_x = 1) in;
 void computeMain()

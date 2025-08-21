@@ -39,4 +39,3 @@ VSOutput main(VSInput input)
 
     return output;
 }
-

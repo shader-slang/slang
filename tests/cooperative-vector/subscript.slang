@@ -16,10 +16,10 @@ void computeMain()
 {
     CoopVec<int32_t, 4> vec;
     vec[0] = 2;
-    vec[1] = vec[0]+2;
-    vec[2] = vec[1]+2;
-    vec[3] = vec[2]+2;
+    vec[1] = vec[0] + 2;
+    vec[2] = vec[1] + 2;
+    vec[3] = vec[2] + 2;
 
-    for(int i = 0; i < vec.getCount(); ++i)
+    for (int i = 0; i < vec.getCount(); ++i)
         outputBuffer[i] = vec[i];
 }

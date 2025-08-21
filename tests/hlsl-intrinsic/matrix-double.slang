@@ -1,7 +1,9 @@
 // TODO(JS):
-// It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
+// It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are
+// disabled here.
 // Arguably we should implement simple intrinsics if missing in the core module.
-// More complicated functions (like say sin) can also be written, if not available on a target, but requires significant
+// More complicated functions (like say sin) can also be written, if not available on a target, but
+// requires significant
 // care.
 
 // TODO(JS):
@@ -28,8 +30,8 @@ Float calcTotal(FloatVector v)
     return v.x + v.y;
 }
 
-Float calcTotal(FloatMatrix v) 
-{ 
+Float calcTotal(FloatMatrix v)
+{
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
@@ -49,7 +51,8 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
     unmodified(f);
 
     // fmod
-    ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
+    ft += FloatMatrix(
+        IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
 
     ft += sin(f);
 
@@ -104,7 +107,8 @@ void test1(inout FloatMatrix ft, inout FloatMatrix f, int idx)
 
     {
         float scalarVs[] = { 1, 10, 100, 1000 };
-        ft += FloatMatrix(IntMatrix(log10(makeFloatMatrix(Float(scalarVs[idx]))) + makeFloatMatrix(0.5f)));
+        ft += FloatMatrix(
+            IntMatrix(log10(makeFloatMatrix(Float(scalarVs[idx]))) + makeFloatMatrix(0.5f)));
     }
 
     ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0f));
@@ -127,27 +131,27 @@ void test2(inout FloatMatrix ft, inout FloatMatrix f)
     ft += step(f, makeFloatMatrix(0.5));
 
 #if 0
-    IntMatrix vi = asint(makeFloatMatrix(idx)); 
+    IntMatrix vi = asint(makeFloatMatrix(idx));
     ft += asfloat(vi);
-    
+
     UIntMatrix vu = asuint(f);
     ft += asfloat(vu);
 #endif
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
     Float scalarF = idx * (1.0f / (4.0f));
 
-    FloatMatrix ft = {}; 
+    FloatMatrix ft = {};
 
-    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02}, { scalarF + 0.011, scalarF + 0.022}};
+    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02 }, { scalarF + 0.011, scalarF + 0.022 } };
 
     test1(ft, f, idx);
     test2(ft, f);
-    
+
     outputBuffer[idx] = calcTotal(ft);
 }

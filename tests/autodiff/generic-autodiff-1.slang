@@ -18,17 +18,21 @@ struct A : IInterface
 {
     float z;
     [mutating]
-    float sample() { z = z + 1.0; return 1.0; }
+    float sample()
+    {
+        z = z + 1.0;
+        return 1.0;
+    }
 };
 
 [ForwardDifferentiable]
-float sqr<T:IInterface>(inout T obj, float x)
+float sqr<T : IInterface>(inout T obj, float x)
 {
-    return (no_diff obj.sample()) + x*x;
+    return (no_diff obj.sample()) + x * x;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     A obj;
     obj.z = 0.0;

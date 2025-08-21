@@ -16,7 +16,10 @@ struct DefaultData : IDefaultInitializable
 
 extension DefaultData
 {
-    int someGet() { return val.x; }
+    int someGet()
+    {
+        return val.x;
+    }
 }
 
 int loadDefaultData(DefaultData noInit)
@@ -31,7 +34,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     DefaultData noInit;
     outputBuffer[0] = true
         && loadDefaultData(noInit) == 0;
-        ;
+    ;
     // BUF: 1
     // BUF-NEXT: 1
 }

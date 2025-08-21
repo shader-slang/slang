@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
-// Not supported in WGSL: Arrays of textures or buffers
+//  Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -14,21 +14,21 @@ RWStructuredBuffer<int> outputBuffer;
 
 struct S
 {
-	RWByteAddressBuffer a;
-	RWByteAddressBuffer b;
+    RWByteAddressBuffer a;
+    RWByteAddressBuffer b;
 };
 S s[2];
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
 
-    int val = int(
-          s[0].a.Load(i * 4)
+    int val =
+        int(s[0].a.Load(i * 4)
         + s[1].a.Load(i * 4)*16
         + s[0].b.Load(i * 4)*256
         + s[1].b.Load(i * 4)*4096);
 
-    outputBuffer[i] = val; 
+    outputBuffer[i] = val;
 }

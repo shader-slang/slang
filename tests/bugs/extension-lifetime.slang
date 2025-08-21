@@ -22,20 +22,23 @@
 
 interface IThing
 {
-	float getThing();
+    float getThing();
 }
 
 extension float : IThing
 {
-	float getThing() { return this; }
+    float getThing()
+    {
+        return this;
+    }
 }
 
 float getThing<T : IThing>(T value)
 {
-	return value.getThing();
+    return value.getThing();
 }
 
-float test( float value )
+float test(float value)
 {
-	return getThing(value);
+    return getThing(value);
 }

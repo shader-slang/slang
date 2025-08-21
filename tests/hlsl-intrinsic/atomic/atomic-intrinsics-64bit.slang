@@ -26,7 +26,7 @@ groupshared uint64_t indexAlloc;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
+void computeMain(uint groupIndex: SV_GroupIndex, int3 dispatchThreadID: SV_DispatchThreadID)
 {
     f32Shared = { 0.f, 0.f, 0.f, 0.f };
     u64Shared = { 0, 0, 0, 0 };
@@ -38,16 +38,16 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
     bool result = true;
 
     uint64_t u64Value[9];
-    int64_t  i64Value[9];
-    float    f32Value[9];
+    int64_t i64Value[9];
+    float f32Value[9];
 
     // Add
     InterlockedAdd(u64Shared[idx], uint64_t(1));
-    InterlockedAdd(i64Shared[idx],  int64_t(1));
+    InterlockedAdd(i64Shared[idx], int64_t(1));
     InterlockedAdd(u64Buffer[idx], uint64_t(1));
-    InterlockedAdd(i64Buffer[idx],  int64_t(1));
+    InterlockedAdd(i64Buffer[idx], int64_t(1));
     uBuf.InterlockedAdd64(idx * 8, uint64_t(1));
-    iBuf.InterlockedAdd64(idx * 8,  int64_t(1));
+    iBuf.InterlockedAdd64(idx * 8, int64_t(1));
 
     result = result
         && (u64Shared[idx] == 1)
@@ -60,11 +60,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // Add - original_value
     InterlockedAdd(u64Shared[idx], uint64_t(1), u64Value[0]);
-    InterlockedAdd(i64Shared[idx],  int64_t(1), i64Value[1]);
+    InterlockedAdd(i64Shared[idx], int64_t(1), i64Value[1]);
     InterlockedAdd(u64Buffer[idx], uint64_t(1), u64Value[2]);
-    InterlockedAdd(i64Buffer[idx],  int64_t(1), i64Value[3]);
+    InterlockedAdd(i64Buffer[idx], int64_t(1), i64Value[3]);
     uBuf.InterlockedAdd64(idx * 8, uint64_t(1), u64Value[4]);
-    iBuf.InterlockedAdd64(idx * 8,  int64_t(1), i64Value[5]);
+    iBuf.InterlockedAdd64(idx * 8, int64_t(1), i64Value[5]);
 
     result = result
         && (u64Value[0] == 1)
@@ -158,11 +158,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // Min
     InterlockedMin(u64Shared[idx], uint64_t(1));
-    InterlockedMin(i64Shared[idx],  int64_t(1));
+    InterlockedMin(i64Shared[idx], int64_t(1));
     InterlockedMin(u64Buffer[idx], uint64_t(1));
-    InterlockedMin(i64Buffer[idx],  int64_t(1));
+    InterlockedMin(i64Buffer[idx], int64_t(1));
     uBuf.InterlockedMin64(idx * 8, uint64_t(1));
-    iBuf.InterlockedMin64(idx * 8,  int64_t(1));
+    iBuf.InterlockedMin64(idx * 8, int64_t(1));
 
     result = result
         && (u64Shared[idx] == 1)
@@ -175,11 +175,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // Min - original_value
     InterlockedMin(u64Shared[idx], uint64_t(2), u64Value[0]);
-    InterlockedMin(i64Shared[idx],  int64_t(2), i64Value[1]);
+    InterlockedMin(i64Shared[idx], int64_t(2), i64Value[1]);
     InterlockedMin(u64Buffer[idx], uint64_t(2), u64Value[2]);
-    InterlockedMin(i64Buffer[idx],  int64_t(2), i64Value[3]);
+    InterlockedMin(i64Buffer[idx], int64_t(2), i64Value[3]);
     uBuf.InterlockedMin64(idx * 8, uint64_t(2), u64Value[4]);
-    iBuf.InterlockedMin64(idx * 8,  int64_t(2), i64Value[5]);
+    iBuf.InterlockedMin64(idx * 8, int64_t(2), i64Value[5]);
 
     result = result
         && (u64Value[0] == 1)
@@ -198,11 +198,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // Max
     InterlockedMax(u64Shared[idx], uint64_t(2));
-    InterlockedMax(i64Shared[idx],  int64_t(2));
+    InterlockedMax(i64Shared[idx], int64_t(2));
     InterlockedMax(u64Buffer[idx], uint64_t(2));
-    InterlockedMax(i64Buffer[idx],  int64_t(2));
+    InterlockedMax(i64Buffer[idx], int64_t(2));
     uBuf.InterlockedMax64(idx * 8, uint64_t(2));
-    iBuf.InterlockedMax64(idx * 8,  int64_t(2));
+    iBuf.InterlockedMax64(idx * 8, int64_t(2));
 
     result = result
         && (u64Shared[idx] == 2)
@@ -215,11 +215,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // Max - original_value
     InterlockedMax(u64Shared[idx], uint64_t(0), u64Value[0]);
-    InterlockedMax(i64Shared[idx],  int64_t(0), i64Value[1]);
+    InterlockedMax(i64Shared[idx], int64_t(0), i64Value[1]);
     InterlockedMax(u64Buffer[idx], uint64_t(0), u64Value[2]);
-    InterlockedMax(i64Buffer[idx],  int64_t(0), i64Value[3]);
+    InterlockedMax(i64Buffer[idx], int64_t(0), i64Value[3]);
     uBuf.InterlockedMax64(idx * 8, uint64_t(0), u64Value[4]);
-    iBuf.InterlockedMax64(idx * 8,  int64_t(0), i64Value[5]);
+    iBuf.InterlockedMax64(idx * 8, int64_t(0), i64Value[5]);
 
     result = result
         && (u64Value[0] == 2)
@@ -237,15 +237,15 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
         ;
 
     // Exchange
-    InterlockedExchange(f32Shared[idx],    float(1), f32Value[0]);
+    InterlockedExchange(f32Shared[idx], float(1), f32Value[0]);
     InterlockedExchange(u64Shared[idx], uint64_t(1), u64Value[1]);
-    InterlockedExchange(i64Shared[idx],  int64_t(1), i64Value[2]);
-    InterlockedExchange(f32Buffer[idx],    float(1), f32Value[3]);
+    InterlockedExchange(i64Shared[idx], int64_t(1), i64Value[2]);
+    InterlockedExchange(f32Buffer[idx], float(1), f32Value[3]);
     InterlockedExchange(u64Buffer[idx], uint64_t(1), u64Value[4]);
-    InterlockedExchange(i64Buffer[idx],  int64_t(1), i64Value[5]);
+    InterlockedExchange(i64Buffer[idx], int64_t(1), i64Value[5]);
     fBuf.InterlockedExchangeFloat(idx * 8, float(1), f32Value[6]);
     uBuf.InterlockedExchange64(idx * 8, uint64_t(1), u64Value[7]);
-    iBuf.InterlockedExchange64(idx * 8,  int64_t(1), i64Value[8]);
+    iBuf.InterlockedExchange64(idx * 8, int64_t(1), i64Value[8]);
 
     result = result
         && (f32Value[0] == 0)
@@ -270,11 +270,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // CompareStore
     InterlockedCompareStore(u64Shared[idx], uint64_t(1), uint64_t(0));
-    InterlockedCompareStore(i64Shared[idx],  int64_t(1),  int64_t(0));
+    InterlockedCompareStore(i64Shared[idx], int64_t(1), int64_t(0));
     InterlockedCompareStore(u64Buffer[idx], uint64_t(1), uint64_t(0));
-    InterlockedCompareStore(i64Buffer[idx],  int64_t(1),  int64_t(0));
+    InterlockedCompareStore(i64Buffer[idx], int64_t(1), int64_t(0));
     uBuf.InterlockedCompareStore64(idx * 8, uint64_t(1), uint64_t(0));
-    iBuf.InterlockedCompareStore64(idx * 8,  int64_t(1),  int64_t(0));
+    iBuf.InterlockedCompareStore64(idx * 8, int64_t(1), int64_t(0));
 
     result = result
         && (u64Shared[idx] == 0)
@@ -288,7 +288,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
     // CompareStoreFloatBitwise
     InterlockedCompareStoreFloatBitwise(f32Shared[idx], float(1), float(0));
     InterlockedCompareStoreFloatBitwise(f32Buffer[idx], float(1), float(0));
-    fBuf.InterlockedCompareStoreFloatBitwise(idx * 8,   float(1), float(0));
+    fBuf.InterlockedCompareStoreFloatBitwise(idx * 8, float(1), float(0));
 
     result = result
         && (f32Shared[idx] == float(0))
@@ -298,11 +298,11 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 
     // CompareExchange
     InterlockedCompareExchange(u64Shared[idx], uint64_t(0), uint64_t(1), u64Value[0]);
-    InterlockedCompareExchange(i64Shared[idx],  int64_t(0),  int64_t(1), i64Value[1]);
+    InterlockedCompareExchange(i64Shared[idx], int64_t(0), int64_t(1), i64Value[1]);
     InterlockedCompareExchange(u64Buffer[idx], uint64_t(0), uint64_t(1), u64Value[2]);
-    InterlockedCompareExchange(i64Buffer[idx],  int64_t(0),  int64_t(1), i64Value[3]);
+    InterlockedCompareExchange(i64Buffer[idx], int64_t(0), int64_t(1), i64Value[3]);
     uBuf.InterlockedCompareExchange64(idx * 8, uint64_t(0), uint64_t(1), u64Value[4]);
-    iBuf.InterlockedCompareExchange64(idx * 8,  int64_t(0),  int64_t(1), i64Value[5]);
+    iBuf.InterlockedCompareExchange64(idx * 8, int64_t(0), int64_t(1), i64Value[5]);
 
     result = result
         && (u64Value[0] == 0)
@@ -322,7 +322,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
     // CompareExchangeFloatBitwise
     InterlockedCompareExchangeFloatBitwise(f32Shared[idx], float(0), float(1), f32Value[0]);
     InterlockedCompareExchangeFloatBitwise(f32Buffer[idx], float(0), float(1), f32Value[1]);
-    fBuf.InterlockedCompareExchangeFloatBitwise(idx * 8,   float(0), float(1), f32Value[2]);
+    fBuf.InterlockedCompareExchangeFloatBitwise(idx * 8, float(0), float(1), f32Value[2]);
 
     result = result
         && (f32Value[0] == float(0))

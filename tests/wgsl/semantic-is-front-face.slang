@@ -3,7 +3,8 @@
 //WGSL-DAG: @builtin(front_facing)
 //WGSL-DAG: @fragment
 
-float4 main(bool isFront : SV_IsFrontFace) : SV_Target 
+float4 main(bool isFront: SV_IsFrontFace)
+    : SV_Target
 {
-    return float4(1,1,1,1);
+    return float4(1, 1, 1, 1);
 }

@@ -7,13 +7,13 @@ Sampler2D<float> t2D;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     float u = idx * (1.0f / 4);
-    
+
     float val = 0.0f;
-   
+
     val += t2D.SampleLevel(float2(u, u), 0);
 
     outputBuffer[idx] = val;

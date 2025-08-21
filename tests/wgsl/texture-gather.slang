@@ -68,7 +68,7 @@ TextureCubeArray<uint4> tCubeArray_u32v4;
 
 // depth
 
-__generic<let sampleCount:int=0, let format:int=0>
+__generic<let sampleCount : int = 0, let format : int = 0>
 typealias Depth2D = _Texture<
     float,
     __Shape2D,
@@ -78,10 +78,9 @@ typealias Depth2D = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<let sampleCount:int=0, let format:int=0>
+__generic<let sampleCount : int = 0, let format : int = 0>
 typealias Depth2DArray = _Texture<
     float,
     __Shape2D,
@@ -91,10 +90,9 @@ typealias Depth2DArray = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<let sampleCount:int=0, let format:int=0>
+__generic<let sampleCount : int = 0, let format : int = 0>
 typealias DepthCube = _Texture<
     float,
     __ShapeCube,
@@ -104,10 +102,9 @@ typealias DepthCube = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
-__generic<let sampleCount:int=0, let format:int=0>
+__generic<let sampleCount : int = 0, let format : int = 0>
 typealias DepthCubeArray = _Texture<
     float,
     __ShapeCube,
@@ -117,8 +114,7 @@ typealias DepthCubeArray = _Texture<
     0, // access
     1, // isShadow
     0, // isCombined
-    format
->;
+    format>;
 
 //TEST_INPUT: Texture2D(size=4, content = zero):name d2D
 Depth2D d2D;
@@ -140,19 +136,19 @@ bool TEST_textureGather<T>(
     TextureCube<T> tCube,
     Texture2DArray<T> t2DArray,
     TextureCubeArray<T> tCubeArray)
-    where T:IArithmetic,ITexelElement
+    where T : IArithmetic, ITexelElement
 {
     // WGSL-LABEL: TEST_textureGather
-    typealias Tv4 = vector<T.Element,4>;
+    typealias Tv4 = vector<T.Element, 4>;
 
     float u = 0;
     float u2 = 0.5;
 
     return true
-        // ==================================
-        // vector<T,4> Gather()
-        // https://www.w3.org/TR/WGSL/#texturegather
-        // ==================================
+           // ==================================
+           // vector<T,4> Gather()
+           // https://www.w3.org/TR/WGSL/#texturegather
+           // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2D
         && all(Tv4(T.Element(0)) == t2D.Gather(samplerState, float2(u, u)))
@@ -168,9 +164,9 @@ bool TEST_textureGather<T>(
         // WGSL: textureGather({{.*}}0{{.*}}tCubeArray
         && all(Tv4(T.Element(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
-        // ==================================
-        // vector<T,4> GatherRed()
-        // ==================================
+           // ==================================
+           // vector<T,4> GatherRed()
+           // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}0{{.*}}t2D
         && all(Tv4(T.Element(0)) == t2D.GatherRed(samplerState, float2(u, u)))
@@ -186,9 +182,9 @@ bool TEST_textureGather<T>(
         // WGSL: textureGather({{.*}}0{{.*}}tCubeArray
         && all(Tv4(T.Element(0)) == tCubeArray.GatherRed(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
-        // ==================================
-        // vector<T,4> GatherGreen()
-        // ==================================
+           // ==================================
+           // vector<T,4> GatherGreen()
+           // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}1{{.*}}t2D
         && all(Tv4(T.Element(0)) == t2D.GatherGreen(samplerState, float2(u, u)))
@@ -204,9 +200,9 @@ bool TEST_textureGather<T>(
         // WGSL: textureGather({{.*}}1{{.*}}tCubeArray
         && all(Tv4(T.Element(0)) == tCubeArray.GatherGreen(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
-        // ==================================
-        // vector<T,4> GatherBlue()
-        // ==================================
+           // ==================================
+           // vector<T,4> GatherBlue()
+           // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}2{{.*}}t2D
         && all(Tv4(T.Element(0)) == t2D.GatherBlue(samplerState, float2(u, u)))
@@ -222,9 +218,9 @@ bool TEST_textureGather<T>(
         // WGSL: textureGather({{.*}}2{{.*}}tCubeArray
         && all(Tv4(T.Element(0)) == tCubeArray.GatherBlue(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
-        // ==================================
-        // vector<T,4> GatherAlpha()
-        // ==================================
+           // ==================================
+           // vector<T,4> GatherAlpha()
+           // ==================================
 
         // WGSL-COUNT-2: textureGather({{.*}}3{{.*}}t2D
         && all(Tv4(T.Element(0)) == t2D.GatherAlpha(samplerState, float2(u, u)))
@@ -250,10 +246,10 @@ bool TEST_textureGather_depth()
     float depthCompare = 0.5f;
 
     return true
-        // ==================================
-        // vector<T,4> Gather()
-        // https://www.w3.org/TR/WGSL/#texturegather
-        // ==================================
+           // ==================================
+           // vector<T,4> Gather()
+           // https://www.w3.org/TR/WGSL/#texturegather
+           // ==================================
 
         // WGSL-COUNT-10: textureGather({{\(*}}d2D
         && all(float4(0) == d2D.Gather     (samplerState, float2(u, u)))
@@ -293,10 +289,10 @@ bool TEST_textureGather_depth()
         && all(float4(0) == dCubeArray.GatherBlue (samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
         && all(float4(0) == dCubeArray.GatherAlpha(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
-        // ==================================
-        // vector<T,4> GatherCmp()
-        // https://www.w3.org/TR/WGSL/#texturegathercompare
-        // ==================================
+           // ==================================
+           // vector<T,4> GatherCmp()
+           // https://www.w3.org/TR/WGSL/#texturegathercompare
+           // ==================================
 
         // WGSL-COUNT-2: textureGatherCompare({{\(*}}d2D
         && all(float4(0) == d2D.GatherCmp(depthSampler, float2(u, u), depthCompare))
@@ -317,7 +313,8 @@ bool TEST_textureGather_depth()
 
 void fragMain()
 {
-    bool result = true
+    bool result =
+        true
         && TEST_textureGather<float3>(t2D_f32v3, tCube_f32v3, t2DArray_f32v3, tCubeArray_f32v3)
         && TEST_textureGather<float4>(t2D_f32v4, tCube_f32v4, t2DArray_f32v4, tCubeArray_f32v4)
         && TEST_textureGather<int32_t3>(t2D_i32v3, tCube_i32v3, t2DArray_i32v3, tCubeArray_i32v3)

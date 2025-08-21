@@ -1,13 +1,13 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx11 -compute  -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute  -output-using-type
 
-interface TestInterface {
+interface TestInterface
+{
     float sample();
 }
-struct TestImplementation : TestInterface {
-    float sample() {
-        return 1.0f;
-    }
+struct TestImplementation : TestInterface
+{
+    float sample() { return 1.0f; }
 };
 
 //TEST_INPUT: set inBuffer = new StructuredBuffer<TestInterface>[new TestImplementation{}];

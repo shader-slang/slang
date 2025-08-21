@@ -4,7 +4,7 @@
 
 Lets see if we can do something with a built in type
 
-Doesn't work because 
+Doesn't work because
 
 error 30052: invalid swizzle pattern 'getType' on type 'int'
     let type = i.getType();
@@ -19,30 +19,31 @@ enum class Type
     Unknown,
     Float,
     Int,
-};
+}
+;
 
 interface IHasType
 {
     Type getType()
 };
 
-extension int : IHasType
-{
-    Type getType() { return Type::Int; }
-};
+extension int : IHasType { Type getType() { return Type::Int;
+}
+}
+;
 
-extension float : IHasType
-{
-    Type getType() { return Type::Float; }
-};
+extension float : IHasType { Type getType() { return Type::Float;
+}
+}
+;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
     int i;
     let type = i.getType();
-    
+
     outputBuffer[dispatchThreadID.x] = int(type);
 }

@@ -7,7 +7,7 @@
 
 struct RNG
 {
-	uint state[2];
+    uint state[2];
 }
 
 void jump(inout RNG rng)

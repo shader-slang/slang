@@ -10,23 +10,23 @@ RWStructuredBuffer<int> outputBuffer;
 // SPIRV: OpSelectionMerge {{.*}} Flatten
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     int v = idx;
-    
+
     [branch]
     if (idx != 0)
     {
         ++v;
     }
-    
+
     [flatten]
     if (idx > 2)
     {
         v += v;
     }
 
-	outputBuffer[dispatchThreadID.x] = v;
+    outputBuffer[dispatchThreadID.x] = v;
 }

@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* Find max algorithm. 
+/* Find max algorithm.
 
 Doesn't work because, can't compare T as it is any type.
 
@@ -29,13 +29,11 @@ T findMax<T, let SIZE : int>(T arr[SIZE])
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
-    int values[] = { 1, 3, - 1};
-    
-	outputBuffer[index] = findMax(values);
+    int values[] = { 1, 3, -1 };
+
+    outputBuffer[index] = findMax(values);
 }
-
-

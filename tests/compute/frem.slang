@@ -11,8 +11,8 @@ RWStructuredBuffer<float> gInput;
 
 int test(int inVal)
 {
-    float a = gInput[inVal*2];
-    float b = gInput[inVal*2 + 1];
+    float a = gInput[inVal * 2];
+    float b = gInput[inVal * 2 + 1];
     return int(a % b);
 }
 
@@ -21,10 +21,10 @@ RWStructuredBuffer<float> outputBuffer;
 
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
-	int inVal = tid;
-	int outVal = test(inVal);
-	outputBuffer[tid] = outVal;
+    int tid = dispatchThreadID.x;
+    int inVal = tid;
+    int outVal = test(inVal);
+    outputBuffer[tid] = outVal;
 }

@@ -9,7 +9,7 @@ Buffer<uint> inputBuffer;
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dtid : SV_DispatchThreadID)
+void computeMain(uint3 dtid: SV_DispatchThreadID)
 {
     uint idx = dtid.x;
     // Load values from the buffer to verify correct access

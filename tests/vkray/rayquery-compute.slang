@@ -4,13 +4,13 @@
 RaytracingAccelerationStructure accelerationStructure;
 
 [numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	RayQuery<RAY_FLAG_NONE> rayQuery;
+    RayQuery<RAY_FLAG_NONE> rayQuery;
 
-	uint instanceInclusionMask = 0x00;
-	RayDesc rayDesc;
-	rayQuery.TraceRayInline(accelerationStructure, RAY_FLAG_NONE, instanceInclusionMask, rayDesc);
+    uint instanceInclusionMask = 0x00;
+    RayDesc rayDesc;
+    rayQuery.TraceRayInline(accelerationStructure, RAY_FLAG_NONE, instanceInclusionMask, rayDesc);
 }
 
 // CHECK: OpCapability RayQueryKHR

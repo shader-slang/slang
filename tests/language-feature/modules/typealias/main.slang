@@ -10,7 +10,7 @@ import lib;
 //TEST_INPUT:set output = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<i32> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 0

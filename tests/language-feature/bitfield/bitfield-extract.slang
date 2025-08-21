@@ -48,10 +48,13 @@ void computeMain()
 
         // Sign extension case
         //  - For unsigned data types, the most significant bits of the result will be set to zero.
-        //  - For signed data types, the most significant bits will be set to the value of bit offset + base - 1
+        //  - For signed data types, the most significant bits will be set to the value of bit
+        //  offset + base - 1
         //    (i.e., it is sign extended to the width of the return type).
-        i32Buffer[10] = bitfieldExtract(0b1010111, 3, 4);  // 0b1010 -> 0b11111111111111111111111111111010
-        i32Buffer[11] = bitfieldExtract(0b1010111u, 3, 4); // 0b1111 -> 0b00000000000000000000000000001010
+        i32Buffer[10] =
+            bitfieldExtract(0b1010111, 3, 4); // 0b1010 -> 0b11111111111111111111111111111010
+        i32Buffer[11] =
+            bitfieldExtract(0b1010111u, 3, 4); // 0b1111 -> 0b00000000000000000000000000001010
 
         // Component-wise extraction
         int4 val4 = int4(0x12345678, 0x9abcdef0, 0x87654321, 0xfedcba98);

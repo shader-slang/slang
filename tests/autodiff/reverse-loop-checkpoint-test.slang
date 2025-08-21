@@ -78,13 +78,13 @@ float3 computeLoop(float y)
 // CHECK-NOT: struct {{[a-zA-Z0-9_]*}}test_simple_loop{{[a-zA-Z0-9_]*}}
 [BackwardDifferentiable]
 float test_simple_loop(float y)
-{  
+{
     float3 x = computeLoop(y);
     return y + x.x;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(1.0, 0.0);

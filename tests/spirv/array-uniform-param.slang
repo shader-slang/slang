@@ -31,8 +31,8 @@ cbuffer Uniforms
 
 // BUFFER: 3
 
-[numthreads(4,1,1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint threadId = dispatchThreadID.x;
     uint result = d.arr[1];

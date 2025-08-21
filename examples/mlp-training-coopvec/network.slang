@@ -11,12 +11,12 @@ public struct MyNetwork
     [Differentiable]
     internal MLVec<4> encodeInput(NFloat x, NFloat y)
     {
-        return MLVec<4>.fromArray({
-                x,
-                y,
-                x*x,
-                y*y,
-            });
+        return MLVec<4>.fromArray( {
+            x,
+            y,
+            x * x,
+            y * y,
+        });
     }
 
     [Differentiable]
@@ -55,4 +55,3 @@ public half4 groundtruth(half x, half y)
         x + 0.5 * y * y,
     };
 }
-

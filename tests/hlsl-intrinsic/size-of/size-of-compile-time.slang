@@ -19,18 +19,26 @@ struct AlignThing<T>
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const int idx = asint(dispatchThreadID.x);
 
     int size = 0;
-    
+
     switch (idx)
-    {   
-        case 0: size = sizeof(Thing<float>); break;
-        case 1: size = sizeof(Thing<float3>); break;
-        case 2: size = sizeof(AlignThing<float>); break;
-        case 3: size = sizeof(AlignThing<float3>); break;
+    {
+    case 0:
+        size = sizeof(Thing<float>);
+        break;
+    case 1:
+        size = sizeof(Thing<float3>);
+        break;
+    case 2:
+        size = sizeof(AlignThing<float>);
+        break;
+    case 3:
+        size = sizeof(AlignThing<float3>);
+        break;
     }
 
     // CHECK: 4

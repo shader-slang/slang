@@ -3,6 +3,6 @@
 
 public struct MaterialPayload
 {
-	public float4 albedo;
-	public float2 uv;
+    public float4 albedo;
+    public float2 uv;
 };

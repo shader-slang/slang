@@ -18,7 +18,7 @@ struct Test
     {
         int a[kArraySize] = {};
 
-        for(int i = 0; i < kArraySize; ++i)
+        for (int i = 0; i < kArraySize; ++i)
             a[i] = i;
 
         return val * 16 + a[val];
@@ -33,7 +33,7 @@ int globalFunc(int val)
 {
     int a[Test.kArraySize] = {};
 
-    for(int i = 0; i < Test::kArraySize; ++i)
+    for (int i = 0; i < Test::kArraySize; ++i)
         a[i] = i;
 
     return val * 16 + a[val];
@@ -50,7 +50,7 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     int inVal = tid;

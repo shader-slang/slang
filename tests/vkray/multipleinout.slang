@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -stage closesthit -entry main -target spirv -emit-spirv-directly
 
-// This test checks whether the spirv generated when there are multiple inout or out variables, they 
+// This test checks whether the spirv generated when there are multiple inout or out variables, they
 // all get consolidated into one IncomingRayPayloadKHR.
 
 struct ReflectionRay

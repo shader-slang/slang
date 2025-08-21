@@ -26,11 +26,12 @@ struct VIn
 struct VSOutput
 {
     uint instanceID : SV_InstanceID;
-	float4 color : COLOR;
+    float4 color : COLOR;
 };
 
 [shader("vertex")]
-VSOutput vmain(VIn vin) {
+VSOutput vmain(VIn vin)
+{
     VSOutput t;
     t.instanceID = vin.instanceID;
     t.color = float4(0, 0, 0, 0);
@@ -38,7 +39,8 @@ VSOutput vmain(VIn vin) {
 }
 
 [shader("pixel")]
-float4 pmain(VSOutput input) : SV_TARGET
+float4 pmain(VSOutput input)
+    : SV_TARGET
 {
-	return float4(float(input.instanceID), input.color.xyz);
+    return float4(float(input.instanceID), input.color.xyz);
 }

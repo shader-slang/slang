@@ -16,7 +16,7 @@ static const float fNEG_ONE = -1.0f;
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint testIndex = 0;
 

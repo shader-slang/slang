@@ -30,7 +30,13 @@ using namespace linalg;
 void computeMain()
 {
     let stride = 16;
-    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
+    let mat = coopMatLoad<
+        int32_t,
+        MemoryScope.Subgroup,
+        16,
+        16,
+        CoopMatMatrixUse.MatrixAccumulator,
+        CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
     let result = mat.Transpose();
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
 }

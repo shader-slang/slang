@@ -29,7 +29,7 @@ float outerF(A x)
     nx.x = 1.0;
     for (int i = 0; i < 2; i++)
         nx.x = nx.x * x.x;
-    nx.nx = 2;//x.nx;
+    nx.nx = 2; // x.nx;
     return f(nx);
 }
 
@@ -44,7 +44,7 @@ float df(A x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Given f(x) = x^4,
     // f''(x) = 12 * x^2

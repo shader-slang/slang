@@ -7,11 +7,13 @@
 // CHECK: OpDecorate %entryPointParam_vertMain_a_value Location 0
 // CHECK: OpDecorate %entryPointParam_vertMain_a_hasValue Location 1
 
-struct VIn {
+struct VIn
+{
     Optional<float> inA;
 }
 
-struct VSOut {
+struct VSOut
+{
     Optional<float> a;
     bool outputValues[3];
 };

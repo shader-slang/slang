@@ -13,5 +13,5 @@
 
 float4 vertexMain()
 {
-    return float4(1,1,1,1);
+    return float4(1, 1, 1, 1);
 }

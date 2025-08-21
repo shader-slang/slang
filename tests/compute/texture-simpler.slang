@@ -16,7 +16,7 @@ SamplerState samplerState;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     float u = i * 0.25;
     outputBuffer[i] = t2D.SampleLevel(samplerState, float2(u, u), 0);

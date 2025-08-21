@@ -26,18 +26,13 @@ RWByteAddressBuffer output;
 void computeMain()
 {
     CoopVec<half, 4> vecA;
-    for(int i = 0; i < vecA.getCount(); ++i)
-        vecA[i] = half(i+1);
+    for (int i = 0; i < vecA.getCount(); ++i)
+        vecA[i] = half(i + 1);
 
     output.Store(0, half(111));
 
-    coopVecReduceSumAccumulate(
-        vecA,
-        output,
-        0,
-    );
+    coopVecReduceSumAccumulate(vecA, output, 0, );
 
-    for(int i = 0; i < vecA.getCount(); ++i)
+    for (int i = 0; i < vecA.getCount(); ++i)
         outputBuffer[i] = output.Load<half>(i * 2);
 }
-

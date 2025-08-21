@@ -8,30 +8,27 @@ interface IFoo<int v>
     float getVal(float x);
 
     [Differentiable]
-    float getGreaterVal<int y>(float x)
-    {
-        return getVal(x) + y + v;
-    }
+    float getGreaterVal<int y>(float x) { return getVal(x) + y + v; }
 }
 
 struct Impl : IFoo<2>
 {
     [Differentiable]
-    float getVal(float x)
-    {
-        return x*x;
-    }
-    
+    float getVal(float x) { return x * x; }
+
     // Using the default implementation for getGreaterVal.
 }
 
 [Differentiable]
-float test<int y, T:IFoo<y>>(T v, float x) { return v.getGreaterVal<1>(x); }
+float test<int y, T : IFoo<y>>(T v, float x)
+{
+    return v.getGreaterVal<1>(x);
+}
 
 //TEST_INPUT: set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> resultBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Impl impl = {};

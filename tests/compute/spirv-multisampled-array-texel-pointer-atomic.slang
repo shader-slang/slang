@@ -17,11 +17,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     uint prevVal;
 //CHECK: %{{.*}} = OpImageTexelPointer %{{.*}} %{{.*}} %{{.*}} %int_1
     InterlockedExchange(rwTexture2DMSArray[loc, 1], 3, prevVal);
-    outputBuffer[0] = uint(true
+    outputBuffer[0] = uint(
+        true
             && rwTexture2DMSArray[loc, 1] == 3
             && rwTexture2DMSArray[loc, 0] == 0
             && prevVal == 0
-            );
+    );
 }
 
 //BUF: 1

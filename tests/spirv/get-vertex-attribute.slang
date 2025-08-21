@@ -9,7 +9,8 @@ struct VertexOutput
 }
 
 [shader("fragment")]
-float4 fsmain(VertexOutput vout) : SV_Target
+float4 fsmain(VertexOutput vout)
+    : SV_Target
 {
     return GetAttributeAtVertex(vout.vertexID, 0);
 }

@@ -8,20 +8,22 @@
 // CHECK_ERROR: warning 36112
 // CHECK-NOT: warning 36112
 
-struct CameraProperties {
+struct CameraProperties
+{
     float4x4 MVP;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<CameraProperties> Cam;
 
-struct VSOutput {
+struct VSOutput
+{
     float4 PositionCS : SV_POSITION;
-    float3 Color      : COLOR;
+    float3 Color : COLOR;
 };
 
 [shader("vertex")]
-VSOutput vsmain(float3 PositionOS : POSITION, float3 Color : COLOR0)
+VSOutput vsmain(float3 PositionOS: POSITION, float3 Color: COLOR0)
 {
     VSOutput output = (VSOutput)0;
     output.PositionCS = mul(Cam.MVP, float4(PositionOS, 1));
@@ -30,7 +32,8 @@ VSOutput vsmain(float3 PositionOS : POSITION, float3 Color : COLOR0)
 }
 
 [shader("pixel")]
-float4 psmain(VSOutput input) : SV_TARGET
+float4 psmain(VSOutput input)
+    : SV_TARGET
 {
-    return float4(input.Color, 1);   
+    return float4(input.Color, 1);
 }

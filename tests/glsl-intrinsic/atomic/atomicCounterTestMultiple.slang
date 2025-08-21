@@ -5,16 +5,17 @@
 buffer MyBlockName
 {
     uint data[1];
-} outputBuffer;
+}
+outputBuffer;
 
-layout(binding = 1, offset = 12) uniform atomic_uint one; 
-layout(binding = 1) uniform atomic_uint two; 
+layout(binding = 1, offset = 12) uniform atomic_uint one;
+layout(binding = 1) uniform atomic_uint two;
 
 // Layout qualifiers can be specified in any order.
-layout(offset = 4, binding = 1) uniform atomic_uint three; 
+layout(offset = 4, binding = 1) uniform atomic_uint three;
 
-layout(binding = 1) uniform atomic_uint four; 
-layout(binding = 2) uniform atomic_uint five; 
+layout(binding = 1) uniform atomic_uint four;
+layout(binding = 2) uniform atomic_uint five;
 
 void computeMain()
 {
@@ -30,7 +31,6 @@ void computeMain()
         && atomicCounter(four) == 0
 // CHECK_GLSL: five_0._data_{{.*}}[0]
         && atomicCounter(five) == 0
-        
-        ;
 
+        ;
 }

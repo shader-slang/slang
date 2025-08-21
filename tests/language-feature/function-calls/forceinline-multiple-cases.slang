@@ -14,7 +14,7 @@ int basicBlockFunc(int value1, int value2)
 int multipleBlockFunc(int value1, int value2)
 {
     int result = value1 * 2;
-    
+
     // Add a condition to create multiple basic blocks
     if (value1 > value2)
     {
@@ -24,7 +24,7 @@ int multipleBlockFunc(int value1, int value2)
     {
         result -= value2;
     }
-    
+
     return result;
 }
 
@@ -50,24 +50,25 @@ int testMultipleBlockCalls()
 int testBasicBlockWithInstructions()
 {
     int result = basicBlockFunc(10, 5);
-    
+
     // Some other instructions
     result *= 2;
     result += 10;
-    
+
     result += basicBlockFunc(20, 15);
     return result;
 }
 
-// Test case d: One call to multiple block func, other instructions, another call to multiple block func
+// Test case d: One call to multiple block func, other instructions, another call to multiple block
+// func
 int testMultipleBlockWithInstructions()
 {
     int result = multipleBlockFunc(10, 5);
-    
+
     // Some other instructions
     result *= 2;
     result += 10;
-    
+
     result += multipleBlockFunc(20, 25);
     return result;
 }
@@ -76,11 +77,11 @@ int testMultipleBlockWithInstructions()
 int testBasicToMultipleBlock()
 {
     int result = basicBlockFunc(10, 5);
-    
+
     // Some other instructions
     result *= 2;
     result += 10;
-    
+
     result += multipleBlockFunc(20, 25);
     return result;
 }
@@ -101,28 +102,29 @@ int testMixedCallsWithCondition()
 }
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // Call all test functions directly and store results in different indices
-    
+
     // Test case a: Multiple calls to basic block function
     outputBuffer[0] = testMultipleBasicBlockCalls();
-    
+
     // Test case b: Multiple calls to multiple block function
     outputBuffer[1] = testMultipleBlockCalls();
-    
+
     // Test case c: One call to basic block, other instructions, another call to basic block
     outputBuffer[2] = testBasicBlockWithInstructions();
-    
-    // Test case d: One call to multiple block func, other instructions, another call to multiple block func
+
+    // Test case d: One call to multiple block func, other instructions, another call to multiple
+    // block func
     outputBuffer[3] = testMultipleBlockWithInstructions();
-    
+
     // Test case e: One call to basic block, other instructions, call to multiple block
     outputBuffer[4] = testBasicToMultipleBlock();
-    
+
     // Additional test case: Mixed calls with condition
     outputBuffer[5] = testMixedCallsWithCondition();
-    
+
     // Set any remaining indices to 0
     if (dispatchThreadID.x >= 6)
     {
@@ -135,7 +137,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-COUNT-28: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 
-// TODO: Verified manually that the count in the .actual file is 28. 
+// TODO: Verified manually that the count in the .actual file is 28.
 // But the pattern matcher complains to match.
 // _CHECK-COUNT-28: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
 // _CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope

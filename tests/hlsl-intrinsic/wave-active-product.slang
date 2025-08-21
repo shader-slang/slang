@@ -11,10 +11,10 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const int idx = int(dispatchThreadID.x);
-       
+
 #if 1
     if (idx < 3)
     {
@@ -25,7 +25,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[idx] = WaveActiveProduct(idx);
 #else
 
-    /// NOTE! Can't say I totally understand WaveActiveProduct. 
+    /// NOTE! Can't say I totally understand WaveActiveProduct.
     /// The following returns 0x240 on CUDA - which is what I'd expect
     /// On DX12, it returns 0
 

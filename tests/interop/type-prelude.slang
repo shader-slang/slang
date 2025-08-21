@@ -5,10 +5,7 @@
 __target_intrinsic(cpp, "Foo")
 struct Foo
 {
-    int test()
-    {
-        __intrinsic_asm "(PRELUDE)";
-    }
+    int test() { __intrinsic_asm "(PRELUDE)"; }
 }
 
 export __extern_cpp int main()

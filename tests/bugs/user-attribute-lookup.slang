@@ -10,24 +10,27 @@ RWStructuredBuffer<int> outputBuffer;
 
 // Define an attribute that will appear in reflection
 [__AttributeUsage(_AttributeTargets.Var)]
-struct StaticSamplerAttribute {};
+struct StaticSamplerAttribute
+{
+};
 
 struct Thing
 {
-    [StaticSampler] SamplerState samplerState1;
-    [StaticSampler] SamplerState samplerState2;
+    [StaticSampler]
+    SamplerState samplerState1;
+    [StaticSampler]
+    SamplerState samplerState2;
 }
 
-[StaticSampler] SamplerState samplerState;
+[StaticSampler]
+SamplerState samplerState;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
-	float inVal = float(tid);
+    float inVal = float(tid);
 
-	outputBuffer[tid] = int(inVal);
+    outputBuffer[tid] = int(inVal);
 }
-
-

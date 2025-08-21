@@ -115,13 +115,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat3 dpmin = dpfloat3(float3(1.0, 1.0, 1.0), float3(0.3, 0.3, 0.3));
 
         dpfloat3 res = fwd_diff(_clamp_equiv)(dpx, dpmin, dpmax);
-        outputBuffer[9] = res.d.x; // Expected: 0.1
+        outputBuffer[9] = res.d.x;  // Expected: 0.1
         outputBuffer[10] = res.d.y; // Expected: 0.3
         outputBuffer[11] = res.d.z; // Expected: 0.2
     }
 
     // Reverse-mode tests.
-    
+
     // x in between max and min
     {
         dpfloat dpx = dpfloat(2.0, 0.0);
@@ -129,8 +129,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpmin = dpfloat(1.0, 0.0);
 
         bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
-        
-        outputBuffer[12] = dpx.d; // Expected: 1.0
+
+        outputBuffer[12] = dpx.d;   // Expected: 1.0
         outputBuffer[13] = dpmin.d; // Expected: 0.0
         outputBuffer[14] = dpmax.d; // Expected: 0.0
     }
@@ -142,8 +142,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpmin = dpfloat(1.0, 0.0);
 
         bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
-        
-        outputBuffer[15] = dpx.d; // Expected: 0.0
+
+        outputBuffer[15] = dpx.d;   // Expected: 0.0
         outputBuffer[16] = dpmin.d; // Expected: 1.0
         outputBuffer[17] = dpmax.d; // Expected: 0.0
     }
@@ -155,8 +155,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpmin = dpfloat(1.0, 0.0);
 
         bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
-        
-        outputBuffer[18] = dpx.d; // Expected: 0.0
+
+        outputBuffer[18] = dpx.d;   // Expected: 0.0
         outputBuffer[19] = dpmin.d; // Expected: 0.0
         outputBuffer[20] = dpmax.d; // Expected: 1.0
     }
@@ -168,10 +168,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat3 dpmin = dpfloat3(float3(1.0, 1.0, 1.0), float3(0.0, 0.0, 0.0));
 
         bwd_diff(_clamp3)(dpx, dpmin, dpmax, float3(0.1, 0.2, 0.3));
-        
-        outputBuffer[21] = dpx.d.x; // Expected: 0.1
-        outputBuffer[22] = dpx.d.y; // Expected: 0.0
-        outputBuffer[23] = dpx.d.z; // Expected: 0.0
+
+        outputBuffer[21] = dpx.d.x;   // Expected: 0.1
+        outputBuffer[22] = dpx.d.y;   // Expected: 0.0
+        outputBuffer[23] = dpx.d.z;   // Expected: 0.0
         outputBuffer[24] = dpmin.d.x; // Expected: 0.0
         outputBuffer[25] = dpmin.d.y; // Expected: 0.2
         outputBuffer[26] = dpmin.d.z; // Expected: 0.0

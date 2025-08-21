@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
-// Check that we do not emit forward reference for debug pointer types if there isn't a need to do so.
+// Check that we do not emit forward reference for debug pointer types if there isn't a need to do
+// so.
 
 // CHECK-NOT: OpExtension "SPV_KHR_relaxed_extended_instruction"
 struct T
@@ -10,8 +11,8 @@ struct T
 
 struct Problem
 {
-    int getVal() { return some_bda_ptr->inner;}
-    T *some_bda_ptr;
+    int getVal() { return some_bda_ptr->inner; }
+    T* some_bda_ptr;
 }
 
 uniform Problem probs;

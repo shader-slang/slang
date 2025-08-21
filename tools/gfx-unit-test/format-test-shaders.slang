@@ -2,9 +2,9 @@
 
 // Copy the contents of "tex" into "buffer". These are for textures containing UINT data.
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexUint4(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<uint4> tex,
     uniform RWStructuredBuffer<uint> buffer)
 {
@@ -19,9 +19,9 @@ void copyTexUint4(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexUint3(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<uint4> tex,
     uniform RWStructuredBuffer<uint> buffer)
 {
@@ -35,9 +35,9 @@ void copyTexUint3(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexUint2(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<uint2> tex,
     uniform RWStructuredBuffer<uint> buffer)
 {
@@ -50,23 +50,24 @@ void copyTexUint2(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexUint(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<uint> tex,
     uniform RWStructuredBuffer<uint> buffer)
 {
     uint width;
     uint height;
     tex.GetDimensions(width, height);
-    buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
+    buffer[sv_dispatchThreadID.x] =
+        tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
 }
 
 // Copy the contents of "tex" into "buffer". These are for textures containing SINT data.
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexInt4(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<int4> tex,
     uniform RWStructuredBuffer<int> buffer)
 {
@@ -81,9 +82,9 @@ void copyTexInt4(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexInt3(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<int4> tex,
     uniform RWStructuredBuffer<int> buffer)
 {
@@ -97,9 +98,9 @@ void copyTexInt3(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexInt2(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<int2> tex,
     uniform RWStructuredBuffer<int> buffer)
 {
@@ -112,23 +113,24 @@ void copyTexInt2(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexInt(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<int> tex,
     uniform RWStructuredBuffer<int> buffer)
 {
     uint width;
     uint height;
     tex.GetDimensions(width, height);
-    buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
+    buffer[sv_dispatchThreadID.x] =
+        tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
 }
 
 // Copy the contents of "tex" into "buffer". These are for textures containing FLOAT data.
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexFloat4(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float4> tex,
     uniform RWStructuredBuffer<float> buffer)
 {
@@ -143,9 +145,9 @@ void copyTexFloat4(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexFloat3(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float4> tex,
     uniform RWStructuredBuffer<float> buffer)
 {
@@ -159,9 +161,9 @@ void copyTexFloat3(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexFloat2(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float2> tex,
     uniform RWStructuredBuffer<float> buffer)
 {
@@ -174,23 +176,24 @@ void copyTexFloat2(
 }
 
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void copyTexFloat(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float> tex,
     uniform RWStructuredBuffer<float> buffer)
 {
     uint width;
     uint height;
     tex.GetDimensions(width, height);
-    buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
+    buffer[sv_dispatchThreadID.x] =
+        tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / width)];
 }
 
 // Sample from "tex" at texture coordinates (0.5, 0.5) and save the results in "buffer".
 [shader("compute")]
-[numthreads(4,1,1)]
+[numthreads(4, 1, 1)]
 void sampleTex(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float4> tex,
     uniform SamplerState sampler,
     uniform RWStructuredBuffer<float> buffer)
@@ -205,9 +208,9 @@ void sampleTex(
 // Sample from "tex" at texture coordinates (0.5, 0.5) and save the resuls in "buffer".
 // This should only be used with textures containing two mip levels.
 [shader("compute")]
-[numthreads(2,1,1)]
+[numthreads(2, 1, 1)]
 void sampleMips(
-    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uint3 sv_dispatchThreadID: SV_DispatchThreadID,
     uniform Texture2D<float4> tex,
     uniform SamplerState sampler,
     uniform RWStructuredBuffer<float> buffer)

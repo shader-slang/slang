@@ -3,7 +3,7 @@
 //WGSL-DAG: @builtin(workgroup_id)
 //WGSL-DAG: @compute
 
-void main(uint3 gid : SV_GroupID) 
+void main(uint3 gid: SV_GroupID)
 {
     // Empty compute shader
 }

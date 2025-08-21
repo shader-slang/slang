@@ -16,7 +16,7 @@ float f(float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = diffPair(2.0);
@@ -27,7 +27,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     {
-        dpfloat dpa = diffPair(0.0,);
+        dpfloat dpa = diffPair(0.0, );
 
         __bwd_diff(f)(dpa, 1.0);
 

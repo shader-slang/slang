@@ -38,7 +38,7 @@ void func(float v)
     outputBuffer[2] = block.b1[0] + block2.b2[0];
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main_kernel()
 {
     func(3.0f);

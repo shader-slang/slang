@@ -15,7 +15,7 @@ struct BaseImpl : IBase
 
 struct S
 {
-    __generic<T:IBase>
+    __generic<T : IBase>
     float eval(T obj)
     {
         return obj.get();
@@ -30,9 +30,9 @@ float test(T obj)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     BaseImpl base;
-	float outVal = test<BaseImpl>(base);
-	outputBuffer[dispatchThreadID.x] = outVal;
+    float outVal = test<BaseImpl>(base);
+    outputBuffer[dispatchThreadID.x] = outVal;
 }

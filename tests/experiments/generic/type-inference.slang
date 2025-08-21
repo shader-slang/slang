@@ -16,18 +16,18 @@ T get0<T>(T values[4])
 {
     return values[0];
 }
-    
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
-    float values[] = { 1, 2, 3, 4};
-    
+    float values[] = { 1, 2, 3, 4 };
+
     // NOTE if we specify T then this works. Ie
     // let val = get0<float>(values);
-    
+
     let val = get0(values);
-    
-	outputBuffer[index] = val;
+
+    outputBuffer[index] = val;
 }

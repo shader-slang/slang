@@ -46,7 +46,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     outputBuffer[0] = true
         && default1.inner.data1 == 0
-        
+
         && default2.inner.data1 == 0
         ;
 }

@@ -62,8 +62,8 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                 axis += silhouette.getNormal(0);
                 axis += silhouette.getNormal(1);
                 radius = max(radius, length(silhouette.getCentroid() - centroid));
-                silhouettesHaveTwoAdjacentFaces = silhouettesHaveTwoAdjacentFaces &&
-                                                  silhouette.hasTwoAdjacentFaces();
+                silhouettesHaveTwoAdjacentFaces =
+                    silhouettesHaveTwoAdjacentFaces && silhouette.hasTwoAdjacentFaces();
                 anySilhouettes = true;
             }
 
@@ -120,10 +120,12 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
             // update internal node's bounding cone
             BoundingCone leftCone = leftNode.getBoundingCone();
             BoundingCone rightCone = rightNode.getBoundingCone();
-            BoundingCone mergedCone = mergeBoundingCones(leftCone, rightCone,
-                                                         leftBox.getCentroid(),
-                                                         rightBox.getCentroid(),
-                                                         mergedBox.getCentroid());
+            BoundingCone mergedCone = mergeBoundingCones(
+                leftCone,
+                rightCone,
+                leftBox.getCentroid(),
+                rightBox.getCentroid(),
+                mergedBox.getCentroid());
             node.setBoundingCone(mergedCone);
         }
     }
@@ -179,7 +181,8 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                     {
                         Interaction c;
                         uint primitiveIndex = node.getPrimitiveOffset() + p;
-                        bool didIntersectPrimitive = primitives[primitiveIndex].intersect(r, checkForOcclusion, c);
+                        bool didIntersectPrimitive =
+                            primitives[primitiveIndex].intersect(r, checkForOcclusion, c);
 
                         if (didIntersectPrimitive)
                         {
@@ -200,11 +203,13 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                     // intersect child nodes
                     uint leftNodeIndex = currentNodeIndex + 1;
                     BoundingBox leftBox = nodes[leftNodeIndex].getBoundingBox();
-                    bool didIntersectLeft = leftBox.intersect(r, distToChildNodes[0], distToChildNodes[1]);
+                    bool didIntersectLeft =
+                        leftBox.intersect(r, distToChildNodes[0], distToChildNodes[1]);
 
                     uint rightNodeIndex = currentNodeIndex + node.getRightChildOffset();
                     BoundingBox rightBox = nodes[rightNodeIndex].getBoundingBox();
-                    bool didIntersectRight = rightBox.intersect(r, distToChildNodes[2], distToChildNodes[3]);
+                    bool didIntersectRight =
+                        rightBox.intersect(r, distToChildNodes[2], distToChildNodes[3]);
 
                     // which nodes did we intersect?
                     if (didIntersectLeft && didIntersectRight)
@@ -257,9 +262,11 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
     }
 
     // intersects aggregate geometry with sphere
-    public bool intersect<T : IBranchTraversalWeight>(BoundingSphere s, float3 randNums,
-                                                      T branchTraversalWeight,
-                                                      inout Interaction i)
+    public bool intersect<T : IBranchTraversalWeight>(
+        BoundingSphere s,
+        float3 randNums,
+        T branchTraversalWeight,
+        inout Interaction i)
     {
         float4 distToChildNodes = float4(0.0, 0.0, 0.0, 0.0);
         BoundingBox rootBox = nodes[0].getBoundingBox();
@@ -333,7 +340,8 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                     // probabilistically select one child node to traverse
                     uint leftNodeIndex = currentNodeIndex + 1;
                     BoundingBox leftBox = nodes[leftNodeIndex].getBoundingBox();
-                    bool overlapsLeft = leftBox.overlap(s, distToChildNodes[0], distToChildNodes[1]);
+                    bool overlapsLeft =
+                        leftBox.overlap(s, distToChildNodes[0], distToChildNodes[1]);
                     float weightLeft = overlapsLeft ? 1.0 : 0.0;
                     if (weightLeft > 0.0)
                     {
@@ -343,7 +351,8 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
 
                     uint rightNodeIndex = currentNodeIndex + node.getRightChildOffset();
                     BoundingBox rightBox = nodes[rightNodeIndex].getBoundingBox();
-                    bool overlapsRight = rightBox.overlap(s, distToChildNodes[2], distToChildNodes[3]);
+                    bool overlapsRight =
+                        rightBox.overlap(s, distToChildNodes[2], distToChildNodes[3]);
                     float weightRight = overlapsRight ? 1.0 : 0.0;
                     if (weightRight > 0.0)
                     {
@@ -386,7 +395,8 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
             else
             {
                 // sample a point on the selected geometric primitive
-                float samplingPdf = primitives[selectedPrimitiveIndex].samplePoint(randNums.yz, i.uv, i.p, i.n);
+                float samplingPdf =
+                    primitives[selectedPrimitiveIndex].samplePoint(randNums.yz, i.uv, i.p, i.n);
                 i.d *= samplingPdf;
             }
         }
@@ -395,8 +405,10 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
     }
 
     // finds closest point on aggregate geometry from sphere center
-    public bool findClosestPoint(inout BoundingSphere s, inout Interaction i,
-                                 bool recordNormal = false)
+    public bool findClosestPoint(
+        inout BoundingSphere s,
+        inout Interaction i,
+        bool recordNormal = false)
     {
         TraversalStack traversalStack[FCPW_BVH_MAX_DEPTH];
         float4 distToChildNodes = float4(0.0, 0.0, 0.0, 0.0);
@@ -448,12 +460,14 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                     // find distance to child nodes
                     uint leftNodeIndex = currentNodeIndex + 1;
                     BoundingBox leftBox = nodes[leftNodeIndex].getBoundingBox();
-                    bool overlapsLeft = leftBox.overlap(s, distToChildNodes[0], distToChildNodes[1]);
+                    bool overlapsLeft =
+                        leftBox.overlap(s, distToChildNodes[0], distToChildNodes[1]);
                     s.r2 = min(s.r2, distToChildNodes[1]);
 
                     uint rightNodeIndex = currentNodeIndex + node.getRightChildOffset();
                     BoundingBox rightBox = nodes[rightNodeIndex].getBoundingBox();
-                    bool overlapsRight = rightBox.overlap(s, distToChildNodes[2], distToChildNodes[3]);
+                    bool overlapsRight =
+                        rightBox.overlap(s, distToChildNodes[2], distToChildNodes[3]);
                     s.r2 = min(s.r2, distToChildNodes[3]);
 
                     // which nodes do we overlap?
@@ -521,9 +535,12 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
     }
 
     // finds closest silhouette point on aggregate geometry from sphere center
-    public bool findClosestSilhouettePoint(inout BoundingSphere s, bool flipNormalOrientation,
-                                           float squaredMinRadius, float precision,
-                                           inout Interaction i)
+    public bool findClosestSilhouettePoint(
+        inout BoundingSphere s,
+        bool flipNormalOrientation,
+        float squaredMinRadius,
+        float precision,
+        inout Interaction i)
     {
         if (squaredMinRadius >= s.r2)
         {
@@ -571,7 +588,11 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
 
                         Interaction c;
                         bool found = silhouette.findClosestSilhouettePoint(
-                            s, flipNormalOrientation, squaredMinRadius, precision, c);
+                            s,
+                            flipNormalOrientation,
+                            squaredMinRadius,
+                            precision,
+                            c);
 
                         // keep the closest silhouette point
                         if (found)
@@ -602,8 +623,12 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                         if (overlapsLeft)
                         {
                             float minAngleRange, maxAngleRange;
-                            overlapsLeft = leftCone.overlap(s.c, leftBox, distToChildNodes[0],
-                                                            minAngleRange, maxAngleRange);
+                            overlapsLeft = leftCone.overlap(
+                                s.c,
+                                leftBox,
+                                distToChildNodes[0],
+                                minAngleRange,
+                                maxAngleRange);
                         }
                     }
 
@@ -618,8 +643,12 @@ public struct Bvh<N : IBvhNode, P : IPrimitive, S : ISilhouette> : IAggregate
                         if (overlapsRight)
                         {
                             float minAngleRange, maxAngleRange;
-                            overlapsRight = rightCone.overlap(s.c, rightBox, distToChildNodes[1],
-                                                              minAngleRange, maxAngleRange);
+                            overlapsRight = rightCone.overlap(
+                                s.c,
+                                rightBox,
+                                distToChildNodes[1],
+                                minAngleRange,
+                                maxAngleRange);
                         }
                     }
 

@@ -7,7 +7,7 @@ Sampler2DShadow ss;
 
 RWStructuredBuffer<float> output;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     output[0] = ss.SampleCmpLevelZero(float2(0.0), 0.5);

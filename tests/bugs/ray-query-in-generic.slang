@@ -41,14 +41,15 @@ uint getCommittedStatus<let Flags : int>(RayQuery<Flags> q)
     return q.CommittedStatus();
 }
 
-bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout RayQuery<Flags> q, const Ray ray, uint rayFlags, uint instanceInclusionMask)
+bool traceSceneVisibilityRayImpl<let Flags : int>(
+    const bool useAlphaTest,
+    inout RayQuery<Flags> q,
+    const Ray ray,
+    uint rayFlags,
+    uint instanceInclusionMask)
 {
     var rayDesc = ray.toRayDesc();
-    q.TraceRayInline(
-        scene,
-        rayFlags,
-        0xff,
-        rayDesc);
+    q.TraceRayInline(scene, rayFlags, 0xff, rayDesc);
     q.Proceed();
     if (getCommittedStatus(q) == COMMITTED_TRIANGLE_HIT)
     {
@@ -58,7 +59,10 @@ bool traceSceneVisibilityRayImpl<let Flags : int>(const bool useAlphaTest, inout
     return false;
 }
 
-bool traceSceneVisibilityRay<let UseAlphaTest : int>(const Ray ray, uint rayFlags, uint instanceInclusionMask)
+bool traceSceneVisibilityRay<let UseAlphaTest : int>(
+    const Ray ray,
+    uint rayFlags,
+    uint instanceInclusionMask)
 {
     RayQuery rayQuery;
     return traceSceneVisibilityRayImpl(false, rayQuery, ray, rayFlags, instanceInclusionMask);
@@ -69,8 +73,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(
-    uint3 threadIdx: SV_DispatchThreadID)
+void computeMain(uint3 threadIdx: SV_DispatchThreadID)
 {
     Ray ray = Ray(float3(0.1, 0.1, 0.0), float3(0, 0, 1), 0.1);
     if (traceSceneVisibilityRay<0>(ray, 0, 0xffff))

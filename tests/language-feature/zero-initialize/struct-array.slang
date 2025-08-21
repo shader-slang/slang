@@ -18,7 +18,7 @@ struct MyStruct : MyStruct_base
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    
+
     Array<MyStruct, 3> myStructs;
 
 // BUF: 1

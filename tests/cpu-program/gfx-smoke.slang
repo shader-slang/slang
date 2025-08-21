@@ -13,8 +13,8 @@ export __extern_cpp int main()
         printf("fail\n");
         return -1;
     }
-    
-    gfx.CommandQueueDesc queueDesc = {gfx::QueueType::Graphics};
+
+    gfx.CommandQueueDesc queueDesc = { gfx::QueueType::Graphics };
     queueDesc.type = gfx.QueueType.Graphics;
     Optional<gfx.ICommandQueue> queue;
     device.value.createCommandQueue(&queueDesc, queue);
@@ -84,8 +84,9 @@ export __extern_cpp int main()
     encoder.value.dispatchCompute(1, 1, 1);
     encoder.value.endEncoding();
     commandBuffer.value.close();
-    
-    NativeRef<gfx.ICommandBuffer> commandBufferRef = NativeRef<gfx.ICommandBuffer>(commandBuffer.value);
+
+    NativeRef<gfx.ICommandBuffer> commandBufferRef =
+        NativeRef<gfx.ICommandBuffer>(commandBuffer.value);
     queue.value.executeCommandBuffers(1, &commandBufferRef, none, 0);
     queue.value.waitOnHost();
 
@@ -94,7 +95,7 @@ export __extern_cpp int main()
 
     for (int i = 0; i < 4; i++)
     {
-        float val = ((float *)blob.value.getBufferPointer())[i];
+        float val = ((float*)blob.value.getBufferPointer())[i];
         printf("%.1f\n", val);
     }
     return 0;

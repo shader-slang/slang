@@ -27,9 +27,7 @@ struct Input
 }
 
 [shader("fragment")]
-void main(
-    Input input,
-    out float4 result : SV_Target)
+void main(Input input, out float4 result: SV_Target)
 {
     result = input.bary.x * GetAttributeAtVertex(input.color, 0)
         + input.bary.y * GetAttributeAtVertex(input.color, 1)

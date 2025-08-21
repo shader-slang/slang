@@ -34,13 +34,13 @@ interface IMaterial : IDifferentiable
     associatedtype MaterialInstance : IMaterialInstance;
 
     [Differentiable]
-    MaterialInstance setupMaterialInstance( ShadingInput input );
+    MaterialInstance setupMaterialInstance(ShadingInput input);
 }
 
 interface IMaterialInstance : IDifferentiable
 {
     [Differentiable]
-    float eval( float x );
+    float eval(float x);
 }
 
 
@@ -56,7 +56,7 @@ void getMaterial_bwd(int id, IDifferentiable d)
     outputBuffer[id] = 2.f;
 }
 
-struct Material1: IMaterial
+struct Material1 : IMaterial
 {
     typedef MaterialInstance1 MaterialInstance;
 
@@ -66,7 +66,7 @@ struct Material1: IMaterial
     float c;
 
     [Differentiable]
-    MaterialInstance1 setupMaterialInstance( ShadingInput input )
+    MaterialInstance1 setupMaterialInstance(ShadingInput input)
     {
         MaterialInstance1 instance;
         instance.a = a * input.scale;
@@ -74,22 +74,18 @@ struct Material1: IMaterial
         instance.c = c * input.scale;
         return instance;
     }
-
 }
-struct MaterialInstance1: IMaterialInstance
+struct MaterialInstance1 : IMaterialInstance
 {
     float a;
     float b;
     float c;
 
     [Differentiable]
-    float eval( float x )
-    {
-        return a * x * x + b * x + c;
-    }
+    float eval(float x) { return a * x * x + b * x + c; }
 }
 
-struct Material2: IMaterial
+struct Material2 : IMaterial
 {
     typedef MaterialInstance2 MaterialInstance;
 
@@ -98,25 +94,21 @@ struct Material2: IMaterial
     float b;
 
     [Differentiable]
-    MaterialInstance2 setupMaterialInstance( ShadingInput input )
+    MaterialInstance2 setupMaterialInstance(ShadingInput input)
     {
         MaterialInstance2 instance;
         instance.a = a * input.scale * input.scale;
         instance.b = b * input.scale * input.scale;
         return instance;
     }
-
 }
-public struct MaterialInstance2: IMaterialInstance
+public struct MaterialInstance2 : IMaterialInstance
 {
     float a;
     float b;
 
     [Differentiable]
-    public float eval( float x )
-    {
-        return a * x + b;
-    }
+    public float eval(float x) { return a * x + b; }
 }
 
 [Differentiable]
@@ -131,13 +123,13 @@ public float shade(int material, ShadingInput input, float x)
 //TEST_INPUT: type_conformance Material2:IMaterial = 1
 
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    outputBuffer[0] = shade(0, {0.5}, 0.6);
+    outputBuffer[0] = shade(0, { 0.5 }, 0.6);
 
     // TODO: VERIFY
     DifferentialPair<float> dpx = diffPair(3.0);
-    bwd_diff(shade)(0, {0.5}, dpx, 1.0);
+    bwd_diff(shade)(0, { 0.5 }, dpx, 1.0);
 
     outputBuffer[3] = dpx.d;
 }

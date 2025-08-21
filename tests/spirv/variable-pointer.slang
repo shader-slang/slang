@@ -11,8 +11,8 @@ StructuredBuffer<float> buffer2;
 //TEST_INPUT:set output = out ubuffer(data=[0.0], stride=4)
 RWStructuredBuffer<float> output;
 
-[numthreads(2,1,1)]
-void computeMain(int id : SV_DispatchThreadID)
+[numthreads(2, 1, 1)]
+void computeMain(int id: SV_DispatchThreadID)
 {
     StructuredBuffer<float> buffer;
     if (id == 0)

@@ -10,7 +10,9 @@ in uint gl_VertexIndex : SV_VertexID;
 static const float2 uvs[] = { float2(0.0, 0.0), float2(0.0, 2.0), float2(2.0, 0.0) };
 
 [shader("vertex")]
-float4 vert_main() : SV_Position{
+float4 vert_main()
+    : SV_Position
+{
     const float2 uv = uvs[gl_VertexIndex];
     return float4((uv * 2.0 - 1.0), 0.0, 1.0);
 }

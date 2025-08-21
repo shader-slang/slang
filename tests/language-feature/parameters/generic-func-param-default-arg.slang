@@ -33,7 +33,7 @@ struct Simple : IValue
 int test(int val)
 {
     let s = Simple(val);
-    return sum<Simple>(s).val + 16*sum(s).val;
+    return sum<Simple>(s).val + 16 * sum(s).val;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gBuffer
@@ -41,7 +41,7 @@ RWStructuredBuffer<int> gBuffer;
 
 [shader("compute")]
 [numthreads(4)]
-void computeMain(int tid : SV_DispatchThreadID)
+void computeMain(int tid: SV_DispatchThreadID)
 {
     gBuffer[tid] = test(tid);
 }

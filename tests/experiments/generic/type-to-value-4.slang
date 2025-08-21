@@ -5,16 +5,18 @@
 This doesn't work without 'public' on struct B. This is necessary such that
 those implementations of `IGetE` are visible for dynamic dispatch.
 
-Otherwise the error 
+Otherwise the error
 
-> tests/experiments/generic/type-to-value-4.slang(21): error 50100: No type conformances are found for interface 'IGetE'. Code generation for current target requires at least one implementation type present in the linkage.
-> interface IGetE
+> tests/experiments/generic/type-to-value-4.slang(21): error 50100: No type conformances are found
+for interface 'IGetE'. Code generation for current target requires at least one implementation type
+present in the linkage. > interface IGetE
           ^~~~~
 
-This is somewhat 'surprising' because the code *explicitly* instanciates B, so why is it necessary to make it 
-public?
+This is somewhat 'surprising' because the code *explicitly* instanciates B, so why is it necessary
+to make it public?
 
-If we make both struct A and struct B public, the following code uses dynamic dispatch in order to implement e.getE(). When it does this it introduces
+If we make both struct A and struct B public, the following code uses dynamic dispatch in order to
+implement e.getE(). When it does this it introduces
 
 ```HLSL
 struct Tuple_0
@@ -35,7 +37,8 @@ void computeMain(uint3 dispatchThreadID_0 : SV_DISPATCHTHREADID)
 }
 ```
 
-But _S1 is never intialized (in HLSL it becomes a Global in a constant buffer). Why does creating a local variable produce something in a constant buffer?
+But _S1 is never intialized (in HLSL it becomes a Global in a constant buffer). Why does creating a
+local variable produce something in a constant buffer?
 
 */
 
@@ -44,12 +47,14 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum class Enum
 {
-    A, B
-};
+    A,
+    B
+}
+;
 
 interface IGetE
 {
-	static Enum getE();    
+    static Enum getE();
 };
 
 struct A : IGetE
@@ -63,10 +68,11 @@ struct B : IGetE
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-   
-    // Err.. even though IGetE doesn't require an instanciation, not clear how to set it. So lets try with instanciation
+
+    // Err.. even though IGetE doesn't require an instanciation, not clear how to set it. So lets
+    // try with instanciation
     B b;
     IGetE g = b;
 

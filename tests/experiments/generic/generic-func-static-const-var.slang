@@ -4,7 +4,7 @@
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
-    
+
 struct GetValue2<let N : int>
 {
     static int getValue()
@@ -12,13 +12,12 @@ struct GetValue2<let N : int>
         static const int v = N;
         return v;
     }
-};    
-  
+};
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = dispatchThreadID.x;
 
-	outputBuffer[index] = GetValue2<20>::getValue(); 
+    outputBuffer[index] = GetValue2<20>::getValue();
 }
-

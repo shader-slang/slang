@@ -18,9 +18,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     sd.V = normalize(float3(0.3, 0.5, 0.8));
 
     {
-        DifferentialPair<Auto_Bwd_BSDFParameters> dp_params = DifferentialPair<Auto_Bwd_BSDFParameters>(
-            { float3(0.9, 0.6, 0.4), 0.1 },
-            { float3(0, 0, 0), 0 });
+        DifferentialPair<Auto_Bwd_BSDFParameters> dp_params =
+            DifferentialPair<Auto_Bwd_BSDFParameters>(
+                { float3(0.9, 0.6, 0.4), 0.1 },
+                { float3(0, 0, 0), 0 });
 
         Auto_Bwd_ScatterSample.Differential dOut = { float3(0, 0, 0), 0, float3(1, 0, 0) };
         __bwd_diff(bsdfGGXSample)(sd, dp_params, dOut);
@@ -32,9 +33,10 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 
     {
-        DifferentialPair<Auto_Bwd_BSDFParameters> dp_params = DifferentialPair<Auto_Bwd_BSDFParameters>(
-            { float3(0.9, 0.6, 0.4), 0.1 },
-            { float3(0, 0, 0), 1.0 });
+        DifferentialPair<Auto_Bwd_BSDFParameters> dp_params =
+            DifferentialPair<Auto_Bwd_BSDFParameters>(
+                { float3(0.9, 0.6, 0.4), 0.1 },
+                { float3(0, 0, 0), 1.0 });
         DifferentialPair<Auto_Bwd_ScatterSample> dp_result;
         __fwd_diff(bsdfGGXSample)(sd, dp_params, dp_result);
 

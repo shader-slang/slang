@@ -16,10 +16,7 @@ interface IFoo
 struct B : IFoo
 {
     [TreatAsDifferentiable]
-    float f(float v)
-    {
-        return v * v;
-    }
+    float f(float v) { return v * v; }
 }
 
 [BackwardDifferentiable]
@@ -29,7 +26,7 @@ float use(IFoo o, float x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     B b;
     var p = diffPair(1.0);

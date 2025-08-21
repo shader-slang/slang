@@ -10,11 +10,12 @@
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=buffer0
-[vk::binding(2, 3)] RWByteAddressBuffer buffer0;
+[vk::binding(2, 3)]
+RWByteAddressBuffer buffer0;
 
 [shader("compute")]
-[numthreads(1,1,1)]
-void computeMain(uint3 threadId : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     // CHECK-NOT: warning
 

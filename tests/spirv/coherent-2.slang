@@ -6,8 +6,8 @@
 globallycoherent RWByteAddressBuffer buffer[];
 
 RWStructuredBuffer<float> output;
-[numthreads(4,1,1)]
-void main(int tid : SV_DispatchThreadID)
+[numthreads(4, 1, 1)]
+void main(int tid: SV_DispatchThreadID)
 {
     buffer[NonUniformResourceIndex(0)].InterlockedAdd(0, 1);
     AllMemoryBarrier();

@@ -1,8 +1,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
-/* A test around use of an array like container. 
+/* A test around use of an array like container.
 
-Here the attempt is to make the equality test separate from the type. 
+Here the attempt is to make the equality test separate from the type.
 This isn't a great answer because it relies on the right types set
 for T and E to work together.
 
@@ -27,11 +27,12 @@ struct IntEquality : IEquality
     static bool isEqual(Type a, Type b) { return a == b; }
 };
 
-struct FixedArray<T, E : IEquality> 
+struct FixedArray<T, E : IEquality>
 {
     static const int SIZE = 4;
-    
-    [mutating] void setAt(int i, T value) { elements[i] = value; }
+
+    [mutating]
+    void setAt(int i, T value) { elements[i] = value; }
     T getAt(int i) { return elements[i]; }
     int indexOf(T v)
     {
@@ -49,13 +50,12 @@ struct FixedArray<T, E : IEquality>
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
     FixedArray<int, IntEquality> arr;
     arr.setAt(0, index);
-    
-	outputBuffer[index] = 1 + arr.getAt(0);
-}
 
+    outputBuffer[index] = 1 + arr.getAt(0);
+}

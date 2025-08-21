@@ -8,7 +8,7 @@
 SamplerState samplerState;
 Texture2D<int> rw;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     clip(0.0f); // clip is not supported in compute shader, so this throws an error.

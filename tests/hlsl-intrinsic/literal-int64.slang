@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-cpu -compute -shaderobj
-// No support for int64_t on D3D11 (no sm 6.0)
+//  No support for int64_t on D3D11 (no sm 6.0)
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -shaderobj
-// No support with Dx12 with dxbc. Needs SM6.0 + dxil
+//  No support with Dx12 with dxbc. Needs SM6.0 + dxil
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -profile cs_6_0 -dx12 -use-dxil -shaderobj -render-feature hardware-device
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck=CHK):-vk -compute -shaderobj -render-feature int64
@@ -22,12 +22,12 @@
 RWStructuredBuffer<uint64_t> outputBuffer;
 
 [numthreads(10, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = int(int64_t(dispatchThreadID.x));
-    
+
     uint64_t v = 0;
-    
+
     if (idx == 0)
     {
         // Should be 0xffffffffffffffff
@@ -51,18 +51,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
     else if (idx == 4)
     {
-        // Should be 0x0000000080000000. Shows hexadecimal literals can represent unsigned 32-bit integers.
+        // Should be 0x0000000080000000. Shows hexadecimal literals can represent unsigned 32-bit
+        // integers.
         v = 0x80000000;
     }
     else if (idx == 5)
     {
         // Should be 0xffffffffffffffff
-        v = ~0; 
+        v = ~0;
     }
     else if (idx == 6)
     {
         // Should be 0xffffffffffffffff
-        v = ~0LL; 
+        v = ~0LL;
     }
     else if (idx == 7)
     {
@@ -72,9 +73,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (idx == 8)
     {
         // Should be 1. Shows decimal literals can represent INT64_MIN or 0x8000000000000000.
-        // Warning will be emitted as negative(-) is scanned separately in the lexer, and the positive
-        // literal portion will emit a warning.
-        // The final value must be correctly set as INT64_MIN and must be negative.
+        // Warning will be emitted as negative(-) is scanned separately in the lexer, and the
+        // positive literal portion will emit a warning. The final value must be correctly set as
+        // INT64_MIN and must be negative.
         if (-9223372036854775808 < 0L)
         {
             v = 1;
@@ -87,9 +88,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
     else
     {
-        // Shoud be 0xfaaaaaaabaaaaaaa. Shows hexadecimal literals can represent unsigned 64-bit integers.
+        // Shoud be 0xfaaaaaaabaaaaaaa. Shows hexadecimal literals can represent unsigned 64-bit
+        // integers.
         v = 0xfaaaaaaabaaaaaaa;
     }
-    
+
     outputBuffer[idx] = v;
 }

@@ -15,21 +15,15 @@ interface IElement
 struct Elem : IElement
 {
     float x;
-    float getElementVal()
-    {
-        return x;
-    }
+    float getElementVal() { return x; }
 }
 
-struct Impl<T1:IElement, T2:IElement> : IFoo
+struct Impl<T1 : IElement, T2 : IElement> : IFoo
 {
     RWStructuredBuffer<T1> buffer0;
     RWStructuredBuffer<T2> buffer1;
 
-    float getVal()
-    {
-        return buffer0[0].getElementVal() + buffer1[0].getElementVal();
-    }
+    float getVal() { return buffer0[0].getElementVal() + buffer1[0].getElementVal(); }
 }
 
 //TEST_INPUT:set gFoo = new Impl<Elem,Elem>{ubuffer(data=[1.0], stride = 4), ubuffer(data=[2.0], stride = 4)}
@@ -40,8 +34,7 @@ struct Impl<T1:IElement, T2:IElement> : IFoo
 void computeMain(
     uniform ParameterBlock<Impl<Elem, Elem>> gFoo,
     uniform float v,
-    uniform RWStructuredBuffer<float> outputBuffer
-)
+    uniform RWStructuredBuffer<float> outputBuffer)
 {
     // CHECK: 4.0
     outputBuffer[0] = gFoo.getVal() + v;

@@ -14,7 +14,7 @@ float sin_series(float x, int iterations)
     [MaxIters(35)]
     for (int i = 1; i < iterations; i++)
     {
-        if(i == 32)
+        if (i == 32)
             i += 1;
         term *= -1.0f * x * x / ((2 * i) * (2 * i + 1));
         result += term;

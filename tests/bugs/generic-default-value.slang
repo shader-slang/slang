@@ -1,10 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-/* Tests purpose is to confirm that use of `= {}` initialization 
+/* Tests purpose is to confirm that use of `= {}` initialization
 works with a generic */
 
 struct Check<T>
@@ -17,12 +17,11 @@ struct Check<T>
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = int(dispatchThreadID.x);
 
-    Check<float> v = {0};
-    
-    outputBuffer[index] = index + int(v.v); 
-}
+    Check<float> v = { 0 };
 
+    outputBuffer[index] = index + int(v.v);
+}

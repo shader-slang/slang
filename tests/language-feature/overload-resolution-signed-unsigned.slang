@@ -3,7 +3,7 @@ RWStructuredBuffer<float> result;
 // CHECK-NOT: result{{.*}}[int(0)] = 1
 // CHECK: result{{.*}}[int(0)] = 2
 // CHECK-NOT: result{{.*}}[int(0)] = 1
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void main()
 {
     int ic = -1;

@@ -20,7 +20,7 @@ SamplerState samplerState;
 // specified as variadic in the json SPIR-V instruction descriptions.
 //
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
     float2 loc = float2(0.5, 0.5);
@@ -28,18 +28,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float r = spirv_asm
     {
         // The type of our sampled image
-        %sampledImageType = OpTypeSampledImage $$Texture2D<float>;
+        % sampledImageType = OpTypeSampledImage $$Texture2D<float>;
         // Combine the image with the sampler
-        %sampledImage : %sampledImageType = OpSampledImage $t2D $samplerState;
+        % sampledImage : % sampledImageType = OpSampledImage $t2D $samplerState;
         // Perform a sample
-        %sampled : __sampledType(float) = OpImageSampleExplicitLod %sampledImage $loc
-            // Put some sampling operands in here to check that they don't warn
+        % sampled : __sampledType(float) =
+            OpImageSampleExplicitLod %
+            sampledImage $loc
+                // Put some sampling operands in here to check that they don't warn
             // DIAG-NOT: warning{{.*}}too many operands
-            Lod $lod;
+                Lod $lod;
         // Samples in SPIR-V always return a 4-vector of the component type,
         // the __truncate function will drop elements so it fits into the
         // desired output type
-        __truncate $$float result __sampledType(float) %sampled;
+        __truncate $$float result __sampledType(float) % sampled;
     };
     outputBuffer[i] = int(r);
 }

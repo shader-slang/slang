@@ -12,7 +12,8 @@ struct VertexIn
 }
 
 [shader("vertex")]
-float4 vsMain(VertexIn vin) : SV_Position
+float4 vsMain(VertexIn vin)
+    : SV_Position
 {
     return float4(vin.position, vin.drawIndex);
 }

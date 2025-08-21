@@ -1,13 +1,14 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-// Note: This test won't produce expected result on vulkan.
+//  Note: This test won't produce expected result on vulkan.
 //DISABLED_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 // Executable test to check the correctness of return values from the constructors within a
 // NonCopyableType struct.
 
 // A constructor from the callsite's point of view is a function that returns the struct type.
-// A constructor from the inside the body is treated as a function that modifies `this` and not return.
+// A constructor from the inside the body is treated as a function that modifies `this` and not
+// return.
 
 // In the following test-cases where the constructor either returns an expr or no value,
 // such as `return ...` within a condition for early exit or not,
@@ -15,13 +16,14 @@
 // `return this` if it returns the struct type, else `return`
 RWStructuredBuffer<float> outputBuffer;
 
-[__NonCopyableType] struct Impl
+[__NonCopyableType]
+struct Impl
 {
     float x;
     __init(float v)
     {
         if (v > 0)
-            {
+        {
             this.x = 2 * v;
             return this;
         }
@@ -47,7 +49,7 @@ RWStructuredBuffer<float> outputBuffer;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint id : SV_DispatchThreadID)
+void computeMain(uint id: SV_DispatchThreadID)
 {
     // CHECK: 4.000000
     // CHECK: 2.000000

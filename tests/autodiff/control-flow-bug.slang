@@ -5,7 +5,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[Differentiable] [PreferRecompute]
+[Differentiable]
+[PreferRecompute]
 float3 fetch(float2 uv)
 {
     if (uv.x > 0.5f)
@@ -48,7 +49,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         DifferentialPair<float2> dpuv = diffPair(float2(0.1f));
         bwd_diff(fetch)(dpuv, float3(1.f));
- 
+
         outputBuffer[3] = dpuv.d.y; // Expect: 3.0 * 3 = 9
     }
 

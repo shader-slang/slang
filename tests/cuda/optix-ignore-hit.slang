@@ -13,7 +13,7 @@ struct HitBuffer
     void insert(float t) { last = t; }
 }
 
-struct RayHit 
+struct RayHit
 {
     float t;
     int instanceID;
@@ -26,15 +26,15 @@ void anyHitShader(inout HitBuffer rayHitBuffer)
     float currentT = RayTCurrent();
     int instanceID = InstanceID();
     RayHit hit = { currentT, instanceID };
-    
+
     // Modify the inout parameter
     rayHitBuffer.insert(hit.t);
-    
+
     // CHECK-PTX: _optix_ignore_intersection
     // Early exit - should not lose the modification to inout rayHitBuffer
     if (hit.t < rayHitBuffer.last)
         IgnoreHit();
-    
+
     // This line should never execute if IgnoreHit() is called,
     // but parameter changes should still propagate back
 }

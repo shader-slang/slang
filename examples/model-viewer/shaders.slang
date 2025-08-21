@@ -91,7 +91,7 @@ struct BlinnPhong : IBRDF
         // coming out of `evaluate()` if we include the specular term.
 
         // return kd*nDotL + ks*pow(nDotH, specularity);
-        return kd*nDotL;
+        return kd * nDotL;
     }
 };
 //
@@ -196,7 +196,7 @@ interface ILightEnv
     // surface point given by `g` (which has the reflectance function
     // `brdf`) and reflected into the outgoing direction `wo`.
     //
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo);
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo);
     //
     // Note that the `illuminate()` method is allowed as an interface
     // requirement in Slang even though it is a generic. Contrast that
@@ -211,7 +211,7 @@ struct DirectionalLight : ILightEnv
     float3 direction;
     float3 intensity;
 
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
     {
         return intensity * brdf.evaluate(wo, direction, g.normal);
     }
@@ -221,12 +221,12 @@ struct PointLight : ILightEnv
     float3 position;
     float3 intensity;
 
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
     {
         float3 delta = position - g.position;
         float d = length(delta);
         float3 direction = normalize(delta);
-        float3 illuminance = intensity / (d*d);
+        float3 illuminance = intensity / (d * d);
         return illuminance * brdf.evaluate(wo, direction, g.normal);
     }
 };
@@ -256,7 +256,7 @@ struct LightArray<L : ILightEnv, let N : int> : ILightEnv
     int count;
     L lights[N];
 
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
     {
         // Our light array integrates illumination by naively summing
         // contributions from all the lights in the array (up to `count`).
@@ -265,7 +265,7 @@ struct LightArray<L : ILightEnv, let N : int> : ILightEnv
         // to pick a subset of lights to sample.
         //
         float3 sum = 0;
-        for( int ii = 0; ii < count; ++ii )
+        for (int ii = 0; ii < count; ++ii)
         {
             sum += lights[ii].illuminate(g, brdf, wo);
         }
@@ -296,7 +296,7 @@ struct LightPair<T : ILightEnv, U : ILightEnv> : ILightEnv
     T first;
     U second;
 
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
     {
         return first.illuminate(g, brdf, wo)
             + second.illuminate(g, brdf, wo);
@@ -308,10 +308,7 @@ struct LightPair<T : ILightEnv, U : ILightEnv> : ILightEnv
 //
 struct EmptyLightEnv : ILightEnv
 {
-    float3 illuminate<B:IBRDF>(SurfaceGeometry g, B brdf, float3 wo)
-    {
-        return 0;
-    }
+    float3 illuminate<B : IBRDF>(SurfaceGeometry g, B brdf, float3 wo) { return 0; }
 };
 
 // The code above constitutes the "shader library" for our
@@ -334,20 +331,20 @@ struct EmptyLightEnv : ILightEnv
 //
 struct PerView
 {
-    float4x4    viewProjection;
-    float3      eyePosition;
+    float4x4 viewProjection;
+    float3 eyePosition;
 };
-ParameterBlock<PerView>     gViewParams;
+ParameterBlock<PerView> gViewParams;
 
 // Declaring a block for per-model parameter data is
 // similarly simple.
 //
 struct PerModel
 {
-    float4x4    modelTransform;
-    float4x4    inverseTransposeModelTransform;
+    float4x4 modelTransform;
+    float4x4 inverseTransposeModelTransform;
 };
-ParameterBlock<PerModel>    gModelParams;
+ParameterBlock<PerModel> gModelParams;
 
 // We want our shader to work with any kind of lighting environment
 // - that is, and type that implements `ILightEnv`.
@@ -366,8 +363,8 @@ IMaterial gMaterial;
 struct AssembledVertex
 {
     float3 position : POSITION;
-    float3 normal   : NORMAL;
-    float2 uv       : UV;
+    float3 normal : NORMAL;
+    float2 uv : UV;
 };
 struct CoarseVertex
 {
@@ -377,8 +374,8 @@ struct CoarseVertex
 };
 struct VertexStageOutput
 {
-    CoarseVertex    coarseVertex    : CoarseVertex;
-    float4          sv_position     : SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 // Perhaps most interesting new feature of the entry
@@ -399,21 +396,20 @@ struct VertexStageOutput
 // want DXBC, DXIL, or SPIR-V output.
 //
 [shader("vertex")]
-VertexStageOutput vertexMain(
-    AssembledVertex assembledVertex)
+VertexStageOutput vertexMain(AssembledVertex assembledVertex)
 {
     VertexStageOutput output;
 
     float3 position = assembledVertex.position;
-    float3 normal   = assembledVertex.normal;
-    float2 uv       = assembledVertex.uv;
+    float3 normal = assembledVertex.normal;
+    float2 uv = assembledVertex.uv;
 
     float3 worldPosition = mul(gModelParams.modelTransform, float4(position, 1.0)).xyz;
     float3 worldNormal = mul(gModelParams.inverseTransposeModelTransform, float4(normal, 0.0)).xyz;
 
     output.coarseVertex.worldPosition = worldPosition;
-    output.coarseVertex.worldNormal   = worldNormal;
-    output.coarseVertex.uv            = uv;
+    output.coarseVertex.worldNormal = worldNormal;
+    output.coarseVertex.uv = uv;
 
     output.sv_position = mul(gViewParams.viewProjection, float4(worldPosition, 1.0));
 
@@ -432,8 +428,8 @@ VertexStageOutput vertexMain(
 // in specialized versions of the `fragmentMain` entry point.
 //
 [shader("fragment")]
-float4 fragmentMain(
-    CoarseVertex coarseVertex : CoarseVertex) : SV_Target
+float4 fragmentMain(CoarseVertex coarseVertex: CoarseVertex)
+    : SV_Target
 {
     // We start by using our interpolated vertex attributes
     // to construct the local surface geometry that we will

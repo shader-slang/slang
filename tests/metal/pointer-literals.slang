@@ -9,7 +9,7 @@ RWStructuredBuffer<uint> outputBuffer;
 
 // Test that pointer literals are handled correctly in Metal.
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // Test pointer literals in some contexts that might generate kIROp_PtrLit.
@@ -17,7 +17,7 @@ void computeMain()
     // Test 1: Basic pointer literal assignment
     void* ptr1 = nullptr;
     outputBuffer[0] = (ptr1 == nullptr) ? 1 : 0;
-    
+
     // Test 2: Pointer literal in struct
     struct TestStruct
     {

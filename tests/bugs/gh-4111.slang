@@ -11,13 +11,14 @@ struct Buf
 struct Push
 {
     bool a_or_b;
-    Buf * a;
-    Buf * b;
+    Buf* a;
+    Buf* b;
 };
 
-[[vk::push_constant]] Push push;
+[[vk::push_constant]]
+Push push;
 
-func tester(Buf * buf)
+func tester(Buf* buf)
 {
     buf->test = 1;
 }
@@ -26,6 +27,6 @@ func tester(Buf * buf)
 [numthreads(1, 1, 1)]
 void main()
 {
-    Buf * b = push.a_or_b ? push.a : push.b;
+    Buf* b = push.a_or_b ? push.a : push.b;
     tester(b);
 }

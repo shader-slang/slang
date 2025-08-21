@@ -3,7 +3,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
-// Confirm that scoping on enums and types works 
+// Confirm that scoping on enums and types works
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -15,9 +15,9 @@ enum Color
     Blue,
 }
 
-struct Thing 
+struct Thing
 {
-    int a; 
+    int a;
     struct Another
     {
         int b;
@@ -28,23 +28,23 @@ int test(int val)
 {
     Color c = Color.Red;
 
-    Thing::Another another;    
+    Thing::Another another;
     another.b = 20;
 
-    if(val > 1)
+    if (val > 1)
     {
         c = Color.Green;
     }
 
-    if(c == Color::Red)
+    if (c == Color::Red)
     {
-        if((val & 1) != 0)
+        if ((val & 1) != 0)
         {
             c = Color::Blue;
         }
     }
 
-    switch(c)
+    switch (c)
     {
     case Color::Red:
         val = 1;
@@ -67,7 +67,7 @@ int test(int val)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 

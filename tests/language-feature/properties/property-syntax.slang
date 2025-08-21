@@ -10,21 +10,31 @@ struct Data
     int _b;
 
     // Traditional syntax
-	property int a
-	{
-		get { return _a; }
-		set(int newValue) { _a = newValue; }
-	}
+    property int a
+    {
+        get {
+            return _a;
+        }
+        set(int newValue) {
+            _a = newValue;
+        }
+    }
 
-	// "Modern" syntax
-	property b : int
-	{
-		get { return _b; }
-		set(newValue : int) { _a = newValue; }
-	}
+    // "Modern" syntax
+    property b : int
+    {
+        get
+        {
+            return _b;
+        }
+        set(newValue: int)
+        {
+            _a = newValue;
+        }
+    }
 }
 
 int test(Data d)
 {
-	return d.a + d.b;
+    return d.a + d.b;
 }

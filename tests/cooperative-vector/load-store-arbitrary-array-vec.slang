@@ -30,6 +30,6 @@ void computeMain()
     let vec = coopVecLoad<15, uint32_t>(input);
     vec.storeAny(temp);
     let result = CoopVec<uint32_t, 15>.loadAny(temp);
-    for(int i = 0; i < result.getCount(); ++i)
+    for (int i = 0; i < result.getCount(); ++i)
         outputBuffer[i] = result[i];
 }

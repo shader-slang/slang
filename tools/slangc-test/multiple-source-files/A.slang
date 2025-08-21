@@ -1,3 +1,6 @@
 module A;
 
-public int test() { return 1; }
+public int test()
+{
+    return 1;
+}

@@ -6,7 +6,8 @@
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 
@@ -20,7 +21,7 @@ bool testNoiseScalar()
         ;
 }
 
-__generic<let N:int>
+__generic<let N : int>
 bool testNoiseVector()
 {
     return true

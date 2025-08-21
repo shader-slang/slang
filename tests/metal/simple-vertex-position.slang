@@ -5,7 +5,7 @@
 //METALLIB: @vertexMain
 
 // Vertex Shader which writes to position
-void vertexMain(out float4 position : SV_Position, in uint vertexID : SV_VertexID)
+void vertexMain(out float4 position: SV_Position, in uint vertexID: SV_VertexID)
 {
     position = float4(0.6, 0.1, 0.6, 0.33);
 }

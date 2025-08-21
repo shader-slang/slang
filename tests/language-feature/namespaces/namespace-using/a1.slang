@@ -2,5 +2,5 @@ implementing a;
 
 namespace ns
 {
-    using ns2;
+using ns2;
 }

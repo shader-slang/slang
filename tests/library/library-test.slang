@@ -3,10 +3,11 @@
 // A test to try out the basics of using libraries that can be linked (by downstream tools).
 // (This is in contrast to Slang modules and Slangs own linkage mechanisms)
 
-// This didn't work for lib_6_2 when compiling via DXC (!). Even though it's stated elsewhere the feature is available from 6.1
+// This didn't work for lib_6_2 when compiling via DXC (!). Even though it's stated elsewhere the
+// feature is available from 6.1
 
 //TEST:COMPILE: tests/library/library.slang -incomplete-library -profile lib_6_3 -target dxil -o tests/library/library.dxil
-//TEST:COMPILE: tests/library/library-test.slang -incomplete-library -entry computeMain -profile cs_6_3 -target dxil -r tests/library/library.dxil -o tests/library/library-test.dxil 
+//TEST:COMPILE: tests/library/library-test.slang -incomplete-library -entry computeMain -profile cs_6_3 -target dxil -r tests/library/library.dxil -o tests/library/library-test.dxil
 
 // Test the produced kernel.
 
@@ -19,9 +20,9 @@ RWStructuredBuffer<int> outputBuffer;
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int index = (int)dispatchThreadID.x;
-       
+
     outputBuffer[index] = foo(index);
 }

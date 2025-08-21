@@ -17,25 +17,25 @@ RWStructuredBuffer<float> outputBuffer;
 
 cbuffer Uniforms
 {
-	float4x4 modelViewProjection;
+    float4x4 modelViewProjection;
 }
 
 struct AssembledVertex
 {
-	float3	position;
-	float3	color;
-    float2  uv;
+    float3 position;
+    float3 color;
+    float2 uv;
 };
 
 struct CoarseVertex
 {
-	float3	color;
-    float2  uv;
+    float3 color;
+    float2 uv;
 };
 
 struct Fragment
 {
-	float4 color;
+    float4 color;
 };
 
 
@@ -43,74 +43,74 @@ struct Fragment
 
 struct VertexStageInput
 {
-	AssembledVertex assembledVertex	: A;
+    AssembledVertex assembledVertex : A;
 };
 
 struct VertexStageOutput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
-	float4			sv_position		: SV_Position;
+    CoarseVertex coarseVertex : CoarseVertex;
+    float4 sv_position : SV_Position;
 };
 
 [shader("vertex")]
 VertexStageOutput vertexMain(VertexStageInput input)
 {
-	VertexStageOutput output;
+    VertexStageOutput output;
 
-	float3 position = input.assembledVertex.position;
-	float3 color	= input.assembledVertex.color;
+    float3 position = input.assembledVertex.position;
+    float3 color = input.assembledVertex.color;
 
-	output.coarseVertex.color = color;
-	output.sv_position = mul(modelViewProjection, float4(position, 1.0));
+    output.coarseVertex.color = color;
+    output.sv_position = mul(modelViewProjection, float4(position, 1.0));
     output.coarseVertex.uv = input.assembledVertex.uv;
-	return output;
+    return output;
 }
 
 // Fragment Shader
 
 struct FragmentStageInput
 {
-	CoarseVertex	coarseVertex	: CoarseVertex;
+    CoarseVertex coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	Fragment fragment	: SV_Target;
+    Fragment fragment : SV_Target;
 };
 
 [shader("fragment")]
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
-	// The texel offset argument to `Texture2D.Sample` is
-	// required to be `constexpr`. This test is going to
-	// check that we correctly propagate this constraint
-	// backward to the value `a`.
-	//
-	// Because the HLSL compiler(s) already do this kind
-	// of propagation, the only real way to test this
-	// will be to target Vulkan, where the standard
-	// GLSL compiler gives an error message rather than
-	// infer `const`-ness.
+    // The texel offset argument to `Texture2D.Sample` is
+    // required to be `constexpr`. This test is going to
+    // check that we correctly propagate this constraint
+    // backward to the value `a`.
+    //
+    // Because the HLSL compiler(s) already do this kind
+    // of propagation, the only real way to test this
+    // will be to target Vulkan, where the standard
+    // GLSL compiler gives an error message rather than
+    // infer `const`-ness.
 
-	uint a = 0;
-	constexpr uint b = 1;
+    uint a = 0;
+    constexpr uint b = 1;
 
-	uint2 ab = uint2(a,b);
+    uint2 ab = uint2(a, b);
 
-	FragmentStageOutput output;
+    FragmentStageOutput output;
 
-	float3 color = input.coarseVertex.color;
+    float3 color = input.coarseVertex.color;
     float2 uv = input.coarseVertex.uv;
-	output.fragment.color = float4(color, 1.0);
+    output.fragment.color = float4(color, 1.0);
 
-	float4 val = float4(color, 1.0);
-	val = val - 16*tex.Sample(samp, uv, int2(ab));
+    float4 val = float4(color, 1.0);
+    val = val - 16 * tex.Sample(samp, uv, int2(ab));
 
-	outputBuffer[0] = 1;
+    outputBuffer[0] = 1;
 
-	if(val.x < 0)
-		discard;
+    if (val.x < 0)
+        discard;
 
-	outputBuffer[1] = 1;
-	return output;
+    outputBuffer[1] = 1;
+    return output;
 }

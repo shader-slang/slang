@@ -10,10 +10,7 @@ interface ITwoParamGeneric<A, B>
 struct Foo<A, B> : ITwoParamGeneric<A, B>
 {
     int val = 0;
-    int getVal()
-    {
-       return val; 
-    }
+    int getVal() { return val; }
 }
 
 struct NotPrimitiveCastable
@@ -21,7 +18,7 @@ struct NotPrimitiveCastable
     double data;
 }
 
-extension<A, B> Foo<A,B> 
+extension<A, B> Foo<A, B>
     where int(A)
 #ifdef FAIL
     where NotPrimitiveCastable(B)

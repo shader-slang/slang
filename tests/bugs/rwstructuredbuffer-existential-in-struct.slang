@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
 // TODO: disable this test to get new gfx checked in, need to re-enable
-// after shader-object binding model is fixed.
+//  after shader-object binding model is fixed.
 
 [anyValueSize(8)]
 interface IMaterial
@@ -26,7 +26,10 @@ struct Parameters
 };
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID, uniform Parameters params, uniform int id)
+void computeMain(
+    uint3 dispatchThreadID: SV_DispatchThreadID,
+    uniform Parameters params,
+    uniform int id)
 {
     uint tid = dispatchThreadID.x;
     float rs = params.materials[0].eval();

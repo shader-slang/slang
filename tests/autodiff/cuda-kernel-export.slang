@@ -40,7 +40,7 @@ export __extern_cpp MyType runCompute(MyInput input)
     MyType rs;
     var outValues = TorchTensor<float>.alloc(1);
     let inValues = input.inValues;
-    
+
     __dispatch_kernel(myKernel, uint3(1, 1, 1), uint3(32, 1, 1))(inValues, outValues);
 
     rs.v = float2(1.0, 2.0);

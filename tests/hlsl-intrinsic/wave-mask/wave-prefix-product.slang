@@ -9,20 +9,19 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(8, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     WaveMask mask = 0xff;
-    
+
     int idx = int(dispatchThreadID.x);
-    
-    
+
+
     float2 v1 = float2(1, idx + 1);
-  
+
     int r0 = WaveMaskPrefixProduct(mask, idx + 1);
     float2 r1 = WaveMaskPrefixProduct(mask, v1);
-    
+
     int r2 = int(r1.x) + int(r1.y) - 1;
-    
+
     outputBuffer[idx] = r0 + (r2 << 16);
-    
 }

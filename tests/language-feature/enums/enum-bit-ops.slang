@@ -4,8 +4,8 @@
 enum MyFlags
 {
     Zero = 0,
-    BitOne, // = 1
-    BitTwo, // = 2
+    BitOne,  // = 1
+    BitTwo,  // = 2
     BitThree // = 4
 }
 

@@ -7,9 +7,10 @@
 
 enum class AAA
 {
-	// These cases use a `uint` literal for initialization,
-	// but the `enum` type will use `int` for its tags.
+    // These cases use a `uint` literal for initialization,
+    // but the `enum` type will use `int` for its tags.
 
-    BBB 	= 0u,
-    CCC  	= 1u,
-};
+    BBB = 0u,
+    CCC = 1u,
+}
+;

@@ -6,17 +6,17 @@
 
 uint test(uint inVal)
 {
-	uint tmp = inVal;
-    for(;;)
+    uint tmp = inVal;
+    for (;;)
     {
-    	if(tmp < 4)
-    	{
-    		tmp++;
-    	}
-    	else
-    	{
-    		break;
-    	}
+        if (tmp < 4)
+        {
+            tmp++;
+        }
+        else
+        {
+            break;
+        }
     }
     return tmp + inVal;
 }
@@ -25,7 +25,7 @@ uint test(uint inVal)
 RWStructuredBuffer<uint> gBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 

@@ -7,42 +7,42 @@
 
 interface IHideout
 {
-	int getAnimalCount();	
+    int getAnimalCount();
 }
 
 interface ISuperhero
 {
-	associatedtype Hideout : IHideout;
+    associatedtype Hideout : IHideout;
 
-	static Hideout getHideout();
+    static Hideout getHideout();
 }
 
 struct Batcave : IHideout
 {
-	int batCount;	
+    int batCount;
 
-	int getAnimalCount() { return batCount; }
+    int getAnimalCount() { return batCount; }
 }
 
 struct Batman : ISuperhero
 {
-	typedef Batcave Hideout;
+    typedef Batcave Hideout;
 
-	static Batcave getHideout()
-	{
-		Batcave batcave = { 100 };
-		return batcave;
-	}
+    static Batcave getHideout()
+    {
+        Batcave batcave = { 100 };
+        return batcave;
+    }
 }
 
-int doIt<T:ISuperhero>()
+int doIt<T : ISuperhero>()
 {
-	return T.getHideout().getAnimalCount();
+    return T.getHideout().getAnimalCount();
 }
 
 int test(int val)
 {
-	return doIt<Batman>();
+    return doIt<Batman>();
 }
 
 
@@ -50,8 +50,8 @@ int test(int val)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
-	outputBuffer[tid] = test(tid);
+    int tid = dispatchThreadID.x;
+    outputBuffer[tid] = test(tid);
 }

@@ -29,13 +29,10 @@ struct GenStruct<T> : IBase
         rs.x = val;
         return rs;
     }
-    T getVal(SubTypeT v)
-    {
-        return v.x;
-    }
+    T getVal(SubTypeT v) { return v.x; }
 };
 
-U.RetT test<U:IBase>(U.RetT val)
+U.RetT test<U : IBase>(U.RetT val)
 {
     U obj = U();
     U.SubTypeT sb = obj.setVal(val);
@@ -43,11 +40,11 @@ U.RetT test<U:IBase>(U.RetT val)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     float inVal = float(tid);
     /* wrong error message for the following line */
-    float outVal = test<GenStruct<float> >(inVal);
+    float outVal = test<GenStruct<float>>(inVal);
     outputBuffer[tid] = outVal.x;
 }

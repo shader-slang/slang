@@ -12,7 +12,7 @@ RWStructuredBuffer<int> outputBuffer;
 __generic<T>
 struct idefault1 : IDefaultInitializable
 {
-    vector<T,4> data;
+    vector<T, 4> data;
 };
 
 [numthreads(1, 1, 1)]
@@ -26,5 +26,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         && default1.data[1] == 0
         && default1.data[2] == 0
         && default1.data[3] == 0
-    ;
+        ;
 }

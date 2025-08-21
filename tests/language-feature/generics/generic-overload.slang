@@ -5,7 +5,8 @@ enum CoopMatMatrixLayout
 {
     RowMajor = 0,
     ColumnMajor = 1,
-};
+}
+;
 
 int Load<let me : CoopMatMatrixLayout>(int inVal)
 {
@@ -21,7 +22,7 @@ int Load<let Dim : uint, let ClampMode : uint>(int inVal, int inVal2)
 
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
 

@@ -15,16 +15,16 @@ float3 helper<let N : uint>(inout RayQuery<N> q)
     ray.TMin = 0;
     ray.TMax = 1000.0;
     q.TraceRayInline(
-        /* accellerationStructure: */   gScene,
-        /* rayFlags: */                 N,
-        /* instanceInclusionmask: */    0xFFFFFFFF,
-        /* ray: */                      ray );
+        /* accellerationStructure: */ gScene,
+        /* rayFlags: */ N,
+        /* instanceInclusionmask: */ 0xFFFFFFFF,
+        /* ray: */ ray);
 
     return q.WorldRayDirection();
 }
 
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid: SV_DispatchThreadID)
 {
     // Note: The original issue was due to "folding" of an instruction
     // into use sites as part of emitting high-level-language code.

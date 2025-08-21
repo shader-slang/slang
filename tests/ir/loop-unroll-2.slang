@@ -16,7 +16,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         {
             if (i == 1 && j == 1)
                 continue;
-            sum += (i+j);
+            sum += (i + j);
         }
     }
     outputBuffer[0] = sum;

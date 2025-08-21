@@ -26,10 +26,10 @@
 
 int instanceTest()
 {
-	return instance;
+    return instance;
 }
 
 int triangleTest()
 {
-	return triangle;
+    return triangle;
 }

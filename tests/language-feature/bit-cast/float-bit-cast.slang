@@ -7,7 +7,6 @@ struct MyStruct
 }
 
 
-
 //TEST_INPUT:set inputBuffer = ubuffer(data=[1.0 3.0 4.0], stride=4)
 RWStructuredBuffer<float> inputBuffer;
 
@@ -18,7 +17,7 @@ RWStructuredBuffer<uint> outputBuffer;
 [shader("compute")]
 void computeMain()
 {
-    vector<float, 1> a = {inputBuffer[0]};
+    vector<float, 1> a = { inputBuffer[0] };
 
     outputBuffer[0] = bit_cast<uint>(a);
     // BUF: 3F800000
@@ -28,5 +27,4 @@ void computeMain()
     // 2.0 : 0x4000
     // 3.0 : 0x4200
     // BUF-NEXT: 44004200
-
 }

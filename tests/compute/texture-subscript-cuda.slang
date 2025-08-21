@@ -56,10 +56,10 @@ RWStructuredBuffer<float> cudaOutputBuffer;
 
 [numthreads(11, 1, 1)]
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     switch (idx)
     {
     case 1:
@@ -67,16 +67,16 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int var = 0;
             float result = cudaT1D[0];
             // This is not supported in PTX.
-            //cudaOutputBuffer[idx] = result;
-        }    
-    break;
-    
+            // cudaOutputBuffer[idx] = result;
+        }
+        break;
+
     case 2:
         {
             int2 var = int2(1, 2);
             float result = cudaT2D[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT2D_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -87,14 +87,14 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += result4.z;
             cudaOutputBuffer[idx] += result4.w;
         }
-    break;
+        break;
 
     case 3:
         {
             int3 var = int3(1, 1, 1);
             float result = cudaT3D[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT3D_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -105,14 +105,14 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += result4.z;
             cudaOutputBuffer[idx] += result4.w;
         }
-    break;
+        break;
 
     case 4:
         {
             int3 var = int3(0, 0, 1);
             float result = cudaT2DArray[var];
             cudaOutputBuffer[idx] = result;
-            
+
             float2 result2 = cudaT2DArray_f2[var];
             cudaOutputBuffer[idx] += result2.x;
             cudaOutputBuffer[idx] += result2.y;
@@ -123,7 +123,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += result4.z;
             cudaOutputBuffer[idx] += result4.w;
         }
-    break;
+        break;
 
     case 5:
         {
@@ -131,7 +131,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int2 var = int2(1, 2);
             uint result = cudaT2D_uint[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             uint2 result2 = cudaT2D_uint2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -142,7 +142,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += float(result4.z);
             cudaOutputBuffer[idx] += float(result4.w);
         }
-    break;
+        break;
 
     case 6:
         {
@@ -150,7 +150,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int2 var = int2(1, 2);
             int result = cudaT2D_int[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             int2 result2 = cudaT2D_int2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -161,7 +161,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += float(result4.z);
             cudaOutputBuffer[idx] += float(result4.w);
         }
-    break;
+        break;
 
     case 7:
         {
@@ -169,7 +169,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(1, 1, 1);
             uint result = cudaT3D_uint[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             uint2 result2 = cudaT3D_uint2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -180,7 +180,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += float(result4.z);
             cudaOutputBuffer[idx] += float(result4.w);
         }
-    break;
+        break;
 
     case 8:
         {
@@ -188,7 +188,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             int3 var = int3(1, 1, 1);
             int result = cudaT3D_int[var];
             cudaOutputBuffer[idx] = float(result);
-            
+
             int2 result2 = cudaT3D_int2[var];
             cudaOutputBuffer[idx] += float(result2.x);
             cudaOutputBuffer[idx] += float(result2.y);
@@ -199,6 +199,6 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
             cudaOutputBuffer[idx] += float(result4.z);
             cudaOutputBuffer[idx] += float(result4.w);
         }
-    break;
+        break;
     }
-} 
+}

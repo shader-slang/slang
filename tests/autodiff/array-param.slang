@@ -16,7 +16,7 @@ struct LatentTexture
     [BackwardDifferentiable]
     void getCodeStochastic(float2 uv, out float code[kLatentDimsCount])
     {
-        return getCode(uint2(1,2), code);
+        return getCode(uint2(1, 2), code);
     }
 
     void getCode(uint2 texel, out float code[kLatentDimsCount])
@@ -30,10 +30,7 @@ struct LatentTexture
         }
     }
     [BackwardDerivativeOf(getCode)]
-    void bwd_getCode(uint2 texel, float d_out[kLatentDimsCount])
-    {
-        outputBuffer[0] = d_out[0];
-    }
+    void bwd_getCode(uint2 texel, float d_out[kLatentDimsCount]) { outputBuffer[0] = d_out[0]; }
 }
 
 static LatentTexture gLatents;
@@ -55,7 +52,7 @@ float evalDecoder()
 {
     // Latent code.
     float latentCode[LatentTexture.kLatentDimsCount];
-    gLatents.getCodeStochastic(float2(1,2), latentCode);
+    gLatents.getCodeStochastic(float2(1, 2), latentCode);
 
     // Model input.
     float input[kDecoderInputCount + LatentTexture.kLatentDimsCount];

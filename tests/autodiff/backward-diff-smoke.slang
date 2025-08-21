@@ -15,7 +15,7 @@ float test(float x, float y)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     dpfloat dpa = dpfloat(2.0, 0.0);
     dpfloat dpb = dpfloat(1.5, 0.0);

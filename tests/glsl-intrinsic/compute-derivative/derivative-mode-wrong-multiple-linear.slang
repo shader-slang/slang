@@ -8,7 +8,8 @@
 buffer MyBlockName
 {
     int result;
-} outputBuffer;
+}
+outputBuffer;
 
 #ifdef LINEAR_SLANG
 [DerivativeGroupLinear]
@@ -20,7 +21,7 @@ layout(derivative_group_linearNV) in;
 [numthreads(1, 3, 1)]
 #endif
 
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     outputBuffer.result = asint(ddx(1));
 }

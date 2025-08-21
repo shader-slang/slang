@@ -11,10 +11,7 @@ struct GenStruct<T>
     {
         T x;
     };
-    T getVal(SubType v)
-    {
-        return v.x;
-    }
+    T getVal(SubType v) { return v.x; }
 };
 
 T test<T>(T val)
@@ -27,7 +24,7 @@ T test<T>(T val)
 
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     float inVal = float(tid);

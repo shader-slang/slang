@@ -7,10 +7,7 @@ struct Buggy<let N : int>
     float m(float x) { return N * x; }
 
     [BackwardDerivativeOf(m)]
-    void mDiff(inout DifferentialPair<float> x, float dResult)
-    {
-        updateDiff(x, N * dResult);
-    }
+    void mDiff(inout DifferentialPair<float> x, float dResult) { updateDiff(x, N * dResult); }
 }
 
 [Differentiable]

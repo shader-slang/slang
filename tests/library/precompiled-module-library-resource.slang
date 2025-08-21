@@ -9,13 +9,11 @@
 
 module "precompiled-module-library-resource";
 
-public struct ResourceStruct {
+public struct ResourceStruct
+{
     public StructuredBuffer<int> buffer;
-    
-    __init(StructuredBuffer<int> bufferIn)
-    {
-        buffer = bufferIn;
-    }
+
+    __init(StructuredBuffer<int> bufferIn) { buffer = bufferIn; }
 };
 
 public int resource_in_parameter(StructuredBuffer<int> buffer)
@@ -35,6 +33,6 @@ internal float matrix_in_parameter_internal(float2x2 matrix)
 
 public float matrix_in_parameter_public(float a)
 {
-    float2x2 matrix = {a, .2, .3, .4};
+    float2x2 matrix = { a, .2, .3, .4 };
     return matrix_in_parameter_internal(matrix);
 }

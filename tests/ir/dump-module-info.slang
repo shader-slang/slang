@@ -1,4 +1,4 @@
-//TEST:COMPILE: tests/ir/dump-module-info.slang -o tests/ir/dump-module-info.slang-module 
+//TEST:COMPILE: tests/ir/dump-module-info.slang -o tests/ir/dump-module-info.slang-module
 
 //TEST:SIMPLE(filecheck=CHECK): -get-module-info tests/ir/dump-module-info.slang-module
 
@@ -9,5 +9,3 @@ module "foo";
 // CHECK: Module Version: 1
 // Just check that this is in the output with some string
 // CHECK: Compiler Version: {{.+}}
-
-

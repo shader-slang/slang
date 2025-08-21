@@ -8,10 +8,7 @@ interface IFoo
 class MyClass : IFoo
 {
     int intMember;
-    __init()
-    {
-        intMember = 0;
-    }
+    __init() { intMember = 0; }
     int method()
     {
         printf("method\n");

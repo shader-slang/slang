@@ -15,8 +15,8 @@ struct Fragment
 // Fragment Shader
 
 [shader("fragment")]
-float4 main(
-    CoarseVertex coarseVertex : CoarseVertex) : SV_Target
+float4 main(CoarseVertex coarseVertex: CoarseVertex)
+    : SV_Target
 {
     float3 color = coarseVertex.color;
 

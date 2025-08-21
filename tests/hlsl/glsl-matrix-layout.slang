@@ -9,16 +9,15 @@ struct MyStruct
 {
     column_major float3x2 mat;
     int otherVal[4];
-
 }
 
 //TEST_INPUT: set gConst = cbuffer(data=[1.0 3.0 5.0 0.0 2.0 4.0 6.0 0.0 100 101 102 103])
-// gConst will be:
-// --             --
-// |   1.0   2.0   |
-// |   3.0   4.0   |
-// |   5.0   6.0   |
-// --             --
+//  gConst will be:
+//  --             --
+//  |   1.0   2.0   |
+//  |   3.0   4.0   |
+//  |   5.0   6.0   |
+//  --             --
 ConstantBuffer<MyStruct> gConst;
 
 //TEST_INPUT: set gStructBuffer = ubuffer(data=[1.0 3.0 5.0 0.0 2.0 4.0 6.0 0.0 100 101 102 103 1.0 3.0 5.0 0.0 2.0 4.0 6.0 0.0 100 101 102 103])
@@ -28,7 +27,7 @@ RWStructuredBuffer<MyStruct[2]> gStructBuffer;
 RWByteAddressBuffer gRawBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         float2 v = float2(2.0, 3.0);
@@ -52,7 +51,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[8] = vm.z; // 28
         gRawBuffer.Store(0, gRawBuffer.Load<MyStruct>(0));
         vm = mul(gRawBuffer.Load<MyStruct>(0).mat, v);
-        outputBuffer[9] = vm.x; // 8
+        outputBuffer[9] = vm.x;  // 8
         outputBuffer[10] = vm.y; // 18
         outputBuffer[11] = vm.z; // 28
     }

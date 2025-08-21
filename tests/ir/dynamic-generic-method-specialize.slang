@@ -44,7 +44,7 @@ struct Mul : IInterface
         float sum = base;
         for (int i = 0; i < N; i++)
             sum *= arr[i];
-         V rs;
+        V rs;
         rs.val = sum;
         return rs;
     }

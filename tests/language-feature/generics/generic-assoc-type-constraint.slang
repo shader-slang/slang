@@ -23,7 +23,11 @@ struct BImpl<int x> : IB<x>
 struct AImpl<int y> : IA<y>
 {
     typealias B = BImpl<y>;
-    B getB() { BImpl<y> b = {}; return b; }
+    B getB()
+    {
+        BImpl<y> b = {};
+        return b;
+    }
 }
 
 int test<int z, T : IA<z>>(T t)
@@ -35,7 +39,7 @@ int test<int z, T : IA<z>>(T t)
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     AImpl<5> a;

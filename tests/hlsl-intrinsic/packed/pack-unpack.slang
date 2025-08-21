@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_6 -dx12 -use-dxil -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
 // 16 bit variants are not supported by WGSL.
@@ -146,7 +146,7 @@ uint __pack_clamp_s8(int16_t4 value)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     const uint unpackTestValue = unpackTestBuffer[0];
 
@@ -175,7 +175,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = uint(unpackedU16.z);
     // 0xD3
     outputBuffer[index++] = uint(unpackedU16.w);
-#else 
+#else
     outputBuffer[index++] = 0xFFU;
     outputBuffer[index++] = 0x83U;
     outputBuffer[index++] = 0x7AU;
@@ -224,8 +224,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = __pack_s8(packS32TestValues);
 
 #if !defined(WGSL)
-    uint16_t4 packU16TestValues = int16_t4(int16_t(packU32TestValues.x), int16_t(packU32TestValues.y), 
-                                           int16_t(packU32TestValues.z), int16_t(packU32TestValues.w));
+    uint16_t4 packU16TestValues = int16_t4(
+        int16_t(packU32TestValues.x),
+        int16_t(packU32TestValues.y),
+        int16_t(packU32TestValues.z),
+        int16_t(packU32TestValues.w));
     int16_t4 packS16TestValues = packU16TestValues;
     outputBuffer[index++] = __pack_u8(packU16TestValues);
     outputBuffer[index++] = __pack_s8(packS16TestValues);
@@ -242,8 +245,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = __pack_clamp_u8(packClampU32TestValues);
 
 #if !defined(WGSL)
-    int16_t4 packClampU16TestValues = int16_t4(int16_t(packClampU32TestValues.x), int16_t(packClampU32TestValues.y),
-                                               int16_t(packClampU32TestValues.z), int16_t(packClampU32TestValues.w));
+    int16_t4 packClampU16TestValues = int16_t4(
+        int16_t(packClampU32TestValues.x),
+        int16_t(packClampU32TestValues.y),
+        int16_t(packClampU32TestValues.z),
+        int16_t(packClampU32TestValues.w));
     outputBuffer[index++] = __pack_clamp_u8(packClampU16TestValues);
 #else
     outputBuffer[index++] = 0xFEFFFF05;
@@ -257,11 +263,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index++] = __pack_clamp_s8(packClampS32TestValues);
 
 #if !defined(WGSL)
-    int16_t4 packClampS16TestValues = int16_t4(int16_t(packClampS32TestValues.x), int16_t(packClampS32TestValues.y),
-                                               int16_t(packClampS32TestValues.z), int16_t(packClampS32TestValues.w));
+    int16_t4 packClampS16TestValues = int16_t4(
+        int16_t(packClampS32TestValues.x),
+        int16_t(packClampS32TestValues.y),
+        int16_t(packClampS32TestValues.z),
+        int16_t(packClampS32TestValues.w));
     outputBuffer[index++] = __pack_clamp_s8(packClampS16TestValues);
 #else
     outputBuffer[index++] = 0x81807FFF;
 #endif
 }
-

@@ -6,11 +6,11 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint v = dispatchThreadID.x;
     // This coercion loses data and would normally produce a warning
     int16_t v1 = v;
-    
+
     outputBuffer[dispatchThreadID.x] = v1;
 }

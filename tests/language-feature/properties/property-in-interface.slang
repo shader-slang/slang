@@ -6,14 +6,28 @@
 
 interface ICell
 {
-    property value : int { get; set; }
+    property value : int
+    {
+        get;
+        set;
+    }
 }
 
 struct MyCell : ICell
 {
     var _data : int;
 
-    property value : int { get { return _data; } set(newValue) { _data = newValue; } }
+    property value : int
+    {
+        get
+        {
+            return _data;
+        }
+        set(newValue)
+        {
+            _data = newValue;
+        }
+    }
 }
 
 struct YourCell : ICell
@@ -22,7 +36,8 @@ struct YourCell : ICell
 
     int getValue() { return value; }
 
-    [mutating] void setValue(int v) { value = v; }
+    [mutating]
+    void setValue(int v) { value = v; }
 }
 
 int helper<C : ICell>(C cell)
@@ -33,7 +48,7 @@ int helper<C : ICell>(C cell)
 
 int test(int value)
 {
-    MyCell myCell = { value+1 };
+    MyCell myCell = { value + 1 };
     YourCell yourCell = { value };
 
     // Note: fetching `value` directly from `YourCell`
@@ -42,14 +57,14 @@ int test(int value)
     // abstract member `ICell::value`.
     //
     int f = (yourCell.value + yourCell.getValue()) / 2;
-    return helper(myCell)*16 + helper(yourCell) + f;
+    return helper(myCell) * 16 + helper(yourCell) + f;
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int inVal = outputBuffer[tid];

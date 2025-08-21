@@ -16,7 +16,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         [ForceUnroll(2)]
         while (j < 3)
         {
-            sum += (i+j);
+            sum += (i + j);
             j++;
         }
         i++;

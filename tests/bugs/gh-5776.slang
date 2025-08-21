@@ -15,19 +15,19 @@ extension float : IFoo
     typedef float FooType;
 }
 
-__generic<T:IFoo, let N:int>
+__generic<T : IFoo, let N : int>
 extension Array<T, N> : IFoo
 {
     typedef Array<T.FooType, N> FooType;
 }
 
-__generic<T:IFoo, let N:int>
+__generic<T : IFoo, let N : int>
 extension vector<T, N> : IFoo
 {
     typedef vector<T.FooType, N> FooType;
 }
 
-__generic<T:IFoo, let N:int, let M:int>
+__generic<T : IFoo, let N : int, let M : int>
 extension matrix<T, N, M> : IFoo
 {
     typedef matrix<T.FooType, N, M> FooType;

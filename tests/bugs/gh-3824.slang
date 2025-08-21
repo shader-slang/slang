@@ -2,12 +2,16 @@
 
 // CHECK: OpEntryPoint
 
-namespace example {
-  struct Example {}
+namespace example
+{
+struct Example
+{
+}
 }
 
-struct Struct {
-  example::Example example;
+struct Struct
+{
+    example::Example example;
 }
 
 void func(Struct Struct)
@@ -15,6 +19,5 @@ void func(Struct Struct)
     // Test parameter name to be the same as type name.
 }
 
-[numthreads(1,1,1)]
-void main()
-{}
+[numthreads(1, 1, 1)]
+void main() {}

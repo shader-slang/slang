@@ -7,11 +7,12 @@ struct VertexOut
     float3 color;
 }
 
-// CHECK_SPV: %v_color = OpVariable %_ptr_Input_v3float Input 
+// CHECK_SPV: %v_color = OpVariable %_ptr_Input_v3float Input
 // CHECK_SPV: %{{.*}} = OpExtInst %v3float %{{.*}} InterpolateAtCentroid %v_color
 // CHECK_HLSL: EvaluateAttributeAtCentroid(v_0.color_0)
 
-float4 main(VertexOut v) : SV_Target
+float4 main(VertexOut v)
+    : SV_Target
 {
     return float4(EvaluateAttributeAtCentroid(v.color), 1.0);
 }

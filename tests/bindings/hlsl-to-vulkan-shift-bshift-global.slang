@@ -12,24 +12,24 @@
 
 float4 g_vGlobalValues; // This ends up in globals
 
-cbuffer CBufferTest_t 
+cbuffer CBufferTest_t
 {
-	float4 g_vCBuffer0Values;
+    float4 g_vCBuffer0Values;
 };
 
 struct VS_INPUT
 {
-	float3 vPositionWs : POSITION;
+    float3 vPositionWs : POSITION;
 };
 
 struct PS_INPUT
 {
-	float4 vColor;
+    float4 vColor;
 };
 
-PS_INPUT MainVs( VS_INPUT i )
+PS_INPUT MainVs(VS_INPUT i)
 {
-	PS_INPUT o;
-	o.vColor.rgba = g_vCBuffer0Values + g_vGlobalValues;
-	return o;
+    PS_INPUT o;
+    o.vColor.rgba = g_vCBuffer0Values + g_vGlobalValues;
+    return o;
 }

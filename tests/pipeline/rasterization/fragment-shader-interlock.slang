@@ -17,9 +17,9 @@
 
 [shader("fragment")]
 void main(
-    float4 coords : COORDS,
+    float4 coords: COORDS,
     uniform RasterizerOrderedTexture2D<float4> texture,
-    out float4 result : SV_Target)
+    out float4 result: SV_Target)
 {
     beginInvocationInterlock();
 

@@ -17,22 +17,18 @@ struct ShadowRay
 
 struct Params
 {
-    Texture2D<float>    alphaMap;
-    SamplerState        sampler;
-    int                 mode;
+    Texture2D<float> alphaMap;
+    SamplerState sampler;
+    int mode;
 }
 ParameterBlock<Params> gParams;
 
-void main(
-    SphereHitAttributes attributes,
-    in out ShadowRay    ioPayload)
+void main(SphereHitAttributes attributes, in out ShadowRay ioPayload)
 {
-    if(gParams.mode != 0)
+    if (gParams.mode != 0)
     {
-        float val = gParams.alphaMap.SampleLevel(
-            gParams.sampler,
-            attributes.normal.xy, 0);
-        if(val > 0)
+        float val = gParams.alphaMap.SampleLevel(gParams.sampler, attributes.normal.xy, 0);
+        if (val > 0)
         {
             AcceptHitAndEndSearch();
         }

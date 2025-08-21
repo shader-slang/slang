@@ -4,14 +4,17 @@
 
 //PASS-NOT: 31104
 #ifdef PASS
-[[vk_binding(0,0)]] uniform ConstantBuffer<uint> addresses;
+[[vk_binding(0, 0)]]
+uniform ConstantBuffer<uint> addresses;
 layout(location = 1) uniform ConstantBuffer<uint> addresses1;
 #endif
 
 //WARN: 31104
 #ifdef WARN1
-[[vk_binding(0,0)]] uniform uint addresses;
-[[vk_binding(1,0)]] uniform uint addresses1;
+[[vk_binding(0, 0)]]
+uniform uint addresses;
+[[vk_binding(1, 0)]]
+uniform uint addresses1;
 #endif
 #ifdef WARN2
 layout(location = 0) uniform uint addresses;

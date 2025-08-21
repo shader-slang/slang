@@ -17,7 +17,7 @@ RWStructuredBuffer<int> inBuffer;
 // CHECK: OpDecorate %inBuffer Binding 2
 
 [numthreads(4, 1, 1)]
-void computeMain(uint i : SV_GroupIndex)
+void computeMain(uint i: SV_GroupIndex)
 {
     int g = inBuffer[i];
     outputBuffer.Append(g);
@@ -26,7 +26,7 @@ void computeMain(uint i : SV_GroupIndex)
 
     uint numStructs, stride;
     outputBuffer.GetDimensions(numStructs, stride);
-    if(i == 0)
+    if (i == 0)
         outputBuffer.Append(int(numStructs));
 
     // BUF: type: int32_t

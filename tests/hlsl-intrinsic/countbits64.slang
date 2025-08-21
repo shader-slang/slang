@@ -3,10 +3,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
-// No support for uint64_t on fxc - we need SM6.0 and dxil to use uint64_t with d3d12
-// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
+//  No support for uint64_t on fxc - we need SM6.0 and dxil to use uint64_t with d3d12
+//  https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -render-feature hardware-device
-// wgpu only has 32-bit support, so we do not try and test it here
+//  wgpu only has 32-bit support, so we do not try and test it here
 
 //CHK:1
 
@@ -14,7 +14,7 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint r1 = countbits(0b1ULL << 32);
     uint2 r2 = countbits(uint64_t2(0b0ULL << 32, 0b1ULL << 32));

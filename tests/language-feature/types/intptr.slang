@@ -13,10 +13,12 @@ intptr_t getNativeIntPtrSize();
 
 __generic<T>
 __target_intrinsic(cpp, "sizeof($0)")
-__target_intrinsic(cuda, "sizeof($0)")
-intptr_t getSizeOf(T val);
+__target_intrinsic(cuda, "sizeof($0)") intptr_t getSizeOf(T val);
 
-intptr_t getIntPtrVal() { return 0z; }
+intptr_t getIntPtrVal()
+{
+    return 0z;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
@@ -36,9 +38,9 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         testResult = 0;
     }
     outputBuffer[dispatchThreadID.x] = testResult;
-    outputBuffer[dispatchThreadID.x+1] = int(b >> 1);
+    outputBuffer[dispatchThreadID.x + 1] = int(b >> 1);
 
     vector<uintptr_t, 2> c = vector<uintptr_t, 2>(2uz);
     vector<uintptr_t, 2> d = vector<uintptr_t, 2>(3uz);
-    outputBuffer[dispatchThreadID.x+2] = int((c+d).y);
+    outputBuffer[dispatchThreadID.x + 2] = int((c + d).y);
 }

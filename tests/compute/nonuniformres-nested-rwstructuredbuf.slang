@@ -25,9 +25,11 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR1]]
     // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR2]]
-    RWStructuredBuffer<int> buffer1 = buffer[NonUniformResourceIndex(NonUniformResourceIndex(NonUniformResourceIndex(dispatchThreadID.x)))];
+    RWStructuredBuffer<int> buffer1 = buffer[NonUniformResourceIndex(
+        NonUniformResourceIndex(NonUniformResourceIndex(dispatchThreadID.x)))];
     buffer1[0] = 1;
 
-    RWStructuredBuffer<int> buffer2 = buffer[int(NonUniformResourceIndex(uint(float(dispatchThreadID.x))))];
+    RWStructuredBuffer<int> buffer2 =
+        buffer[int(NonUniformResourceIndex(uint(float(dispatchThreadID.x))))];
     buffer2[0] = 1;
 }

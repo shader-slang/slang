@@ -4,9 +4,11 @@
 // CHECK: OpEntryPoint MissKHR %missShader "missShader"
 // CHECK: OpEntryPoint MissKHR %missShader2 "missShader2"
 
-struct RayPayload{};
+struct RayPayload
+{
+};
 [shader("miss")]
-void missShader(inout RayPayload payload) { }
+void missShader(inout RayPayload payload) {}
 
 [shader("miss")]
-void missShader2(inout RayPayload payload)  { }
+void missShader2(inout RayPayload payload) {}

@@ -1,6 +1,7 @@
 //TEST:INTERPRET(filecheck=CHECK):
 interface IBar
-{}
+{
+}
 
 interface IFoo : IBar
 {
@@ -9,13 +10,10 @@ interface IFoo : IBar
 
 struct Impl : IFoo
 {
-    void execute()
-    {
-        printf("Impl::execute();\n");
-    }
+    void execute() { printf("Impl::execute();\n"); }
 }
 
-extension<T:IBar> T : IFoo
+extension<T : IBar> T : IFoo
 {
     void execute()
     {
@@ -23,9 +21,11 @@ extension<T:IBar> T : IFoo
     }
 }
 
-struct Base : IBar{}
+struct Base : IBar
+{
+}
 
-void test<T:IFoo>(T t)
+void test<T : IFoo>(T t)
 {
     t.execute();
 }

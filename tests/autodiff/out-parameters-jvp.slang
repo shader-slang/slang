@@ -17,7 +17,7 @@ void h(float x, float y, out float result)
 
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float x = 2.0;
     float y = 3.5;
@@ -28,5 +28,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __fwd_diff(h)(dpfloat(x, dx), dpfloat(y, dy), dresult);
 
     outputBuffer[0] = dresult.d; // Expect: 9.5
-
 }

@@ -12,10 +12,7 @@ interface IFoo
 
 struct A : IFoo
 {
-    float doSomething()
-    {
-        return 0.0f;
-    }
+    float doSomething() { return 0.0f; }
 }
 
 // A normal function that calls doSomething().
@@ -41,13 +38,13 @@ float caller(IFoo d, float x)
 //TEST_INPUT: type_conformance A:IFoo = 0
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IFoo>(dispatchThreadID.x, 0); // A
 
     var a = diffPair(3.0, 1.0);
     __bwd_diff(caller)(obj, a, 1.0);
-    outputBuffer[0] = a.d;                                         // Expect: 12.0
+    outputBuffer[0] = a.d;                                           // Expect: 12.0
     outputBuffer[1] = __fwd_diff(caller)(obj, diffPair(3.0, 1.0)).p; // Expect: 18.0
-    outputBuffer[2] = caller(obj, 3.0); // Expect: 9.0
+    outputBuffer[2] = caller(obj, 3.0);                              // Expect: 9.0
 }

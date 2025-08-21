@@ -2,10 +2,7 @@
 class MyClass
 {
     int intMember;
-    __init()
-    {
-        intMember = 0;
-    }
+    __init() { intMember = 0; }
     int method()
     {
         printf("method\n");

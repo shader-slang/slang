@@ -8,7 +8,8 @@
 buffer MyBlockName
 {
     uint data[2];
-} outputBuffer;
+}
+outputBuffer;
 
 // CHECK_GLSL-DAG: void main(
 // CHECK_SPV-DAG: OpEntryPoint
@@ -24,7 +25,7 @@ bool testSetterAndGetter()
         && atomicCounterExchange(one, 1) == 0
 
 // CHECK_GLSL-DAG: atomicExchange
-// no idea how to check the spirv reliabley...
+           // no idea how to check the spirv reliabley...
         && atomicCounter(one) == 1
         && atomicCounterExchange(one, 5) == 1
         && atomicCounter(one) == 5
@@ -47,10 +48,10 @@ bool counterAsParam(atomic_uint param)
 // SPV_CHECK-LABEL: testAtomicUint
 bool testAtomicUint()
 {
-// ensure the code emits for `one` index into [3] for 12/4
+    // ensure the code emits for `one` index into [3] for 12/4
 // CHECK_GLSL-DAG: {{.*}}_data_{{.*}}[3]{{.*}}
     return true
-    
+
         && atomicCounterExchange(one, 5) != 100
 // CHECK_GLSL-DAG: atomicAdd(
 // CHECK_SPV-DAG: OpAtomicIIncrement
@@ -82,7 +83,7 @@ bool testAtomicUint()
         && atomicCounterExchange(one, 5) != 100
 // CHECK_GLSL-DAG: atomicMax(
 // CHECK_SPV-DAG: OpAtomicUMax
-        && atomicCounterMax(one, 1) == 5 
+        && atomicCounterMax(one, 1) == 5
         && atomicCounter(one) == 5
 
 // CHECK_GLSL-DAG: atomicAnd(
@@ -106,27 +107,27 @@ bool testAtomicUint()
 // CHECK_GLSL-DAG: atomicCompSwap(
 // CHECK_SPV-DAG: OpAtomicCompareExchange
         && atomicCounterExchange(one, 5) != 100
-        && atomicCounterCompSwap(one, 5, 3) == 5 
+        && atomicCounterCompSwap(one, 5, 3) == 5
         && atomicCounter(one) == 3
 
 // CHECK_GLSL-DAG: atomicCompSwap(
 // CHECK_SPV-DAG: OpAtomicCompareExchange
         && atomicCounterExchange(one, 5) != 100
-        && atomicCounterCompSwap(one, 5, 3) == 5 
+        && atomicCounterCompSwap(one, 5, 3) == 5
         && atomicCounter(one) == 3
 
         && counterAsParam(one);
-        ;
+    ;
 }
 
 void computeMain()
 {
     outputBuffer.data[0] = true
             && testSetterAndGetter()
-            ;
+        ;
     outputBuffer.data[1] = true
             && testAtomicUint()
-            ;
+        ;
     // BUF: 1
     // BUF-NEXT: 1
 }

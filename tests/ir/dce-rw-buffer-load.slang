@@ -18,4 +18,3 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // CHECK: void computeMain
 // CHECK-NOT: test
 // CHECK: }
-

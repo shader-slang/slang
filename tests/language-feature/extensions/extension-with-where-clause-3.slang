@@ -5,10 +5,7 @@
 struct Foo<each A>
 {
     int val = 0;
-    int getVal()
-    {
-       return val; 
-    }
+    int getVal() { return val; }
 }
 
 extension<each A> Foo<A>

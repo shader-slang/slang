@@ -25,7 +25,7 @@ uint[2] maybeGroupSharedReturn(uint id)
 }
 
 [numthreads(2, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     g_values = { 1, 0 };
     AllMemoryBarrierWithGroupSync();

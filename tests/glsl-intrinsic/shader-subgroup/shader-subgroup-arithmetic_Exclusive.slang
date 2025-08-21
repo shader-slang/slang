@@ -25,13 +25,15 @@
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 #define local_size_x_v 4
 layout(local_size_x = local_size_x_v) in;
 
 __generic<T : __BuiltinLogicalType>
-bool test1Logical() {
+bool test1Logical()
+{
     return true
 #if defined(TEST_when_logical_operators_are_implemented)
         & subgroupExclusiveAnd(T(1)) == T(1)
@@ -42,7 +44,8 @@ bool test1Logical() {
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-bool testVLogical() {
+bool testVLogical()
+{
     typealias gvec = vector<T, N>;
 
     return true
@@ -54,7 +57,8 @@ bool testVLogical() {
         ;
 }
 
-bool testLogical() {
+bool testLogical()
+{
     return true
         & test1Logical<int>()
         & testVLogical<int, 2>()
@@ -96,12 +100,13 @@ bool testLogical() {
 }
 
 __generic<T : __BuiltinArithmeticType>
-bool test1Arithmetic() {
+bool test1Arithmetic()
+{
     return true
         & subgroupExclusiveAdd(T(1)) == T(3)
         & subgroupExclusiveMul(T(1)) == T(1)
 
-        // WGSL and METAL does not support exclusive min/max.
+    // WGSL and METAL does not support exclusive min/max.
 #if !defined(WGPU) && !defined(METAL)
         & subgroupExclusiveMin(T(1)) == T(1)
         & subgroupExclusiveMax(T(1)) == T(1)
@@ -109,14 +114,15 @@ bool test1Arithmetic() {
         ;
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVArithmetic() {
+bool testVArithmetic()
+{
     typealias gvec = vector<T, N>;
 
     return true
         & subgroupExclusiveAdd(gvec(T(1))) == gvec(T(3))
         & subgroupExclusiveMul(gvec(T(1))) == gvec(T(1))
 
-        // WGSL and METAL does not support exclusive min/max.
+    // WGSL and METAL does not support exclusive min/max.
 #if !defined(WGPU) && !defined(METAL)
         & subgroupExclusiveMin(gvec(T(1))) == gvec(T(1))
         & subgroupExclusiveMax(gvec(T(1))) == gvec(T(1))
@@ -124,7 +130,8 @@ bool testVArithmetic() {
         ;
 }
 
-bool testArithmetic() {
+bool testArithmetic()
+{
     return true
         & test1Arithmetic<float>()
         & testVArithmetic<float, 2>()
@@ -143,7 +150,7 @@ bool testArithmetic() {
         & testVArithmetic<uint, 3>()
         & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+    // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
 #if !defined(WGPU) && !defined(METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
@@ -167,8 +174,8 @@ bool testArithmetic() {
         & testVArithmetic<uint64_t, 4>()
 #endif
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+    // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined(WGPU)
         & test1Arithmetic<int16_t>()
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()
@@ -190,14 +197,15 @@ void computeMain()
 #if !defined(WGPU) && !defined(METAL)
             & testLogical()
 #endif
-            ;
+        ;
 
 
     bool res1 = true
             & testArithmetic()
-            ;
+        ;
 
-    if (gl_LocalInvocationID.x == 3) {
+    if (gl_LocalInvocationID.x == 3)
+    {
         // seperate so if there is an erroneous error the "major"
         // tests are issolated into 2 branches without polluting the
         // file with a bunch of individual test values

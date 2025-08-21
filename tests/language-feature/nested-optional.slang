@@ -1,6 +1,9 @@
 //TEST:INTERPRET(filecheck=CHECK):
 
-Optional<Optional<int>> getNone() { return none; }
+Optional<Optional<int>> getNone()
+{
+    return none;
+}
 
 void main()
 {

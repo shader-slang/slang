@@ -82,27 +82,27 @@ void accumulate_3D(inout uint r, TextureFootprint3D f)
 // SPRIV: OpExtension "SPV_NV_shader_image_footprint"
 
 void fragmentMain(
-            float                       v : VARYING,
+    float v: VARYING,
 
-    uniform Texture2D                   texture_2D,
+    uniform Texture2D texture_2D,
 // SPIRV-DAG: OpTypeImage {{.*}} 2D
 
 // HLSL-DAG: Texture2D{{.*}}register(t0)
 
-    uniform Texture3D                   texture_3D,
+    uniform Texture3D texture_3D,
 // SPIRV-DAG: OpTypeImage {{.*}} 3D
 
 // HLSL-DAG: Texture3D{{.*}}register(t1)
 
-    uniform SamplerState                sampler,
-    uniform RWStructuredBuffer<uint>    outputBuffer,
-    uniform float4                      c,
-    uniform float4                      gx,
-    uniform float4                      gy,
-    uniform uint                        g,
-    uniform float                       lodBias,
-    uniform float                       lodClamp,
-    uniform float                       lod)
+    uniform SamplerState sampler,
+    uniform RWStructuredBuffer<uint> outputBuffer,
+    uniform float4 c,
+    uniform float4 gx,
+    uniform float4 gy,
+    uniform uint g,
+    uniform float lodBias,
+    uniform float lodClamp,
+    uniform float lod)
 {
     uint index = uint(v);
     uint r = 0;
@@ -115,26 +115,26 @@ void fragmentMain(
 #define CLAMP(ARG) /* empty */
 #endif
 
-#define TEST_COMMON(ND, COARSE_OR_FINE) \
-        accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE            (granularity, sampler, coords                   ))  ;\
-        accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Bias      (granularity, sampler, coords, lodBias          ))  ;\
-CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Clamp     (granularity, sampler, coords, lodClamp         ))) ;\
-CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##BiasClamp (granularity, sampler, coords, lodBias, lodClamp))) ;\
-        accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Level     (granularity, sampler, coords, lod              ))  ;\
-/* end */
-
-#define TEST_GRAD(ND, COARSE_OR_FINE) \
-        accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Grad      (granularity, sampler, coords, dx, dy           ))  ;\
-CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp (granularity, sampler, coords, dx, dy, lodClamp ))) ;\
-/* end */
-
-
-#define TEST_2D(COARSE_OR_FINE) \
-    TEST_COMMON(_2D, COARSE_OR_FINE) \
-    TEST_GRAD(_2D, COARSE_OR_FINE) \
+#define TEST_COMMON(ND, COARSE_OR_FINE)                                                                                               \
+    accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE(granularity, sampler, coords));                                      \
+    accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Bias(granularity, sampler, coords, lodBias));                       \
+    CLAMP(accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Clamp(granularity, sampler, coords, lodClamp)));              \
+    CLAMP(accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##BiasClamp(granularity, sampler, coords, lodBias, lodClamp))); \
+    accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Level(granularity, sampler, coords, lod));                          \
     /* end */
 
-#define TEST_3D(COARSE_OR_FINE) \
+#define TEST_GRAD(ND, COARSE_OR_FINE)                                                                                                \
+    accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##Grad(granularity, sampler, coords, dx, dy));                       \
+    CLAMP(accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp(granularity, sampler, coords, dx, dy, lodClamp))); \
+    /* end */
+
+
+#define TEST_2D(COARSE_OR_FINE)      \
+    TEST_COMMON(_2D, COARSE_OR_FINE) \
+    TEST_GRAD(_2D, COARSE_OR_FINE)   \
+    /* end */
+
+#define TEST_3D(COARSE_OR_FINE)      \
     TEST_COMMON(_3D, COARSE_OR_FINE) \
     /* end */
 
@@ -199,7 +199,6 @@ CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp 
 
 // SPIRV: OpImageSampleFootprintNV
 // SPIRV-SAME: [[FALSE]] Grad|MinLod
-
     }
 
     {
@@ -246,7 +245,6 @@ CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp 
 // SPIRV: OpImageSampleFootprintNV
 // SPIRV-SAME: [[FALSE]] Lod
 // HLSL-DAG: NvFootprintFineLevel{{.*}}NV_EXTN_TEXTURE_3D
-
     }
 
     outputBuffer[index] = r;

@@ -13,23 +13,26 @@
 // a structured or constant buffer into a subroutine, which requires
 // further work.
 
-struct S { float4 f; };
+struct S
+{
+    float4 f;
+};
 
 cbuffer C
 {
     uint index;
 }
 
-ConstantBuffer<S>           cb [3];
-StructuredBuffer<S>         sb1[4];
-RWStructuredBuffer<float4>  sb2[5];
-ByteAddressBuffer           bb [6];
+ConstantBuffer<S> cb[3];
+StructuredBuffer<S> sb1[4];
+RWStructuredBuffer<float4> sb2[5];
+ByteAddressBuffer bb[6];
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
-    return cb [index]       .f
+    return cb[index].f
          + sb1[index][index].f
          + sb2[index][index]
          + float4(bb[index].Load(int(index*4)));
 }
-

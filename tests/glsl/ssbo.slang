@@ -8,13 +8,15 @@ precision highp int;
 buffer MyBlockName
 {
     uint data[];
-} inputBuffer;
+}
+inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
     uint data[];
-} outputBuffer;
+}
+outputBuffer;
 
 layout(local_size_x = 4) in;
 [shader("compute")]

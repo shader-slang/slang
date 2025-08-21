@@ -13,10 +13,7 @@ struct C
         return a;
     }
     [mutating]
-    void init()
-    {
-        a = 0;
-    }
+    void init() { a = 0; }
 }
 int doSomething(C d_in)
 {
@@ -31,7 +28,7 @@ int doSomething(C d_in)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     C c;

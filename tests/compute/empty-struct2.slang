@@ -19,7 +19,7 @@ interface IEmptyS
 };
 struct EmptyS : IEmptyS
 {
-    float emptyFunc() {return 0.0;}    
+    float emptyFunc() { return 0.0; }
 };
 
 struct Empty<TT : IEmptyS> : IInterface
@@ -27,10 +27,7 @@ struct Empty<TT : IEmptyS> : IInterface
     typedef TT T;
     TT value = TT();
     float a = 0;
-    TT getT()
-    {
-        return value;
-    }
+    TT getT() { return value; }
     [mutating]
     void setT(TT val)
     {
@@ -46,7 +43,7 @@ void test<Obj : IInterface>(Obj obj)
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     Empty<EmptyS> obj = {};
     test(obj);

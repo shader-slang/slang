@@ -33,10 +33,10 @@ float infinitesimal(float x)
 
 // Test that computeLoop's intermediates have no float sitting
 // around (must not cache the outvar from 'compute()')
-// 
-// Further, if loop exit value inference is working correctly, 
+//
+// Further, if loop exit value inference is working correctly,
 // then there should be no context type at all.
-// 
+//
 // CHECK-NOT: struct s_bwd_prop_computeLoop_Intermediates
 //
 // Check that the signature of the s_bwd_prop_computeLoop function only
@@ -67,13 +67,13 @@ float computeLoop(float y)
 // CHECK-NOT: struct {{[a-zA-Z0-9_]*}}test_simple_loop{{[a-zA-Z0-9_]*}}
 [BackwardDifferentiable]
 float test_simple_loop(float y)
-{  
+{
     float x = computeLoop(y);
     return y + x;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpa = dpfloat(1.0, 0.0);

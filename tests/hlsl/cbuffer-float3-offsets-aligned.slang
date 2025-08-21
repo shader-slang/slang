@@ -73,7 +73,7 @@ cbuffer Constants
 // REFLECT: "offset": 92
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = 0;
     outputBuffer[i++] = v0.x;
@@ -111,6 +111,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // BUFFER-NEXT: 15
     // BUFFER-NEXT: 16
     // BUFFER-NEXT: 17
-
 }
-

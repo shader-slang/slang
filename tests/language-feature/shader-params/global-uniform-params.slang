@@ -11,7 +11,7 @@ uniform int b;
 
 int test(int val)
 {
-	return a*(val+1) + b*(val+2);
+    return a * (val + 1) + b * (val + 2);
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -19,7 +19,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
 [shader("compute")]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
     int inVal = tid;

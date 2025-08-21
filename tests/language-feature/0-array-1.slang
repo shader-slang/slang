@@ -7,10 +7,10 @@ struct MyData
 }
 
 uniform MyData* myData;
-uniform int * output;
+uniform int* output;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     // These are all ill-formed, but we want to still ensure our backend
     // can handle them gracefully without crashing.
@@ -18,7 +18,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // by a `if` statement that checks the size before accessing.
     // The condition would then evaluate to false and causing all the accessing
     // code to be optimized out.
-    
+
     // Use runtime values to access the 0-sized array to avoid triggering
     // the new out-of-bounds diagnostic for constant indices
     uint runtimeIndex = dispatchThreadID.x;

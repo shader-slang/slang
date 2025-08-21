@@ -19,19 +19,13 @@ interface IBar
 struct Foo : IFoo
 {
     float3 albedo;
-    float sample()
-    {
-        return albedo.x;
-    }
+    float sample() { return albedo.x; }
 }
 
 struct Bar : IBar
 {
     IFoo foo;
-    float sample()
-    {
-        return foo.sample();
-    }
+    float sample() { return foo.sample(); }
 }
 
 struct AnyVal

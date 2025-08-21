@@ -20,8 +20,8 @@ struct MyType
     float myField[3];
 }
 
-[numthreads(1,1,1)]
-void computeMain(int id : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain(int id: SV_DispatchThreadID)
 {
     MyType v;
     v.myField[id] = 0.0f;

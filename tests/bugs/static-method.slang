@@ -4,10 +4,7 @@
 
 struct S
 {
-    static void doThing(in out int x, int y)
-    {
-        x += y;
-    }
+    static void doThing(in out int x, int y) { x += y; }
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -25,7 +22,7 @@ int test(int t)
 }
 
 [numthreads(4)]
-void computeMain(int3 tid : SV_DispatchThreadID)
+void computeMain(int3 tid: SV_DispatchThreadID)
 {
     int val = tid.x;
     val = test(val);

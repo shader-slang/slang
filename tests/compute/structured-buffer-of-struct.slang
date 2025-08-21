@@ -31,7 +31,7 @@ S test(S s)
 // {
 //     buf[i] = test(buf[i]);
 // }
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     buf[dispatchThreadID.x] = test(buf[dispatchThreadID.x]);
 }

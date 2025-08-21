@@ -50,12 +50,12 @@ struct TopFragment
 
 struct FragmentStageInput
 {
-	float4	coarseVertex	: CoarseVertex;
+    float4 coarseVertex : CoarseVertex;
 };
 
 struct FragmentStageOutput
 {
-	TopFragment fragment	: SV_Target;
+    TopFragment fragment : SV_Target;
 };
 
 //WGSL: fn fragmentMain{{.*}}-> [[ReturnType:FragmentStageOutput[_0-9]+]]

@@ -13,7 +13,8 @@ cbuffer C
     float2 uv;
 };
 
-float4 main() : SV_Target
+float4 main()
+    : SV_Target
 {
     return t0.Sample(s, uv)
          + t1.Sample(s, uv);
@@ -35,12 +36,11 @@ Texture2D C_t0_0 : register(t0);
 Texture2D C_t1_0 : register(t1);
 SamplerState C_s_0 : register(s0);
 
-float4 main() : SV_TARGET
+float4 main()
+    : SV_TARGET
 {
     return C_t0_0.Sample(C_s_0, C_0.uv_0)
          + C_t1_0.Sample(C_s_0, C_0.uv_0);
 }
 
 #endif
-
-

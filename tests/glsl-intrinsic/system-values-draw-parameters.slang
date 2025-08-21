@@ -16,4 +16,3 @@ void main()
     // CHECK_HLSL: SV_StartInstanceLocation
     // CHECK_METAL: base_instance
 }
-

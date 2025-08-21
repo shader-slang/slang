@@ -10,7 +10,8 @@
 // GLSL: gl_VertexIndex - gl_BaseVertex
 
 [shader("vertex")]
-float4 vertMain(int i : SV_VertexID) : SV_Position
+float4 vertMain(int i: SV_VertexID)
+    : SV_Position
 {
     return i;
 }

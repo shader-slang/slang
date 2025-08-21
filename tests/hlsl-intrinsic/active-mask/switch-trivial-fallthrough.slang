@@ -29,34 +29,35 @@ RWStructuredBuffer<int> buffer;
 
 #define THREAD_COUNT 4
 #define LOC_COUNT 5
-#define WRITE(LOC) buffer[tid + (LOC)*THREAD_COUNT] = 0xA0000000 | (tid << 24) | (LOC << 8) | WaveGetActiveMask()
+#define WRITE(LOC) \
+    buffer[tid + (LOC) * THREAD_COUNT] = 0xA0000000 | (tid << 24) | (LOC << 8) | WaveGetActiveMask()
 
 //TEST_INPUT:cbuffer(data=[0 1]):name C
 cbuffer C
 {
-	int alwaysFalse;
-	int alwaysTrue;
+    int alwaysFalse;
+    int alwaysTrue;
 }
 
 void test(int tid)
 {
-	switch(tid)
-	{
-	case 0:
-	case 1:
-		WRITE(0);
-		break;
+    switch (tid)
+    {
+    case 0:
+    case 1:
+        WRITE(0);
+        break;
 
-	case 2:
-	default:
-		WRITE(2);
-		break;
-	}
-	WRITE(4);
+    case 2:
+    default:
+        WRITE(2);
+        break;
+    }
+    WRITE(4);
 }
 
 [numthreads(THREAD_COUNT, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-	test(dispatchThreadID.x);
+    test(dispatchThreadID.x);
 }

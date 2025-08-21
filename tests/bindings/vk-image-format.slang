@@ -25,10 +25,11 @@ RWTexture2D<float4> snormTextureWithUnderscore;
 
 cbuffer C
 {
-	uint2 index;
+    uint2 index;
 }
 
-float4 main(): SV_Target
+float4 main()
+    : SV_Target
 {
     float4 result = 0;
 
@@ -36,6 +37,6 @@ float4 main(): SV_Target
     result += snormTexture[index];
     result += specialTexture[index];
     result += snormTextureWithUnderscore[index];
-    
+
     return result;
 }

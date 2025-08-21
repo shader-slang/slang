@@ -50,7 +50,7 @@ struct DiffMaterialData : IDifferentiable
 
 RWStructuredBuffer<float3> outputBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     DiffMaterialData diffData;

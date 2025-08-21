@@ -19,33 +19,35 @@ enum FirstEnum
 {
     A,
     B
-};
+}
+;
 
 enum SecondEnum
 {
     C,
-    D=3
-};
+    D = 3
+}
+;
 
-extension FirstEnum: IThing
+extension FirstEnum : IThing
 {
     void writeInfo(int i)
     {
         outputBuffer[i] = 1;
-        outputBuffer[i+1] = this;
+        outputBuffer[i + 1] = this;
     }
 }
 
-extension SecondEnum: IThing
+extension SecondEnum : IThing
 {
     void writeInfo(int i)
     {
         outputBuffer[i] = 2;
-        outputBuffer[i+1] = this;
+        outputBuffer[i + 1] = this;
     }
 }
 
-void indirectionFunc<T: IThing>(T val, int i)
+void indirectionFunc<T : IThing>(T val, int i)
 {
     val.writeInfo(i);
 }

@@ -19,9 +19,9 @@ groupshared float4 s[GROUP_THREAD_COUNT];
 
 [numthreads(GROUP_THREAD_COUNT, 1, 1)]
 void main(
-    uint dispatchThreadID   : SV_DispatchThreadID,
-    uint groupThreadID      : SV_GroupThreadID,
-    uint groupID            : SV_GroupIndex )
+    uint dispatchThreadID: SV_DispatchThreadID,
+    uint groupThreadID: SV_GroupThreadID,
+    uint groupID: SV_GroupIndex)
 {
     // the actual algorithm being done here is bogus
 
@@ -29,7 +29,7 @@ void main(
     s[groupThreadID] = input[dispatchThreadID];
 
     // do some sum passes
-    for(uint stride = 1; stride < GROUP_THREAD_COUNT; stride <<= 1)
+    for (uint stride = 1; stride < GROUP_THREAD_COUNT; stride <<= 1)
     {
         GroupMemoryBarrierWithGroupSync();
 
@@ -40,4 +40,3 @@ void main(
 
     output[dispatchThreadID] = s[0];
 }
-

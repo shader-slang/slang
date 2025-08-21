@@ -18,16 +18,13 @@ interface IFoo2
 }
 
 [require(spvGroupNonUniformArithmetic)]
-void useNonUniformArithmetic()
-{}
+void useNonUniformArithmetic() {}
 
 [require(spvRayQueryKHR)]
-void useRayQueryKHR()
-{}
+void useRayQueryKHR() {}
 
 [require(spvAtomicFloat16AddEXT)]
-void useAtomicFloat16()
-{}
+void useAtomicFloat16() {}
 
 // This should be OK, uses nothing past what is declared in the interface.
 struct Impl1 : IFoo
@@ -38,10 +35,7 @@ struct Impl1 : IFoo
         useRayQueryKHR();
     }
 
-    void method2()
-    {
-        useAtomicFloat16();
-    }
+    void method2() { useAtomicFloat16(); }
 }
 
 struct Impl2 : IFoo, IFoo2
@@ -63,7 +57,7 @@ struct Impl2 : IFoo, IFoo2
         useNonUniformArithmetic();
     }
 
-    // do not error here because capabilities are not explicitly tagged 
+    // do not error here because capabilities are not explicitly tagged
     // on the requirement parent `IFoo2` or requirment method
     // CHECK-NOT: error
     void method3()
@@ -73,5 +67,4 @@ struct Impl2 : IFoo, IFoo2
     }
 }
 
-void main()
-{}
+void main() {}

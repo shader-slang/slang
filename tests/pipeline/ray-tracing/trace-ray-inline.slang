@@ -32,21 +32,21 @@ RaytracingAccelerationStructure myAccelerationStructure;
 
 struct MyRayPayload
 {
-	int value;
+    int value;
 };
 
 // The first and simplest shader is the miss shader.
 //
 void myMiss(inout MyRayPayload payload)
 {
-	payload.value = 0;
+    payload.value = 0;
 }
 
 // Next, up is a closest hit shader for opaque triangles.
 //
 void myTriangleClosestHit(inout MyRayPayload payload)
 {
-	payload.value = 1;
+    payload.value = 1;
 }
 
 // In order to support alpha testing, we need an any-hit
@@ -58,13 +58,16 @@ void myTriangleClosestHit(inout MyRayPayload payload)
 bool myTriangleAnyHit(inout MyRayPayload payload)
 {
     unmodified(payload);
-	return true;
+    return true;
 }
 
 // Procedural primitives are different than triangles
 // in that they need user-defined hit attributes.
 //
-struct MyProceduralHitAttrs { int value; }
+struct MyProceduralHitAttrs
+{
+    int value;
+}
 
 // Otherwise, the closest- and any-hit shaders
 // for procedural primitives are similar to those
@@ -72,12 +75,12 @@ struct MyProceduralHitAttrs { int value; }
 //
 void myProceduralClosestHit(inout MyRayPayload payload, MyProceduralHitAttrs attrs)
 {
-	payload.value = attrs.value;
+    payload.value = attrs.value;
 }
 bool myProceduralAnyHit(inout MyRayPayload payload)
 {
     unmodified(payload);
-	return true;
+    return true;
 }
 
 // The new piece of the puzzle for procedural primitives
@@ -91,7 +94,7 @@ bool myProceduralIntersection(inout float tHit, inout MyProceduralHitAttrs hitAt
 {
     unmodified(tHit);
     unmodified(hitAttrs);
-	return true;
+    return true;
 }
 
 RWStructuredBuffer<int> resultBuffer;
@@ -101,87 +104,81 @@ RWStructuredBuffer<int> resultBuffer;
 //
 cbuffer C
 {
-	float3 origin;
-	float tMin;
-	float3 direction;
-	float tMax;
-	uint rayFlags;
-	uint instanceMask;
-	uint shouldStopAtFirstHit;
+    float3 origin;
+    float tMin;
+    float3 direction;
+    float tMax;
+    uint rayFlags;
+    uint instanceMask;
+    uint shouldStopAtFirstHit;
 }
 
 // The actual tracing is handled by a compute shader,
 // which here takes on the role of a ray generation shader.
 //
-void main(uint3 tid : SV_DispatchThreadID)
+void main(uint3 tid: SV_DispatchThreadID)
 {
-	uint index = tid.x;
+    uint index = tid.x;
 
-	RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
-	MyProceduralHitAttrs committedProceduralAttrs;
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
+    MyProceduralHitAttrs committedProceduralAttrs;
 
-	MyRayPayload payload = { -1 };
-	RayDesc ray = { origin, tMin, direction, tMax };
-	query.TraceRayInline(
-		myAccelerationStructure,
-		rayFlags,
-		instanceMask,
-		ray);
+    MyRayPayload payload = { -1 };
+    RayDesc ray = { origin, tMin, direction, tMax };
+    query.TraceRayInline(myAccelerationStructure, rayFlags, instanceMask, ray);
 
 
-	for(;;)
-	{
-		if(!query.Proceed()) break;
+    for (;;)
+    {
+        if (!query.Proceed())
+            break;
 
-		switch(query.CandidateType())
-		{
-		case CANDIDATE_PROCEDURAL_PRIMITIVE:
-			{
-				MyProceduralHitAttrs candidateProceduralAttrs = { 0 };
-				float tHit = 0.0f;
-				if(myProceduralIntersection(tHit, candidateProceduralAttrs))
-				{
-					if(myProceduralAnyHit(payload))
-					{
-						query.CommitProceduralPrimitiveHit(tHit);
-						committedProceduralAttrs = candidateProceduralAttrs;
-						if(shouldStopAtFirstHit != 0)
-							query.Abort();
-					}
-				}
-			}
-			break;
+        switch (query.CandidateType())
+        {
+        case CANDIDATE_PROCEDURAL_PRIMITIVE:
+            {
+                MyProceduralHitAttrs candidateProceduralAttrs = { 0 };
+                float tHit = 0.0f;
+                if (myProceduralIntersection(tHit, candidateProceduralAttrs))
+                {
+                    if (myProceduralAnyHit(payload))
+                    {
+                        query.CommitProceduralPrimitiveHit(tHit);
+                        committedProceduralAttrs = candidateProceduralAttrs;
+                        if (shouldStopAtFirstHit != 0)
+                            query.Abort();
+                    }
+                }
+            }
+            break;
 
-		case CANDIDATE_NON_OPAQUE_TRIANGLE:
-			{
-				if(myTriangleAnyHit(payload))
-				{
-					query.CommitNonOpaqueTriangleHit();
-					if(shouldStopAtFirstHit != 0)
-						query.Abort();
-				}
-			}
-			break;
+        case CANDIDATE_NON_OPAQUE_TRIANGLE:
+            {
+                if (myTriangleAnyHit(payload))
+                {
+                    query.CommitNonOpaqueTriangleHit();
+                    if (shouldStopAtFirstHit != 0)
+                        query.Abort();
+                }
+            }
+            break;
+        }
+    }
 
-		}
+    switch (query.CommittedStatus())
+    {
+    case COMMITTED_TRIANGLE_HIT:
+        myTriangleClosestHit(payload);
+        break;
 
+    case COMMITTED_PROCEDURAL_PRIMITIVE_HIT:
+        myProceduralClosestHit(payload, committedProceduralAttrs);
+        break;
 
-	}
-
-	switch(query.CommittedStatus())
-	{
-	case COMMITTED_TRIANGLE_HIT:
-		myTriangleClosestHit(payload);
-		break;
-
-	case COMMITTED_PROCEDURAL_PRIMITIVE_HIT:
-		myProceduralClosestHit(payload, committedProceduralAttrs);
-		break;
-
-	case COMMITTED_NOTHING:
-		myMiss(payload);
-		break;
-	}
+    case COMMITTED_NOTHING:
+        myMiss(payload);
+        break;
+    }
 
     resultBuffer[index] = payload.value;
 }

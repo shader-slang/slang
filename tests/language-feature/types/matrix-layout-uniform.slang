@@ -7,13 +7,9 @@
 [shader("vertex")]
 void Main(
     uniform column_major float4x4 worldToClip,
-    out float4 SV_Position : SV_Position,
-    in row_major float4x4 instanceMeshToWorld : instanceMeshToWorld,
-    in float3 vertexPositionInMesh : vertexPositionInMesh
-)
+    out float4 SV_Position: SV_Position,
+    in row_major float4x4 instanceMeshToWorld: instanceMeshToWorld,
+    in float3 vertexPositionInMesh: vertexPositionInMesh)
 {
-    SV_Position = mul(
-        mul(worldToClip, instanceMeshToWorld),
-        float4(vertexPositionInMesh, 1.f),
-    );
+    SV_Position = mul(mul(worldToClip, instanceMeshToWorld), float4(vertexPositionInMesh, 1.f), );
 }

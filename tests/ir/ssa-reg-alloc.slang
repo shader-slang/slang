@@ -42,9 +42,11 @@ int test3(uint p)
 {
     int a = 1;
     int b = 5;
-    
-    if (p > 0) a = 2;
-    if (p > 0) b = 3;
+
+    if (p > 0)
+        a = 2;
+    if (p > 0)
+        b = 3;
 
     // a and b are now register allocated.
     // The first block of the loop will have IRParams in the form of (a, b)
@@ -60,7 +62,7 @@ int test3(uint p)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let rs1 = test1(dispatchThreadID.x) + test2(dispatchThreadID.x);
     outputBuffer[0] = rs1;

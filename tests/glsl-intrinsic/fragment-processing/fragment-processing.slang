@@ -4,10 +4,10 @@
 
 layout(location = 0) out ivec4 outColorActual;
 
-layout (location = 0) in float inDataV1;
-layout (location = 1) in vec2 inDataV2;
-layout (location = 2) in vec3 inDataV3;
-layout (location = 3) in vec4 inDataV4;
+layout(location = 0) in float inDataV1;
+layout(location = 1) in vec2 inDataV2;
+layout(location = 2) in vec3 inDataV3;
+layout(location = 3) in vec4 inDataV4;
 
 bool testFragmentProcessingDerivativeFunctionsScalar()
 {
@@ -41,7 +41,7 @@ bool testFragmentProcessingDerivativeFunctionsScalar()
         && fwidthCoarse(1.0f) != -1.0f
         ;
 }
-__generic<let N:int>
+__generic<let N : int>
 bool testFragmentProcessingDerivativeFunctionsVector()
 {
 // CHECK_SPV: OpDPdx
@@ -130,8 +130,10 @@ bool testFragmentProcessingFunctions()
     ;
 }
 
-void main() {
-    outColorActual = ivec4(true
+void main()
+{
+    outColorActual = ivec4(
+        true
         && testFragmentProcessingFunctions()
-        );
+    );
 }

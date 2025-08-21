@@ -8,10 +8,7 @@ RWStructuredBuffer<float> outputBuffer;
 struct S<T>
 {
     T v;
-    __init(T x)
-    {
-        v = x;
-    }
+    __init(T x) { v = x; }
 }
 
 
@@ -26,7 +23,7 @@ void writeSingle<T : __BuiltinFloatingPointType>(T value)
 {
     static int counter = 0;
     outputBuffer[counter++] = __realCast<float>(value);
-    //return value;
+    // return value;
 }
 
 void write<each T : __BuiltinFloatingPointType>(expand S<each T> value)
@@ -34,7 +31,7 @@ void write<each T : __BuiltinFloatingPointType>(expand S<each T> value)
     accept(expand writeSingle((each value).v));
 }
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     // CHECK: 1.0

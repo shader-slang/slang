@@ -7,12 +7,11 @@ struct GetValue<let N : int>
 {
     static const int Value = N;
 };
-  
+
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{    
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
     int index = int(dispatchThreadID.x);
 
-	outputBuffer[index] = GetValue<10>::Value;
+    outputBuffer[index] = GetValue<10>::Value;
 }
-

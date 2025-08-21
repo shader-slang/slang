@@ -14,4 +14,3 @@ void main()
     // CHECK_GLSL: gl_PointCoord
     // CHECK_METAL: point_coord
 }
-

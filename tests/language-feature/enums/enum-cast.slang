@@ -2,7 +2,9 @@
 
 enum MyFlags
 {
-    A,B,C
+    A,
+    B,
+    C
 }
 
 bool test(MyFlags f1)

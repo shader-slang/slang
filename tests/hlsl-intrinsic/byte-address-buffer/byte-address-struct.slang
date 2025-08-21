@@ -27,25 +27,25 @@ RWStructuredBuffer<int> outputBuffer;
 
 struct Data
 {
-	int a;
-	float b;
+    int a;
+    float b;
 }
 
 int test(int val)
 {
-	int offsetX = val*8;
-	int offsetY = offsetX & 0xFF;
+    int offsetX = val * 8;
+    int offsetY = offsetX & 0xFF;
 
-	Data x = inputBuffer.Load<Data>(offsetX);
-	tmpBuffer.Store<Data>(offsetY, x);
+    Data x = inputBuffer.Load<Data>(offsetX);
+    tmpBuffer.Store<Data>(offsetY, x);
 
-	Data y = tmpBuffer.Load<Data>(offsetX);
-	return y.a*256*16 + int(y.b);
+    Data y = tmpBuffer.Load<Data>(offsetX);
+    return y.a * 256 * 16 + int(y.b);
 }
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-	int tid = dispatchThreadID.x;
-	outputBuffer[tid] = test(tid);
+    int tid = dispatchThreadID.x;
+    outputBuffer[tid] = test(tid);
 }

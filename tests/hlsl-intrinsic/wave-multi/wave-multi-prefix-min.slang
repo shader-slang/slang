@@ -26,12 +26,14 @@ bool test1Min(uint4 mask)
     let larger = T(gLarger);
     let minValue = T(gMaxValue);
 
-    // The smaller values are set to be the last in the partition, exclusive variants will never get these values.
+    // The smaller values are set to be the last in the partition, exclusive variants will never get
+    // these values.
     bool exclusiveRes = true
                         & (__partitionedExclusiveMin(minValue, mask) == larger)
-                        ;
-    // Do not check exclusive prefix for the first invocation in partition as their values(identity values) depend on the builtin type `T`. It would be
-    // nice to have something like T::min or T::max.
+        ;
+    // Do not check exclusive prefix for the first invocation in partition as their values(identity
+    // values) depend on the builtin type `T`. It would be nice to have something like T::min or
+    // T::max.
     if (isFirstInPartition)
     {
         exclusiveRes = true;
@@ -44,18 +46,21 @@ bool test1Min(uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-bool testVMin(uint4 mask) {
+bool testVMin(uint4 mask)
+{
     typealias GVec = vector<T, N>;
 
     let larger = GVec(T(gLarger));
     let minValue = GVec(T(gMaxValue));
 
-    // The smaller values are set to be the last in the partition, exclusive variants will never get these values.
+    // The smaller values are set to be the last in the partition, exclusive variants will never get
+    // these values.
     bool exclusiveRes = true
                         & all(__partitionedExclusiveMin(minValue, mask) == larger)
-                        ;
-    // Do not check exclusive prefix for the first invocation in partition as their values(identity values) depend on the builtin type `T`. It would be
-    // nice to have something like T::min or T::max.
+        ;
+    // Do not check exclusive prefix for the first invocation in partition as their values(identity
+    // values) depend on the builtin type `T`. It would be nice to have something like T::min or
+    // T::max.
     if (isFirstInPartition)
     {
         exclusiveRes = true;
@@ -120,7 +125,7 @@ bool testMin(uint4 mask)
 [numthreads(32, 1, 1)]
 [shader("compute")]
 [MaximallyReconverges]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     let index = dispatchThreadID.x;
 
@@ -133,7 +138,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool result = true
             & testMin(mask)
-            ;
+        ;
 
     gSmaller = isSecondGroup ? 2 : 0;
     gLarger = isSecondGroup ? 3 : 1;

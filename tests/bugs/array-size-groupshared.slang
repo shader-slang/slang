@@ -12,7 +12,7 @@ struct B : IA
 {
     static const int M = 2;
 }
-struct GenType<T : __BuiltinIntegerType, A: IA, let N : int, let M : int>
+struct GenType<T : __BuiltinIntegerType, A : IA, let N : int, let M : int>
 {
     static const int HalfN = N > 1? N / A.M : 1;
     static const int P = M + N;

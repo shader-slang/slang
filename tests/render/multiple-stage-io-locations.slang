@@ -27,9 +27,9 @@ struct VertexStageInput
 
 struct VertexStageOutput
 {
-    float3 color           : VERTEX_COLOR;
-    float3 localPosition   : VERTEX_LOCAL_POSITION;
-    float4 sv_position     : SV_Position;
+    float3 color : VERTEX_COLOR;
+    float3 localPosition : VERTEX_LOCAL_POSITION;
+    float4 sv_position : SV_Position;
 };
 
 [shader("vertex")]
@@ -38,10 +38,10 @@ VertexStageOutput vertexMain(VertexStageInput input)
     VertexStageOutput output;
 
     float3 position = input.assembledVertex.position;
-    float3 color    = input.assembledVertex.color;
+    float3 color = input.assembledVertex.color;
 
-    output.color         = color;
-    output.sv_position   = mul(modelViewProjection, float4(position, 1.0));
+    output.color = color;
+    output.sv_position = mul(modelViewProjection, float4(position, 1.0));
     output.localPosition = position;
 
     return output;
@@ -51,7 +51,7 @@ VertexStageOutput vertexMain(VertexStageInput input)
 
 struct FragmentStageInput
 {
-    float3 color         : VERTEX_COLOR;
+    float3 color : VERTEX_COLOR;
     float3 localPosition : VERTEX_LOCAL_POSITION;
 };
 

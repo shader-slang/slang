@@ -10,5 +10,4 @@
 //TEST:CROSS_COMPILE:-target spirv -profile glsl_450+spirv_1_5 -entry main -stage compute
 
 [shader("compute")]
-void main()
-{}
+void main() {}

@@ -15,7 +15,7 @@ struct D : IDifferentiable
 [BackwardDifferentiable]
 void g(no_diff float p, inout float x)
 {
-    x = p * ((x+1)*(x+1));
+    x = p * ((x + 1) * (x + 1));
 }
 
 [PreferRecompute]
@@ -28,13 +28,13 @@ void f(no_diff float p, inout float x)
 [BackwardDifferentiable]
 float f_ref(no_diff float p, float x)
 {
-    float y1 = p * (x+1)*(x+1);
-    float y2 = p * (y1+1)*(y1+1);
+    float y1 = p * (x + 1) * (x + 1);
+    float y2 = p * (y1 + 1) * (y1 + 1);
     return y2;
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     var x = diffPair(2.0, 1.0);
 
@@ -45,5 +45,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     var refVal = __fwd_diff(f_ref)(3.0, diffPair(2.0, 1.0)).d;
     outputBuffer[2] = refVal; // 3024
-
 }

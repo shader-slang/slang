@@ -3,12 +3,12 @@
 //WGSL-DAG: @builtin(sample_mask)
 //WGSL-DAG: @fragment
 
-struct Out 
+struct Out
 {
     uint coverage : SV_Coverage;
 };
 
-Out main() 
+Out main()
 {
     Out output;
     output.coverage = 1;

@@ -14,7 +14,10 @@ float test()
     return 2.0f;
 }
 
-float noDiffFunc(float x) { return x; }
+float noDiffFunc(float x)
+{
+    return x;
+}
 
 [BackwardDerivativeOf(test)]
 void d_test(float dOut)
@@ -23,7 +26,7 @@ void d_test(float dOut)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     __bwd_diff(test)(3.0f);
 }

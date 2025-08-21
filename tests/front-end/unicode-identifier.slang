@@ -10,7 +10,7 @@ static const float π = float.getPi();
 
 float /*комментарий*/ 圆周率_円周率_원주율()
 {
-    return π;   
+    return π;
 }
 
 [numthreads(1, 1, 1)]

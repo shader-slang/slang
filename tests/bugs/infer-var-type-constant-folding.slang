@@ -7,7 +7,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 static const let C = float(3);
-static const let D = int(4+4+int(C));
+static const let D = int(4 + 4 + int(C));
 
 void computeMain()
 {

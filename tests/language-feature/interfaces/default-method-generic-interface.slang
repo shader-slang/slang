@@ -6,42 +6,33 @@
 interface IFoo<int v>
 {
     int getVal();
-    int getGreaterVal<int x>()
-    {
-        return getVal() + x + v;
-    }
+    int getGreaterVal<int x>() { return getVal() + x + v; }
 }
 
 struct Impl : IFoo<2>
 {
-    int getVal()
-    {
-        return 42;
-    }
-    
+    int getVal() { return 42; }
+
     // Using the default implementation for getGreaterVal.
 }
 
 struct Impl2 : IFoo<2>
 {
-    int getVal()
-    {
-        return 42;
-    }
-    
+    int getVal() { return 42; }
+
     // overriding default implementation.
-    override int getGreaterVal<int x>()
-    {
-        return 100 + x;
-    }
+    override int getGreaterVal<int x>() { return 100 + x; }
 }
 
-int test<int y, T:IFoo<y>>(T v) { return v.getGreaterVal<1>(); }
+int test<int y, T : IFoo<y>>(T v)
+{
+    return v.getGreaterVal<1>();
+}
 
 //TEST_INPUT: set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> resultBuffer;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     Impl impl = {};

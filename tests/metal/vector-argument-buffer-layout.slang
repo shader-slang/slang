@@ -22,7 +22,7 @@ struct Params
 RWStructuredBuffer<float> o;
 ParameterBlock<Params> gParams;
 
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     o[0] = gParams.dir.x;

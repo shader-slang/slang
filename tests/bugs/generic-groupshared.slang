@@ -5,7 +5,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [ForceInline]
-Ref<uint> table<let n: int>(int index)
+Ref<uint> table<let n : int>(int index)
 {
     static groupshared uint array[n];
     return array[index];

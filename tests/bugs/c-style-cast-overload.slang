@@ -7,7 +7,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-struct S {};
+struct S
+{
+};
 
 int f(S)
 {
@@ -20,7 +22,7 @@ int f(float)
 }
 
 [shader("compute")]
-[numthreads(1,1,1)]
+[numthreads(1, 1, 1)]
 void computeMain()
 {
     outputBuffer[0] = f(float(0));

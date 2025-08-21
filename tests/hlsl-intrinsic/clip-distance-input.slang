@@ -4,7 +4,7 @@
 // CHECK: OpDecorate %[[VARNAME:[A-Za-z_0-9]+]] BuiltIn ClipDistance
 // CHECK: %[[VARNAME]] = OpVariable %_ptr_Input__arr_float_{{u?}}int_1 Input
 
-float4 fragMain(float flClipDist : SV_ClipDistance0 )
+float4 fragMain(float flClipDist: SV_ClipDistance0)
 {
     return flClipDist;
 }
