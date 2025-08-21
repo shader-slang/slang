@@ -544,6 +544,7 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
 
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
+    TestContext* context,
     TestCategorySet* categorySet,
     String filePath,
     FileTestList* outTestList)
@@ -571,6 +572,58 @@ static SlangResult _gatherTestsForFile(
             skipToEndOfLine(&cursor);
             continue;
         }
+
+        // Check for malformed TEST patterns
+        const char* afterSlashes = cursor;
+
+        // Check for triple slash (///) pattern
+        if (*afterSlashes == '/')
+        {
+            // Skip any additional slashes
+            while (*afterSlashes == '/')
+                afterSlashes++;
+
+            // Skip any horizontal space
+            const char* afterSpaces = afterSlashes;
+            while (*afterSpaces == ' ' || *afterSpaces == '\t')
+                afterSpaces++;
+
+            // Check if this looks like a TEST command
+            if ((afterSpaces[0] == 'T' && afterSpaces[1] == 'E' && afterSpaces[2] == 'S' &&
+                 afterSpaces[3] == 'T') ||
+                (strncmp(afterSpaces, "DIAGNOSTIC_TEST", 15) == 0))
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::RunError,
+                    "Malformed TEST line in '%s': TEST lines must start with '//' not '///' or "
+                    "more slashes",
+                    filePath.getBuffer());
+                return SLANG_FAIL;
+            }
+        }
+
+        // Skip horizontal space after //
+        const char* beforeCommand = cursor;
+        skipHorizontalSpace(&cursor);
+
+        // Check if we skipped space and now have a TEST-like command
+        if (cursor != beforeCommand)
+        {
+            // We skipped some space, check if what follows looks like a TEST command
+            if ((cursor[0] == 'T' && cursor[1] == 'E' && cursor[2] == 'S' && cursor[3] == 'T') ||
+                (strncmp(cursor, "DIAGNOSTIC_TEST", 15) == 0))
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::RunError,
+                    "Malformed TEST line in '%s': TEST lines must not have spaces after '//', use "
+                    "'//TEST' not '// TEST'",
+                    filePath.getBuffer());
+                return SLANG_FAIL;
+            }
+        }
+
+        // Reset cursor to where it was before we skipped spaces for command extraction
+        cursor = beforeCommand;
 
         UnownedStringSlice command;
 
@@ -4372,7 +4425,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // Gather a list of tests to run
     FileTestList testList;
 
-    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList));
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(context, &context->categorySet, filePath, &testList));
 
     if (testList.tests.getCount() == 0)
     {
