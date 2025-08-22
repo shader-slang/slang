@@ -3345,6 +3345,86 @@ struct AutoDiffPass : public InstPassBase
         return true;
     }
 
+    bool isReachableInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_BackwardDiffIntermediateContextType:
+        case kIROp_Func:
+            return true;
+        case kIROp_Generic:
+            // For generic, if it's a generic function and it's used by any other reachable
+            // inst, we will consider it reachable.
+            auto genericIR = as<IRGeneric>(inst);
+            if (as<IRFunc>(findInnerMostGenericReturnVal(genericIR)))
+            {
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    auto user = use->getUser();
+                    if (as<IRModuleInst>(user->parent))
+                        return true;
+
+                    for (; user; user = user->parent)
+                    {
+                        if (auto genericUser = as<IRGeneric>(user))
+                            return (inst != genericUser) &&
+                                (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) != nullptr);
+
+                        else if (as<IRFunc>(user))
+                            return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    template<typename Func>
+    void processAllReachableInsts(const Func& f)
+    {
+        workList.clear();
+        workListSet.clear();
+
+        // addToWorkList(module->getModuleInst());
+
+        // We will do the first around of filter to include only functions and generic functions
+        for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())
+        {
+            if (isReachableInst(child))
+            {
+                addToWorkList(child);
+            }
+        }
+
+        while (workList.getCount() != 0)
+        {
+            IRInst* inst = pop(false);
+            f(inst);
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                if (as<IRDecoration>(child))
+                    break;
+                switch (child->getOp())
+                {
+                case kIROp_GenericSpecializationDictionary:
+                case kIROp_ExistentialFuncSpecializationDictionary:
+                case kIROp_ExistentialTypeSpecializationDictionary:
+                case kIROp_DebugInlinedAt:
+                case kIROp_DebugFunction:
+                    continue;
+                default:
+                    break;
+                }
+                SLANG_ASSERT(child);
+                if (shouldInstBeLiveIfParentIsLive(child, IRDeadCodeEliminationOptions()))
+                    addToWorkList(child);
+            }
+        }
+    }
     // Process all differentiate calls, and recursively generate code for forward and backward
     // derivative functions.
     //
