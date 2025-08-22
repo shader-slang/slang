@@ -168,7 +168,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         case kIROp_GetOffsetPtr:
         case kIROp_Load:
             return true;
-        
+
         default:
             return false;
         }
@@ -206,8 +206,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     // it.
                     if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                     {
-                        if (ptrType->hasAddressSpace() &&
-                            !instHasUnreliablePtrAddressSpace(inst))
+                        if (ptrType->hasAddressSpace() && !instHasUnreliablePtrAddressSpace(inst))
                         {
                             mapInstToAddrSpace[inst] = ptrType->getAddressSpace();
                             continue;
@@ -393,7 +392,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     case kIROp_Return:
                         {
                             auto retVal = inst->getOperand(0);
-                            
+
                             // only specialize ptr returns
                             if (!as<IRPtrTypeBase>(retVal->getDataType()))
                                 continue;

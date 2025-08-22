@@ -9281,7 +9281,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 requireSPIRVCapability(SpvCapabilityVariablePointers);
                 break;
             }
-
         }
     }
 
