@@ -1,4 +1,4 @@
-// This test is disabled sine Slang doesn't support address-space specialization of nested pointers.
+// This test is disabled since Slang doesn't support address-space specialization of nested pointers.
 // Currently, Slang assumes all nested pointers are of the `UserPointer` address space.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -capability vk_mem_model+sm_6_0+spvGroupNonUniformBallot
 
