@@ -3372,7 +3372,8 @@ struct AutoDiffPass : public InstPassBase
                     {
                         if (auto genericUser = as<IRGeneric>(user))
                             return (inst != genericUser) &&
-                                (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) != nullptr);
+                                   (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) !=
+                                    nullptr);
 
                         else if (as<IRFunc>(user))
                             return true;
@@ -3392,7 +3393,8 @@ struct AutoDiffPass : public InstPassBase
         // addToWorkList(module->getModuleInst());
 
         // We will do the first around of filter to include only functions and generic functions
-        for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())
+        for (auto child = module->getModuleInst()->getFirstChild(); child;
+             child = child->getNextInst())
         {
             if (isReachableInst(child))
             {
