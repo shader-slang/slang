@@ -14,6 +14,8 @@ if(SLANG_ENABLE_SLANGC)
             core
             slang
             ${SLANG_GLSL_MODULE_DEPENDENCY}
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${CMAKE_BINARY_DIR}/Debug/include
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
