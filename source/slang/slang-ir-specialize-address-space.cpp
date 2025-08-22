@@ -13,10 +13,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<IRInst*, AddressSpace> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
+    DiagnosticSink* sink;
     HashSet<IRFunc*> functionsToConsiderRemoving;
+    HashSet<IRDebugValue*> debugValuesToFixup;
 
-    AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
-        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
+    AddressSpaceContext(
+        IRModule* inModule,
+        InitialAddressSpaceAssigner* inAddrSpaceAssigner,
+        DiagnosticSink* sink)
+        : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner), sink(sink)
     {
     }
 
@@ -124,6 +129,30 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         return getAddressSpaceFromVarType(funcType->getResultType());
     }
 
+    bool instHasUnreliablePtrAddressSpace(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        // These ops are linked to frontend-input. This means
+        // we default-set these pointers to AddressSpace::UserPointer.
+        // This is incorrect and we should ignore the existing type of these
+        // inst's.
+        case kIROp_Add:
+        case kIROp_BitCast:
+        case kIROp_GetOffsetPtr:
+        case kIROp_Load:
+
+        // May be a ptr to a local-var.
+        // This local may be re-written to be groupshared-addr-space
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+            return true;
+        
+        default:
+            return false;
+        }
+    }
+
     // Return true if the address space of the function return type is changed.
     bool processFunction(IRFunc* func)
     {
@@ -139,6 +168,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
                 for (auto inst : block->getChildren())
                 {
+                    if (auto debugValue = as<IRDebugValue>(inst))
+                        debugValuesToFixup.add(debugValue);
+
                     // If we have already assigned an address space to this instruction, then skip
                     // it.
                     if (mapInstToAddrSpace.containsKey(inst))
@@ -153,7 +185,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     // it.
                     if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                     {
-                        if (ptrType->hasAddressSpace())
+                        if (ptrType->hasAddressSpace() &&
+                            !instHasUnreliablePtrAddressSpace(inst))
                         {
                             mapInstToAddrSpace[inst] = ptrType->getAddressSpace();
                             continue;
@@ -176,10 +209,37 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             }
                             break;
                         }
+                    case kIROp_Load:
+                        if (!mapInstToAddrSpace.containsKey(inst))
+                        {
+                            auto load = as<IRLoad>(inst);
+                            // This is a hack to handle `Ptr<Ptr<T>>`
+                            auto ptr = load->getPtr();
+                            auto pointerType = as<IRPtrTypeBase>(ptr->getDataType());
+                            auto nestedPointerType = as<IRPtrTypeBase>(pointerType->getValueType());
+                            if (nestedPointerType && nestedPointerType->getAddressSpace() != AddressSpace::Generic)
+                            {
+                                mapInstToAddrSpace[inst] = nestedPointerType->getAddressSpace();
+                                changed = true;
+                                break;
+                            }
+
+                            // Backup is to get address-space of `inst`.
+                            // Technically this should be the only logic,
+                            // but Ptr<Ptr<T>> is not fully functional.
+                            auto addrSpace = getAddrSpace(inst->getOperand(0));
+                            if (addrSpace != AddressSpace::Generic)
+                            {
+                                mapInstToAddrSpace[inst] = addrSpace;
+                                changed = true;
+                            }
+                        }
+                        break;
+                    case kIROp_Add:
+                    case kIROp_BitCast:
+                    case kIROp_GetOffsetPtr:
                     case kIROp_GetElementPtr:
                     case kIROp_FieldAddress:
-                    case kIROp_GetOffsetPtr:
-                    case kIROp_BitCast:
                         if (!mapInstToAddrSpace.containsKey(inst))
                         {
                             auto addrSpace = getAddrSpace(inst->getOperand(0));
@@ -192,22 +252,33 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         break;
                     case kIROp_Store:
                         {
-                            auto addrSpace = getAddrSpace(inst->getOperand(1));
-                            if (addrSpace != AddressSpace::Generic)
+                            auto store = as<IRStore>(inst);
+                            auto val = store->getVal();
+                            auto ptr = store->getPtr();
+                            auto addrSpaceVal = getAddrSpace(val);
+                            if (addrSpaceVal != AddressSpace::Generic)
                             {
-                                mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
-                                mapInstToAddrSpace[inst] = addrSpace;
+                                mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpaceVal;
+                                mapInstToAddrSpace[inst] = addrSpaceVal;
                                 changed = true;
                             }
-                        }
-                        break;
-                    case kIROp_Load:
-                        {
-                            if (auto addrSpace =
-                                    mapVarValueToAddrSpace.tryGetValue(inst->getOperand(0)))
+
+                            // If storing into a `Ptr<Ptr<...>>` a Non-UserPointer, warn since Slang
+                            // is experiemental with this feature. We do not track nested pointers
+                            // currently.
+                            auto valPtrType = as<IRPtrTypeBase>(val->getFullType());
+                            auto ptrPtrType = as<IRPtrTypeBase>(ptr->getFullType());
+                            if (!valPtrType || !ptrPtrType)
+                                break;
+                            auto ptrPtrValueType = as<IRPtrTypeBase>(ptrPtrType->getValueType());
+                            if (!ptrPtrValueType)
+                                break;
+                            if (addrSpaceVal != AddressSpace::Generic &&
+                                addrSpaceVal != AddressSpace::UserPointer)
                             {
-                                mapInstToAddrSpace[inst] = *addrSpace;
-                                changed = true;
+                                sink->diagnose(
+                                    store,
+                                    Diagnostics::assignmentOfNonUserPointerToNestedPointer);
                             }
                         }
                         break;
@@ -296,6 +367,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     case kIROp_Return:
                         {
                             auto retVal = inst->getOperand(0);
+                            
+                            // only specialize ptr returns
+                            if (!as<IRPtrTypeBase>(retVal->getDataType()))
+                                continue;
+
                             auto addrSpace = getAddrSpace(retVal);
                             if (addrSpace != AddressSpace::Generic)
                             {
@@ -305,7 +381,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 {
                                     auto ptrResultType =
                                         as<IRPtrTypeBase>(funcType->getResultType());
-                                    SLANG_ASSERT(ptrResultType);
                                     IRBuilder builder(func);
                                     auto newResultType = builder.getPtrType(
                                         ptrResultType->getOp(),
@@ -344,15 +419,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         for (auto [inst, addrSpace] : mapInstToAddrSpace)
         {
             auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
-            if (ptrType)
+            if (!ptrType)
+                continue;
+            if (ptrType->getAddressSpace() != addrSpace)
             {
-                if (ptrType->getAddressSpace() != addrSpace)
-                {
-                    IRBuilder builder(inst);
-                    auto newType =
-                        builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
-                    setDataType(inst, newType);
-                }
+                IRBuilder builder(inst);
+                auto newType =
+                    builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
+                setDataType(inst, newType);
             }
         }
     }
@@ -398,6 +472,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
         applyAddressSpaceToInstType();
 
+        // Correct DebugVar types
+        IRBuilder builder(module);
+        for (auto inst : debugValuesToFixup)
+        {
+            auto debugValue = as<IRDebugValue>(inst);
+            auto debugVar = debugValue->getDebugVar();
+            auto value = debugValue->getValue();
+            auto valuePtrType = as<IRPtrTypeBase>(value->getDataType());
+            if (!valuePtrType)
+                continue;
+
+            // Ensure the address-space of debug-ptr is correct.
+            // Should be Ptr<Ptr<...>>
+            builder.setInsertBefore(valuePtrType);
+            auto newDebugPtrType = builder.getPtrType(valuePtrType);
+            debugVar->setFullType(newDebugPtrType);
+        }
+
         for (IRFunc* func : functionsToConsiderRemoving)
         {
             SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
@@ -407,9 +499,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     }
 };
 
-void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrSpaceAssigner)
+void specializeAddressSpace(
+    IRModule* module,
+    InitialAddressSpaceAssigner* addrSpaceAssigner,
+    DiagnosticSink* sink)
 {
-    AddressSpaceContext context(module, addrSpaceAssigner);
+    AddressSpaceContext context(module, addrSpaceAssigner, sink);
     context.processModule();
 }
 
