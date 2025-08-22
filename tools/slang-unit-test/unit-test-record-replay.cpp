@@ -457,7 +457,7 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing)
 
 // This causes a Windows Graphics driver crash.
 // Temporarily disabled; issue #8022
-#if 1
+#if 0
 SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline")));
