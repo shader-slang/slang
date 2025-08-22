@@ -2,6 +2,7 @@
 
 // Test that calling a `[mutating]` method on an `inout` function parameter works.
 
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
