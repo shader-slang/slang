@@ -2370,7 +2370,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }
     else if (auto swizzleExpr = expr.as<SwizzleExpr>())
     {
-        // For swizzle expressions on link-time constants, we need to fold the base
+        // For swizzle expressions on constants, we need to fold the base
         // and then handle the swizzled component. For now, we only support
         // single-component swizzles in constant contexts.
         if (swizzleExpr.getExpr()->elementIndices.getCount() != 1)
@@ -2381,11 +2381,11 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             kind,
             circularityInfo);
 
-        if (baseVal && baseVal->isLinkTimeVal())
+        if (baseVal)
         {
-            // For link-time constants that are swizzled, we just return the base value.
+            // For constants that are swizzled, we just return the base value.
             // The actual swizzle extraction will be handled during IR lowering or linking.
-            // This allows the swizzle expression to be considered a valid link-time constant.
+            // This allows the swizzle expression to be considered a valid constant.
             return baseVal;
         }
 
