@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization
+//TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization
 
 // Test basic dynamic dispatch code gen
 
