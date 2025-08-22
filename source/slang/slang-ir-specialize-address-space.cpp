@@ -216,12 +216,17 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             // This is a hack to handle `Ptr<Ptr<T>>`
                             auto ptr = load->getPtr();
                             auto pointerType = as<IRPtrTypeBase>(ptr->getDataType());
-                            auto nestedPointerType = as<IRPtrTypeBase>(pointerType->getValueType());
-                            if (nestedPointerType && nestedPointerType->getAddressSpace() != AddressSpace::Generic)
+                            if (pointerType)
                             {
-                                mapInstToAddrSpace[inst] = nestedPointerType->getAddressSpace();
-                                changed = true;
-                                break;
+                                auto nestedPointerType =
+                                    as<IRPtrTypeBase>(pointerType->getValueType());
+                                if (nestedPointerType &&
+                                    nestedPointerType->getAddressSpace() != AddressSpace::Generic)
+                                {
+                                    mapInstToAddrSpace[inst] = nestedPointerType->getAddressSpace();
+                                    changed = true;
+                                    break;
+                                }
                             }
 
                             // Backup is to get address-space of `inst`.
