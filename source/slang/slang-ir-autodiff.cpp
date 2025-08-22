@@ -3377,8 +3377,8 @@ struct AutoDiffPass : public InstPassBase
                     for (; user; user = user->parent)
                     {
                         if (auto genericUser = as<IRGeneric>(user))
-                            return (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) !=
-                                    nullptr);
+                            return (
+                                as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) != nullptr);
 
                         else if (as<IRFunc>(user))
                             return true;
