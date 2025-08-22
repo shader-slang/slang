@@ -18,6 +18,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     uint testArray2[groupSize.y];
     uint testArray3[groupSize.z];
     
+    // NOTE: Using swizzle expressions directly in numthreads attributes like:
+    // [numthreads(groupSize.x, groupSize.y, groupSize.z)]
+    // currently triggers an internal error during IR generation.
+    // The error "needed a known integer value" indicates that numthreads
+    // requires actual integer values at IR generation time, not just link-time constants.
+    // This limitation is beyond the current SwizzleExpr constant folding fix.
+    
     // Atomically increment to count how many threads were launched
     // Expected: 8 * 8 * 1 = 64 threads total
     uint originalValue;
