@@ -511,6 +511,15 @@ class MakeOptionalExpr : public Expr
     FIDDLE() Expr* typeExpr = nullptr;
 };
 
+/// Conversion from Optional<T> to Optional<U> where T can be cast to U.
+FIDDLE()
+class ConvertOptionalExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* operand = nullptr;
+    FIDDLE() SubtypeWitness* witness = nullptr;
+};
+
 /// A cast of a value to the same type, with different modifiers.
 ///
 /// The type being cast to is stored as this expression's `type`.

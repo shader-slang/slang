@@ -5208,6 +5208,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitConvertOptionalExpr(ConvertOptionalExpr* expr)
+    {
+        // For now, use a simpler approach - treat this like a CastToSuperTypeExpr
+        // but with Optional wrapping/unwrapping logic
+        auto sourceVal = lowerRValueExpr(context, expr->operand);
+        auto targetType = lowerType(context, expr->type);
+
+        // Generate a cast instruction that handles Optional conversion
+        // This will be expanded by later IR passes
+        auto irVal = context->irBuilder->emitCast(targetType, sourceVal.val);
+        return LoweredValInfo::simple(irVal);
+    }
+
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");

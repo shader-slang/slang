@@ -1443,6 +1443,37 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be cast to Optional<I> if T can be cast to I
+    if (auto fromOptionalType = as<OptionalType>(fromType))
+    {
+        if (auto toOptionalType = as<OptionalType>(toType))
+        {
+            Type* fromValueType = fromOptionalType->getValueType();
+            Type* toValueType = toOptionalType->getValueType();
+
+            // Check if the value types can be converted via subtype witness
+            if (auto valueWitness = tryGetSubtypeWitness(fromValueType, toValueType))
+            {
+                if (outCost)
+                {
+                    // Cost is slightly higher than interface casting due to Optional wrapping
+                    *outCost = kConversionCost_CastToInterface + 10;
+                }
+                if (outToExpr)
+                {
+                    // Create a specialized expression for Optional-to-Optional conversion
+                    auto convertExpr = getASTBuilder()->create<ConvertOptionalExpr>();
+                    convertExpr->loc = fromExpr->loc;
+                    convertExpr->type = toType;
+                    convertExpr->operand = fromExpr;
+                    convertExpr->witness = valueWitness;
+                    *outToExpr = convertExpr;
+                }
+                return true;
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
