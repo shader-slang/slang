@@ -131,21 +131,42 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     bool instHasUnreliablePtrAddressSpace(IRInst* inst)
     {
+        // With our current approach, we set address-spaces based on
+        // the `Ptr<T,AddressSpace` from `inst->getDataType()`.
+        //
+        // Due to this process, we have some special cases where
+        // we cannot reliably infer the address-space of the `inst`
+        // from the `inst->getDataType()` and need to ignore this
+        // step of our specialization pass.
+        //
+        // Following cases should have address-space inferred from
+        // operands instead.
+        //
         switch (inst->getOp())
         {
-        // These ops are linked to frontend-input. This means
-        // we default-set these pointers to AddressSpace::UserPointer.
-        // This is incorrect and we should ignore the existing type of these
-        // inst's.
+        // These ops below are included in this check because of (one or more)
+        // of the following cases:
+        //
+        // 1. These ops are linked to frontend-input. This means we (by-default)
+        //     set these pointers to AddressSpace::UserPointer.
+        //     This is incorrect since it means these types will have an `AddressSpace`
+        //     already (which is possibly incorrect). We should infer AddressSpace based
+        //     on source-operand. since these ops are getting address-space from these
+        //     operands anyways.
+        //
+        // 2. These ops may be linked to a local-variable.
+        //    If this is the case, we may rewrite the local-variable
+        //    address-space. If we re-write the local-variable
+        //    address-space we will need to reflect this change
+        //    to these ops and fetch the address-space from the
+        //    operands instead.
+        //
         case kIROp_Add:
         case kIROp_BitCast:
-        case kIROp_GetOffsetPtr:
-        case kIROp_Load:
-
-        // May be a ptr to a local-var.
-        // This local may be re-written to be groupshared-addr-space
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_Load:
             return true;
         
         default:
