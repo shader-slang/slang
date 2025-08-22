@@ -1,7 +1,7 @@
 // main.cpp
 
-#include "slang.h"
 #include "slang-tag-version.h"
+#include "slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
@@ -21,7 +21,10 @@ static const char* getSlangcVersionString()
 }
 
 // Check if version option is present and handle version check
-static bool handleVersionOption(SlangCompileRequest* compileRequest, int argc, const char* const* argv)
+static bool handleVersionOption(
+    SlangCompileRequest* compileRequest,
+    int argc,
+    const char* const* argv)
 {
     // Look for version options in command line
     for (int i = 1; i < argc; i++)
@@ -30,16 +33,16 @@ static bool handleVersionOption(SlangCompileRequest* compileRequest, int argc, c
         {
             // Get slangc version
             const char* slangcVersionRaw = getSlangcVersionString();
-            
+
             // Get slang library version
             const char* slangLibVersion = spGetBuildTagString();
-            
+
             // Apply the same logic as getBuildTagString() for slangc version
             String slangcVersion;
             if (UnownedStringSlice(slangcVersionRaw) == "0.0.0-unknown")
             {
                 // For slangc, we can't easily get the executable timestamp like shared libraries,
-                // so we'll use a different approach - we'll consider "0.0.0-unknown" to match 
+                // so we'll use a different approach - we'll consider "0.0.0-unknown" to match
                 // any library version that also resolves to a timestamp.
                 slangcVersion = slangcVersionRaw;
             }
@@ -47,31 +50,33 @@ static bool handleVersionOption(SlangCompileRequest* compileRequest, int argc, c
             {
                 slangcVersion = slangcVersionRaw;
             }
-            
+
             // Compare versions
             bool versionsMatch = false;
             if (slangcVersion == slangLibVersion)
             {
                 versionsMatch = true;
             }
-            else if (UnownedStringSlice(slangcVersionRaw) == "0.0.0-unknown" && 
-                     UnownedStringSlice(slangLibVersion).getLength() > 0 &&
-                     isdigit(slangLibVersion[0]))
+            else if (
+                UnownedStringSlice(slangcVersionRaw) == "0.0.0-unknown" &&
+                UnownedStringSlice(slangLibVersion).getLength() > 0 && isdigit(slangLibVersion[0]))
             {
                 // Both are using fallback logic (timestamp for library, unknown for slangc)
                 // Consider this a match since they're built from the same source
                 versionsMatch = true;
             }
-            
+
             auto stdOut = StdWriters::getOut();
             stdOut.print("%s\n", slangLibVersion);
-            
+
             if (!versionsMatch)
             {
                 // Versions don't match, print warning
                 auto stdError = StdWriters::getError();
-                stdError.print("warning: slangc version (%s) does not match slang library version (%s)\n", 
-                    slangcVersion.getBuffer(), slangLibVersion);
+                stdError.print(
+                    "warning: slangc version (%s) does not match slang library version (%s)\n",
+                    slangcVersion.getBuffer(),
+                    slangLibVersion);
             }
             return true; // Handled version option
         }
