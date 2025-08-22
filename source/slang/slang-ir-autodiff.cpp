@@ -3345,6 +3345,12 @@ struct AutoDiffPass : public InstPassBase
         return true;
     }
 
+    // This function will check whether a global inst can be gathered as a candidate for
+    // differentiable IR. Before we do the recursive search on every IR, we will first filter
+    // the global IR to find out some candidates, and then we will start the recursive search
+    // on this filtered list.
+    // For a generic, we will add it to the list only when it's a function and it's used by other
+    // function, because that is the case of dynamic dispatch.
     bool isReachableInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -3371,8 +3377,7 @@ struct AutoDiffPass : public InstPassBase
                     for (; user; user = user->parent)
                     {
                         if (auto genericUser = as<IRGeneric>(user))
-                            return (inst != genericUser) &&
-                                   (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) !=
+                            return (as<IRFunc>(findInnerMostGenericReturnVal(genericUser)) !=
                                     nullptr);
 
                         else if (as<IRFunc>(user))
@@ -3389,8 +3394,6 @@ struct AutoDiffPass : public InstPassBase
     {
         workList.clear();
         workListSet.clear();
-
-        // addToWorkList(module->getModuleInst());
 
         // We will do the first around of filter to include only functions and generic functions
         for (auto child = module->getModuleInst()->getFirstChild(); child;
