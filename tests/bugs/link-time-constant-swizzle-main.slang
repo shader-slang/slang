@@ -19,7 +19,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     uint testArray3[groupSize.z];
     
     // Atomically increment to count how many threads were launched
-    // Expected: 8 * 8 * 1 = 64 threads
+    // Expected: 8 * 8 * 1 = 64 threads total
     uint originalValue;
     InterlockedAdd(outputBuffer[0], 1, originalValue);
 }
