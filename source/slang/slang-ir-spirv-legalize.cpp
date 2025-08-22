@@ -1864,7 +1864,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_CoopMatMapElementIFunc:
                 processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFunc>(inst));
                 break;
-
+            case kIROp_CoherentLoad:
+            case kIROp_CoherentStore:
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+                break;
             case kIROp_DebugValue:
                 if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
                     inst->removeAndDeallocate();

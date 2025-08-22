@@ -4444,7 +4444,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CoherentLoad:
         {
             if (m_memoryModel != SpvMemoryModelVulkan)
-                SLANG_UNEXPECTED("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
+                SLANG_ASSERT_FAILURE("Explicit coherent operations require vulkan-memory-model, "
+                                     "specify the capability 'vk_mem_model'");
             
             auto op = as<IRCoherentLoad>(inst);
             maybeRequireVMMDeviceScope(op);
@@ -4461,7 +4462,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
             case AddressSpace::Image:
                 {
-                    SLANG_UNEXPECTED(
+                    SLANG_UNIMPLEMENTED_X(
                         "Coherent operations with an image is currently unimplemented");
 
                     // TODO: 
@@ -4522,7 +4523,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CoherentStore:
         {
             if (m_memoryModel != SpvMemoryModelVulkan)
-                SLANG_UNEXPECTED("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
+                SLANG_ASSERT_FAILURE("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
             
             auto op = as<IRCoherentStore>(inst);
             maybeRequireVMMDeviceScope(op);
@@ -4539,7 +4540,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
             case AddressSpace::Image:
                 {
-                    SLANG_UNEXPECTED(
+                    SLANG_UNIMPLEMENTED_X(
                         "Coherent operations with an image is currently unimplemented");
                     break;
                 }
