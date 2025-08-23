@@ -666,10 +666,8 @@ struct FunctionParameterSpecializationContext
                 auto ptrParamType = as<IRPtrTypeBase>(paramType);
                 argType = as<IRPtrTypeBase>(argType)->getValueType();
                 resultType = getBuilder()->getPtrType(
-                    paramType->getOp(),
                     argType,
-                    ptrParamType->getAccessQualifier(),
-                    ptrParamType->getAddressSpace());
+                    ptrParamType);
                 break;
             }
         }

@@ -2935,10 +2935,9 @@ IRInOutType* IRBuilder::getInOutType(IRType* valueType)
 
 IRRefType* IRBuilder::getRefType(
     IRType* valueType,
-    AccessQualifier accessQualifier,
     AddressSpace addrSpace)
 {
-    return (IRRefType*)getPtrType(kIROp_RefType, valueType, accessQualifier, addrSpace);
+    return (IRRefType*)getPtrType(kIROp_RefType, valueType, AccessQualifier::ReadWrite, addrSpace);
 }
 
 IRConstRefType* IRBuilder::getConstRefType(IRType* valueType, AddressSpace addrSpace)
@@ -4833,7 +4832,7 @@ IRGlobalVar* IRBuilder::createGlobalVar(IRType* valueType)
 
 IRGlobalVar* IRBuilder::createGlobalVar(IRType* valueType, AddressSpace addressSpace)
 {
-    auto ptrType = getPtrType(kIROp_PtrType, valueType, AccessQualifier::ReadWrite, addressSpace);
+    auto ptrType = getPtrType(valueType, addressSpace);
     IRGlobalVar* globalVar = createInst<IRGlobalVar>(this, kIROp_GlobalVar, ptrType);
     _maybeSetSourceLoc(globalVar);
     addGlobalValue(this, globalVar);
@@ -5090,7 +5089,7 @@ IRVar* IRBuilder::emitVar(IRType* type)
 
 IRVar* IRBuilder::emitVar(IRType* type, AddressSpace addressSpace)
 {
-    auto allocatedType = getPtrType(kIROp_PtrType, type, AccessQualifier::ReadWrite, addressSpace);
+    auto allocatedType = getPtrType(type, addressSpace);
     auto inst = createInst<IRVar>(this, kIROp_Var, allocatedType);
     addInst(inst);
     return inst;
@@ -5359,7 +5358,7 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
     }
     SLANG_RELEASE_ASSERT(resultType);
     return emitFieldAddress(
-        getPtrType(kIROp_PtrType, resultType, accessQualifier, addrSpace),
+        getPtrType(resultType, accessQualifier, addrSpace),
         basePtr,
         fieldKey);
 }
@@ -5519,7 +5518,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(kIROp_PtrType, type, accessQualifier, addrSpace),
+        getPtrType(type, accessQualifier, addrSpace),
         basePtr,
         index);
 

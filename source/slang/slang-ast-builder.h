@@ -538,7 +538,7 @@ public:
     InOutType* getInOutType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
+    RefType* getRefType(Type* valueType);
 
     // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(Type* valueType);

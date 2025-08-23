@@ -504,11 +504,9 @@ InOutType* ASTBuilder::getInOutType(Type* valueType)
 }
 
 RefType* ASTBuilder::getRefType(
-    Type* valueType,
-    AccessQualifier accessQualifier,
-    AddressSpace addrSpace)
+    Type* valueType)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, accessQualifier, addrSpace, "RefType"));
+    return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
 ConstRefType* ASTBuilder::getConstRefType(Type* valueType)

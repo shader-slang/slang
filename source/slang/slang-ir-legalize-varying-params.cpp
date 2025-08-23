@@ -3557,7 +3557,6 @@ protected:
                     const auto annotatedPayloadType = builder.getPtrType(
                         kIROp_RefType,
                         payloadPtrType->getValueType(),
-                        AccessQualifier::ReadWrite,
                         AddressSpace::MetalObjectData);
                     auto packedParam = builder.emitParam(annotatedPayloadType);
                     builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));

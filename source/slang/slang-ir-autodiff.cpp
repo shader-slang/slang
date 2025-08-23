@@ -202,7 +202,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
     {
         auto loweredType = lowerDiffPairType(builder, basePtrType->getValueType());
 
-        pairType = builder->getPtrType(kIROp_PtrType, (IRType*)loweredType);
+        pairType = builder->getPtrType((IRType*)loweredType);
     }
     else
     {

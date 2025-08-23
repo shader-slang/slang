@@ -784,7 +784,7 @@ Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBa
     case kParameterDirection_InOut:
         return astBuilder->getInOutType(result);
     case kParameterDirection_Ref:
-        return astBuilder->getRefType(result, AccessQualifier::ReadWrite, AddressSpace::Generic);
+        return astBuilder->getRefType(result);
     default:
         return result;
     }

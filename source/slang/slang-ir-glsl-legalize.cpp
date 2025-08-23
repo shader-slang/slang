@@ -1592,7 +1592,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     //
 
     // Non system value varying inputs shall be passed as pointers.
-    IRType* paramType = builder->getPtrType(ptrOpCode, type, AccessQualifier::ReadWrite, addrSpace);
+    IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
@@ -2555,9 +2555,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
     // Create a global variable to hold the consolidated struct
     consolidatedVar = builder->createGlobalVar(structType);
     auto ptrType = builder->getPtrType(
-        kIROp_PtrType,
         structType,
-        AccessQualifier::ReadWrite,
         AddressSpace::IncomingRayPayload);
     consolidatedVar->setFullType(ptrType);
     consolidatedVar->moveToEnd();
@@ -4303,10 +4301,8 @@ void legalizeEntryPointForGLSL(
             if (ptrType)
             {
                 sizedArrayType = builder.getPtrType(
-                    ptrType->getOp(),
                     sizedArrayType,
-                    ptrType->getAccessQualifier(),
-                    ptrType->getAddressSpace());
+                    ptrType);
             }
 
             // Change the globals type
@@ -4488,7 +4484,6 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                         builder.getPtrType(
                             payloadPtrType->getOp(),
                             payloadPtrType->getValueType(),
-                            AccessQualifier::ReadWrite,
                             AddressSpace::TaskPayloadWorkgroup));
                     payload->setFullType(payloadSharedPtrType);
                 }

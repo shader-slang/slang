@@ -250,7 +250,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 builder.setInsertBefore(use->getUser());
                 auto addr = builder.emitFieldAddress(
                     builder.getPtrType(
-                        kIROp_PtrType,
                         innerType,
                         AccessQualifier::Read,
                         AddressSpace::Uniform),
@@ -296,12 +295,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 IRType* ptrType = nullptr;
                 if (basePtrType->hasAddressSpace())
                     ptrType = builder.getPtrType(
-                        kIROp_PtrType,
                         user->getDataType(),
-                        basePtrType->getAccessQualifier(),
-                        basePtrType->getAddressSpace());
+                        basePtrType);
                 else
-                    ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType());
+                    ptrType = builder.getPtrType(user->getDataType());
                 IRInst* subAddr = nullptr;
                 if (user->getOp() == kIROp_GetElement)
                     subAddr = builder.emitElementAddress(
@@ -564,7 +561,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(kIROp_PtrType, innerType, access, addressSpace);
+            ptrType = builder.getPtrType(innerType, access, addressSpace);
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -588,7 +585,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             builder.setInsertBefore(user);
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
-                                    kIROp_PtrType,
                                     innerElementType,
                                     ptrType->getAccessQualifier(),
                                     addressSpace),
@@ -801,10 +797,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             IRType* newPtrType = oldPtrType->hasAddressSpace()
                                      ? builder.getPtrType(
-                                           oldPtrType->getOp(),
                                            newPtrValueType,
-                                           oldPtrType->getAccessQualifier(),
-                                           oldPtrType->getAddressSpace())
+                                           oldPtrType)
                                      : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
             inst->setFullType(newPtrType);
         }
@@ -1117,9 +1111,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
             builder.getPtrType(
-                kIROp_PtrType,
                 loadInst->getFullType(),
-                AccessQualifier::ReadWrite,
                 getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
@@ -1140,9 +1132,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
             builder.getPtrType(
-                kIROp_PtrType,
                 value->getFullType(),
-                AccessQualifier::ReadWrite,
                 getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
@@ -1164,7 +1154,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newPtrType = builder.getPtrType(
                 ptrType->getOp(),
                 ptrType->getValueType(),
-                AccessQualifier::ReadWrite,
                 AddressSpace::Image);
             subscript->setFullType(newPtrType);
 
@@ -2205,10 +2194,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Update the global param's type to use the wrapper struct
             auto newPtrType = builder.getPtrType(
-                ptrType->getOp(),
                 wrapperStruct,
-                ptrType->getAccessQualifier(),
-                ptrType->getAddressSpace());
+                ptrType);
             globalParam->setFullType(newPtrType);
 
             // Traverse all uses of the global param and insert a FieldAddress to access the
@@ -2220,10 +2207,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     builder.setInsertBefore(use->getUser());
                     auto addr = builder.emitFieldAddress(
                         builder.getPtrType(
-                            kIROp_PtrType,
                             structType,
-                            ptrType->getAccessQualifier(),
-                            ptrType->getAddressSpace()),
+                            ptrType),
                         globalParam,
                         key);
                     use->set(addr);
@@ -2293,7 +2278,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
-                kIROp_PtrType,
                 lowered.structType,
                 accessQualifier,
                 getStorageBufferAddressSpace()));

@@ -3890,7 +3890,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
             auto debugVarPtrType =
-                builder.getPtrType(varType, AccessQualifier::ReadWrite, AddressSpace::Function);
+                builder.getPtrType(varType, AddressSpace::Function);
             auto actualHelperVar =
                 emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
             maybeEmitPointerDecoration(actualHelperVar, debugVar);
@@ -7180,7 +7180,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto ptrElementType = builder.getPtrType(
             kIROp_PtrType,
             sourceElementType,
-            AccessQualifier::ReadWrite,
             addrSpace);
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
@@ -7262,7 +7261,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
-            AccessQualifier::ReadWrite,
             addressSpace);
     }
 

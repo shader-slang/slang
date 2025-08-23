@@ -162,7 +162,7 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
         auto refStructType =
-            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
+            builder.getRefType(structType, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -216,7 +216,7 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
         auto outStructType =
-            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
+            builder.getRefType(structType, AddressSpace::Generic);
         IRType* paramTypes[] = {outStructType, matrixType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -303,7 +303,7 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
         auto refStructType =
-            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
+            builder.getRefType(structType, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -368,7 +368,7 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
         auto outLoweredType =
-            builder.getRefType(structType, AccessQualifier::ReadWrite, AddressSpace::Generic);
+            builder.getRefType(structType, AddressSpace::Generic);
         IRType* paramTypes[] = {outLoweredType, structType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -719,7 +719,6 @@ struct LoweredElementTypeContext
                 builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
                 auto refLoweredType = builder.getRefType(
                     loweredType,
-                    AccessQualifier::ReadWrite,
                     AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
@@ -759,7 +758,6 @@ struct LoweredElementTypeContext
 
                 auto outLoweredType = builder.getRefType(
                     loweredType,
-                    AccessQualifier::ReadWrite,
                     AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(
@@ -1077,7 +1075,6 @@ struct LoweredElementTypeContext
                             newArrayPtrVal = builder.emitBitCast(
                                 builder.getPtrType(
                                     loweredInnerType.loweredType,
-                                    AccessQualifier::ReadWrite,
                                     ptrType->getAddressSpace()),
                                 newArrayPtrVal);
                             traverseUses(
