@@ -1588,10 +1588,7 @@ SlangResult EndToEndCompileRequest::compile()
         }
         else
         {
-            // need a new diagnostic here. seems like we get no reflection if there's no target?
-            //
-            // should probably error instead of hitting a segfault.
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+            getSink()->diagnose(SourceLoc(), Diagnostics::noReflectionAvailableForModule, reflectionPath);
         }
     }
 
