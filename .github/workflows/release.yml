@@ -192,13 +192,13 @@ jobs:
 
           # WASM packaging
           if [[ "${{ matrix.platform }}" == "wasm" ]]; then
-            wasm_base=slang-wasm-${version}
-            mkdir -p "${wasm_base}"
-            cp build.em/Release/bin/slang-wasm.wasm "${wasm_base}/slang-wasm.wasm"
-            cp build.em/Release/bin/slang-wasm.js "${wasm_base}/slang-wasm.js"
-            cp build.em/Release/bin/interface.d.ts "${wasm_base}/interface.d.ts"
-            (cd "${wasm_base}" && zip -r "../${wasm_base}.zip" .)
-            echo "SLANG_WASM_ARCHIVE_ZIP=${wasm_base}.zip" >> "$GITHUB_OUTPUT"
+            base=slang-${version}-${{matrix.platform}}
+            mkdir -p "${base}"
+            cp build.em/Release/bin/slang-wasm.wasm "${base}/slang-wasm.wasm"
+            cp build.em/Release/bin/slang-wasm.js "${base}/slang-wasm.js"
+            cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
+            (cd "${base}" && zip -r "../${base}.zip" .)
+            echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -259,7 +259,6 @@ jobs:
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
             ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
-            ${{ steps.package.outputs.SLANG_WASM_ARCHIVE_ZIP }}
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
