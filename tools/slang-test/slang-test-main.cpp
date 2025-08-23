@@ -4842,6 +4842,14 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
+                // Check for VVL errors in unit tests
+                if (exeRes.debugLayer.getLength() > 0)
+                {
+                    testResult = TestResult::Fail;
+                    reporter->message(TestMessageType::TestFailure,
+                        exeRes.debugLayer);
+                }
+
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
@@ -4877,9 +4885,22 @@ static SlangResult runUnitTestModule(
             // TODO(JS): Problem here could be exception not handled properly across
             // shared library boundary.
             testModule->setTestReporter(reporter);
+
+            // Clear any previous debug messages
+            coreDebugCallback.clear();
+
             try
             {
                 test.testFunc(&unitTestContext);
+
+                // Check for VVL errors after test completion
+                String debugMessages = coreDebugCallback.getString();
+                if (debugMessages.getLength() > 0)
+                {
+                    reporter->message(TestMessageType::TestFailure,
+                        debugMessages);
+                    reporter->addResult(TestResult::Fail);
+                }
             }
             catch (...)
             {
