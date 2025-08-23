@@ -9,6 +9,9 @@ tests/diagnostics/int-literal.slang(32): warning 39999: integer literal is too l
 tests/diagnostics/int-literal.slang(39): warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
     uint64_t d2 = -9223372036854775808;
                    ^~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal.slang(14): warning 39999: integer literal '0x80000000' too large for type 'int' truncated to '2147483648'
+    int c3 = 0x80000000;
+             ^~~~~~~~~~
 }
 standard output = {
 }

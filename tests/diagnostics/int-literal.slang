@@ -10,7 +10,7 @@ int doSomething(int a)
     
     int c2 = int(-1u);
     
-    // Should sign extend 
+    // Warning, integer literal is too large for signed 32 bit, must be interpreted as unsigned.
     int c3 = 0x80000000;
     
     // No warning, hex literal will be interpreted as an unsigned 64 integer then signed with negative operator.
