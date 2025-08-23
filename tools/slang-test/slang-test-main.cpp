@@ -4846,8 +4846,7 @@ static SlangResult runUnitTestModule(
                 if (exeRes.debugLayer.getLength() > 0)
                 {
                     testResult = TestResult::Fail;
-                    reporter->message(TestMessageType::TestFailure,
-                        exeRes.debugLayer);
+                    reporter->message(TestMessageType::TestFailure, exeRes.debugLayer);
                 }
 
                 // If the rpc failed, output an error message
@@ -4897,8 +4896,7 @@ static SlangResult runUnitTestModule(
                 String debugMessages = coreDebugCallback.getString();
                 if (debugMessages.getLength() > 0)
                 {
-                    reporter->message(TestMessageType::TestFailure,
-                        debugMessages);
+                    reporter->message(TestMessageType::TestFailure, debugMessages);
                     reporter->addResult(TestResult::Fail);
                 }
             }
