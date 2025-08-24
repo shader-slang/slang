@@ -218,7 +218,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // already a struct, returns the newly created struct type.
     IRType* wrapConstantBufferElement(IRInst* cbParamInst)
     {
-        auto innerType = as<IRParameterGroupType>(cbParamInst->getDataType())->getElementType();
+        auto paramGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
+        if (!paramGroupType)
+        {
+            // This is not a parameter group type - probably a descriptor handle
+            // Return nullptr to indicate no wrapping is needed
+            return nullptr;
+        }
+        auto innerType = paramGroupType->getElementType();
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
@@ -454,6 +461,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(m_sharedContext->m_irModule);
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
+            
+            // Skip constant buffer processing for descriptor handles entirely
+            if (as<IRDescriptorHandleType>(innerType))
+            {
+                return;
+            }
+            
             if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
@@ -468,7 +482,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // a struct.
                 if (!as<IRStructType>(innerType))
                 {
-                    innerType = wrapConstantBufferElement(inst);
+                    auto wrappedType = wrapConstantBufferElement(inst);
+                    if (wrappedType)
+                    {
+                        innerType = wrappedType;
+                    }
+                    else
+                    {
+                        // Unable to wrap the element - this might be a descriptor handle
+                        // Skip the rest of the constant buffer processing
+                        return;
+                    }
                 }
                 builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
 

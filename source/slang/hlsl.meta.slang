@@ -22805,12 +22805,12 @@ struct DynamicResourceTypeInfo
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
+    { "StructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
     { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
     { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
     { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
     { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ByteAddressBuffer", "Buffer", "General", "Read" },
+    { "ByteAddressBuffer", "Buffer", "General", "ReadWrite" },
     { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
     { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
