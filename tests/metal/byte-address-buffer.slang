@@ -18,7 +18,7 @@ struct TestStruct
 void main_kernel(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: uint [[WORD0:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);
-    // CHECK: uint8_t [[A:[a-zA-Z0-9_]+]] = uint8_t(([[WORD0]] >> 0U) & 255U);
+    // CHECK: uchar [[A:[a-zA-Z0-9_]+]] = uchar(([[WORD0]] >> 0U) & 255U);
     // CHECK: uint [[WORD1:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);
     // CHECK: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort(([[WORD1]] >> 16U) & 65535U));
 
