@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -target cuda -stage compute -entry computeMain
 
 //CHECK_GLSL-DAG: binding = 4, set = 2
 //CHECK_GLSL-DAG: binding = 5, set = 1
@@ -14,6 +15,20 @@
 //CHECK_HLSL-DAG: u7
 //CHECK_HLSL-DAG: u9
 //CHECK_HLSL-DAG: u12
+
+//CHECK_CUDA-DAG: RWStructuredBuffer<int> b0_0;
+//CHECK_CUDA-DAG: RWStructuredBuffer<int> b1_0;
+//CHECK_CUDA-DAG: RWStructuredBuffer<int> b2_0;
+//CHECK_CUDA-DAG: RWStructuredBuffer<int> b3_0;
+//CHECK_CUDA-DAG: FixedArray<RWStructuredBuffer<int>, 2>  b4_0;
+//CHECK_CUDA-DAG: FixedArray<RWStructuredBuffer<int>, 2>  b5_0;
+//CHECK_CUDA: *(&(globalParams_0->b0_0)[int(0)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b1_0)[int(0)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b2_0)[int(0)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b3_0)[int(0)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b4_0[int(0)])[int(0)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b4_0[int(0)])[int(1)]) = int(1);
+//CHECK_CUDA: *(&(globalParams_0->b5_0[int(0)])[int(1)]) = int(1);
 
 [[vk::binding(4,2)]]
 RWStructuredBuffer<int> b0 : register(u4, space2);
