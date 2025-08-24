@@ -1386,6 +1386,20 @@ __intrinsic_op($(kIROp_Eql))
 bool operator ==(Ptr<T, addrSpace> p1, Ptr<T, addrSpace> p2);
 
 //@public:
+__generic<T, let addrSpace : uint64_t>
+extension Ptr<T, addrSpace> : IComparable
+{
+    __intrinsic_op($(kIROp_Less))
+    bool lessThan(This other);
+
+    __intrinsic_op($(kIROp_Leq))
+    bool lessThanOrEquals(This other);
+
+    __intrinsic_op($(kIROp_Eql))
+    bool equals(This other);
+}
+
+//@public:
 extension bool : IRangedValue
 {
     __generic<T, let addrSpace : uint64_t>
