@@ -1,6 +1,6 @@
 +# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. test commit
 
 **Repository**: shader-slang/slang - A shading language for GPU programming
 **Primary Language**: C++ with custom Slang language
