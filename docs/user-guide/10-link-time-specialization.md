@@ -149,11 +149,13 @@ RWStructuredBuffer<float> output;
 void main(uint tid : SV_DispatchThreadID)
 {
     Sampler sampler;
-    [ForceUnroll]
+    [unroll]
     for (int i = 0; i < sampler.getSampleCount(); i++)
         output[tid] += sampler.sample(i);
 }
 ```
+
+Note that we use `[unroll]` rather than `[ForceUnroll]` here. This is because `sampler.getSampleCount()` is a method call that returns a value at runtime, even though the concrete type of `Sampler` is known at link time. The `[unroll]` attribute allows the compiler to decide whether to unroll the loop based on the generated code, while `[ForceUnroll]` would cause a compilation error since it requires the loop bounds to be known at compile time.
 
 Again, we can separately compile these modules into binary forms independently from how they will be specialized.
 To specialize the shader, we can author a third module that provides a definition for the `extern Sampler` type:
