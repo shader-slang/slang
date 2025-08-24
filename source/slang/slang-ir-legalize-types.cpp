@@ -4145,7 +4145,7 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 };
 
 // This customization of type legalization is used to remove empty
-// structs from cpp/cuda programs if the empty type isn't used in
+// structs from cpp/cuda/metal programs if the empty type isn't used in
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
