@@ -1,6 +1,6 @@
-
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-metal -compute -output-using-type
 
 // METAL-NOT: struct emptyStruct
 struct emptyStruct
@@ -20,6 +20,7 @@ struct MyStruct
     emptyStruct e;
 }
 
+//TEST_INPUT: set param = new MyStruct{ out ubuffer(data=[0]), 5, {}}
 ParameterBlock<MyStruct> param;
 
 // LIB: @computeMain
@@ -29,5 +30,6 @@ void computeMain(
     uint tid: SV_DispatchThreadID,
 )
 {
+    // CHK: 5
     param.set();
 }

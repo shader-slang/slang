@@ -1,4 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
+//DISABLE_TEST:SIMPLE(filecheck=METAL-ASM): -stage compute -entry computeMain -target metallib -DEMIT_SOURCE
+
+// FIXME: Disabled due to location argument being passed wrong argument type
+// METAL-ASM-NOT: error :
+// METAL-ASM: @computeMain
 
 // TEST_INPUT: RWTexture2D(size=4, content = zero, sampleCount=2):name texMS
 Texture2DMS<float4> texMS;

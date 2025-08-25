@@ -1,4 +1,8 @@
 //TEST:SIMPLE(filecheck=METAL): -entry taskMain -stage amplification -target metal
+//TEST:SIMPLE(filecheck=METAL-ASM): -entry taskMain -stage amplification -target metallib
+
+// METAL-ASM-NOT: error :
+// METAL-ASM: @taskMain
 
 cbuffer Uniforms
 {

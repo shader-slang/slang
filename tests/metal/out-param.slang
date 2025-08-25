@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
 
 // Test that we can specailize mutable parameters based on the argument
 // address space when generating code for Metal.
@@ -41,4 +42,7 @@ void computeMain()
     outputBuffer[2] = sharedValue[0];
 
     outputBuffer[0]++;
+    // BUF: 2
+    // BUF: 1
+    // BUF: 1
 }

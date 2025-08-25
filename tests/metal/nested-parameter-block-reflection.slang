@@ -1,4 +1,5 @@
 //TEST:REFLECTION(filecheck=CHECK): -target metal
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -slang -compute -output-using-type
 
 
 
@@ -20,6 +21,8 @@
 // CHECK: "name": "output",
 // CHECK: "binding": {"kind": "constantBuffer", "index": 1},
 //
+
+//TEST_INPUT: set gParams = new Params{new Data{{0,0,0}}, Texture2D(size=4, content=one)}
 struct Data { int3 content; }
 struct Params
 {
@@ -27,9 +30,16 @@ struct Params
     Texture2D tex;
 }
 ParameterBlock<Params> gParams;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=output
 RWStructuredBuffer<float4> output;
+
 [numthreads(1,1,1)]
 void computeMain()
 {
+    // BUF: 1.0
+    // BUF: 1.0
+    // BUF: 1.0
+    // BUF: 1.0
     output[0] = gParams.tex.Load(gParams.pdata.content);
 }

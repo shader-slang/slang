@@ -1,5 +1,10 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal
+//TEST:SIMPLE(filecheck=MTL-ASM): -target metallib
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry vertMain -stage vertex
+
+
+// MTL-ASM-NOT: error :
+// MTL-ASM: @vertMain
 
 // MTL: attribute(3)
 // WGSL: @location(3)

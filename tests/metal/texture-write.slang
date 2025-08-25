@@ -1,5 +1,11 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
 //TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type
+
+//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
+
+
 // for some reason, metal textures dont have an overload for less-than-four component
 // writes, they need to be converted to 4-components in a legalize step, as the other components
 // get discarded
@@ -54,4 +60,8 @@ void computeMain()
     // METALLIB: call {{.*}}.write_texture_2d_array.v4f32(
     // METAL: .write(
     pWrites.tex4Array[uint3(4, 4, 4)] = float4(1, 2, 3, 4);
+
+    // Smoke-test
+    // BUF: 1
+    outputBuffer[0] = 1;
 }

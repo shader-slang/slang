@@ -10,6 +10,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-directly
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
 
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type -xslang -DMETAL_COMPUTE
+
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
@@ -61,9 +63,12 @@ bool Test_Scalar()
         // METALLIB: atan.f32
         && zero == atan<T>(zero)
 
+#ifndef METAL_COMPUTE
+        // atan2(0,0) in Metal results in NaN
         // METAL: atan2(
         // METALLIB: atan2.f32
         && zero == atan2<T>(zero, zero)
+#endif
 
         // METAL: atanh(
         // METALLIB: atanh.f32
@@ -289,9 +294,12 @@ bool Test_Vector()
         // METAL-NOT: atan(
         && zero == atan<T>(zero)
 
+#ifndef METAL_COMPUTE
+        // atan2(0,0) in Metal results in NaN
         // METAL: atan2(
         // METAL-NOT: atan2(
         && zero == atan2<T>(zero, zero)
+#endif
 
         // METAL: atanh(
         // METAL-NOT: atanh(

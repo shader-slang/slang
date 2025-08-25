@@ -4,6 +4,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK -xslang -minimum-slang-optimization
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CUDA):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=METAL):-metal -compute -shaderobj -output-using-type
 
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=uintBuffer
@@ -284,3 +285,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
 // CUDA: 207
 // CUDA: 230
 // CUDA: 253
+// METAL: 184
+// METAL: 207
+// METAL: 230
+// METAL: 253
