@@ -2933,9 +2933,7 @@ IRInOutType* IRBuilder::getInOutType(IRType* valueType)
     return (IRInOutType*)getPtrType(kIROp_InOutType, valueType);
 }
 
-IRRefType* IRBuilder::getRefType(
-    IRType* valueType,
-    AddressSpace addrSpace)
+IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
 {
     return (IRRefType*)getPtrType(kIROp_RefType, valueType, AccessQualifier::ReadWrite, addrSpace);
 }
@@ -5357,10 +5355,7 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(
-        getPtrType(resultType, accessQualifier, addrSpace),
-        basePtr,
-        fieldKey);
+    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace), basePtr, fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)

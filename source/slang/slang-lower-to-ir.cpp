@@ -3473,8 +3473,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getInOutType(irParamType);
             break;
         case kParameterDirection_Ref:
-            irParamType =
-                builder->getRefType(irParamType, AddressSpace::Generic);
+            irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
             irParamType = builder->getConstRefType(irParamType, AddressSpace::Generic);

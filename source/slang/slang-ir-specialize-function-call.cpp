@@ -665,9 +665,7 @@ struct FunctionParameterSpecializationContext
             {
                 auto ptrParamType = as<IRPtrTypeBase>(paramType);
                 argType = as<IRPtrTypeBase>(argType)->getValueType();
-                resultType = getBuilder()->getPtrType(
-                    argType,
-                    ptrParamType);
+                resultType = getBuilder()->getPtrType(argType, ptrParamType);
                 break;
             }
         }
