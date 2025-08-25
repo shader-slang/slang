@@ -14610,6 +14610,29 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 {
     setParentFuncOfVisitor(funcDecl);
 
+    for (UserDefinedDerivativeAttribute* modifier :
+         funcDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
+    {
+        // Propegate capabilities of user defined derivatives to funcDecl.
+        visitReferencedDecls(
+            *this,
+            modifier->funcExpr,
+            funcDecl->loc,
+            nullptr,
+            [this, funcDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+            {
+                _propagateRequirement(
+                    this,
+                    funcDecl->inferredCapabilityRequirements,
+                    funcDecl,
+                    node,
+                    nodeCaps,
+                    refLoc);
+            },
+            [this, funcDecl](DiagnosticCategory category)
+            { _propagateSeeDefinitionOf(this, funcDecl, category); });
+    }
+
     // visit the members of our funcDecl
     for (auto member : funcDecl->getDirectMemberDecls())
     {
