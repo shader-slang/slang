@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
 
 struct Param
 {

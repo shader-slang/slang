@@ -1,4 +1,5 @@
 //DISABLED_TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -cuda
 
 //TEST_INPUT:type Material<1,2>
 
