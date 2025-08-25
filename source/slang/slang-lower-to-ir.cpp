@@ -2067,7 +2067,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto astValueType = type->getValueType();
 
         IRType* irValueType = lowerType(context, astValueType);
+        IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+
+        if (auto astAccessQualifier = type->getAccessQualifier())
+        {
+            accessQualifier = getSimpleVal(context, lowerVal(context, astAccessQualifier));
+        }
+
         if (auto astAddrSpace = type->getAddressSpace())
         {
             addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
@@ -2078,7 +2085,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 getBuilder()->getUInt64Type(),
                 (IRIntegerValue)AddressSpace::Generic);
         }
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace);
+
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3437,7 +3445,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -3469,7 +3476,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
-            irParamType = builder->getConstRefType(irParamType);
+            irParamType = builder->getConstRefType(irParamType, AddressSpace::Generic);
             break;
         default:
             SLANG_UNEXPECTED("unknown parameter direction");

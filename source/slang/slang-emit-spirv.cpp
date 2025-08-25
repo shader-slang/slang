@@ -3265,6 +3265,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getPtrType(
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
+                AccessQualifier::ReadWrite,
                 AddressSpace::BuiltinInput),
             kind,
             spvAsmBuiltinVar);
@@ -7355,7 +7356,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }

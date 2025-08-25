@@ -583,7 +583,6 @@ class BuiltinRequirementModifier : public Modifier
     FIDDLE() BuiltinRequirementKind kind;
 };
 
-
 // A modifier applied to declarations of builtin types to indicate how they
 // should be lowered to the IR.
 //
