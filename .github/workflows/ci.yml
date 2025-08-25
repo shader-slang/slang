@@ -306,7 +306,7 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release' && github.event_name == 'pull_request'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -357,8 +357,7 @@ jobs:
           Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
-          # Disable some slangpy tests temporarily. This should be enabled back when https://github.com/shader-slang/slangpy/issues/274 is closed.
-          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v -k "not (test_nested_structs and DeviceType.cuda) and not (test_cursor_read_write and DeviceType.cuda) and not (test_fill_from_kernel and DeviceType.cuda) and not (test_wrap_buffer and DeviceType.cuda) and not (test_apply_changes and DeviceType.cuda) and not (test_shader_cursor and DeviceType.cuda)"
+          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
