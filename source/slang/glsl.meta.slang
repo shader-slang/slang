@@ -219,6 +219,8 @@ public in int gl_BaseInstance : SV_StartInstanceLocation;
 public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
 public in int2 gl_FragSizeEXT : SV_FragSize;
 
+public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
+
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
