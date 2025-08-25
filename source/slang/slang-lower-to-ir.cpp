@@ -9425,6 +9425,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // on an associated types.
             if (auto associatedTypeDeclRef = requirementDeclRef.as<AssocTypeDecl>())
             {
+                IRBuilderInsertLocScope insertScope(subBuilder);
+                subBuilder->setInsertInto(subBuilder->getModule());
                 for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
                          subContext->astBuilder,
                          associatedTypeDeclRef))
