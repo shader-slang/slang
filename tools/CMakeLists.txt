@@ -81,6 +81,10 @@ generator(
     slang-capability-lookup
     slang-lookup-tables
     Threads::Threads
+    INCLUDE_DIRECTORIES_PRIVATE
+    ${CMAKE_BINARY_DIR}/$<CONFIG>/include
+    REQUIRES
+    copy_slang_headers
 )
 
 slang_add_target(
