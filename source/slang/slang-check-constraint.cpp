@@ -820,38 +820,28 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
+    // if both values are constant integers, then compare them
+    if (auto fstIntVal = as<ConstantIntVal>(fst))
+    {
+        if (auto sndIntVal = as<ConstantIntVal>(snd))
+        {
+            return fstIntVal->getValue() == sndIntVal->getValue();
+        }
+    }
+
     // Check if both are integer values in general
     const auto fstInt = as<IntVal>(fst);
     const auto sndInt = as<IntVal>(snd);
-
     if (fstInt && sndInt)
     {
-        const auto paramUnderCastToConstant = [](IntVal* intVal)
-        {
-            while (auto typeCastIntVal = as<TypeCastIntVal>(intVal))
-                intVal = as<IntVal>(typeCastIntVal->getBase());
-            return intVal;
-        };
-
-        // If both values are constant integers, then compare them
-        if (auto fstIntVal = as<ConstantIntVal>(paramUnderCastToConstant(fstInt)))
-        {
-            if (auto sndIntVal = as<ConstantIntVal>(paramUnderCastToConstant(sndInt)))
-            {
-                return fstIntVal->getValue() == sndIntVal->getValue();
-            }
-        }
-
-
-        const auto tryParamUnderCastToDeclRefIntVal = [](IntVal* i)
+        const auto paramUnderCast = [](IntVal* i)
         {
             if (const auto c = as<TypeCastIntVal>(i))
                 i = as<IntVal>(c->getBase());
             return as<DeclRefIntVal>(i);
         };
-
-        auto fstParam = tryParamUnderCastToDeclRefIntVal(fstInt);
-        auto sndParam = tryParamUnderCastToDeclRefIntVal(sndInt);
+        auto fstParam = paramUnderCast(fstInt);
+        auto sndParam = paramUnderCast(sndInt);
 
         bool okay = false;
         if (fstParam)
@@ -860,6 +850,7 @@ bool SemanticsVisitor::TryUnifyVals(
             okay |= TryUnifyIntParam(constraints, unifyCtx, sndParam->getDeclRef(), fstInt);
         return okay;
     }
+
     if (auto fstWit = as<DeclaredSubtypeWitness>(fst))
     {
         if (auto sndWit = as<DeclaredSubtypeWitness>(snd))
