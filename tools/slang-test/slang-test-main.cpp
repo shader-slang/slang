@@ -4842,17 +4842,17 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
+                // If the rpc failed, output an error message
+                if (SLANG_FAILED(rpcRes))
+                {
+                    reporter->message(TestMessageType::RunError, "rpc failed");
+                }
+
                 // Check for VVL errors in unit tests
                 if (exeRes.debugLayer.getLength() > 0)
                 {
                     testResult = TestResult::Fail;
                     reporter->message(TestMessageType::TestFailure, exeRes.debugLayer);
-                }
-
-                // If the rpc failed, output an error message
-                if (SLANG_FAILED(rpcRes))
-                {
-                    reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
                 // If the test fails, output any output - which might give information about
