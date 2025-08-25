@@ -99,6 +99,8 @@ class IntegerLiteralExpr : public LiteralExpr
 {
     FIDDLE(...)
     FIDDLE() IntegerLiteralValue value;
+    FIDDLE() bool wasNegated = false;
+    FIDDLE() bool wasBitwiseNot = false;
 };
 
 FIDDLE()

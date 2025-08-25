@@ -8717,6 +8717,17 @@ static Expr* parsePrefixExpr(Parser* parser)
                 }
 
                 newLiteral->value = value;
+                // Mark this literal as having been negated if it was a unary minus operation
+                if (tokenType == TokenType::OpSub)
+                {
+                    newLiteral->wasNegated = true;
+                }
+                // Mark this literal as having been bitwise NOT if it was a unary bitwise NOT
+                // operation
+                if (tokenType == TokenType::OpBitNot)
+                {
+                    newLiteral->wasBitwiseNot = true;
+                }
                 return newLiteral;
             }
             else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))

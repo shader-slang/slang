@@ -28,10 +28,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     //
     // dot4add_i8packed()
-    // [6 2 3 -1] dot [-2 -6 2 6] - 100
-    // (6 * -2) + (2 * -6) + (3 * 2) + (-1 * 6) - 100 = -124
+    // [4 3 2 1] dot [-2 -6 2 6] - 100
+    // (4 * -2) + (3 * -6) + (2 * 2) + (1 * 6) - 100 = -116
     //
-    int signedX = 0xFF030206;
+    int signedX = 0x01020304;
     int signedY = 0x0602FAFE;
     int signedAcc = -100;
     int signedResult = dot4add_i8packed(signedX, signedY, signedAcc);

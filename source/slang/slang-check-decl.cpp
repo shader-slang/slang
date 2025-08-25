@@ -24,6 +24,125 @@
 namespace Slang
 {
 
+// Static helper function to check for integer literal overflow in variable initializers
+static void checkIntegerLiteralOverflow(
+    IntegerLiteralExpr* intLit,
+    VarDeclBase* varDecl,
+    DiagnosticSink* sink)
+{
+    // Only apply overflow detection to integer types, not float types
+    bool isIntegerType = false;
+    if (auto basicType = as<BasicExpressionType>(varDecl->type.type))
+    {
+        const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+        isIntegerType = (info.flags & BaseTypeInfo::Flag::Integer) != 0;
+    }
+
+    if (!isIntegerType)
+    {
+        // Skip overflow detection for non-integer types
+        return;
+    }
+
+    // Check if this literal was created by legitimate operations
+    bool isLegitimateNegative = intLit->wasNegated || intLit->wasBitwiseNot;
+
+    // Check if the value is valid for the declared type
+    bool isValidForDeclaredType = false;
+    if (auto basicType = as<BasicExpressionType>(varDecl->type.type))
+    {
+        const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+
+        if (info.flags & BaseTypeInfo::Flag::Integer)
+        {
+            if (info.flags & BaseTypeInfo::Flag::Signed)
+            {
+                // For signed types, check if the value fits within the type's range
+                int64_t minValue = 0, maxValue = 0;
+                if (info.sizeInBytes == 1)
+                {
+                    minValue = INT8_MIN;
+                    maxValue = INT8_MAX;
+                }
+                else if (info.sizeInBytes == 2)
+                {
+                    minValue = INT16_MIN;
+                    maxValue = INT16_MAX;
+                }
+                else if (info.sizeInBytes == 4)
+                {
+                    minValue = INT32_MIN;
+                    maxValue = INT32_MAX;
+                }
+                else
+                {
+                    minValue = INT64_MIN;
+                    maxValue = INT64_MAX;
+                }
+                isValidForDeclaredType = (intLit->value >= minValue && intLit->value <= maxValue);
+            }
+            else
+            {
+                // For unsigned types, check if the value is valid when interpreted as unsigned
+                uint64_t unsignedValue = (uint64_t)intLit->value;
+                uint64_t maxValue = 0;
+                if (info.sizeInBytes == 1)
+                    maxValue = UINT8_MAX;
+                else if (info.sizeInBytes == 2)
+                    maxValue = UINT16_MAX;
+                else if (info.sizeInBytes == 4)
+                    maxValue = UINT32_MAX;
+                else
+                    maxValue = UINT64_MAX;
+                isValidForDeclaredType = (unsignedValue <= maxValue);
+            }
+        }
+    }
+
+    // Check if this is a negative value that was created by overflow rather than legitimate
+    // operations
+    bool isOverflowedPositive = false;
+    if (intLit->value < 0 && !isLegitimateNegative)
+    {
+        // Check if the literal's inferred type is larger than the declared type
+        if (auto literalType = as<BasicExpressionType>(intLit->type.type))
+        {
+            if (auto declaredType = as<BasicExpressionType>(varDecl->type.type))
+            {
+                const auto& literalInfo = BaseTypeInfo::getInfo(literalType->getBaseType());
+                const auto& declaredInfo = BaseTypeInfo::getInfo(declaredType->getBaseType());
+
+                // If the literal's type is larger than the declared type, it might be an overflowed
+                // positive
+                if (literalInfo.sizeInBytes > declaredInfo.sizeInBytes)
+                {
+                    isOverflowedPositive = true;
+                }
+            }
+        }
+    }
+
+    // Generate appropriate diagnostics for different overflow scenarios
+    if (!isLegitimateNegative)
+    {
+        if (!isValidForDeclaredType)
+        {
+            // The literal value doesn't fit in the declared type
+            sink->diagnose(
+                intLit,
+                Diagnostics::integerLiteralTruncated,
+                intLit->token.getContent(),
+                varDecl->type.type->toString(),
+                intLit->value);
+        }
+        else if (isOverflowedPositive)
+        {
+            // The literal overflowed from positive to negative during parsing
+            sink->diagnose(intLit, Diagnostics::integerLiteralTooLarge);
+        }
+    }
+}
+
 static bool isAssociatedTypeDecl(Decl* decl)
 {
     auto d = decl;
@@ -2710,6 +2829,12 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // it to the type of the variable.
         //
         initExpr = subVisitor.CheckTerm(initExpr);
+
+        // Check for integer literal overflow in variable initializers
+        if (auto intLit = as<IntegerLiteralExpr>(initExpr))
+        {
+            checkIntegerLiteralOverflow(intLit, varDecl, getSink());
+        }
 
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
