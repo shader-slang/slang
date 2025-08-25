@@ -2171,6 +2171,44 @@ local insts = {
 			},
 		},
 	},
+	{
+		-- A collection of IR instructions used for propagation analysis
+		-- The operands are the elements of the set, sorted by unique ID to ensure canonical ordering
+		TypeFlowData = {
+			hoistable = true,
+			{
+				CollectionBase = {
+					{ TypeCollection = {} },
+					{ FuncCollection = {} },
+					{ TableCollection = {} },
+					{ GenericCollection = {} },
+				},
+			},
+			{ UnboundedCollection = {} },
+			{ CollectionTagType = {} }, -- Operand is TypeCollection/FuncCollection/TableCollection (funcs/tables)
+			{ CollectionTaggedUnionType = {}} -- Operand is TypeCollection, TableCollection for existential
+		},
+	},
+	{ CastInterfaceToTaggedUnionPtr = {
+		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
+	} }, 
+	{ CastTaggedUnionToInterfacePtr = {
+		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
+	} }, 
+	{ GetTagForSuperCollection = {
+		-- Translate a tag from a set to its equivalent in a super-set
+	} }, 
+	{ GetTagForMappedCollection = {
+		-- Translate a tag from a set to its equivalent in a different set
+		-- based on a mapping induced by a lookup key
+	} },                                    
+	{ GetTagFromSequentialID = {
+		-- Translate an existing sequential ID (a 'global' ID) & and interface type into a tag
+	    -- the provided collection (a 'local' ID)
+	} }, 
+	{ GetSequentialIDFromTag = {
+		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
+	} } 
 }
 
 -- A function to calculate some useful properties and put it in the table,

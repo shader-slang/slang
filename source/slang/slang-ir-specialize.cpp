@@ -9,6 +9,8 @@
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -848,7 +850,45 @@ struct SpecializationContext
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         if (!witnessTable)
         {
-            return false;
+            if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
+            {
+                auto requirementKey = lookupInst->getRequirementKey();
+
+                HashSet<IRInst*> satisfyingValSet;
+                bool skipSpecialization = false;
+                forEachInCollection(
+                    collection,
+                    [&](IRInst* instElement)
+                    {
+                        if (auto table = as<IRWitnessTable>(instElement))
+                        {
+                            if (auto satisfyingVal = findWitnessVal(table, requirementKey))
+                            {
+                                satisfyingValSet.add(satisfyingVal);
+                                return;
+                            }
+                        }
+
+                        // If we reach here, we didn't find a satisfying value.
+                        skipSpecialization = true;
+                    });
+
+                if (!skipSpecialization)
+                {
+                    CollectionBuilder cBuilder(lookupInst->getModule());
+                    auto newCollection = cBuilder.makeSet(satisfyingValSet);
+                    addUsersToWorkList(lookupInst);
+                    lookupInst->replaceUsesWith(newCollection);
+                    lookupInst->removeAndDeallocate();
+                    return true;
+                }
+                else
+                    return false;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         // Because we have a concrete witness table, we can
@@ -963,18 +1003,33 @@ struct SpecializationContext
     void readSpecializationDictionaries()
     {
         auto moduleInst = module->getModuleInst();
+        ShortList<IRInst*, 4> dictInsts;
         for (auto child : moduleInst->getChildren())
         {
             switch (child->getOp())
             {
             case kIROp_GenericSpecializationDictionary:
-                _readSpecializationDictionaryImpl(genericSpecializations, child);
+            case kIROp_ExistentialFuncSpecializationDictionary:
+            case kIROp_ExistentialTypeSpecializationDictionary:
+                dictInsts.add(child);
+                break;
+            default:
+                continue;
+            }
+        }
+
+        for (auto dict : dictInsts)
+        {
+            switch (dict->getOp())
+            {
+            case kIROp_GenericSpecializationDictionary:
+                _readSpecializationDictionaryImpl(genericSpecializations, dict);
                 break;
             case kIROp_ExistentialFuncSpecializationDictionary:
-                _readSpecializationDictionaryImpl(existentialSpecializedFuncs, child);
+                _readSpecializationDictionaryImpl(existentialSpecializedFuncs, dict);
                 break;
             case kIROp_ExistentialTypeSpecializationDictionary:
-                _readSpecializationDictionaryImpl(existentialSpecializedStructs, child);
+                _readSpecializationDictionaryImpl(existentialSpecializedStructs, dict);
                 break;
             default:
                 continue;
@@ -1141,7 +1196,13 @@ struct SpecializationContext
             if (iterChanged)
             {
                 this->changed = true;
+                writeSpecializationDictionaries();
+                genericSpecializations.clear();
+                existentialSpecializedFuncs.clear();
+                existentialSpecializedStructs.clear();
                 eliminateDeadCode(module->getModuleInst());
+                readSpecializationDictionaries();
+                // eliminateDeadCode(module->getModuleInst());
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
             }
 
@@ -1157,7 +1218,26 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = lowerWitnessLookup(module, sink);
+                iterChanged = specializeDynamicInsts(module, sink);
+                if (iterChanged)
+                {
+                    // We'll write out the specialization info to an inst,
+                    // and read it back again so we can remove entries
+                    // for specializations that are no longer needed.
+                    //
+                    // If we don't do this, we'll end up with deallocated
+                    // references in the specialization dictionaries, and
+                    // can't reliably handle situations where the same specialization
+                    // is requested again in the future once a different function
+                    // has been specialized.
+                    //
+                    writeSpecializationDictionaries();
+                    genericSpecializations.clear();
+                    existentialSpecializedFuncs.clear();
+                    existentialSpecializedStructs.clear();
+                    eliminateDeadCode(module->getModuleInst());
+                    readSpecializationDictionaries();
+                }
             }
 
             if (!iterChanged || sink->getErrorCount())
@@ -3049,12 +3129,192 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+// DUPLICATE: merge.
+static bool isDynamicGeneric(IRInst* callee)
+{
+    // If the callee is a specialization, and at least one of its arguments
+    // is a type-flow-collection, then it is a dynamic generic.
+    //
+    if (auto specialize = as<IRSpecialize>(callee))
+    {
+        auto generic = as<IRGeneric>(specialize->getBase());
+
+        // Only functions need dynamic-aware specialization.
+        if (getGenericReturnVal(generic)->getOp() != kIROp_Func)
+            return false;
+
+        for (UInt i = 0; i < specialize->getArgCount(); i++)
+        {
+            auto arg = specialize->getArg(i);
+            if (as<IRCollectionBase>(arg))
+                return true; // Found a type-flow-collection argument
+        }
+        return false; // No type-flow-collection arguments found
+    }
+
+    return false;
+}
+
+static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
+{
+    auto generic = cast<IRGeneric>(specializeInst->getBase());
+    auto genericReturnVal = findGenericReturnVal(generic);
+
+    IRBuilder builder(specializeInst->getModule());
+    builder.setInsertInto(specializeInst->getModule());
+
+    // Let's start by creating the function itself.
+    auto loweredFunc = builder.createFunc();
+    builder.setInsertInto(loweredFunc);
+    builder.setInsertInto(builder.emitBlock());
+
+    IRCloneEnv cloneEnv;
+    cloneEnv.squashChildrenMapping = true;
+
+    IRCloneEnv staticCloningEnv;
+    // Use this as the child to 'override' certain elements in the parent environment with
+    // their static versions.
+    //
+    staticCloningEnv.parent = &cloneEnv;
+
+    Index argIndex = 0;
+    List<IRType*> extraParamTypes;
+    // Map the generic's parameters to the specialized arguments.
+    for (auto param : generic->getFirstBlock()->getParams())
+    {
+        auto specArg = specializeInst->getArg(argIndex++);
+        if (auto collection = as<IRCollectionBase>(specArg))
+        {
+            // We're dealing with a set of types.
+            if (as<IRTypeType>(param->getDataType()))
+            {
+                // auto unionType = createAnyValueTypeFromInsts(collectionSet);
+                cloneEnv.mapOldValToNew[param] = collection;
+            }
+            else if (as<IRWitnessTableType>(param->getDataType()))
+            {
+                // For cloning parameter types, we want to just use the
+                // collection.
+                //
+                staticCloningEnv.mapOldValToNew[param] = collection;
+
+                // We'll create an integer parameter for all the rest of
+                // the insts which will may need the runtime tag.
+                //
+                auto tagType = (IRType*)makeTagType(collection);
+                cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                extraParamTypes.add(tagType);
+            }
+        }
+        else
+        {
+            // For everything else, just set the parameter type to the argument;
+            SLANG_ASSERT(specArg->getParent()->getOp() == kIROp_ModuleInst);
+            cloneEnv.mapOldValToNew[param] = specArg;
+        }
+    }
+
+    // Clone in the rest of the generic's body including the blocks of the returned func.
+    for (auto inst = generic->getFirstBlock()->getFirstOrdinaryInst(); inst;
+         inst = inst->getNextInst())
+    {
+        if (inst == genericReturnVal)
+        {
+            auto returnedFunc = cast<IRFunc>(inst);
+            auto funcFirstBlock = returnedFunc->getFirstBlock();
+
+            // cloneEnv.mapOldValToNew[funcFirstBlock] = loweredFunc->getFirstBlock();
+            builder.setInsertInto(loweredFunc);
+            for (auto block : returnedFunc->getBlocks())
+            {
+                // Merge the first block of the generic with the first block of the
+                // returned function to merge the parameter lists.
+                //
+                cloneEnv.mapOldValToNew[block] = cloneInstAndOperands(&cloneEnv, &builder, block);
+            }
+
+            builder.setInsertInto(builder.getModule());
+            auto loweredFuncType =
+                as<IRFuncType>(cloneInst(&staticCloningEnv, &builder, returnedFunc->getFullType()));
+            loweredFunc->setFullType((IRType*)loweredFuncType);
+
+            builder.setInsertInto(loweredFunc->getFirstBlock());
+            builder.emitBranch(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
+
+            for (auto param : funcFirstBlock->getParams())
+            {
+                // Clone the parameters of the first block.
+                if (loweredFunc->getFirstBlock()->getFirstParam() == nullptr)
+                    builder.setInsertBefore(loweredFunc->getFirstBlock()->getFirstChild());
+                else
+                    builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
+
+                auto newParam = cloneInst(&staticCloningEnv, &builder, param);
+                cloneEnv.mapOldValToNew[param] = newParam; // Transfer the param to the dynamic env
+            }
+
+            builder.setInsertInto(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
+            for (auto _inst = funcFirstBlock->getFirstOrdinaryInst(); _inst;
+                 _inst = _inst->getNextInst())
+            {
+                // Clone the instructions in the first block.
+                cloneInst(&cloneEnv, &builder, _inst);
+            }
+
+            for (auto block : returnedFunc->getBlocks())
+            {
+                if (block == funcFirstBlock)
+                    continue; // Already cloned the first block
+
+                cloneInstDecorationsAndChildren(
+                    &cloneEnv,
+                    builder.getModule(),
+                    block,
+                    cloneEnv.mapOldValToNew[block]);
+            }
+
+            // Add extra indices to the func-type parameters
+            List<IRType*> funcTypeParams;
+            for (Index i = 0; i < extraParamTypes.getCount(); i++)
+                funcTypeParams.add(extraParamTypes[i]);
+
+            for (auto paramType : loweredFuncType->getParamTypes())
+                funcTypeParams.add(paramType);
+
+            // Set the new function type with the extra indices
+            loweredFunc->setFullType(
+                builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
+        }
+        else if (!as<IRReturn>(inst))
+        {
+            // Clone insts in the generic under two different environments:
+            // One that is "static" (for cloning types), and one that is "dynamic"
+            // which uses tags for witness tables instead of a static collection.
+            //
+            // We'll want to use the dynamic environment for cloning everything in the function
+            // body, but the static environment for cloning parameter types.
+            //
+            // Note that this can result in some types inside the function (i.e. not used in the
+            // parameter types) being cloned under the dynamic environment, but
+            // a subsequent pass of dynamic-inst-lowering will convert those to the static form.
+            //
+            cloneInst(&staticCloningEnv, &builder, inst);
+            cloneInst(&cloneEnv, &builder, inst);
+        }
+    }
+
+    return loweredFunc;
+}
+
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
     IRModule* module,
     SpecializationContext* context)
 {
+    if (isDynamicGeneric(specializeInst))
+        return specializeDynamicGeneric(specializeInst);
+
     // Effectively, specializing a generic amounts to "calling" the generic
     // on its concrete argument values and computing the
     // result it returns.
@@ -3192,6 +3452,10 @@ IRInst* specializeGeneric(IRSpecialize* specializeInst)
     if (!module)
         return specializeInst;
 
+    if (isDynamicGeneric(specializeInst))
+        return specializeDynamicGeneric(specializeInst);
+
+    // Standard static specialization of generic.
     return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);
 }
 
