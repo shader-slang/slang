@@ -603,8 +603,7 @@ void computeMain(int id : SV_DispatchThreadID)
 ### Coherent Operations
 
 Slang supports coherence to specific memory-scopes on a per operation basis when working with pointers.
-To use coherent operations, `vk_mem_model` is required.
-
+To use coherent operations, `vk_mem_model` is required and will be automatically-enabled.
 Textures are not currently supported.
 
 ```c#
