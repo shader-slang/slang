@@ -4,12 +4,14 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 
 // HLSL: computeMain
 // GLSL: main
 // METAL: computeMain
 // CPP: computeMain
 // SPIRV: OpEntryPoint
+// CUDA: computeMain
 
 struct PowActivationEx : IDifferentiable
 {

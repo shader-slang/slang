@@ -143,6 +143,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::EmitSpirvDirectly:
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
+        case CompilerOptionName::ForceCLayout:
         case CompilerOptionName::MatrixLayoutRow:
         case CompilerOptionName::MatrixLayoutColumn:
         case CompilerOptionName::VulkanInvertY:

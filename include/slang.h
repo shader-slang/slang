@@ -1053,6 +1053,8 @@ typedef uint32_t SlangSizeT;
         // Bitfield options
         UseMSVCStyleBitfieldPacking, // bool
 
+        ForceCLayout, // bool
+
         CountOf,
     };
 
@@ -4686,6 +4688,66 @@ struct SlangGlobalSessionDesc
     /// Reserved for future use.
     uint32_t reserved[16] = {};
 };
+
+/* Create a blob from binary data.
+ *
+ * @param data Pointer to the binary data to store in the blob. Must not be null.
+ * @param size Size of the data in bytes. Must be greater than 0.
+ * @return The created blob on success, or nullptr on failure.
+ */
+SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
+
+/* Load a module from source code with size specification.
+ *
+ * @param session The session to load the module into.
+ * @param moduleName The name of the module.
+ * @param path The path for the module.
+ * @param source Pointer to the source code data.
+ * @param sourceSize Size of the source code data in bytes.
+ * @param outDiagnostics (out, optional) Diagnostics output.
+ * @return The loaded module on success, or nullptr on failure.
+ */
+SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromSource(
+    slang::ISession* session,
+    const char* moduleName,
+    const char* path,
+    const char* source,
+    size_t sourceSize,
+    ISlangBlob** outDiagnostics = nullptr);
+
+/** Load a module from IR data.
+ * @param session The session to load the module into.
+ * @param moduleName Name of the module to load.
+ * @param path Path for the module (used for diagnostics).
+ * @param source IR data containing the module.
+ * @param sourceSize Size of the IR data in bytes.
+ * @param outDiagnostics (out, optional) Diagnostics output.
+ * @return The loaded module on success, or nullptr on failure.
+ */
+SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromIRBlob(
+    slang::ISession* session,
+    const char* moduleName,
+    const char* path,
+    const void* source,
+    size_t sourceSize,
+    ISlangBlob** outDiagnostics = nullptr);
+
+/** Read module info (name and version) from IR data.
+ * @param session The session to use for loading module info.
+ * @param source IR data containing the module.
+ * @param sourceSize Size of the IR data in bytes.
+ * @param outModuleVersion (out) Module version number.
+ * @param outModuleCompilerVersion (out) Compiler version that created the module.
+ * @param outModuleName (out) Name of the module.
+ * @return SLANG_OK on success, or an error code on failure.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadModuleInfoFromIRBlob(
+    slang::ISession* session,
+    const void* source,
+    size_t sourceSize,
+    SlangInt& outModuleVersion,
+    const char*& outModuleCompilerVersion,
+    const char*& outModuleName);
 
 /* Create a global session, with the built-in core module.
 

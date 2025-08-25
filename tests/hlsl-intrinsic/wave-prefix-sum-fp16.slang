@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -16,6 +17,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK_SPV: OpGroupNonUniformFAdd
     // CHECK_WGSL: subgroupExclusiveAdd
     // CHECK_METAL: simd_prefix_exclusive_sum
+    // CHECK_CUDA: _wavePrefixSumMultiple
     float2 r1 = WavePrefixSum(v1);
     
     outputBuffer[idx] = (int)r1.x;
