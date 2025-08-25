@@ -43,7 +43,7 @@ static Slang::Result loadSpirvProgram(
         export public struct S : IFoo
         {
             public float4 getFoo() { return this.foo; }
-            float4 foo;
+            float4 foo : POSITION;
         }
     )";
 
@@ -213,10 +213,23 @@ void linkTimeTypeLayoutImpl(rhi::IDevice* device, UnitTestContext* context)
     validateStructSLayout(context, slangReflection);
 
     // Create a graphics pipeline to verify SPIRV code generation works
+    InputElementDesc inputElements[] = {
+        {"POSITION", 0, Format::RGBA32Float, 0, 0}, // S struct as POSITION semantic (float4)
+    };
+    VertexStreamDesc vertexStreams[] = {
+        {16, InputSlotClass::PerVertex, 0}, // sizeof(float4)
+    };
+    InputLayoutDesc inputLayoutDesc = {};
+    inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+    inputLayoutDesc.inputElements = inputElements;
+    inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+    inputLayoutDesc.vertexStreams = vertexStreams;
+    auto inputLayout = device->createInputLayout(inputLayoutDesc);
+    SLANG_CHECK(inputLayout != nullptr);
+
     RenderPipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
-
-    // We need to set up a minimal pipeline state for a vertex shader
+    pipelineDesc.inputLayout = inputLayout;
     pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
 
     ComPtr<IRenderPipeline> pipelineState;
