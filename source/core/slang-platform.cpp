@@ -18,6 +18,7 @@
 
 #if SLANG_LINUX_FAMILY
 #include <execinfo.h>
+#include <unistd.h>
 #endif
 
 namespace Slang

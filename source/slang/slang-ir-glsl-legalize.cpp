@@ -756,6 +756,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_SampleID";
     }
+    else if (semanticName == "sv_vulkansampleposition")
+    {
+        context->requireGLSLVersion(ProfileVersion::GLSL_400);
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
+        name = "gl_SamplePosition";
+    }
     else if (semanticName == "sv_stencilref")
     {
         // uint in hlsl, int in glsl

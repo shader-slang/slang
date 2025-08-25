@@ -2406,6 +2406,11 @@ struct OutputIndices
             case spirv: __setIndices(this, index, newValue);
             }
         }
+
+        // If a 'OutputIndices[index]' is referred to by a '__ref', call 'kIROp_MeshOutputRef(index)'
+        [require(glsl_hlsl_metal_spirv, meshshading)]
+        __intrinsic_op($(kIROp_MeshOutputRef))
+        ref;
     }
 };
 
