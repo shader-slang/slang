@@ -91,7 +91,8 @@
       "description": "Build the compile time generators used in building Slang",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
-        "SLANG_ENABLE_SLANG_RHI": false
+        "SLANG_ENABLE_SLANG_RHI": false,
+        "SLANG_ENABLE_TESTS": false
       }
     }
   ],
