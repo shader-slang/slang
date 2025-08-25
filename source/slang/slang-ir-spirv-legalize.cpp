@@ -249,10 +249,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 builder.setInsertBefore(use->getUser());
                 auto addr = builder.emitFieldAddress(
-                    builder.getPtrType(
-                        innerType,
-                        AccessQualifier::Read,
-                        AddressSpace::Uniform),
+                    builder.getPtrType(innerType, AccessQualifier::Read, AddressSpace::Uniform),
                     cbParamInst,
                     key);
                 use->set(addr);
@@ -294,9 +291,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto basePtrType = as<IRPtrTypeBase>(addr->getDataType());
                 IRType* ptrType = nullptr;
                 if (basePtrType->hasAddressSpace())
-                    ptrType = builder.getPtrType(
-                        user->getDataType(),
-                        basePtrType);
+                    ptrType = builder.getPtrType(user->getDataType(), basePtrType);
                 else
                     ptrType = builder.getPtrType(user->getDataType());
                 IRInst* subAddr = nullptr;
@@ -796,9 +791,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             IRType* newPtrType = oldPtrType->hasAddressSpace()
-                                     ? builder.getPtrType(
-                                           newPtrValueType,
-                                           oldPtrType)
+                                     ? builder.getPtrType(newPtrValueType, oldPtrType)
                                      : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
             inst->setFullType(newPtrType);
         }
@@ -1110,9 +1103,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(loadInst);
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(
-                loadInst->getFullType(),
-                getStorageBufferAddressSpace()),
+            builder.getPtrType(loadInst->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1131,9 +1122,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(storeInst);
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(
-                value->getFullType(),
-                getStorageBufferAddressSpace()),
+            builder.getPtrType(value->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1151,10 +1140,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
             IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(subscript);
-            auto newPtrType = builder.getPtrType(
-                ptrType->getOp(),
-                ptrType->getValueType(),
-                AddressSpace::Image);
+            auto newPtrType =
+                builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), AddressSpace::Image);
             subscript->setFullType(newPtrType);
 
             // HACK: assumes the image operand is a load and replace it with
@@ -2193,9 +2180,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             // Update the global param's type to use the wrapper struct
-            auto newPtrType = builder.getPtrType(
-                wrapperStruct,
-                ptrType);
+            auto newPtrType = builder.getPtrType(wrapperStruct, ptrType);
             globalParam->setFullType(newPtrType);
 
             // Traverse all uses of the global param and insert a FieldAddress to access the
@@ -2206,9 +2191,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     builder.setInsertBefore(use->getUser());
                     auto addr = builder.emitFieldAddress(
-                        builder.getPtrType(
-                            structType,
-                            ptrType),
+                        builder.getPtrType(structType, ptrType),
                         globalParam,
                         key);
                     use->set(addr);

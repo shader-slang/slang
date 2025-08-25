@@ -3728,9 +3728,7 @@ public:
 
     IROutType* getOutType(IRType* valueType);
     IRInOutType* getInOutType(IRType* valueType);
-    IRRefType* getRefType(
-        IRType* valueType,
-        AddressSpace addrSpace);
+    IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
@@ -3753,19 +3751,19 @@ public:
     {
         return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
     }
-    IRPtrType* getPtrType(
-        IRType* valueType,
-        AddressSpace addressSpace)
+    IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
         return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
     }
     // Copies the op-type of the oldPtrType, access-qualifier and address-space.
     // Does not reuse the same `inst` for access-qualifier and address-space.
-    IRPtrTypeBase* getPtrType(
-        IRType* valueType,
-        IRPtrTypeBase* oldPtrType)
+    IRPtrTypeBase* getPtrType(IRType* valueType, IRPtrTypeBase* oldPtrType)
     {
-        return getPtrType(oldPtrType->getOp(), valueType, oldPtrType->getAccessQualifier(), oldPtrType->getAddressSpace());
+        return getPtrType(
+            oldPtrType->getOp(),
+            valueType,
+            oldPtrType->getAccessQualifier(),
+            oldPtrType->getAddressSpace());
     }
 
     IRTextureTypeBase* getTextureType(

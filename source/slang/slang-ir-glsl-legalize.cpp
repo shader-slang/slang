@@ -2554,9 +2554,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
     // Create a global variable to hold the consolidated struct
     consolidatedVar = builder->createGlobalVar(structType);
-    auto ptrType = builder->getPtrType(
-        structType,
-        AddressSpace::IncomingRayPayload);
+    auto ptrType = builder->getPtrType(structType, AddressSpace::IncomingRayPayload);
     consolidatedVar->setFullType(ptrType);
     consolidatedVar->moveToEnd();
 
@@ -4300,9 +4298,7 @@ void legalizeEntryPointForGLSL(
             // Re-add ptr if there was one on the input
             if (ptrType)
             {
-                sizedArrayType = builder.getPtrType(
-                    sizedArrayType,
-                    ptrType);
+                sizedArrayType = builder.getPtrType(sizedArrayType, ptrType);
             }
 
             // Change the globals type

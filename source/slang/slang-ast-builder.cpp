@@ -503,8 +503,7 @@ InOutType* ASTBuilder::getInOutType(Type* valueType)
     return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
 }
 
-RefType* ASTBuilder::getRefType(
-    Type* valueType)
+RefType* ASTBuilder::getRefType(Type* valueType)
 {
     return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
