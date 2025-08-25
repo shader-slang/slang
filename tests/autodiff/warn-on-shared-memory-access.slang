@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -12,7 +13,7 @@ float get_thread_5_value(float v, uint group_thread_id)
     {
         // Using 'detach(v)' makes the error go away
         s_shared = v;
-        // CHECK: tests/autodiff/warn-on-shared-memory-access.slang(14): error 41024: derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention.
+        // CHECK: tests/autodiff/warn-on-shared-memory-access.slang([[# @LINE-1]]): error 41024: derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention.
         // CHECK: s_shared = v;
         // CHECK:          ^
     }

@@ -47,6 +47,7 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_StartVertexLocation`    | `[[base_vertex]]`                                    |
 | `SV_StartInstanceLocation`  | `[[base_instance]]`                                  |
 | `SV_VulkanInstanceID`       | `[[instance_id]]`                                    |
+| `SV_VulkanSamplePosition`   | `(Not supported)`                                    |
 | `SV_VulkanVertexID`         | `[[vertex_id]]`                                      |
 
 Custom semantics are mapped to user attributes:

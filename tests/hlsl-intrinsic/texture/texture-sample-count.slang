@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_6 -entry main -stage compute
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -profile sm_6_6 -entry main -stage compute
+//TEST:SIMPLE(filecheck=DXIL): -target cuda -profile sm_6_6 -entry main -stage compute
 
 // Test that Texture2DMS accepts an optional sampleCount argument
 // and the argument correctly appears in the output hlsl.

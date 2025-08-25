@@ -1,4 +1,5 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj
 
 // CHECK:      2
 // CHECK-NEXT: 1

@@ -2153,6 +2153,7 @@ alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
                       | glsl + GL_KHR_shader_subgroup_ballot
                       | _sm_6_0
                       | _cuda_sm_7_0
+                      | metal
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic_ballot'
 /// [Compound]

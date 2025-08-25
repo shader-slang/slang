@@ -74,6 +74,28 @@ SlangResult CommonInterfaceReplayer::getLayout(
     return res;
 }
 
+SlangResult CommonInterfaceReplayer::queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    slang::IComponentType* pObj = getObjectPointer(objectId);
+    if (pObj == nullptr)
+    {
+        return SLANG_FAIL;
+    }
+
+    void* outInterface = nullptr;
+    SlangResult res = pObj->queryInterface(guid, &outInterface);
+
+    if (res == SLANG_OK && outInterface != nullptr)
+    {
+        m_objectMap.add(outInterfaceId, outInterface);
+    }
+
+    return res;
+}
+
 SlangResult CommonInterfaceReplayer::getEntryPointCode(
     ObjectID objectId,
     SlangInt entryPointIndex,
@@ -314,6 +336,58 @@ SlangResult CommonInterfaceReplayer::linkWithOptions(
     if (outLinkedComponentType && SLANG_SUCCEEDED(res))
     {
         m_objectMap.addIfNotExists(outLinkedComponentTypeId, outLinkedComponentType);
+    }
+
+    ReplayConsumer::printDiagnosticMessage(outDiagnostics);
+    return res;
+}
+
+SlangResult CommonInterfaceReplayer::getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    InputObjectSanityCheck(objectId);
+
+    slang::IComponentType2* pObj = getObjectPointer2(objectId);
+    slang::ICompileResult* outCompileResultType{};
+    slang::IBlob* outDiagnostics{};
+
+    SlangResult res =
+        pObj->getTargetCompileResult(targetIndex, &outCompileResultType, &outDiagnostics);
+
+    if (outCompileResultType && SLANG_SUCCEEDED(res))
+    {
+        m_objectMap.addIfNotExists(outCompileResultId, outCompileResultType);
+    }
+
+    ReplayConsumer::printDiagnosticMessage(outDiagnostics);
+    return res;
+}
+
+SlangResult CommonInterfaceReplayer::getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    InputObjectSanityCheck(objectId);
+
+    slang::IComponentType2* pObj = getObjectPointer2(objectId);
+    slang::ICompileResult* outCompileResultType{};
+    slang::IBlob* outDiagnostics{};
+
+    SlangResult res = pObj->getEntryPointCompileResult(
+        entryPointIndex,
+        targetIndex,
+        &outCompileResultType,
+        &outDiagnostics);
+
+    if (outCompileResultType && SLANG_SUCCEEDED(res))
+    {
+        m_objectMap.addIfNotExists(outCompileResultId, outCompileResultType);
     }
 
     ReplayConsumer::printDiagnosticMessage(outDiagnostics);
@@ -1644,6 +1718,15 @@ void ReplayConsumer::ICompositeComponentType_linkWithOptions(
     FAIL_WITH_LOG(ICompositeComponentType::linkWithOptions);
 }
 
+void ReplayConsumer::ICompositeComponentType_queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    SlangResult res = m_commonReplayer.queryInterface(objectId, guid, outInterfaceId);
+    FAIL_WITH_LOG(ICompositeComponentType::queryInterface);
+}
+
 
 // ITypeConformance
 void ReplayConsumer::ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId) {}
@@ -1784,5 +1867,34 @@ void ReplayConsumer::ITypeConformance_linkWithOptions(
     FAIL_WITH_LOG(ITypeConformance::linkWithOptions);
 }
 
+void ReplayConsumer::IComponentType2_getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SlangResult res = m_commonReplayer.getTargetCompileResult(
+        objectId,
+        targetIndex,
+        outCompileResultId,
+        outDiagnosticsId);
+    FAIL_WITH_LOG(IComponentType2::getTargetCompileResult);
+}
+
+void ReplayConsumer::IComponentType2_getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SlangResult res = m_commonReplayer.getEntryPointCompileResult(
+        objectId,
+        entryPointIndex,
+        targetIndex,
+        outCompileResultId,
+        outDiagnosticsId);
+    FAIL_WITH_LOG(IComponentType2::getEntryPointCompileResult);
+}
 
 }; // namespace SlangRecord

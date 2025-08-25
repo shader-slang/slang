@@ -40,6 +40,16 @@ public:
     {
         recordValue(reinterpret_cast<SlangRecord::AddressFormat>(value));
     }
+    void recordGuid(const SlangUUID& guid)
+    {
+        recordValue(guid.data1);
+        recordValue(guid.data2);
+        recordValue(guid.data3);
+        for (int i = 0; i < 8; i++)
+        {
+            recordValue(guid.data4[i]);
+        }
+    }
     void recordStruct(SlangGlobalSessionDesc const& desc);
     void recordStruct(slang::SessionDesc const& desc);
     void recordStruct(slang::PreprocessorMacroDesc const& desc);

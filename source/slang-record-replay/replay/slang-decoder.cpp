@@ -373,6 +373,9 @@ bool SlangDecoder::processICompositeComponentTypeMethods(
     case ApiCallId::ICompositeComponentType_linkWithOptions:
         ICompositeComponentType_linkWithOptions(objectId, parameterBlock);
         break;
+    case ApiCallId::ICompositeComponentType_queryInterface:
+        ICompositeComponentType_queryInterface(objectId, parameterBlock);
+        break;
     }
     return true;
 }
@@ -422,6 +425,12 @@ bool SlangDecoder::processITypeConformanceMethods(
         break;
     case ApiCallId::ITypeConformance_linkWithOptions:
         ITypeConformance_linkWithOptions(objectId, parameterBlock);
+        break;
+    case ApiCallId::IComponentType2_getTargetCompileResult:
+        IComponentType2_getTargetCompileResult(objectId, parameterBlock);
+        break;
+    case ApiCallId::IComponentType2_getEntryPointCompileResult:
+        IComponentType2_getEntryPointCompileResult(objectId, parameterBlock);
         break;
     }
     return true;
@@ -2787,6 +2796,46 @@ void SlangDecoder::ICompositeComponentType_linkWithOptions(
     }
 }
 
+void SlangDecoder::ICompositeComponentType_queryInterface(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+
+    // Decode the GUID
+    SlangUUID guid;
+    readByte = ParameterDecoder::decodeUint32(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        guid.data1);
+    readByte += ParameterDecoder::decodeUint16(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        guid.data2);
+    readByte += ParameterDecoder::decodeUint16(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        guid.data3);
+    for (int i = 0; i < 8; i++)
+    {
+        readByte += ParameterDecoder::decodeUint8(
+            parameterBlock.parameterBuffer + readByte,
+            parameterBlock.parameterBufferSize - readByte,
+            guid.data4[i]);
+    }
+
+    // Decode the output interface pointer
+    ObjectID outInterfaceId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outInterfaceId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->ICompositeComponentType_queryInterface(objectId, guid, outInterfaceId);
+    }
+}
 
 void SlangDecoder::ITypeConformance_getSession(
     ObjectID objectId,
@@ -3153,6 +3202,76 @@ void SlangDecoder::ITypeConformance_linkWithOptions(
             outLinkedComponentTypeId,
             compilerOptionEntryCount,
             compilerOptionEntries.data(),
+            outDiagnosticsId);
+    }
+}
+
+void SlangDecoder::IComponentType2_getTargetCompileResult(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+    int64_t targetIndex = 0;
+    readByte = ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        targetIndex);
+
+    ObjectID outCompileResultId = 0;
+    ObjectID outDiagnosticsId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outCompileResultId);
+    readByte += ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer + readByte,
+        parameterBlock.outputBufferSize - readByte,
+        outDiagnosticsId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->IComponentType2_getTargetCompileResult(
+            objectId,
+            targetIndex,
+            outCompileResultId,
+            outDiagnosticsId);
+    }
+}
+
+void SlangDecoder::IComponentType2_getEntryPointCompileResult(
+    ObjectID objectId,
+    ParameterBlock const& parameterBlock)
+{
+    size_t readByte = 0;
+    int64_t targetIndex = 0;
+    int64_t entryPointIndex = 0;
+    readByte = ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer,
+        parameterBlock.parameterBufferSize,
+        targetIndex);
+    readByte += ParameterDecoder::decodeInt64(
+        parameterBlock.parameterBuffer + readByte,
+        parameterBlock.parameterBufferSize - readByte,
+        entryPointIndex);
+
+    ObjectID outCompileResultId = 0;
+    ObjectID outDiagnosticsId = 0;
+    readByte = ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer,
+        parameterBlock.outputBufferSize,
+        outCompileResultId);
+    readByte += ParameterDecoder::decodeAddress(
+        parameterBlock.outputBuffer + readByte,
+        parameterBlock.outputBufferSize - readByte,
+        outDiagnosticsId);
+
+    for (auto consumer : m_consumers)
+    {
+        consumer->IComponentType2_getEntryPointCompileResult(
+            objectId,
+            entryPointIndex,
+            targetIndex,
+            outCompileResultId,
             outDiagnosticsId);
     }
 }
