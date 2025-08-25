@@ -293,7 +293,9 @@ if(SLANG_ENABLE_TESTS)
     )
     set_property(
         TARGET slang-test
-        PROPERTY VS_DEBUGGER_ENVIRONMENT "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
+        PROPERTY
+            VS_DEBUGGER_ENVIRONMENT
+                "VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation"
     )
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
