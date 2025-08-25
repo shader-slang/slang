@@ -4032,6 +4032,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetOffsetPtr:
             result = emitGetOffsetPtr(parent, inst);
             break;
+        case kIROp_MeshOutputRef:
+            result = emitMeshOutputRef(parent, inst);
+            break;
         case kIROp_GetElement:
             result = emitGetElement(parent, as<IRGetElement>(inst));
             break;
@@ -7000,6 +7003,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getFullType(),
             baseId,
             makeArray(inst->getIndex()));
+    }
+
+    SpvInst* emitMeshOutputRef(SpvInstParent* parent, IRInst* inst)
+    {
+        // MeshOutputRef takes two operands: the mesh output array and the index
+        // It should return a reference (address) to the element at that index
+        auto base = inst->getOperand(0);
+        auto index = inst->getOperand(1);
+
+        const SpvWord baseId = getID(ensureInst(base));
+
+        // Use OpAccessChain to get the address of the element
+        return emitOpAccessChain(parent, inst, inst->getFullType(), baseId, makeArray(index));
     }
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)

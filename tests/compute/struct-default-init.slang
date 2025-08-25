@@ -1,6 +1,7 @@
 // struct-default-init.slang
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 
 struct Test
 {

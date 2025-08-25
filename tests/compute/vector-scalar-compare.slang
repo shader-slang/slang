@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-dx12 -compute -shaderobj 
 //TEST(compute):COMPARE_COMPUTE:-vk -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -compute  -shaderobj
 
 // Test doing vector comparisons 
 
