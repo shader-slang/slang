@@ -669,7 +669,7 @@ struct LoweredElementTypeContext
             //
             // Additionally, `buffer` blocks do not work correctly unless lowered when targeting
             // GLSL.
-            if (!isKhronosTarget(target->getTargetReq()))
+            if (!target->shouldEmitSPIRVDirectly())
             {
                 // For non-spirv target, we skip lowering this type if all field types are
                 // unchanged.
