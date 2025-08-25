@@ -2086,7 +2086,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto declRef = type->getDeclRef();
         auto decl = declRef.getDecl();
 
-        // Check for types with teh `__intrinsic_type` modifier.
+        // Check for types with the `__intrinsic_type` modifier.
         if (decl->findModifier<IntrinsicTypeModifier>())
         {
             return lowerSimpleIntrinsicType(type);

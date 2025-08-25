@@ -4878,7 +4878,7 @@ IRInterfaceRequirementEntry* IRBuilder::createInterfaceRequirementEntry(
         nullptr,
         requirementKey,
         requirementVal);
-    addGlobalValue(this, entry);
+    addInst(entry);
     return entry;
 }
 
