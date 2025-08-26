@@ -643,7 +643,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             // parameter modifier makes big difference in the spirv code generation, for example
             // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
             // distinguish them in the mangled name to avoid name collision.
-            ParameterDirection paramDirection = getParameterDirection(paramDeclRef.getDecl());
+            ParameterDirection paramDirection = getNominalParameterDirection(paramDeclRef.getDecl());
             switch (paramDirection)
             {
             case kParameterDirection_Ref:
@@ -663,7 +663,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 break;
             default:
                 StringBuilder errMsg;
-                errMsg << "Unknown parameter direction: " << paramDirection;
+                errMsg << "Unknown parameter direction: " << int(paramDirection);
                 SLANG_ABORT_COMPILATION(errMsg.toString().begin());
                 break;
             }

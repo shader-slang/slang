@@ -1685,15 +1685,208 @@ FIDDLE() namespace Slang
         List<RefPtr<DeclAssociation>> associations;
     };
 
-    /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
-    enum ParameterDirection
+    /// A mode for passing data between caller and callee, for a specific parameter.
+    ///
+    /// A programmer writing in Slang controls the mode used for a given parameter
+    /// using modifiers like `in`, `ref`, etc. Because of the subtleties to how
+    /// those modifiers can be combined (e.g., a parameter declared with both `in`
+    /// and `out` should be treated like one with `inout`, and should *not* be
+    /// sent down code paths that are intended for parameters with only `in` or
+    /// only `out`.
+    ///
+    /// Note that there is a distinction between the *nominal* parameter-passing
+    /// mode for a parameter and the *actual* parameter-passing mode that might
+    /// be used when lowering that parameter. For example, a parameter with just
+    /// an `in` modifier (or no modifiers) nominally uses `ParameterPassingMode::In`,
+    /// but if the type of that parameter is a non-copyable type then semantically
+    /// it will act as if it was declared using `ParameterPassingMode::ImmutableRef`.
+    ///
+    enum class ParameterPassingMode
     {
-        kParameterDirection_In,       ///< Copy in
-        kParameterDirection_Out,      ///< Copy out
-        kParameterDirection_InOut,    ///< Copy in, copy out
-        kParameterDirection_Ref,      ///< By-reference
-        kParameterDirection_ConstRef, ///< By-const-reference
+        /// The default mode for parameter passing, corresponding to the `in` modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * For a copyable types, the value of the argument is copied in to
+        ///   the storage for the parameter.
+        ///
+        /// * For non-copyable types, behaves as if using `ImmutableRef`.
+        ///
+        In,
+
+        /// The mode for output parameter, corresponding to the `out` modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to an uninitialized memory location
+        ///   of the parameter's type.
+        ///
+        /// * The callee ensures that on any normal return from the function, the
+        ///   memory location holds a fully initialized value, and on any abnormal
+        ///   (e.g., error) return, the location is fully uninitialized.
+        ///
+        /// Note that this mode works fine with parameters of non-copyable type;
+        /// the callee may simply needs to move a value into the memory location
+        /// rather than copy into it.
+        ///
+        Out,
+
+        /// An exclusive mutable borrow of a value, corresponding to the `inout` modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to a fully initialized memory location
+        ///   of the parameter's type.
+        ///
+        /// * The memory location that the caller passes in may *either* be the
+        ///   memory location of the argument itself, or a temporary memory location
+        ///   holding a copy of the argument (if the parameter type is copyable).
+        ///
+        /// * The callee may mutate the value at the memory location that was passed in,
+        ///   and must ensure that on any return the memory location is fully initialized.
+        ///
+        /// * The caller is responsible for ensuring that for the duration of the call,
+        ///   no other accesses may occur to the memory location of the argument,
+        ///   or of the copy (if any).
+        ///
+        /// * After a normal return from the callee, if the caller used a temporary,
+        ///   it must move or copy the value from the temporary location into the
+        ///   location of the argument.
+        ///
+        /// In the case where the parameter has a non-copyable type, the caller
+        /// will typically not use a temporary, and this mode is equivalent to
+        /// `MutableRef`.
+        ///
+        /// Note that the choice of whether or not to copy things through a
+        /// temporary is at the discretion of the compiler, and is not something
+        /// the programmer can directly control. Any program that can observe
+        /// the difference between the two options (copying or not) is in violation
+        /// of the requirement that no overlapping accesses occur for the
+        /// duration of the call.
+        ///
+        MutableValueBorrow,
+
+        /// An immutable borrow of a value.
+        ///
+        /// Currently there is no modifier corresponding to this case.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to a fully initialized memory location
+        ///   of the parameter's type.
+        ///
+        /// * The memory location that the caller passes in may *either* be the
+        ///   memory location of the argument itself (if it has one), or a temporary
+        ///   memory location holding a copy of the argument value (if the parameter
+        ///   type is copyable).
+        ///
+        /// * The callee must not mutate the value at the memory location that was
+        ///   passed in.
+        ///
+        /// * The caller is responsible for ensuring that for the duration of the call,
+        ///   no write accesses may occur to either the memory location that was passed
+        ///   in or the storage location of the argument (if it has one).
+        ///
+        /// In the case where the parameter has a non-copyable type, the caller
+        /// will typically not be able to use a temporary, and this mode is
+        /// equivalent to `ImmutableRef`.
+        ///
+        /// Note that the choice of whether or not to copy things through a
+        /// temporary is at the discretion of the compiler, and is not something
+        /// the programmer can directly control. Any program that can observe
+        /// the difference between the two options (copying or not) is in violation
+        /// of the requirement that no overlapping write accesses occur for the
+        /// duration of the call.
+        ///
+        ImmutableValueBorrow,
+
+        /// A value to be "consumed" by the caller, which takes ownership of it.
+        ///
+        /// Does not correspond to any existing modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to the memory location that holds the
+        ///   argument value. The memory location must be fully initialized.
+        ///
+        /// * The callee assumes ownership of the value in the memory location that
+        ///   was passed in. On any return from the callee, it must ensure that the
+        ///   memory location is fully uninitialized (whether by de-initializing it,
+        ///   or by moving the value out of it).
+        ///
+        /// * The caller is responsible for ensuring that for the duration of the call,
+        ///   no operations could be performed that would access overlapping memory
+        ///   locations.
+        ///
+        /// If the type of a parameter is known to be copyable, then a parameter with
+        /// this mode could be changed to use `In` or `ImmutableValueBorrow` without
+        /// any semantic consequences.
+        ///
+        Consume,
+
+        /// A reference to a mutable memory location, corresponding to the `ref` modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to the memory location of the argument.
+        ///   The argument must have a storage location, that storage location
+        ///   must be in memory, and that memory location must be fully initialized
+        ///   at the point where the call is made.
+        ///
+        /// * The callee may mutate the value at the memory location that was passed in,
+        ///   and must ensure that the contents of that location remain valid/initialized
+        ///   for the duration of the call.
+        ///
+        /// * The caller is responsible for ensuring that for the duration of the call,
+        ///   no operations could be performed that would invalidate the memory location
+        ///   that was passed in (e.g., by de-initializing it).
+        ///
+        /// Note that unlike the `MutableValueBorrow` case, there is no enforced assumption
+        /// of exclusivity of access for `ref` parameters.
+        ///
+        MutableMemoryRef,
+
+        /// A reference to an immutable memory location, corresponding to the `__constref` modifier.
+        ///
+        /// Semantics:
+        ///
+        /// * The caller passes in a pointer to the memory location of the argument.
+        ///   The argument must have a storage location, that storage location
+        ///   must be in memory, and that memory location must be fully initialized
+        ///   at the point where the call is made.
+        ///
+        /// * The callee must not mutate the value at the memory location that was passed in.
+        ///
+        /// * The caller is responsible for ensuring that for the duration of the call,
+        ///   no write operations may be performed that overlap the memory location that
+        ///   was passed in.
+        ///
+        /// TODO: We need to finalize a decision on whether the semantics are that the
+        /// memory location must be immutable (that is, cannot change out from under the
+        /// callee), or if it the callee is simply being passed a read-only reference
+        /// (a limitation on *access*, without a promise that other kinds of access will
+        /// not occur).
+        ///
+        ImmutableMemoryRef,
+
+        Default = In,
+        InOut = MutableValueBorrow,
+        Ref = MutableMemoryRef,
+        ConstRef = ImmutableMemoryRef,
     };
+
+    //
+    // The `ParameterPassingMode` type above used to be called `ParameterDirection`.
+    // To avoid creating too much churn for the codebase, we define aliases that
+    // help keep existing code working.
+    //
+
+    using ParameterDirection = ParameterPassingMode;
+    static const auto kParameterDirection_In = ParameterPassingMode::In;
+    static const auto kParameterDirection_Out = ParameterPassingMode::Out;
+    static const auto kParameterDirection_InOut = ParameterPassingMode::InOut;
+    static const auto kParameterDirection_Ref = ParameterPassingMode::Ref;
+    static const auto kParameterDirection_ConstRef = ParameterPassingMode::ConstRef;
 
     void printDiagnosticArg(StringBuilder & sb, ParameterDirection direction);
 

@@ -163,7 +163,7 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
 
 /// Get the parameter type, wrapped with `Out<>`, `InOut<>` or `Ref<>` if the parameter has
 /// an non-trivial direction.
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
 
 inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
@@ -238,7 +238,43 @@ SubstitutionSet makeSubstitutionFromIncompleteSet(
 
 Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
-ParameterDirection getParameterDirection(VarDeclBase* varDecl);
+/// Calculate the nominal parameter-passing mode ("direction") of a parameter.
+///
+/// The nominal parameter-passing mode is based on the modifiers on the parameter
+/// (such as `ref`, `inout`, etc.), but does *not* take the type of the parameter
+/// into account.
+///
+/// In cases where a parameter is declared with a non-copyable type, the actual
+/// parameter direction that gets used at the IR level may differ from the nominal
+/// direction.
+///
+ParameterDirection getNominalParameterDirection(ParamDecl* paramDecl);
+
+/// Calculate the nominal parameter-passing mode ("direction") of an implicit `this` parameter.
+///
+/// The `declWithThisParam` is a declaration like a function, property, etc. that
+/// is declared in a context where it is determined to have an implicit `this` parameter.
+///
+/// The nominal parameter-passing mode is based on the modifiers on the declaration
+/// that has the implicit `this` parameter, as well as the ancestors of that declaration,
+/// up to the enclosing declaration that determines the type `This` (usually an outer
+/// type or `extension` declaration).
+///
+/// This logic largely ignores the type that the `this` parameter has, with one exception:
+/// it takes into account the fact that any `this` parameter for a `class` type should
+/// have an implicit `in` mode, whether or not the body of the declaration might perform
+/// mutation through `this`.
+///
+/// In some cases, the direction to use for a `this` parameter is driven by contextual information
+/// not associated with the declaration, and in those cases this function will return the
+/// `defaultDirection` that was passed in.
+///
+ParameterDirection getNominalThisParamDirection(Decl* declWithThisParam, ParameterDirection defaultDirection);
+
+/// Calculate the actual/effective parameter-passing mode ("direction") to use,
+/// based on the nominal mode and type of a parameter.
+///
+ParameterDirection getActualParamDirection(ParameterDirection nominalDirection, Type* paramType);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {

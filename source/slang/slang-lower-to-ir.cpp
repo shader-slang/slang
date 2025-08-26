@@ -2910,8 +2910,7 @@ void addCallArgsForParam(
 
 //
 
-/// Compute the direction for a parameter based on its declaration
-ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
+ParameterDirection getNominalParameterDirection(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
@@ -2951,7 +2950,7 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 /// If the given declaration doesn't care about the direction of a `this` parameter, then
 /// it will return the provided `defaultDirection` instead.
 ///
-ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
+ParameterDirection getNominalThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
     auto parentParent = getParentAggTypeDecl(parentDecl);
 
@@ -2959,14 +2958,6 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     if (as<ClassDecl>(parentParent))
     {
         return kParameterDirection_In;
-    }
-
-    if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
-    {
-        if (parentDecl->hasModifier<MutatingAttribute>())
-            return kParameterDirection_Ref;
-        else
-            return kParameterDirection_ConstRef;
     }
 
     // Applications can opt in to a mutable `this` parameter,
@@ -3024,6 +3015,85 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // For now we make any `this` parameter default to `in`.
     //
     return kParameterDirection_In;
+}
+
+ParameterDirection getActualParamDirection(ParameterDirection nominalDirection, Type* paramType)
+{
+    //
+    // The primary distinction here is whether or not the `paramType`
+    // could be non-copyable, based on the information that is
+    // statically available to us.
+    //
+    // Note that in cases where a parameter appears under a generic,
+    // it is possible that a generic type parameter might support
+    // non-copyable types, but that for a given specializations the
+    // corersponding argument type could actually be copyable.
+    // Because specialization occurs at the level of Slang IR,
+    // any attempt to refine the parameter-passing mode for a function
+    // based on specialized types is left to IR optimization
+    // passes.
+    //
+
+    auto direction = nominalDirection;
+
+    if (isNonCopyableType(paramType))
+    {
+        // For a parameter of non-copyable type the `in`
+        // parameter-passing mode can not be implemented with
+        // its usual by-value copy-in semantics.
+        //
+        // We don't want programmers to have to specify an
+        // explicit mode on every parameter of a non-copyable type,
+        // and not specifying a mode is currently shorthand for
+        // `in`, so we choose to re-interpret the `in` mode as
+        // semantically equivalent to an immutable borrow.
+        //
+        if (direction == ParameterDirection::In)
+            direction = ParameterDirection::ImmutableValueBorrow;
+
+        // The current implementation of non-copyable types
+        // relies on them being passed by-reference in all cases,
+        // but the current lowering logic around borrows (e.g.,
+        // `inout` parameters) is overzealous in introducing
+        // temporaries.
+        //
+        // To work around this issue, we take any parameter
+        // that is nominally a borrow (e.g., `inout`) and
+        // change it to a by-reference parameter (e.g., `ref`)
+        // if the parameter type could be non-copyable.
+        //
+        switch (direction)
+        {
+        case ParameterDirection::ImmutableValueBorrow:
+            direction = ParameterDirection::ImmutableMemoryRef;
+            break;
+
+        case ParameterDirection::MutableValueBorrow:
+            direction = ParameterDirection::MutableMemoryRef;
+            break;
+
+        default:
+            break;
+        }
+    }
+    else
+    {
+        // In the case where we know that a parameter has a
+        // copyable type, the `consume` parameter-passing mode
+        // isn't meaningful.
+        //
+        // We choose to interpret that mode as an immutable
+        // value borrow (which should be semantically equivalent
+        // for copyable types) because an immutable value borrow
+        // gives the compiler back-end the maximum flexibility
+        // in deciding how it wants to pass a parameter (whether
+        // by-value, by-reference, or by-reference of a copy, etc.)
+        //
+        if (direction == ParameterDirection::Consume)
+            direction = ParameterDirection::ImmutableValueBorrow;
+    }
+
+    return direction;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
@@ -3175,11 +3245,22 @@ struct IRLoweringParameterInfo
     // This AST-level type of the parameter
     Type* type = nullptr;
 
-    // The direction (`in` vs `out` vs `in out`)
-    ParameterDirection direction;
+    /// The parameter-passing mode ("direction") that has been selected for this parameter.
+    ///
+    /// This may differ from the `declaredDirection` below, in cases where the type
+    /// of the parameter is non-copyable and the default implementation of the declared
+    /// direction isn't compatible with non-copyable types.
+    ///
+    ParameterDirection actualParameterPassingMode = kParameterDirection_In;
 
-    // The direction declared in user code.
-    ParameterDirection declaredDirection = ParameterDirection::kParameterDirection_In;
+    /// The parameter-passing mode ("direction") as it was declared in the user's code.
+    ///
+    /// Note that in the case of a `this` parameter (which is not typically explicitly
+    /// declared), this field holds the direction as determined solely from the modifiers
+    /// on the declaration that has the implicit `this` parameter, as well as its enclosing
+    /// type declaration.
+    ///
+    ParameterDirection nominalParameterPassingMode = kParameterDirection_In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
@@ -3197,14 +3278,19 @@ struct IRLoweringParameterInfo
 //
 IRLoweringParameterInfo getParameterInfo(
     IRGenContext* context,
-    DeclRef<VarDeclBase> const& paramDecl)
+    DeclRef<ParamDecl> const& paramDecl)
 {
     IRLoweringParameterInfo info;
 
-    info.type = getParamType(context->astBuilder, paramDecl);
+    auto paramType = getParamType(context->astBuilder, paramDecl);
+
+    auto nominalParameterDirection = getNominalParameterDirection(paramDecl.getDecl());
+    auto actualParameterDirection = getActualParamDirection(nominalParameterDirection, paramType);
+
+    info.type = paramType;
     info.decl = paramDecl.getDecl();
-    info.direction = getParameterDirection(paramDecl.getDecl());
-    info.declaredDirection = info.direction;
+    info.nominalParameterPassingMode = nominalParameterDirection;
+    info.actualParameterPassingMode = actualParameterDirection;
     info.isThisParam = false;
     return info;
 }
@@ -3245,13 +3331,16 @@ ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, Contai
 // When dealing with a member function, we need to be able to add the `this`
 // parameter for the enclosing type:
 //
-void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* ioParameterLists)
+void addThisParameter(ParameterDirection nominalParameterDirection, Type* type, ParameterLists* ioParameterLists)
 {
+    auto actualParamDirection = getActualParamDirection(nominalParameterDirection, type);
+
+
     IRLoweringParameterInfo info;
     info.type = type;
     info.decl = nullptr;
-    info.direction = direction;
-    info.declaredDirection = direction;
+    info.nominalParameterPassingMode = nominalParameterDirection;
+    info.actualParameterPassingMode = actualParamDirection;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -3259,13 +3348,22 @@ void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* 
 
 void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
 {
+    // Any AST-level callable that is declared to return a non-copyable
+    // type is converted to instead take a trailing `out` parameter
+    // of that type.
+    //
+    // Semantically, the caller should pass in a pointer to an uninitialized
+    // memory location, and the callee should move a value into that location.
+
     if (isNonCopyableType(resultType))
     {
+        auto parameterPassingMode = kParameterDirection_Out;
+
         IRLoweringParameterInfo info;
         info.type = resultType;
         info.decl = nullptr;
-        info.direction = kParameterDirection_Ref;
-        info.declaredDirection = info.direction;
+        info.nominalParameterPassingMode = parameterPassingMode;
+        info.actualParameterPassingMode = parameterPassingMode;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
@@ -3273,13 +3371,14 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
 
 void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
 {
-    if (paramInfo.direction != kParameterDirection_In)
+    if (paramInfo.actualParameterPassingMode != kParameterDirection_In)
         return;
     if (paramInfo.decl->findModifier<HLSLUniformModifier>())
         return;
     if (as<HLSLPatchType>(paramInfo.type))
         return;
-    paramInfo.direction = kParameterDirection_ConstRef;
+
+    paramInfo.actualParameterPassingMode = kParameterDirection_ConstRef;
 }
 //
 // And here is our function that will do the recursive walk:
@@ -3288,7 +3387,7 @@ void collectParameterLists(
     DeclRef<Decl> const& declRef,
     ParameterLists* ioParameterLists,
     ParameterListCollectMode mode,
-    ParameterDirection thisParamDirection)
+    ParameterDirection defaultNominalThisParamDirection)
 {
     // Don't collect any parameters beyond certain decls.
     if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
@@ -3310,8 +3409,8 @@ void collectParameterLists(
         if (innerMode < mode)
             innerMode = mode;
 
-        ParameterDirection innerThisParamDirection =
-            getThisParamDirection(declRef.getDecl(), thisParamDirection);
+        ParameterDirection nominalThisParamDirection =
+            getNominalThisParamDirection(declRef.getDecl(), defaultNominalThisParamDirection);
 
 
         // Now collect any parameters from the parent declaration itself
@@ -3320,7 +3419,7 @@ void collectParameterLists(
             parentDeclRef,
             ioParameterLists,
             innerMode,
-            innerThisParamDirection);
+            nominalThisParamDirection);
 
         // We also need to consider whether the inner declaration needs to have a `this`
         // parameter corresponding to the outer declaration.
@@ -3341,10 +3440,10 @@ void collectParameterLists(
                 else if (auto bwdDerivDeclRef = declRef.as<BackwardDerivativeRequirementDecl>())
                 {
                     thisType = bwdDerivDeclRef.getDecl()->diffThisType;
-                    innerThisParamDirection = kParameterDirection_InOut;
+                    nominalThisParamDirection = kParameterDirection_InOut;
                 }
 
-                addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
+                addThisParameter(nominalThisParamDirection, thisType, ioParameterLists);
             }
         }
     }
@@ -3449,7 +3548,7 @@ void _lowerFuncDeclBaseTypeInfo(
     {
         IRType* irParamType = lowerType(context, paramInfo.type);
 
-        switch (paramInfo.direction)
+        switch (paramInfo.actualParameterPassingMode)
         {
         case kParameterDirection_In:
             // Simple case of a by-value input parameter.
@@ -3576,7 +3675,7 @@ static LoweredValInfo _emitCallToAccessor(
             &fixups,
             base,
             thisParamType,
-            thisParam.direction,
+            thisParam.actualParameterPassingMode,
             thisParam.type,
             SourceLoc());
     }
@@ -3807,13 +3906,17 @@ struct ExprLoweringContext
 
         for (Index i = 0; i < argCount; ++i)
         {
-            IRType* paramType = lowerType(context, funcType->getParamType(i));
-            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            auto astParamType = funcType->getParamType(i);
+            auto irParamType = lowerType(context, astParamType);
+
+            auto nominalParamDirection = funcType->getParamDirection(i);
+            auto actualParamDirection = getActualParamDirection(nominalParamDirection, astParamType);
+
             addDirectCallArgs(
                 expr,
                 i,
-                paramType,
-                paramDirection,
+                irParamType,
+                actualParamDirection,
                 DeclRef<ParamDecl>(),
                 ioArgs,
                 ioFixups);
@@ -3830,15 +3933,18 @@ struct ExprLoweringContext
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
-            auto paramDirection = getParameterDirection(paramDecl);
+            auto astParamType = getType(getASTBuilder(), paramDeclRef);
+            auto irParamType = lowerType(context, astParamType);
+
+            auto nominalParamDirection = getNominalParameterDirection(paramDecl);
+            auto actualParamDirection = getActualParamDirection(nominalParamDirection, astParamType);
 
             Index argIndex = argCounter++;
             addDirectCallArgs(
                 expr,
                 argIndex,
-                paramType,
-                paramDirection,
+                irParamType,
+                actualParamDirection,
                 paramDeclRef,
                 ioArgs,
                 ioFixups);
@@ -4042,12 +4148,16 @@ struct ExprLoweringContext
             // a member function:
             if (baseExpr)
             {
-                auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
-                auto irThisType = lowerType(context, thisType);
+                auto astThisType = getThisParamTypeForCallable(context, funcDeclRef);
+                auto irThisType = lowerType(context, astThisType);
+
+                auto nominalParamDirection = getNominalThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In);
+                auto actualParamDirection = getActualParamDirection(nominalParamDirection, astThisType);
+
                 addCallArgsForParam(
                     context,
                     irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
+                    actualParamDirection,
                     baseExpr,
                     &irArgs,
                     &argFixups);
@@ -10812,7 +10922,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 IRParam* irParam = nullptr;
 
-                switch (paramInfo.direction)
+                switch (paramInfo.actualParameterPassingMode)
                 {
                 default:
                     {
@@ -10835,22 +10945,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         if (paramInfo.isReturnDestination)
                             subContext->returnDestination = paramVal;
 
-                        if (paramInfo.declaredDirection == kParameterDirection_In &&
-                            paramInfo.direction == kParameterDirection_ConstRef)
+                        // If a parameter was declared as `in`, but has been changed to
+                        // use any other parameter-passing mode (most notably the
+                        // `constRef` mode), then we need to emit a local variable to
+                        // hold a copy of the original value, so that we can still
+                        // generate correct code for functions that use the `in` parameter
+                        // as a mutable local variable in the function body.
+                        //
+                        // In cases where the user never writes to the temporary that
+                        // we add here, the SSA pass should clean up the use of the intermediate
+                        // temporary, so that everything can refer back to the original
+                        // parameter.
+                        //
+                        if (paramInfo.nominalParameterPassingMode == kParameterDirection_In
+                            && paramInfo.actualParameterPassingMode != paramInfo.nominalParameterPassingMode)
                         {
-                            // If the parameter is originally declared as "in", but we are
-                            // lowering it as constref for any reason (e.g. it is a varying input),
-                            // then we need to emit a local variable to hold the original value, so
-                            // that we can still generate correct code when the user trys to mutate
-                            // the variable.
-                            // The local variable introduced here is cleaned up by the SSA pass, if
-                            // we can determine that there are no actual writes into the local var.
                             auto irLocal =
                                 subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
                             auto localVal = LoweredValInfo::ptr(irLocal);
                             assign(subContext, localVal, paramVal);
                             paramVal = localVal;
                         }
+
                         // TODO: We might want to copy the pointed-to value into
                         // a temporary at the start of the function, and then copy
                         // back out at the end, so that we don't have to worry
