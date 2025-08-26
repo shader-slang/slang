@@ -529,35 +529,67 @@ bool CapabilitySet::implies(CapabilityAtom atom) const
     return this->implies(tmpSet);
 }
 
+// Implication depends heavily on context as per the `ImpliesFlags`.
 CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
     CapabilitySet const& otherSet,
     ImpliesFlags flags) const
 {
-    // x implies (c | d) only if (x implies c) and (x implies d).
+    // By default (`ImpliesFlags::None`): x implies (c | d) only if (x implies c) and (x implies d).
 
     bool onlyRequireSingleImply = ((int)flags & (int)ImpliesFlags::OnlyRequireASingleValidImply);
+    bool cannotHaveMoreTargetAndStageSets =
+        ((int)flags & (int)ImpliesFlags::CannotHaveMoreTargetAndStageSets);
+    bool canHaveSubsetOfTargetAndStageSets =
+        ((int)flags & (int)ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
+
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
     if (otherSet.isEmpty())
         return CapabilitySet::ImpliesReturnFlags::Implied;
 
-    for (const auto& otherTarget : otherSet.m_targetSets)
+    // If empty, and the other is not empty, it does not matter what flags are used,
+    // `this` is considered to "not imply" another set. This is important since
+    // `T.join(U)` causes `T == U`.
+    if (this->isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (cannotHaveMoreTargetAndStageSets &&
+        this->getCapabilityTargetSets().getCount() > otherSet.getCapabilityTargetSets().getCount())
     {
-        auto thisTarget = this->m_targetSets.tryGetValue(otherTarget.first);
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+    }
+
+    for (const auto& otherTargetPair : otherSet.m_targetSets)
+    {
+        auto thisTarget = this->m_targetSets.tryGetValue(otherTargetPair.first);
+        const auto& otherTarget = otherTargetPair.second;
         if (!thisTarget)
         {
             if (onlyRequireSingleImply)
+                continue;
+
+            if (canHaveSubsetOfTargetAndStageSets)
                 continue;
             // 'this' lacks a target 'other' has.
             return CapabilitySet::ImpliesReturnFlags::NotImplied;
         }
 
-        for (const auto& otherStage : otherTarget.second.shaderStageSets)
+        if (cannotHaveMoreTargetAndStageSets && thisTarget->getShaderStageSets().getCount() >
+                                                    otherTarget.getShaderStageSets().getCount())
         {
-            auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStage.first);
+            return CapabilitySet::ImpliesReturnFlags::NotImplied;
+        }
+
+        for (const auto& otherStagePair : otherTarget.getShaderStageSets())
+        {
+            auto thisStage = thisTarget->shaderStageSets.tryGetValue(otherStagePair.first);
+            const auto& otherStage = otherStagePair.second;
             if (!thisStage)
             {
                 if (onlyRequireSingleImply)
+                    continue;
+
+                if (canHaveSubsetOfTargetAndStageSets)
                     continue;
                 // 'this' lacks a stage 'other' has.
                 return CapabilitySet::ImpliesReturnFlags::NotImplied;
@@ -567,9 +599,9 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::_implies(
             if (thisStage->atomSet)
             {
                 auto& thisStageSet = thisStage->atomSet.value();
-                if (otherStage.second.atomSet)
+                if (otherStage.atomSet)
                 {
-                    auto contained = thisStageSet.contains(otherStage.second.atomSet.value());
+                    auto contained = thisStageSet.contains(otherStage.atomSet.value());
                     if (!onlyRequireSingleImply && !contained)
                     {
                         return CapabilitySet::ImpliesReturnFlags::NotImplied;
@@ -593,10 +625,18 @@ bool CapabilitySet::implies(CapabilitySet const& other) const
     return (int)_implies(other, ImpliesFlags::None) &
            (int)CapabilitySet::ImpliesReturnFlags::Implied;
 }
+
 CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(
     CapabilitySet const& other) const
 {
     return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
+}
+
+bool CapabilitySet::joinWithOtherWillChangeThis(CapabilitySet const& other) const
+{
+    return !(
+        (int)_implies(other, ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
+        (int)CapabilitySet::ImpliesReturnFlags::Implied);
 }
 
 void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
