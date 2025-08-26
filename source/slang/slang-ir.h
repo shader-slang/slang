@@ -1021,6 +1021,10 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType);
 
 bool isIntegralScalarOrCompositeType(IRType* t);
 
+bool isDoublePrecisionFloatingType(IRType* t);
+
+bool isDoublePrecisionFloatingScalarOrCompositeType(IRType* t);
+
 IRStructField* findStructField(IRInst* type, IRStructKey* key);
 
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);

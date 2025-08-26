@@ -7981,6 +7981,31 @@ bool isIntegralScalarOrCompositeType(IRType* t)
     }
 }
 
+bool isDoublePrecisionFloatingType(IRType* t)
+{
+    if (!t)
+        return false;
+    if (auto basicType = as<IRBasicType>(t))
+    {
+        return basicType->getBaseType() == BaseType::Double;
+    }
+    return false;
+}
+
+bool isDoublePrecisionFloatingScalarOrCompositeType(IRType* t)
+{
+    if (!t)
+        return false;
+    switch (t->getOp())
+    {
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return isDoublePrecisionFloatingType((IRType*)t->getOperand(0));
+    default:
+        return isDoublePrecisionFloatingType(t);
+    }
+}
+
 IRStructField* findStructField(IRInst* type, IRStructKey* key)
 {
     if (auto irStructType = as<IRStructType>(type))

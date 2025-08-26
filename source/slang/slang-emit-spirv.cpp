@@ -3012,8 +3012,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         bool anyModifiers = (var->findDecoration<IRInterpolationModeDecoration>() != nullptr);
 
         // If the user didn't explicitly qualify a varying
-        // with integer type, then we need to explicitly
-        // add the `flat` modifier for GLSL.
+        // with integer or double-precision floating-point type, then we need to explicitly
+        // add the `flat` modifier for GLSL and SPIRV. Per ARB_gpu_shader_fp64, GLSL does not
+        // support interpolation of double-precision values; they must be qualified as "flat".
         if (!anyModifiers)
         {
             // Only emit a default `flat` for fragment
@@ -3022,7 +3023,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 layout->usesResourceKind(LayoutResourceKind::VaryingInput))
             {
                 const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
-                if (ptrType && isIntegralScalarOrCompositeType(ptrType->getValueType()))
+                if (ptrType && (isIntegralScalarOrCompositeType(ptrType->getValueType()) ||
+                               isDoublePrecisionFloatingScalarOrCompositeType(ptrType->getValueType())))
                     emitOpDecorate(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
@@ -5946,7 +5948,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = ptrType->getAddressSpace();
         if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
-            if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
+            if (isIntegralScalarOrCompositeType(ptrType->getValueType()) ||
+                isDoublePrecisionFloatingScalarOrCompositeType(ptrType->getValueType()))
             {
                 if (isInstUsedInStage(irInst, Stage::Fragment))
                     return true;
