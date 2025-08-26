@@ -630,7 +630,7 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 {
     auto paramType = getType(astBuilder, param);
     bool isLVal = false;
-    switch (getParameterDirection(param.getDecl()))
+    switch (getNominalParameterDirection(param.getDecl()))
     {
     case kParameterDirection_InOut:
     case kParameterDirection_Out:
@@ -3002,7 +3002,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             for (auto param : callableDeclRef.getDecl()->getParameters())
             {
-                paramDirections.add(getParameterDirection(param));
+                paramDirections.add(getNominalParameterDirection(param));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)

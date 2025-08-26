@@ -769,10 +769,10 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
+    auto direction = getNominalParameterDirection(paramDeclRef.getDecl());
     switch (direction)
     {
     case kParameterDirection_In:
