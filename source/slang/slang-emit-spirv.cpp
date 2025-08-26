@@ -3863,6 +3863,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
+    // returns true if the given type is legal for a `DebugVar`.
     bool isLegalDebugVarType(IRInst* type)
     {
         switch (type->getOp())
