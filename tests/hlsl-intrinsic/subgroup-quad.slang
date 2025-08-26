@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage compute -target spirv -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL): -entry main -stage compute -target hlsl
 //TEST:SIMPLE(filecheck=METAL): -entry main -stage compute -target metal
+//TEST:SIMPLE(filecheck=CUDA): -entry main -stage compute -target cuda
 
 RWStructuredBuffer<float> output;
 
@@ -51,4 +52,13 @@ void main()
     // METAL: ^ 3
     // METAL: quad_shuffle
     // METAL: quad_shuffle
+
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, (_getLaneId() & 0xFFFFFFFC) | ((1U) & 3))
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, (_getLaneId() & 0xFFFFFFFC) | ((1U) & 3))
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 1)
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 1)
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 2)
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 2)
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 3)
+    // CUDA: _waveShuffleMultiple({{.*}}, {{.*}}, _getLaneId() ^ 3)
 }
