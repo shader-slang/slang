@@ -241,7 +241,19 @@ jobs:
           # LLVM is required to run the filecheck
           echo "Checking llvm ..." && echo "$supportedBackends" | grep -q llvm
 
-          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]
+          if [[ "${{matrix.os}}" == "macos" ]]
+          then
+            for backend in metal
+            do
+              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
+            done
+
+            for api in 'mtl,metal'
+            do
+              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
+            done
+          else
+            if [[ "${{matrix.full-gpu-tests}}" == "true" ]]
           then
             for backend in fxc dxc glslang visualstudio genericcpp nvrtc metal tint # clang gcc
             do
@@ -256,19 +268,7 @@ jobs:
             echo "Printing CUDA compiler version: ..." && nvcc --version
             echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
             echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
-          fi
-
-          if [[ "${{matrix.os}}" == "macos" ]]
-          then
-            for backend in metal
-            do
-              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
-            done
-
-            for api in 'mtl,metal'
-            do
-              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
-            done
+            fi
           fi
 
       - name: Test Slang
