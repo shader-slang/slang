@@ -70,13 +70,13 @@ int getTypeBitSize(Type* t);
 // that can be used as lookup key in caches
 struct BasicTypeKey
 {
-    uint32_t baseType : 8;
-    uint32_t dim1 : 4;
-    uint32_t dim2 : 4;
-    uint32_t knownConstantBitCount : 8;
+    uint32_t baseType : 5;
+    uint32_t dim1 : 8;
+    uint32_t dim2 : 8;
+    uint32_t knownConstantBitCount : 6;
     uint32_t knownNegative : 1;
     uint32_t isLValue : 1;
-    uint32_t reserved : 6;
+    uint32_t reserved : 3;
     uint32_t getRaw() const
     {
         uint32_t val;
@@ -84,7 +84,7 @@ struct BasicTypeKey
         return val;
     }
     bool operator==(BasicTypeKey other) const { return getRaw() == other.getRaw(); }
-    static BasicTypeKey invalid() { return BasicTypeKey{0xff, 0, 0, 0, 0, 0, 0}; }
+    static BasicTypeKey invalid() { return BasicTypeKey{0x1f, 0, 0, 0, 0, 0, 0}; }
 };
 
 SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(
@@ -1069,6 +1069,18 @@ public:
         return result;
     }
 
+    // Setup the flag to indicate we're in a for-loop side effect context where comma operators are
+    // allowed
+    SemanticsContext withInForLoopSideEffect()
+    {
+        SemanticsContext result(*this);
+        result.m_inForLoopSideEffect = true;
+        return result;
+    }
+
+    bool getInForLoopSideEffect() { return m_inForLoopSideEffect; }
+
+
     TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
     SemanticsContext withEnclosingTryClauseType(TryClauseType tryClauseType)
@@ -1201,6 +1213,11 @@ protected:
     // 2. the logic expression is in the init expression of a static const variable.
     // 3. the logic expression is in an array size declaration.
     bool m_shouldShortCircuitLogicExpr = true;
+
+    // Flag to track when we're in a for-loop side effect expression where comma operators are
+    // allowed
+    bool m_inForLoopSideEffect = false;
+
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
@@ -1405,7 +1422,11 @@ public:
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
     /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
-    LookupResult resolveOverloadedLookup(LookupResult const& lookupResult);
+    LookupResult resolveOverloadedLookup(LookupResult const& lookupResult, Type* targetType);
+    inline LookupResult resolveOverloadedLookup(LookupResult const& lookupResult)
+    {
+        return resolveOverloadedLookup(lookupResult, nullptr);
+    }
 
     /// Attempt to resolve `expr` into an expression that refers to a single declaration/value.
     /// If `expr` isn't overloaded, then it will be returned as-is.
@@ -1417,26 +1438,40 @@ public:
     /// appropriate "ambiguous reference" error will be reported, and an error expression will be
     /// returned. Otherwise, the original expression is returned if resolution fails.
     ///
-    Expr* maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink);
+    Expr* maybeResolveOverloadedExpr(
+        Expr* expr,
+        LookupMask mask,
+        Type* targetType,
+        DiagnosticSink* diagSink);
+
+    inline Expr* maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink)
+    {
+        return maybeResolveOverloadedExpr(expr, mask, nullptr, diagSink);
+    }
 
     /// Attempt to resolve `overloadedExpr` into an expression that refers to a single
     /// declaration/value.
     ///
     /// Equivalent to `maybeResolveOverloadedExpr` with `diagSink` bound to the sink for the
     /// `SemanticsVisitor`.
-    Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask);
+    Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, Type* targetType, LookupMask mask);
+    inline Expr* resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask)
+    {
+        return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
+    }
 
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
         OverloadedExpr* overloadedExpr,
         LookupMask mask,
+        Type* targetType,
         DiagnosticSink* diagSink);
 
     void diagnoseAmbiguousReference(
         OverloadedExpr* overloadedExpr,
         LookupResult const& lookupResult);
     void diagnoseAmbiguousReference(Expr* overloadedExpr);
-
+    bool maybeDiagnoseAmbiguousReference(Expr* overloadedExpr);
 
     Expr* ExpectATypeRepr(Expr* expr);
 
@@ -2229,6 +2264,7 @@ public:
     void maybeInferArraySizeForVariable(VarDeclBase* varDecl);
 
     void validateArraySizeForVariable(VarDeclBase* varDecl);
+    void validateArrayElementTypeForVariable(VarDeclBase* varDecl);
 
     IntVal* getIntVal(IntegerLiteralExpr* expr);
 
@@ -2839,6 +2875,10 @@ public:
     void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
 
     void AddGenericOverloadCandidates(Expr* baseExpr, OverloadResolveContext& context);
+
+    // Given an argument list, expand all `expand` expressions, if the type/value pack being
+    // expanded is already specialized.
+    void maybeExpandArgList(List<Expr*>& args);
 
     template<class T>
     void trySetGenericToRayTracingWithParamAttribute(

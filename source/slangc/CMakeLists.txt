@@ -13,7 +13,6 @@ if(SLANG_ENABLE_SLANGC)
         LINK_WITH_PRIVATE
             core
             slang
-            Threads::Threads
             ${SLANG_GLSL_MODULE_DEPENDENCY}
         INSTALL
         EXPORT_SET_NAME SlangTargets

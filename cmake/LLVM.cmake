@@ -60,7 +60,7 @@ function(fetch_or_build_slang_llvm)
             endif()
         endif()
     elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-        find_package(LLVM 13.0 REQUIRED CONFIG)
+        find_package(LLVM 14.0 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
         llvm_target_from_components(llvm-dep filecheck native orcjit)
@@ -92,6 +92,10 @@ function(fetch_or_build_slang_llvm)
         )
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
+        set_target_properties(
+            slang-llvm
+            PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON
+        )
         add_supported_cxx_linker_flags(
             slang-llvm
             PRIVATE
@@ -104,7 +108,7 @@ function(fetch_or_build_slang_llvm)
         endif()
 
         # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
-        # directive for libLLVM-13.so, it's almost certainly going to break at
+        # directive for libLLVM-14.so, it's almost certainly going to break at
         # runtime in surprising ways when linked alongside Mesa (or anything else
         # pulling in libLLVM.so)
     endif()

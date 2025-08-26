@@ -42,6 +42,7 @@ struct ExecutionResult
 {
     String stdOut;
     String stdError;
+    String debugLayer;
     int32_t result = SLANG_OK;
     int32_t returnCode = 0; ///< As returned if invoked as command line
 

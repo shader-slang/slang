@@ -360,7 +360,7 @@ struct SpvLiteralBits
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string's nul-termination character (0), and
+        // > The final word contains the string’s nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
 
         // First work out the amount of words we'll need
@@ -1847,10 +1847,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRSizeAndAlignment sizeAndAlignment;
                         uint32_t stride;
 
-                        getNaturalSizeAndAlignment(
-                            m_targetProgram->getOptionSet(),
-                            valueType,
-                            &sizeAndAlignment);
+                        if (auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>())
+                        {
+                            auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
+                            getSizeAndAlignment(
+                                m_targetProgram->getOptionSet(),
+                                rule,
+                                valueType,
+                                &sizeAndAlignment);
+                        }
+                        else
+                        {
+                            getNaturalSizeAndAlignment(
+                                m_targetProgram->getOptionSet(),
+                                valueType,
+                                &sizeAndAlignment);
+                        }
                         uint64_t valueSize = sizeAndAlignment.size;
 
                         // Any unsized data type (e.g. struct or array) will have size of
@@ -2039,24 +2051,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
-                auto elementType = matrixType->getElementType();
-
-                // SPIR-V only supports floating-point matrices
-                // bool/int matrices should be lowered to
-                // arrays of vectors before reaching here
-                SLANG_ASSERT(!as<IRBoolType>(elementType));
-                SLANG_ASSERT(!as<IRIntType>(elementType));
-                SLANG_ASSERT(!as<IRUIntType>(elementType));
-
                 auto vectorSpvType = ensureVectorType(
-                    static_cast<IRBasicType*>(elementType)->getBaseType(),
+                    static_cast<IRBasicType*>(matrixType->getElementType())->getBaseType(),
                     static_cast<IRIntLit*>(matrixType->getColumnCount())->getValue(),
                     nullptr);
                 const auto columnCount =
                     static_cast<IRIntLit*>(matrixType->getRowCount())->getValue();
-                const auto columnCountSpv = SpvLiteralInteger::from32(int32_t(columnCount));
-                SpvInst* matrixSpvType = emitOpTypeMatrix(inst, vectorSpvType, columnCountSpv);
-                return matrixSpvType;
+                auto matrixSPVType = emitOpTypeMatrix(
+                    inst,
+                    vectorSpvType,
+                    SpvLiteralInteger::from32(int32_t(columnCount)));
+                return matrixSPVType;
             }
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
@@ -2626,7 +2631,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
-        // Vulkan spec 16.1: "The "Depth" operand of OpTypeImage is ignored."
+        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
         SpvWord depth =
             ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
@@ -3758,7 +3763,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3786,7 +3791,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
                         kIROp_HalfType)
                     {
-                        ensureExtensionDeclaration(toSlice("VK_NV_shader_atomic_float16_vector"));
+                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
                         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
                     }
                     break;
@@ -3967,6 +3972,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    SpvSelectionControlMask getSpvBranchSelectionControl(IRInst* inst)
+    {
+        if (inst->findDecorationImpl(kIROp_BranchDecoration))
+            return SpvSelectionControlDontFlattenMask;
+
+        if (inst->findDecorationImpl(kIROp_FlattenDecoration))
+            return SpvSelectionControlFlattenMask;
+
+        return SpvSelectionControlMaskNone;
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -4013,6 +4029,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_GetOffsetPtr:
             result = emitGetOffsetPtr(parent, inst);
+            break;
+        case kIROp_MeshOutputRef:
+            result = emitMeshOutputRef(parent, inst);
             break;
         case kIROp_GetElement:
             result = emitGetElement(parent, as<IRGetElement>(inst));
@@ -4274,7 +4293,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto ifelseInst = as<IRIfElse>(inst);
                 auto afterBlockID = getIRInstSpvID(ifelseInst->getAfterBlock());
-                emitOpSelectionMerge(parent, nullptr, afterBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    afterBlockID,
+                    getSpvBranchSelectionControl(ifelseInst));
                 auto falseLabel = ifelseInst->getFalseBlock();
                 result = emitOpBranchConditional(
                     parent,
@@ -4289,7 +4312,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto switchInst = as<IRSwitch>(inst);
                 auto mergeBlockID = getIRInstSpvID(switchInst->getBreakLabel());
-                emitOpSelectionMerge(parent, nullptr, mergeBlockID, SpvSelectionControlMaskNone);
+                emitOpSelectionMerge(
+                    parent,
+                    nullptr,
+                    mergeBlockID,
+                    getSpvBranchSelectionControl(switchInst));
                 result = emitInstCustomOperandFunc(
                     parent,
                     inst,
@@ -6142,6 +6169,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilitySampleRateShading);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSampleId, inst);
                 }
+                else if (semanticName == "sv_vulkansampleposition")
+                {
+                    requireSPIRVCapability(SpvCapabilitySampleRateShading);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInSamplePosition, inst);
+                }
                 else if (semanticName == "sv_stencilref")
                 {
                     requireSPIRVCapability(SpvCapabilityStencilExportEXT);
@@ -6190,11 +6222,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityFragmentBarycentricKHR);
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaryCoordKHR, inst);
 
-                    // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
-                    // we ought to use if the `noperspective` modifier has been
-                    // applied to this varying input.
+                    auto interpolationModeDecor =
+                        inst->findDecoration<IRInterpolationModeDecoration>();
+                    if (interpolationModeDecor &&
+                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordNoPerspKHR,
+                            inst);
+                    }
+                    else
+                    {
+                        return getBuiltinGlobalVar(
+                            inst->getFullType(),
+                            SpvBuiltInBaryCoordKHR,
+                            inst);
+                    }
                 }
                 else if (semanticName == "sv_cullprimitive")
                 {
@@ -6203,6 +6248,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return getBuiltinGlobalVar(
                         inst->getFullType(),
                         SpvBuiltInCullPrimitiveEXT,
+                        inst);
+                }
+                else if (semanticName == "sv_fragsize")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragSizeEXT, inst);
+                }
+                else if (semanticName == "sv_fraginvocationcount")
+                {
+                    requireSPIRVCapability(SpvCapabilityFragmentDensityEXT);
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_fragment_invocation_density"));
+                    return getBuiltinGlobalVar(
+                        inst->getFullType(),
+                        SpvBuiltInFragInvocationCountEXT,
                         inst);
                 }
                 else if (semanticName == "sv_shadingrate")
@@ -6913,6 +6975,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getFullType(),
             baseId,
             makeArray(inst->getIndex()));
+    }
+
+    SpvInst* emitMeshOutputRef(SpvInstParent* parent, IRInst* inst)
+    {
+        // MeshOutputRef takes two operands: the mesh output array and the index
+        // It should return a reference (address) to the element at that index
+        auto base = inst->getOperand(0);
+        auto index = inst->getOperand(1);
+
+        const SpvWord baseId = getID(ensureInst(base));
+
+        // Use OpAccessChain to get the address of the element
+        return emitOpAccessChain(parent, inst, inst->getFullType(), baseId, makeArray(index));
     }
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
@@ -7752,40 +7827,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, operands are raw elements, we need to construct row vectors first,
         // then construct matrix from row vectors.
         List<SpvInst*> rowVectors;
-
-        IRIntegerValue rowCount;
-        IRIntegerValue colCount;
-        IRType* elementType;
-
-        // Data type can be either matrix or vector depending on the
-        // legalization requirements
-        auto dataType = inst->getDataType();
-
-        if (auto matrixType = as<IRMatrixType>(dataType))
-        {
-            elementType = matrixType->getElementType();
-            rowCount = getIntVal(matrixType->getRowCount());
-            colCount = getIntVal(matrixType->getColumnCount());
-        }
-        else if (auto arrayType = as<IRArrayType>(dataType))
-        {
-            auto vectorType = as<IRVectorType>(arrayType->getElementType());
-            SLANG_ASSERT(vectorType);
-
-            elementType = vectorType->getElementType();
-            rowCount = getIntVal(arrayType->getElementCount());
-            colCount = getIntVal(vectorType->getElementCount());
-        }
-        else
-        {
-            SLANG_UNEXPECTED("data type for makeMatrix operation is "
-                             "expected be either a matrix or array type");
-        }
-
+        auto matrixType = cast<IRMatrixType>(inst->getDataType());
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto colCount = getIntVal(matrixType->getColumnCount());
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(elementType, colCount);
-
+        auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
         List<IRInst*> colElements;
         UInt index = 0;
         for (IRIntegerValue j = 0; j < rowCount; j++)
@@ -7910,10 +7957,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ArrayView<IRInst*> operands)
     {
         IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
-        SLANG_ASSERT(elementType);
-
         IRBasicType* basicType = as<IRBasicType>(elementType);
-        SLANG_ASSERT(basicType);
 
         SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
         if (opCode == SpvOpUndef)
@@ -7974,52 +8018,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_UNREACHABLE("Arithmetic op with 0 or more than 2 operands");
     }
 
-    // Helper method to handle composite arithmetic operations for matrices and arrays
-    SpvInst* emitCompositeArithmetic(
-        SpvInstParent* parent,
-        IRInst* inst,
-        IRIntegerValue rowCount,
-        IRIntegerValue colCount,
-        IRType* elementType,
-        IRType* resultType,
-        bool isMatrixType)
-    {
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        auto rowVectorType = builder.getVectorType(elementType, colCount);
-        List<SpvInst*> rows;
-
-        for (IRIntegerValue i = 0; i < rowCount; i++)
-        {
-            List<IRInst*> operands;
-            for (UInt j = 0; j < inst->getOperandCount(); j++)
-            {
-                auto originalOperand = inst->getOperand(j);
-                bool shouldExtract =
-                    isMatrixType ? as<IRMatrixType>(originalOperand->getDataType()) != nullptr
-                                 : as<IRArrayType>(originalOperand->getDataType()) != nullptr;
-
-                if (shouldExtract)
-                {
-                    auto operand = builder.emitElementExtract(originalOperand, i);
-                    emitLocalInst(parent, operand);
-                    operands.add(operand);
-                }
-                else
-                {
-                    operands.add(originalOperand);
-                }
-            }
-            rows.add(emitVectorOrScalarArithmetic(
-                parent,
-                nullptr,
-                rowVectorType,
-                inst->getOp(),
-                inst->getOperandCount(),
-                operands.getArrayView()));
-        }
-        return emitCompositeConstruct(parent, inst, resultType, rows);
-    }
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
@@ -8027,38 +8025,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
             auto colCount = getIntVal(matrixType->getColumnCount());
-            return emitCompositeArithmetic(
-                parent,
-                inst,
-                rowCount,
-                colCount,
-                matrixType->getElementType(),
-                inst->getDataType(),
-                true);
-        }
-        else if (const auto arrayType = as<IRArrayType>(inst->getDataType()))
-        {
-            // Only for legalization
-            auto arrayElementType = arrayType->getElementType();
-            SLANG_ASSERT(as<IRVectorType>(arrayElementType));
-
-            auto vectorType = as<IRVectorType>(arrayElementType);
-            auto elementType = vectorType->getElementType();
-            SLANG_ASSERT(
-                as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-                as<IRIntType>(elementType));
-
-            auto rowCount = getIntVal(arrayType->getElementCount());
-            auto colCount = getIntVal(vectorType->getElementCount());
-
-            return emitCompositeArithmetic(
-                parent,
-                inst,
-                rowCount,
-                colCount,
-                elementType,
-                inst->getDataType(),
-                false);
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+            List<SpvInst*> rows;
+            for (IRIntegerValue i = 0; i < rowCount; i++)
+            {
+                List<IRInst*> operands;
+                for (UInt j = 0; j < inst->getOperandCount(); j++)
+                {
+                    auto originalOperand = inst->getOperand(j);
+                    if (as<IRMatrixType>(originalOperand->getDataType()))
+                    {
+                        auto operand = builder.emitElementExtract(originalOperand, i);
+                        emitLocalInst(parent, operand);
+                        operands.add(operand);
+                    }
+                    else
+                    {
+                        operands.add(originalOperand);
+                    }
+                }
+                rows.add(emitVectorOrScalarArithmetic(
+                    parent,
+                    nullptr,
+                    rowVectorType,
+                    inst->getOp(),
+                    inst->getOperandCount(),
+                    operands.getArrayView()));
+            }
+            return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
         }
 
         Array<IRInst*, 4> operands;

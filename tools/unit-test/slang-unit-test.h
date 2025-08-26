@@ -37,6 +37,11 @@ public:
 
 ITestReporter* getTestReporter();
 
+namespace rhi
+{
+class IDebugCallback;
+}
+
 struct UnitTestContext
 {
     slang::IGlobalSession* slangGlobalSession;
@@ -44,6 +49,7 @@ struct UnitTestContext
     const char* executableDirectory;
     Slang::RenderApiFlags enabledApis;
     bool enableDebugLayers;
+    rhi::IDebugCallback* debugCallback = nullptr;
 };
 
 typedef void (*UnitTestFunc)(UnitTestContext*);

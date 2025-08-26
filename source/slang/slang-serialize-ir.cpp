@@ -4,6 +4,7 @@
 #include "core/slang-blob-builder.h"
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
@@ -269,11 +270,11 @@ struct IRSerialWriteContext;
 // Specialize to the reader/writer for the specific backend we're targeting
 // instead of ISerializerImpl to avoid some virtual function calls
 #if USE_RIFF
-using IRWriteSerializer = Serializer_<RIFFSerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer_<RIFFSerialReader, IRSerialReadContext>;
+using IRWriteSerializer = Serializer<RIFFSerialWriter, IRSerialWriteContext>;
+using IRReadSerializer = Serializer<RIFFSerialReader, IRSerialReadContext>;
 #else
-using IRWriteSerializer = Serializer_<Fossil::SerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer_<Fossil::SerialReader, IRSerialReadContext>;
+using IRWriteSerializer = Serializer<Fossil::SerialWriter, IRSerialWriteContext>;
+using IRReadSerializer = Serializer<Fossil::SerialReader, IRSerialReadContext>;
 #endif
 
 struct IRSerialWriteContext : SourceLocSerialContext
@@ -848,6 +849,8 @@ Result readSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
+    SLANG_PROFILE;
+
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
 
     //

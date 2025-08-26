@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -slang -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -vk -compute -output-using-type -shaderobj
-
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -cuda -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,8 +14,8 @@ struct Thing
     int bigArray[128];
 
     // Check that we are not inserting local variables that are copies of `this` parameter.
-    
-    // CHECK: __device__ int Thing_getSum{{.*}}(Thing{{.*}} * this{{.*}})
+
+    // CHECK: __device__ int Thing_getSum{{.*}}Thing{{.*}}*{{.*}}this{{.*}})
     // CHECK-NOT: Thing{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}
     // CHECK: }
     [constref]
@@ -32,7 +32,7 @@ struct Thing
 
 // Check that we are not inserting local variables that are copies of `thing` parameter.
 
-// CHECK: __device__ int test{{.*}}(Thing{{.*}} * thing{{.*}})
+// CHECK: __device__ int test{{.*}}Thing{{.*}}*{{.*}}thing{{.*}})
 // CHECK-NOT: Thing{{[a-zA-Z0-9_]*}} {{[a-zA-Z0-9_]+}}
 // CHECK: }
 

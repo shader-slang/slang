@@ -2,7 +2,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "v20[2-9][0-9].[0-9]*"
 
 name: ubuntu18-gcc11 Release
 jobs:

@@ -1,6 +1,7 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:SIMPLE(filecheck=DXIL):-target dxbc-assembly -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
@@ -34,6 +35,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %[[N4]] = OpLoad %int %[[N3]]
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
+    // CUDA: Array<RWStructuredBuffer<int>>  g_aoa_0;
+    // CUDA: globalParams_0->g_aoa_0[index_0 >> int(2)].GetDimensions
+    // CUDA: _S1[index_0 >> int(2)]
     int index = int(dispatchThreadID.x);
     
     int baseIndex = index >> 2;

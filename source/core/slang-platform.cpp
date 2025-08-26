@@ -18,6 +18,7 @@
 
 #if SLANG_LINUX_FAMILY
 #include <execinfo.h>
+#include <unistd.h>
 #endif
 
 namespace Slang
@@ -174,12 +175,27 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 }
 
 #else // _WIN32
-
 /* static */ SlangResult PlatformUtil::getInstancePath([[maybe_unused]] StringBuilder& out)
 {
-    // On non Windows it's typically hard to get the instance path, so we'll say not implemented.
-    // The meaning is also somewhat more ambiguous - is it the exe or the shared library path?
+#if defined(__linux__) || defined(__CYGWIN__)
+    char path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len == -1)
+    {
+        return SLANG_FAIL;
+    }
+
+    path[len] = '\0';
+    String pathString(path);
+
+    // We don't want the instance name, just the path to it
+    out.clear();
+    out.append(Path::getParentDirectory(pathString));
+
+    return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
+#else
     return SLANG_E_NOT_IMPLEMENTED;
+#endif
 }
 
 /* static */ SlangResult PlatformUtil::appendResult(

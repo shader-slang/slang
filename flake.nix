@@ -21,10 +21,23 @@
         # the latter brings in GCC by default on Linux.
         devShell = pkgs.mkShellNoCC {
           buildInputs = [
-            # Must put `clang-tools` before `clang` for clangd to work properly.
-            # We use `llvmPackages_17.clang-tools` instead of just `clang-tools`
-            # to match the `clang-format` version used in CI.
-            pkgs.llvmPackages_17.clang-tools
+            # We must list clangd before the `clang` package to make sure it
+            # comes earlier on the `PATH`, and we must get it from the
+            # `clang-tools` package so that it is wrapped properly.
+            (pkgs.linkFarm "clangd-21" [
+              {
+                name = "bin/clangd";
+                # New enough to support `HeaderInsertion: Never` in `.clangd`.
+                path = "${pkgs.llvmPackages_21.clang-tools}/bin/clangd";
+              }
+            ])
+            (pkgs.linkFarm "clang-format-17" [
+              {
+                name = "bin/clang-format";
+                # Match the clang-format version used in CI.
+                path = "${pkgs.llvmPackages_17.clang-tools}/bin/clang-format";
+              }
+            ])
 
             pkgs.clang
             pkgs.cmake
@@ -35,7 +48,14 @@
             pkgs.prettier
             pkgs.python3
             pkgs.shfmt
+            pkgs.vulkan-loader # Ensure this gets built to use in library path.
             pkgs.xorg.libX11
+          ];
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            # In addition to this, running the Vulkan tests on Linux distros
+            # other than NixOS may require the use of nixGL:
+            # https://github.com/nix-community/nixGL
+            pkgs.vulkan-loader
           ];
         };
       }

@@ -626,10 +626,22 @@ FIDDLE() namespace Slang
     typedef SyntaxClassBase ReflectClassInfo;
     typedef SyntaxClassBase ASTClassInfo;
 
+    enum class SyntaxClassInfoDebugVisType
+    {
+        Decl,
+        Expr,
+        Modifier,
+        Stmt,
+        Val,
+        Scope,
+        Unknown,
+    };
+
     struct SyntaxClassInfo
     {
     public:
         char const* name;
+        SyntaxClassInfoDebugVisType debugVisType;
         ASTNodeType firstTag;
         Count tagCount;
         void* (*createFunc)(ASTBuilder*);
@@ -1629,6 +1641,7 @@ FIDDLE() namespace Slang
     struct SpecializationArg
     {
         Val* val = nullptr;
+        Expr* expr = nullptr;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 

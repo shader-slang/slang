@@ -3740,6 +3740,7 @@ public:
     IRInOutType* getInOutType(IRType* valueType);
     IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
     IRConstRefType* getConstRefType(IRType* valueType);
+    IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
     IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
     IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);

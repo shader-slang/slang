@@ -2961,6 +2961,11 @@ IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
     return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
 }
 
+IRConstRefType* IRBuilder::getConstRefType(IRType* valueType, AddressSpace addrSpace)
+{
+    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, addrSpace);
+}
+
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
 {
     IRInst* operands[] = {type};
@@ -6013,14 +6018,14 @@ IRInst* IRBuilder::emitIfElseWithBlocks(
     outTrueBlock = createBlock();
     outAfterBlock = createBlock();
     outFalseBlock = createBlock();
+
     auto f = getFunc();
-    SLANG_ASSERT(f);
-    if (f)
-    {
-        f->addBlock(outTrueBlock);
-        f->addBlock(outAfterBlock);
-        f->addBlock(outFalseBlock);
-    }
+
+    SLANG_ASSERT(f && "Expected function");
+    f->addBlock(outTrueBlock);
+    f->addBlock(outAfterBlock);
+    f->addBlock(outFalseBlock);
+
     auto result = emitIfElse(val, outTrueBlock, outFalseBlock, outAfterBlock);
     setInsertInto(outTrueBlock);
     return result;
