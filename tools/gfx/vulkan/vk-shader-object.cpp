@@ -504,7 +504,6 @@ void ShaderObjectImpl::writeAccelerationStructureDescriptor(
             static_cast<AccelerationStructureImpl*>(resourceViews[i].Ptr());
         VkWriteDescriptorSetAccelerationStructureKHR writeAS = {};
         writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-        static const VkAccelerationStructureKHR nullHandle = VK_NULL_HANDLE;
         if (accelerationStructure)
         {
             writeAS.accelerationStructureCount = 1;
@@ -514,10 +513,9 @@ void ShaderObjectImpl::writeAccelerationStructureDescriptor(
         {
             // The Vulkan spec states: If the nullDescriptor feature is not enabled, each element of
             // pAccelerationStructures must not be VK_NULL_HANDLE
-            if (!context.device->m_api.m_extendedFeatures.robustness2Features.nullDescriptor)
-            {
-                continue;
-            }
+            SLANG_ASSERT(context.device->m_api.m_extendedFeatures.robustness2Features.nullDescriptor);
+
+            static const VkAccelerationStructureKHR nullHandle = VK_NULL_HANDLE;
             writeAS.accelerationStructureCount = 1;
             writeAS.pAccelerationStructures = &nullHandle;
         }
