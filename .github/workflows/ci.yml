@@ -84,6 +84,11 @@ jobs:
             runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
+          # Enable GPU tests for macOS release
+          - os: macos
+            config: release
+            full-gpu-tests: true
+            has-gpu: true
           # Enable debug layers for all by default
           - enable-debug-layers: true
       fail-fast: false
@@ -166,7 +171,7 @@ jobs:
         run: ./extras/check-inst-version-changes.sh
 
       - name: Upload IR version check results
-        if: ${{ steps.check-versions.outputs.artifact_created == 'true' }}
+        if: ${{ steps.check-ir-versions.outputs.artifact_created == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ir-version-check-results
@@ -328,36 +333,34 @@ jobs:
       - name: Run slangpy tests
         # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
-        shell: pwsh
         run: |
           python --version
-          Write-Host "Cleaning up existing installations and installing slangpy..."
-          try {
-            $SLANGPY_LOCATION = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
-            Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
-            if (Test-Path $SLANGPY_LOCATION) {
-              Write-Host "Removing existing slangpy directory at: $SLANGPY_LOCATION"
-              Remove-Item -Path $SLANGPY_LOCATION -Recurse -Force
-            }
-          } catch {
-            Write-Host "slangpy not found or already removed"
-          }
+          echo "Cleaning up existing installations and installing slangpy..."
+          
+          # Try to uninstall existing slangpy
+          python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+          
+          # Install slangpy
           python -m pip install --verbose slangpy --user
-          $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
-          $bin_dir = $env:bin_dir -replace '^/c/', 'C:\' -replace '/', '\'
-          Write-Host "Site packages directory: $SITE_PACKAGES"
-          Write-Host "bin_dir location: $bin_dir"
-          try {
-            Copy-Item -Path "$bin_dir\slang*.dll" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Stop
-          } catch {
-            Write-Error "Failed to copy library files: $_"
-            exit 1
-          }
-          Write-Host "Listing files in slangpy directory..."
-          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
-          Write-Host "Running pytest on slangpy tests..."
-          $env:PYTHONPATH = "$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
+          
+          # Get site packages directory
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          
+          # Copy library files
+          if [[ "${{matrix.os}}" == "windows" ]]; then
+            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          else
+            cp "$bin_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          fi
+          
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+          
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -v
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
