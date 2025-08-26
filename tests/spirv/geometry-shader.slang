@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK):-entry gsMain -stage geometry -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=DEBUGINFO):-entry gsMain -stage geometry -target spirv -emit-spirv-directly -g2
 
 struct GsOut
 {
@@ -20,6 +21,11 @@ struct GsOut
 // CHECK: OpStore %gl_Position
 // CHECK: OpEmitVertex
 // CHECK: OpEndPrimitive
+
+// Entry point params should be emitted as local-variable debug info
+// DEBUGINFO: %[[outStr:[0-9]+]] = OpString "outStream"
+// DEBUGINFO: %[[outId:[a-zA-Z0-9_]+]] = {{.*}} DebugLocalVariable %[[outStr]]
+// DEBUGINFO: DebugValue %[[outId]]
 
 [maxvertexcount(15)]
 void gsMain(uint triIdx : SV_PrimitiveID, inout TriangleStream<GsOut> outStream)
