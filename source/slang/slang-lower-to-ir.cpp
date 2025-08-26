@@ -3251,7 +3251,7 @@ struct IRLoweringParameterInfo
     /// of the parameter is non-copyable and the default implementation of the declared
     /// direction isn't compatible with non-copyable types.
     ///
-    ParameterDirection actualParameterPassingMode = kParameterDirection_In;
+    ParameterDirection actualParameterPassingMode = ParameterPassingMode::Default;
 
     /// The parameter-passing mode ("direction") as it was declared in the user's code.
     ///
@@ -3260,7 +3260,7 @@ struct IRLoweringParameterInfo
     /// on the declaration that has the implicit `this` parameter, as well as its enclosing
     /// type declaration.
     ///
-    ParameterDirection nominalParameterPassingMode = kParameterDirection_In;
+    ParameterDirection nominalParameterPassingMode = ParameterPassingMode::Default;
 
     // The variable/parameter declaration for
     // this parameter (if any)
