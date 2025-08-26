@@ -89,6 +89,7 @@ jobs:
             config: release
             full-gpu-tests: true
             has-gpu: true
+            server-count: 3
           # Enable debug layers for all by default
           - enable-debug-layers: true
       fail-fast: false
