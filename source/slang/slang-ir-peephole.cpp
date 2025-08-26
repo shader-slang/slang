@@ -3,8 +3,8 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-short-string.h"
 #include "slang-ir-sccp.h"
-#include "slang-ir-short-string.h"
 #include "slang-ir-util.h"
 
 namespace Slang

@@ -1775,15 +1775,15 @@ struct ShortString : IArray<uint>
     /// Get the number of bytes in the string.
     /// @return The number of bytes in the string.
     /// @remarks Does not count the implicit null terminator.
-    property uint length
+    property int length
     {
-        [__unsafeForceInlineEarly] get { return (uint)getCount(); }
+        [__unsafeForceInlineEarly] get { return (int)getCount(); }
     }
 
     /// Get the i-th byte of the string.
-    /// @param i The index of the byte. Must be strictly less than `N`.
+    /// @param i The index of the byte. Must satisfy: 0 <= i < N.
     /// @return The byte in the lower 8 bits. The remaining 24 high bits are guaranteed to be zero.
-    __subscript(uint i) -> uint
+    __subscript(int i) -> uint
     {
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_GetCharFromString)) get;
     }

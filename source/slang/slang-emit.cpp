@@ -84,6 +84,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
+#include "slang-ir-lower-short-string.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
@@ -96,7 +97,6 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
-#include "slang-ir-short-string.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
@@ -753,10 +753,6 @@ Result linkAndOptimizeIR(
          target == CodeGenTarget::CSource);
     shortStrOptions.targetSupports8BitsIntegrals =
         (target != CodeGenTarget::WGSL && target != CodeGenTarget::HLSL);
-    if (requiredLoweringPassSet.shortString)
-    {
-        lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
-    }
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
     // opt out of debug info.
@@ -1034,6 +1030,11 @@ Result linkAndOptimizeIR(
                 changed |= processAutodiffCalls(targetProgram, irModule, sink);
             }
             dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
+        }
+
+        if (requiredLoweringPassSet.shortString)
+        {
+            lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
         }
 
         if (!changed)

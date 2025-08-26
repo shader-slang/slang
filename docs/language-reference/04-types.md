@@ -313,7 +313,7 @@ The C-style layout of an array type differs from the standard layout in that the
 
 The D3D constant buffer layout of an array differs from the standard layout in that the element stride of the array is set to the smallest multiple of the alignment of `T` that is not less than the stride of `T`
 
-ShortString
+ShortString (experimental)
 -----------
 
 String literals of `N` bytes are typed with `ShortString<N>`.

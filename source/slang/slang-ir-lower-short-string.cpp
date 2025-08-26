@@ -1,4 +1,4 @@
-#include "slang-ir-short-string.h"
+#include "slang-ir-lower-short-string.h"
 
 #include "slang-ir-inst-pass-base.h"
 
@@ -194,17 +194,19 @@ struct ShortStringLoweringPass : InstPassBase
             }
             else
             {
+                auto charIndex = getChar->getIndex();
+                charIndex = builder.emitCast(builder.getUIntType(), charIndex);
                 // The short string is stored as a packed u32 array
                 // str[i] := bitfieldExtract(str_u32_packed_array[i / 4], (i % 4) * 8, 8);
                 // i / 4 := i >> 2
                 auto u32Index = builder.emitShr(
                     builder.getUIntType(),
-                    getChar->getIndex(),
+                    charIndex,
                     builder.getIntValue(builder.getUIntType(), 2));
                 // i % 4 != i & 0b11
                 auto indexInU32 = builder.emitBitAnd(
                     builder.getUIntType(),
-                    getChar->getIndex(),
+                    charIndex,
                     builder.getIntValue(builder.getUIntType(), 0b11));
                 // (i % 4) * 8 := (i % 4) << 3
                 auto bitIndex = builder.emitShl(
