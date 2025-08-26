@@ -22,6 +22,16 @@ struct LowerCombinedSamplerContext
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
+    IRTextureTypeBase* findCombinedTextureSamplerTypeInArray(IRInst* type, IRUse*& firstUse)
+    {
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            firstUse = arrayType->firstUse;
+            return findCombinedTextureSamplerTypeInArray(arrayType->getElementType(), firstUse);
+        }
+        return as<IRTextureTypeBase>(type);
+    }
+
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(textureType))
@@ -115,12 +125,19 @@ void lowerCombinedTextureSamplers(
     // Lower combined texture sampler type into a struct type.
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto textureType = as<IRTextureTypeBase>(globalInst);
+        IRUse* firstUse = nullptr;
+        auto textureType = context.findCombinedTextureSamplerTypeInArray(globalInst, firstUse);
+
         if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
             continue;
         auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
 
-        for (auto use = textureType->firstUse; use; use = use->nextUse)
+        if (!firstUse)
+        {
+            firstUse = textureType->firstUse;
+        }
+
+        for (auto use = firstUse; use; use = use->nextUse)
         {
             auto typeUser = use->getUser();
             if (use != &typeUser->typeUse)
@@ -129,12 +146,25 @@ void lowerCombinedTextureSamplers(
             auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>();
             if (!layoutDecor)
                 continue;
-            // Replace the original VarLayout with the new StructTypeVarLayout.
+
             auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
             if (!varLayout)
                 continue;
             IRBuilder subBuilder(typeUser);
-            IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
+
+            auto oldTypeLayout = varLayout->getTypeLayout();
+            IRTypeLayout* newTypeLayout = typeInfo.typeLayout;
+
+            // If the user of the type is an array, then we update the element layout
+            // to use the new StructTypeVarLayout. Otherwise, we replace the VarLayout
+            // with the new StructTypeVarLayout.
+            if (as<IRArrayTypeLayout>(oldTypeLayout))
+            {
+                newTypeLayout =
+                    IRArrayTypeLayout::Builder(&subBuilder, typeInfo.typeLayout).build();
+            }
+
+            IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, newTypeLayout);
             newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
             IRVarOffsetAttr* resOffsetAttr = nullptr;
             IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
