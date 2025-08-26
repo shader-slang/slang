@@ -142,12 +142,12 @@ option(
 )
 option(
     SLANG_ENABLE_TESTS
-    "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
+    "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
 )
 option(
     SLANG_ENABLE_EXAMPLES
-    "Enable example targets, requires SLANG_ENABLE_GFX"
+    "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
@@ -399,8 +399,8 @@ if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
     message(SEND_ERROR "SLANG_ENABLE_NVAPI is only supported on Windows")
 endif()
 
-if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_GFX)
-    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_GFX")
+if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_SLANG_RHI)
+    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_SLANG_RHI")
 endif()
 
 #
