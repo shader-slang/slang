@@ -623,6 +623,7 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
             HashSet<IRInst*> processed; // Track processed instructions to avoid infinite loops
             
             worklist.add(startInst);
+			// Process all users of the current instruction
 
             while (worklist.getCount() > 0) {
                 auto currentInst = worklist.getLast();
@@ -633,8 +634,15 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 }
                 processed.add(currentInst);
 
-                // Process all users of the current instruction
+                // Collect all uses first to avoid modification during iteration
+                List<IRUse*> usesToProcess;
                 for (auto use = currentInst->firstUse; use; use = use->nextUse)
+                {
+                    usesToProcess.add(use);
+                }
+
+                // Process all users of the current instruction
+                for (auto use : usesToProcess)
                 {
                     auto userInstruction = use->getUser();
                     if (processed.contains(userInstruction)) {
