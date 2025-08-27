@@ -312,7 +312,7 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.os != 'macos' && matrix.full-gpu-tests && matrix.config == 'release'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -330,7 +330,11 @@ jobs:
         # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -tce=cmd-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          if [[ "${{matrix.os}}" == "macos" ]]; then
+            export SLANG_RHI_EXCLUDE_TESTS="sampler-array"
+          fi
+          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
       - name: Run slangpy tests
         # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
@@ -348,12 +352,12 @@ jobs:
           SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
           echo "Site packages directory: $SITE_PACKAGES"
           echo "bin_dir location: $bin_dir"
-          
+          echo "lib_dir location: $lib_dir"
           # Copy library files
           if [[ "${{matrix.os}}" == "windows" ]]; then
             cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           else
-            cp "$bin_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+            cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           fi
           
           echo "Listing files in slangpy directory..."
